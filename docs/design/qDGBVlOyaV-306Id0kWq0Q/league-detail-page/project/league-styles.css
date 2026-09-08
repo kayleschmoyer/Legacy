@@ -8,9 +8,11 @@
    exactly one designed layout — nothing is left to invented thresholds.
 
      Band   Range           Layout tier                              Frame
-     xxs    0–659px         @659 + @799 + @859 + @979 (most compact)  fully designed; @390 adds one scoped
-                                                                       .ls-player-row override (Tamagui $xxs,
-                                                                       LS-9419) — full sub-660 coverage is LS-9418
+     xxs    0–659px         @659 + @799 + @859 + @979 (most compact)  fully designed down to 660px; @390 is
+                                                                       its own fully designed 375px frame
+                                                                       (Tamagui $xxs, LS-9906) — page/hero/
+                                                                       snapshot density steps down once more
+                                                                       and folds in the LS-9419 player-row fix
      xs     660–799px       @799 + @859 + @979 (stacked, no @659)     shares xxs's mobile chrome, hero less compressed
      sm     800–859px       @859 + @979 (no @799/@659)                nav tabs hidden, mobile padding
      md     860–979px       @979 only                                 overview grid → 1-col, snapshot → 3-col
@@ -646,9 +648,12 @@ input, textarea, select { font-family: inherit; }
      not decoration, once the visible label is hidden here. */
   .ls-chip-commish-label { display: none; }
 }
-/* BREAKPOINTS: serves xxs only (0–659px, strictly below xs's 660px
-   start) — the fully designed 375px frame: tightest padding, smallest
-   crest, and the smallest hero heading size. */
+/* BREAKPOINTS: serves the whole xxs band (0–659px, strictly below xs's
+   660px start) — the baseline compact layout: tighter padding, smaller
+   crest, and the smallest hero heading size shared by every xxs width.
+   The bottom of the band (≤390px) layers one further density step on
+   top of this — see the @390 block below for what changes again at true
+   phone width. */
 @media (max-width: 659px) {
   .ls-page { padding: 12px 10px 48px; }
   .ls-hero { padding: 14px 14px; }
@@ -659,13 +664,23 @@ input, textarea, select { font-family: inherit; }
   .ls-snapshot { grid-template-columns: 1fr 1fr; }
 }
 /* BREAKPOINTS: serves Tamagui's `$xxs` (≤390px) — the smallest-phone tier,
-   below every band in the table above (LS-9418 tracks giving this prototype
-   full sub-660 coverage; this is the one scoped override needed for the
-   `.ls-player-row` action-wrapping fix below, not a general xxs pass). Steps
-   `.ls-player-row`'s gap/padding down one space token so its own action row
-   (`.ls-player-actions`, already isolated onto its own grid row by the 859
-   tier above) has room to stay on a single line down to 320px. */
+   and this prototype's own fully designed 375px frame (LS-9906 closes the
+   gap LS-9418 flagged: the page previously reused the 659px tier verbatim
+   all the way down to 0, so nothing distinguished a 375px phone from a
+   650px one). One more step down the density ladder from the 659px tier
+   above: page/hero padding drop a further space token, the hero heading
+   and snapshot stat values shrink again, and the meta grid's gap tightens
+   so an iPhone-SE-width column doesn't collide with itself. The
+   `.ls-player-row` action-wrapping fix from LS-9419 is folded in here
+   rather than kept as a separate scoped rule. */
 @media (max-width: 390px) {
+  .ls-page { padding: 10px 8px 44px; }
+  .ls-hero { padding: 12px 10px; }
+  .ls-hero h1 { font-size: 19px; }
+  .ls-hero-meta { gap: 8px 14px; }
+  .ls-hero-metaitem .value { font-size: 12px; }
+  .ls-snapshot .ls-snap-stat { padding: 12px 10px; }
+  .ls-snapshot .ls-snap-stat .value { font-size: 22px; }
   .ls-player-row { gap: 8px; padding: 8px 10px; }
   .ls-player-slot { min-width: 32px; }
   .ls-player-actions { flex-wrap: nowrap; flex-shrink: 0; }

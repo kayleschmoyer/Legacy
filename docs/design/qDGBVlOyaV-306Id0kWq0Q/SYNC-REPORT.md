@@ -7,6 +7,25 @@
 **Files**: 90
 **Source**: `designsync-local` (LS-8974)
 
+## LS-9906: Sub-660px narrow tier (2026-09-08)
+
+LS-9418 (design-coverage audit) singled this bundle out: its own `league-styles.css` header
+comment claimed a "fully designed 375px frame," but the `@media (max-width: 659px)` tier was
+reused verbatim all the way down to 0px — nothing distinguished a 375px phone from a 650px
+one, and the only override actually scoped below 659px was LS-9419's single `.ls-player-row`
+fix at `@390`.
+
+**Fix applied directly to this repo bundle** (same cloud-session constraint as LS-9091 above —
+`DesignSync` is unavailable here; a follow-up local session should `/push-design` this and
+`/pull-design` back to reconcile the source). `@media (max-width: 390px)` in
+`league-styles.css` is now a genuine further density step, not just the player-row scoping:
+page/hero padding, the hero heading, and the snapshot stat values all shrink one step further
+than the `@659` tier, and the hero-meta grid's gap tightens. The LS-9419 player-row fix is
+folded into this same block. Header comment tables in `league-styles.css` and
+`project/CLAUDE.md` updated to describe the `@390` tier accurately instead of claiming the
+`@659` tier alone was the "375px frame." `docs/design/manifest.json`'s `lastSyncedHash`
+resynced via `node scripts/hash-design-bundle.mjs`.
+
 ## LS-9091: Breakpoints coverage fix (2026-08-09)
 
 LS-9024 audited all synced design bundles against `docs/agents/pages/PROMPT.md`'s Breakpoints

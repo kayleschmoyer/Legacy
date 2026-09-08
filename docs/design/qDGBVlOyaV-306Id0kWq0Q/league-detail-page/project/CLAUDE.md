@@ -46,3 +46,14 @@ example behind the app-wide "cut repeated content" rule.
   text is wrapped in `.ls-chip-commish-label` and hidden there, but the chip carries
   `aria-label="Commissioner"` so it still reads as a role, not decoration. No `::after`/`::before`
   hit-area technique was introduced — the badge isn't interactive, so it has no hit target to size.
+
+## Resolved gaps (LS-9906)
+
+Before this ticket, the prototype's `@390` tier was scoped to the single `.ls-player-row`
+fix above — everything else below 660px just reused the `@659` tier verbatim, so nothing in
+the prototype actually distinguished a 375px phone from a 650px one, despite this file's own
+header comment claiming a "fully designed 375px frame." `@media (max-width: 390px)` in
+`league-styles.css` is now a real further density step (one more step down the ladder from
+`@659`): page/hero padding, the hero heading, and the snapshot stat values all shrink again,
+and the hero-meta grid's gap tightens. The `.ls-player-row` fix from LS-9419 is folded into
+this same block rather than kept separate.
