@@ -38,6 +38,7 @@ import {
   type GetPositionsForLeagueQueryVariables,
   Sport,
 } from '@legacy-sports/graphql';
+import { isUpstreamUnreachableError } from '../../leagues/submitError';
 import type {
   AvailableDraftPlayer,
   CurrentDraftPickInfo,
@@ -186,11 +187,20 @@ export function useDraftQueries({
     const isForbidden =
       CombinedGraphQLErrors.is(draftError) &&
       draftError.errors.some((e) => e.extensions?.['code'] === 'FORBIDDEN');
+    // A 502/503/504 is the same transient upstream-gateway blip the shared
+    // apollo-client errorLink already excludes from Rollbar — but this query
+    // reads `error` directly off useQuery rather than going through that
+    // link's captureError call, so it needs the same check applied locally
+    // (LS-9492: this query kept flooding Rollbar with gateway timeouts on
+    // the draft board after the league-create submit handlers were fixed).
+    const isUpstreamUnreachable = isUpstreamUnreachableError(draftError);
     if (isForbidden) {
       LOGGER.warn(
         '[Draft] getLeagueDraft: user lost league access',
         draftError,
       );
+    } else if (isUpstreamUnreachable) {
+      LOGGER.warn('[Draft] getLeagueDraft: upstream unreachable', draftError);
     } else {
       LOGGER.error('[Draft] getLeagueDraft error:', draftError);
     }

@@ -71,9 +71,11 @@ export function isPremiumRequiredError(error: unknown): boolean {
  * True for the upstream-gateway-unreachable family (502/503/504) — mirrors
  * the `isUpstreamUnreachable` check in apollo-client.ts's shared `errorLink`,
  * which deliberately does not report these to Rollbar since they're transient
- * infra blips rather than actionable bugs. The league-create submit handlers
- * bypass that shared link (`errorPolicy: 'none'` + `suppressGlobalError`), so
- * callers here must apply the same policy themselves (LS-9492).
+ * infra blips rather than actionable bugs. Any caller that reads a query or
+ * mutation's `error` directly instead of going through that shared link (e.g.
+ * the league-create submit handlers' `errorPolicy: 'none'` +
+ * `suppressGlobalError`, or useDraftQueries' `getLeagueDraft` query) must
+ * apply the same policy itself (LS-9492).
  */
 export function isUpstreamUnreachableError(error: unknown): boolean {
   return (

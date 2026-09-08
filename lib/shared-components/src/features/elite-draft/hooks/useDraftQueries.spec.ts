@@ -10,6 +10,7 @@
  * Android. `isCompact: true` must keep the query mounted for a live draft.
  */
 import { renderHook } from '@testing-library/react';
+import { ServerError } from '@apollo/client';
 import { useDraftQueries } from './useDraftQueries';
 
 // Variable and helper names are prefixed `mock` — Jest's module-factory
@@ -23,6 +24,24 @@ const mockRecordedCalls: {
   operationName: string | undefined;
   options: { skip?: boolean } | undefined;
 }[] = [];
+
+// Settable by individual tests (LS-9492) to simulate a `getLeagueDraft`
+// query failure without needing a real Apollo error shape per case.
+let mockDraftError: unknown;
+
+const mockLoggerError = jest.fn();
+const mockLoggerWarn = jest.fn();
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    warn: (...args: unknown[]): void => {
+      mockLoggerWarn(...args);
+    },
+    error: (...args: unknown[]): void => {
+      mockLoggerError(...args);
+    },
+    info: jest.fn(),
+  },
+}));
 
 function mockOperationName(document: {
   definitions: readonly { kind: string; name?: { value: string } }[];
@@ -49,9 +68,11 @@ jest.mock('@apollo/client/react', () => ({
     }
     if (opName === 'GetLiveDraftLeagueDraft') {
       return {
-        data: { getLeagueDraft: { id: 99, selectionMethod: 'snake' } },
+        data: mockDraftError
+          ? undefined
+          : { getLeagueDraft: { id: 99, selectionMethod: 'snake' } },
         loading: false,
-        error: undefined,
+        error: mockDraftError,
         refetch: jest.fn(),
       };
     }
@@ -64,6 +85,15 @@ jest.mock('@apollo/client/react', () => ({
   },
 }));
 
+function makeServerError(statusCode: number): ServerError {
+  // The jest env here has no global `Response`; ServerError only reads
+  // `response.status`, so a minimal stand-in is sufficient.
+  return new ServerError('Response not successful', {
+    response: { status: statusCode } as Response,
+    bodyText: '',
+  });
+}
+
 function draftTeamOrderSkip(): boolean | undefined {
   const call = mockRecordedCalls.find(
     (c) => c.operationName === 'GetDraftTeamOrder',
@@ -74,6 +104,7 @@ function draftTeamOrderSkip(): boolean | undefined {
 describe('useDraftQueries — GET_DRAFT_TEAM_ORDER skip gating', () => {
   beforeEach(() => {
     mockRecordedCalls.length = 0;
+    mockDraftError = undefined;
   });
 
   it('mounts the team-order query for the compact/native board during a live draft', () => {
@@ -116,5 +147,60 @@ describe('useDraftQueries — GET_DRAFT_TEAM_ORDER skip gating', () => {
     );
 
     expect(draftTeamOrderSkip()).toBe(false);
+  });
+});
+
+// LS-9492 (reopened) — the `getLeagueDraft` query on the draft board kept
+// unconditionally LOGGER.error-ing a transient upstream-gateway 504, which
+// RollbarOutputDestination forwards to Rollbar for every error/fatal log —
+// the same class of bug the league-create submit handlers were fixed for,
+// but in this unrelated third code path.
+describe('useDraftQueries — getLeagueDraft error log level (LS-9492)', () => {
+  beforeEach(() => {
+    mockRecordedCalls.length = 0;
+    mockDraftError = undefined;
+    mockLoggerError.mockClear();
+    mockLoggerWarn.mockClear();
+  });
+
+  it.each([502, 503, 504])(
+    'logs a %d getLeagueDraft ServerError at warn, not error',
+    (statusCode) => {
+      mockDraftError = makeServerError(statusCode);
+
+      renderHook(() =>
+        useDraftQueries({
+          leagueId: 1,
+          playerSearch: '',
+          selectedPosition: '',
+          viewMode: 'grid',
+        }),
+      );
+
+      expect(mockLoggerError).not.toHaveBeenCalled();
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        '[Draft] getLeagueDraft: upstream unreachable',
+        mockDraftError,
+      );
+    },
+  );
+
+  it('still logs a non-gateway getLeagueDraft ServerError at error', () => {
+    mockDraftError = makeServerError(500);
+
+    renderHook(() =>
+      useDraftQueries({
+        leagueId: 1,
+        playerSearch: '',
+        selectedPosition: '',
+        viewMode: 'grid',
+      }),
+    );
+
+    expect(mockLoggerWarn).not.toHaveBeenCalled();
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      '[Draft] getLeagueDraft error:',
+      mockDraftError,
+    );
   });
 });
