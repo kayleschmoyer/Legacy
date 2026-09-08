@@ -14,7 +14,14 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 test.describe('About Page @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');
-    await page.waitForLoadState('load');
+    // LS-9918: gate on the About route having *rendered*, not on the document
+    // 'load' event. /about is lazy-loaded, so 'load' resolves before the
+    // component mounts — every negative assertion in this describe would then
+    // pass vacuously against an empty DOM (same failure mode as LS-9839 /
+    // LS-9847).
+    await expect(
+      page.getByRole('heading', { name: /about legacy sports/i }),
+    ).toBeVisible();
   });
 
   test('renders the About Legacy Sports heading', async ({ page }) => {
@@ -53,10 +60,19 @@ test.describe('About Page @smoke', () => {
     await expect(page.getByText('Environment:')).toBeVisible();
   });
 
-  test('does not expose GraphQL API URL in production build', async ({
+  // LS-9918: the previous assertion was `getByText('GraphQL API:')` +
+  // `.not.toBeVisible()`. AboutPage renders that *label* unconditionally and
+  // gates only the value (`showGraphqlUrl = env.isDev`), so the assertion
+  // contradicted the component and only passed because the lazy route had not
+  // mounted yet. The E2E suite serves the production `nx build web` output via
+  // `vite preview`, so `import.meta.env.DEV` is false and the value must be
+  // the placeholder. Assert that instead — the actual contract.
+  test('hides the GraphQL API URL behind a placeholder in a production build', async ({
     page,
   }) => {
-    await expect(page.getByText('GraphQL API:')).not.toBeVisible();
+    await expect(page.getByTestId('build-info-graphql-value')).toHaveText(
+      '(hidden in production)',
+    );
   });
 
   test('shows a View on GitHub button', async ({ page }) => {
@@ -87,7 +103,11 @@ unauthTest.describe('About page — unauthenticated visitor @regression', () => 
     '"Get Started Free" CTA is visible and interactive on /about for unauthenticated users',
     async ({ page }) => {
       await page.goto('/about');
-      await page.waitForLoadState('load');
+      // LS-9918: gate on the lazy /about route having rendered before
+      // locating anything on it.
+      await expect(
+        page.getByRole('heading', { name: /about legacy sports/i }),
+      ).toBeVisible({ timeout: 15_000 });
 
       const getStartedBtn = page.getByRole('button', {
         name: /get started free/i,
@@ -166,8 +186,10 @@ test.describe('About page — scoreboard ticker navigation @regression', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     await page.goto('/about');
-    await page.waitForLoadState('load');
 
+    // LS-9918: the ticker assertion below is already a positive render gate,
+    // so no `waitForLoadState('load')` is needed (and it would not gate the
+    // lazy /about route anyway).
     // The ticker must be visible before we try to click inside it.
     await expect(page.getByTestId('scoreboard-ticker')).toBeVisible();
 
@@ -200,7 +222,12 @@ test.describe('About page — scoreboard ticker navigation @regression', () => {
 unauthTest.describe('About page — unauthenticated visitor @regression', () => {
   unauthTest.beforeEach(async ({ page }) => {
     await page.goto('/about');
-    await page.waitForLoadState('load');
+    // LS-9918: same render gate as the @smoke describe — without it the
+    // "does not show the marketing landing page" negative assertion below
+    // passes vacuously against a not-yet-mounted lazy route.
+    await expect(
+      page.getByRole('heading', { name: /about legacy sports/i }),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   unauthTest(
