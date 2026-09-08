@@ -338,10 +338,15 @@ export async function ec2ConsoleOutput(
     const output = await runCommand('aws', args, repoRoot);
     const data = JSON.parse(output) as ConsoleOutputResponse;
 
-    // AWS returns the output base64-encoded
-    const rawOutput = data.Output
-      ? Buffer.from(data.Output, 'base64').toString('utf-8')
-      : null;
+    // The EC2 API returns Output base64-encoded, but the AWS CLI decodes it
+    // for us before we ever see it (a built-in CLI customization that runs
+    // regardless of --output format, not just --output text) — see
+    // https://docs.aws.amazon.com/cli/latest/reference/ec2/get-console-output.html.
+    // `data.Output` here is already plain text; re-running it through
+    // Buffer.from(..., 'base64') treats decoded text as base64 and produces
+    // mojibake (replacement characters interleaved with ESC sequences) on
+    // any output containing bytes outside the base64 alphabet, which is most
+    // real kernel/cloud-init logs.
 
     return {
       content: [
@@ -351,7 +356,7 @@ export async function ec2ConsoleOutput(
             ok: true,
             instanceId: data.InstanceId,
             timestamp: data.Timestamp ?? null,
-            output: rawOutput ?? '(no console output available)',
+            output: data.Output ?? '(no console output available)',
           }),
         },
       ],

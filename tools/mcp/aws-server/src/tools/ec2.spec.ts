@@ -5,6 +5,7 @@ jest.mock('../run-command.js', () => ({
 
 import { runCommand } from '../run-command.js';
 import {
+  ec2ConsoleOutput,
   ec2DescribeImage,
   ec2Instances,
   ec2LaunchTemplateInspect,
@@ -104,6 +105,53 @@ describe('ec2DescribeImage', () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.imageId).toBe('ami-0123456789abcdef0');
     expect(parsed.tags).toEqual({ PlaywrightVersion: '1.50.0' });
+  });
+});
+
+describe('ec2ConsoleOutput', () => {
+  it('passes the CLI-decoded Output straight through (no re-decode as base64)', async () => {
+    // The AWS CLI's get-console-output customization already base64-decodes
+    // Output for every --output format, so `aws ec2 get-console-output
+    // --output json` hands back plain text here — including bytes (ESC
+    // sequences, high-bit chars from a Nitro console) that are not valid
+    // base64. Re-running this through Buffer.from(text, 'base64') is what
+    // produced the LS-4928 mojibake; asserting exact passthrough locks in
+    // the fix.
+    const decodedConsoleLog =
+      '[    0.840651] usbcore: registered new interface driver usbfs\n' +
+      '\x1b[0;32m  OK  \x1b[0mStarted OpenBSD Secure Shell server.\n' +
+      'ci-info: +++ Authorized keys from /home/ubuntu/.ssh/authorized_keys \xe9\xff +++';
+
+    mockedRun.mockResolvedValue(
+      JSON.stringify({
+        InstanceId: 'i-0574f935ca44318d1',
+        Timestamp: '2026-05-27T00:00:00.000Z',
+        Output: decodedConsoleLog,
+      }),
+    );
+
+    const out = text(
+      await ec2ConsoleOutput({ instanceId: 'i-0574f935ca44318d1' }),
+    );
+    const parsed = JSON.parse(out) as { ok: boolean; output: string };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.output).toBe(decodedConsoleLog);
+    expect(parsed.output).not.toContain('�');
+  });
+
+  it('reports no console output available when Output is absent', async () => {
+    mockedRun.mockResolvedValue(
+      JSON.stringify({
+        InstanceId: 'i-0574f935ca44318d1',
+        Timestamp: '2026-05-27T00:00:00.000Z',
+      }),
+    );
+
+    const out = text(
+      await ec2ConsoleOutput({ instanceId: 'i-0574f935ca44318d1' }),
+    );
+    const parsed = JSON.parse(out) as { output: string };
+    expect(parsed.output).toBe('(no console output available)');
   });
 });
 
