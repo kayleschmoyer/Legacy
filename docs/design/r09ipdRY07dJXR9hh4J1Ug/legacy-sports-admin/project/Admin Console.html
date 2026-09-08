@@ -5,13 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin Console — Legacy Sports (Mockup)</title>
 
-    <!-- Design intent:
-     This file is a static mockup. Two surfaces shown side-by-side:
-     a 1280px desktop and a single iPhone frame whose inner viewport
-     can be toggled between 320 / 360 / 375 / 390 / 428. The state
-     tab bar at the top swaps which conditional render is shown in
-     BOTH surfaces simultaneously, so reviewers can compare layouts
-     state-for-state. -->
+    <!-- HANDOFF
+     Final file: "Admin Console.html" (this file). admin-styles.css holds the
+     product styles; design_system/colors_and_type.css is the shared token
+     foundation.
+
+     Design intent:
+     This file is a static mockup. Two surfaces shown side-by-side: a
+     resizable "desktop" frame and a single iPhone frame whose inner
+     viewport can be toggled between 320 / 360 / 375 / 390 / 428 (all
+     inside the $xxs band — that phone frame IS the designed xxs/375
+     frame). The state tab bar at the top swaps which conditional render
+     is shown in BOTH surfaces simultaneously, so reviewers can compare
+     layouts state-for-state.
+
+     LS-9903: this bundle previously had zero coverage between the phone
+     frame (≤428, all $xxs) and the fixed 1280px desktop frame — nothing
+     exercised the $xs–$xl bands. The desktop frame's width is now driven
+     by DESKTOP_WIDTHS (660 $xs / 860 $md / 1120 $xl / 1280 $xxl) and its
+     .desktop-body is a real inline-size container (`admin-vp`), so the
+     @container rules in admin-styles.css's BREAKPOINTS block produce a
+     genuine reflow at each preset, not a rescaled screenshot of the 1280
+     layout. $xs/$sm (660–859) share one reflow and $lg/$xl (980–1279)
+     share the base/$xxl layout — annotated in admin-styles.css rather
+     than framed separately, matching the Nav Bar bundle's convention for
+     bands that don't change shape.
+
+     Deliberate deviations: none.
+     Open questions for the implementer: none outstanding.
+    -->
 
     <link rel="stylesheet" href="design_system/colors_and_type.css" />
     <link rel="stylesheet" href="admin-styles.css" />
@@ -147,9 +169,13 @@
         width: 0;
       }
 
-      /* Desktop preview — bordered viewport with browser chrome */
+      /* Desktop preview — bordered viewport with browser chrome.
+     Width is driven by an inline style (see DESKTOP_WIDTHS in the
+     script below) rather than fixed here, so the frame can be resized
+     to any canonical band and .desktop-body's container query rules
+     (admin-styles.css) genuinely reflow instead of just re-scaling
+     a screenshot of the 1280 layout. */
       .desktop-frame {
-        width: 1280px;
         max-width: 100%;
         border-radius: 14px;
         overflow: hidden;
@@ -199,15 +225,22 @@
         height: 820px;
         overflow: auto;
         background: var(--bg);
+        /* Real inline-size container — admin-styles.css's BREAKPOINTS
+           block below queries this, not the browser viewport, so the
+           reflow fires at the frame's chosen width. */
+        container-type: inline-size;
+        container-name: admin-vp;
       }
 
       /* Scaled-down desktop on small viewers */
       .desktop-scale {
-        width: 1280px;
         transform-origin: top left;
       }
 
-      /* Stage layout */
+      /* Stage layout — REVIEW SCAFFOLD ONLY. This stacks the two review
+         frames (mobile + desktop) vertically once they no longer fit
+         side-by-side in the reviewer's own browser window; it is not a
+         product breakpoint and 1700 is not a canonical band threshold. */
       .stage-grid {
         gap: 80px;
       }
@@ -266,6 +299,17 @@
         { w: 428, label: '428', device: 'Pro Max' },
       ];
 
+      // BREAKPOINTS: canonical bands from lib/design-tokens/src/lib/breakpoints.ts.
+      // $xxs (0–659) is the phone frame above (320–428, all inside that band).
+      // $xs/$sm (660–859) and $lg/$xl (980–1279) each share one layout — see the
+      // BREAKPOINTS comment above the @container rules in admin-styles.css.
+      const DESKTOP_WIDTHS = [
+        { w: 660, label: '660', token: '$xs' },
+        { w: 860, label: '860', token: '$md' },
+        { w: 1120, label: '1120', token: '$xl' },
+        { w: 1280, label: '1280', token: '$xxl' },
+      ];
+
       function PhoneStatusBar({ time = '9:41' }) {
         return (
           <div className="status-bar">
@@ -291,24 +335,27 @@
       function App() {
         const [state, setState] = useState('populated');
         const [phoneW, setPhoneW] = useState(375);
+        const [desktopW, setDesktopW] = useState(1280);
         const [theme, setTheme] = useState('mobile'); // 'mobile' | 'desktop' | 'both'
         const [scale, setScale] = useState(1);
 
-        // Compute desktop scale based on container width so desktop fits viewers smaller than 1280px
+        // Compute desktop scale based on container width so the frame fits
+        // viewers smaller than the currently selected band.
         useEffect(() => {
           const update = () => {
-            const w = window.innerWidth;
-            if (w < 1340) setScale(Math.max(0.55, (w - 80) / 1280));
-            else setScale(1);
+            const avail = window.innerWidth - 80;
+            setScale(avail < desktopW ? Math.max(0.4, avail / desktopW) : 1);
           };
           update();
           window.addEventListener('resize', update);
           return () => window.removeEventListener('resize', update);
-        }, []);
+        }, [desktopW]);
 
         const isCompactPhone = phoneW <= 360;
         const phoneLabel =
           PHONE_WIDTHS.find((p) => p.w === phoneW)?.device || 'iPhone';
+        const desktopToken =
+          DESKTOP_WIDTHS.find((p) => p.w === desktopW)?.token || '$xxl';
 
         return (
           <>
@@ -388,6 +435,25 @@
                     ))}
                   </div>
                 )}
+
+                {(theme === 'desktop' || theme === 'both') && (
+                  <div
+                    className="width-toggle"
+                    role="tablist"
+                    aria-label="Desktop frame width"
+                  >
+                    {DESKTOP_WIDTHS.map((p) => (
+                      <button
+                        key={p.w}
+                        className={desktopW === p.w ? 'on' : ''}
+                        onClick={() => setDesktopW(p.w)}
+                        title={p.token}
+                      >
+                        {p.token} <span className="px">{p.w}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -406,19 +472,19 @@
                 {(theme === 'desktop' || theme === 'both') && (
                   <div className="frame-wrap">
                     <span className="frame-caption">
-                      Desktop · 1280
-                      <span className="px">1280 × 820</span>
+                      Desktop · {desktopW} · {desktopToken}
+                      <span className="px">{desktopW} × 820</span>
                     </span>
                     <div
                       style={{
-                        width: 1280 * scale,
+                        width: desktopW * scale,
                         height: 820 * scale + 36 * scale + 4,
                         position: 'relative',
                       }}
                     >
                       <div
                         className="desktop-frame desktop-scale"
-                        style={{ transform: `scale(${scale})` }}
+                        style={{ width: desktopW, transform: `scale(${scale})` }}
                       >
                         <div className="desktop-chrome">
                           <div className="dots">

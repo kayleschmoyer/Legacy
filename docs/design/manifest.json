@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-09-04T00:00:00.000Z",
+  "lastSyncedAt": "2026-09-08T00:00:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -16,8 +16,8 @@
       "title": "Public Leagues",
       "slug": "legacy-sports-public-leagues",
       "status": "active",
-      "lastSyncedHash": "527e13f10705d61db2c7412aac75c7e930364d74468d56632cf99a75ae770762",
-      "lastSyncedAt": "2026-08-04T15:47:00.000Z",
+      "lastSyncedHash": "sha256-3ce99e0a96f2d8c78162e170434da38c4747b7a6ae6328aca72d5467957971a7",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
       "jiraKey": "LS-9017",
       "source": "designsync-local"
     },
@@ -242,8 +242,8 @@
       "title": "Admin",
       "slug": "legacy-sports-admin",
       "status": "active",
-      "lastSyncedHash": "sha256-72095bd10902bb24684be54f9567af7489ef6fd9179eb1ecd7be09c414ada29e",
-      "lastSyncedAt": "2026-08-04T15:49:28.000Z",
+      "lastSyncedHash": "sha256-8cb1a2c21db38e5285041ab46c9fdb9073ca69e7e8308f46d5a1274829c361d1",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
       "jiraKey": "LS-8976"
     },
     {

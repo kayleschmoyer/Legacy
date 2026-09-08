@@ -1202,7 +1202,7 @@
   margin: 24px 0;
 }
 
-/* ───────── Mobile-specific tightening (≤480px) ───────── */
+/* ───────── Mobile-specific tightening ($xxs · phone frame, 320–428px) ───────── */
 .mobile-shell .admin-main {
   padding: 18px 14px 28px;
 }
@@ -1279,6 +1279,69 @@
 }
 .tiny .admin-nav .brand-mark {
   display: none;
+}
+
+/* ============================================================
+   BREAKPOINTS — the desktop review frame's .desktop-body is a real
+   inline-size container (`admin-vp`, declared in Admin Console.html)
+   sized by the DESKTOP_WIDTHS preset toggle, so these rules fire on
+   the frame's actual width, not the browser viewport.
+   xxs 0–659 (the separate phone frame, 320–428, above) · xs 660–799 ·
+   sm 800–859 · md 860–979 · lg 980–1119 · xl 1120–1279 · xxl 1280+.
+   Base rules elsewhere in this file (outside .mobile-shell) are the
+   $xxl desktop layout; $lg/$xl share that layout unchanged, so no
+   dedicated frame or block is needed for them. $xs/$sm share one
+   reflow below.
+   ============================================================ */
+
+/* $xs–$sm · ≤859 — the desktop frame at its narrowest presets.
+   Same condensation direction as .mobile-shell (hide secondary
+   metadata, stack card actions) but keeps the desktop nav/section
+   chrome since compact JSX stays false here. */
+@container admin-vp (max-width: 859px) {
+  .admin-main {
+    padding: 22px 16px 32px;
+  }
+  .page-head h1 {
+    font-size: 34px;
+  }
+  .section-head {
+    padding: 15px 16px;
+  }
+  .section-head .num {
+    display: none;
+  }
+  .admin-nav .me .who {
+    display: none;
+  }
+  .user-card {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+  }
+  .user-card .id {
+    display: none;
+  }
+  .user-card .actions {
+    width: 100%;
+    justify-content: stretch;
+    margin-top: 4px;
+  }
+  .user-card .actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* $md · 860–979 — tablet landscape. Nav/section chrome back to full
+   width but the card grid stays single-column (no room for two-up
+   yet at 860). */
+@container admin-vp (min-width: 860px) and (max-width: 979px) {
+  .admin-main {
+    padding: 26px 20px 36px;
+  }
+  .user-card .id {
+    display: none;
+  }
 }
 
 /* ───────── State-only display rules ───────── */
