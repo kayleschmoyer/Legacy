@@ -29,6 +29,8 @@ No other files in the bundle changed (fonts/icons/logo/uploads/deck-stage.js/REA
 
 Genre-caveat waiver question raised on LS-8969: this bundle is a fixed 1920×1080 video storyboard, not an interactive page mockup, so PROMPT.md's core-states switcher, seven-breakpoint-band coverage, and full interactive-state (`:hover`/`:focus-visible`/`[disabled]`) requirements may not meaningfully apply. Awaiting a decision from the brief owner; no state/breakpoint work was done in this sync pending that answer.
 
+**Resolved (LS-9904):** breakpoint-band question decided — this is not a viewport-responsive surface (fixed-aspect video, no browser width to reflow against), so no narrow-tier design is required. `Intro Video Storyboard.html` now carries a `<!-- BREAKPOINTS -->` annotation stating this explicitly, per PROMPT.md's allowed annotation form. The core-states-switcher and interactive-state waivers remain open questions for the brief owner.
+
 ## Truncated / skipped files
 
 None — all files round-tripped via `DesignSync get_file`/`write_files` without hitting the 256 KiB cap.

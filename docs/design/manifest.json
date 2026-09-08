@@ -159,9 +159,9 @@
       "title": "Intro Video",
       "slug": "intro-video",
       "status": "active",
-      "lastSyncedHash": "sha256-f91d091e6b2a07d07d2de9afcb7574f5525c32a76f4e5d4d9c9e99eda49cbd5c",
-      "lastSyncedAt": "2026-08-04T15:20:00.000Z",
-      "jiraKey": "LS-8969",
+      "lastSyncedHash": "sha256-9fef106dd284f1133b7173efb40f7c779646546b4412b85e389c6c623ee4a034",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+      "jiraKey": "LS-9904",
       "source": "designsync-local"
     },
     {
@@ -289,9 +289,9 @@
       "title": "Mobile Draft Room v2 (ESPN × Sleeper hybrid)",
       "slug": "legacy-sports-draft-room-v2",
       "status": "active",
-      "lastSyncedHash": "sha256-83faf5ff1826d10eaa9661085a2d39d46cab468f5740f7fc7dee997e194d994e",
-      "lastSyncedAt": "2026-08-12T00:00:00.000Z",
-      "jiraKey": "LS-9395",
+      "lastSyncedHash": "sha256-8948442c34f30add9599ed449883e86425bb151a1ba68412881827c7548dbf63",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+      "jiraKey": "LS-9904",
       "source": "manual-local-sync"
     },
     {
