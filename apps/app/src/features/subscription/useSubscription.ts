@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import {
   ClientNotificationType,
@@ -57,6 +58,7 @@ function useOnSubscriptionUpdated(onUpdate: () => void): void {
     }
 
     let active = true;
+    let appStateSubscription: { remove: () => void } | null = null;
 
     const connect = async () => {
       try {
@@ -83,6 +85,23 @@ function useOnSubscriptionUpdated(onUpdate: () => void): void {
         });
 
         clientRef.current = client;
+
+        // A stretch of flaky mobile network can burn through this client's
+        // bounded reconnect budget the same way it can for the league socket
+        // (LS-8985), but unlike useLeagueWebSocketLifecycle this standalone
+        // connection — used at the ~40 call sites outside a league screen,
+        // e.g. Home-tab subscription/entitlement gating — never wired up the
+        // AppState foreground signal, so it stayed dead for the rest of the
+        // app session once its budget (plus the LS-9489 give-up-cooldown
+        // retry) was exhausted. Mirror the same fix here.
+        appStateSubscription = AppState.addEventListener(
+          'change',
+          (nextState) => {
+            if (nextState === 'active') {
+              client.reconnectNow();
+            }
+          },
+        );
       } catch (err) {
         if (!active) return;
         captureError(err instanceof Error ? err : new Error(String(err)));
@@ -93,6 +112,7 @@ function useOnSubscriptionUpdated(onUpdate: () => void): void {
 
     return () => {
       active = false;
+      appStateSubscription?.remove();
       clientRef.current?.dispose();
       clientRef.current = null;
     };

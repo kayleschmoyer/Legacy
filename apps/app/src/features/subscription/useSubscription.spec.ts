@@ -69,6 +69,7 @@ jest.mock('@legacy-sports/rollbar/native', () => ({
 let mockCtorOpts: Record<string, unknown> | null = null;
 const mockRegisteredHandlers = new Map<string, (n: unknown) => void>();
 const mockClientDispose = jest.fn();
+const mockReconnectNow = jest.fn();
 jest.mock('@legacy-sports/websocket-client', () => ({
   WebSocketClient: class {
     constructor(opts: Record<string, unknown>) {
@@ -81,8 +82,33 @@ jest.mock('@legacy-sports/websocket-client', () => ({
     dispose(): void {
       mockClientDispose();
     }
+    reconnectNow(): void {
+      mockReconnectNow();
+    }
   },
 }));
+
+// Mirrors the AppState mock in useLeagueWebSocketLifecycle.spec.ts.
+type AppStateChangeHandler = (state: string) => void;
+let appStateListeners: AppStateChangeHandler[] = [];
+const mockAppStateAddEventListener = jest.fn<
+  { remove: () => void },
+  [string, AppStateChangeHandler]
+>();
+jest.mock('react-native', () => {
+  const RN = jest.requireActual<typeof import('react-native')>('react-native');
+  return new Proxy(RN, {
+    get(target, prop: string) {
+      if (prop === 'AppState') {
+        return {
+          addEventListener: (...args: [string, AppStateChangeHandler]) =>
+            mockAppStateAddEventListener(...args),
+        };
+      }
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,6 +140,21 @@ function emitNotification(type: string, payload: Record<string, unknown>) {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+/** Re-arms the AppState listener mock; call after `jest.resetAllMocks()`. */
+function primeAppStateMock() {
+  appStateListeners = [];
+  mockAppStateAddEventListener.mockImplementation(
+    (_event: string, handler: AppStateChangeHandler) => {
+      appStateListeners.push(handler);
+      return {
+        remove: () => {
+          appStateListeners = appStateListeners.filter((h) => h !== handler);
+        },
+      };
+    },
+  );
+}
 
 describe('useSubscription — isPremium', () => {
   beforeEach(() => {
@@ -209,6 +250,7 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     mockRegisteredHandlers.clear();
     mockWebsocketUrl = 'wss://example.com/ws';
     mockReadKeychainValue.mockResolvedValue('jwt-token');
+    primeAppStateMock();
   });
 
   afterEach(() => {
@@ -284,6 +326,59 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     unmount();
 
     expect(mockClientDispose).toHaveBeenCalledTimes(1);
+  });
+
+  // LS-8985 (reopened): this standalone connection — used at the ~40 call
+  // sites outside a league screen — never got the AppState foreground
+  // recovery signal that useLeagueWebSocketLifecycle has, so a flaky-network
+  // stretch that exhausted its reconnect budget left it dead for the rest of
+  // the app session.
+  it('calls reconnectNow when the app returns to the foreground (LS-8985)', async () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({ status: 'active', tier: 'premium' }),
+    );
+
+    renderHook(() => useSubscription());
+
+    await waitFor(() => {
+      expect(appStateListeners).toHaveLength(1);
+    });
+
+    appStateListeners[0]('active');
+
+    expect(mockReconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call reconnectNow for a background transition', async () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({ status: 'active', tier: 'premium' }),
+    );
+
+    renderHook(() => useSubscription());
+
+    await waitFor(() => {
+      expect(appStateListeners).toHaveLength(1);
+    });
+
+    appStateListeners[0]('background');
+
+    expect(mockReconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('removes the AppState subscription on unmount', async () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({ status: 'active', tier: 'premium' }),
+    );
+
+    const { unmount } = renderHook(() => useSubscription());
+
+    await waitFor(() => {
+      expect(appStateListeners).toHaveLength(1);
+    });
+
+    unmount();
+
+    expect(appStateListeners).toHaveLength(0);
   });
 });
 
