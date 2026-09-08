@@ -1137,9 +1137,19 @@ export function findLatestSession(projectDir: string): string {
 /**
  * Look up a session ID from ~/.claude/sessions/{PID}.json.
  * Returns null when the file is missing, unreadable, or has no sessionId.
+ *
+ * Resolves the base directory the same way findClaudeProjectsDir() does
+ * (../session-files.ts): prefer $HOME over os.homedir(), since some
+ * hosted/CCR server processes carry a stale $HOME baked into their launch
+ * environment (e.g. /home/sbx_user1051) that no longer matches the
+ * container's actual home (LS-8867). This function was missed when that
+ * fix landed, so the `pid` lookup path in ci_audit_session_bash kept
+ * resolving the wrong home even after the shared projects-dir path was
+ * fixed (LS-8687).
  */
 export function findSessionByPid(pid: number): string | null {
-  const pidFile = join(homedir(), '.claude', 'sessions', `${pid}.json`);
+  const home = process.env['HOME'] || homedir();
+  const pidFile = join(home, '.claude', 'sessions', `${pid}.json`);
   let data: unknown;
   try {
     data = JSON.parse(readFileSync(pidFile, 'utf8'));

@@ -12,6 +12,7 @@ import {
   extractMcpCalls,
   extractMcpCallsFromContent,
   extractScratchSubprocessCalls,
+  findSessionByPid,
   formatAudit,
   formatGapsOnly,
   isRecurringInvestigative,
@@ -762,6 +763,44 @@ describe('audit-session-bash-parse', () => {
       expect(report.action_required.gaps_to_review_overflow?.note).toContain(
         'gapsOnly:true',
       );
+    });
+  });
+
+  describe('findSessionByPid', () => {
+    let savedHome: string | undefined;
+
+    beforeEach(() => {
+      savedHome = process.env['HOME'];
+    });
+
+    afterEach(() => {
+      if (savedHome === undefined) {
+        delete process.env['HOME'];
+      } else {
+        process.env['HOME'] = savedHome;
+      }
+    });
+
+    it('resolves ~/.claude/sessions/{pid}.json from $HOME, not just os.homedir() (LS-8687)', () => {
+      // Mirrors the LS-8867 fix in findClaudeProjectsDir: a hosted/CCR server
+      // process can carry a stale $HOME baked into its launch environment
+      // (os.homedir() reading /home/sbx_user1051-shaped defaults) while the
+      // real session lives under a different $HOME. findSessionByPid must
+      // prefer $HOME the same way, or the two resolution paths diverge.
+      process.env['HOME'] = fixtureDir;
+      const sessionsDir = join(fixtureDir, '.claude', 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+      writeFileSync(
+        join(sessionsDir, '4242.json'),
+        JSON.stringify({ sessionId: 'session-abc-123' }),
+      );
+
+      expect(findSessionByPid(4242)).toBe('session-abc-123');
+    });
+
+    it('returns null when no PID file exists under the resolved home', () => {
+      process.env['HOME'] = fixtureDir;
+      expect(findSessionByPid(99999)).toBeNull();
     });
   });
 });
