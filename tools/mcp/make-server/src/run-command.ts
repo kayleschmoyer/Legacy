@@ -1,8 +1,7 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { buildChildEnv } from './child-env.js';
+import { resolveMainRepoPath } from './resolve-main-repo.js';
 
 const COMMAND_TIMEOUT = 300_000; // 5 minutes default for make targets
 
@@ -17,10 +16,21 @@ export class TimeoutError extends Error {
   }
 }
 
-/** Resolve the repository root from this script's location (tools/mcp/make-server/src/). */
+/**
+ * Resolve the main repo root, from `process.cwd()`.
+ *
+ * Uses `git rev-parse --git-common-dir` rather than this script's own
+ * `import.meta.url` (LS-4802): a worktree checkout has its own full copy of
+ * `tools/mcp/make-server`, so a make-server process spawned from within a
+ * worktree previously resolved "repo root" to the *worktree's* path instead
+ * of the main repo — silently breaking `make worktree` (and every other
+ * `getRepoRoot()` caller) whenever this server wasn't running from the main
+ * repo's own checkout. `git rev-parse --git-common-dir` answers "where is
+ * the main repo?" correctly from any worktree of it, no caller override
+ * needed. See `resolveMainRepoPath` for details.
+ */
 export function getRepoRoot(): string {
-  const thisDir = resolve(fileURLToPath(import.meta.url), '..');
-  return resolve(thisDir, '..', '..', '..', '..');
+  return resolveMainRepoPath(process.cwd());
 }
 
 /**
