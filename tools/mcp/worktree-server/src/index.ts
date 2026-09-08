@@ -56,6 +56,11 @@ import {
 import { executeWorktreeMv } from './move-file-utils';
 import { mergeFromMain } from './merge-from-main';
 import { rebaseOntoMain } from './rebase-onto-main';
+import {
+  type RebaseContinueDeps,
+  type RebaseContinueResult,
+  rebaseContinueStep,
+} from './rebase-continue-step';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitish } from './resolve-commitish';
@@ -750,61 +755,26 @@ function grepContent(
   };
 }
 
+/** Injected deps for {@link rebaseContinueStep} (LS-8593) — real git/fs bindings. */
+const REBASE_CONTINUE_DEPS: RebaseContinueDeps = {
+  runGit,
+  runShell: run,
+  existsSync,
+  join,
+};
+
 /**
- * Perform a single rebase-continue step: stage files, run `git rebase --continue`
- * with a non-interactive editor, and return structured state. Shared by
- * `worktree_rebase` (auto-continue loop) and `worktree_rebase_continue` tool.
+ * Wrapper binding {@link rebaseContinueStep} (extracted to its own module for
+ * unit testability, LS-8593) to this file's real git/fs implementations. `env`
+ * is required (not defaulted) so every call site must explicitly decide which
+ * rerere override applies — see the callers below.
  */
-function rebaseContinueStep(
+function continueRebaseStep(
   cwd: string,
+  env: Record<string, string>,
   files?: string[],
-  env: Record<string, string> = NON_INTERACTIVE_GIT_ENV,
-): {
-  completed: boolean;
-  conflicted: string[];
-  error?: string;
-} {
-  const getConflictedFiles = (): string[] => {
-    try {
-      return run('git diff --name-only --diff-filter=U', cwd)
-        .trim()
-        .split('\n')
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  };
-
-  // Stage resolved files
-  if (files && files.length > 0) {
-    runGit(['add', '--', ...files], cwd);
-  } else {
-    runGit(['add', '-A'], cwd);
-  }
-
-  // Continue rebase — may throw if new conflicts arise.
-  // `env` carries the caller's rerere.enabled override (see LS-8112 /
-  // LS-8593): each `--continue` step is its own git process, so the
-  // disableRerere override from the original rebase invocation must be
-  // re-applied here too, not just on the first `git rebase` call.
-  runGit(['rebase', '--continue'], cwd, {
-    timeout: 120_000,
-    env,
-  });
-
-  // Check if rebase is still in progress
-  const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
-  const stillRebasing =
-    existsSync(join(gitDir, 'rebase-merge')) ||
-    existsSync(join(gitDir, 'rebase-apply'));
-
-  if (!stillRebasing) {
-    return { completed: true, conflicted: [] };
-  }
-
-  // Still rebasing — check for new conflicts
-  const conflictedFiles = getConflictedFiles();
-  return { completed: false, conflicted: conflictedFiles };
+): RebaseContinueResult {
+  return rebaseContinueStep(cwd, env, REBASE_CONTINUE_DEPS, files);
 }
 
 /**
@@ -5862,7 +5832,7 @@ const handleCallTool = async (
               }
 
               try {
-                const step = rebaseContinueStep(cwd, undefined, rebaseEnv);
+                const step = continueRebaseStep(cwd, rebaseEnv);
 
                 if (step.completed) {
                   return rebaseCompleteResponse(
@@ -6044,7 +6014,7 @@ const handleCallTool = async (
       }
 
       try {
-        const step = rebaseContinueStep(cwd, files);
+        const step = continueRebaseStep(cwd, NON_INTERACTIVE_GIT_ENV, files);
 
         if (step.completed) {
           const completionLog: string[] = [];
