@@ -239,6 +239,13 @@ jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => ({ id: 1, username: 'Manager' }),
 }));
 
+const mockCaptureError = jest.fn();
+jest.mock('@legacy-sports/rollbar/native', () => ({
+  captureError: (...args: unknown[]) => {
+    mockCaptureError(...args);
+  },
+}));
+
 // The sport home screens live outside the route tree so the Home tab is their
 // only mount point (LS-8823).
 let capturedOnSwitchSport: ((sport: 'football') => void) | null = null;
@@ -800,6 +807,7 @@ describe('HomeTab scroll reset on tab focus (LS-9248)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCaptureError.mockClear();
     mockSearchParams = {};
     capturedScrollRef = null;
     focusCallbacks.length = 0;
@@ -844,5 +852,23 @@ describe('HomeTab scroll reset on tab focus (LS-9248)', () => {
     }
 
     expect(() => refocusTab()).not.toThrow();
+  });
+
+  // Rollbar #225 kept recurring after the fix above: `scrollTo` can exist as
+  // a function but still throw "undefined is not a function" from inside
+  // Tamagui/RN's own implementation (e.g. the underlying native view hasn't
+  // finished attaching yet when focus reconnects the effect).
+  it('does not throw when the scrollTo method itself throws (LS-9249 recurrence)', () => {
+    render(<HomeTab />);
+    const handle = attachScrollHandle();
+    handle.scrollTo.mockImplementation(() => {
+      throw new TypeError('undefined is not a function');
+    });
+
+    expect(() => refocusTab()).not.toThrow();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ tag: 'home-dashboard-scroll-reset-failed' }),
+    );
   });
 });

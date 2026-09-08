@@ -24,6 +24,7 @@ import {
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar/native';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
@@ -87,9 +88,23 @@ export default function HomeTab() {
       // Tamagui's `ScrollView` doesn't always forward a ref exposing RN's
       // imperative `scrollTo` (its shape varies by platform/wrapper), so a
       // bare `?.scrollTo(...)` call can throw "undefined is not a function"
-      // when `current` is set but isn't that method (LS-9249).
+      // when `current` is set but isn't that method (LS-9249). The `typeof`
+      // guard only rules out `scrollTo` being absent outright — Rollbar #225
+      // kept recurring after that fix because `scrollTo` can still exist as
+      // a function but throw the same "undefined is not a function" from
+      // *inside* Tamagui/RN's own implementation when it's invoked during an
+      // effect "reconnect" (tab refocus) before the underlying native view
+      // has finished attaching. The reset is cosmetic, so swallow that
+      // failure instead of crashing the whole screen (LS-9249 recurrence).
       if (typeof dashboardScrollRef.current?.scrollTo === 'function') {
-        dashboardScrollRef.current.scrollTo({ y: 0, animated: false });
+        try {
+          dashboardScrollRef.current.scrollTo({ y: 0, animated: false });
+        } catch (error) {
+          captureError(
+            error instanceof Error ? error : new Error(String(error)),
+            { tag: 'home-dashboard-scroll-reset-failed' },
+          );
+        }
       }
     }, []),
   );
