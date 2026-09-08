@@ -83,6 +83,7 @@ jest.mock('../graphql-errors', () => ({
 import {
   assertLeagueMemberOrSystem,
   isBenignAutoPickRace,
+  isDraftNotYetInitialized,
   isLockWaitTimeout,
   runAutoPickLockedTransaction,
 } from './scheduled-mutations';
@@ -392,6 +393,26 @@ describe('isBenignAutoPickRace (LS-9691)', () => {
 
   it('does not treat an unrelated Postgres SQLSTATE (e.g. FK violation) as a benign race', () => {
     expect(isBenignAutoPickRace(pgError('fk violation', '23503'))).toBe(false);
+  });
+});
+
+describe('isDraftNotYetInitialized (LS-4853)', () => {
+  it('treats "No teams configured for this draft" as expected — draft_teams not populated yet', () => {
+    expect(
+      isDraftNotYetInitialized(new Error('No teams configured for this draft')),
+    ).toBe(true);
+  });
+
+  it('does not treat an unrelated error as draft-not-yet-initialized', () => {
+    expect(
+      isDraftNotYetInitialized(new Error('Team 5 roster is full in draft 100')),
+    ).toBe(false);
+  });
+
+  it('does not treat a non-Error value as draft-not-yet-initialized', () => {
+    expect(isDraftNotYetInitialized('No teams configured for this draft')).toBe(
+      false,
+    );
   });
 });
 

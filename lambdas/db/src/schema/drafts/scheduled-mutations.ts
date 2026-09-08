@@ -71,6 +71,25 @@ export function isBenignAutoPickRace(error: unknown): boolean {
   return isLockWaitTimeout(error) || isRetryablePgError(error);
 }
 
+/**
+ * True when `error` is the "No teams configured for this draft" thrown by
+ * `getCurrentDraftPickInfo` (helpers.ts) for a draft whose `draft_teams`
+ * hasn't been populated yet — the same expected, transient window between
+ * league creation and `initializeDraft`'s transaction completing that the
+ * `getCurrentDraftPick` query resolver already classifies as client-visible
+ * rather than a server defect (LS-4853, graphql-error-codes.ts). The
+ * every-minute EventBridge sweep scans for expired deadlines across every
+ * league, so it can catch this exact window on an unrelated draft; the next
+ * tick retries once `initializeDraft` finishes, so this is safe to skip
+ * rather than report to Rollbar via `LOGGER.error`.
+ */
+export function isDraftNotYetInitialized(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message === 'No teams configured for this draft'
+  );
+}
+
 // ── LS-9319: Phase 1 / Phase 2 split for the per-draft auto-pick loop ───────
 //
 // Mirrors the pattern LS-4692 (PR #4146) already proved out for makeDraftPick
@@ -792,6 +811,14 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   leagueId: draftLeagueId,
                   dbError: formatDbError(describeDbError(draftError)),
                 },
+              );
+              continue;
+            }
+
+            if (isDraftNotYetInitialized(draftError)) {
+              LOGGER.warn(
+                `[autoProcessDraftPicks] Draft ${draftId} has an expired deadline but draft_teams isn't populated yet — skipping until initializeDraft completes (will retry next cycle)`,
+                { draftId, leagueId: draftLeagueId },
               );
               continue;
             }
