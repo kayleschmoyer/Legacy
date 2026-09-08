@@ -20,12 +20,17 @@ const QB_HTML = fix('qb-main-page.html');
 const K_HTML = fix('k-main-page.html');
 const IDP_HTML = fix('idp-main-page.html');
 const IDP_MISSED_SEASON_HTML = fix('idp-main-page-missed-season.html');
+const WR_MULTI_TEAM_HTML = fix('wr-main-page-multi-team.html');
+const IDP_MULTI_TEAM_NO_AGG_HTML = fix(
+  'idp-main-page-multi-team-no-aggregate.html',
+);
 
 const wr = { id: 10, pfrId: 'AdamDa01' };
 const rb = { id: 20, pfrId: 'HenrDe00' };
 const qb = { id: 30, pfrId: 'MahoPa00' };
 const kicker = { id: 40, pfrId: 'TuckJu00' };
 const idp = { id: 50, pfrId: 'TestLb00' };
+const tradedWr = { id: 60, pfrId: 'SanuMo00' };
 
 describe('parseMainPageSeasonTotals — WR (receiving_and_rushing in comment)', () => {
   it('parses two seasons from comment-wrapped receiving_and_rushing table', () => {
@@ -227,6 +232,128 @@ describe('parseMainPageSeasonTotals — K (scoring table)', () => {
   it('skips Career totals row', () => {
     const seasons = parseMainPageSeasonTotals(K_HTML, kicker);
     expect(seasons.map((s) => s.kicking?.season)).toEqual([2021, 2022, 2023]);
+  });
+});
+
+// LS-9915: a traded player's season was collapsed to whichever team row PFR
+// happened to print last, so only part of the season was stored. Combination is
+// now explicit and order-independent — these cover the two layouts that broke.
+describe('parseMainPageSeasonTotals — multi-team seasons (LS-9915)', () => {
+  it('uses the aggregate row when PFR prints it BEFORE the per-team rows', () => {
+    const seasons = parseMainPageSeasonTotals(WR_MULTI_TEAM_HTML, tradedWr);
+    const s2019 = seasons.find((s) => s.receiving?.season === 2019);
+
+    // Previously returned the last row (NWE: 8 g, 26 rec, 207 yds).
+    expect(s2019?.receiving).toMatchObject({
+      team: '2TM',
+      g: 15,
+      gs: 9,
+      tgt: 90,
+      rec: 59,
+      yds: 520,
+      td: 1,
+      firstDowns: 26,
+      lng: 32,
+      fumbles: 1,
+      ydsPerRec: 8.8,
+    });
+  });
+
+  it('rebuilds the combined line when the page carries NO aggregate row', () => {
+    const seasons = parseMainPageSeasonTotals(WR_MULTI_TEAM_HTML, tradedWr);
+    const s2020 = seasons.find((s) => s.receiving?.season === 2020);
+
+    expect(s2020?.receiving).toMatchObject({
+      team: '2TM',
+      g: 15,
+      gs: 9,
+      tgt: 90,
+      rec: 59,
+      yds: 520,
+      td: 1,
+      firstDowns: 26,
+      // Season long is a maximum across teams, not a sum.
+      lng: 32,
+      fumbles: 1,
+      // Recomputed from the merged line (520/59), not averaged from 9.5 and 8.0.
+      ydsPerRec: 8.8,
+    });
+  });
+
+  it('folds rushing independently of receiving on the same rows', () => {
+    const seasons = parseMainPageSeasonTotals(WR_MULTI_TEAM_HTML, tradedWr);
+    const s2020 = seasons.find((s) => s.rushing?.season === 2020);
+
+    expect(s2020?.rushing).toMatchObject({
+      team: '2TM',
+      g: 15,
+      att: 3,
+      yds: 18,
+      td: 1,
+      firstDowns: 1,
+      lng: 9,
+      ydsPerAtt: 6,
+    });
+  });
+
+  it('leaves single-team seasons untouched', () => {
+    const seasons = parseMainPageSeasonTotals(WR_MULTI_TEAM_HTML, tradedWr);
+    const s2018 = seasons.find((s) => s.receiving?.season === 2018);
+
+    expect(s2018?.receiving).toMatchObject({
+      team: 'GNB',
+      g: 16,
+      gs: 14,
+      rec: 38,
+      yds: 446,
+      ydsPerRec: 11.7,
+    });
+  });
+
+  it('emits exactly one row per season', () => {
+    const seasons = parseMainPageSeasonTotals(WR_MULTI_TEAM_HTML, tradedWr);
+    expect(seasons.map((s) => s.receiving?.season)).toEqual([2018, 2019, 2020]);
+  });
+});
+
+describe('parseMainPageDefenseSeasonTotals — multi-team seasons (LS-9915)', () => {
+  it('rebuilds a combined IDP season when no aggregate row is present', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(
+      IDP_MULTI_TEAM_NO_AGG_HTML,
+      idp,
+    );
+    const s2015 = seasons.find((s) => s.season === 2015);
+
+    // Previously returned the last row (NWE: 7 g, 40 tackles).
+    expect(s2015).toMatchObject({
+      team: '2TM',
+      g: 16,
+      gs: 14,
+      soloTkl: 60,
+      astTkl: 25,
+      totalTkl: 85,
+      // Half-sacks must survive the fold.
+      sacks: 3,
+      int: 3,
+      pd: 12,
+      ff: 3,
+      fr: 2,
+      defTd: 2,
+      safeties: 1,
+    });
+  });
+
+  it('leaves a single-team IDP season untouched', () => {
+    const seasons = parseMainPageDefenseSeasonTotals(
+      IDP_MULTI_TEAM_NO_AGG_HTML,
+      idp,
+    );
+    expect(seasons.find((s) => s.season === 2014)).toMatchObject({
+      team: 'PHI',
+      g: 16,
+      totalTkl: 85,
+      sacks: 1.5,
+    });
   });
 });
 

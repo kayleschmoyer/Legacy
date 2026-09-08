@@ -23,22 +23,6 @@ function currentYear(): number {
   return new Date().getFullYear();
 }
 
-// NFL passer rating formula
-function computePasserRating(
-  cmp: number,
-  att: number,
-  yds: number,
-  td: number,
-  int: number,
-): number | null {
-  if (att === 0) return null;
-  const a = Math.max(0, Math.min((cmp / att - 0.3) / 0.2, 2.375));
-  const b = Math.max(0, Math.min((yds / att - 3) / 4, 2.375));
-  const c = Math.max(0, Math.min(td / att / 0.05, 2.375));
-  const d = Math.max(0, Math.min(0.095 - int / att / 0.04, 2.375));
-  return Math.round(((a + b + c + d) / 6) * 100 * 10) / 10;
-}
-
 // Sums two nullable numbers, treating null as 0 for summation.
 function sumNullable(a: number | null, b: number | null): number | null {
   if (a === null && b === null) return null;
@@ -74,7 +58,9 @@ function aggregatePassingSeasons(
 
   if (!att || att === 0) return null;
 
-  const rating = computePasserRating(
+  // Shared with the season-row combiner in pfr-client, which needs the same
+  // formula to rebuild a traded player's multi-team season.
+  const rating = CareerStats.computePasserRating(
     cmp ?? 0,
     att,
     yds ?? 0,
@@ -490,6 +476,43 @@ async function upsertSeasonDefenseIdp(
     });
 }
 
+// Season rows are upserted, never deleted, and the conflict target includes
+// `team` — so when a season's team label changes, the old row survives beside
+// the new one. That matters for the LS-9915 backfill: a traded player's season
+// was stored under a single team (Sanu 2019 -> "NWE") and now loads as the
+// combined "2TM" line, which would insert alongside the stale row and make the
+// career aggregate count the season twice.
+//
+// After writing a player's rows for a season, drop any other row that player
+// still has for that same season. The main page returns the player's whole
+// career in one request and we now emit exactly one row per season, so
+// everything we did not just write for a fetched season is stale by
+// construction. Seasons we did not fetch are left alone.
+// The season tables this prune may target. A literal union rather than `string`
+// so the sql.raw() below can only ever receive one of these names.
+type FootballSeasonTable =
+  | 'football_season_passing'
+  | 'football_season_rushing'
+  | 'football_season_receiving'
+  | 'football_season_kicking'
+  | 'football_season_defense_idp';
+
+async function pruneSupersededSeasonRows(
+  db: PublicDb,
+  table: FootballSeasonTable,
+  playerId: number,
+  written: { season: number; team: string }[],
+): Promise<void> {
+  for (const { season, team } of written) {
+    await db.execute(
+      sql`DELETE FROM ${sql.raw(table)}
+          WHERE player_id = ${playerId}
+            AND season = ${season}
+            AND team IS DISTINCT FROM ${team}`,
+    );
+  }
+}
+
 export interface FootballCareerResult {
   playerId: number;
   pfrId: string;
@@ -651,6 +674,13 @@ async function loadFootballCareerStatsInner(
       }
     }
 
+    await pruneSupersededSeasonRows(
+      db,
+      'football_season_defense_idp',
+      playerId,
+      defenseSeasons,
+    );
+
     if (groupsUpserted.length > 0) {
       LOGGER.info(
         `Upserted football_season_defense_idp rows for IDP player ${playerId} ` +
@@ -771,6 +801,33 @@ async function loadFootballCareerStatsInner(
       });
     }
   }
+
+  // Drop rows superseded by this load before the career totals are summed
+  // from the season rows — see pruneSupersededSeasonRows.
+  await pruneSupersededSeasonRows(
+    db,
+    'football_season_passing',
+    playerId,
+    passingSeasons,
+  );
+  await pruneSupersededSeasonRows(
+    db,
+    'football_season_rushing',
+    playerId,
+    rushingSeasons,
+  );
+  await pruneSupersededSeasonRows(
+    db,
+    'football_season_receiving',
+    playerId,
+    receivingSeasons,
+  );
+  await pruneSupersededSeasonRows(
+    db,
+    'football_season_kicking',
+    playerId,
+    kickingSeasons,
+  );
 
   const careerPassing = aggregatePassingSeasons(passingSeasons, playerId);
   if (careerPassing) {

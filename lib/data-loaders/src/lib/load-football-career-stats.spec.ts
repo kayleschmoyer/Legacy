@@ -9,6 +9,23 @@ const mockTeamDefenseGetSeasonTotals = jest.fn();
 // Records the stats_last_fetched_at stamp (db.execute) calls.
 const mockDbExecute = jest.fn();
 
+type PasserRating = (
+  cmp: number | null,
+  att: number | null,
+  yds: number | null,
+  td: number | null,
+  int: number | null,
+) => number | null;
+
+// jest.mock factories are hoisted above const initialisers, so the real module
+// has to be resolved lazily — and jest.requireActual is untyped, so narrow it to
+// the one pure helper being borrowed rather than spreading `any` into the mock.
+function actualComputePasserRating(): PasserRating {
+  return jest.requireActual<{
+    CareerStats: { computePasserRating: PasserRating };
+  }>('@legacy-sports/pfr-client').CareerStats.computePasserRating;
+}
+
 // Marks an error as a simulated PFR 403 without depending on axios —
 // isPfrForbiddenError is mocked to recognize it directly.
 class FakeAuthError extends Error {
@@ -24,6 +41,10 @@ jest.mock('@legacy-sports/pfr-client', () => ({
       mockCareerGetAllSeasonTotals(...args),
     getAllDefenseSeasonTotalsFromMainPage: (...args: unknown[]): unknown =>
       mockCareerGetAllDefenseSeasonTotals(...args),
+    // Pure formula, not a network call — use the real one so the career
+    // aggregate's passer rating is actually exercised.
+    computePasserRating: (...args: Parameters<PasserRating>): number | null =>
+      actualComputePasserRating()(...args),
   },
   TeamDefense: {
     getSeasonTotals: (...args: unknown[]): unknown =>
@@ -798,5 +819,120 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       // every remaining season for this player.
       expect(mockTeamDefenseGetSeasonTotals).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// LS-9915: season rows are upserted with `team` in the conflict target, so a
+// season whose team label changes (a traded player's "NWE" becoming the
+// combined "2TM") would otherwise leave the stale row in place and make the
+// career aggregate count that season twice.
+describe('loadFootballCareerStats — superseded season rows (LS-9915)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCareerGetAllDefenseSeasonTotals.mockResolvedValue([]);
+    mockTeamDefenseGetSeasonTotals.mockResolvedValue(null);
+  });
+
+  // Flattens a drizzle sql template into plain text plus its bound params, so a
+  // test can assert on the statement without a live database. Chunks are one of
+  // three shapes: a literal ({ value: string[] }), a nested sql fragment (from
+  // sql.raw, carrying its own queryChunks), or a bound param as a raw value.
+  // Renders anything that is not an object; objects have no useful string
+  // form here and are handled by the chunk walker instead.
+  const renderPrimitive = (input: unknown): string =>
+    typeof input === 'string' ||
+    typeof input === 'number' ||
+    typeof input === 'boolean' ||
+    typeof input === 'bigint'
+      ? String(input)
+      : '';
+
+  const renderChunk = (chunk: unknown): string => {
+    if (typeof chunk !== 'object' || chunk === null) {
+      return renderPrimitive(chunk);
+    }
+
+    const { value, queryChunks } = chunk as {
+      value?: unknown;
+      queryChunks?: unknown[];
+    };
+    if (Array.isArray(queryChunks)) {
+      return queryChunks.map(renderChunk).join('');
+    }
+    if (Array.isArray(value)) return value.map(renderPrimitive).join('');
+    return renderPrimitive(value);
+  };
+
+  const renderedExecuteCalls = (): string[] =>
+    mockDbExecute.mock.calls.map(([statement]) =>
+      ((statement as { queryChunks?: unknown[] })?.queryChunks ?? [])
+        .map(renderChunk)
+        .join(''),
+    );
+
+  it('deletes the stale single-team row for a season it just rewrote', async () => {
+    const db = makeDb({
+      id: 42,
+      pfrId: 'SanuMo00',
+      isDst: false,
+      nflTeam: null,
+      position: 'WR',
+      sport: 'football',
+    });
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      {
+        passing: null,
+        rushing: null,
+        kicking: null,
+        receiving: {
+          playerId: 42,
+          season: 2019,
+          team: '2TM',
+          pfrRowId: '2019',
+          g: 15,
+          gs: 9,
+          rec: 59,
+          tgt: 90,
+          yds: 520,
+          td: 1,
+          lng: 32,
+          firstDowns: 26,
+          fumbles: 1,
+          ydsPerRec: 8.8,
+        },
+      },
+    ]);
+
+    await loadFootballCareerStats(db, 42);
+
+    const deletes = renderedExecuteCalls().filter((s) => s.includes('DELETE'));
+    const receivingDelete = deletes.find((s) =>
+      s.includes('football_season_receiving'),
+    );
+
+    expect(receivingDelete).toBeDefined();
+    // Scoped to this player and season, and spares the row just written.
+    expect(receivingDelete).toContain('42');
+    expect(receivingDelete).toContain('2019');
+    expect(receivingDelete).toContain('2TM');
+    expect(receivingDelete).toContain('IS DISTINCT FROM');
+  });
+
+  it('does not prune a season it did not fetch', async () => {
+    const db = makeDb({
+      id: 42,
+      pfrId: 'SanuMo00',
+      isDst: false,
+      nflTeam: null,
+      position: 'WR',
+      sport: 'football',
+    });
+    mockCareerGetAllSeasonTotals.mockResolvedValue([]);
+
+    await loadFootballCareerStats(db, 42);
+
+    expect(renderedExecuteCalls().filter((s) => s.includes('DELETE'))).toEqual(
+      [],
+    );
   });
 });

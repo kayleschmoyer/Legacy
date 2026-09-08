@@ -446,9 +446,226 @@ export async function getSeasonTotals(
 // all career seasons in a single HTTP request instead of one per season.
 // Tables vary by position: `passing` (QBs), `receiving_and_rushing` /
 // `rushing_and_receiving` (skill players), `scoring` (kickers).
-// For multi-team seasons PFR places individual team rows first and the
-// aggregate "2TM"/"3TM" row last — later map.set() calls overwrite earlier
-// ones, so the aggregate row (with correct combined totals) always wins.
+// Multi-team seasons are combined explicitly by season — see the combination
+// helpers below — rather than by relying on PFR's row order.
+
+// NFL passer rating. Lives here rather than in the loader because combining a
+// traded player's split seasons has to recompute it from the merged line —
+// rating is not additive, so a multi-team season cannot reuse either team's
+// published value.
+export function computePasserRating(
+  cmp: number | null,
+  att: number | null,
+  yds: number | null,
+  td: number | null,
+  int: number | null,
+): number | null {
+  if (att === null || att === 0) return null;
+  const a = Math.max(0, Math.min(((cmp ?? 0) / att - 0.3) / 0.2, 2.375));
+  const b = Math.max(0, Math.min(((yds ?? 0) / att - 3) / 4, 2.375));
+  const c = Math.max(0, Math.min((td ?? 0) / att / 0.05, 2.375));
+  const d = Math.max(0, Math.min(0.095 - (int ?? 0) / att / 0.04, 2.375));
+  return Math.round(((a + b + c + d) / 6) * 100 * 10) / 10;
+}
+
+// --- Multi-team season combination (LS-9915) ---
+// PFR splits a traded player's season into one row per team, alongside an
+// aggregate "2TM"/"3TM" row carrying the combined totals. Selecting a single
+// row per season by document order silently kept whichever team row came last
+// and dropped the rest of the season, so traded players were stored with only
+// part of a season (Mohamed Sanu 2019 landed as NWE-only: 8 g / 26 rec / 207
+// yds against an actual 15 g / 59 rec / 520 yds). Every football_season_* table
+// showed it, because they all funnel through the same per-season collapse.
+//
+// Combination is therefore explicit and order-independent: prefer PFR's own
+// aggregate row when the page carries one, and otherwise rebuild the combined
+// line by folding the per-team rows together. That is correct whether the
+// aggregate row appears first, last, or not at all — which matters because PFR
+// is behind a Cloudflare challenge and its current row order cannot be
+// re-verified by scraping.
+
+// PFR labels an aggregate multi-team row by team count: "2TM", "3TM", …
+const AGGREGATE_TEAM_REGEX = /^\d+TM$/;
+
+function isAggregateRow(row: { team: string }): boolean {
+  return AGGREGATE_TEAM_REGEX.test(row.team.trim());
+}
+
+// Sums across rows, staying null only when no row carries a value — so a
+// genuinely absent stat is not reported as a hard zero.
+function sumField<T>(
+  rows: T[],
+  pick: (row: T) => number | null,
+): number | null {
+  let total: number | null = null;
+  for (const row of rows) {
+    const value = pick(row);
+    if (value === null) continue;
+    total = (total ?? 0) + value;
+  }
+  return total;
+}
+
+// "Long" columns are a season maximum, not a sum.
+function maxField<T>(
+  rows: T[],
+  pick: (row: T) => number | null,
+): number | null {
+  let best: number | null = null;
+  for (const row of rows) {
+    const value = pick(row);
+    if (value === null) continue;
+    best = best === null ? value : Math.max(best, value);
+  }
+  return best;
+}
+
+// PFR rounds published per-team rate columns, so combined rates are recomputed
+// from the summed components rather than averaged.
+function ratePerUnit(
+  total: number | null,
+  units: number | null,
+): number | null {
+  if (total === null || units === null || units === 0) return null;
+  return Math.round((total / units) * 10) / 10;
+}
+
+// Collapses one season's rows to a single combined row. A single-team season
+// passes through untouched; a season carrying PFR's own aggregate row uses it
+// verbatim; anything else is folded by `fold`.
+function combineSeasonRows<T extends { team: string }>(
+  rows: T[],
+  fold: (rows: T[]) => T,
+): T {
+  if (rows.length === 1) return rows[0];
+
+  const aggregate = rows.find(isAggregateRow);
+  if (aggregate) return aggregate;
+
+  return fold(rows);
+}
+
+// Groups rows by season and combines each group, preserving season order.
+function combineBySeason<T extends { season: number; team: string }>(
+  rows: T[],
+  fold: (rows: T[]) => T,
+): Map<number, T> {
+  const bySeason = new Map<number, T[]>();
+  for (const row of rows) {
+    const group = bySeason.get(row.season);
+    if (group) group.push(row);
+    else bySeason.set(row.season, [row]);
+  }
+
+  const combined = new Map<number, T>();
+  for (const [season, group] of bySeason) {
+    combined.set(season, combineSeasonRows(group, fold));
+  }
+  return combined;
+}
+
+// The synthesised team label for a folded multi-team season, matching PFR's
+// own convention so a rebuilt row is indistinguishable from a supplied one.
+function combinedTeamLabel(rows: unknown[]): string {
+  return `${rows.length}TM`;
+}
+
+function foldPassing(rows: FootballSeasonPassing[]): FootballSeasonPassing {
+  const cmp = sumField(rows, (r) => r.cmp);
+  const att = sumField(rows, (r) => r.att);
+  const yds = sumField(rows, (r) => r.yds);
+  const td = sumField(rows, (r) => r.td);
+  const int = sumField(rows, (r) => r.int);
+  return {
+    ...rows[0],
+    team: combinedTeamLabel(rows),
+    g: sumField(rows, (r) => r.g),
+    gs: sumField(rows, (r) => r.gs),
+    cmp,
+    att,
+    yds,
+    td,
+    int,
+    firstDowns: sumField(rows, (r) => r.firstDowns),
+    sacked: sumField(rows, (r) => r.sacked),
+    sackYds: sumField(rows, (r) => r.sackYds),
+    lng: maxField(rows, (r) => r.lng),
+    // Passer rating is not additive — recompute it from the combined line.
+    rating: computePasserRating(cmp, att, yds, td, int),
+  };
+}
+
+function foldRushing(rows: FootballSeasonRushing[]): FootballSeasonRushing {
+  const att = sumField(rows, (r) => r.att);
+  const yds = sumField(rows, (r) => r.yds);
+  return {
+    ...rows[0],
+    team: combinedTeamLabel(rows),
+    g: sumField(rows, (r) => r.g),
+    gs: sumField(rows, (r) => r.gs),
+    att,
+    yds,
+    td: sumField(rows, (r) => r.td),
+    lng: maxField(rows, (r) => r.lng),
+    firstDowns: sumField(rows, (r) => r.firstDowns),
+    fumbles: sumField(rows, (r) => r.fumbles),
+    ydsPerAtt: ratePerUnit(yds, att),
+  };
+}
+
+function foldReceiving(
+  rows: FootballSeasonReceiving[],
+): FootballSeasonReceiving {
+  const rec = sumField(rows, (r) => r.rec);
+  const yds = sumField(rows, (r) => r.yds);
+  return {
+    ...rows[0],
+    team: combinedTeamLabel(rows),
+    g: sumField(rows, (r) => r.g),
+    gs: sumField(rows, (r) => r.gs),
+    rec,
+    tgt: sumField(rows, (r) => r.tgt),
+    yds,
+    td: sumField(rows, (r) => r.td),
+    lng: maxField(rows, (r) => r.lng),
+    firstDowns: sumField(rows, (r) => r.firstDowns),
+    fumbles: sumField(rows, (r) => r.fumbles),
+    ydsPerRec: ratePerUnit(yds, rec),
+  };
+}
+
+function foldKicking(rows: FootballSeasonKicking[]): FootballSeasonKicking {
+  return {
+    ...rows[0],
+    team: combinedTeamLabel(rows),
+    g: sumField(rows, (r) => r.g),
+    fgm: sumField(rows, (r) => r.fgm),
+    fga: sumField(rows, (r) => r.fga),
+    xpm: sumField(rows, (r) => r.xpm),
+    xpa: sumField(rows, (r) => r.xpa),
+  };
+}
+
+function foldDefenseIdp(
+  rows: FootballSeasonDefenseIdp[],
+): FootballSeasonDefenseIdp {
+  return {
+    ...rows[0],
+    team: combinedTeamLabel(rows),
+    g: sumField(rows, (r) => r.g),
+    gs: sumField(rows, (r) => r.gs),
+    soloTkl: sumField(rows, (r) => r.soloTkl),
+    astTkl: sumField(rows, (r) => r.astTkl),
+    totalTkl: sumField(rows, (r) => r.totalTkl),
+    sacks: sumField(rows, (r) => r.sacks),
+    int: sumField(rows, (r) => r.int),
+    pd: sumField(rows, (r) => r.pd),
+    ff: sumField(rows, (r) => r.ff),
+    fr: sumField(rows, (r) => r.fr),
+    defTd: sumField(rows, (r) => r.defTd),
+    safeties: sumField(rows, (r) => r.safeties),
+  };
+}
 
 function parseMainPageYear(row: Row): number | null {
   const year = parseIntCell(row, 'year_id');
@@ -591,9 +808,12 @@ export function parseMainPageSeasonTotals(
 
   const passingTable = getTable(root, 'passing');
   if (passingTable) {
-    parseTableRows(passingTable, (r) =>
+    const rows = parseTableRows(passingTable, (r) =>
       parseMainPagePassingRow(r, player),
-    ).forEach((s) => passingBySeason.set(s.season, s));
+    );
+    for (const [season, s] of combineBySeason(rows, foldPassing)) {
+      passingBySeason.set(season, s);
+    }
   }
 
   // PFR names the skill table by primary position — try both orderings.
@@ -601,19 +821,34 @@ export function parseMainPageSeasonTotals(
     getTable(root, 'receiving_and_rushing') ??
     getTable(root, 'rushing_and_receiving');
   if (skillTable) {
-    parseTableRows(skillTable, (r) => parseMainPageSkillRow(r, player)).forEach(
-      ({ season, receiving, rushing }) => {
-        if (receiving) receivingBySeason.set(season, receiving);
-        if (rushing) rushingBySeason.set(season, rushing);
-      },
+    const rows = parseTableRows(skillTable, (r) =>
+      parseMainPageSkillRow(r, player),
     );
+    // The skill table interleaves two categories on one row; combine each
+    // independently so a season that produced only one of them is unaffected.
+    const receivingRows = rows
+      .map((r) => r.receiving)
+      .filter((r): r is FootballSeasonReceiving => r !== null);
+    const rushingRows = rows
+      .map((r) => r.rushing)
+      .filter((r): r is FootballSeasonRushing => r !== null);
+
+    for (const [season, s] of combineBySeason(receivingRows, foldReceiving)) {
+      receivingBySeason.set(season, s);
+    }
+    for (const [season, s] of combineBySeason(rushingRows, foldRushing)) {
+      rushingBySeason.set(season, s);
+    }
   }
 
   const scoringTable = getTable(root, 'scoring');
   if (scoringTable) {
-    parseTableRows(scoringTable, (r) =>
+    const rows = parseTableRows(scoringTable, (r) =>
       parseMainPageKickingRow(r, player),
-    ).forEach((s) => kickingBySeason.set(s.season, s));
+    );
+    for (const [season, s] of combineBySeason(rows, foldKicking)) {
+      kickingBySeason.set(season, s);
+    }
   }
 
   const allSeasons = new Set<number>([
@@ -737,12 +972,11 @@ export function parseMainPageDefenseSeasonTotals(
     return [];
   }
 
-  // One row per season: for multi-team seasons PFR emits individual team rows
-  // first and the aggregate "2TM"/"3TM" row last, so the later map.set() wins
-  // (same convention as the offensive parser).
-  const bySeason = new Map<number, FootballSeasonDefenseIdp>();
-  parseTableRows(table, (r) => parseMainPageDefenseRow(r, player)).forEach(
-    (s) => bySeason.set(s.season, s),
+  // One combined row per season — multi-team seasons are folded together
+  // rather than resolved by row order (same convention as the offensive parser).
+  const bySeason = combineBySeason(
+    parseTableRows(table, (r) => parseMainPageDefenseRow(r, player)),
+    foldDefenseIdp,
   );
 
   const seasons = [...bySeason.values()].sort((a, b) => a.season - b.season);

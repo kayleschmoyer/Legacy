@@ -1,0 +1,178 @@
+<!--
+  LS-9915 regression fixture: a WR (pfrId SanuMo00, Mohamed Sanu) with
+  multi-team seasons, exercising the two layouts the old order-dependent parser
+  got wrong. Stats are Sanu's real 2019 ATL/NWE splits.
+
+  2018 - single team (GNB). Control: must be unchanged by combination.
+
+  2019 - traded ATL -> NWE, with PFR's aggregate "2TM" row FIRST, before the
+  per-team rows. The old parser kept the LAST row (NWE) and reported an
+  8-game / 26-rec / 207-yd season against an actual 15 / 59 / 520.
+
+  2020 - traded ATL -> NWE with NO aggregate row at all. The combined line has
+  to be rebuilt by folding the per-team rows together.
+
+  Expected season totals:
+    2018: receiving(team=GNB, g=16, gs=14, tgt=66, rec=38, yds=446, td=3,
+          firstDowns=20, lng=32, ydsPerRec=11.7), rushing=null
+    2019: receiving(team=2TM, g=15, gs=9, tgt=90, rec=59, yds=520, td=1,
+          firstDowns=26, lng=32, ydsPerRec=8.8, fumbles=1)  <- aggregate row
+    2020: receiving(team=2TM, g=15, gs=9, tgt=90, rec=59, yds=520, td=1,
+          firstDowns=26, lng=32, ydsPerRec=8.8, fumbles=1)  <- folded ATL+NWE
+          rushing(team=2TM, g=15, gs=9, att=3, yds=18, td=1, firstDowns=1,
+          lng=9, ydsPerAtt=6, fumbles=1)
+-->
+<html>
+  <body>
+    <div id="content">
+      <!--
+        <table id="receiving_and_rushing">
+          <thead>
+            <tr>
+              <th data-stat="year_id">Year</th>
+              <th data-stat="team_name_abbr">Tm</th>
+              <th data-stat="games">G</th>
+              <th data-stat="games_started">GS</th>
+              <th data-stat="targets">Tgt</th>
+              <th data-stat="rec">Rec</th>
+              <th data-stat="rec_yds">Yds</th>
+              <th data-stat="rec_td">TD</th>
+              <th data-stat="rec_first_down">1D</th>
+              <th data-stat="rec_long">Lng</th>
+              <th data-stat="rec_yds_per_rec">Y/R</th>
+              <th data-stat="rush_att">Att</th>
+              <th data-stat="rush_yds">Yds</th>
+              <th data-stat="rush_td">TD</th>
+              <th data-stat="rush_first_down">1D</th>
+              <th data-stat="rush_long">Lng</th>
+              <th data-stat="rush_yds_per_att">Y/A</th>
+              <th data-stat="fumbles">Fmb</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th data-stat="year_id">2018</th>
+              <td data-stat="team_name_abbr"><a href="/teams/gnb/2018.htm">GNB</a></td>
+              <td data-stat="games">16</td>
+              <td data-stat="games_started">14</td>
+              <td data-stat="targets">66</td>
+              <td data-stat="rec">38</td>
+              <td data-stat="rec_yds">446</td>
+              <td data-stat="rec_td">3</td>
+              <td data-stat="rec_first_down">20</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">11.7</td>
+              <td data-stat="rush_att">0</td>
+              <td data-stat="rush_yds">0</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">0</td>
+              <td data-stat="rush_yds_per_att">0</td>
+              <td data-stat="fumbles">0</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2019</th>
+              <td data-stat="team_name_abbr">2TM</td>
+              <td data-stat="games">15</td>
+              <td data-stat="games_started">9</td>
+              <td data-stat="targets">90</td>
+              <td data-stat="rec">59</td>
+              <td data-stat="rec_yds">520</td>
+              <td data-stat="rec_td">1</td>
+              <td data-stat="rec_first_down">26</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">8.8</td>
+              <td data-stat="rush_att">0</td>
+              <td data-stat="rush_yds">0</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">0</td>
+              <td data-stat="rush_yds_per_att">0</td>
+              <td data-stat="fumbles">1</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2019</th>
+              <td data-stat="team_name_abbr"><a href="/teams/atl/2019.htm">ATL</a></td>
+              <td data-stat="games">7</td>
+              <td data-stat="games_started">6</td>
+              <td data-stat="targets">48</td>
+              <td data-stat="rec">33</td>
+              <td data-stat="rec_yds">313</td>
+              <td data-stat="rec_td">1</td>
+              <td data-stat="rec_first_down">16</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">9.5</td>
+              <td data-stat="rush_att">0</td>
+              <td data-stat="rush_yds">0</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">0</td>
+              <td data-stat="rush_yds_per_att">0</td>
+              <td data-stat="fumbles">1</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2019</th>
+              <td data-stat="team_name_abbr"><a href="/teams/nwe/2019.htm">NWE</a></td>
+              <td data-stat="games">8</td>
+              <td data-stat="games_started">3</td>
+              <td data-stat="targets">42</td>
+              <td data-stat="rec">26</td>
+              <td data-stat="rec_yds">207</td>
+              <td data-stat="rec_td">0</td>
+              <td data-stat="rec_first_down">10</td>
+              <td data-stat="rec_long">25</td>
+              <td data-stat="rec_yds_per_rec">8.0</td>
+              <td data-stat="rush_att">0</td>
+              <td data-stat="rush_yds">0</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">0</td>
+              <td data-stat="rush_yds_per_att">0</td>
+              <td data-stat="fumbles">0</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2020</th>
+              <td data-stat="team_name_abbr"><a href="/teams/atl/2020.htm">ATL</a></td>
+              <td data-stat="games">7</td>
+              <td data-stat="games_started">6</td>
+              <td data-stat="targets">48</td>
+              <td data-stat="rec">33</td>
+              <td data-stat="rec_yds">313</td>
+              <td data-stat="rec_td">1</td>
+              <td data-stat="rec_first_down">16</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">9.5</td>
+              <td data-stat="rush_att">2</td>
+              <td data-stat="rush_yds">14</td>
+              <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">1</td>
+              <td data-stat="rush_long">9</td>
+              <td data-stat="rush_yds_per_att">7.0</td>
+              <td data-stat="fumbles">1</td>
+            </tr>
+            <tr>
+              <th data-stat="year_id">2020</th>
+              <td data-stat="team_name_abbr"><a href="/teams/nwe/2020.htm">NWE</a></td>
+              <td data-stat="games">8</td>
+              <td data-stat="games_started">3</td>
+              <td data-stat="targets">42</td>
+              <td data-stat="rec">26</td>
+              <td data-stat="rec_yds">207</td>
+              <td data-stat="rec_td">0</td>
+              <td data-stat="rec_first_down">10</td>
+              <td data-stat="rec_long">25</td>
+              <td data-stat="rec_yds_per_rec">8.0</td>
+              <td data-stat="rush_att">1</td>
+              <td data-stat="rush_yds">4</td>
+              <td data-stat="rush_td">1</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">4</td>
+              <td data-stat="rush_yds_per_att">4.0</td>
+              <td data-stat="fumbles">0</td>
+            </tr>
+          </tbody>
+        </table>
+      -->
+    </div>
+  </body>
+</html>
