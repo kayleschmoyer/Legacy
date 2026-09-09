@@ -245,7 +245,7 @@ if (command) {
       'Deleting a .git directory destroys repository history. If a worktree needs cleanup, use `twig worktree clean`.',
     ],
     [
-      /git\s+(?:-C\s+\S+\s+)*push\b(?=[^\n]*(--force(?!-with-lease)\b|\s-f\b))/,
+      /git\s+(?:-C\s+\S+\s+)*push\b(?=[^;&|\n]*(--force(?!-with-lease)\b|\s-f\b))/,
       'force-push',
       'Bare force pushes can destroy remote history. Use --force-with-lease on a feature branch if a rewrite is genuinely required — and never on main.',
     ],
