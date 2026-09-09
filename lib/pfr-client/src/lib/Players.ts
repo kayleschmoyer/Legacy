@@ -79,8 +79,18 @@ export async function getPlayersByLetter(
 
     // Text following the anchor is `(POS) START-END`, e.g. "(OLB) 2019-2025".
     // (The <b> wrapper on active players does not affect el.text.)
+    // Hall of Fame inductees carry a trailing "+" directly after the name,
+    // outside the <a> tag, e.g. "Joe Montana+ (QB) 1979-1994" — strip it
+    // before matching the parenthesized position, or the regex anchor below
+    // never matches, rawPosition stays '', mapPfrPosition('') returns null,
+    // and processFootballLetter silently drops the player entirely (LS-9968:
+    // this is why HOF QBs — and Payton/Rice/Simpson — were absent from
+    // `players` while their non-HOF, same-letter contemporaries were fine).
     const elText = el.text.trim();
-    const afterName = elText.slice(name.length).trim();
+    const afterName = elText
+      .slice(name.length)
+      .trim()
+      .replace(/^\+\s*/, '');
 
     // Position is the parenthesized leading token, e.g. "(OLB)" → "OLB".
     // The [A-Z/]+ class keeps multi-position entries like "(DB/LB)" intact.

@@ -13,6 +13,7 @@ import { handleSeedDevData } from './commands/seedDevData';
 import { handleLoadSinglePlayerStats } from './commands/loadSinglePlayerStats';
 import { handleLoadGameStats } from './commands/loadGameStats';
 import { handleCheckStatsStatus } from './commands/checkStatsStatus';
+import { handleCheckFootballHofCoverage } from './commands/checkFootballHofCoverage';
 import { handleListPlayers } from './commands/listPlayers';
 import { handleTestAddPlayer } from './commands/testAddPlayer';
 import { handleTestConnection } from './commands/testConnection';
@@ -218,6 +219,14 @@ export function buildProgram(): Command {
     .command('check-stats-status')
     .description('Check the status of season stats loading')
     .action(handleCheckStatsStatus);
+
+  program
+    .command('check-football-hof-coverage')
+    .description(
+      'Regression check (LS-9968): fail if a known Hall of Fame / ' +
+        'all-time-great football player has no players row with a pfr_id',
+    )
+    .action(handleCheckFootballHofCoverage);
 
   program
     .command('list-players')

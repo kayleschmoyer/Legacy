@@ -60,7 +60,7 @@ describe('getPlayersByLetter — #div_players + parenthesized position', () => {
 
   it('parses every player entry in the list (non-empty)', async () => {
     const players = await getPlayersByLetter('A');
-    expect(players).toHaveLength(6);
+    expect(players).toHaveLength(7);
   });
 
   it('extracts pfrId, name, and parenthesized position', async () => {
@@ -105,10 +105,74 @@ describe('getPlayersByLetter — #div_players + parenthesized position', () => {
     expect(players.every((p) => p.lastTeam === null)).toBe(true);
   });
 
+  it('strips the Hall of Fame "+" marker so position still parses (LS-9968)', async () => {
+    const players = await getPlayersByLetter('A');
+    const aikman = players.find((p) => p.pfrId === 'AikmTr00');
+
+    expect(aikman).toEqual({
+      pfrId: 'AikmTr00',
+      name: 'Troy Aikman',
+      rawPosition: 'QB',
+      lastTeam: null,
+    });
+  });
+
   it('returns an empty array when #div_players is absent', async () => {
     mockGetPlayersList.mockResolvedValue('<html><body></body></html>');
     const players = await getPlayersByLetter('A');
     expect(players).toEqual([]);
+  });
+});
+
+describe('getPlayersByLetter — Hall of Fame "+" marker (LS-9968)', () => {
+  // PFR marks Hall of Fame inductees with a trailing "+" directly after the
+  // </a>, before the parenthesized position — e.g. "Joe Montana+ (QB)
+  // 1979-1994". Previously this left rawPosition empty, mapPfrPosition
+  // returned null, and processFootballLetter silently dropped the player.
+  const buildHtml = (href: string, name: string, pos: string) => `
+    <html>
+      <body>
+        <div id="div_players">
+          <p>
+            <a href="${href}">${name}</a>+ (${pos}) 1979-1994
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  it('parses position for an HOF-marked entry with a space before the paren', async () => {
+    mockGetPlayersList.mockResolvedValue(
+      buildHtml('/players/M/MontJo00.htm', 'Joe Montana', 'QB'),
+    );
+    const players = await getPlayersByLetter('M');
+
+    expect(players).toEqual([
+      {
+        pfrId: 'MontJo00',
+        name: 'Joe Montana',
+        rawPosition: 'QB',
+        lastTeam: null,
+      },
+    ]);
+  });
+
+  it('parses position for an HOF-marked entry with no space before the paren', async () => {
+    mockGetPlayersList.mockResolvedValue(`
+      <html><body><div id="div_players">
+        <p><a href="/players/R/RiceJe00.htm">Jerry Rice</a>+(WR) 1985-2004</p>
+      </div></body></html>
+    `);
+    const players = await getPlayersByLetter('R');
+
+    expect(players).toEqual([
+      {
+        pfrId: 'RiceJe00',
+        name: 'Jerry Rice',
+        rawPosition: 'WR',
+        lastTeam: null,
+      },
+    ]);
   });
 });
 
