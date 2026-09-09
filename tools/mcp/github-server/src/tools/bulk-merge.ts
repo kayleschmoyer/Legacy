@@ -1,5 +1,6 @@
+import { fetchPrLabels } from './manage-labels.js';
 import { getRepoOwnerName } from '../auth.js';
-import { githubGraphQL, githubRest } from '../github-api.js';
+import { githubRest } from '../github-api.js';
 import { assembleBatchResult, checkBatchSize, runBatch } from '../batch.js';
 import type { ToolResult } from '../types.js';
 
@@ -18,31 +19,11 @@ interface MergeResponse {
   message: string;
 }
 
-interface PRIdResponse {
-  repository: {
-    pullRequest: { id: string } | null;
-  };
-}
-
-interface EnableAutoMergeResponse {
-  enablePullRequestAutoMerge: {
-    pullRequest: { number: number; autoMergeRequest: { mergeMethod: string } };
-  };
-}
-
-const PR_ID_QUERY = `
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) { id }
-  }
-}`;
-
-const ENABLE_AUTO_MERGE_MUTATION = `
-mutation($prId: ID!) {
-  enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
-    pullRequest { number autoMergeRequest { mergeMethod } }
-  }
-}`;
+// This repo's merge queue (.github/workflows/merge-queue.yml) is a custom
+// label-based workflow, not GitHub's native merge queue/auto-merge feature —
+// see docs/ci-cd/merge-queue-guide.md. It watches for this label; nothing
+// else enqueues a PR into it.
+const MERGE_WHEN_READY_LABEL = 'merge-when-ready';
 
 interface BulkMergeSuccess {
   index: number;
@@ -84,23 +65,42 @@ export async function bulkMerge(params: BulkMergeParams): Promise<ToolResult> {
         };
       }
 
-      const prIdResult = await githubGraphQL<PRIdResponse>(PR_ID_QUERY, {
-        owner: repo.owner,
-        repo: repo.name,
-        number: item.number,
-      });
-      const prNode = prIdResult.data.repository.pullRequest;
-      if (!prNode) {
-        throw new Error(`PR #${item.number} not found.`);
+      // Queue strategy: apply the merge-when-ready label — that is what
+      // actually enqueues the PR into this repo's custom merge-queue
+      // workflow (GitHub's native `enablePullRequestAutoMerge` GraphQL
+      // mutation is a no-op here, so a caller trusting that mutation's
+      // success gets a false positive — see LS-9851/merge-pr.ts).
+      const labelsPath = `/repos/${repo.owner}/${repo.name}/issues/${item.number}/labels`;
+      try {
+        await githubRest({
+          method: 'POST',
+          path: labelsPath,
+          body: { labels: [MERGE_WHEN_READY_LABEL] },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('(404)')) {
+          throw new Error(`PR #${item.number} not found.`);
+        }
+        throw error;
       }
-      await githubGraphQL<EnableAutoMergeResponse>(ENABLE_AUTO_MERGE_MUTATION, {
-        prId: prNode.id,
-      });
+
+      // Verify the label actually took before reporting success — GitHub's
+      // Labels API can 200 without applying the label on a permission edge
+      // case, and trusting the POST response alone reproduces the exact
+      // silent-failure bug this fix addresses (LS-9851).
+      const currentLabels = await fetchPrLabels(labelsPath);
+      if (!currentLabels.includes(MERGE_WHEN_READY_LABEL)) {
+        throw new Error(
+          `PR #${item.number}: applied the ${MERGE_WHEN_READY_LABEL} label but it is not present on the PR afterward — the enqueue did not take effect. Merge manually via strategy: "direct" instead.`,
+        );
+      }
+
       return {
         index,
         number: item.number,
         strategy,
-        message: `PR #${item.number} enqueued for auto-merge (squash).`,
+        message: `PR #${item.number} labeled ${MERGE_WHEN_READY_LABEL} — the merge queue will process it automatically once all required checks pass.`,
       };
     },
     { concurrency: 5, keyOf: (item) => item.number },
