@@ -42,6 +42,19 @@ interface PRWhyBlockedGraphQLResponse {
       url: string;
       isDraft: boolean;
       mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+      // GitHub's own authoritative merge-gate rollup — recomputed asynchronously
+      // across ALL checks (not just the ones we resolve as "required"), reviews,
+      // and conflicts. Used as a backstop against our own required-check
+      // partition sampling too narrow a set of checks (LS-9888).
+      mergeStateStatus:
+        | 'BEHIND'
+        | 'BLOCKED'
+        | 'CLEAN'
+        | 'DIRTY'
+        | 'DRAFT'
+        | 'HAS_HOOKS'
+        | 'UNKNOWN'
+        | 'UNSTABLE';
       isInMergeQueue: boolean;
       reviewDecision: string | null;
       // Head commit SHA + base branch — used to evaluate required checks via REST
@@ -90,6 +103,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       url
       isDraft
       mergeable
+      mergeStateStatus
       isInMergeQueue
       reviewDecision
       headRefOid
@@ -454,14 +468,42 @@ export function diagnose(
     };
   }
 
+  // mergeStateStatus is GitHub's own authoritative merge-gate rollup, computed
+  // across every check on the SHA (not only the required-name subset our own
+  // `ci` partition tracks) plus reviews and conflicts. If everything we can see
+  // looks clear but GitHub still reports BLOCKED, our partition is missing a
+  // failing check outside its tracked scope — trust GitHub's verdict over ours
+  // rather than returning a false READY (LS-9888). A merge-when-ready label
+  // that reads absent here is consistent with the failure gate having just
+  // stripped it, so surface that pairing explicitly instead of staying silent.
+  if (pr.mergeStateStatus === 'BLOCKED') {
+    return {
+      status: 'BLOCKED',
+      reason: 'MERGE_STATE_BLOCKED',
+      summary:
+        'GitHub reports this PR as not mergeable (mergeStateStatus: BLOCKED), even though the required checks tracked here show no failures — a check outside that tracked scope is likely still red.' +
+        (!hasMergeWhenReady
+          ? ' merge-when-ready is not applied, consistent with the failure gate having just stripped it.'
+          : ''),
+      details: {
+        mergeStateStatus: pr.mergeStateStatus,
+        ciPassingRequiredChecks: ci.passing,
+        hasMergeWhenReady,
+      },
+      nextAction:
+        'Check all check-runs on the head SHA (not just required contexts) for failures and fix the root cause, then push a new commit. Do not apply merge-when-ready yourself — that label is restored by the Reviewer Bot / failure gate once checks are green.',
+    };
+  }
+
   // All clear
   return {
     status: 'READY',
     reason: 'READY',
-    summary: 'PR is approved, CI is passing, and there are no conflicts.',
+    summary:
+      'PR is approved, required CI checks are passing, and there are no conflicts.',
     details: {
       reviewDecision: effectiveReviewDecision,
-      ciPassing: ci.passing,
+      ciPassingRequiredChecks: ci.passing,
       hasMergeWhenReady,
       labels: [...labels],
       ...(labelsTruncated ? { labelsTruncated: true } : {}),
@@ -470,7 +512,7 @@ export function diagnose(
     },
     nextAction: hasMergeWhenReady
       ? 'merge-when-ready label is applied — the bot will merge this automatically.'
-      : 'Apply the merge-when-ready label (Reviewer Bot) or merge manually.',
+      : 'Wait for the Reviewer Bot to (re-)apply merge-when-ready now that checks are green, or ask a maintainer to merge manually. Do not apply merge-when-ready yourself — the Author Agent Contract forbids it.',
   };
 }
 

@@ -56,6 +56,7 @@ function makePR(overrides: Partial<PRInput> = {}): PRInput {
     url: 'https://github.com/owner/repo/pull/42',
     isDraft: false,
     mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
     isInMergeQueue: false,
     reviewDecision: null,
     headRefOid: 'deadbeef',
@@ -506,6 +507,58 @@ describe('diagnose', () => {
       const result = diagnose(pr, ci({ passing: 8 }));
       expect(result.status).toBe('READY');
       expect(result.reason).toBe('READY');
+      expect(
+        (result.details as { ciPassingRequiredChecks: number })
+          .ciPassingRequiredChecks,
+      ).toBe(8);
+    });
+
+    it('never tells the caller to apply merge-when-ready themselves when it is missing', () => {
+      const pr = withReview(
+        makePR({ reviewDecision: 'APPROVED' }),
+        'reviewer',
+        'APPROVED',
+      );
+      const result = diagnose(pr, ci({ passing: 8 }));
+      expect(result.nextAction).not.toContain('Apply the merge-when-ready');
+      expect(result.nextAction).toContain('Reviewer Bot');
+    });
+
+    // LS-9888: our own required-check partition can look fully green (a
+    // narrower required-name scope than the checks GitHub itself gates on)
+    // while GitHub's mergeStateStatus rollup — which considers every check on
+    // the SHA — still reports BLOCKED. Trust GitHub's verdict over ours rather
+    // than returning a false READY, especially since a just-stripped
+    // merge-when-ready label (hasMergeWhenReady: false) is itself evidence
+    // that a failure gate fired.
+    it('returns BLOCKED/MERGE_STATE_BLOCKED instead of READY when mergeStateStatus is BLOCKED despite a clean required-check partition', () => {
+      const pr = withReview(
+        makePR({ reviewDecision: 'APPROVED', mergeStateStatus: 'BLOCKED' }),
+        'reviewer',
+        'APPROVED',
+      );
+      const result = diagnose(pr, ci({ passing: 4 }));
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('MERGE_STATE_BLOCKED');
+      expect(
+        (result.details as { hasMergeWhenReady: boolean }).hasMergeWhenReady,
+      ).toBe(false);
+      expect(result.summary).toContain('stripped');
+      expect(result.nextAction).not.toContain('Apply the merge-when-ready');
+    });
+
+    it('does not mention a stripped label when mergeStateStatus is BLOCKED but merge-when-ready is still applied', () => {
+      const pr = withLabel(
+        withReview(
+          makePR({ reviewDecision: 'APPROVED', mergeStateStatus: 'BLOCKED' }),
+          'reviewer',
+          'APPROVED',
+        ),
+        'merge-when-ready',
+      );
+      const result = diagnose(pr, ci({ passing: 4 }));
+      expect(result.reason).toBe('MERGE_STATE_BLOCKED');
+      expect(result.summary).not.toContain('stripped');
     });
 
     it('includes labelsTruncated in details when labels page is truncated', () => {
