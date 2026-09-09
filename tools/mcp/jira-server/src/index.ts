@@ -327,7 +327,7 @@ server.tool(
 // --- jira_bulk_link_issues ---
 server.tool(
   'jira_bulk_link_issues',
-  'Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for "Blocks", inwardKey is blocked by outwardKey. Returns { total, succeeded, failed } — one link erroring never fails the whole batch.',
+  'Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for "Blocks", inwardKey is blocked by outwardKey. linkType is case/typo-tolerant. Returns { total, succeeded, failed } — one link erroring never fails the whole batch.',
   {
     links: z
       .array(
@@ -412,7 +412,7 @@ server.tool(
 // --- jira_link_issues ---
 server.tool(
   'jira_link_issues',
-  'Create a link between two tickets. For "Blocks": inwardKey is blocked by outwardKey.',
+  'Create a link between two tickets. For "Blocks": inwardKey is blocked by outwardKey. linkType is case/typo-tolerant.',
   {
     inwardKey: z
       .string()

@@ -1,4 +1,6 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { fetchLinkTypes, resolveLinkType } from './link-types.js';
 import { jiraRequest } from '../jira-api.js';
 
 interface LinkIssuesParams {
@@ -49,6 +51,38 @@ export async function linkIssues(
     };
   }
 
+  let resolvedLinkType = linkType;
+  try {
+    const types = await fetchLinkTypes();
+    const resolution = resolveLinkType(linkType, types);
+    if (resolution.resolved === null) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: `No issue link type matching "${linkType}" found.`,
+              suggestion: resolution.suggestion ?? undefined,
+              availableLinkTypes: resolution.availableNames,
+            }),
+          },
+        ],
+      };
+    }
+    resolvedLinkType = resolution.resolved;
+  } catch (error) {
+    // Link-type discovery failed (e.g. transient network error) — fall back
+    // to the caller's literal string so a working exact-name call still
+    // succeeds instead of being blocked by a discovery-only failure.
+    LOGGER.error(
+      `Link type discovery failed, forwarding "${linkType}" verbatim`,
+      error instanceof Error ? error : new Error(String(error)),
+      { linkType },
+    );
+  }
+
   try {
     // Jira's POST treats `inwardIssue` as the outward (e.g. blocker) end of the link
     // and `outwardIssue` as the inward (e.g. blocked) end — the inverse of our public
@@ -57,7 +91,7 @@ export async function linkIssues(
       method: 'POST',
       path: '/rest/api/3/issueLink',
       body: {
-        type: { name: linkType },
+        type: { name: resolvedLinkType },
         inwardIssue: { key: outwardKey },
         outwardIssue: { key: inwardKey },
       },
@@ -69,10 +103,10 @@ export async function linkIssues(
           type: 'text',
           text: JSON.stringify({
             success: true,
-            linkType,
+            linkType: resolvedLinkType,
             inwardKey,
             outwardKey,
-            message: `Created "${linkType}" link: ${inwardKey} (inward) ← ${outwardKey} (outward)`,
+            message: `Created "${resolvedLinkType}" link: ${inwardKey} (inward) ← ${outwardKey} (outward)`,
           }),
         },
       ],

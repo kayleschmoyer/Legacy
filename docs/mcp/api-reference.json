@@ -6409,7 +6409,7 @@
         },
         {
           "name": "jira_bulk_link_issues",
-          "description": "Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for \"Blocks\", inwardKey is blocked by outwardKey. Returns { total, succeeded, failed } — one link erroring never fails the whole batch.",
+          "description": "Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for \"Blocks\", inwardKey is blocked by outwardKey. linkType is case/typo-tolerant. Returns { total, succeeded, failed } — one link erroring never fails the whole batch.",
           "inputs": {
             "links": {
               "type": "array",
@@ -6801,7 +6801,7 @@
         },
         {
           "name": "jira_link_issues",
-          "description": "Create a link between two tickets. For \"Blocks\": inwardKey is blocked by outwardKey.",
+          "description": "Create a link between two tickets. For \"Blocks\": inwardKey is blocked by outwardKey. linkType is case/typo-tolerant.",
           "inputs": {
             "inwardKey": {
               "type": "string",

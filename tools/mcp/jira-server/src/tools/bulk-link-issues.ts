@@ -1,4 +1,10 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  fetchLinkTypes,
+  type JiraLinkType,
+  resolveLinkType,
+} from './link-types.js';
 import { jiraRequest } from '../jira-api.js';
 
 export interface BulkLinkInput {
@@ -51,6 +57,20 @@ export async function bulkLinkIssues(
   const succeeded: SucceededEntry[] = [];
   const failed: FailedEntry[] = [];
 
+  // Resolve link types once for the whole batch (shared cache in link-types.ts
+  // also dedupes this against a same-process jira_link_issues call). A
+  // discovery failure falls back to forwarding each linkType verbatim, same
+  // as the single-item tool, so exact-name calls still succeed.
+  let linkTypes: JiraLinkType[] | null = null;
+  try {
+    linkTypes = await fetchLinkTypes();
+  } catch (error) {
+    LOGGER.error(
+      'Link type discovery failed, forwarding linkTypes verbatim',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
+
   async function runOne(link: BulkLinkInput, index: number): Promise<void> {
     const { inwardKey, outwardKey, linkType } = link;
     if (inwardKey === outwardKey) {
@@ -64,6 +84,22 @@ export async function bulkLinkIssues(
       return;
     }
 
+    let resolvedLinkType = linkType;
+    if (linkTypes) {
+      const resolution = resolveLinkType(linkType, linkTypes);
+      if (resolution.resolved === null) {
+        failed.push({
+          index,
+          inwardKey,
+          outwardKey,
+          linkType,
+          error: `No issue link type matching "${linkType}" found.${resolution.suggestion ? ` Did you mean "${resolution.suggestion}"?` : ''} Available: ${resolution.availableNames.join(', ')}`,
+        });
+        return;
+      }
+      resolvedLinkType = resolution.resolved;
+    }
+
     try {
       // Same param swap as single-item link-issues.ts — Jira's POST treats
       // `inwardIssue` as the outward (blocker) end of the link.
@@ -71,15 +107,26 @@ export async function bulkLinkIssues(
         method: 'POST',
         path: '/rest/api/3/issueLink',
         body: {
-          type: { name: linkType },
+          type: { name: resolvedLinkType },
           inwardIssue: { key: outwardKey },
           outwardIssue: { key: inwardKey },
         },
       });
-      succeeded.push({ index, inwardKey, outwardKey, linkType });
+      succeeded.push({
+        index,
+        inwardKey,
+        outwardKey,
+        linkType: resolvedLinkType,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      failed.push({ index, inwardKey, outwardKey, linkType, error: message });
+      failed.push({
+        index,
+        inwardKey,
+        outwardKey,
+        linkType: resolvedLinkType,
+        error: message,
+      });
     }
   }
 
