@@ -176,11 +176,59 @@ function main() {
   }
 
   // 3. Format exactly those files -- not the whole repo.
+  //
+  //    Prettier's own `--write` is not guaranteed to reach a fixed point in a
+  //    single pass for every file it formats (observed for GFM markdown
+  //    tables, LS-9894): a `--write` can leave a file in a state that
+  //    prettier's own `--list-different`/`--check` on that same file still
+  //    flags as needing formatting. Committing after only one pass can
+  //    therefore commit output that fails CI's independent
+  //    `pnpm exec prettier --check` on the exact file this step just wrote.
+  //    Verify convergence after each write and re-write anything that still
+  //    disagrees, up to MAX_FORMAT_PASSES, so the commit never contains
+  //    output prettier itself considers non-canonical.
   console.log('  Formatting changed files; committing as a new commit...');
-  const writeResult = runPrettier(['--write', '--ignore-unknown', ...files]);
-  if (writeResult.status !== 0) {
-    process.stderr.write(writeResult.stderr || writeResult.stdout || '');
-    process.exitCode = writeResult.status ?? 1;
+  const MAX_FORMAT_PASSES = 3;
+  let remaining = files;
+  for (let pass = 1; pass <= MAX_FORMAT_PASSES; pass++) {
+    const writeResult = runPrettier([
+      '--write',
+      '--ignore-unknown',
+      ...remaining,
+    ]);
+    if (writeResult.status !== 0) {
+      process.stderr.write(writeResult.stderr || writeResult.stdout || '');
+      process.exitCode = writeResult.status ?? 1;
+      return;
+    }
+
+    const verifyResult = runPrettier([
+      '--list-different',
+      '--ignore-unknown',
+      ...remaining,
+    ]);
+    if (verifyResult.status !== 0 && verifyResult.status !== 1) {
+      process.stderr.write(verifyResult.stderr || verifyResult.stdout || '');
+      process.exitCode = verifyResult.status ?? 1;
+      return;
+    }
+    remaining = parseFileList(verifyResult.stdout);
+    if (remaining.length === 0) {
+      break;
+    }
+  }
+
+  if (remaining.length > 0) {
+    console.error('');
+    console.error(
+      `ERROR: prettier --write did not converge after ${MAX_FORMAT_PASSES} passes for:`,
+    );
+    console.error(remaining.map((file) => `  ${file}`).join('\n'));
+    console.error('');
+    console.error(
+      'Run `pnpm exec prettier --write` on these files manually and investigate (LS-9894).',
+    );
+    process.exitCode = 1;
     return;
   }
 

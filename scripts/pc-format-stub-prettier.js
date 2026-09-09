@@ -18,11 +18,18 @@ const path = require('node:path');
 
 const DIRTY_FILE = 'needs-format.js';
 const UNRELATED_FILE = 'unrelated.txt';
+const WRITTEN_MARKER = '.stub-written';
 
 const args = process.argv.slice(2);
 const cwd = process.cwd();
+const writtenMarkerPath = path.join(cwd, WRITTEN_MARKER);
 
 if (args.includes('--list-different')) {
+  // Converges after a single --write, unlike the LS-9894 two-pass/
+  // never-converges stubs -- this models the common case.
+  if (fs.existsSync(writtenMarkerPath)) {
+    process.exit(0);
+  }
   process.stdout.write(`${DIRTY_FILE}\n`);
   process.exit(1); // prettier's real exit code when differences are found
 }
@@ -38,6 +45,7 @@ if (args.includes('--write')) {
   for (const file of targetFiles) {
     fs.writeFileSync(path.join(cwd, file), 'formatted-content\n');
   }
+  fs.writeFileSync(writtenMarkerPath, '1');
   process.exit(0);
 }
 
