@@ -262,3 +262,65 @@ describe('reclassifyAffirmationFindings — PR #7447 regression (LS-9685)', () =
     );
   });
 });
+
+// LS-9826: this [HIGH][contract] finding is reproduced verbatim from PR
+// #7473 (LS-9634 session, 2026-09-03). It escaped the guard because the verb
+// after "correctly" was "uses" (not in the correctly-verb list) and the
+// closing line ("This is a critical security improvement...") didn't match
+// any affirmation phrase. It set the review to changes_requested and blocked
+// the merge queue despite describing only correct, already-implemented
+// behavior with no actionable ask.
+const PR_7473_ESCAPE = {
+  severity: 'high',
+  file: 'tools/mcp/github-server/src/tools/list-prs.ts',
+  line: 160,
+  title: 'Robust regex validation for paths parameter',
+  body: 'The compilePathPatterns function correctly uses safe-regex to prevent catastrophic backtracking (ReDoS) attacks from user-provided regex patterns. It also includes length validation and clear error messages for invalid patterns. This is a critical security improvement for handling external input.',
+};
+
+describe('isAffirmationFinding — "correctly uses" / critical-improvement template (LS-9826)', () => {
+  it('flags the pure-praise finding that escaped on PR #7473', () => {
+    assert.ok(isAffirmationFinding(PR_7473_ESCAPE));
+  });
+
+  it('flags other "correctly/properly uses" and "good practice" phrasings', () => {
+    const cases = [
+      'The helper correctly uses a bounded retry to avoid hammering the API.',
+      'This properly uses a parameterised query to guard against injection.',
+      'Adding a changelog entry here is a good practice.',
+      'This is a critical improvement for the auth flow overall.',
+    ];
+    for (const body of cases) {
+      assert.ok(
+        isAffirmationFinding({ title: '', body }),
+        `should flag: ${body}`,
+      );
+    }
+  });
+
+  it('does not flag "uses"/"improvement" phrasing that also carries a defect', () => {
+    const cases = [
+      'This correctly uses safe-regex, but should also cap the pattern count.',
+      'Good practice overall, though the error message needs to redact the internal path.',
+    ];
+    for (const body of cases) {
+      assert.equal(
+        isAffirmationFinding({ title: '', body }),
+        false,
+        `should not flag: ${body}`,
+      );
+    }
+  });
+});
+
+describe('reclassifyAffirmationFindings — PR #7473 regression (LS-9826)', () => {
+  it('reclassifies the escaped finding to observation severity', () => {
+    const { kept, reclassified } = reclassifyAffirmationFindings([
+      PR_7473_ESCAPE,
+    ]);
+    assert.equal(reclassified.length, 1);
+    assert.equal(kept[0].severity, 'observation');
+    assert.equal(reclassified[0].from_severity, 'high');
+    assert.equal(reclassified[0].reclass_reason, 'affirmation_polarity');
+  });
+});

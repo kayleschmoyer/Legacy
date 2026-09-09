@@ -34,12 +34,24 @@
  * correctly-handled case equally well, so praise for error handling used to
  * disqualify itself. They now disqualify a finding only outside the benign
  * contexts documented on FAILURE_NOUN_RE below.
+ *
+ * LS-9826: the phrase list above still missed a common shape — praise
+ * phrased as "correctly uses X to prevent/guard/handle Y" (verb after
+ * "correctly"/"properly" is "use", not one of the listed verbs) and
+ * "this is a critical security improvement" / "is a good practice"
+ * closing-line templates. PR #7473 got a [HIGH] finding entirely in this
+ * shape ("The compilePathPatterns function correctly uses safe-regex to
+ * prevent catastrophic backtracking... This is a critical security
+ * improvement for handling external input.") that set the review to
+ * changes_requested with nothing actionable in it. "use" was added to the
+ * correctly/properly verb lists and a template phrase was added for the
+ * critical-improvement / good-practice closing lines.
  */
 
 // Phrases that only appear when a finding is praising something the PR
 // already does correctly — never part of a defect report.
 const AFFIRMATION_PHRASE_RE =
-  /\b(directly addresses|crucial for|excellent (?:refactor|fix|approach|work|choice|implementation|catch)|correctly (?:implement|handle|address|resolve|prevent|fix)\w*|properly (?:handle|implement|address|guard|validat)\w*|successfully (?:fix|resolve|address|prevent)\w*|great (?:fix|work|job|catch|approach)|good (?:catch|fix|call|choice)|well[- ]?done|nicely (?:handle|do|implement)\w*|solid (?:fix|approach|implementation))\b/i;
+  /\b(directly addresses|crucial for|excellent (?:refactor|fix|approach|work|choice|implementation|catch)|correctly (?:implement|handle|address|resolve|prevent|fix|use)\w*|properly (?:handle|implement|address|guard|validat|use)\w*|successfully (?:fix|resolve|address|prevent)\w*|great (?:fix|work|job|catch|approach)|good (?:catch|fix|call|choice|practice)|well[- ]?done|nicely (?:handle|do|implement)\w*|solid (?:fix|approach|implementation)|critical\s+(?:security|reliability|performance)?\s*improvement)\b/i;
 
 // Unambiguously corrective language: a request for a change, a negation of
 // current behaviour, or a work marker. Any of these disqualifies a finding
