@@ -119,10 +119,18 @@ export async function searchLogs(
     // surface it so a zero-match result is never read as a clean negative.
     const jobsUnsearched = rawLogs.jobsTotal - rawLogs.jobsSearched;
     const partialCoverage = jobsUnsearched > 0;
+    // Name the actual skipped jobs and why (LS-9748) — the earlier version of
+    // this note only ever gave a count and a generic "excluded by failedOnly
+    // and/or the per-call job cap" catch-all, which left a caller unable to
+    // tell which specific jobs were missed or which of the two reasons
+    // applied to which job.
+    const skippedJobsList = (rawLogs.skippedJobs ?? [])
+      .map((j) => `"${j.name}" (${j.reason})`)
+      .join(', ');
     const scopeNote = rawLogs.skippedByFailedOnly
-      ? `0 of ${rawLogs.jobsTotal} job(s) were searched — all were excluded by failedOnly=true (default). Retry with failedOnly=false to search successful-job logs too.`
+      ? `0 of ${rawLogs.jobsTotal} job(s) were searched — all were excluded by failedOnly=true (default)${skippedJobsList ? `: ${skippedJobsList}` : ''}. Retry with failedOnly=false to search successful-job logs too.`
       : partialCoverage
-        ? `${rawLogs.jobsSearched} of ${rawLogs.jobsTotal} job(s) were searched — ${jobsUnsearched} job(s) were not searched (excluded by failedOnly=true and/or the per-call job cap). A 0-match result does NOT mean the pattern is absent from the run. Retry with failedOnly=false and/or jobName/jobId to cover the remaining job(s).`
+        ? `${rawLogs.jobsSearched} of ${rawLogs.jobsTotal} job(s) were searched — ${jobsUnsearched} job(s) were not searched${skippedJobsList ? `: ${skippedJobsList}` : ' (excluded by failedOnly=true and/or the per-call job cap)'}. A 0-match result does NOT mean the pattern is absent from the run. Retry with failedOnly=false and/or jobName/jobId to cover the remaining job(s).`
         : undefined;
 
     return {

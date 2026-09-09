@@ -277,9 +277,20 @@ export function extractZipEntriesRaw(buffer: ArrayBuffer): RawZipEntry[] {
                 maxOutputLength: MAX_UNCOMPRESSED_ENTRY_BYTES,
               }),
             });
-          } else if (compressionMethod === 0 && !streamed) {
-            // Stored (no compression) — only trustworthy when the header's
-            // size fields are real, i.e. not a streamed entry.
+          } else if (compressionMethod === 0) {
+            // Stored (no compression) — `compressedData`'s bounds come from
+            // `entryEnd`, which for a streamed entry is located by scanning
+            // forward for the next entry signature (findStreamedEntryEnd),
+            // not from the (zeroed, untrustworthy) header size fields. That
+            // makes the bytes just as trustworthy for a streamed stored
+            // entry as for a non-streamed one — the earlier `&& !streamed`
+            // guard here silently dropped every streamed+stored entry
+            // (neither this branch nor the deflate branch above claimed it),
+            // losing that step's log output entirely with no warning
+            // (LS-9748): a search against a job whose failing step happened
+            // to be archived this way would report 0 matches — full
+            // coverage, matches genuinely absent — when the content was
+            // simply never extracted.
             entries.push({ name, data: Buffer.from(compressedData) });
           }
         } catch {
@@ -541,6 +552,14 @@ export interface FetchRunLogsResult {
    */
   skippedByFailedOnly: boolean;
   /**
+   * Every job in scope that was NOT searched, with a human-readable reason
+   * (LS-9748) — named explicitly rather than only counted, so a caller (or
+   * the agent reading `ci_search_logs`' output) can see exactly which jobs a
+   * `truncated: true` / partial-coverage result left uncovered instead of
+   * just a count. Empty/absent when `jobsSearched === jobsTotal`.
+   */
+  skippedJobs?: Array<{ name: string; reason: string }>;
+  /**
    * The single job `jobName` resolved to, echoed back so a caller can see
    * exactly which job answered the query (LS-9578) — present only when
    * `jobName` was given and resolved to exactly one job.
@@ -594,11 +613,18 @@ export async function fetchRunLogs(
 
   const failedOnly = params.failedOnly !== false;
   const jobsTotal = allJobs.length;
+  const excludedByFailedOnly = failedOnly
+    ? allJobs.filter((j) => j.conclusion === 'success')
+    : [];
   let jobs = failedOnly
     ? allJobs.filter((j) => j.conclusion !== 'success')
     : allJobs;
 
   const skippedByFailedOnly = failedOnly && jobsTotal > 0 && jobs.length === 0;
+  const failedOnlySkippedJobs = excludedByFailedOnly.map((j) => ({
+    name: j.name,
+    reason: 'excluded by failedOnly=true (job conclusion: success)',
+  }));
 
   if (jobs.length === 0) {
     return {
@@ -608,12 +634,16 @@ export async function fetchRunLogs(
       jobsSearched: 0,
       jobsTotal,
       skippedByFailedOnly,
+      skippedJobs:
+        failedOnlySkippedJobs.length > 0 ? failedOnlySkippedJobs : undefined,
       resolvedJobName,
       resolvedJobId,
     };
   }
 
-  const skipped = jobs.length > MAX_LOG_JOBS ? jobs.length - MAX_LOG_JOBS : 0;
+  const overCapJobs =
+    jobs.length > MAX_LOG_JOBS ? jobs.slice(MAX_LOG_JOBS) : [];
+  const skipped = overCapJobs.length;
   if (skipped > 0) jobs = jobs.slice(0, MAX_LOG_JOBS);
 
   // Fetch logs with concurrency limiting to avoid OOM and rate limiting
@@ -629,11 +659,20 @@ export async function fetchRunLogs(
     );
   }
 
+  const skippedJobs = [
+    ...failedOnlySkippedJobs,
+    ...overCapJobs.map((j) => ({
+      name: j.name,
+      reason: `excluded by the per-call job cap (MAX_LOG_JOBS=${MAX_LOG_JOBS}) — use jobName or jobId to fetch it directly`,
+    })),
+  ];
+
   return {
     text: logEntries.join('\n\n'),
     jobsSearched: jobs.length,
     jobsTotal,
     skippedByFailedOnly: false,
+    skippedJobs: skippedJobs.length > 0 ? skippedJobs : undefined,
     resolvedJobName,
     resolvedJobId,
   };

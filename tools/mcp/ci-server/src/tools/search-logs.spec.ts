@@ -291,6 +291,37 @@ describe('searchLogs partial job coverage (LS-9389)', () => {
     expect(parsed.scopeNote).toMatch(/does NOT mean the pattern is absent/);
   });
 
+  it('names the actual skipped jobs and reasons in the scopeNote (LS-9748)', async () => {
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('some-failed-job\nunrelated output', {
+        jobsSearched: 7,
+        jobsTotal: 26,
+        skippedByFailedOnly: false,
+        skippedJobs: [
+          {
+            name: 'lint',
+            reason: 'excluded by failedOnly=true (job conclusion: success)',
+          },
+          {
+            name: 'e2e-shard-12',
+            reason: 'excluded by the per-call job cap (MAX_LOG_JOBS=10)',
+          },
+        ],
+      }),
+    );
+    const result = await searchLogs({
+      runId: 32696766559,
+      pattern: 'FootballLeagueId',
+    });
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.scopeNote).toContain('"lint"');
+    expect(parsed.scopeNote).toContain('excluded by failedOnly=true');
+    expect(parsed.scopeNote).toContain('"e2e-shard-12"');
+    expect(parsed.scopeNote).toContain('per-call job cap');
+  });
+
   it('does not flag partial coverage when every job in scope was searched', async () => {
     mockFetchRunLogs.mockResolvedValue(
       fetchResult('job-a\nMATCH here', {

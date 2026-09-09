@@ -82,6 +82,37 @@ function buildStreamedDeflateZipEntry(name: string, text: string): Buffer {
   return Buffer.concat([header, nameBuf, compressed, dataDescriptor]);
 }
 
+/**
+ * Build a STORED (no compression) ZIP local file entry with general-purpose
+ * bit 3 set — a streamed entry (zeroed header sizes, trailing data
+ * descriptor) whose compression method is "stored" rather than deflate. Real
+ * ZIP writers can legitimately emit this shape (e.g. an already-compressed
+ * or very small step's output written via the same streaming path used for
+ * larger entries) — LS-9748.
+ */
+function buildStreamedStoredZipEntry(name: string, text: string): Buffer {
+  const nameBuf = Buffer.from(name, 'utf-8');
+  const data = Buffer.from(text, 'utf-8');
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0); // local file header signature
+  header.writeUInt16LE(20, 4); // version needed to extract
+  header.writeUInt16LE(0x0008, 6); // general purpose bit flag: data descriptor follows
+  header.writeUInt16LE(0, 8); // compression method: stored
+  header.writeUInt32LE(0, 14); // crc-32: zeroed
+  header.writeUInt32LE(0, 18); // compressed size: zeroed
+  header.writeUInt32LE(0, 22); // uncompressed size: zeroed
+  header.writeUInt16LE(nameBuf.length, 26); // file name length
+  header.writeUInt16LE(0, 28); // extra field length
+
+  const dataDescriptor = Buffer.alloc(16);
+  dataDescriptor.writeUInt32LE(0x08074b50, 0); // optional data descriptor signature
+  dataDescriptor.writeUInt32LE(0, 4); // crc-32
+  dataDescriptor.writeUInt32LE(data.length, 8); // compressed size == uncompressed size (stored)
+  dataDescriptor.writeUInt32LE(data.length, 12); // uncompressed size
+
+  return Buffer.concat([header, nameBuf, data, dataDescriptor]);
+}
+
 describe('stripAnsiCodes (LS-9557)', () => {
   // Built from String.fromCharCode rather than a \x1b literal — same
   // no-control-regex rationale as logs.ts / get-logs.ts.
@@ -550,6 +581,17 @@ describe('fetchRunLogs scope metadata (LS-8301)', () => {
       jobsSearched: 0,
       jobsTotal: 2,
       skippedByFailedOnly: true,
+      // LS-9748: the skipped jobs are named explicitly, not just counted.
+      skippedJobs: [
+        {
+          name: 'merge-queue-processor',
+          reason: 'excluded by failedOnly=true (job conclusion: success)',
+        },
+        {
+          name: 'notify',
+          reason: 'excluded by failedOnly=true (job conclusion: success)',
+        },
+      ],
     });
     expect(mockGithubGetArrayBuffer).not.toHaveBeenCalled();
   });
@@ -642,6 +684,41 @@ describe('fetchRunLogs scope metadata (LS-8301)', () => {
     expect(result.jobsSearched).toBe(1);
     expect(result.jobsTotal).toBe(2);
     expect(result.skippedByFailedOnly).toBe(false);
+    expect(result.skippedJobs).toEqual([
+      {
+        name: 'ok-job',
+        reason: 'excluded by failedOnly=true (job conclusion: success)',
+      },
+    ]);
+  });
+
+  it('names the jobs skipped by the per-call job cap (LS-9748)', async () => {
+    // 12 failed jobs, over the MAX_LOG_JOBS=10 cap — the 2 beyond the cap
+    // must be named, not just counted, so a caller reading a partial-coverage
+    // result knows exactly which jobs to re-fetch with jobName/jobId.
+    const jobs = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1,
+      name: `job-${i + 1}`,
+      status: 'completed',
+      conclusion: 'failure',
+    }));
+    mockGithubGet.mockResolvedValue({ total_count: 12, jobs });
+    mockGithubGetArrayBuffer.mockResolvedValue(textToArrayBuffer('boom'));
+
+    const result = await fetchRunLogs({ runId: 1, failedOnly: true });
+
+    expect(result.jobsSearched).toBe(10);
+    expect(result.jobsTotal).toBe(12);
+    expect(result.skippedJobs).toEqual([
+      {
+        name: 'job-11',
+        reason: expect.stringContaining('per-call job cap'),
+      },
+      {
+        name: 'job-12',
+        reason: expect.stringContaining('per-call job cap'),
+      },
+    ]);
   });
 });
 
@@ -673,6 +750,40 @@ describe('extractTextFromZip streamed (data-descriptor) entries (LS-9229)', () =
 
     expect(result.text).toContain('Setting up job');
     expect(result.text).toContain('42 passed (18s)');
+  });
+
+  it('reads content from a streamed STORED (uncompressed) entry (LS-9748)', async () => {
+    // A streamed entry (general-purpose bit 3 set) whose compression method
+    // is "stored" rather than deflate. Before the fix, `compressionMethod
+    // === 0` only pushed the entry when `!streamed` — so this shape matched
+    // neither the deflate branch (wrong compression method) nor the stored
+    // branch (excluded by the `!streamed` guard) and was silently dropped,
+    // even though `compressedData`'s bounds (found via signature-scanning)
+    // are just as trustworthy here as for a streamed deflate entry. This is
+    // exactly the failure mode behind LS-9748: a search against a job whose
+    // matching step happened to be archived this way reported 0 matches with
+    // full (mis-reported) coverage, because the content was never extracted
+    // in the first place — not because the pattern was genuinely absent.
+    const zip = Buffer.concat([
+      buildStoredZipEntry('1_setup.txt', 'Setting up job\n'),
+      buildStreamedStoredZipEntry(
+        '2_lint.txt',
+        'Running lint\nFootballLeagueId is defined but never used\n',
+      ),
+      // Real ZIP archives always end in a central directory; without this
+      // marker the streamed entry's data boundary would be the buffer end,
+      // swallowing its own trailing data-descriptor bytes into the "stored"
+      // text (harmless for the deflate case above since deflate streams are
+      // self-terminating, but not for a literal stored copy).
+      Buffer.from([0x50, 0x4b, 0x01, 0x02]), // central directory file header signature
+    ]);
+
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(zip));
+
+    const result = await fetchRunLogs({ jobId: 42 });
+
+    expect(result.text).toContain('Setting up job');
+    expect(result.text).toContain('FootballLeagueId is defined but never used');
   });
 
   it('reads a streamed entry that is the only entry in the archive', async () => {
