@@ -1,6 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { fetchPrLabels } from './manage-labels.js';
 import { getRepoOwnerName } from '../auth.js';
-import { githubGraphQL, githubRest } from '../github-api.js';
+import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface MergePRParams {
@@ -14,31 +15,11 @@ interface MergeResponse {
   message: string;
 }
 
-interface PRIdResponse {
-  repository: {
-    pullRequest: { id: string } | null;
-  };
-}
-
-interface EnableAutoMergeResponse {
-  enablePullRequestAutoMerge: {
-    pullRequest: { number: number; autoMergeRequest: { mergeMethod: string } };
-  };
-}
-
-const PR_ID_QUERY = `
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) { id }
-  }
-}`;
-
-const ENABLE_AUTO_MERGE_MUTATION = `
-mutation($prId: ID!) {
-  enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
-    pullRequest { number autoMergeRequest { mergeMethod } }
-  }
-}`;
+// This repo's merge queue (.github/workflows/merge-queue.yml) is a custom
+// label-based workflow, not GitHub's native merge queue/auto-merge feature —
+// see docs/ci-cd/merge-queue-guide.md. It watches for this label; nothing
+// else enqueues a PR into it.
+const MERGE_WHEN_READY_LABEL = 'merge-when-ready';
 
 export async function mergePR(params: MergePRParams): Promise<ToolResult> {
   try {
@@ -72,29 +53,47 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
       };
     }
 
-    // Queue strategy: enable auto-merge via GraphQL
-    const prIdResult = await githubGraphQL<PRIdResponse>(PR_ID_QUERY, {
-      owner: repo.owner,
-      repo: repo.name,
-      number: params.number,
-    });
-    const prNode = prIdResult.data.repository.pullRequest;
-    if (!prNode) {
+    // Queue strategy: apply the merge-when-ready label — that is what
+    // actually enqueues the PR into this repo's custom merge-queue workflow
+    // (GitHub's native `enablePullRequestAutoMerge` GraphQL mutation is a
+    // no-op here: this repo doesn't use GitHub's built-in merge queue at
+    // all, so a caller trusting that mutation's success gets a false
+    // positive — the PR never enters the queue that actually merges PRs).
+    const labelsPath = `/repos/${repo.owner}/${repo.name}/issues/${params.number}/labels`;
+    try {
+      await githubRest({
+        method: 'POST',
+        path: labelsPath,
+        body: { labels: [MERGE_WHEN_READY_LABEL] },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('(404)')) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `PR #${params.number} not found.` }],
+        };
+      }
+      throw error;
+    }
+
+    // Verify the label actually took — GitHub's Labels API can 200 without
+    // applying the label on a permission edge case, and a caller trusting
+    // the POST response alone reproduces the exact silent-failure bug this
+    // fix addresses (LS-9851). Confirm the enqueue really happened before
+    // reporting success.
+    const currentLabels = await fetchPrLabels(labelsPath);
+    if (!currentLabels.includes(MERGE_WHEN_READY_LABEL)) {
       return {
         isError: true,
         content: [
           {
             type: 'text',
-            text: `PR #${params.number} not found.`,
+            text: `PR #${params.number}: applied the ${MERGE_WHEN_READY_LABEL} label but it is not present on the PR afterward — the enqueue did not take effect. Merge manually via strategy: "direct" instead.`,
           },
         ],
       };
     }
-    const prId = prNode.id;
-
-    await githubGraphQL<EnableAutoMergeResponse>(ENABLE_AUTO_MERGE_MUTATION, {
-      prId,
-    });
 
     return {
       content: [
@@ -104,7 +103,7 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
             success: true,
             prNumber: params.number,
             strategy: params.strategy,
-            output: `PR #${params.number} enqueued for auto-merge (squash).`,
+            output: `PR #${params.number} labeled ${MERGE_WHEN_READY_LABEL} — the merge queue will process it automatically once all required checks pass.`,
           }),
         },
       ],
