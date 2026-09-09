@@ -524,12 +524,14 @@ jobs:
           echo "  Current:  lineage=$CURRENT_LINEAGE serial=$CURRENT_SERIAL"
 
           if [ -z "$EXPECTED_SERIAL" ] || [ -z "$EXPECTED_LINEAGE" ]; then
-            echo "::error::Could not determine the expected state serial/lineage from the plan step — refusing to apply blind. This is a workflow bug, not a state race; check the plan/replan step outputs."
+            echo "::error::Could not determine the expected state serial/lineage from the plan step — refusing to apply blind." \
+              "This is a workflow bug, not a state race; check the plan/replan step outputs."
             exit 1
           fi
 
           if [ "$CURRENT_SERIAL" != "$EXPECTED_SERIAL" ] || [ "$CURRENT_LINEAGE" != "$EXPECTED_LINEAGE" ]; then
-            echo "::error::State changed underneath this run between plan and apply (lineage/serial mismatch) -- another apply wrote to the backend in that window. Refusing to apply a stale plan. Re-run this workflow to pick up a fresh plan against the current state."
+            echo "::error::State changed underneath this run between plan and apply (lineage/serial mismatch) -- another apply wrote to the backend in that window." \
+              "Refusing to apply a stale plan. Re-run this workflow to pick up a fresh plan against the current state."
             exit 1
           fi
 

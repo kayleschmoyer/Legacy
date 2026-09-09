@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const glob = require('glob');
 const yaml = require('js-yaml');
 const Ajv = require('ajv');
@@ -211,6 +212,82 @@ function runWorkingDirectoryCheck({ workflowFiles, actionFiles, repoRoot }) {
   return false;
 }
 
+// Run the same yamllint pass the pre-commit hook (scripts/git-hooks/pre-commit)
+// runs on staged files, but across every workflow/action file so this check
+// catches the same violations before commit time (LS-9911).
+//
+// Before this, `pc-workflows` only ran the JSON-schema + working-directory
+// checks above, while the actual pre-commit hook separately shelled out to
+// `python -m yamllint`, which is stricter (e.g. .yamllint.yml's 200-char
+// line-length rule isn't checked by anything in this file). That gap let
+// `make pc` / `pc-workflows` report green on a diff the pre-commit hook would
+// still block — a validation-gate inconsistency the two checks should not
+// have.
+//
+// Degrades gracefully (a warning, not a failure) when python/yamllint isn't
+// on PATH, since that's an environment gap rather than a workflow-file
+// problem — mirrors the fail-open posture used elsewhere in this file only
+// for genuinely external dependencies, not for the repo's own vendored state.
+function isYamllintAvailable(pythonCandidates = ['python3', 'python']) {
+  for (const python of pythonCandidates) {
+    const result = spawnSync(python, ['-m', 'yamllint', '--version']);
+    if (!result.error && result.status === 0) {
+      return python;
+    }
+  }
+  return null;
+}
+
+function runYamllintCheck({
+  workflowFiles,
+  actionFiles,
+  repoRoot,
+  pythonCandidates,
+}) {
+  log('\n🔍 Running yamllint...', 'cyan');
+
+  const python = isYamllintAvailable(pythonCandidates);
+  if (!python) {
+    log(
+      '⚠️  yamllint not available (no `python`/`python3` with the `yamllint` ' +
+        'module found on PATH) — SKIPPING this check. Install it with ' +
+        '`pip install yamllint` to catch these violations here instead of at ' +
+        'commit time.',
+      'yellow',
+    );
+    return true;
+  }
+
+  const files = [...workflowFiles, ...actionFiles];
+  if (files.length === 0) {
+    log('✓ No workflow/action files to lint', 'green');
+    return true;
+  }
+
+  const result = spawnSync(python, ['-m', 'yamllint', ...files], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+
+  if (result.error) {
+    log(
+      `⚠️  Failed to invoke yamllint (${result.error.message}) — SKIPPING this check.`,
+      'yellow',
+    );
+    return true;
+  }
+
+  if (result.status === 0) {
+    log(`✓ yamllint passed for ${files.length} file(s)`, 'green');
+    return true;
+  }
+
+  log('\n❌ yamllint found violation(s):', 'red');
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+  console.log(output.trim());
+  return false;
+}
+
 // Validate a single YAML file
 async function validateFile(filePath, schema, ajv) {
   try {
@@ -367,6 +444,14 @@ async function main() {
       repoRoot,
     });
 
+    // yamllint pass (LS-9911): same check the pre-commit hook runs, so this
+    // validator and the hook can't disagree on green/red.
+    const yamllintOk = runYamllintCheck({
+      workflowFiles,
+      actionFiles,
+      repoRoot,
+    });
+
     // Load the vendored schemas from disk. No network involved, so this check
     // is now a pure function of the repo contents — it cannot change verdict
     // without a diff, and it cannot silently skip itself when a host is down.
@@ -407,8 +492,8 @@ async function main() {
       formatErrors(failures);
       log(`\n❌ ${failures.length} file(s) failed validation`, 'red');
       process.exit(1);
-    } else if (!wdOk) {
-      // Schema validation passed but working-directory check failed.
+    } else if (!wdOk || !yamllintOk) {
+      // Schema validation passed but another check failed.
       process.exit(1);
     } else {
       log(`\n✅ All workflow files are valid!`, 'green');
@@ -432,7 +517,8 @@ module.exports = {
   ACTION_SCHEMA_PATH,
   checkWorkingDirectoryPaths,
   isActionFile,
-  validateFile,
+  isYamllintAvailable,
+  runYamllintCheck,
 };
 
 if (require.main === module) {

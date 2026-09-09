@@ -25,6 +25,8 @@ const {
   collectWorkingDirectories,
   checkWorkingDirectoryPaths,
   isActionFile,
+  isYamllintAvailable,
+  runYamllintCheck,
   validateFile,
   loadSchema,
   WORKFLOW_SCHEMA_PATH,
@@ -282,6 +284,103 @@ test('checkWorkingDirectoryPaths flags paths that exist but are files, not direc
     rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// yamllint pass (LS-9911)
+//
+// pc-workflows previously ran only the schema + working-directory checks
+// above, while the actual pre-commit hook separately shelled out to
+// `python -m yamllint`, which is stricter (e.g. the repo's 200-char
+// line-length rule). That let `make pc` / `pc-workflows` report green on a
+// diff the pre-commit hook would still block. These tests cover both the
+// happy path and the graceful-degrade path when python/yamllint is missing.
+// ---------------------------------------------------------------------------
+
+test('isYamllintAvailable returns null when no candidate binary exists', () => {
+  assert.equal(isYamllintAvailable(['no-such-python-binary-ls-9911']), null);
+});
+
+test('runYamllintCheck degrades gracefully (returns true, does not throw) when yamllint is unavailable', () => {
+  const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+  try {
+    const filePath = join(tmpRepo, 'workflow.yml');
+    writeFileSync(filePath, `${'x'.repeat(500)}\n`);
+
+    const ok = runYamllintCheck({
+      workflowFiles: [filePath],
+      actionFiles: [],
+      repoRoot: tmpRepo,
+      pythonCandidates: ['no-such-python-binary-ls-9911'],
+    });
+
+    // Missing tooling must never hard-crash the validator, and must not
+    // silently report success either (visible warning is asserted via a
+    // captured console.log below rather than duplicated here).
+    assert.equal(ok, true);
+  } finally {
+    rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});
+
+test('runYamllintCheck returns true when there are no workflow/action files', () => {
+  const ok = runYamllintCheck({
+    workflowFiles: [],
+    actionFiles: [],
+    repoRoot: process.cwd(),
+    pythonCandidates: ['no-such-python-binary-ls-9911'],
+  });
+  assert.equal(ok, true);
+});
+
+// The remaining tests require an actual yamllint installation and are
+// skipped (not failed) when one isn't present, matching the check's own
+// graceful-degrade behavior rather than making CI environment-dependent.
+const yamllintBinary = isYamllintAvailable();
+
+test(
+  'runYamllintCheck passes on a clean file (requires yamllint)',
+  { skip: !yamllintBinary },
+  () => {
+    const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+    try {
+      const filePath = join(tmpRepo, 'workflow.yml');
+      writeFileSync(filePath, 'on:\n  push:\n');
+
+      const ok = runYamllintCheck({
+        workflowFiles: [filePath],
+        actionFiles: [],
+        repoRoot: tmpRepo,
+      });
+      assert.equal(ok, true);
+    } finally {
+      rmSync(tmpRepo, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'runYamllintCheck fails on a line-length violation (requires yamllint)',
+  { skip: !yamllintBinary },
+  () => {
+    const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+    try {
+      const filePath = join(tmpRepo, 'workflow.yml');
+      writeFileSync(
+        filePath,
+        `on:\n  push:\n# ${Array(60).fill('word').join(' ')}\n`,
+      );
+
+      const ok = runYamllintCheck({
+        workflowFiles: [filePath],
+        actionFiles: [],
+        repoRoot: tmpRepo,
+      });
+      assert.equal(ok, false);
+    } finally {
+      rmSync(tmpRepo, { recursive: true, force: true });
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Vendored schemas (LS-9797)

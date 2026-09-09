@@ -377,7 +377,8 @@ jobs:
 
           if [[ "$PAGE" -gt "$MAX_PAGES" ]]; then
             CAPPED=true
-            echo "::warning::hit the $MAX_PAGES-page cap — some active items were not scanned this run. Each run starts from page 1, so a future run will re-scan from the top rather than resume; raise MAX_PAGES if this recurs."
+            echo "::warning::hit the $MAX_PAGES-page cap — some active items were not scanned this run." \
+              "Each run starts from page 1, so a future run will re-scan from the top rather than resume; raise MAX_PAGES if this recurs."
           fi
 
           # One node process decides every queued item at once.
