@@ -104,13 +104,20 @@ function createMcpServer(): McpServer {
 
   server.tool(
     'rollbar_list_occurrences',
-    'List recent occurrences (instances) of a Rollbar item by its internal item id, each with a truncated message summary. READ-ONLY.',
+    'List recent occurrences of a Rollbar item by itemId or counter, each with a truncated summary. READ-ONLY.',
     {
       itemId: z
         .number()
         .int()
         .positive()
-        .describe('Internal item id (the `id` field, not the counter)'),
+        .optional()
+        .describe('Internal item id (not the counter)'),
+      counter: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Per-project item counter (in the item URL)'),
       page: z
         .number()
         .int()

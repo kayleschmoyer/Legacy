@@ -3,12 +3,14 @@ import { rollbarGet } from '../rollbar-api.js';
 import {
   occurrenceSummary,
   type RollbarInstance,
+  type RollbarItem,
   withPageFullHint,
 } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface ListOccurrencesParams {
-  itemId: number;
+  itemId?: number;
+  counter?: number;
   page?: number;
   perPage?: number;
 }
@@ -19,15 +21,49 @@ interface InstancesResult {
 }
 
 /**
- * List recent occurrences (instances) of an item by its internal `itemId`,
- * each reduced to id, timestamp, version, and a truncated message summary.
+ * List recent occurrences (instances) of an item by its internal `itemId`
+ * or by its per-project `counter` (the number in the item URL), each
+ * reduced to id, timestamp, version, and a truncated message summary. A
+ * `counter` is resolved to an `itemId` via the same `/item_by_counter/{counter}`
+ * path that `rollbar_get_item` uses.
  */
 export async function listOccurrences(
   params: ListOccurrencesParams,
 ): Promise<ToolResult> {
+  const { counter } = params;
+
+  if (params.itemId === undefined && counter === undefined) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'Provide either `itemId` (internal item id) or `counter` (the number in the Rollbar item URL).',
+        },
+      ],
+    };
+  }
+
   try {
+    const itemId =
+      params.itemId ??
+      (await rollbarGet<RollbarItem>({ path: `/item_by_counter/${counter}` }))
+        .id;
+
+    if (itemId === undefined) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to resolve Rollbar item id for counter ${counter}.`,
+          },
+        ],
+      };
+    }
+
     const result = await rollbarGet<InstancesResult>({
-      path: `/item/${params.itemId}/instances`,
+      path: `/item/${itemId}/instances`,
       query: { page: params.page, per_page: params.perPage },
     });
 
@@ -41,7 +77,7 @@ export async function listOccurrences(
 
     const text =
       rows.length === 0
-        ? `No occurrences found for item ${params.itemId}.`
+        ? `No occurrences found for item ${itemId}.`
         : withPageFullHint(
             markdownTable(rows, {
               columns: ['id', 'timestamp', 'version', 'summary'],
@@ -54,12 +90,16 @@ export async function listOccurrences(
     return { content: [{ type: 'text', text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const label =
+      params.itemId !== undefined
+        ? `item ${params.itemId}`
+        : `counter ${counter}`;
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to list occurrences for item ${params.itemId}: ${message}`,
+          text: `Failed to list occurrences for ${label}: ${message}`,
         },
       ],
     };

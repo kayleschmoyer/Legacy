@@ -8513,16 +8513,25 @@
         },
         {
           "name": "rollbar_list_occurrences",
-          "description": "List recent occurrences (instances) of a Rollbar item by its internal item id, each with a truncated message summary. READ-ONLY.",
+          "description": "List recent occurrences of a Rollbar item by itemId or counter, each with a truncated summary. READ-ONLY.",
           "inputs": {
             "itemId": {
               "type": "number",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "integer",
                 "> 0"
               ],
-              "description": "Internal item id (the `id` field, not the counter)"
+              "description": "Internal item id (not the counter)"
+            },
+            "counter": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "Per-project item counter (in the item URL)"
             },
             "page": {
               "type": "number",

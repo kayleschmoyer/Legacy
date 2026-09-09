@@ -64,11 +64,12 @@ List Rollbar items (deduplicated errors), optionally filtered by status, level, 
 
 ### `rollbar_list_occurrences`
 
-List recent occurrences (instances) of a Rollbar item by its internal item id, each with a truncated message summary. READ-ONLY.
+List recent occurrences of a Rollbar item by itemId or counter, each with a truncated summary. READ-ONLY.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `itemId` | number | **required** | integer, > 0 | Internal item id (the `id` field, not the counter) |
+| `itemId` | number |  | integer, > 0 | Internal item id (not the counter) |
+| `counter` | number |  | integer, > 0 | Per-project item counter (in the item URL) |
 | `page` | number |  | integer, > 0 | 1-based page number |
 | `perPage` | number |  | integer, > 0 | Results per page (Rollbar default 20, max 100) |
 
