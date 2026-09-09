@@ -78,6 +78,7 @@ import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitish } from './resolve-commitish';
 import { resolveMainRepoPath } from './resolve-main-repo';
+import { resolveResetTarget } from './resolve-reset-target';
 import { runOnRef } from './run-on-ref';
 import {
   type BranchEntry,
@@ -2736,16 +2737,15 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       description:
         'Reset HEAD to a specific commit SHA (git reset). ' +
         'Safety: refuses main branch and only allows resetting to ancestor SHAs ' +
-        '(commits already reachable from HEAD) to prevent accidental data loss. ' +
-        'Typical use: strip a stray commit pushed by another agent and restore ' +
-        'the branch to the correct SHA before force-pushing with worktree_push.',
+        '(commits reachable from HEAD) to prevent accidental data loss. ' +
+        'Typical use: strip a stray commit and restore the branch before ' +
+        'force-pushing with worktree_push.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           sha: {
             type: 'string',
-            description:
-              'Target commit SHA to reset to. Must be an ancestor of the current HEAD.',
+            description: 'Target commit SHA to reset to.',
           },
           mode: {
             type: 'string',
@@ -2758,9 +2758,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           force: {
             type: 'boolean',
             description:
-              'Skip the dirty-worktree safety check for --hard resets. ' +
-              'When false (default), worktree_reset refuses to hard-reset if there are ' +
-              'uncommitted working tree changes. Pass true to override and discard them.',
+              'Skip the dirty-worktree check for --hard resets. Default false ' +
+              '(refuses if uncommitted changes exist); true discards them.',
+          },
+          allowNonAncestor: {
+            type: 'boolean',
+            description:
+              'Default false. If true, allow non-ancestor sha in reflog.',
           },
           worktree: {
             type: 'string',
@@ -11256,11 +11260,13 @@ const handleCallTool = async (
         sha,
         mode = 'hard',
         force = false,
+        allowNonAncestor = false,
         worktree: wtKeyRaw,
       } = args as {
         sha: string;
         mode?: 'hard' | 'soft' | 'mixed';
         force?: boolean;
+        allowNonAncestor?: boolean;
         worktree?: unknown;
       };
 
@@ -11406,11 +11412,17 @@ const handleCallTool = async (
           };
         }
 
-        // Safety: verify target SHA is an ancestor of HEAD to prevent data loss.
-        // git merge-base --is-ancestor exits 0 if ancestor, 1 if not.
-        try {
-          runGit(['merge-base', '--is-ancestor', targetSha, 'HEAD'], cwd);
-        } catch {
+        // Safety: verify target SHA is an ancestor of HEAD to prevent data loss,
+        // with a reflog-verified escape hatch for non-ancestor recovery targets.
+        // See resolveResetTarget for the full decision logic (unit-tested there).
+        const { allowed, reflogVerifiedNonAncestor } = resolveResetTarget(
+          targetSha,
+          allowNonAncestor,
+          cwd,
+          runGit,
+        );
+
+        if (!allowed) {
           return {
             content: [
               {
@@ -11419,7 +11431,9 @@ const handleCallTool = async (
                   `[resolvedWorktree: ${cwd}]`,
                   `Refused: "${sha}" (${targetSha.slice(0, 7)}) is not an ancestor of HEAD (${previousSha.slice(0, 7)}).`,
                   `worktree_reset only allows resetting to ancestor commits to prevent accidental data loss.`,
-                  `If you intentionally need a non-ancestor reset, use worktree_run with git reset directly.`,
+                  allowNonAncestor
+                    ? `allowNonAncestor was set, but "${targetSha.slice(0, 7)}" was not found in this branch's reflog (HEAD), so it cannot be verified as a real prior HEAD position.`
+                    : `If this is a documented recovery scenario (e.g. resetting to a pre-rebase tip found via worktree_reflog), pass allowNonAncestor: true — it is honored only when the target SHA is verified present in the reflog.`,
                 ].join('\n'),
               },
             ],
@@ -11496,6 +11510,9 @@ const handleCallTool = async (
                   currentSha,
                   mode,
                   filesChanged,
+                  ...(reflogVerifiedNonAncestor
+                    ? { reflogVerifiedNonAncestor: true }
+                    : {}),
                   nextStep:
                     mode === 'hard'
                       ? 'worktree_push() to force-push the reset branch.'

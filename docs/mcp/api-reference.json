@@ -1196,12 +1196,12 @@
         },
         {
           "name": "worktree_reset",
-          "description": "Reset HEAD to a specific commit SHA (git reset). Safety: refuses main branch and only allows resetting to ancestor SHAs (commits already reachable from HEAD) to prevent accidental data loss. Typical use: strip a stray commit pushed by another agent and restore the branch to the correct SHA before force-pushing with worktree_push.",
+          "description": "Reset HEAD to a specific commit SHA (git reset). Safety: refuses main branch and only allows resetting to ancestor SHAs (commits reachable from HEAD) to prevent accidental data loss. Typical use: strip a stray commit and restore the branch before force-pushing with worktree_push.",
           "inputs": {
             "sha": {
               "type": "string",
               "optional": false,
-              "description": "Target commit SHA to reset to. Must be an ancestor of the current HEAD."
+              "description": "Target commit SHA to reset to."
             },
             "mode": {
               "type": "string",
@@ -1216,7 +1216,12 @@
             "force": {
               "type": "boolean",
               "optional": true,
-              "description": "Skip the dirty-worktree safety check for --hard resets. When false (default), worktree_reset refuses to hard-reset if there are uncommitted working tree changes. Pass true to override and discard them."
+              "description": "Skip the dirty-worktree check for --hard resets. Default false (refuses if uncommitted changes exist); true discards them."
+            },
+            "allowNonAncestor": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Default false. If true, allow non-ancestor sha in reflog."
             },
             "worktree": {
               "type": "string",
