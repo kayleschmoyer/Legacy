@@ -40,6 +40,7 @@ import {
   isEscalationRequired,
   isInfraErrorReview,
   isThreadReplyArtifactReview,
+  shouldAutoResetArbitrationCycle,
   REVIEWER_BOT_LOGINS,
 } from './lib/cycle-counter.mjs';
 import {
@@ -455,18 +456,54 @@ async function main() {
     }
   }
 
+  // The last review that actually counted toward the cycle total (mirrors
+  // computeCycle's inclusion set) — used both to decide whether a labeled
+  // event represents a genuine post-arbitration push below, and to build the
+  // escalation comment further down.
+  const lastCountedBotReview =
+    allReviews
+      .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
+      .slice()
+      .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1))
+      .findLast(
+        (r) =>
+          r.state !== 'DISMISSED' &&
+          r.state !== 'APPROVED' &&
+          !isInfraErrorReview(r) &&
+          !isThreadReplyArtifactReview(r),
+      ) ?? null;
+
   // Auto-reset when new commits are pushed during arbitration (LS-4857).
   // A synchronize event means the author pushed new code that has not been
   // reviewed yet — it deserves a fresh cycle even if the prior cycle limit
   // was hit. Mirrors the admin bot:reset-cycle-counter path but fires
   // automatically so the author does not need maintainer intervention for
   // every post-arbitration fix push.
+  //
+  // LS-9756: a qualifying push's own review job can be skipped (the
+  // check-runner-access "Evaluate review gate" step computes should-review
+  // false for that specific run — timing, a gate-evaluation quirk, or a
+  // concurrency cancellation), in which case TRIGGERED_BY_SYNCHRONIZE never
+  // reaches this code and the PR is stranded in arbitration with no way back
+  // short of a maintainer override. The label remove+re-add self-heal trick
+  // (already used to force a fresh review in that situation) fires a
+  // `labeled` event instead of `synchronize`, so also accept
+  // TRIGGERED_BY_READY_LABEL here — gated on the head SHA having actually
+  // moved past the last cycle-counted review so a redundant label cycle on
+  // an already-reviewed SHA can't loop-reset the counter without new code.
   const triggeredBySynchronize =
     process.env.TRIGGERED_BY_SYNCHRONIZE === 'true';
+  const triggeredByReadyForReviewLabel =
+    process.env.TRIGGERED_BY_READY_LABEL === 'true';
   if (
-    isEscalationRequired(cycle) &&
-    triggeredBySynchronize &&
-    prLabels.includes(NEEDS_HUMAN_ARBITRATION_LABEL)
+    shouldAutoResetArbitrationCycle({
+      cycle,
+      arbitrationLabelPresent: prLabels.includes(NEEDS_HUMAN_ARBITRATION_LABEL),
+      triggeredBySynchronize,
+      triggeredByReadyForReviewLabel,
+      headSha: sha,
+      lastCountedBotReviewCommitId: lastCountedBotReview?.commitId ?? null,
+    })
   ) {
     const priorBotReviews = allReviews.filter((r) =>
       REVIEWER_BOT_LOGINS.has(r.userLogin),
@@ -502,24 +539,12 @@ async function main() {
 
   // Cycle > MAX_CYCLE → escalate instead of reviewing
   if (isEscalationRequired(cycle)) {
-    const lastReviewForEscalation =
-      allReviews
-        .filter((r) => REVIEWER_BOT_LOGINS.has(r.userLogin))
-        .slice()
-        .sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : 1))
-        .findLast(
-          (r) =>
-            r.state !== 'DISMISSED' &&
-            r.state !== 'APPROVED' &&
-            !isInfraErrorReview(r) &&
-            !isThreadReplyArtifactReview(r),
-        ) ?? null;
     await escalateToHumanArbitration(
       prNumber,
       sha,
       `Cycle ${cycle} exceeds MAX_CYCLE — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
       {
-        body: buildCycleLimitArbitrationComment(cycle, lastReviewForEscalation),
+        body: buildCycleLimitArbitrationComment(cycle, lastCountedBotReview),
       },
     );
     return;

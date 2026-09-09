@@ -6,6 +6,7 @@ import {
   isInfraErrorReview,
   isThreadReplyArtifactReview,
   isCodeWriterBotAuthor,
+  shouldAutoResetArbitrationCycle,
   REVIEWER_BOT_LOGINS,
   CODE_WRITER_BOT_LOGIN,
   MAX_CYCLE,
@@ -652,5 +653,122 @@ describe('isCodeWriterBotAuthor', () => {
 describe('CODE_WRITER_BOT_LOGIN', () => {
   it('is the expected login string', () => {
     assert.strictEqual(CODE_WRITER_BOT_LOGIN, 'code-writer-bot[bot]');
+  });
+});
+
+describe('shouldAutoResetArbitrationCycle', () => {
+  // MAX_CYCLE is 3, so cycle 4 is the smallest escalation-required value.
+  const escalatedCycle = MAX_CYCLE + 1;
+
+  it('fires on a genuine synchronize event while in arbitration (LS-4857)', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: true,
+        triggeredByReadyForReviewLabel: false,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: 'old-sha',
+      }),
+      true,
+    );
+  });
+
+  it('fires on a bot:ready-for-review labeled event when the head SHA has moved past the last counted review (LS-9756)', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: false,
+        triggeredByReadyForReviewLabel: true,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: 'old-sha',
+      }),
+      true,
+    );
+  });
+
+  it('does not fire on a labeled event for the same SHA as the last counted review (no new push — would loop-reset)', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: false,
+        triggeredByReadyForReviewLabel: true,
+        headSha: 'same-sha',
+        lastCountedBotReviewCommitId: 'same-sha',
+      }),
+      false,
+    );
+  });
+
+  it('fires on a labeled event when there is no prior counted review at all', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: false,
+        triggeredByReadyForReviewLabel: true,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: null,
+      }),
+      true,
+    );
+  });
+
+  it('does not fire when the PR is not in arbitration, even on a matching trigger', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: false,
+        triggeredBySynchronize: true,
+        triggeredByReadyForReviewLabel: false,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: 'old-sha',
+      }),
+      false,
+    );
+  });
+
+  it('does not fire when the cycle has not exceeded MAX_CYCLE (no regression to normal enforcement)', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: MAX_CYCLE,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: true,
+        triggeredByReadyForReviewLabel: false,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: 'old-sha',
+      }),
+      false,
+    );
+  });
+
+  it('does not fire on an unrelated trigger (e.g. a plain "opened" event)', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: false,
+        triggeredByReadyForReviewLabel: false,
+        headSha: 'new-sha',
+        lastCountedBotReviewCommitId: 'old-sha',
+      }),
+      false,
+    );
+  });
+
+  it('does not fire on a labeled event with no head SHA available', () => {
+    assert.strictEqual(
+      shouldAutoResetArbitrationCycle({
+        cycle: escalatedCycle,
+        arbitrationLabelPresent: true,
+        triggeredBySynchronize: false,
+        triggeredByReadyForReviewLabel: true,
+        headSha: '',
+        lastCountedBotReviewCommitId: null,
+      }),
+      false,
+    );
   });
 });

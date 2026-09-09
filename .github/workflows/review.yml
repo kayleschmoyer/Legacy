@@ -209,6 +209,11 @@ jobs:
           REVIEWER_AUTO_APPROVE: ${{ contains(github.event.pull_request.labels.*.name, 'review-bot-override') && 'true' || '' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
           TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
+          # LS-9756: lets the LS-4857 post-arbitration auto-reset also fire on
+          # the bot:ready-for-review labeled event (the self-heal trick used
+          # when a push's own synchronize-triggered review job was skipped).
+          # See the LS-9756 comment on the auto-reset block in index.mjs.
+          TRIGGERED_BY_READY_LABEL: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:ready-for-review' && 'true' || '' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs

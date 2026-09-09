@@ -147,3 +147,47 @@ export function computeCycle(reviews, botLogins = REVIEWER_BOT_LOGINS) {
 export function isEscalationRequired(cycle) {
   return cycle > MAX_CYCLE;
 }
+
+/**
+ * Whether the LS-4857 post-arbitration cycle-counter auto-reset should fire.
+ *
+ * The original LS-4857 path only fired on a genuine `synchronize` event,
+ * because that event carries `TRIGGERED_BY_SYNCHRONIZE` and is set by the
+ * workflow inside the same review job that computes the reset. When a
+ * qualifying push's own review job is skipped (the `should-review` gate
+ * evaluates false for that specific run — timing, a gate quirk, or a
+ * concurrency cancellation), `synchronize` never reaches this code and the
+ * PR is stuck: the label remove+re-add self-heal trick that would normally
+ * force a fresh review fires a `labeled` event instead, which was previously
+ * excluded from the auto-reset condition entirely (LS-9756).
+ *
+ * This widens the trigger to also accept a `bot:ready-for-review` labeled
+ * event, but only when the head SHA has actually moved past the last
+ * cycle-counted bot review — otherwise a redundant label cycle on a SHA that
+ * was already reviewed (and already escalated) would reset the counter in a
+ * loop without any new code ever landing, which would regress normal
+ * cycle-limit enforcement for that SHA.
+ *
+ * @param {{
+ *   cycle: number,
+ *   arbitrationLabelPresent: boolean,
+ *   triggeredBySynchronize: boolean,
+ *   triggeredByReadyForReviewLabel: boolean,
+ *   headSha: string,
+ *   lastCountedBotReviewCommitId?: string | null,
+ * }} params
+ * @returns {boolean}
+ */
+export function shouldAutoResetArbitrationCycle({
+  cycle,
+  arbitrationLabelPresent,
+  triggeredBySynchronize,
+  triggeredByReadyForReviewLabel,
+  headSha,
+  lastCountedBotReviewCommitId = null,
+}) {
+  if (!isEscalationRequired(cycle) || !arbitrationLabelPresent) return false;
+  if (triggeredBySynchronize) return true;
+  if (!triggeredByReadyForReviewLabel) return false;
+  return Boolean(headSha) && headSha !== lastCountedBotReviewCommitId;
+}
