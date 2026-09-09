@@ -86,12 +86,15 @@ jest.mock('@legacy-sports/shared-components', () => {
 });
 
 const mockCurrentUser = { id: 1, name: 'Test User' };
-const mockUseCurrentUserInfo = jest.fn(() => ({
+const mockUseCurrentUserInfo = jest.fn<
+  { data: { id: number; name: string } | null; loading: boolean },
+  []
+>(() => ({
   data: mockCurrentUser,
   loading: false,
 }));
 jest.mock('../../common/auth/AuthHooks', () => ({
-  useCurrentUserInfo: (...args: unknown[]) => mockUseCurrentUserInfo(...args),
+  useCurrentUserInfo: () => mockUseCurrentUserInfo(),
 }));
 
 jest.mock('../../common/auth/AuthorizedUserContext', () => {

@@ -8,7 +8,7 @@ let mockSearchParams: Record<string, string | undefined> = {};
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
     const { Text } = jest.requireActual<{
-      Text: React.ComponentType<{ children: React.ReactNode }>;
+      Text: React.ComponentType<{ children: React.ReactNode; testID?: string }>;
     }>('react-native');
     return <Text testID="redirect">{`Redirect:${href}`}</Text>;
   },

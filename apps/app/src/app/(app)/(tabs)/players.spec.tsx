@@ -21,9 +21,9 @@ import PlayersTab from './players';
 // 'EventEmitter')` in `expo/src/winter/fetch`) — this is why every export
 // below is a hand-written stub, not a `jest.requireActual` passthrough.
 
-const mockUseFeatureIsOn = jest.fn(() => false);
+const mockUseFeatureIsOn = jest.fn((_feature: string) => false);
 jest.mock('@growthbook/growthbook-react', () => ({
-  useFeatureIsOn: (...args: unknown[]) => mockUseFeatureIsOn(...args),
+  useFeatureIsOn: (feature: string) => mockUseFeatureIsOn(feature),
 }));
 
 // Mirrors home.spec.tsx's mock (LS-8625/LS-8834) — a real SafeAreaProvider
@@ -53,7 +53,7 @@ jest.mock('expo-router', () => ({
 
 const mockUseSubscription = jest.fn(() => ({ isPremium: false }));
 jest.mock('../../../features/subscription/useSubscription', () => ({
-  useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
+  useSubscription: () => mockUseSubscription(),
 }));
 
 // Defaults to the narrow/`sm` breakpoint so all of this file's existing
@@ -578,7 +578,7 @@ describe('PlayersTab', () => {
 
   describe('wide viewport (tablet)', () => {
     beforeEach(() => {
-      mockUseMedia.mockReturnValue({});
+      mockUseMedia.mockReturnValue({ sm: false });
     });
 
     it('renders the baseball stats table instead of the card feed', () => {

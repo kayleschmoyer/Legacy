@@ -104,7 +104,7 @@ jest.mock('tamagui', () => {
     ActivityIndicator,
   } = jest.requireActual<typeof import('react-native')>('react-native');
   const passthrough =
-    (Tag: React.ComponentType<{ children?: React.ReactNode }>) =>
+    (Tag: React.ComponentType<Record<string, unknown>>) =>
     ({
       children,
       onPress,
@@ -161,11 +161,18 @@ jest.mock('tamagui', () => {
   };
 });
 
-function okBugResponse(issueKey: string): unknown {
+function okBugResponse(issueKey: string): {
+  ok: boolean;
+  status: number;
+  json: () => Promise<unknown>;
+} {
   return { ok: true, status: 201, json: () => Promise.resolve({ issueKey }) };
 }
 
-function errorResponse(status: number, error: string): unknown {
+function errorResponse(
+  status: number,
+  error: string,
+): { ok: boolean; status: number; json: () => Promise<unknown> } {
   return { ok: false, status, json: () => Promise.resolve({ error }) };
 }
 

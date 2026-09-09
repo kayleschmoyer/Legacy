@@ -39,8 +39,7 @@ let mockUserData: { user: { subscriptionTier: string } } | null = null;
 const mockUseGetUserByIdQuery = jest.fn(() => ({ data: mockUserData }));
 const mockUpdateUserTheme = jest.fn().mockResolvedValue(undefined);
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserByIdQuery: (...args: unknown[]): unknown =>
-    mockUseGetUserByIdQuery(...args),
+  useGetUserByIdQuery: (): unknown => mockUseGetUserByIdQuery(),
   useUpdateUserThemeMutation: (): unknown => [mockUpdateUserTheme],
 }));
 
@@ -48,8 +47,7 @@ const mockUseCurrentUserInfo = jest.fn(() => ({
   data: { id: 42, name: 'Test' },
 }));
 jest.mock('../common/auth/AuthHooks', () => ({
-  useCurrentUserInfo: (...args: unknown[]): unknown =>
-    mockUseCurrentUserInfo(...args),
+  useCurrentUserInfo: (): unknown => mockUseCurrentUserInfo(),
 }));
 
 jest.mock('../common/ApolloClientContext', () => {

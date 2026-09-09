@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { MatchupStatus } from '@legacy-sports/graphql';
-import type { AppMatchupFragment } from '@legacy-sports/graphql';
+import type { MatchupFragment } from '@legacy-sports/graphql';
 import { MatchupCard } from './MatchupCard';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -24,8 +24,8 @@ jest.mock('@tamagui/lucide-icons', () => ({
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const createMatchup = (
-  overrides: Partial<AppMatchupFragment> = {},
-): AppMatchupFragment => ({
+  overrides: Partial<MatchupFragment> = {},
+): MatchupFragment => ({
   __typename: 'Matchup',
   id: '1',
   weekNumber: 3,

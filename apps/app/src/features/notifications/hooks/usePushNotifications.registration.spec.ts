@@ -25,7 +25,12 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: jest.fn() }),
 }));
 
-const mockAddPushTokenListener = jest.fn(() => ({ remove: jest.fn() }));
+const mockAddPushTokenListener = jest.fn<
+  { remove: jest.Mock },
+  [cb: () => void]
+>(() => ({
+  remove: jest.fn(),
+}));
 
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
@@ -181,7 +186,7 @@ describe('usePushNotifications — token rotation', () => {
   it('re-registers when the OS rolls a new device push token', async () => {
     mockExtra = { eas: { projectId: 'proj-abc' } };
 
-    let capturedListener: (() => void) | null = null;
+    let capturedListener: (() => void) | undefined;
     mockAddPushTokenListener.mockImplementation((cb: () => void) => {
       capturedListener = cb;
       return { remove: jest.fn() };

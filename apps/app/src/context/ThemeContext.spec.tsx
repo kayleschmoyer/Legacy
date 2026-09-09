@@ -25,11 +25,13 @@ jest.mock('@legacy-sports/shared-components', () => ({
 }));
 
 let mockUserData: { user: { themePreference: string | null } } | undefined;
-const mockUseGetUserByIdQuery = jest.fn(() => ({ data: mockUserData }));
+const mockUseGetUserByIdQuery = jest.fn((_options?: unknown) => ({
+  data: mockUserData,
+}));
 const mockUpdateUserTheme = jest.fn().mockResolvedValue(undefined);
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserByIdQuery: (...args: unknown[]): unknown =>
-    mockUseGetUserByIdQuery(...args),
+  useGetUserByIdQuery: (options: unknown): unknown =>
+    mockUseGetUserByIdQuery(options),
   useUpdateUserThemeMutation: (): unknown => [mockUpdateUserTheme],
 }));
 

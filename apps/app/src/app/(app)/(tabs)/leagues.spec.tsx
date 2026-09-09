@@ -90,28 +90,27 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
   };
 });
 
-const mockUseGetUserLeagueSummariesQuery = jest.fn(() => ({
+const mockUseGetUserLeagueSummariesQuery = jest.fn((_options?: unknown) => ({
   data: null,
   loading: false,
 }));
 
 // Standings ride a second, parallel query since LS-9528.
-const mockUseGetUserLeagueStandingsQuery = jest.fn(() => ({
+const mockUseGetUserLeagueStandingsQuery = jest.fn((_options?: unknown) => ({
   data: null,
   refetch: jest.fn(),
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserLeagueSummariesQuery: (...args: unknown[]) =>
-    mockUseGetUserLeagueSummariesQuery(...args),
-  useGetUserLeagueStandingsQuery: (...args: unknown[]) =>
-    mockUseGetUserLeagueStandingsQuery(...args),
+  useGetUserLeagueSummariesQuery: (options: unknown) =>
+    mockUseGetUserLeagueSummariesQuery(options),
+  useGetUserLeagueStandingsQuery: (options: unknown) =>
+    mockUseGetUserLeagueStandingsQuery(options),
 }));
 
 const mockUseAuthorizedUserInfo = jest.fn(() => ({ id: 1, name: 'Test User' }));
 jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
-  useAuthorizedUserInfo: (...args: unknown[]) =>
-    mockUseAuthorizedUserInfo(...args),
+  useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

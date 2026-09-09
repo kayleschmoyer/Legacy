@@ -131,7 +131,7 @@ jest.mock('../subscription', () => ({
   useSubscription: jest.fn(() => ({ isPremium: false })),
 }));
 
-const mockUseHasEntitlement = jest.fn(() => false);
+const mockUseHasEntitlement = jest.fn((_key: string) => false);
 jest.mock('../subscription/useSubscription', () => ({
   useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
 }));

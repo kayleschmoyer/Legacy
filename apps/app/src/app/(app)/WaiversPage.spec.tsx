@@ -38,14 +38,16 @@ jest.mock('../../common/utilities/RouteUtils', () => ({
   },
 }));
 
-const mockUseGetUserTeamIdQuery = jest.fn(() => ({
+const mockUseGetUserTeamIdQuery = jest.fn<
+  { data: { userTeamId: number | null } | undefined; loading: boolean },
+  []
+>(() => ({
   data: { userTeamId: 10 },
   loading: false,
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserTeamIdQuery: (...args: unknown[]) =>
-    mockUseGetUserTeamIdQuery(...args),
+  useGetUserTeamIdQuery: () => mockUseGetUserTeamIdQuery(),
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

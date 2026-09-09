@@ -138,7 +138,10 @@ jest.mock('@legacy-sports/shared-components/football', () => {
   };
 });
 
-const mockUseAuthorizedUserInfo = jest.fn(() => ({
+const mockUseAuthorizedUserInfo = jest.fn<
+  { id: number; username: string } | null,
+  []
+>(() => ({
   id: 1,
   username: 'testuser',
 }));

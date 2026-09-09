@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
+import type { MatchupStatus as MatchupStatusType } from '@legacy-sports/graphql';
 
 // ── Component under test ─────────────────────────────────────────────────────
 import { MatchupWinProbabilityPanel } from './MatchupWinProbabilityPanel';
@@ -80,9 +81,9 @@ const mockUseGetLeagueTeamsQuery = jest.fn();
 const mockUseGetMatchupWinProbabilityQuery = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
-    Scheduled: 'SCHEDULED',
-    InProgress: 'IN_PROGRESS',
-    Completed: 'COMPLETED',
+    Scheduled: 'scheduled',
+    InProgress: 'in_progress',
+    Completed: 'completed',
   },
   useGetMatchupPlayersQuery: (opts: unknown): unknown =>
     mockUseGetMatchupPlayersQuery(opts),
@@ -100,9 +101,9 @@ jest.mock('../../../common/scoring', () => ({
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const SCHEDULED = 'SCHEDULED';
-const COMPLETED = 'COMPLETED';
-const IN_PROGRESS = 'IN_PROGRESS';
+const SCHEDULED = 'scheduled' as MatchupStatusType;
+const COMPLETED = 'completed' as MatchupStatusType;
+const IN_PROGRESS = 'in_progress' as MatchupStatusType;
 
 interface TestMatchup {
   id: string;
@@ -110,7 +111,7 @@ interface TestMatchup {
   team1Id: number;
   team2Id: number;
   gamesPerMatchup: number;
-  status: string;
+  status: MatchupStatusType;
 }
 
 function makeMatchup(overrides: Partial<TestMatchup> = {}): TestMatchup {

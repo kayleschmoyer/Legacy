@@ -149,10 +149,12 @@ describe('withPremiumScreen', () => {
   it('passes through own props to the wrapped component', () => {
     interface ExtraProps {
       label: string;
-      isPremium: boolean;
     }
 
-    function LabeledScreen({ label, isPremium }: ExtraProps) {
+    function LabeledScreen({
+      label,
+      isPremium,
+    }: ExtraProps & { isPremium: boolean }) {
       return (
         <RNText testID="label">
           {label}-{isPremium ? 'premium' : 'free'}

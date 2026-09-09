@@ -1,4 +1,5 @@
 import React from 'react';
+import type { EffectCallback } from 'react';
 import {
   fireEvent,
   render,
@@ -30,7 +31,7 @@ jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
     useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
-    useFocusEffect: (cb: () => unknown) => {
+    useFocusEffect: (cb: EffectCallback) => {
       ReactActual.useEffect(cb, []);
     },
   };
@@ -166,7 +167,10 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
   };
 });
 
-const mockUseAuthorizedUserInfo = jest.fn(() => ({
+const mockUseAuthorizedUserInfo = jest.fn<
+  { id: number | null; username: string | null } | null,
+  []
+>(() => ({
   id: 1,
   username: 'testuser',
 }));

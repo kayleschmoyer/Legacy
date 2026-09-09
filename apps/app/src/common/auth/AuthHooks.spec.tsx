@@ -121,9 +121,9 @@ jest.mock('@legacy-sports/shared-components', () => {
       signOut: (...args: unknown[]): unknown => mockSignOut(...args),
     },
     SecureStorageProvider: {
-      getItem: (...args: unknown[]): unknown => mockGetItem(...args),
-      setItem: (...args: unknown[]): unknown => mockSetItem(...args),
-      removeItem: (...args: unknown[]): unknown => mockRemoveItem(...args),
+      getItem: (key: string): unknown => mockGetItem(key),
+      setItem: (key: string, value: string): unknown => mockSetItem(key, value),
+      removeItem: (key: string): unknown => mockRemoveItem(key),
     },
   };
 });

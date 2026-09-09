@@ -43,7 +43,6 @@ jest.mock('tamagui', () => {
     };
 
   return {
-    createTokens: (tokens: unknown) => tokens,
     ...mocks.tamaguiMocks,
     XStack: pressableStack(),
     YStack: pressableStack(),
