@@ -26,6 +26,7 @@ interface GitHubPull {
 interface GitHubWorkflowRun {
   id: number;
   status: string;
+  head_sha: string;
 }
 
 interface GitHubRunsResponse {
@@ -69,6 +70,50 @@ function noSignalResult(prNumber: number, reason: string): ToolResult {
           `Use ci_rerun({ runId, withDiagnostics: true }) to manually retry after confirming the failure cause.`,
       },
     ],
+  };
+}
+
+function staleRunResult(
+  prNumber: number,
+  runId: number,
+  currentHeadSha: string,
+  runHeadSha: string,
+): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text:
+          `Run ${runId}, resolved from PR #${prNumber}'s "${RUNNER_FLAKE_LABEL}" label/comment, ` +
+          `is stale: it belongs to head ${runHeadSha}, but the PR's current head is ${currentHeadSha}. ` +
+          'Refusing to rerun a run that has already been superseded by later commits. ' +
+          "Find the PR's actual current failing run (ci_list_runs({ branch, limit: 1 }) or " +
+          'github_pr_diagnose) and call ci_retry_failed({ runId }) / ci_rerun({ runId }) against it directly.',
+      },
+    ],
+  };
+}
+
+/**
+ * The label/comment resolved below can point at a run from an earlier push —
+ * neither artifact is invalidated when a new commit lands, so by the time a
+ * later commit's own failure is being investigated, a stale label/comment
+ * from an earlier flake can still resolve to a run that no longer reflects
+ * the PR's current head (LS-9807). Verify head_sha equality before acting on
+ * a label/comment-resolved run id.
+ */
+async function runMatchesCurrentHead(
+  prNumber: number,
+  runId: number,
+): Promise<{ matches: boolean; currentHeadSha: string; runHeadSha: string }> {
+  const [pull, run] = await Promise.all([
+    githubGet<GitHubPull>(`/pulls/${prNumber}`),
+    githubGet<GitHubWorkflowRun>(`/actions/runs/${runId}`),
+  ]);
+  return {
+    matches: pull.head.sha === run.head_sha,
+    currentHeadSha: pull.head.sha,
+    runHeadSha: run.head_sha,
   };
 }
 
@@ -219,6 +264,16 @@ export async function retryRunnerFlake(
         params.prNumber,
         `the "${RUNNER_FLAKE_LABEL}" label is present, but no bot comment with a ` +
           'parseable run ID was found.',
+      );
+    }
+
+    const headCheck = await runMatchesCurrentHead(params.prNumber, runId);
+    if (!headCheck.matches) {
+      return staleRunResult(
+        params.prNumber,
+        runId,
+        headCheck.currentHeadSha,
+        headCheck.runHeadSha,
       );
     }
 

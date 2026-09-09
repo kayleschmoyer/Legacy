@@ -51,7 +51,7 @@ describe('retryRunnerFlake', () => {
   });
 
   describe('label present + comment found', () => {
-    it('extracts the run id from the bot comment and delegates to retryFailed', async () => {
+    it('extracts the run id from the bot comment and delegates to retryFailed when the run matches the current head', async () => {
       mockGet.mockImplementation((path: string) => {
         if (path === '/issues/42') {
           return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
@@ -67,6 +67,16 @@ describe('retryRunnerFlake', () => {
               ].join('\n'),
             ),
           ]);
+        }
+        if (path === '/pulls/42') {
+          return Promise.resolve({ head: { sha: 'currentsha' } });
+        }
+        if (path === '/actions/runs/12345') {
+          return Promise.resolve({
+            id: 12345,
+            status: 'completed',
+            head_sha: 'currentsha',
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -92,12 +102,57 @@ describe('retryRunnerFlake', () => {
             ),
           ]);
         }
+        if (path === '/pulls/7') {
+          return Promise.resolve({ head: { sha: 'headsha222' } });
+        }
+        if (path === '/actions/runs/222') {
+          return Promise.resolve({
+            id: 222,
+            status: 'completed',
+            head_sha: 'headsha222',
+          });
+        }
         throw new Error(`unexpected path ${path}`);
       });
 
       await retryRunnerFlake({ prNumber: 7 });
 
       expect(mockRetryFailed).toHaveBeenCalledWith({ runId: 222 });
+    });
+
+    it('LS-9807: refuses and does not call retryFailed when the label/comment-resolved run belongs to a superseded head', async () => {
+      mockGet.mockImplementation((path: string) => {
+        if (path === '/issues/7453') {
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
+        }
+        if (path === '/issues/7453/comments') {
+          return Promise.resolve([
+            comment(
+              'CI cancelled due to a runner restart\n[link](https://github.com/acme/repo/actions/runs/33554899413)',
+            ),
+          ]);
+        }
+        if (path === '/pulls/7453') {
+          return Promise.resolve({ head: { sha: 'bdbfb99' } });
+        }
+        if (path === '/actions/runs/33554899413') {
+          return Promise.resolve({
+            id: 33554899413,
+            status: 'completed',
+            head_sha: 'b40d50b',
+          });
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+
+      const result = await retryRunnerFlake({ prNumber: 7453 });
+
+      expect(mockRetryFailed).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain('33554899413');
+      expect(result.content[0].text).toContain('stale');
+      expect(result.content[0].text).toContain('b40d50b');
+      expect(result.content[0].text).toContain('bdbfb99');
+      expect(result.content[0].text).toContain('ci_retry_failed');
     });
   });
 
@@ -264,6 +319,16 @@ describe('retryRunnerFlake', () => {
               ].join('\n'),
             ),
           ]);
+        }
+        if (path === '/pulls/101') {
+          return Promise.resolve({ head: { sha: 'matchingsha' } });
+        }
+        if (path === '/actions/runs/999') {
+          return Promise.resolve({
+            id: 999,
+            status: 'completed',
+            head_sha: 'matchingsha',
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });
