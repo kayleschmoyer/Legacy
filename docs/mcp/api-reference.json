@@ -6005,7 +6005,7 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Specific check name to re-request (retriggers all matching)"
+              "description": "Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching)"
             },
             "allFailed": {
               "type": "boolean",

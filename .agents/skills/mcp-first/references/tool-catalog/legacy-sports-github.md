@@ -497,7 +497,7 @@ Re-request failed status checks on a PR, no empty commit needed; falls back to t
 | --- | --- | --- | --- | --- |
 | `number` | number |  | coerced, integer, > 0 | PR number |
 | `prNumber` | number |  | coerced, integer, > 0 | Alias for "number" — use either, not both. |
-| `checkName` | string |  | min 1 | Specific check name to re-request (retriggers all matching) |
+| `checkName` | string |  | min 1 | Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching) |
 | `allFailed` | boolean |  | — | When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given. |
 
 ### `github_secret_delete`

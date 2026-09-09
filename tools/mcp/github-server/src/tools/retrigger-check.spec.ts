@@ -252,3 +252,72 @@ describe('retriggerCheck — Actions API fallback (LS-9881)', () => {
     expect(body.failed).toBe(0);
   });
 });
+
+describe('retriggerCheck — checkName matching on names containing "&" (LS-9884)', () => {
+  it('matches a check name containing "&" via local substring filtering', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 1,
+        check_runs: [
+          makeCheckRun('GraphQL Schema & Codegen', { conclusion: 'failure' }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 7562,
+      checkName: 'GraphQL Schema & Codegen',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    expect(body.failed).toBe(0);
+    // Server-side check_name filtering must not be used — the request lists
+    // all check runs unfiltered and matching happens locally.
+    const calls = mockGithubRest.mock.calls as Array<
+      [{ query?: Record<string, string> }]
+    >;
+    expect(calls[0][0].query).not.toHaveProperty('check_name');
+  });
+
+  it('matches a "&"-containing check name via a partial substring', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 1,
+        check_runs: [
+          makeCheckRun('GraphQL Schema & Codegen', { conclusion: 'failure' }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 7562,
+      checkName: 'Schema',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+  });
+
+  it('reports available check names when a checkName matches nothing', async () => {
+    mockGithubRest.mockResolvedValueOnce({
+      total_count: 1,
+      check_runs: [
+        makeCheckRun('GraphQL Schema & Codegen', { conclusion: 'failure' }),
+      ],
+    });
+
+    const result = await retriggerCheck({
+      number: 7562,
+      checkName: 'nonexistent check',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /No check run named "nonexistent check"/,
+    );
+    expect(result.content[0].text).toMatch(/GraphQL Schema & Codegen/);
+  });
+});

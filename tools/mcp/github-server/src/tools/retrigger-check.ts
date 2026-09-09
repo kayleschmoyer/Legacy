@@ -1,5 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { parseRunIds } from './get-check-runs.js';
+import { filterRunsByName, parseRunIds } from './get-check-runs.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
@@ -56,11 +56,13 @@ export async function retriggerCheck(
     };
   }
 
-  // 2. List check runs for the commit (paginated)
+  // 2. List check runs for the commit (paginated). Always fetch unfiltered —
+  //    GitHub's own `check_name` query param is an exact match against the
+  //    full display name and mishandles names containing "&" (matching
+  //    neither the full name nor a substring, LS-9884) — so `checkName` is
+  //    applied locally below via the same case-insensitive substring matcher
+  //    get-check-runs.ts uses (LS-8771).
   const baseQuery: Record<string, string> = { per_page: '100' };
-  if (params.checkName) {
-    baseQuery.check_name = params.checkName;
-  }
 
   let allCheckRuns: CheckRun[] = [];
   let totalCount = 0;
@@ -86,12 +88,26 @@ export async function retriggerCheck(
       content: [
         {
           type: 'text',
-          text: params.checkName
-            ? `No check run named "${params.checkName}" found on PR #${params.number} (commit ${sha.slice(0, 7)}).`
-            : `No check runs found on PR #${params.number} (commit ${sha.slice(0, 7)}).`,
+          text: `No check runs found on PR #${params.number} (commit ${sha.slice(0, 7)}).`,
         },
       ],
     };
+  }
+
+  if (params.checkName) {
+    const matched = filterRunsByName(allCheckRuns, params.checkName);
+    if (matched.length === 0) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `No check run named "${params.checkName}" found on PR #${params.number} (commit ${sha.slice(0, 7)}). Available check names: ${allCheckRuns.map((r) => r.name).join(', ')}`,
+          },
+        ],
+      };
+    }
+    allCheckRuns = matched;
   }
 
   // 3. Filter checks based on params:

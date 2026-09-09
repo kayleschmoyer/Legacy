@@ -1775,7 +1775,7 @@ export function createServer(): McpServer {
         .min(1)
         .optional()
         .describe(
-          'Specific check name to re-request (retriggers all matching)',
+          'Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching)',
         ),
       allFailed: coercedBoolean
         .default(false)

@@ -144,10 +144,16 @@ async function mapWithConcurrency<T, R>(
 // display name (e.g. "🚀 CI Pipeline / lint"), which no agent can guess —
 // so we always fetch the unfiltered list here and apply our own
 // case-insensitive substring match in `filterRunsByName` instead (LS-8771).
-function filterRunsByName(
-  runs: SerializedCheckRun[],
+// It also mishandles a name containing "&" (LS-9884) — GitHub's REST
+// check_name filter fails to match such names at all (both the full name and
+// any substring), so any caller that still relied on server-side check_name
+// filtering (e.g. retrigger-check.ts) hit the same "no check run found" gap.
+// Exported so other tools reuse this local substring matcher instead of the
+// broken server-side param.
+export function filterRunsByName<T extends { name: string }>(
+  runs: T[],
   checkName: string,
-): SerializedCheckRun[] {
+): T[] {
   const needle = checkName.toLowerCase();
   return runs.filter((run) => run.name.toLowerCase().includes(needle));
 }
