@@ -54,7 +54,13 @@ resource "aws_iam_role_policy_attachment" "draft_processor_lambda_vpc" {
 
 # Secrets manager policy for database credentials
 resource "aws_iam_policy" "draft_processor_lambda_secrets" {
-  name        = "${local.name_prefix}-draft-processor-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-draft-processor-lambda-secrets-"
   description = "Allow draft processor lambda to read secrets"
 
   policy = jsonencode({
@@ -75,16 +81,33 @@ resource "aws_iam_policy" "draft_processor_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "draft_processor_lambda_secrets" {
   policy_arn = aws_iam_policy.draft_processor_lambda_secrets.arn
   role       = aws_iam_role.draft_processor_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # RDS connection policy
 resource "aws_iam_policy" "draft_processor_lambda_rds" {
-  name        = "${local.name_prefix}-draft-processor-lambda-rds"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-draft-processor-lambda-rds-"
   description = "Allow draft processor lambda to connect to RDS"
 
   policy = jsonencode({
@@ -101,16 +124,33 @@ resource "aws_iam_policy" "draft_processor_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "draft_processor_lambda_rds" {
   policy_arn = aws_iam_policy.draft_processor_lambda_rds.arn
   role       = aws_iam_role.draft_processor_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # SQS permission policy for receiving messages from automatic_drafts queue
 resource "aws_iam_policy" "draft_processor_lambda_sqs" {
-  name        = "${local.name_prefix}-draft-processor-lambda-sqs"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-draft-processor-lambda-sqs-"
   description = "Allow draft processor lambda to receive SQS messages"
 
   policy = jsonencode({
@@ -129,16 +169,33 @@ resource "aws_iam_policy" "draft_processor_lambda_sqs" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "draft_processor_lambda_sqs" {
   policy_arn = aws_iam_policy.draft_processor_lambda_sqs.arn
   role       = aws_iam_role.draft_processor_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # WebSocket/DynamoDB permissions for notifications
 resource "aws_iam_policy" "draft_processor_lambda_websocket" {
-  name        = "${local.name_prefix}-draft-processor-lambda-websocket"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-draft-processor-lambda-websocket-"
   description = "Allow draft processor lambda to send WebSocket notifications"
 
   policy = jsonencode({
@@ -167,17 +224,34 @@ resource "aws_iam_policy" "draft_processor_lambda_websocket" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "draft_processor_lambda_websocket" {
   policy_arn = aws_iam_policy.draft_processor_lambda_websocket.arn
   role       = aws_iam_role.draft_processor_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Permission to publish draft_completed push notification events onto the
 # notifications queue (lib/aws-utils NotificationPublisher). LS-6838.
 resource "aws_iam_policy" "draft_processor_lambda_notifications_sqs" {
-  name        = "${local.name_prefix}-draft-processor-lambda-notifications-sqs"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-draft-processor-lambda-notifications-sqs-"
   description = "Allow draft processor lambda to publish to the notifications queue"
 
   policy = jsonencode({
@@ -192,11 +266,22 @@ resource "aws_iam_policy" "draft_processor_lambda_notifications_sqs" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "draft_processor_lambda_notifications_sqs" {
   policy_arn = aws_iam_policy.draft_processor_lambda_notifications_sqs.arn
   role       = aws_iam_role.draft_processor_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Draft processor Lambda function
