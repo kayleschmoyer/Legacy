@@ -339,14 +339,14 @@ jobs:
           # Plan changes with lock timeout
           if terraform plan -input=false -out=tfplan -lock-timeout=5m 2>&1 | tee plan.log; then
             echo "✅ Terraform plan successful"
-            
+
             # Check if there are any changes
             if grep -q "No changes" plan.log; then
               echo "has_changes=false" >> $GITHUB_OUTPUT
               echo "::notice::No infrastructure changes needed"
             else
               echo "has_changes=true" >> $GITHUB_OUTPUT
-              
+
               # Extract what's changing
               echo "## 📝 Planned Changes" >> $GITHUB_STEP_SUMMARY
               grep -A 50 "Terraform will perform" plan.log >> $GITHUB_STEP_SUMMARY || true
@@ -356,6 +356,17 @@ jobs:
             cat plan.log
             exit 1
           fi
+
+          # Record the state serial + lineage this plan was computed against
+          # (LS-9966). tfplan is only valid for the exact state it was read
+          # from — capture that identity now so a later step can assert
+          # nothing else wrote to the backend before we apply it. See
+          # "Verify State Serial Before Apply" below and
+          # .agents/skills/infrastructure/references/terraform-state-and-operations.md#state-serial-assertion-ls-9966
+          # for why this doesn't lean on S3 read-after-write consistency.
+          STATE_JSON=$(terraform state pull)
+          echo "state_serial=$(echo "$STATE_JSON" | jq -r '.serial')" >> "$GITHUB_OUTPUT"
+          echo "state_lineage=$(echo "$STATE_JSON" | jq -r '.lineage')" >> "$GITHUB_OUTPUT"
 
       - name: Release Lock on Plan Failure
         if: always() && steps.plan.outcome == 'failure'
@@ -458,8 +469,74 @@ jobs:
               ;;
           esac
 
-      - name: "📡 Rollbar Deploy Started"
+          # Re-plan reads the backend again, so it supersedes the serial/lineage
+          # captured by the original plan step (LS-9966) — the tfplan file on
+          # disk was just overwritten and is now only valid for whatever state
+          # this pull observes.
+          STATE_JSON=$(terraform state pull)
+          echo "state_serial=$(echo "$STATE_JSON" | jq -r '.serial')" >> "$GITHUB_OUTPUT"
+          echo "state_lineage=$(echo "$STATE_JSON" | jq -r '.lineage')" >> "$GITHUB_OUTPUT"
+
+      - name: Verify State Serial Before Apply
+        # LS-9966: during the LS-9877 slice-4 apply, this workflow re-replaced
+        # 23 IAM policies/attachments that a slice-3 apply had *already*
+        # applied moments earlier, with no wall-clock overlap between the two
+        # applies' Apply Infrastructure Changes steps. The suspected cause —
+        # S3 backend eventual consistency on the state read — does not hold
+        # up: this backend has used_lockfile-based S3 native locking (a real
+        # mutex via conditional PUT) since before this incident, and S3 has
+        # offered strict read-after-write consistency for all operations,
+        # globally, since December 2020, so a GetObject immediately following
+        # a completed PutObject cannot observe stale data. The state view a
+        # plan reads is only ever wrong if something *else* legitimately wrote
+        # to the backend in the window this workflow doesn't otherwise guard:
+        # between when a plan/re-plan step reads state and when the Apply
+        # step consumes the tfplan file built from it. (This workflow already
+        # closes the equivalent gap for Lambda SSM versions via the
+        # "Re-check SSM Versions After Plan" / "Re-plan if Versions Changed"
+        # pair — this is the same pattern applied to the state file itself,
+        # which had no such guard.) Fail loudly here instead of letting a
+        # stale tfplan re-apply — see the "state-serial assertion" section of
+        # .agents/skills/infrastructure/references/terraform-state-and-operations.md
+        # for the full incident writeup.
+        id: verify-serial
         if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
+        working-directory: terraform/main
+        run: |
+          set -o pipefail
+
+          # Prefer the re-plan's snapshot when a re-plan ran (it re-read the
+          # backend most recently); otherwise fall back to the original plan's.
+          if [ "${{ steps.replan.outcome }}" = "success" ]; then
+            EXPECTED_SERIAL='${{ steps.replan.outputs.state_serial }}'
+            EXPECTED_LINEAGE='${{ steps.replan.outputs.state_lineage }}'
+          else
+            EXPECTED_SERIAL='${{ steps.plan.outputs.state_serial }}'
+            EXPECTED_LINEAGE='${{ steps.plan.outputs.state_lineage }}'
+          fi
+
+          echo "🔍 Verifying backend state is unchanged since the tfplan we're about to apply was computed..."
+          CURRENT_JSON=$(terraform state pull)
+          CURRENT_SERIAL=$(echo "$CURRENT_JSON" | jq -r '.serial')
+          CURRENT_LINEAGE=$(echo "$CURRENT_JSON" | jq -r '.lineage')
+
+          echo "  Expected: lineage=$EXPECTED_LINEAGE serial=$EXPECTED_SERIAL"
+          echo "  Current:  lineage=$CURRENT_LINEAGE serial=$CURRENT_SERIAL"
+
+          if [ -z "$EXPECTED_SERIAL" ] || [ -z "$EXPECTED_LINEAGE" ]; then
+            echo "::error::Could not determine the expected state serial/lineage from the plan step — refusing to apply blind. This is a workflow bug, not a state race; check the plan/replan step outputs."
+            exit 1
+          fi
+
+          if [ "$CURRENT_SERIAL" != "$EXPECTED_SERIAL" ] || [ "$CURRENT_LINEAGE" != "$EXPECTED_LINEAGE" ]; then
+            echo "::error::State changed underneath this run between plan and apply (lineage/serial mismatch) -- another apply wrote to the backend in that window. Refusing to apply a stale plan. Re-run this workflow to pick up a fresh plan against the current state."
+            exit 1
+          fi
+
+          echo "✅ State unchanged since plan — safe to apply"
+
+      - name: "📡 Rollbar Deploy Started"
+        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false' && steps.verify-serial.outcome == 'success'
         uses: ./.github/actions/rollbar-deploy
         with:
           rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
@@ -469,7 +546,7 @@ jobs:
 
       - name: Apply Infrastructure Changes
         id: apply
-        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
+        if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false' && steps.verify-serial.outcome == 'success'
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
