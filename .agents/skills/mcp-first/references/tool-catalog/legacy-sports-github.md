@@ -23,7 +23,8 @@ Fetch GitHub Actions job logs with server-side truncation. When a step is marked
 | `job_id` | number |  | coerced, integer, > 0 | Specific job ID. Required when run_id is not provided. |
 | `run_id` | number |  | coerced, integer, > 0 | Workflow run ID. Fetches logs for all jobs in the run (filtered by failed_only). Required when job_id is not provided. |
 | `failed_only` | boolean |  | — | When using run_id, only fetch logs for failed jobs (default: true). |
-| `tail_lines` | number |  | coerced, integer, > 0 | Max lines from the end of the log (default: 200); always applied server-side. |
+| `tail_lines` | number |  | coerced, integer, > 0 | Max lines from the end of the log (default 200). |
+| `tailLines` | number |  | coerced, integer, > 0 | camelCase alias for tail_lines; tail_lines wins if both set. |
 | `max_chars` | number |  | coerced, integer, > 0 | Hard cap on output characters (default: 10 000); truncated output is suffixed with the total byte count. |
 | `error_summary` | boolean |  | — | Extract only error/failure lines (plus 2 lines of context) instead of tailing. |
 | `truncate_line_length` | number |  | coerced, integer, > 0 | Truncate lines longer than this many characters (e.g. 500), so one pathologically long line can't alone consume the max_chars budget. |

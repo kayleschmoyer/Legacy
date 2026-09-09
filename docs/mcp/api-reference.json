@@ -4033,8 +4033,17 @@
                 "integer",
                 "> 0"
               ],
-              "default": 200,
-              "description": "Max lines from the end of the log (default: 200); always applied server-side."
+              "description": "Max lines from the end of the log (default 200)."
+            },
+            "tailLines": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "camelCase alias for tail_lines; tail_lines wins if both set."
             },
             "max_chars": {
               "type": "number",

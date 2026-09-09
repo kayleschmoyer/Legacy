@@ -2207,9 +2207,15 @@ export function createServer(): McpServer {
         .number()
         .int()
         .positive()
-        .default(200)
+        .optional()
+        .describe('Max lines from the end of the log (default 200).'),
+      tailLines: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
         .describe(
-          'Max lines from the end of the log (default: 200); always applied server-side.',
+          'camelCase alias for tail_lines; tail_lines wins if both set.',
         ),
       max_chars: z.coerce
         .number()
@@ -2248,7 +2254,7 @@ export function createServer(): McpServer {
         jobId: params.job_id,
         runId: params.run_id,
         failedOnly: params.failed_only,
-        tailLines: params.tail_lines,
+        tailLines: params.tail_lines ?? params.tailLines,
         maxChars: params.max_chars,
         errorSummary: params.error_summary,
         truncateLineLength: params.truncate_line_length,

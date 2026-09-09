@@ -14,6 +14,7 @@ import { finishFixRound } from './tools/finish-fix-round';
 import { resolveThreads } from './tools/resolve-threads';
 import { prDiff } from './tools/pr-diff';
 import { diagnose } from './tools/diagnose';
+import { getJobLogs } from './tools/get-job-logs';
 import type { ToolResult } from './types';
 
 jest.mock('./tools/mark-pr-ready');
@@ -29,6 +30,7 @@ jest.mock('./tools/finish-fix-round');
 jest.mock('./tools/resolve-threads');
 jest.mock('./tools/pr-diff');
 jest.mock('./tools/diagnose');
+jest.mock('./tools/get-job-logs');
 
 // getRepoRoot lives in ./repo-root and uses import.meta.url, which cannot be
 // compiled under the CommonJS tsconfig the Jest preset uses — mock it with a
@@ -92,6 +94,7 @@ describe('index tool registration — prNumber alias resolution', () => {
     jest.mocked(resolveThreads).mockResolvedValue(okResult);
     jest.mocked(prDiff).mockResolvedValue(okResult);
     jest.mocked(diagnose).mockResolvedValue(okResult);
+    jest.mocked(getJobLogs).mockResolvedValue(okResult);
   });
 
   describe('github_mark_pr_ready', () => {
@@ -710,6 +713,54 @@ describe('index tool registration — prNumber alias resolution', () => {
         { type: 'text', text: MISSING_PARAM_ERROR },
       ]);
       expect(diagnose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('get_job_logs', () => {
+    it('accepts "tail_lines" and forwards it as "tailLines"', async () => {
+      const result = await client.callTool({
+        name: 'get_job_logs',
+        arguments: { job_id: 123, tail_lines: 400 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(getJobLogs).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 123, tailLines: 400 }),
+      );
+    });
+
+    it('accepts the "tailLines" alias and forwards it as "tailLines" (LS-9951)', async () => {
+      const result = await client.callTool({
+        name: 'get_job_logs',
+        arguments: { job_id: 123, tailLines: 400 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(getJobLogs).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 123, tailLines: 400 }),
+      );
+    });
+
+    it('prefers "tail_lines" when both are provided', async () => {
+      await client.callTool({
+        name: 'get_job_logs',
+        arguments: { job_id: 123, tail_lines: 100, tailLines: 400 },
+      });
+
+      expect(getJobLogs).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 123, tailLines: 100 }),
+      );
+    });
+
+    it('forwards undefined when neither is provided, leaving the default to getJobLogs', async () => {
+      await client.callTool({
+        name: 'get_job_logs',
+        arguments: { job_id: 123 },
+      });
+
+      expect(getJobLogs).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: 123, tailLines: undefined }),
+      );
     });
   });
 });
