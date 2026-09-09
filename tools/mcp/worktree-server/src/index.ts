@@ -41,6 +41,7 @@ import { checkJiraAuth } from './auth-checks';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
 import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
+import { isTwigNotFoundError } from './twig-rebase-fallback';
 import {
   getConflictInfo,
   scanStagedForConflictMarkers,
@@ -5856,16 +5857,35 @@ const handleCallTool = async (
           } catch (twigErr: unknown) {
             const twigMsg =
               twigErr instanceof Error ? twigErr.message : String(twigErr);
-            const twigStdout =
-              (twigErr as { stdout?: string; stderr?: string }).stdout ?? '';
-            const twigStderr =
-              (twigErr as { stdout?: string; stderr?: string }).stderr ?? '';
-            const noParent =
-              /no parent|parent branch/i.test(twigMsg) ||
-              /no parent|parent branch/i.test(twigStdout + twigStderr);
-            if (noParent) {
+            const twigErrInfo = twigErr as {
+              stdout?: string;
+              stderr?: string;
+              status?: number;
+              code?: string;
+            };
+            const twigStdout = twigErrInfo.stdout ?? '';
+            const twigStderr = twigErrInfo.stderr ?? '';
+            const noParent = /no parent|parent branch/i.test(
+              `${twigMsg}\n${twigStdout}\n${twigStderr}`,
+            );
+            // twig is a local-Windows-only CLI (AGENTS.md) and is absent in
+            // Claude Code Remote / cloud sessions (LS-9954): the shell can't
+            // find the binary and exits 127 (or Node reports ENOENT directly
+            // when no shell intermediary is involved), distinct from twig
+            // running successfully but reporting "no parent registered".
+            const twigNotFound = isTwigNotFoundError({
+              message: twigMsg,
+              code: twigErrInfo.code,
+              status: twigErrInfo.status,
+              stdout: twigStdout,
+              stderr: twigStderr,
+            });
+            if (noParent || twigNotFound) {
+              const reason = twigNotFound
+                ? `twig binary not found: ${twigMsg}`
+                : `no parent registered: ${twigMsg}`;
               log.push(
-                `(twig rebase failed — no parent registered: ${twigMsg})`,
+                `(twig rebase failed — ${reason})`,
                 '(falling back to: git rebase origin/main)',
               );
               log.push('$ git rebase origin/main');
