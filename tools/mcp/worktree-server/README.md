@@ -61,6 +61,8 @@ Fetch origin and rebase the active worktree branch onto its parent (via `twig re
 
 Run post-rebase stabilization: `make install`, regenerate schema, and run codegen on affected projects. Must be run **before** pushing after a rebase.
 
+Job-backed (LS-9957): a run that finishes within the sync budget returns its full result inline, exactly as before. A slower run (e.g. a cold `pnpm install`) instead returns `{ status: "running", jobId }` — poll it with `worktree_job_status`/`worktree_job_wait` rather than re-invoking `worktree_stabilize`.
+
 | Parameter  | Type   | Required | Description                                  |
 | ---------- | ------ | -------- | -------------------------------------------- |
 | `worktree` | string | No       | Ticket key. Uses active worktree if omitted. |

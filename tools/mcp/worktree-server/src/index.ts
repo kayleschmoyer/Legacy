@@ -927,6 +927,20 @@ const WORKTREE_RUN_TIMEOUT_MS = 120_000;
 const WORKTREE_RUN_LONG_DEFAULT_TIMEOUT_MS = 600_000; // 10 min
 const WORKTREE_RUN_LONG_MAX_TIMEOUT_MS = 3_600_000; // 60 min
 
+/**
+ * Process-level cap for worktree_stabilize's install + schema + codegen
+ * sequence (LS-9957). The prior implementation ran these steps synchronously
+ * in-process with generous per-step timeouts (300s/60s/120s = 480s worst
+ * case) — well past the ~60s cloud MCP transport timeout (LS-8559) that caps
+ * how long any single tool call can block the client, regardless of the
+ * tool's own internal timeouts. That mismatch is what produced the observed
+ * "timed out after 60s" on a stabilize run that was still making progress
+ * (a slow-but-live pnpm install), not a hang — the fix is the same
+ * job-backed / pollable pattern already used by worktree_run_long, not a
+ * larger synchronous timeout (which would just move the transport cutoff).
+ */
+const WORKTREE_STABILIZE_TIMEOUT_MS = 600_000; // 10 min
+
 type ToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   isError?: boolean;
@@ -1039,7 +1053,8 @@ function formatWorktreeRunSnapshot(snapshot: JobSnapshot): ToolResult {
 function formatJobSnapshotResult(snapshot: JobSnapshot): ToolResult {
   if (
     (snapshot.meta?.['kind'] === 'worktree_run' ||
-      snapshot.meta?.['kind'] === 'worktree_run_long') &&
+      snapshot.meta?.['kind'] === 'worktree_run_long' ||
+      snapshot.meta?.['kind'] === 'worktree_stabilize') &&
     (snapshot.status === 'done' || snapshot.status === 'failed')
   ) {
     return formatWorktreeRunSnapshot(snapshot);
@@ -7413,22 +7428,14 @@ const handleCallTool = async (
       const steps = [
         ...(nodeModulesIsSymlink
           ? []
-          : [
-              {
-                label: 'make install',
-                cmd: 'make install',
-                timeout: 300_000,
-              },
-            ]),
+          : [{ label: 'make install', cmd: 'make install' }]),
         {
           label: 'pnpm exec nx run db:print-schema',
           cmd: 'pnpm exec nx run db:print-schema',
-          timeout: 60_000,
         },
         {
           label: 'pnpm exec nx affected -t codegen --base=origin/main',
           cmd: 'pnpm exec nx affected -t codegen --base=origin/main',
-          timeout: 120_000,
         },
       ];
 
@@ -7438,36 +7445,55 @@ const handleCallTool = async (
         );
       }
 
-      for (const step of steps) {
-        log.push(``, `$ ${step.label}`);
-        try {
-          const out = run(step.cmd, cwd, { timeout: step.timeout });
-          const trimmed = out.trim();
-          if (trimmed) log.push(trimmed);
-          log.push(`✓ ${step.label} succeeded`);
-        } catch (err: unknown) {
-          const e = err as {
-            stdout?: string;
-            stderr?: string;
-            status?: number;
-          };
-          const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
-          log.push(
-            `✗ ${step.label} failed (exit code ${e.status ?? 'unknown'})`,
-            output,
-          );
-          return {
-            content: [{ type: 'text', text: log.join('\n') }],
-            isError: true,
-          };
-        }
-      }
-
-      log.push(
-        '',
-        'Stabilization complete. Next: worktree_run(command: "make pc") to validate.',
+      // Run the whole sequence as a single job-backed shell command (LS-9957)
+      // instead of blocking this tool call in-process step by step. The prior
+      // synchronous loop could legitimately run past the ~60s cloud MCP
+      // transport timeout (LS-8559) on a slow-but-successful `make install`,
+      // which is indistinguishable from a hang to the caller. Chaining with
+      // `&&` preserves the same short-circuit-on-first-failure behavior as
+      // the old loop, and each step still echoes its own label/success
+      // marker into the job log so a caller polling via worktree_job_status
+      // sees the same progress shape as before.
+      const shellSteps = steps.map(
+        (step) =>
+          `echo '$ ${step.label}' && ${step.cmd} && echo '✓ ${step.label} succeeded'`,
       );
-      return { content: [{ type: 'text', text: log.join('\n') }] };
+      shellSteps.push(
+        `echo && echo 'Stabilization complete. Next: worktree_run(command: "make pc") to validate.'`,
+      );
+      const command = shellSteps.join(' && ');
+
+      const shell =
+        process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
+      const isCmdShell =
+        process.platform === 'win32' && shell.toLowerCase().endsWith('cmd.exe');
+      const shellArgs = isCmdShell
+        ? ['/d', '/s', '/c', command]
+        : ['-c', command];
+
+      const snapshot = await runJobWithBudget(
+        {
+          command: shell,
+          args: shellArgs,
+          cwd,
+          label: 'worktree_stabilize',
+          timeoutMs: WORKTREE_STABILIZE_TIMEOUT_MS,
+          meta: { kind: 'worktree_stabilize', command: 'worktree_stabilize' },
+        },
+        JOB_SYNC_BUDGET_MS,
+      );
+
+      const preamble = log.join('\n');
+      const result = formatWorktreeRunSnapshot(snapshot);
+      return {
+        ...result,
+        content: [
+          {
+            type: 'text',
+            text: `${preamble}\n${result.content[0]?.text ?? ''}`,
+          },
+        ],
+      };
     }
 
     // -----------------------------------------------------------------------
