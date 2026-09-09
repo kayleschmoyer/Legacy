@@ -39,7 +39,10 @@ Use the 7 pc-* chunks IN ORDER instead, one per call:
 
   Preferred (whenever the nx MCP server is loaded):
     nx_run_pc_chunk({ chunk: "pc-db-prep" })  ...  nx_run_pc_chunk({ chunk: "pc-build" })
-  Degraded CC web (no custom MCP servers):
+  nx MCP server not loaded (degraded CC web, OR a local session where the stdio
+  servers failed to start — see .agents/skills/mcp-first/references/diagnostics.md
+  Check 1 before assuming this is cloud-only; recurring in local Windows
+  launcher-worktree sessions per LS-8774/LS-9743):
     Bash make pc-<chunk> with run_in_background: true — foreground make pc-* is
     blocked by .agents/hooks/enforce-background.mjs; wait for each background
     completion before starting the next chunk.

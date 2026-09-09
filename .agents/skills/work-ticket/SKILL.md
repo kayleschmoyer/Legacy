@@ -73,6 +73,8 @@ The worktree MCP server tracks an "active" worktree independently of the session
 
 Skip this sub-step only if no worktree MCP tools will be used in this session (rare — `worktree_rename_session` in Step 1 already requires it).
 
+**If `worktree_set` (or any `worktree_*`/`nx_*`/`make_*` tool) is unexpectedly absent** — `ToolSearch` returns "No matching deferred tools found" for an exact-name query — do not silently fall through to Bash/`git`/`make`/`npx nx` for the rest of the session. This is a recurring, documented failure mode in local Windows launcher-worktree sessions specifically (not only degraded cloud sessions), tracked under LS-8774/LS-9743. Run the [diagnostics checklist](../mcp-first/references/diagnostics.md) first — it already covers this exact symptom (Check 1: `node_modules/.bin/tsx`) with recovery steps — and report the diagnosis before deciding a shell fallback is appropriate for the immediate operation.
+
 ### 0b: Verify Jira auth
 
 ```
