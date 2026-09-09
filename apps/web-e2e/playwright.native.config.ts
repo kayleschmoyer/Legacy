@@ -3,6 +3,20 @@ import { defineConfig } from '@playwright/test';
 import type { BackendOptions, PlatformOptions } from './src/fixtures/dual';
 
 /**
+ * Marks every worker process this config spawns as native-only (LS-9864).
+ * `dual.ts` reads this at module load — before `test.extend()` runs — to
+ * choose the native implementation of `driver`/`testData`, which never
+ * names the `page` fixture in their signature. This must happen at import
+ * time, not inside a fixture body: Playwright resolves every fixture named
+ * in a function's destructured parameters before the body runs, so a
+ * runtime `if (platform === 'native')` branch inside a fixture that still
+ * destructures `page` doesn't help — the browser gets launched anyway. Set
+ * here (not in dual.ts) so the gate lives at the project-config level, and
+ * only this dedicated native config ever sets it.
+ */
+process.env.E2E_DUAL_PLATFORM = 'native';
+
+/**
  * Native E2E config (ADR-0016 native rollout blueprint, step 3 — LS-8449).
  *
  * The SAME shared spec bodies the hermetic browser projects run mocked

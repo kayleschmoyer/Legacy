@@ -68,6 +68,18 @@ export interface BackendOptions {
  */
 export type PlatformMode = 'web' | 'native';
 
+/**
+ * Set (only) by `playwright.native.config.ts` before any worker spawns
+ * (LS-9864). Read here, at module load, to choose the native
+ * implementation of `driver`/`testData` below — one that never names the
+ * `page` fixture in its signature — instead of branching on the `platform`
+ * *fixture* inside a function that also destructures `page`. Playwright
+ * resolves every fixture named in a function's destructured parameters
+ * before the body runs, so a runtime branch doesn't prevent the browser
+ * launch; only never naming `page` in the registered function does.
+ */
+const IS_NATIVE_WORKER = process.env.E2E_DUAL_PLATFORM === 'native';
+
 export interface PlatformOptions {
   /**
    * Which platform driver this spec runs against. Set per project via
@@ -228,70 +240,84 @@ export const test = base.extend<
     await attributePageCoverage(page, testInfo, baseline);
   },
 
-  testData: async (
-    {
-      backend,
-      platform,
-      page,
-      nativeMockServer,
-    }: {
-      backend: BackendMode;
-      platform: PlatformMode;
-      page: Page;
-      nativeMockServer: GraphQLMockServer;
-    },
-    use: (testData: TestData) => Promise<void>,
-  ) => {
-    if (platform === 'native') {
-      // Native + live: same identity path as the web `shared-live` project.
-      if (backend !== 'mock') {
-        await use(new LiveTestData());
-        return;
+  /**
+   * Backend-appropriate data-precondition seam (ADR-0016 §backend seam).
+   *
+   * Split at module load (LS-9864) rather than branched on `platform` inside
+   * one function: the native implementation never names `page` in its
+   * signature, so a native-project test never forces Playwright to launch a
+   * browser to get it — unlike a runtime `if (platform === 'native')` branch,
+   * which doesn't prevent the eager resolution of a fixture that's still
+   * destructured in the same function.
+   */
+  testData: IS_NATIVE_WORKER
+    ? async (
+        {
+          backend,
+          nativeMockServer,
+        }: { backend: BackendMode; nativeMockServer: GraphQLMockServer },
+        use: (testData: TestData) => Promise<void>,
+      ) => {
+        // Native + live: same identity path as the web `shared-live` project.
+        if (backend !== 'mock') {
+          await use(new LiveTestData());
+          return;
+        }
+        // Native + mock: the per-worker server is started, wired via adb
+        // reverse, and reset for this test by the `_backendEnv` auto-fixture
+        // above; hand the spec a TestData seam that registers overrides
+        // in-process on it.
+        await use(new NativeMockTestData(nativeMockServer));
       }
-      // Native + mock: the per-worker server is started, wired via adb reverse,
-      // and reset for this test by the `_backendEnv` auto-fixture above; hand the
-      // spec a TestData seam that registers overrides in-process on it.
-      await use(new NativeMockTestData(nativeMockServer));
-      return;
-    }
-    await use(backend === 'mock' ? new MockTestData(page) : new LiveTestData());
-  },
+    : async (
+        { backend, page }: { backend: BackendMode; page: Page },
+        use: (testData: TestData) => Promise<void>,
+      ) => {
+        await use(
+          backend === 'mock' ? new MockTestData(page) : new LiveTestData(),
+        );
+      },
 
   /**
    * Platform driver — a *project* decision (ADR-0016), not a spec decision.
    * Web mode adapts the Playwright `page`; native mode injects the native
-   * driver (`playwright.native.config.ts` projects set `platform: 'native'`).
-   * Page objects are identical in both modes — they speak only the AppDriver
-   * contract.
+   * driver. Page objects are identical in both modes — they speak only the
+   * AppDriver contract.
+   *
+   * Split at module load (LS-9864) for the same reason as `testData` above:
+   * the native implementation never names `page`.
    */
-  driver: async (
-    { page, platform }: { page: Page; platform: PlatformMode },
-    use: (driver: AppDriver) => Promise<void>,
-  ) => {
-    if (platform !== 'native') {
-      await use(new PlaywrightWebDriver(page));
-      return;
-    }
-    // Native: drive a real Appium/UiAutomator2 session when an emulator harness
-    // is configured (`E2E_NATIVE_APP` set — the scheduled, watched login →
-    // league-list job of LS-8450). The `webdriverio` runtime is pulled in via a
-    // dynamic import ONLY on this path, so the hermetic web PR-CI collection of
-    // these shared specs never loads wdio (ADR-0016; see appium-session.ts).
-    if (!isNativeEmulatorConfigured()) {
-      // No emulator harness in this environment — inject the capability-only
-      // placeholder so capability-gated specs skip cleanly. An ungated native
-      // interaction throws loudly rather than silently passing.
-      await use(createNativeDriver());
-      return;
-    }
-    const { createAndroidSession } = await import('../driver/appium-session');
-    const { driver, dispose } = await createAndroidSession();
-    try {
-      await use(driver);
-    } finally {
-      await dispose();
-    }
-  },
+  driver: IS_NATIVE_WORKER
+    ? async ({}, use: (driver: AppDriver) => Promise<void>) => {
+        // Drive a real Appium/UiAutomator2 session when an emulator harness
+        // is configured (`E2E_NATIVE_APP` set — the scheduled, watched login →
+        // league-list job of LS-8450). The `webdriverio` runtime is pulled in
+        // via a dynamic import ONLY on this path, so the hermetic web PR-CI
+        // collection of these shared specs never loads wdio (ADR-0016; see
+        // appium-session.ts).
+        if (!isNativeEmulatorConfigured()) {
+          // No emulator harness in this environment — inject the
+          // capability-only placeholder so capability-gated specs skip
+          // cleanly. An ungated native interaction throws loudly rather than
+          // silently passing.
+          await use(createNativeDriver());
+          return;
+        }
+        const { createAndroidSession } =
+          await import('../driver/appium-session');
+        const { driver, dispose } = await createAndroidSession();
+        try {
+          await use(driver);
+        } finally {
+          await dispose();
+        }
+      }
+    : async (
+        { page }: { page: Page },
+        use: (driver: AppDriver) => Promise<void>,
+      ) => {
+        await use(new PlaywrightWebDriver(page));
+      },
 
   // Page objects — identical instances in both modes (ADR-0015 §5, §6).
   draftPage: async (
