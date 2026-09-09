@@ -451,9 +451,24 @@ export function createServer(): McpServer {
   // --- github_get_repo_info ---
   server.tool(
     'github_get_repo_info',
-    'Get repo info: owner, name, default branch, URL.',
-    {},
-    async () => getRepoInfo(),
+    'Get repo info: owner, name, default branch, URL. Optional "include": "rulesets" and/or "actions_permissions", for workflow-403 triage without a raw `gh api` call.',
+    {
+      include: z
+        .array(z.enum(['rulesets', 'actions_permissions']))
+        .optional()
+        .describe('Extra data to include beyond the default repo card.'),
+      includesParents: z
+        .boolean()
+        .optional()
+        .describe(
+          'Rulesets "includes_parents" query param. Only used with include: ["rulesets"].',
+        ),
+    },
+    async (params) =>
+      getRepoInfo({
+        include: params.include,
+        includesParents: params.includesParents,
+      }),
   );
 
   // --- github_get_review_threads ---

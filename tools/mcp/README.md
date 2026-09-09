@@ -201,7 +201,7 @@ Pull request and review lifecycle management:
 - **github_get_review_threads** — Fetch review threads via GraphQL (unresolved/resolved, comments with path+line)
 - **github_resolve_thread** — Resolve a review thread via GraphQL mutation
 - **github_manage_labels** — Add or remove labels (e.g. `bot:ready-for-review`)
-- **github_get_repo_info** — Get repo owner, name, default branch, and URL
+- **github_get_repo_info** — Get repo owner, name, default branch, and URL. Optional `include: ["rulesets", "actions_permissions"]` for workflow-403 triage
 
 See `.agents/skills/pr-lifecycle/SKILL.md` for the workflows this server supports.
 

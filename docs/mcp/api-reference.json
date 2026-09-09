@@ -4781,8 +4781,27 @@
         },
         {
           "name": "github_get_repo_info",
-          "description": "Get repo info: owner, name, default branch, URL.",
-          "inputs": {},
+          "description": "Get repo info: owner, name, default branch, URL. Optional \"include\": \"rulesets\" and/or \"actions_permissions\", for workflow-403 triage without a raw `gh api` call.",
+          "inputs": {
+            "include": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "enum",
+                "optional": false,
+                "enum": [
+                  "rulesets",
+                  "actions_permissions"
+                ]
+              },
+              "description": "Extra data to include beyond the default repo card."
+            },
+            "includesParents": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Rulesets \"includes_parents\" query param. Only used with include: [\"rulesets\"]."
+            }
+          },
           "transports": [
             "stdio"
           ]
