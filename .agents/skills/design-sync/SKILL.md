@@ -96,6 +96,8 @@ Local sessions cannot WebFetch design URLs (share URLs → 403, handoff URLs →
 2. **Anything within ~10% of the cap (≳236 KiB) does not go through `get_file`.** Route it to the user-assisted **Export → Project HTML (.zip)** path through the logged-in Chrome fallback — see [references/designsync-tool.md](references/designsync-tool.md) (access matrix and "When to use what"). Ask the user for the export; do not spend the context proving the file is too big.
 3. **A deliberately skipped file MUST be recorded in the SYNC-REPORT** under a `## Not pulled` heading (the worked example titles it `## Not pulled in this pass`), with its path and the reason. Skipping one means the bundle is knowingly **not byte-exact** with the remote, and that has to be visible rather than silent — otherwise the completeness gate passes on a bundle it has no grounds to trust. [`docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/SYNC-REPORT.md`](../../../docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/SYNC-REPORT.md) is the worked example — `project/scratch/mockups/draft.html` at 259,625 bytes, within 1% of the cap.
 
+**Prevention, not just mitigation**: the upstream fix is authoring designs that never produce an oversized file. [references/design-authoring-guidelines.md](references/design-authoring-guidelines.md) is the brief to hand the Claude Design agent — size budgets, the `@intent` production/option/scratch classification, page-splitting rules, and a `project/INDEX.md` size manifest that closes the "`list_files` carries no byte sizes" gap in step 1 above.
+
 Truncation is the outcome this avoids: a `truncated: true` response means you have already paid the full context cost _and_ come away with a file you must not write into `docs/design/`.
 
 ## Phase 2: Consume (local agent)
@@ -145,6 +147,7 @@ Once addressed, run `/sync-designs` from a cloud session (or `/pull-design <shar
 - DesignSync tool (local access): [references/designsync-tool.md](references/designsync-tool.md)
 - Completeness gate: [references/completeness-gate.md](references/completeness-gate.md)
 - Slicing heuristic: [references/slicing-heuristic.md](references/slicing-heuristic.md)
+- Design authoring guidelines (hand to the Claude Design agent): [references/design-authoring-guidelines.md](references/design-authoring-guidelines.md)
 - Cloud agent prompt: [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md)
 - Local agent prompt: [`.claude/commands/implement-design.md`](../../../.claude/commands/implement-design.md)
 - Bot-PR contract: [`.agents/skills/pr-lifecycle/SKILL.md`](../pr-lifecycle/SKILL.md)
