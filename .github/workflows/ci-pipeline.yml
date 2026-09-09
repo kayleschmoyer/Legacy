@@ -1016,7 +1016,12 @@ jobs:
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - name: "Evaluate e2e result"
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: "Log e2e-affected inputs"
         env:
           E2E_RESULT: ${{ needs.e2e.result }}
           E2E_MOBILE_RESULT: ${{ needs.e2e-mobile.result }}
@@ -1029,27 +1034,41 @@ jobs:
           echo "run-all: ${RUN_ALL:-false}"
           echo "affected specs:"
           printf '%s\n' "${SPEC_LIST:-}" | grep -v '^[[:space:]]*$' || echo "  (none — @critical only)"
-          FAILED=false
-          case "$E2E_RESULT" in
-            success|skipped) ;;
-            *)
-              echo "::error::e2e-affected gate failed — the e2e job result was '$E2E_RESULT'."
-              echo "::error::A hermetic e2e regression in @critical or the PR's affected area must be fixed before merge."
-              FAILED=true
-              ;;
-          esac
-          case "$E2E_MOBILE_RESULT" in
-            success|skipped) ;;
-            *)
-              echo "::error::e2e-affected gate failed — the e2e-mobile job result was '$E2E_MOBILE_RESULT'."
-              echo "::error::A hermetic e2e regression visible only at the Mobile Chrome viewport must be fixed before merge."
-              FAILED=true
-              ;;
-          esac
-          if [ "$FAILED" = "true" ]; then
-            exit 1
-          fi
-          echo "✅ e2e-affected gate passed (e2e=$E2E_RESULT, e2e-mobile=$E2E_MOBILE_RESULT)"
+
+      # LS-9889: a `cancelled` e2e/e2e-mobile result is not a test verdict on
+      # its own — it can mean this run's shard lost a concurrency-group race
+      # while an identical shard on a sibling run (same head SHA) succeeded.
+      # Before failing the gate, check the SHA's live check runs for a
+      # sibling success on the same shard context. Logic + tests live in
+      # .github/scripts/e2e-affected-gate.js (mirrors ci-gate.js's
+      # assertSuccessIsCurrent, LS-9579).
+      - name: "Evaluate e2e result"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          E2E_RESULT: ${{ needs.e2e.result }}
+          E2E_MOBILE_RESULT: ${{ needs.e2e-mobile.result }}
+          HEAD_SHA: ${{ inputs.head-sha || github.event.pull_request.head.sha || github.sha }}
+        with:
+          script: |
+            const { evaluateE2eAffectedGate } = require('./.github/scripts/e2e-affected-gate.js');
+            const { owner, repo } = context.repo;
+            const { pass, messages } = await evaluateE2eAffectedGate({
+              github,
+              core,
+              owner,
+              repo,
+              sha: process.env.HEAD_SHA,
+              e2eResult: process.env.E2E_RESULT,
+              e2eMobileResult: process.env.E2E_MOBILE_RESULT,
+            });
+            for (const message of messages) {
+              core.info(message);
+            }
+            if (!pass) {
+              core.setFailed(messages.join(' '));
+            } else {
+              core.info('✅ e2e-affected gate passed');
+            }
 
   # ============================================================================
   # STAGE 3b — Merge E2E shard reports and deploy to GitHub Pages
