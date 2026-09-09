@@ -250,7 +250,26 @@ export function diagnose(
     labels,
     failingChecks: ci.failing,
   });
-  if (conflictSignals.conflicting) {
+
+  // The CI: Conflicts label (and its paired "No Merge Conflicts" check) are
+  // written by a separate, independently-scheduled workflow and can lag real
+  // git state by 5-15+ minutes after a conflict is actually resolved and
+  // pushed (LS-9945). GitHub's own `mergeable`/`mergeStateStatus` fields are
+  // recomputed live on every push and only ever settle to MERGEABLE/CLEAN
+  // (or UNSTABLE, which still means no conflict) once GitHub has finished
+  // computing — they never falsely report "clean" while still stale, unlike
+  // the label. When those two live fields already agree the branch is clean,
+  // a conflict verdict resting solely on the (unioned) label/check signal is
+  // that lag, not a real conflict — trust the live fields over it.
+  const liveMergeStateConfirmsClear =
+    pr.mergeable === 'MERGEABLE' &&
+    (pr.mergeStateStatus === 'CLEAN' || pr.mergeStateStatus === 'UNSTABLE');
+  const conflictIsStaleAsyncSignalOnly =
+    conflictSignals.conflicting &&
+    !conflictSignals.sources.includes('mergeable:CONFLICTING') &&
+    liveMergeStateConfirmsClear;
+
+  if (conflictSignals.conflicting && !conflictIsStaleAsyncSignalOnly) {
     const otherFailing = ci.failing.filter((f) => !isConflictCheckFailure(f));
     return {
       status: 'BLOCKED',

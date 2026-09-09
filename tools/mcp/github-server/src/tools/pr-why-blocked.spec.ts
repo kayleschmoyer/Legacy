@@ -149,14 +149,51 @@ describe('diagnose', () => {
       expect(result.reason).toBe('MERGE_CONFLICT');
     });
 
-    it('returns MERGE_CONFLICT from the CI: Conflicts label when mergeable is stale-MERGEABLE', () => {
-      const pr = withLabel(makePR({ mergeable: 'MERGEABLE' }), 'CI: Conflicts');
+    // LS-9945: the CI: Conflicts label is written by a separate, independently
+    // -scheduled workflow and can lag real git state by 5-15+ minutes after a
+    // conflict actually resolves. GitHub's own `mergeable` + `mergeStateStatus`
+    // fields are recomputed live on every push and don't share that lag — once
+    // both already agree the branch is clean, a stale label alone must not
+    // override them.
+    it('does not report MERGE_CONFLICT from a stale CI: Conflicts label once live mergeable + mergeStateStatus both confirm the branch is clean (LS-9945)', () => {
+      const pr = withLabel(
+        makePR({ mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' }),
+        'CI: Conflicts',
+      );
+      const result = diagnose(pr, NO_CI);
+      expect(result.reason).not.toBe('MERGE_CONFLICT');
+      expect(result.status).toBe('READY');
+    });
+
+    it('also treats mergeStateStatus UNSTABLE (mergeable, but failing non-required checks) as confirming a lingering label is stale', () => {
+      const pr = withLabel(
+        makePR({ mergeable: 'MERGEABLE', mergeStateStatus: 'UNSTABLE' }),
+        'CI: Conflicts',
+      );
+      const result = diagnose(pr, NO_CI);
+      expect(result.reason).not.toBe('MERGE_CONFLICT');
+    });
+
+    it('still reports MERGE_CONFLICT from the label when mergeStateStatus has not confirmed the branch is clean', () => {
+      const pr = withLabel(
+        makePR({ mergeable: 'MERGEABLE', mergeStateStatus: 'UNKNOWN' }),
+        'CI: Conflicts',
+      );
       const result = diagnose(pr, NO_CI);
       expect(result.status).toBe('BLOCKED');
       expect(result.reason).toBe('MERGE_CONFLICT');
       expect((result.details as { signals: string[] }).signals).toContain(
         'label:CI: Conflicts',
       );
+    });
+
+    it('still reports MERGE_CONFLICT when mergeable itself is live CONFLICTING, even if a paired check disagrees', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }),
+        NO_CI,
+      );
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('MERGE_CONFLICT');
     });
 
     it('returns MERGE_CONFLICT (not CI_FAILING) when the No Merge Conflicts check fails during a mergeable UNKNOWN window', () => {
