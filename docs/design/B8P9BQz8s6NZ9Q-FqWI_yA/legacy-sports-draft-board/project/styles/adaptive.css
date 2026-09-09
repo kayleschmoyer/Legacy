@@ -1,0 +1,244 @@
+/* Football sport theme + container-query and breakpoint adaptations.
+   MUST be linked LAST — these rules rely on source order to win. */
+/* ============================================================
+   FOOTBALL SPORT THEME
+   ============================================================
+   Per spec: "If you design a football artifact, mirror the
+   baseball conventions but swap navy \u2192 green and seam-red
+   \u2192 amber." We hold the night-stadium chrome (it IS the
+   brand) and shift accents:
+     \u2022 the live-draft seam-red \u2192 amber/gold-warm in football
+     • position colors remap to gridiron roles:
+         QB  = seam       (marquee, the pitcher analog)
+         RB  = dirt brown (workhorse, infield analog)
+         WR  = turf green (receivers, outfield analog)
+         TE  = steel gray (hybrid, catcher analog)
+         K   = aged gold  (special teams)
+         DEF = navy-blue  (defensive unit)
+         FLEX = muted gold (utility/flex)
+   ============================================================ */
+
+/* Football position pills (mirror .pill-X structure from baseball) */
+.pill-QB  { background: rgba(196,30,58,0.18);  color: var(--seam-bright); }
+.pill-RB  { background: rgba(139,111,71,0.22); color: #C7A475; }
+.pill-WR  { background: rgba(45,106,79,0.22);  color: #6FAE8B; }
+.pill-TE  { background: rgba(124,135,148,0.2); color: #A8B3BF; }
+.pill-K   { background: rgba(197,165,90,0.18); color: var(--gold); }
+.pill-DEF { background: rgba(74,111,165,0.22); color: #8BAEDB; }
+.pill-FLEX { background: rgba(196,154,108,0.18); color: #DAB58A; }
+
+/* Player card left-edge accents \u2014 same 1px-edge vocabulary */
+.player-card[data-pos="QB"]  { border-left-color: var(--seam); }
+.player-card[data-pos="RB"]  { border-left-color: var(--pos-if); }
+.player-card[data-pos="WR"]  { border-left-color: var(--pos-of); }
+.player-card[data-pos="TE"]  { border-left-color: var(--pos-c); }
+.player-card[data-pos="K"]   { border-left-color: var(--gold); }
+.player-card[data-pos="DEF"] { border-left-color: var(--pos-def); }
+
+.mob-player[data-pos="QB"]  { border-left-color: var(--seam); }
+.mob-player[data-pos="RB"]  { border-left-color: var(--pos-if); }
+.mob-player[data-pos="WR"]  { border-left-color: var(--pos-of); }
+.mob-player[data-pos="TE"]  { border-left-color: var(--pos-c); }
+.mob-player[data-pos="K"]   { border-left-color: var(--gold); }
+.mob-player[data-pos="DEF"] { border-left-color: var(--pos-def); }
+
+/* Draft-board cell left edges + position glyph color for football.
+   1px only per brief \u2014 was 3px, banned per brand.md "no border-left
+   accent stripes wider than 1px on cards or callouts". */
+.board-grid .cell[data-pos="QB"]  { border-left: 1px solid var(--seam); }
+.board-grid .cell[data-pos="RB"]  { border-left: 1px solid var(--pos-if); }
+.board-grid .cell[data-pos="WR"]  { border-left: 1px solid var(--pos-of); }
+.board-grid .cell[data-pos="TE"]  { border-left: 1px solid var(--pos-c); }
+.board-grid .cell[data-pos="K"]   { border-left: 1px solid var(--gold); }
+.board-grid .cell[data-pos="DEF"] { border-left: 1px solid var(--pos-def); }
+.board-grid .cell[data-pos="QB"]  .pos { color: var(--seam-bright); }
+.board-grid .cell[data-pos="RB"]  .pos { color: #C49A6C; }
+.board-grid .cell[data-pos="WR"]  .pos { color: #6FAE8B; }
+.board-grid .cell[data-pos="TE"]  .pos { color: #A8B3BF; }
+.board-grid .cell[data-pos="K"]   .pos { color: var(--gold); }
+.board-grid .cell[data-pos="DEF"] .pos { color: #8BAEDB; }
+
+/* Roster progress-bar fill colors for football positions */
+.pos-row[data-pos="QB"]   { --bar: var(--seam); }
+.pos-row[data-pos="RB"]   { --bar: var(--pos-if); }
+.pos-row[data-pos="WR"]   { --bar: var(--pos-of); }
+.pos-row[data-pos="TE"]   { --bar: var(--pos-c); }
+.pos-row[data-pos="K"]    { --bar: var(--gold); }
+.pos-row[data-pos="DEF"]  { --bar: var(--pos-def); }
+.pos-row[data-pos="FLEX"] { --bar: #C49A6C; }
+
+/* Show/hide based on active sport. data-sport on body sets the
+   page; descendants tagged data-sport="baseball|football" are
+   visible only when matching. !important so it overrides any
+   element-level display rules (table-row, grid, etc). */
+body[data-sport="baseball"] [data-sport="football"],
+body[data-sport="football"] [data-sport="baseball"] { display: none !important; }
+/* The harness sport toggle is a control, not sport-scoped content — keep both buttons visible. */
+.state-switcher .sport-toggle button[data-sport] { display: inline-block !important; }
+
+/* ============================================================
+   CONTAINER-QUERY VIEWPORT ADAPTATIONS — placed LAST so they
+   win source-order specificity against the base layout rules.
+   .vp-desktop is the inline-size container; its width is set by
+   the .viewports grid track per body[data-viewport].
+     Tablet (≤900cqw): rail stacks under main; player grid 2-col;
+       depth chart 2-col; topband wraps.
+     Wide (≥1400cqw): player grid 4-col with more breathing room.
+   ============================================================ */
+.sh-team { min-width: 0; }
+.team-select {
+  appearance: none; -webkit-appearance: none;
+  min-height: 40px; max-width: 100%;
+  padding: 6px 30px 6px 10px;
+  background: var(--bg-panel) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%238A9BB5' stroke-width='1.5' stroke-linecap='round'/></svg>") no-repeat right 10px center;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-family: var(--f-display); font-weight: 700; font-size: 16px;
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--text);
+  cursor: pointer;
+}
+.team-select:hover { border-color: var(--border-hov); }
+.team-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+/* ── Pick inspector — tapping any board cell, mini-cell, or
+   timeline row opens the pick it represents. ── */
+.pick-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(10,15,26,0.74); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.pick-modal.open { opacity: 1; pointer-events: auto; }
+.pick-modal .pm-card { width: 100%; max-width: 380px; padding: 22px; border: 1px solid var(--gold-dim); border-radius: 14px; background: linear-gradient(180deg, rgba(27,58,92,0.5) 0%, var(--bg-panel) 100%); position: relative; }
+.pick-modal .pm-x { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; display: grid; place-items: center; background: transparent; border: 0; color: var(--text-sec); font-size: 20px; line-height: 1; cursor: pointer; }
+.pick-modal .pm-x:hover { color: var(--text); }
+.pick-modal .pm-eyebrow { font-family: var(--f-display); font-weight: 700; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+.pick-modal h3 { font-size: 26px; margin: 7px 0 2px; }
+.pick-modal .pm-meta { font-family: var(--f-body); font-size: 12px; color: var(--text-sec); }
+.pick-modal .pm-rows { margin-top: 16px; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.pick-modal .pm-row { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 9px 12px; background: var(--bg-panel); }
+.pick-modal .pm-row dt { font-family: var(--f-display); font-weight: 700; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
+.pick-modal .pm-row dd { margin: 0; font-family: var(--f-body); font-size: 13px; color: var(--text); }
+.pick-modal .pm-empty { margin-top: 14px; font-family: var(--f-body); font-style: italic; font-size: 13px; color: var(--text-sec); }
+.mc, .tl-pick[data-pos], .board-grid .cell { cursor: pointer; }
+
+/* ── Drawer trigger — nav pattern below $lg per DS matrix ── */
+.nav-burger { display: none; width: 40px; height: 40px; flex: none; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-sec); place-items: center; font-size: 18px; line-height: 1; cursor: pointer; }
+.nav-burger:hover { color: var(--text); border-color: var(--border-hov); }
+
+/* ── Round-by-round timeline — the board's sub-$lg form ────
+   DS reflow rule: "draft board — full grid only at $gtLg.
+   Below that, collapse to a single round-by-round timeline
+   with the on-the-clock card pinned to the top." ── */
+.board-timeline { display: none; }
+.tl-clock { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 12px; background: linear-gradient(180deg, rgba(27,58,92,0.42) 0%, var(--bg-panel) 100%); border: 1px solid var(--gold-dim); border-radius: 12px; box-shadow: var(--shadow-gold); }
+.tl-clock .team { font-family: var(--f-display); font-weight: 800; font-size: 24px; line-height: 1.05; color: var(--text); margin-top: 3px; }
+.tl-clock .sub { font-family: var(--f-body); font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+.tl-clock .eyebrow { color: var(--gold); }
+.tl-ring { width: 46px; height: 46px; position: relative; display: grid; place-items: center; flex: none; }
+.tl-ring svg { position: absolute; inset: 0; }
+.tl-ring .t { font-family: var(--f-display); font-weight: 800; font-size: 13px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.tl-note { font-size: 12px; color: var(--text-mute); font-style: italic; margin: 0 0 14px; }
+.tl-round { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); margin-bottom: 8px; overflow: hidden; }
+.tl-hd { width: 100%; min-height: 48px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 12px 14px; background: transparent; border: 0; cursor: pointer; text-align: left; }
+.tl-hd .r { font-family: var(--f-display); font-weight: 800; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+.tl-hd .c { font-family: var(--f-body); font-size: 12px; color: var(--text-sec); }
+.tl-hd .chev { color: var(--text-mute); font-size: 12px; }
+.tl-round.open .tl-hd { border-bottom: 1px solid var(--border); }
+.tl-picks { display: flex; flex-direction: column; }
+.tl-pick { display: grid; grid-template-columns: 42px 34px 1fr auto; gap: 12px; align-items: center; min-height: 56px; padding: 9px 14px; border-bottom: 1px solid var(--border); border-left: 1px solid transparent; }
+.tl-picks .tl-pick:last-child { border-bottom: 0; }
+.tl-pick .n { font-family: var(--f-display); font-weight: 700; font-size: 12px; color: var(--text-mute); }
+.tl-pick .tm { font-family: var(--f-display); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; color: var(--text-sec); }
+.tl-pick .nm { font-family: var(--f-display); font-weight: 700; font-size: 16px; color: var(--text); }
+.tl-pick .mt { font-family: var(--f-body); font-size: 11px; color: var(--text-sec); }
+.tl-pick .pos { font-family: var(--f-display); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; color: var(--text-sec); }
+.tl-pick.me { background: rgba(197,165,90,0.07); }
+.tl-pick.me .tm { color: var(--gold); }
+.tl-pick.now { background: rgba(197,165,90,0.12); border-left-color: var(--gold); }
+.tl-pick.now .nm { color: var(--gold); font-style: italic; }
+.tl-pick.now .pos { color: var(--gold); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tl-pick.up .nm { color: var(--text-mute); }
+.tl-pick[data-pos="P"], .tl-pick[data-pos="QB"] { border-left-color: var(--seam); }
+.tl-pick[data-pos="C"], .tl-pick[data-pos="TE"] { border-left-color: var(--pos-c); }
+.tl-pick[data-pos="1B"], .tl-pick[data-pos="2B"], .tl-pick[data-pos="3B"], .tl-pick[data-pos="SS"], .tl-pick[data-pos="RB"] { border-left-color: var(--pos-if); }
+.tl-pick[data-pos="OF"], .tl-pick[data-pos="WR"] { border-left-color: var(--pos-of); }
+.tl-pick[data-pos="DEF"] { border-left-color: var(--pos-def); }
+
+/* ============================================================
+   BREAKPOINT ADAPTATIONS — one block per DS media token band.
+   .vp-desktop is the inline-size container; its width is the
+   .viewports grid track set by body[data-viewport].
+   ============================================================ */
+
+/* $md and below (≤979) — tablet portrait and smaller.
+   Drawer nav, single column capped at 720, rail becomes a
+   panel shelf, board collapses to the timeline, 44px targets. */
+@container vp (max-width: 979px) {
+  .nav-burger { display: grid; }
+  .nav .crumbs { display: none; }
+  .nav { padding: 0 16px; gap: 14px; }
+  .board { grid-template-columns: 1fr; grid-template-areas: "topband" "main" "rail"; min-height: 0; }
+  .rail { border-left: 0; border-top: 1px solid var(--border); max-height: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; padding: 16px 18px 22px; }
+  .rail > * { min-width: 0; }
+  .topband { grid-template-columns: auto 1fr auto; row-gap: 12px; }
+  .topband .tb-divider { display: none; }
+  .tb-clock     { grid-column: 1 / -1; }
+  .tb-autopick  { grid-column: 1 / span 2; min-width: 0; }
+  .tb-commish   { grid-column: 3; }
+  .main { padding: 16px; }
+  .main > * { width: 100%; max-width: 720px; margin-inline: auto; }
+  .hero { padding: 22px 18px 16px; }
+  .hero h1 { font-size: 30px; }
+  .player-grid { grid-template-columns: repeat(2, 1fr); }
+  .depth { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 14px; }
+  .depth-slot[style*="grid-column: span 4"] { grid-column: span 2 !important; }
+  .depth-slot[style*="grid-column: span 4"] .slot-list[style*="grid-template-columns:repeat(3"] { grid-template-columns: repeat(2, 1fr) !important; }
+  .lobby { padding: 22px 18px; }
+  .lobby-hero { grid-template-columns: 1fr; gap: 18px; padding: 22px 22px; }
+  .lobby-hero h2 { font-size: 26px; }
+  .lobby-grid { grid-template-columns: 1fr; gap: 16px; }
+  .error-wrap { padding: 48px 24px; min-height: 560px; }
+  .view-tabs { overflow-x: auto; scrollbar-width: none; }
+  .view-tabs::-webkit-scrollbar { display: none; }
+  .view-tabs button { padding: 10px 12px; white-space: nowrap; }
+  .filter-row { overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-row .pill-btn { white-space: nowrap; }
+  /* Touch: DS matrix says 44px minimum below $lg. */
+  .pill-btn { min-height: 44px; }
+  .view-toggle button { width: 44px; height: 44px; }
+  /* Board: full grid is $gtLg only. */
+  .board-grid { display: none; }
+  .board-timeline { display: block; }
+}
+/* $sm and below (≤859) — the rail shelf can no longer hold two. */
+@container vp (max-width: 859px) {
+  .rail { grid-template-columns: 1fr; }
+}
+/* $lg (980–1119) — tablet landscape. Top nav returns, the full
+   grid unlocks, rail comes back as a column. */
+@container vp (min-width: 980px) and (max-width: 1119px) {
+  .board { grid-template-columns: 1fr 300px; }
+  .main { padding: 18px 20px 96px; }
+  .player-grid { grid-template-columns: repeat(2, 1fr); }
+  .depth { grid-template-columns: repeat(3, 1fr); }
+}
+/* $xl (1120–1279) — laptop. */
+@container vp (min-width: 1120px) and (max-width: 1279px) {
+  .board { grid-template-columns: 1fr 320px; }
+  .player-grid { grid-template-columns: repeat(3, 1fr); }
+  .depth { grid-template-columns: repeat(4, 1fr); }
+}
+/* $xxl (1280+) — primary desktop target. */
+@container vp (min-width: 1280px) {
+  .main { padding: 20px 24px 96px; }
+  .board { grid-template-columns: 1fr 340px; }
+  .player-grid { grid-template-columns: repeat(3, 1fr); }
+}
+/* Wide — same token as 1280; content caps and the surplus
+   becomes margin rather than more columns of the same density. */
+@container vp (min-width: 1400px) {
+  .main { padding: 22px 28px; gap: 16px; }
+  .main > * { max-width: 1280px; }
+  .hero { padding: 32px 36px 22px; }
+  .player-grid { grid-template-columns: repeat(4, 1fr); }
+  .depth { grid-template-columns: repeat(5, 1fr); }
+  .lobby { padding: 36px 40px; }
+  .rail { padding: 18px 18px 96px; }
+  .board { grid-template-columns: 1fr 360px; }
+}

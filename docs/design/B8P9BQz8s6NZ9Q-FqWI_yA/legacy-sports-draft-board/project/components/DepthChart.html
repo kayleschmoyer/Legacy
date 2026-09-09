@@ -1,0 +1,196 @@
+<!-- @intent production surface="draft-room" note="Depth Chart view — component prototype extracted from DraftRoom.html" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Depth Chart view · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="../styles/harness.css" />
+<link rel="stylesheet" href="../styles/board.css" />
+<link rel="stylesheet" href="../styles/states.css" />
+<link rel="stylesheet" href="../styles/mobile.css" />
+<link rel="stylesheet" href="../styles/adaptive.css" />
+</head>
+<body data-viewport="desktop" data-role="member" data-sport="baseball" data-vp-base="../">
+<div class="state-switcher">
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="populated">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Depth Chart view</div>
+      <div class="board" style="grid-template-columns:minmax(0,1fr);">
+        <section class="main">
+          <div class="view-tabs" role="tablist" aria-label="Player view">
+            <a href="../DraftRoom.html" data-view="cards" role="tab"><span class="glyph">▦</span>Cards</a>
+            <a href="PlayerTable.html" data-view="table" role="tab"><span class="glyph">≡</span>Data Table</a>
+            <a href="DraftGrid.html" data-view="board" role="tab"><span class="glyph">⊞</span>Draft Board</a>
+            <a href="DepthChart.html" class="active" data-view="depth" role="tab"><span class="glyph">▤</span>My Depth Chart</a>
+          </div>
+          <div class="view-pane active" data-view="depth">
+            <div class="result-meta" style="padding:2px;">
+              <span><span data-sport="baseball">Sandlot Dreamers · 3 of 23 positions filled</span><span data-sport="football">Sunday Captains · 3 of 17 positions filled</span></span>
+              <span class="right"><span data-sport="baseball">Next need: 1B, 2B, 3B, SS</span><span data-sport="football">Next need: RB, TE, FLEX, K</span></span>
+            </div>
+            <div class="depth" data-sport="baseball">
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">C</span><span class="slot-ct">1 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row"><span>Yogi Berra</span><span class="span">1946–65</span></div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">1B</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty need">Open — priority</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">2B</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">3B</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">SS</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">OF</span><span class="slot-ct">1 / 3</span></div>
+                <div class="slot-list">
+                  <div class="slot-row"><span>Willie Mays</span><span class="span">1951–73</span></div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">UTIL</span><span class="slot-ct">0 / 2</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">BENCH</span><span class="slot-ct">0 / 4</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot" style="grid-column: span 4;">
+                <div class="slot-head"><span class="slot-pos">P — Pitching Staff</span><span class="slot-ct">1 / 9</span></div>
+                <div class="slot-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+                  <div class="slot-row"><span>Pedro Martínez</span><span class="span">1992–2009</span></div>
+                  <div class="slot-row empty">Open SP</div>
+                  <div class="slot-row empty">Open SP</div>
+                  <div class="slot-row empty">Open SP</div>
+                  <div class="slot-row empty">Open SP</div>
+                  <div class="slot-row empty">Open RP</div>
+                  <div class="slot-row empty">Open RP</div>
+                  <div class="slot-row empty">Open RP</div>
+                  <div class="slot-row empty">Open RP</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── FOOTBALL DEPTH CHART — 17-slot standard fantasy roster ── -->
+            <div class="depth" data-sport="football">
+              <div class="depth-slot complete">
+                <div class="slot-head"><span class="slot-pos">QB</span><span class="slot-ct">1 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row"><span>Joe Montana</span><span class="span">1979–94</span></div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">RB</span><span class="slot-ct">0 / 2</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty need">Open — priority</div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">WR</span><span class="slot-ct">1 / 2</span></div>
+                <div class="slot-list">
+                  <div class="slot-row"><span>Marvin Harrison</span><span class="span">1996–2008</span></div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">TE</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">FLEX</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">RB / WR / TE</div>
+                </div>
+              </div>
+              <div class="depth-slot">
+                <div class="slot-head"><span class="slot-pos">K</span><span class="slot-ct">0 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+              <div class="depth-slot complete">
+                <div class="slot-head"><span class="slot-pos">DEF</span><span class="slot-ct">1 / 1</span></div>
+                <div class="slot-list">
+                  <div class="slot-row"><span>Bruce Smith</span><span class="span">1985–2003</span></div>
+                </div>
+              </div>
+              <div class="depth-slot" style="grid-column: span 4;">
+                <div class="slot-head"><span class="slot-pos">BENCH</span><span class="slot-ct">0 / 8</span></div>
+                <div class="slot-list" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                  <div class="slot-row empty">Open</div>
+                </div>
+              </div>
+            </div>
+          </div><!-- /depth pane -->
+        </section>
+      </div>
+    </div>
+  </div>
+
+</section>
+<script src="../scripts/draft.js"></script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!-- @intent production surface="draft-room" note="375px viewport" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Live Draft Board · Mobile · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<link rel="stylesheet" href="styles/harness.css" />
+<link rel="stylesheet" href="styles/board.css" />
+<link rel="stylesheet" href="styles/states.css" />
+<link rel="stylesheet" href="styles/mobile.css" />
+<link rel="stylesheet" href="styles/adaptive.css" />
+</head>
+<body data-viewport="mobile" data-role="member" data-sport="baseball" data-vp-base="">
+<div class="state-switcher">
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="populated">
+  <div class="viewports">
+    <div class="viewport vp-mobile">
+      <div class="viewport-chrome">Mobile · 375</div>
+      <div class="mob" data-picksheet="closed" style="position:relative;">
+        <div class="mob-nav">
+          <span class="back-icon">←</span>
+          <span class="title"><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span></span>
+          <span class="back-icon" style="visibility:hidden;">⋯</span>
+        </div>
+        <!-- Clock bar: who + how long, in one line. The full hero
+             is desktop-only — a phone needs the fact, not the frame. -->
+        <div class="mob-clock mine">
+          <div>
+            <div class="eyebrow">You're on the clock · R4 · P42</div>
+            <div class="team"><span data-sport="baseball">Sandlot Dreamers</span><span data-sport="football">Sunday Captains</span></div>
+          </div>
+          <div class="mob-ring">
+            <svg width="54" height="54" viewBox="0 0 54 54">
+              <circle cx="27" cy="27" r="23" fill="none" stroke="#1E2D45" stroke-width="4"/>
+              <circle cx="27" cy="27" r="23" fill="none" stroke="#C5A55A" stroke-width="4" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="70"/>
+            </svg>
+            <div class="t num">0:47</div>
+          </div>
+        </div>
+
+        <div class="mob-round" data-sport="baseball"></div>
+        <div class="mob-round" data-sport="football"></div>
+        <div class="mob-cta"><button data-picksheet-open>Pick a player · 0:47 left</button></div>
+        <div class="ps-scrim" data-picksheet-close></div>
+        <div class="mob-picksheet">
+          <div class="grab"></div>
+          <div class="sh-hd">
+            <div><h3>Available players</h3><p>Pick #42 · 1,148 available · open slots first</p></div>
+            <button class="x" data-picksheet-close aria-label="Close">✕</button>
+          </div>
+          <div class="ps-body">
+            <!-- Search + sort sit above the pills: on a phone you type a
+                 name far more often than you browse a position. -->
+            <div class="mob-search">
+              <input type="text" placeholder="Search available players…" />
+              <div class="mob-sort">
+                <button class="active">ADP</button>
+                <button>PTS</button>
+              </div>
+            </div>
+
+            <!-- Roster left the tab set — it lives in the squad strip below. -->
+            <div class="mob-tabs" style="margin-top:12px;">
+              <button class="active">Players</button>
+              <button>Queue</button>
+              <button>History</button>
+            </div>
+
+            <div class="mob-filter" data-sport="baseball">
+              <button class="toggle on" style="min-height:36px;"><span class="sw"></span>Available</button>
+              <span style="width:1px;background:var(--border);align-self:stretch;margin:6px 2px;"></span>
+              <button class="pill-btn active">ALL</button>
+              <button class="pill-btn">C</button>
+              <button class="pill-btn">1B</button>
+              <button class="pill-btn">2B</button>
+              <button class="pill-btn">3B</button>
+              <button class="pill-btn">SS</button>
+              <button class="pill-btn">OF</button>
+              <button class="pill-btn">P</button>
+            </div>
+            <div class="mob-filter" data-sport="football">
+              <button class="toggle on" style="min-height:36px;"><span class="sw"></span>Available</button>
+              <span style="width:1px;background:var(--border);align-self:stretch;margin:6px 2px;"></span>
+              <button class="pill-btn active">ALL</button>
+              <button class="pill-btn">QB</button>
+              <button class="pill-btn">RB</button>
+              <button class="pill-btn">WR</button>
+              <button class="pill-btn">TE</button>
+              <button class="pill-btn">K</button>
+              <button class="pill-btn">DEF</button>
+            </div>
+
+            <div class="mob-players" data-sport="baseball">
+              <div class="mob-player" data-pos="1B">
+                <div>
+                  <div class="name">Lou Gehrig <span style="color:var(--gold);font-size:10px;letter-spacing:0.1em;">· QUEUED</span></div>
+                  <div class="sub">1B / OF · NYY · 1923–1939 · .340 / 493 HR career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 14</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="2B">
+                <div>
+                  <div class="name">Rogers Hornsby</div>
+                  <div class="sub">2B / SS · STL · 1915–1937 · .358 / 301 HR career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 15</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="SS">
+                <div>
+                  <div class="name">Honus Wagner</div>
+                  <div class="sub">SS / OF · PIT · 1897–1917 · .328 / 101 HR career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 17</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="P">
+                <div>
+                  <div class="name">Greg Maddux</div>
+                  <div class="sub">P · ATL · 1986–2008 · 3.16 ERA / 355 W career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 18</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="C">
+                <div>
+                  <div class="name">Johnny Bench</div>
+                  <div class="sub">C / 1B · CIN · 1967–1983 · .267 / 389 HR career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 19</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="OF">
+                <div>
+                  <div class="name">Hank Aaron</div>
+                  <div class="sub">OF / 1B · ATL · 1954–1976 · .305 / 755 HR career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 21</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mob-players" data-sport="football">
+              <div class="mob-player" data-pos="WR">
+                <div>
+                  <div class="name">Randy Moss <span style="color:var(--gold);font-size:10px;letter-spacing:0.1em;">· QUEUED</span></div>
+                  <div class="sub">WR · MIN · 1998–2012 · 15,292 YDS / 156 TD career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 14</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="RB">
+                <div>
+                  <div class="name">Emmitt Smith</div>
+                  <div class="sub">RB / FLEX · DAL · 1990–2004 · 18,355 YDS / 164 TD career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 15</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="RB">
+                <div>
+                  <div class="name">Bo Jackson</div>
+                  <div class="sub">RB / WR · LAR · 1987–1990 · 2,782 YDS / 5.4 YPC career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 16</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="QB">
+                <div>
+                  <div class="name">Dan Marino</div>
+                  <div class="sub">QB · MIA · 1983–1999 · 61,361 YDS / 420 TD career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 17</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="TE">
+                <div>
+                  <div class="name">Tony Gonzalez</div>
+                  <div class="sub">TE · KC/ATL · 1997–2013 · 15,127 YDS / 111 TD career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 18</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+              <div class="mob-player" data-pos="QB">
+                <div>
+                  <div class="name">John Elway</div>
+                  <div class="sub">QB · DEN · 1983–1998 · 51,475 YDS / 300 TD career</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                  <div class="adp">ADP 21</div>
+                  <button class="draft-sm">Draft</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+
+        <!-- Persistent squad strip. Answers "what do I still need"
+             without leaving the board; tap to expand the full sheet. -->
+        <div class="mob-squad">
+          <div class="hd">
+            <span class="lbl"><span data-sport="baseball">Positions drafted · 3/23</span><span data-sport="football">Positions drafted · 3/17</span></span>
+            <button class="open" data-sheet-open>Open slots: <span data-sport="baseball">1B, SS</span><span data-sport="football">RB, WR</span> ▴</button>
+          </div>
+          <div class="sb-track" data-sport="baseball" data-sheet-open>
+            <div class="sb-slot filled" data-pos="C" title="C — Yogi Berra"><span class="sb-pos">C</span><span class="sb-mark">YB</span></div>
+            <div class="sb-slot open need" data-pos="1B" title="1B — open, priority"><span class="sb-pos">1B</span><span class="sb-mark">+</span></div>
+            <div class="sb-slot open" data-pos="2B" title="2B — open"><span class="sb-pos">2B</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="3B" title="3B — open"><span class="sb-pos">3B</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SS" title="SS — open"><span class="sb-pos">SS</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="OF" title="OF — Willie Mays"><span class="sb-pos">OF</span><span class="sb-mark">WM</span></div>
+            <div class="sb-slot open" data-pos="OF" title="OF — open"><span class="sb-pos">OF</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="OF" title="OF — open"><span class="sb-pos">OF</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="UTIL" title="UTIL — open"><span class="sb-pos">UTIL</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="UTIL" title="UTIL — open"><span class="sb-pos">UTIL</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="SP" title="SP — Pedro Martínez"><span class="sb-pos">SP</span><span class="sb-mark">PM</span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+          </div>
+          <div class="sb-track" data-sport="football" data-sheet-open>
+            <div class="sb-slot filled" data-pos="QB" title="QB — Joe Montana"><span class="sb-pos">QB</span><span class="sb-mark">JM</span></div>
+            <div class="sb-slot open need" data-pos="RB" title="RB — open, priority"><span class="sb-pos">RB</span><span class="sb-mark">+</span></div>
+            <div class="sb-slot open" data-pos="RB" title="RB — open"><span class="sb-pos">RB</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="WR" title="WR — Marvin Harrison"><span class="sb-pos">WR</span><span class="sb-mark">MH</span></div>
+            <div class="sb-slot open" data-pos="WR" title="WR — open"><span class="sb-pos">WR</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="TE" title="TE — open"><span class="sb-pos">TE</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="FLEX" title="FLEX — RB / WR / TE"><span class="sb-pos">FLEX</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="K" title="K — open"><span class="sb-pos">K</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="DEF" title="DEF — Bruce Smith"><span class="sb-pos">DEF</span><span class="sb-mark">BS</span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+          </div>
+        </div>
+
+        <div class="mob-sheet">
+          <div class="grab"></div>
+          <div class="sh-hd">
+            <div class="sh-team">
+              <!-- Any team's roster is inspectable, not just your own —
+                   scouting what the room still needs is half of drafting. -->
+              <select class="team-select" data-sport="baseball" aria-label="View team roster"><option>Bronx Bombers</option><option>Sandlot Swingers</option><option>Chi-Town</option><option>Dead Ball Legends</option><option>Fenway Faithful</option><option selected>Sandlot Dreamers (you)</option><option>Iron Horse Club</option><option>Pinstripe Legacy</option><option>Old Ball Game</option><option>Splendid Swings</option><option>Cooperstown FC</option><option>Golden Era</option></select>
+              <select class="team-select" data-sport="football" aria-label="View team roster"><option>Steel Curtain Crew</option><option>Frozen Tundra</option><option>Monsters of Midway</option><option>Greatest Generation</option><option>Two-Minute Drill</option><option selected>Sunday Captains (you)</option><option>Iron Helmets</option><option>Cleat Marks</option><option>Goal Line Stand</option><option>Hash Mark Heroes</option><option>Canton Calling</option><option>Lombardi Trophy</option></select>
+              <p><span data-sport="baseball">Open: OF, MI · Settings: 1×P, 1×OF, 1×MI, 1×CI, 1×UTIL</span><span data-sport="football">Open: RB, WR · Settings: 1×QB, 1×RB, 1×WR, 1×TE, 1×FLEX</span></p>
+            </div>
+            <button class="x" data-sheet-close>×</button>
+          </div>
+          <div class="rows" data-sport="baseball">
+            <div class="srow" data-pos="P"><div class="slot"><div class="p">P</div><div class="e">SP or RP</div></div><div><div class="nm">Zack Wheeler</div><div class="mt">SP · Rd 2 · Pick #14</div></div><div class="sc num">9.1</div></div>
+            <div class="srow vacant" data-pos="OF"><div class="slot"><div class="p">OF</div><div class="e">OF</div></div><div><div class="nm">Empty — needs OF</div></div><div></div></div>
+            <div class="srow vacant" data-pos="MI"><div class="slot"><div class="p">MI</div><div class="e">2B or SS</div></div><div><div class="nm">Empty — needs 2B or SS</div></div><div></div></div>
+            <div class="srow" data-pos="CI"><div class="slot"><div class="p">CI</div><div class="e">1B or 3B</div></div><div><div class="nm">Manny Machado</div><div class="mt">3B · Rd 3 · Pick #19</div></div><div class="sc num">8.0</div></div>
+            <div class="srow" data-pos="UTIL"><div class="slot"><div class="p">UTIL</div><div class="e">Any batter</div></div><div><div class="nm">Shohei Ohtani</div><div class="mt">DH · Rd 1 · Pick #3</div></div><div class="sc num">11.2</div></div>
+          </div>
+          <div class="rows" data-sport="football">
+            <div class="srow" data-pos="QB"><div class="slot"><div class="p">QB</div><div class="e">QB</div></div><div><div class="nm">Dan Marino</div><div class="mt">QB · Rd 1 · Pick #3</div></div><div class="sc num">11.2</div></div>
+            <div class="srow vacant" data-pos="RB"><div class="slot"><div class="p">RB</div><div class="e">RB</div></div><div><div class="nm">Empty — needs RB</div></div><div></div></div>
+            <div class="srow vacant" data-pos="WR"><div class="slot"><div class="p">WR</div><div class="e">WR</div></div><div><div class="nm">Empty — needs WR</div></div><div></div></div>
+            <div class="srow" data-pos="TE"><div class="slot"><div class="p">TE</div><div class="e">TE</div></div><div><div class="nm">Tony Gonzalez</div><div class="mt">TE · Rd 3 · Pick #19</div></div><div class="sc num">8.0</div></div>
+            <div class="srow" data-pos="FLEX"><div class="slot"><div class="p">FLEX</div><div class="e">RB/WR/TE</div></div><div><div class="nm">Bo Jackson</div><div class="mt">RB · Rd 2 · Pick #14</div></div><div class="sc num">9.1</div></div>
+          </div>
+        </div>
+
+        <div class="mob-announce">
+          <div class="card">
+            <div class="shot" data-sport="baseball">LG</div>
+            <div class="shot" data-sport="football">RM</div>
+            <div class="eyebrow">Pick #42 · Round 4</div>
+            <h2><span data-sport="baseball">Lou Gehrig</span><span data-sport="football">Randy Moss</span></h2>
+            <div class="meta"><span data-sport="baseball">1B / OF · NYY — to Sandlot Dreamers</span><span data-sport="football">WR · MIN — to Sunday Captains</span></div>
+            <p class="quip"><span data-sport="baseball">The Iron Horse comes off the board — that's the last true corner bat in the pool.</span><span data-sport="football">Moss goes deep. Straight cash, and the biggest ceiling left on the board.</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+<script src="scripts/draft.js"></script>
+</body>
+</html>

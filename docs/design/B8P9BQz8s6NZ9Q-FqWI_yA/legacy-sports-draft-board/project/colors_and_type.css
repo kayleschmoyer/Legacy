@@ -1,0 +1,107 @@
+/* Legacy Sports — design tokens + base typography.
+   Shared by every page under project/. Do not duplicate into a <style> block. */
+/* ============================================================
+   Design intent: a night-stadium draft board. The page is a war
+   room: timer + roster on the left as persistent ops console,
+   available-player grid as the main field of play. Typography
+   pairs a condensed scoreboard display face (Big Shoulders) with
+   an editorial serif (Literata) so stats shout and prose
+   breathes. No uniform card grid — player cards, pick history,
+   and roster slots each get a visually distinct treatment
+   because they are different information.
+   ============================================================ */
+
+:root {
+  /* Palette — exact tokens from the brief. No substitutes. */
+  --bg-page:     #0A0F1A;
+  --bg-subtle:   #0D1526;
+  --bg-panel:    #111B2F;
+  --bg-elevated: #16223A;
+  --bg-raised:   #1C2A47;  /* one step above elevated for hover */
+  --gold:        #C5A55A;
+  --gold-dim:    #A8894A;
+  --seam:        #C41E3A;
+  --seam-bright: #E63950;
+  --navy:        #1B3A5C;
+  --navy-light:  #2C4A7C;
+  --text:        #E8EDF5;
+  --text-sec:    #8A9BB5;
+  --text-mute:   #5E6E87;
+  --border:      #1E2D45;
+  --border-hov:  #2F4062;
+
+  /* Position accents (1px edge only — never wider per brief).
+     On-palette only: reuse brand.md's approved accent/neutral tokens —
+     no invented hues outside the documented palette. */
+  --pos-p:   var(--seam);
+  --pos-c:   #7C8794;
+  --pos-if:  var(--gold-dim);
+  --pos-of:  var(--navy-light);
+  --pos-def: var(--navy-light);
+  --pos-u:   var(--gold);
+
+  /* System-status hue (brand.md: "positive system state") — used for
+     on/complete indicators, never for position-accent decoration. */
+  --success: #4AAE7C;
+
+  /* Gold glow used by on-the-clock surfaces (top band, current cell,
+     current-pick panel, lobby hero). */
+  --shadow-gold: 0 0 0 1px rgba(197,165,90,0.28), 0 6px 24px rgba(197,165,90,0.10);
+
+  --f-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --f-body:    'Literata', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+/* Global keyboard-focus state — same gold-outline vocabulary as
+   .team-select:focus-visible below, applied to every interactive
+   element so keyboard users get a visible indicator everywhere. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+body {
+  background: var(--bg-page);
+  color: var(--text);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Signature "night stadium" wash — subtle, fixed, non-decorative */
+  background-image:
+    radial-gradient(ellipse at 12% -10%, rgba(27,58,92,0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 92% 8%, rgba(196,30,58,0.09) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 110%, rgba(197,165,90,0.07) 0%, transparent 55%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Typography recipes ────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-sec);
+}
+h1, h2, h3, h4 { font-family: var(--f-display); margin: 0; color: var(--text); letter-spacing: -0.005em; }
+h1 { font-weight: 800; font-size: 40px; line-height: 1.02; letter-spacing: -0.015em; }
+h2 { font-weight: 800; font-size: 26px; line-height: 1.1; }
+h3 { font-weight: 700; font-size: 18px; line-height: 1.15; }
+h4 { font-weight: 700; font-size: 14px; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-sec); }
+p  { font-family: var(--f-body); color: var(--text-sec); max-width: 70ch; }
+.num, .tnum { font-variant-numeric: tabular-nums; }
+
+
+/* Links — defined so any link added later inherits the palette
+   instead of falling back to browser blue. */
+a { color: var(--gold); text-decoration-color: rgba(197,165,90,0.45); text-underline-offset: 2px; }
+a:hover { color: var(--text); text-decoration-color: var(--text); }

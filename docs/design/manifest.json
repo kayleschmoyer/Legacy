@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+  "lastSyncedAt": "2026-09-09T00:00:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -64,9 +64,9 @@
       "title": "Draft Board",
       "slug": "legacy-sports-draft-board",
       "status": "active",
-      "lastSyncedHash": "sha256-15c870e81a44c33d5189b3b525ad206d5bf00029e08967df17ee229075e0888e",
-      "lastSyncedAt": "2026-09-03T00:00:00.000Z",
-      "jiraKey": "LS-8961",
+      "lastSyncedHash": "sha256-3dd83f68735aa8851e7be85af437a19ca1d2ab708d4c6b19970bd7040043d2c8",
+      "lastSyncedAt": "2026-09-09T00:00:00.000Z",
+      "jiraKey": "LS-9981",
       "source": "designsync-local"
     },
     {

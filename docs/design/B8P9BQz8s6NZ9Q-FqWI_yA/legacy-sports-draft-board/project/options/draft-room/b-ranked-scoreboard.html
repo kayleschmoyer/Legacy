@@ -1,0 +1,30 @@
+<!-- @intent option surface="draft-room" variant="ranked-scoreboard" status="proposed" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Option B — ranked-scoreboard · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<link rel="stylesheet" href="../../styles/options-board.css" />
+</head>
+<body>
+<div class="wrap">
+<div class="pagehd">
+  <div class="eyebrow">Draft board · cell density study · option B</div>
+  <h1>Ranked scoreboard</h1>
+  <p>One of three options for the draft-board cell. See <a href="README.md">README.md</a> for the open question and the other two.</p>
+</div>
+<section class="opt" id="b">
+  <p class="why"><b>Every pick shows where it sat on the big board.</b> A rank plate anchors the left of the cell, so scanning a column tells you the quality of a team's haul, not just its shape. Team headers gain roster-fill dots — red means an unfilled required slot — so needs read at the top instead of in a side panel.</p>
+  <div class="board-grid"><div class="tbl" data-render="b"></div>
+    <div class="legend"><b>Header dots</b><span><span class="swatch" style="background:var(--gold-dim)"></span>slot filled</span><span><span class="swatch" style="background:var(--border)"></span>open slot</span><span><span class="swatch" style="background:var(--seam)"></span>required slot still empty</span></div>
+  </div>
+</section>
+</div>
+<script src="../../scripts/options-board.js"></script>
+</body>
+</html>

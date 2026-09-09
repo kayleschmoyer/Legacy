@@ -1,0 +1,589 @@
+<!-- @intent production surface="draft-room" note="loading / error / pre-draft states for DraftRoom.html" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Draft Board — states · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<link rel="stylesheet" href="styles/harness.css" />
+<link rel="stylesheet" href="styles/board.css" />
+<link rel="stylesheet" href="styles/states.css" />
+<link rel="stylesheet" href="styles/mobile.css" />
+<link rel="stylesheet" href="styles/adaptive.css" />
+</head>
+<body data-viewport="desktop" data-role="member" data-sport="baseball" data-vp-base="">
+<div class="state-switcher">
+  <span class="label">State</span>
+  <div class="group" id="state-group" role="tablist">
+    <button data-state="loading" class="active">Loading</button>
+    <button data-state="empty">Pre-draft</button>
+    <button data-state="error">Error</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="loading">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Loading</div>
+      <div class="nav">
+        <button class="nav-burger" aria-label="Menu">≡</button>
+        <div class="brand"><div class="brand-mark">⬢</div>Legacy Sports</div>
+        <div class="crumbs"><span>Leagues</span><span class="sep">/</span><span class="cur">Loading…</span></div>
+        <div class="spacer"></div>
+        <div class="avatar">JR</div>
+      </div>
+      <header class="hero">
+        <div class="back">← Back to league</div>
+        <div class="title-row" style="gap:18px;">
+          <div class="sk sk-rect" style="width:420px;height:42px;"></div>
+          <div class="badges" style="display:flex;gap:8px;margin-top:0;">
+            <div class="sk sk-pill" style="width:110px;height:24px;"></div>
+            <div class="sk sk-pill" style="width:180px;height:24px;"></div>
+          </div>
+        </div>
+      </header>
+      <div class="board">
+
+        <!-- TOPBAND skeleton — mirrors the populated status strip's
+             5-column grid: status · divider · timer · current-pick · autopick.
+             Ring stays a perfect circle; slab keeps its width. -->
+        <div class="topband">
+          <div class="tb-status">
+            <div class="sk" style="width:76px;height:11px;margin-bottom:8px;"></div>
+            <div class="sk" style="width:90px;height:20px;margin-bottom:6px;"></div>
+            <div class="sk" style="width:130px;height:11px;"></div>
+          </div>
+          <span class="tb-divider"></span>
+          <div class="tb-timer">
+            <div class="sk" style="width:58px;height:58px;border-radius:50%;flex:0 0 58px;"></div>
+            <div class="info" style="display:flex;flex-direction:column;gap:6px;">
+              <div class="sk" style="width:64px;height:10px;"></div>
+              <div class="sk" style="width:48px;height:10px;"></div>
+            </div>
+          </div>
+          <div class="tb-clock" style="box-shadow:none;background:var(--bg-panel);border:1px solid var(--border);">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;">
+              <div class="sk" style="width:92px;height:10px;"></div>
+              <div class="sk" style="width:170px;height:20px;"></div>
+              <div class="sk" style="width:140px;height:11px;"></div>
+            </div>
+          </div>
+          <div class="tb-autopick" style="gap:8px;">
+            <div class="sk" style="width:110px;height:10px;"></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div class="sk" style="width:34px;height:20px;border-radius:9999px;"></div>
+              <div class="sk" style="width:26px;height:12px;"></div>
+            </div>
+            <div class="sk" style="width:118px;height:10px;"></div>
+          </div>
+        </div>
+
+        <!-- MAIN skeleton — view tabs, toolbar, position filters, card grid. -->
+        <section class="main">
+          <div class="view-tabs" style="gap:20px;">
+            <div class="sk" style="width:90px;height:14px;"></div>
+            <div class="sk" style="width:110px;height:14px;"></div>
+            <div class="sk" style="width:108px;height:14px;"></div>
+            <div class="sk" style="width:118px;height:14px;"></div>
+          </div>
+          <div class="toolbar">
+            <div class="sk sk-rect" style="height:42px;"></div>
+            <div class="sk sk-rect" style="height:42px;width:180px;"></div>
+          </div>
+          <div class="filter-row">
+            <div class="sk sk-pill" style="width:72px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:48px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:52px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:52px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:52px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:52px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:56px;height:32px;"></div>
+            <div class="sk sk-pill" style="width:48px;height:32px;"></div>
+          </div>
+          <div class="player-grid">
+            <!-- Each skeleton card matches real card geometry. -->
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+            <div class="sk sk-rect" style="height:172px;"></div>
+          </div>
+        </section>
+
+        <!-- RIGHT RAIL skeleton — intel · queue · roster · history. -->
+        <aside class="rail">
+          <!-- Draft Intelligence -->
+          <div class="intel">
+            <div class="sk" style="width:160px;height:12px;margin-bottom:10px;"></div>
+            <div class="sk" style="width:220px;height:10px;margin-bottom:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="sk sk-rect" style="height:56px;"></div>
+              <div class="sk sk-rect" style="height:56px;"></div>
+              <div class="sk sk-rect" style="height:56px;"></div>
+            </div>
+          </div>
+          <!-- Queue -->
+          <div class="queue">
+            <div class="sk" style="width:120px;height:12px;margin-bottom:10px;"></div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="sk sk-rect" style="height:28px;"></div>
+              <div class="sk sk-rect" style="height:28px;"></div>
+              <div class="sk sk-rect" style="height:28px;"></div>
+            </div>
+          </div>
+          <!-- My Roster -->
+          <div class="roster">
+            <div class="sk" style="width:110px;height:12px;margin-bottom:10px;"></div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+              <div class="sk sk-rect" style="height:14px;"></div>
+            </div>
+          </div>
+          <!-- Pick History -->
+          <div class="history">
+            <div class="sk" style="width:120px;height:12px;margin-bottom:10px;"></div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="sk sk-rect" style="height:36px;"></div>
+              <div class="sk sk-rect" style="height:36px;"></div>
+              <div class="sk sk-rect" style="height:36px;"></div>
+              <div class="sk sk-rect" style="height:36px;"></div>
+              <div class="sk sk-rect" style="height:36px;"></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="viewport vp-mobile">
+      <div class="viewport-chrome">Mobile · 375 · Loading</div>
+      <div class="mob" data-picksheet="closed" style="position:relative;">
+        <div class="mob-nav">
+          <span class="back-icon">←</span>
+          <div class="sk" style="width:140px;height:12px;"></div>
+          <span class="back-icon" style="visibility:hidden;">⋯</span>
+        </div>
+        <div class="mob-hero">
+          <div class="sk" style="width:140px;height:26px;margin-bottom:8px;"></div>
+          <div class="sk sk-pill" style="width:160px;height:20px;"></div>
+        </div>
+        <div class="mob-timer-card">
+          <div class="sk" style="width:84px;height:84px;border-radius:50%;"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="sk" style="width:120px;height:10px;"></div>
+            <div class="sk" style="width:160px;height:16px;"></div>
+            <div class="sk" style="width:140px;height:10px;"></div>
+          </div>
+        </div>
+        <div class="mob-tabs">
+          <div class="sk sk-pill" style="flex:1;height:32px;margin:4px;"></div>
+          <div class="sk sk-pill" style="flex:1;height:32px;margin:4px;"></div>
+          <div class="sk sk-pill" style="flex:1;height:32px;margin:4px;"></div>
+          <div class="sk sk-pill" style="flex:1;height:32px;margin:4px;"></div>
+        </div>
+        <div class="mob-players">
+          <div class="sk sk-rect" style="height:60px;"></div>
+          <div class="sk sk-rect" style="height:60px;"></div>
+          <div class="sk sk-rect" style="height:60px;"></div>
+          <div class="sk sk-rect" style="height:60px;"></div>
+          <div class="sk sk-rect" style="height:60px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="viewport-note">
+    The skeleton is not a grey-bar placeholder — it reproduces the exact shape of
+    each card and panel (timer ring stays circular, player cards keep their
+    3-stat proportions) so the reveal is a content swap, not a reflow.
+  </p>
+</section>
+
+<section class="stage" data-stage="error">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Error</div>
+      <div class="nav">
+        <button class="nav-burger" aria-label="Menu">≡</button>
+        <div class="brand"><div class="brand-mark">⬢</div>Legacy Sports</div>
+        <div class="crumbs"><span>Leagues</span><span class="sep">/</span><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span><span class="sep">/</span><span class="cur">Draft</span></div>
+        <div class="spacer"></div>
+        <div class="avatar">JR</div>
+      </div>
+      <header class="hero">
+        <div class="back">← Back to league</div>
+        <div class="title-row">
+          <h1><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span> · Draft</h1>
+        </div>
+      </header>
+      <div class="error-wrap">
+        <div class="error-card" role="alert">
+          <div class="error-icon">!</div>
+          <div class="eyebrow" style="color:var(--seam-bright);">Connection Lost</div>
+          <h2 style="margin-top:6px;">Unable to load player pool</h2>
+          <p>
+            We couldn't reach the stats server. The draft clock is paused for everyone
+            until the feed recovers — no picks will be missed.
+          </p>
+          <div class="error-actions">
+            <button class="btn primary">Retry</button>
+            <button class="btn ghost">Go back to league</button>
+          </div>
+          <div style="margin-top:14px;font-family:var(--f-mono, ui-monospace);font-size:11px;color:var(--text-mute);">
+            Error code: <span class="num">PLAYERS_5XX · req 4f2a-91c8</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="viewport vp-mobile">
+      <div class="viewport-chrome">Mobile · 375 · Error</div>
+      <div class="mob">
+        <div class="mob-nav">
+          <span class="back-icon">←</span>
+          <span class="title"><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span></span>
+          <span class="back-icon" style="visibility:hidden;">⋯</span>
+        </div>
+        <div class="error-wrap" style="padding:32px 20px;min-height:600px;">
+          <div class="error-card" style="padding:22px;">
+            <div class="error-icon">!</div>
+            <div class="eyebrow" style="color:var(--seam-bright);">Connection Lost</div>
+            <h2 style="margin-top:6px;font-size:22px;">Can't reach the draft room</h2>
+            <p style="font-size:13px;">
+              We lost the live feed. The clock is paused for everyone — try again in a moment.
+            </p>
+            <div class="error-actions">
+              <button class="btn primary">Retry</button>
+              <button class="btn ghost">Back</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="viewport-note">
+    Error voice is neutral and actionable — not apologetic. Seam-red is earned here:
+    it's an alert. The request ID below the retry button is included because
+    serious fans will quote it in a support ticket.
+  </p>
+</section>
+
+<section class="stage" data-stage="empty">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Pre-Draft Lobby</div>
+      <div class="nav">
+        <button class="nav-burger" aria-label="Menu">≡</button>
+        <div class="brand"><div class="brand-mark">⬢</div>Legacy Sports</div>
+        <div class="crumbs"><span>Leagues</span><span class="sep">/</span><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span><span class="sep">/</span><span class="cur">Draft</span></div>
+        <div class="spacer"></div>
+        <div class="avatar">JR</div>
+      </div>
+      <header class="hero">
+        <div class="back">← Back to league</div>
+        <div class="title-row">
+          <h1><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span> · Draft</h1>
+          <div class="badges">
+            <span class="badge" style="color:var(--gold);border-color:rgba(197,165,90,0.4);background:rgba(197,165,90,0.08);">Pre-Draft</span>
+            <span class="badge teams">12 teams · Snake</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="lobby">
+        <div class="lobby-hero">
+          <div>
+            <div class="eyebrow" style="color:var(--gold);">Opening Day</div>
+            <h2>Your draft opens Friday · 8:00 PM ET</h2>
+            <p data-sport="baseball">
+              Twelve managers. Twenty-three rounds. One hundred and twenty years of
+              baseball to choose from. Get your queue in order — the clock doesn't wait.
+            </p>
+            <p data-sport="football">
+              Twelve managers. Sixteen rounds. A century of gridiron history to
+              choose from. Get your queue in order — the clock doesn't wait.
+            </p>
+          </div>
+          <div class="clock-face" aria-label="2 days 14 hours until draft">
+            <div>
+              <div style="font-size:26px;line-height:1;">2d</div>
+              <div style="font-size:11px;color:var(--text-sec);margin-top:4px;">14:32:06</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lobby-grid">
+          <!-- Draft order: reorderable (commissioner) -->
+          <div class="order-panel">
+            <div class="order-head">
+              <h3>Draft Order</h3>
+              <div style="display:flex;gap:6px;" data-visible-to="commissioner">
+                <button class="btn small">Randomize</button>
+                <button class="btn small ghost">Reset</button>
+              </div>
+            </div>
+            <div class="order-list" data-sport="baseball">
+              <div class="order-row">
+                <span class="seed">1</span>
+                <div>
+                  <div class="teamname">Bronx Bombers</div>
+                  <div class="mgr">Jordan R. (you) · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">2</span>
+                <div>
+                  <div class="teamname">Fenway Faithful</div>
+                  <div class="mgr">Marcus Holloway · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">3</span>
+                <div>
+                  <div class="teamname">Dead Ball Legends</div>
+                  <div class="mgr">Priya Venkatesan · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">4</span>
+                <div>
+                  <div class="teamname">Chicago Chi-Town</div>
+                  <div class="mgr">Ben Okafor · Offline</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">5</span>
+                <div>
+                  <div class="teamname">St. Louis Cardinals</div>
+                  <div class="mgr">Elena Marchetti · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">6</span>
+                <div>
+                  <div class="teamname">Sandlot Swingers</div>
+                  <div class="mgr">Theo Nakashima · Offline</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row" style="opacity:0.7;">
+                <span class="seed">…</span>
+                <div>
+                  <div class="teamname">6 more teams</div>
+                  <div class="mgr">Grand Lake, Ironmen, Pennant Chasers…</div>
+                </div>
+                <div></div>
+              </div>
+            </div>
+            <div class="order-list" data-sport="football">
+              <div class="order-row">
+                <span class="seed">1</span>
+                <div>
+                  <div class="teamname">Sunday Captains</div>
+                  <div class="mgr">Jordan R. (you) · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">2</span>
+                <div>
+                  <div class="teamname">Two-Minute Drill</div>
+                  <div class="mgr">Marcus Holloway · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">3</span>
+                <div>
+                  <div class="teamname">Greatest Generation</div>
+                  <div class="mgr">Priya Venkatesan · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">4</span>
+                <div>
+                  <div class="teamname">Frozen Tundra</div>
+                  <div class="mgr">Ben Okafor · Offline</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">5</span>
+                <div>
+                  <div class="teamname">Monsters of Midway</div>
+                  <div class="mgr">Elena Marchetti · Online</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row">
+                <span class="seed">6</span>
+                <div>
+                  <div class="teamname">Steel Curtain Crew</div>
+                  <div class="mgr">Theo Nakashima · Offline</div>
+                </div>
+                <div class="arrows" data-visible-to="commissioner">
+                  <button class="icon-btn" aria-label="Move up">↑</button>
+                  <button class="icon-btn" aria-label="Move down">↓</button>
+                </div>
+              </div>
+              <div class="order-row" style="opacity:0.7;">
+                <span class="seed">…</span>
+                <div>
+                  <div class="teamname">6 more teams</div>
+                  <div class="mgr">Iron Helmets, Cleat Marks, Hash Mark Heroes…</div>
+                </div>
+                <div></div>
+              </div>
+            </div>
+
+            <div data-visible-to="commissioner" style="margin-top:16px;display:flex;gap:8px;">
+              <button class="btn gold">Start Snake Draft</button>
+              <button class="btn">Start Linear Draft</button>
+            </div>
+            <div data-visible-to="member" style="margin-top:16px;font-size:13px;color:var(--text-sec);">
+              Waiting on the commissioner to start the draft. You'll be notified the moment it opens.
+            </div>
+          </div>
+
+          <!-- Right rail: league details + queue preview -->
+          <div class="lobby-side">
+            <h3 style="margin-bottom:12px;">Draft Details</h3>
+            <div class="detail-line"><span>Format</span><span style="font-weight:600;"><span data-sport="baseball">Snake · 23 rounds</span><span data-sport="football">Snake · 16 rounds</span></span></div>
+            <div class="detail-line"><span>Pick clock</span><span>90 seconds</span></div>
+            <div class="detail-line"><span>Player pool</span><span><span data-sport="baseball">All eras · 1876–present</span><span data-sport="football">All eras · 1920–present</span></span></div>
+            <div class="detail-line"><span><span data-sport="baseball">Min. career games</span><span data-sport="football">Min. career games</span></span><span class="num"><span data-sport="baseball">500</span><span data-sport="football">64</span></span></div>
+            <div class="detail-line"><span>Auto-pick</span><span>Enabled</span></div>
+            <div class="detail-line"><span>Draft order</span><span>Custom</span></div>
+
+            <h3 style="margin:20px 0 10px;">Your Queue</h3>
+            <div class="empty-inline" style="font-style:normal;color:var(--text-sec);">
+              No players queued yet. Build your shortlist before Friday to let auto-pick
+              cover you if you drop off.
+            </div>
+            <button class="btn block" style="margin-top:10px;">Build Queue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="viewport vp-mobile">
+      <div class="viewport-chrome">Mobile · 375 · Pre-Draft</div>
+      <div class="mob">
+        <div class="mob-nav">
+          <span class="back-icon">←</span>
+          <span class="title"><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span></span>
+          <span class="back-icon" style="visibility:hidden;">⋯</span>
+        </div>
+        <div class="mob-hero">
+          <h1>Draft</h1>
+          <div class="badges">
+            <span class="badge" style="color:var(--gold);border-color:rgba(197,165,90,0.4);background:rgba(197,165,90,0.08);">Pre-Draft</span>
+          </div>
+        </div>
+
+        <div style="margin:14px;padding:18px;background:linear-gradient(135deg, rgba(27,58,92,0.28) 0%, var(--bg-panel) 60%);border:1px solid rgba(197,165,90,0.35);border-radius:16px;text-align:center;">
+          <div class="eyebrow" style="color:var(--gold);">Opening Day</div>
+          <div style="font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.1;margin-top:6px;">Fri Apr 24 · 8:00 PM ET</div>
+          <div style="font-family:var(--f-display);font-weight:800;font-size:32px;margin-top:10px;color:var(--gold);letter-spacing:0.04em;" class="num">2d 14:32:06</div>
+          <div style="font-size:12px;color:var(--text-sec);margin-top:6px;">12 managers locked in · <span data-sport="baseball">23 rounds</span><span data-sport="football">16 rounds</span></div>
+        </div>
+
+        <div style="margin:0 14px;">
+          <h3 style="margin-bottom:10px;">Draft Order</h3>
+          <div class="order-list" data-sport="baseball">
+            <div class="order-row"><span class="seed">1</span><div><div class="teamname">Bronx Bombers</div><div class="mgr">You</div></div><div></div></div>
+            <div class="order-row"><span class="seed">2</span><div><div class="teamname">Fenway Faithful</div><div class="mgr">Marcus H.</div></div><div></div></div>
+            <div class="order-row"><span class="seed">3</span><div><div class="teamname">Dead Ball Legends</div><div class="mgr">Priya V.</div></div><div></div></div>
+            <div class="order-row"><span class="seed">4</span><div><div class="teamname">Chi-Town</div><div class="mgr">Ben O.</div></div><div></div></div>
+            <div class="order-row" style="opacity:0.7;"><span class="seed">…</span><div><div class="teamname">8 more</div><div class="mgr">Tap to expand</div></div><div></div></div>
+          </div>
+          <div class="order-list" data-sport="football">
+            <div class="order-row"><span class="seed">1</span><div><div class="teamname">Sunday Captains</div><div class="mgr">You</div></div><div></div></div>
+            <div class="order-row"><span class="seed">2</span><div><div class="teamname">Two-Minute Drill</div><div class="mgr">Marcus H.</div></div><div></div></div>
+            <div class="order-row"><span class="seed">3</span><div><div class="teamname">Greatest Generation</div><div class="mgr">Priya V.</div></div><div></div></div>
+            <div class="order-row"><span class="seed">4</span><div><div class="teamname">Frozen Tundra</div><div class="mgr">Ben O.</div></div><div></div></div>
+            <div class="order-row" style="opacity:0.7;"><span class="seed">…</span><div><div class="teamname">8 more</div><div class="mgr">Tap to expand</div></div><div></div></div>
+          </div>
+          <button class="btn block gold" data-visible-to="commissioner" style="margin-top:14px;min-height:44px;">Start Snake Draft</button>
+          <button class="btn block" data-visible-to="member" style="margin-top:14px;min-height:44px;">Build Queue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="viewport-note">
+    Pre-draft has a different editorial tone: this is the overture, not the game.
+    A large countdown tile anchors the page because the most useful thing to tell
+    the user is "when". Order below it is the second-most-useful — "in what order
+    will it happen?".
+  </p>
+</section>
+<script src="scripts/draft.js"></script>
+</body>
+</html>

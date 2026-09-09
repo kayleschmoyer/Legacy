@@ -1,0 +1,950 @@
+<!-- @intent production surface="draft-room" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Live Draft Board · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<link rel="stylesheet" href="styles/harness.css" />
+<link rel="stylesheet" href="styles/board.css" />
+<link rel="stylesheet" href="styles/states.css" />
+<link rel="stylesheet" href="styles/mobile.css" />
+<link rel="stylesheet" href="styles/adaptive.css" />
+</head>
+<body data-viewport="desktop" data-role="member" data-sport="baseball" data-vp-base="">
+<div class="state-switcher">
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="populated">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span></div>
+
+      <div class="nav">
+        <button class="nav-burger" aria-label="Menu">≡</button>
+        <div class="brand"><div class="brand-mark">⬢</div>Legacy Sports</div>
+        <div class="crumbs">
+          <span>Leagues</span><span class="sep">/</span>
+          <span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span><span class="sep">/</span>
+          <span class="cur">Draft</span>
+        </div>
+        <div class="spacer"></div>
+        <div class="avatar" title="You">JR</div>
+      </div>
+
+      <header class="hero">
+        <div class="back">← Back to league</div>
+        <div class="title-row">
+          <h1><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span> · Draft</h1>
+          <div class="badges">
+            <span class="badge draft-live"><span class="dot"></span>Draft Live</span>
+            <span class="badge round"><span data-sport="baseball">Round 4 · Pick 42 of 276</span><span data-sport="football">Round 4 · Pick 42 of 192</span></span>
+            <span class="badge teams"><span data-sport="baseball">12 teams · Snake</span><span data-sport="football">12 teams · Snake</span></span>
+          </div>
+        </div>
+      </header>
+
+      <div class="board">
+        <!-- ═════════ TOP STATUS BAND ═════════
+             Horizontal: Pick status · Timer · Current pick slab ·
+             My Auto-Pick toggle · Commissioner button. Commissioner-only
+             controls collapse into one button that pops a sheet on
+             click (mocked here as an inline stack via :hover). -->
+        <div class="topband">
+          <div class="tb-status">
+            <div class="live"><span class="dot"></span>Live Draft</div>
+            <div class="pick-num num">Pick #42</div>
+            <div class="round-meta">Round 4 · Pick 6 of 12</div>
+          </div>
+
+          <span class="tb-divider"></span>
+
+          <div class="tb-timer">
+            <div class="ring">
+              <svg width="58" height="58" viewBox="0 0 58 58" aria-hidden="true">
+                <circle cx="29" cy="29" r="24" fill="none" stroke="#1E2D45" stroke-width="4"/>
+                <!-- circumference 2π·24 ≈ 150.8; 0:47 / 1:30 → 52.2% remaining → offset ≈ 72 -->
+                <circle cx="29" cy="29" r="24" fill="none" stroke="#C5A55A" stroke-width="4"
+                        stroke-linecap="round" stroke-dasharray="151" stroke-dashoffset="72"
+                        transform="rotate(-90 29 29)"/>
+              </svg>
+              <div class="t warn num">0:47</div>
+            </div>
+            <div class="info">
+              <div class="cap">Time left</div>
+              <div class="zones">of 1:30</div>
+            </div>
+          </div>
+
+          <!-- Current-pick slab stretches to fill flexible column -->
+          <div class="tb-clock">
+            <div style="flex:1;min-width:0;" data-sport="baseball">
+              <div class="eyebrow">You're on the clock</div>
+              <div class="who">Sandlot Dreamers</div>
+              <div class="mgr"><span class="online-dot"></span>You · online</div>
+            </div>
+            <div style="flex:1;min-width:0;" data-sport="football">
+              <div class="eyebrow">You're on the clock</div>
+              <div class="who">Sunday Captains</div>
+              <div class="mgr"><span class="online-dot"></span>You · online</div>
+            </div>
+          </div>
+
+          <!-- Auto-pick: member-controlled. If a user toggles ON, their
+               own picks auto-submit from their queue if their clock expires.
+               This is separate from the commissioner's league-wide
+               "Disable Auto-Pick" which stops ALL users' auto-picks. -->
+          <div class="tb-autopick on" role="switch" aria-checked="true" tabindex="0" title="Auto-pick takes the top of your queue when your clock expires">
+            <div class="label">Auto-pick my turn</div>
+            <div class="ctrl">
+              <div class="sw" aria-hidden="true"></div>
+              <div class="state">ON</div>
+            </div>
+            <div class="sub">Queue: 3 players ready</div>
+          </div>
+
+          <!-- Commissioner controls — role-gated. Expands inline when
+               viewing as commissioner; hidden otherwise. -->
+          <div class="tb-commish" data-visible-to="commissioner">
+            <button class="btn">⏸ Pause</button>
+            <button class="btn ghost">Commish…</button>
+          </div>
+        </div>
+
+        <!-- ═════════ POSITIONS DRAFTED ═════════
+             Roster slots in lineup order. Filled = monogram in the
+             position accent; open = dashed; the next priority hole
+             reads gold. Counts track My Depth Chart. -->
+        <div class="slotbar">
+          <div class="sb-head">
+            <span class="sb-cap">Positions drafted</span>
+            <span class="sb-ct" data-sport="baseball">3 / 23 slots</span>
+            <span class="sb-ct" data-sport="football">3 / 17 slots</span>
+          </div>
+          <div class="sb-track" data-sport="baseball">
+            <div class="sb-slot filled" data-pos="C" title="C — Yogi Berra"><span class="sb-pos">C</span><span class="sb-mark">YB</span></div>
+            <div class="sb-slot open need" data-pos="1B" title="1B — open, priority"><span class="sb-pos">1B</span><span class="sb-mark">+</span></div>
+            <div class="sb-slot open" data-pos="2B" title="2B — open"><span class="sb-pos">2B</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="3B" title="3B — open"><span class="sb-pos">3B</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SS" title="SS — open"><span class="sb-pos">SS</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="OF" title="OF — Willie Mays"><span class="sb-pos">OF</span><span class="sb-mark">WM</span></div>
+            <div class="sb-slot open" data-pos="OF" title="OF — open"><span class="sb-pos">OF</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="OF" title="OF — open"><span class="sb-pos">OF</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="UTIL" title="UTIL — open"><span class="sb-pos">UTIL</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="UTIL" title="UTIL — open"><span class="sb-pos">UTIL</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="SP" title="SP — Pedro Martínez"><span class="sb-pos">SP</span><span class="sb-mark">PM</span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="SP" title="SP — open"><span class="sb-pos">SP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="RP" title="RP — open"><span class="sb-pos">RP</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+          </div>
+          <div class="sb-track" data-sport="football">
+            <div class="sb-slot filled" data-pos="QB" title="QB — Joe Montana"><span class="sb-pos">QB</span><span class="sb-mark">JM</span></div>
+            <div class="sb-slot open need" data-pos="RB" title="RB — open, priority"><span class="sb-pos">RB</span><span class="sb-mark">+</span></div>
+            <div class="sb-slot open" data-pos="RB" title="RB — open"><span class="sb-pos">RB</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="WR" title="WR — Marvin Harrison"><span class="sb-pos">WR</span><span class="sb-mark">MH</span></div>
+            <div class="sb-slot open" data-pos="WR" title="WR — open"><span class="sb-pos">WR</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="TE" title="TE — open"><span class="sb-pos">TE</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="FLEX" title="FLEX — RB / WR / TE"><span class="sb-pos">FLEX</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open" data-pos="K" title="K — open"><span class="sb-pos">K</span><span class="sb-mark"></span></div>
+            <div class="sb-slot filled" data-pos="DEF" title="DEF — Bruce Smith"><span class="sb-pos">DEF</span><span class="sb-mark">BS</span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+            <div class="sb-slot open bench" data-pos="BN" title="Bench — open"><span class="sb-pos">BN</span><span class="sb-mark"></span></div>
+          </div>
+        </div>
+
+        <!-- ═════════ MAIN ═════════ -->
+        <section class="main">
+
+          <!-- VIEW TABS — four top-level views for the same pool:
+               Cards (visual scan) · Table (sort/compare) ·
+               Draft Board (league-wide pick grid) · Depth Chart (my team). -->
+          <div class="view-tabs" role="tablist" aria-label="Player view">
+            <button class="active" data-view="cards" role="tab"><span class="glyph">▦</span>Cards<span class="tab-ct" data-sport="baseball">214</span><span class="tab-ct" data-sport="football">156</span></button>
+            <a href="components/PlayerTable.html" data-view="table" role="tab"><span class="glyph">≡</span>Data Table<span class="tab-ct" data-sport="baseball">214</span><span class="tab-ct" data-sport="football">156</span></a>
+            <a href="components/DraftGrid.html" data-view="board" role="tab"><span class="glyph">⊞</span>Draft Board</a>
+            <a href="components/DepthChart.html" data-view="depth" role="tab"><span class="glyph">▤</span>My Depth Chart<span class="tab-ct" data-sport="baseball">3/23</span><span class="tab-ct" data-sport="football">3/17</span></a>
+          </div>
+
+          <!-- ───── CARDS VIEW ───── -->
+          <div class="view-pane active" data-view="cards">
+
+            <div class="toolbar">
+              <label class="search">
+                <span class="glyph" aria-hidden="true">⌕</span>
+                <input type="text" placeholder="Search available players…" />
+                <span class="clear" title="Clear">✕</span>
+              </label>
+            </div>
+
+            <!-- POSITION FILTER PILLS + Availability toggle.
+                 Counts are eligibility-aware (a 1B/OF player is counted
+                 under BOTH). Availability defaults ON so drafted players
+                 are hidden from the card grid. -->
+            <div class="filter-row" data-sport="baseball">
+              <span class="fl-label">Position</span>
+              <button class="pill-btn active">ALL <span class="ct">214</span></button>
+              <button class="pill-btn">C <span class="ct">18</span></button>
+              <button class="pill-btn">1B <span class="ct">22</span></button>
+              <button class="pill-btn">2B <span class="ct">19</span></button>
+              <button class="pill-btn">3B <span class="ct">20</span></button>
+              <button class="pill-btn">SS <span class="ct">21</span></button>
+              <button class="pill-btn">OF <span class="ct">54</span></button>
+              <button class="pill-btn">P <span class="ct">60</span></button>
+              <span class="divider" aria-hidden="true"></span>
+              <button class="toggle on" role="switch" aria-checked="true" title="Hide drafted players">
+                <span class="sw" aria-hidden="true"></span>Available only
+              </button>
+            </div>
+            <div class="filter-row" data-sport="football">
+              <span class="fl-label">Position</span>
+              <button class="pill-btn active">ALL <span class="ct">156</span></button>
+              <button class="pill-btn">QB <span class="ct">14</span></button>
+              <button class="pill-btn">RB <span class="ct">26</span></button>
+              <button class="pill-btn">WR <span class="ct">32</span></button>
+              <button class="pill-btn">TE <span class="ct">16</span></button>
+              <button class="pill-btn">K <span class="ct">12</span></button>
+              <button class="pill-btn">DEF <span class="ct">16</span></button>
+              <span class="divider" aria-hidden="true"></span>
+              <button class="toggle on" role="switch" aria-checked="true" title="Hide drafted players">
+                <span class="sw" aria-hidden="true"></span>Available only
+              </button>
+            </div>
+
+            <div class="result-meta">
+              <span><span data-sport="baseball">214 players available · sorted by ADP</span><span data-sport="football">156 players available · sorted by ADP</span></span>
+              <span class="right">Round 4 · Pick 6</span>
+            </div>
+
+            <!-- PLAYER GRID — each card is an editorial object: name loud,
+                 era quiet serif, 3 decisive stats, primary draft CTA. -->
+            <div class="player-grid" data-sport="baseball">
+            <article class="player-card" data-pos="1B">
+              <div class="pc-badges">
+                <span class="mini-badge queued">Queued</span>
+              </div>
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-1B" title="Primary position">1B</span>
+                      <span class="alt" title="Also eligible">OF</span>
+                    </span>
+                    <div class="pc-name">Lou Gehrig</div>
+                  </div>
+                  <div class="pc-meta">NYY · L/L · ADP <span class="num">14</span></div>
+                  <div class="pc-career">Career <span class="seasons">1923–1939</span> · 17 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.340</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">493</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,995</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn queued" title="In queue">★</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="2B">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-2B" title="Primary position">2B</span>
+                      <span class="alt" title="Also eligible">SS</span>
+                    </span>
+                    <div class="pc-name">Rogers Hornsby</div>
+                  </div>
+                  <div class="pc-meta">STL · R/R · ADP <span class="num">15</span></div>
+                  <div class="pc-career">Career <span class="seasons">1915–1937</span> · 23 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.358</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">301</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,584</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="SS">
+              <div class="pc-badges"><span class="mini-badge auto">Auto</span></div>
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-SS" title="Primary position">SS</span>
+                      <span class="alt" title="Also eligible">OF</span>
+                    </span>
+                    <div class="pc-name">Honus Wagner</div>
+                  </div>
+                  <div class="pc-meta">PIT · R/R · ADP <span class="num">17</span></div>
+                  <div class="pc-career">Career <span class="seasons">1897–1917</span> · 21 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.328</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">101</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,732</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn on" title="On watchlist">★</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="P">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-P" title="Primary position">P</span>
+                    </span>
+                    <div class="pc-name">Greg Maddux</div>
+                  </div>
+                  <div class="pc-meta">ATL · R/R · ADP <span class="num">18</span></div>
+                  <div class="pc-career">Career <span class="seasons">1986–2008</span> · 23 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">3.16</div><div class="k">CAREER ERA</div></div>
+                <div class="pc-stat"><div class="v num">355</div><div class="k">WINS</div></div>
+                <div class="pc-stat"><div class="v num">3,371</div><div class="k">K</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="C">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-C" title="Primary position">C</span>
+                      <span class="alt" title="Also eligible">1B</span>
+                    </span>
+                    <div class="pc-name">Johnny Bench</div>
+                  </div>
+                  <div class="pc-meta">CIN · R/R · ADP <span class="num">19</span></div>
+                  <div class="pc-career">Career <span class="seasons">1967–1983</span> · 17 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.267</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">389</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,376</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card taken" data-pos="OF">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-OF" title="Primary position">OF</span>
+                    </span>
+                    <div class="pc-name">Ty Cobb</div>
+                  </div>
+                  <div class="pc-meta">DET · L/R · ADP <span class="num">20</span></div>
+                  <div class="pc-career">Career <span class="seasons">1905–1928</span> · 24 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.366</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">117</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">897</div><div class="k">SB</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="OF">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-OF" title="Primary position">OF</span>
+                      <span class="alt" title="Also eligible">1B</span>
+                    </span>
+                    <div class="pc-name">Hank Aaron</div>
+                  </div>
+                  <div class="pc-meta">ATL · R/R · ADP <span class="num">21</span></div>
+                  <div class="pc-career">Career <span class="seasons">1954–1976</span> · 23 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.305</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">755</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">2,297</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="3B">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-3B" title="Primary position">3B</span>
+                    </span>
+                    <div class="pc-name">Mike Schmidt</div>
+                  </div>
+                  <div class="pc-meta">PHI · R/R · ADP <span class="num">22</span></div>
+                  <div class="pc-career">Career <span class="seasons">1972–1989</span> · 18 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.267</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">548</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,595</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+
+            <article class="player-card" data-pos="1B">
+              <div class="pc-top">
+                <div>
+                  <div class="pc-name-row">
+                    <span class="pc-positions">
+                      <span class="pill pill-1B" title="Primary position">1B</span>
+                      <span class="alt" title="Also eligible">C</span>
+                    </span>
+                    <div class="pc-name">Jimmie Foxx</div>
+                  </div>
+                  <div class="pc-meta">PHA · R/R · ADP <span class="num">23</span></div>
+                  <div class="pc-career">Career <span class="seasons">1925–1945</span> · 20 seasons</div>
+                </div>
+              </div>
+              <div class="pc-stats">
+                <div class="pc-stat"><div class="v num">.325</div><div class="k">CAREER AVG</div></div>
+                <div class="pc-stat"><div class="v num">534</div><div class="k">HR</div></div>
+                <div class="pc-stat"><div class="v num">1,922</div><div class="k">RBI</div></div>
+              </div>
+              <div class="pc-actions">
+                <button class="btn draft">Draft</button>
+                <button class="star-btn" title="Watchlist">☆</button>
+              </div>
+            </article>
+          </div>
+
+            <!-- ── FOOTBALL PLAYER GRID — gridiron legends across eras ── -->
+            <div class="player-grid" data-sport="football">
+              <article class="player-card" data-pos="WR">
+                <div class="pc-badges"><span class="mini-badge queued">Queued</span></div>
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-WR">WR</span></span>
+                      <div class="pc-name">Randy Moss</div>
+                    </div>
+                    <div class="pc-meta">MIN · 6'4" · ADP <span class="num">14</span></div>
+                    <div class="pc-career">Career <span class="seasons">1998–2012</span> · 14 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">15,292</div><div class="k">REC YDS</div></div>
+                  <div class="pc-stat"><div class="v num">156</div><div class="k">REC TD</div></div>
+                  <div class="pc-stat"><div class="v num">982</div><div class="k">REC</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn queued" title="In queue">★</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="RB">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-RB">RB</span><span class="alt">FLEX</span></span>
+                      <div class="pc-name">Emmitt Smith</div>
+                    </div>
+                    <div class="pc-meta">DAL · 5'9" · ADP <span class="num">15</span></div>
+                    <div class="pc-career">Career <span class="seasons">1990–2004</span> · 15 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">18,355</div><div class="k">RUSH YDS</div></div>
+                  <div class="pc-stat"><div class="v num">164</div><div class="k">RUSH TD</div></div>
+                  <div class="pc-stat"><div class="v num">4.2</div><div class="k">YPC</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="RB">
+                <div class="pc-badges"><span class="mini-badge auto">Auto</span></div>
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-RB">RB</span><span class="alt">WR</span></span>
+                      <div class="pc-name">Bo Jackson</div>
+                    </div>
+                    <div class="pc-meta">LAR · 6'1" · ADP <span class="num">16</span></div>
+                    <div class="pc-career">Career <span class="seasons">1987–1990</span> · 4 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">2,782</div><div class="k">RUSH YDS</div></div>
+                  <div class="pc-stat"><div class="v num">16</div><div class="k">RUSH TD</div></div>
+                  <div class="pc-stat"><div class="v num">5.4</div><div class="k">YPC</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn on" title="On watchlist">★</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="QB">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-QB">QB</span></span>
+                      <div class="pc-name">Dan Marino</div>
+                    </div>
+                    <div class="pc-meta">MIA · 6'4" · ADP <span class="num">17</span></div>
+                    <div class="pc-career">Career <span class="seasons">1983–1999</span> · 17 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">61,361</div><div class="k">PASS YDS</div></div>
+                  <div class="pc-stat"><div class="v num">420</div><div class="k">PASS TD</div></div>
+                  <div class="pc-stat"><div class="v num">252</div><div class="k">INT</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="TE">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-TE">TE</span></span>
+                      <div class="pc-name">Tony Gonzalez</div>
+                    </div>
+                    <div class="pc-meta">KC/ATL · 6'5" · ADP <span class="num">18</span></div>
+                    <div class="pc-career">Career <span class="seasons">1997–2013</span> · 17 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">15,127</div><div class="k">REC YDS</div></div>
+                  <div class="pc-stat"><div class="v num">111</div><div class="k">REC TD</div></div>
+                  <div class="pc-stat"><div class="v num">1,325</div><div class="k">REC</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card taken" data-pos="DEF">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-DEF">DEF</span></span>
+                      <div class="pc-name">Reggie White</div>
+                    </div>
+                    <div class="pc-meta">PHI/GB · 6'5" · ADP <span class="num">19</span></div>
+                    <div class="pc-career">Career <span class="seasons">1985–2000</span> · 15 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">198.0</div><div class="k">CAREER SACKS</div></div>
+                  <div class="pc-stat"><div class="v num">33</div><div class="k">FORCED FUM</div></div>
+                  <div class="pc-stat"><div class="v num">13×</div><div class="k">PRO BOWL</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="RB">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-RB">RB</span></span>
+                      <div class="pc-name">Adrian Peterson</div>
+                    </div>
+                    <div class="pc-meta">MIN · 6'1" · ADP <span class="num">20</span></div>
+                    <div class="pc-career">Career <span class="seasons">2007–2021</span> · 15 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">14,918</div><div class="k">RUSH YDS</div></div>
+                  <div class="pc-stat"><div class="v num">120</div><div class="k">RUSH TD</div></div>
+                  <div class="pc-stat"><div class="v num">4.6</div><div class="k">YPC</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="QB">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-QB">QB</span></span>
+                      <div class="pc-name">John Elway</div>
+                    </div>
+                    <div class="pc-meta">DEN · 6'3" · ADP <span class="num">21</span></div>
+                    <div class="pc-career">Career <span class="seasons">1983–1998</span> · 16 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">51,475</div><div class="k">PASS YDS</div></div>
+                  <div class="pc-stat"><div class="v num">300</div><div class="k">PASS TD</div></div>
+                  <div class="pc-stat"><div class="v num">226</div><div class="k">INT</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+
+              <article class="player-card" data-pos="DEF">
+                <div class="pc-top">
+                  <div>
+                    <div class="pc-name-row">
+                      <span class="pc-positions"><span class="pill pill-DEF">DEF</span></span>
+                      <div class="pc-name">Deion Sanders</div>
+                    </div>
+                    <div class="pc-meta">DAL/SF · 6'1" · ADP <span class="num">22</span></div>
+                    <div class="pc-career">Career <span class="seasons">1989–2005</span> · 14 seasons</div>
+                  </div>
+                </div>
+                <div class="pc-stats">
+                  <div class="pc-stat"><div class="v num">53</div><div class="k">CAREER INT</div></div>
+                  <div class="pc-stat"><div class="v num">9</div><div class="k">DEF TD</div></div>
+                  <div class="pc-stat"><div class="v num">8×</div><div class="k">PRO BOWL</div></div>
+                </div>
+                <div class="pc-actions">
+                  <button class="btn draft">Draft</button>
+                  <button class="star-btn" title="Watchlist">☆</button>
+                </div>
+              </article>
+            </div>
+          </div><!-- /cards pane -->
+        </section>
+        <!-- ═════════ RIGHT RAIL ═════════
+             Draft Intelligence (premium) · Queue (drag-to-sort) ·
+             Pick history · My roster summary. -->
+        <aside class="rail">
+
+          <!-- DRAFT INTELLIGENCE — tailored recs, shows on user's pick -->
+          <div class="intel">
+            <div class="roster-head">
+              <h4>Draft Intelligence <span class="premium-tag">✦ PREMIUM</span></h4>
+              <span class="count num">3</span>
+            </div>
+            <p style="font-size:11px;font-style:italic;color:var(--text-mute);margin:2px 0 6px;">
+              Tailored to your roster holes and pool tier breaks.
+            </p>
+
+            <div class="intel-rec" data-sport="baseball">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip">POS RUN</span>
+                  <span class="reason-chip" style="background:rgba(27,58,92,0.25);color:#8FB4E8;">TIER BREAK</span>
+                </div>
+                <div class="name">Lou Gehrig <span class="pill pill-1B" style="margin-left:4px;font-size:9px;">1B</span></div>
+                <div class="why">Last elite 1B before tier 2.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <div class="intel-rec" data-sport="baseball">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip">ROSTER FIT</span>
+                </div>
+                <div class="name">Honus Wagner <span class="pill pill-SS" style="margin-left:4px;font-size:9px;">SS</span></div>
+                <div class="why">Fills your open SS.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <div class="intel-rec" data-sport="baseball">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip" style="background:rgba(196,30,58,0.18);color:var(--seam-bright);">VALUE</span>
+                </div>
+                <div class="name">Greg Maddux <span class="pill pill-P" style="margin-left:4px;font-size:9px;">P</span></div>
+                <div class="why">Sliding 4 slots below consensus.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <!-- Football recommendations — RB run + open TE + value pitcher analog -->
+            <div class="intel-rec" data-sport="football">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip">POS RUN</span>
+                  <span class="reason-chip" style="background:rgba(27,58,92,0.25);color:#8FB4E8;">TIER BREAK</span>
+                </div>
+                <div class="name">Emmitt Smith <span class="pill pill-RB" style="margin-left:4px;font-size:9px;">RB</span></div>
+                <div class="why">Last elite RB1 before tier drop.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <div class="intel-rec" data-sport="football">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip">ROSTER FIT</span>
+                </div>
+                <div class="name">Tony Gonzalez <span class="pill pill-TE" style="margin-left:4px;font-size:9px;">TE</span></div>
+                <div class="why">Fills your open TE.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <div class="intel-rec" data-sport="football">
+              <div style="min-width:0;flex:1;">
+                <div style="margin-bottom:3px;">
+                  <span class="reason-chip" style="background:rgba(196,30,58,0.18);color:var(--seam-bright);">VALUE</span>
+                </div>
+                <div class="name">Marshall Faulk <span class="pill pill-RB" style="margin-left:4px;font-size:9px;">RB</span></div>
+                <div class="why">Sliding 6 slots below consensus.</div>
+              </div>
+              <button class="btn small primary">Draft</button>
+            </div>
+
+            <div class="more">View all recommendations →</div>
+          </div>
+
+          <!-- QUEUE — drag-to-sort. Handle on the left, rank number,
+               player + position tag, remove button. Second item shown
+               in the dragging state mid-reorder for documentation. -->
+          <div class="queue">
+            <div class="roster-head">
+              <h4>Auto-pick Queue</h4>
+              <span class="count num">3</span>
+            </div>
+            <div class="queue-list" data-sortable="true" data-sport="baseball">
+              <div class="queue-item" draggable="true">
+                <span class="drag" title="Drag to reorder">⋮⋮</span>
+                <span class="rank num">1</span>
+                <span class="name"><span class="pos-tag">1B</span>Lou Gehrig</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+              <div class="queue-item dragging" draggable="true">
+                <span class="drag">⋮⋮</span>
+                <span class="rank num">2</span>
+                <span class="name"><span class="pos-tag">2B</span>Rogers Hornsby</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+              <div class="queue-item drop-target" draggable="true">
+                <span class="drag">⋮⋮</span>
+                <span class="rank num">3</span>
+                <span class="name"><span class="pos-tag">SS</span>Honus Wagner</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+            </div>
+            <div class="queue-list" data-sortable="true" data-sport="football">
+              <div class="queue-item" draggable="true">
+                <span class="drag" title="Drag to reorder">⋮⋮</span>
+                <span class="rank num">1</span>
+                <span class="name"><span class="pos-tag">RB</span>Emmitt Smith</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+              <div class="queue-item dragging" draggable="true">
+                <span class="drag">⋮⋮</span>
+                <span class="rank num">2</span>
+                <span class="name"><span class="pos-tag">RB</span>Marshall Faulk</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+              <div class="queue-item drop-target" draggable="true">
+                <span class="drag">⋮⋮</span>
+                <span class="rank num">3</span>
+                <span class="name"><span class="pos-tag">TE</span>Tony Gonzalez</span>
+                <button class="icon-btn" aria-label="Remove">✕</button>
+              </div>
+            </div>
+            <div class="queue-hint">Drag ⋮⋮ to reorder. Auto-pick takes #1 first.</div>
+          </div>
+
+          <!-- MY ROSTER — condensed. Full lineup lives in Depth Chart tab. -->
+          <div class="roster">
+            <div class="roster-head">
+              <h4>My Roster</h4>
+              <span class="count num"><span data-sport="baseball">3 / 23</span><span data-sport="football">3 / 17</span></span>
+            </div>
+            <div class="pos-list" data-sport="baseball">
+              <div class="pos-row complete" data-pos="C"  style="--fill:100%"><span class="pos-label">C</span>   <div class="bar"></div><span class="count">1/1</span></div>
+              <div class="pos-row target"   data-pos="1B" style="--fill:0%"><span class="pos-label">1B</span> <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row target"   data-pos="2B" style="--fill:0%"><span class="pos-label">2B</span> <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row target"   data-pos="3B" style="--fill:0%"><span class="pos-label">3B</span> <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row target"   data-pos="SS" style="--fill:0%"><span class="pos-label">SS</span> <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row filled"   data-pos="OF" style="--fill:33%"><span class="pos-label">OF</span> <div class="bar"></div><span class="count">1/3</span></div>
+              <div class="pos-row filled"   data-pos="P"  style="--fill:11%"><span class="pos-label">P</span>  <div class="bar"></div><span class="count">1/9</span></div>
+              <div class="pos-row target"   data-pos="U"  style="--fill:0%"><span class="pos-label">UTIL</span><div class="bar"></div><span class="count">0/2</span></div>
+            </div>
+            <div class="pos-list" data-sport="football">
+              <div class="pos-row complete" data-pos="QB"   style="--fill:100%"><span class="pos-label">QB</span>  <div class="bar"></div><span class="count">1/1</span></div>
+              <div class="pos-row target"   data-pos="RB"   style="--fill:0%"><span class="pos-label">RB</span>  <div class="bar"></div><span class="count">0/2</span></div>
+              <div class="pos-row filled"   data-pos="WR"   style="--fill:50%"><span class="pos-label">WR</span>  <div class="bar"></div><span class="count">1/2</span></div>
+              <div class="pos-row target"   data-pos="TE"   style="--fill:0%"><span class="pos-label">TE</span>  <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row target"   data-pos="FLEX" style="--fill:0%"><span class="pos-label">FLEX</span><div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row target"   data-pos="K"    style="--fill:0%"><span class="pos-label">K</span>   <div class="bar"></div><span class="count">0/1</span></div>
+              <div class="pos-row complete" data-pos="DEF"  style="--fill:100%"><span class="pos-label">DEF</span> <div class="bar"></div><span class="count">1/1</span></div>
+            </div>
+          </div>
+
+          <!-- COMMISSIONER — role-gated. Lives in rail so it doesn't
+               compete with the member's own controls in the topband. -->
+          <div class="commish" data-visible-to="commissioner">
+            <h4>Commissioner</h4>
+            <div class="btns" style="display:grid;gap:6px;">
+              <button class="btn">⏸ Pause Draft</button>
+              <button class="btn ghost">Commissioner Pick Mode</button>
+              <button class="btn ghost">Disable League Auto-Pick</button>
+            </div>
+          </div>
+
+          <!-- PICK HISTORY — compact ledger -->
+          <div class="history">
+            <div class="roster-head">
+              <h4>Pick History</h4>
+              <span class="count num">41</span>
+            </div>
+            <div class="history-list" data-sport="baseball">
+              <div class="pick-row">
+                <span class="num">4.05</span><span class="pill pill-OF">OF</span>
+                <span><span class="p-name">Ty Cobb</span><br/><span class="p-team">DET · 1905–1928 → Sandlot Swingers</span></span>
+                <span class="auto-badge">AUTO</span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.04</span><span class="pill pill-P">P</span>
+                <span><span class="p-name">Bob Gibson</span><br/><span class="p-team">STL · 1959–1975 → Bronx Bombers</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.03</span><span class="pill pill-1B">1B</span>
+                <span><span class="p-name">Albert Pujols</span><br/><span class="p-team">STL · 2001–2022 → Chi-Town</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.02</span><span class="pill pill-SS">SS</span>
+                <span><span class="p-name">Ozzie Smith</span><br/><span class="p-team">STL · 1978–1996 → Dead Ball Legends</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.01</span><span class="pill pill-OF">OF</span>
+                <span><span class="p-name">Stan Musial</span><br/><span class="p-team">STL · 1941–1963 → Fenway Faithful</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">3.12</span><span class="pill pill-P">P</span>
+                <span><span class="p-name">Walter Johnson</span><br/><span class="p-team">WSH · 1907–1927 → Bronx Bombers</span></span>
+                <span></span>
+              </div>
+            </div>
+            <div class="history-list" data-sport="football">
+              <div class="pick-row">
+                <span class="num">4.05</span><span class="pill pill-WR">WR</span>
+                <span><span class="p-name">Don Hutson</span><br/><span class="p-team">GB · 1935–1945 → Two-Minute Drill</span></span>
+                <span class="auto-badge">AUTO</span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.04</span><span class="pill pill-QB">QB</span>
+                <span><span class="p-name">Russell Wilson</span><br/><span class="p-team">SEA · 2012–present → Greatest Generation</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.03</span><span class="pill pill-QB">QB</span>
+                <span><span class="p-name">Lamar Jackson</span><br/><span class="p-team">BAL · 2018–present → Monsters of Midway</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.02</span><span class="pill pill-RB">RB</span>
+                <span><span class="p-name">Marcus Allen</span><br/><span class="p-team">LAR · 1982–1997 → Frozen Tundra</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">4.01</span><span class="pill pill-DEF">DEF</span>
+                <span><span class="p-name">Mel Blount</span><br/><span class="p-team">PIT · 1970–1983 → Steel Curtain Crew</span></span>
+                <span></span>
+              </div>
+              <div class="pick-row">
+                <span class="num">3.12</span><span class="pill pill-QB">QB</span>
+                <span><span class="p-name">Roger Staubach</span><br/><span class="p-team">DAL · 1969–1979 → Lombardi Trophy</span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+
+        </aside>
+      </div>
+    </div>
+  </div>
+  <p class="viewport-note">
+    The sidebar reads top-to-bottom as a command console — status, timer, commish,
+    current pick, roster, queue, history — because during a live draft a user scans
+    from fixed landmarks down. The main board is the field: search and filter
+    first, then a grid where editorial treatment of each player (loud display name,
+    quiet serif era, three decisive stats) helps the eye compare without gridding.
+  </p>
+</section>
+<script src="scripts/draft.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+/* Review harness only — state/role/sport/viewport switcher, stage
+   containers, viewport frames, annotation rail. Not production chrome. */
+/* ============================================================
+   STATE SWITCHER (top of page, reviewer-only affordance)
+   ============================================================ */
+.state-switcher {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,15,26,0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap;
+}
+.state-switcher .label {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.state-switcher .group { display: flex; gap: 4px; padding: 3px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 9999px; }
+.state-switcher button {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-sec);
+  background: transparent;
+  border: 0;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: color 140ms, background 140ms;
+}
+.state-switcher button:hover { color: var(--text); }
+.state-switcher button.active { background: var(--navy); color: var(--text); }
+.state-switcher .viewport-toggle button.active { background: var(--bg-elevated); color: var(--gold); }
+.state-switcher .role-toggle button.active { background: var(--bg-elevated); color: var(--text); }
+.state-switcher .sport-toggle button.active { background: var(--bg-elevated); color: var(--gold); }
+.state-switcher .sport-toggle button[data-sport="football"].active { color: #6FAE8B; }
+
+/* ============================================================
+   STAGES (one per state; only .active is displayed)
+   MOTION: crossfade, 140ms, on state switch
+   ============================================================ */
+.stage { display: none; }
+.stage.active { display: block; }
+
+/* ============================================================
+   LAYOUT — desktop 1280 + mobile 375 side-by-side
+   ============================================================ */
+.viewports {
+  display: grid;
+  gap: 32px;
+  padding: 28px 20px 56px;
+  /* Centering a fixed-width track overflows BOTH sides once the pane is
+     narrower than the frame, and you can only ever scroll right — so the
+     left edge becomes unreachable. `safe center` centers while the frame
+     fits and falls back to start alignment when it overflows; the plain
+     `start` above is the fallback for engines without `safe`. */
+  justify-content: start;
+  justify-content: safe center;
+  align-items: start;
+}
+/* One viewport visible at a time — sized to the chosen breakpoint */
+/* Frame widths track the design system's Tamagui media tokens
+   (see Breakpoints in the DS): $xxs 0–659 · $xs 660–799 ·
+   $sm 800–859 · $md 860–979 · $lg 980–1119 · $xl 1120–1279 ·
+   $xxl 1280+. We frame one representative width per layout
+   change rather than one per token — $xxs/$xs and $sm/$md share
+   a layout, as do $xl/$xxl. */
+body[data-viewport="mobile"]  .viewports { grid-template-columns: 405px; }
+body[data-viewport="tablet"]  .viewports { grid-template-columns: 860px; }
+body[data-viewport="land"]    .viewports { grid-template-columns: 980px; }
+body[data-viewport="desktop"] .viewports { grid-template-columns: 1280px; }
+body[data-viewport="wide"]    .viewports { grid-template-columns: 1440px; }
+/* Hide the inactive viewport frame for each size. Mobile shows the
+   dedicated phone layout; tablet/desktop/wide reuse the .vp-desktop
+   content and let container queries adapt the internal layout. */
+body[data-viewport="mobile"] .vp-desktop { display: none; }
+body:not([data-viewport="mobile"]) .vp-mobile { display: none; }
+
+.viewport {
+  background: var(--bg-page);
+  /* Outline, not border: the frame hairline must not consume
+     inline size, or every container query lands 2px short of
+     its nominal breakpoint. */
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  /* Gutter strip at the top of the frame so the size label has its
+     own space instead of sitting on top of the app's nav bar. */
+  padding-top: 24px;
+}
+/* Frame caption size prefix is driven by the active breakpoint —
+   the .vp-desktop frame is shared by tablet/desktop/wide. */
+body[data-viewport="tablet"]  .vp-size::before { content: "Tablet portrait · 860 · $md"; }
+body[data-viewport="land"]    .vp-size::before { content: "Tablet landscape · 980 · $lg"; }
+body[data-viewport="desktop"] .vp-size::before { content: "Desktop · 1280 · $xxl"; }
+body[data-viewport="wide"]    .vp-size::before { content: "Wide · 1440 · $xxl"; }
+.viewport-chrome {
+  position: absolute; top: 7px; left: 14px;
+  font-family: var(--f-display); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-mute);
+  pointer-events: none; z-index: 2;
+}
+/* .vp-desktop is a responsive container; its width comes from the
+   parent .viewports grid track (set by body[data-viewport]). The
+   internal layout adapts via @container queries below. */
+.vp-desktop {
+  width: 100%;
+  container-type: inline-size;
+  container-name: vp;
+}
+.vp-mobile  { width: 405px; }
+
+/* ── Container-query adaptations for .vp-desktop are defined
+   at the END of this stylesheet so they win specificity against
+   the base .board / .rail / .player-grid rules below. ── */
+
+/* ============================================================
+   COMMENTARY / NOTES (right-hand annotation rail — dev-only)
+   The mockup is a communication tool: we surface a small
+   "design note" tile below each viewport so reviewers see the
+   intent inline without having to read comments in source.
+   ============================================================ */
+.viewport-note {
+  max-width: 1280px;
+  margin: 10px auto 0;
+  padding: 10px 14px;
+  font-family: var(--f-body);
+  font-size: 12px;
+  color: var(--text-mute);
+  border-left: 1px solid var(--border);
+  font-style: italic;
+  max-width: 70ch;
+}
+

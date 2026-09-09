@@ -1,0 +1,363 @@
+<!-- @intent production surface="draft-room" note="Draft Board view — component prototype extracted from DraftRoom.html" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Draft Board view · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="../styles/harness.css" />
+<link rel="stylesheet" href="../styles/board.css" />
+<link rel="stylesheet" href="../styles/states.css" />
+<link rel="stylesheet" href="../styles/mobile.css" />
+<link rel="stylesheet" href="../styles/adaptive.css" />
+</head>
+<body data-viewport="desktop" data-role="member" data-sport="baseball" data-vp-base="../">
+<div class="state-switcher">
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="populated">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Draft Board view</div>
+      <div class="board" style="grid-template-columns:minmax(0,1fr);">
+        <section class="main">
+          <div class="view-tabs" role="tablist" aria-label="Player view">
+            <a href="../DraftRoom.html" data-view="cards" role="tab"><span class="glyph">▦</span>Cards</a>
+            <a href="PlayerTable.html" data-view="table" role="tab"><span class="glyph">≡</span>Data Table</a>
+            <a href="DraftGrid.html" class="active" data-view="board" role="tab"><span class="glyph">⊞</span>Draft Board</a>
+            <a href="DepthChart.html" data-view="depth" role="tab"><span class="glyph">▤</span>My Depth Chart</a>
+          </div>
+          <div class="view-pane active" data-view="board">
+            <div class="result-meta" style="padding:2px;">
+              <span><span data-sport="baseball">Snake draft · 12 teams · 23 rounds · 42 of 276 picks made</span><span data-sport="football">Snake draft · 12 teams · 16 rounds · 42 of 192 picks made</span></span>
+              <span class="right">Round 4 · Pick 6 — on the clock</span>
+            </div>
+
+            <div class="board-timeline" data-sport="baseball">
+              <div class="tl-clock">
+                <div>
+                  <div class="eyebrow">You're on the clock · Pick #42</div>
+                  <div class="team">Sandlot Dreamers</div>
+                  <div class="sub">Round 4 · Pick 6 of 12 · You · Online</div>
+                </div>
+                <div class="tl-ring">
+                  <svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="#1E2D45" stroke-width="4"/><circle cx="23" cy="23" r="19" fill="none" stroke="#C5A55A" stroke-width="4" stroke-linecap="round" stroke-dasharray="119.4" stroke-dashoffset="57" transform="rotate(-90 23 23)"/></svg>
+                  <div class="t num">0:47</div>
+                </div>
+              </div>
+              <p class="tl-note">Full grid is a $gtLg layout. Below that the board reads as a round-by-round timeline — the same picks, ordered by time instead of by team.</p>
+          <div class="tl-round open">
+            <button class="tl-hd"><span class="r">Round 4</span><span class="c">5 of 12 picks</span><span class="chev">▾</span></button>
+            <div class="tl-picks">
+              <div class="tl-pick" data-pos="2B"><span class="n num">#37</span><span class="tm">BB</span><div class="pl"><div class="nm">Rod Carew</div><div class="mt">2B · Bronx Bombers</div></div><span class="pos">2B</span></div>
+              <div class="tl-pick" data-pos="OF"><span class="n num">#38</span><span class="tm">SW</span><div class="pl"><div class="nm">Tony Gwynn</div><div class="mt">OF · Sandlot Swingers</div></div><span class="pos">OF</span></div>
+              <div class="tl-pick" data-pos="3B"><span class="n num">#39</span><span class="tm">CT</span><div class="pl"><div class="nm">George Brett</div><div class="mt">3B · Chi-Town</div></div><span class="pos">3B</span></div>
+              <div class="tl-pick" data-pos="3B"><span class="n num">#40</span><span class="tm">DL</span><div class="pl"><div class="nm">Wade Boggs</div><div class="mt">3B · Dead Ball Legends</div></div><span class="pos">3B</span></div>
+              <div class="tl-pick" data-pos="1B"><span class="n num">#41</span><span class="tm">FF</span><div class="pl"><div class="nm">Tony Pérez</div><div class="mt">1B · Fenway Faithful</div></div><span class="pos">1B</span></div>
+              <div class="tl-pick now"><span class="n num">#42</span><span class="tm">SD</span><div class="pl"><div class="nm">On the clock</div><div class="mt">Sandlot Dreamers · your pick</div></div><span class="pos">0:47</span></div>
+              <div class="tl-pick up"><span class="n num">#43</span><span class="tm">IH</span><div class="pl"><div class="nm">—</div><div class="mt">Iron Horse Club</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#44</span><span class="tm">PL</span><div class="pl"><div class="nm">—</div><div class="mt">Pinstripe Legacy</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#45</span><span class="tm">OB</span><div class="pl"><div class="nm">—</div><div class="mt">Old Ball Game</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#46</span><span class="tm">SPS</span><div class="pl"><div class="nm">—</div><div class="mt">Splendid Swings</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#47</span><span class="tm">CF</span><div class="pl"><div class="nm">—</div><div class="mt">Cooperstown FC</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#48</span><span class="tm">GE</span><div class="pl"><div class="nm">—</div><div class="mt">Golden Era</div></div><span class="pos"></span></div>
+            </div>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 3</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 2</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 1</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+            </div>
+            <div class="board-timeline" data-sport="football">
+              <div class="tl-clock">
+                <div>
+                  <div class="eyebrow">You're on the clock · Pick #42</div>
+                  <div class="team">Sunday Captains</div>
+                  <div class="sub">Round 4 · Pick 6 of 12 · You · Online</div>
+                </div>
+                <div class="tl-ring">
+                  <svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="#1E2D45" stroke-width="4"/><circle cx="23" cy="23" r="19" fill="none" stroke="#C5A55A" stroke-width="4" stroke-linecap="round" stroke-dasharray="119.4" stroke-dashoffset="57" transform="rotate(-90 23 23)"/></svg>
+                  <div class="t num">0:47</div>
+                </div>
+              </div>
+              <p class="tl-note">Full grid is a $gtLg layout. Below that the board reads as a round-by-round timeline — the same picks, ordered by time instead of by team.</p>
+          <div class="tl-round open">
+            <button class="tl-hd"><span class="r">Round 4</span><span class="c">5 of 12 picks</span><span class="chev">▾</span></button>
+            <div class="tl-picks">
+              <div class="tl-pick" data-pos="DEF"><span class="n num">#37</span><span class="tm">SCC</span><div class="pl"><div class="nm">Mel Blount</div><div class="mt">DEF · Steel Curtain Crew</div></div><span class="pos">DEF</span></div>
+              <div class="tl-pick" data-pos="RB"><span class="n num">#38</span><span class="tm">FT</span><div class="pl"><div class="nm">Marcus Allen</div><div class="mt">RB · Frozen Tundra</div></div><span class="pos">RB</span></div>
+              <div class="tl-pick" data-pos="QB"><span class="n num">#39</span><span class="tm">MOM</span><div class="pl"><div class="nm">Lamar Jackson</div><div class="mt">QB · Monsters of Midway</div></div><span class="pos">QB</span></div>
+              <div class="tl-pick" data-pos="QB"><span class="n num">#40</span><span class="tm">GG</span><div class="pl"><div class="nm">Russell Wilson</div><div class="mt">QB · Greatest Generation</div></div><span class="pos">QB</span></div>
+              <div class="tl-pick" data-pos="WR"><span class="n num">#41</span><span class="tm">TMD</span><div class="pl"><div class="nm">Don Hutson</div><div class="mt">WR · Two-Minute Drill</div></div><span class="pos">WR</span></div>
+              <div class="tl-pick now"><span class="n num">#42</span><span class="tm">SUN</span><div class="pl"><div class="nm">On the clock</div><div class="mt">Sunday Captains · your pick</div></div><span class="pos">0:47</span></div>
+              <div class="tl-pick up"><span class="n num">#43</span><span class="tm">IRH</span><div class="pl"><div class="nm">—</div><div class="mt">Iron Helmets</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#44</span><span class="tm">CM</span><div class="pl"><div class="nm">—</div><div class="mt">Cleat Marks</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#45</span><span class="tm">GLS</span><div class="pl"><div class="nm">—</div><div class="mt">Goal Line Stand</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#46</span><span class="tm">HMH</span><div class="pl"><div class="nm">—</div><div class="mt">Hash Mark Heroes</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#47</span><span class="tm">CAN</span><div class="pl"><div class="nm">—</div><div class="mt">Canton Calling</div></div><span class="pos"></span></div>
+              <div class="tl-pick up"><span class="n num">#48</span><span class="tm">LOM</span><div class="pl"><div class="nm">—</div><div class="mt">Lombardi Trophy</div></div><span class="pos"></span></div>
+            </div>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 3</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 2</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+          <div class="tl-round">
+            <button class="tl-hd"><span class="r">Round 1</span><span class="c">12 picks</span><span class="chev">▸</span></button>
+          </div>
+            </div>
+            <div class="board-grid" data-sport="baseball">
+              <div class="tbl">
+                <!-- Header row: round label cell + 12 team columns -->
+                <div></div>
+                <div class="th-team">Bronx Bombers</div>
+                <div class="th-team">Sandlot Swingers</div>
+                <div class="th-team">Chi-Town</div>
+                <div class="th-team">Dead Ball Legends</div>
+                <div class="th-team">Fenway Faithful</div>
+                <div class="th-team me">★ Sandlot Dreamers</div>
+                <div class="th-team">Iron Horse Club</div>
+                <div class="th-team">Pinstripe Legacy</div>
+                <div class="th-team">Old Ball Game</div>
+                <div class="th-team">Splendid Swings</div>
+                <div class="th-team">Cooperstown FC</div>
+                <div class="th-team">Golden Era</div>
+
+                <!-- Round 1 (snake: L→R) -->
+                <div class="th-round">R1</div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.01</div><div class="pname">Babe Ruth</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.02</div><div class="pname">Barry Bonds</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.03</div><div class="pname">Willie Mays</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.04</div><div class="pname">Ted Williams</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">1.05</div><div class="pname">Cy Young</div></div><div class="pos">P</div></div>
+                <div class="cell me" data-pos="C"><div><div class="num">1.06</div><div class="pname">Yogi Berra</div></div><div class="pos">C</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">1.07</div><div class="pname">Roger Clemens</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="3B"><div><div class="num">1.08</div><div class="pname">Alex Rodriguez</div></div><div class="pos">3B</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.09</div><div class="pname">Mickey Mantle</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">1.10</div><div class="pname">Randy Johnson</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="SS"><div><div class="num">1.11</div><div class="pname">Cal Ripken Jr.</div></div><div class="pos">SS</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">1.12</div><div class="pname">Joe DiMaggio</div></div><div class="pos">OF</div></div>
+
+                <!-- Round 2 (snake: R→L, but visually still L→R with pick numbers) -->
+                <div class="th-round">R2</div>
+                <div class="cell" data-pos="OF"><div><div class="num">2.24</div><div class="pname">Frank Robinson</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">2.23</div><div class="pname">Tom Seaver</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">2.22</div><div class="pname">Nolan Ryan</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">2.21</div><div class="pname">Rickey Henderson</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">2.20</div><div class="pname">Mike Trout</div></div><div class="pos">OF</div></div>
+                <div class="cell me" data-pos="P"><div><div class="num">2.19</div><div class="pname">Pedro Martínez</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">2.18</div><div class="pname">Sandy Koufax</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">2.17</div><div class="pname">Ken Griffey Jr.</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">2.16</div><div class="pname">Warren Spahn</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">2.15</div><div class="pname">Tris Speaker</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="3B"><div><div class="num">2.14</div><div class="pname">Eddie Mathews</div></div><div class="pos">3B</div></div>
+                <div class="cell" data-pos="SS"><div><div class="num">2.13</div><div class="pname">Derek Jeter</div></div><div class="pos">SS</div></div>
+
+                <!-- Round 3 -->
+                <div class="th-round">R3</div>
+                <div class="cell" data-pos="P"><div><div class="num">3.25</div><div class="pname">Walter Johnson</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">3.26</div><div class="pname">Christy Mathewson</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">3.27</div><div class="pname">Mel Ott</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="2B"><div><div class="num">3.28</div><div class="pname">Jackie Robinson</div></div><div class="pos">2B</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">3.29</div><div class="pname">Stan Musial</div></div><div class="pos">OF</div></div>
+                <div class="cell me" data-pos="OF"><div><div class="num">3.30</div><div class="pname">Willie Mays</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="SS"><div><div class="num">3.31</div><div class="pname">Ozzie Smith</div></div><div class="pos">SS</div></div>
+                <div class="cell" data-pos="1B"><div><div class="num">3.32</div><div class="pname">Albert Pujols</div></div><div class="pos">1B</div></div>
+                <div class="cell" data-pos="P"><div><div class="num">3.33</div><div class="pname">Bob Gibson</div></div><div class="pos">P</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">3.34</div><div class="pname">Roberto Clemente</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">3.35</div><div class="pname">Carl Yastrzemski</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="C"><div><div class="num">3.36</div><div class="pname">Johnny Bench</div></div><div class="pos">C</div></div>
+
+                <!-- Round 4 — in progress -->
+                <div class="th-round">R4</div>
+                <div class="cell" data-pos="2B"><div><div class="num">4.37</div><div class="pname">Rod Carew</div></div><div class="pos">2B</div></div>
+                <div class="cell" data-pos="OF"><div><div class="num">4.38</div><div class="pname">Tony Gwynn</div></div><div class="pos">OF</div></div>
+                <div class="cell" data-pos="3B"><div><div class="num">4.39</div><div class="pname">George Brett</div></div><div class="pos">3B</div></div>
+                <div class="cell" data-pos="3B"><div><div class="num">4.40</div><div class="pname">Wade Boggs</div></div><div class="pos">3B</div></div>
+                <div class="cell" data-pos="1B"><div><div class="num">4.41</div><div class="pname">Tony Pérez</div></div><div class="pos">1B</div></div>
+                <div class="cell current"><div><div class="num">4.42</div><div class="pname">On the clock…</div></div><div class="pos">0:47</div></div>
+                <div class="cell empty"><div><div class="num">4.43</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.44</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.45</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.46</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.47</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.48</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+
+                <!-- Round 5 stub to convey the grid continues -->
+                <div class="th-round">R5</div>
+                <div class="cell empty" style="grid-column: 2 / span 12; justify-content:center; align-items:center;">
+                  <div style="color:var(--text-mute);font-family:var(--f-body);font-style:italic;font-size:12px;">Rounds 5–23 unlock as picks happen · Scroll ↓</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── FOOTBALL DRAFT BOARD — same snake grid, NFL teams + players ── -->
+            <div class="board-grid" data-sport="football">
+              <div class="tbl">
+                <!-- 12 teams, 16 rounds, snake — visually L→R with reversed pick numbers on even rounds -->
+                <div></div>
+                <div class="th-team">Steel Curtain Crew</div>
+                <div class="th-team">Frozen Tundra</div>
+                <div class="th-team">Monsters of Midway</div>
+                <div class="th-team">Greatest Generation</div>
+                <div class="th-team">Two-Minute Drill</div>
+                <div class="th-team me">★ Sunday Captains</div>
+                <div class="th-team">Iron Helmets</div>
+                <div class="th-team">Cleat Marks</div>
+                <div class="th-team">Goal Line Stand</div>
+                <div class="th-team">Hash Mark Heroes</div>
+                <div class="th-team">Canton Calling</div>
+                <div class="th-team">Lombardi Trophy</div>
+
+                <!-- Round 1 (L→R) — the legends go fast -->
+                <div class="th-round">R1</div>
+                <div class="cell" data-pos="QB"><div><div class="num">1.01</div><div class="pname">Tom Brady</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">1.02</div><div class="pname">Jerry Rice</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">1.03</div><div class="pname">Jim Brown</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">1.04</div><div class="pname">Patrick Mahomes</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">1.05</div><div class="pname">Peyton Manning</div></div><div class="pos">QB</div></div>
+                <div class="cell me" data-pos="QB"><div><div class="num">1.06</div><div class="pname">Joe Montana</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">1.07</div><div class="pname">Walter Payton</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">1.08</div><div class="pname">Lawrence Taylor</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">1.09</div><div class="pname">Aaron Donald</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">1.10</div><div class="pname">Barry Sanders</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">1.11</div><div class="pname">Calvin Johnson</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="TE"><div><div class="num">1.12</div><div class="pname">Rob Gronkowski</div></div><div class="pos">TE</div></div>
+
+                <!-- Round 2 (snake reverses — pick numbers go 2.24 → 2.13 visually L→R) -->
+                <div class="th-round">R2</div>
+                <div class="cell" data-pos="QB"><div><div class="num">2.24</div><div class="pname">Aaron Rodgers</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">2.23</div><div class="pname">Drew Brees</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">2.22</div><div class="pname">Reggie White</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">2.21</div><div class="pname">Brett Favre</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">2.20</div><div class="pname">L. Tomlinson</div></div><div class="pos">RB</div></div>
+                <div class="cell me" data-pos="DEF"><div><div class="num">2.19</div><div class="pname">Bruce Smith</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">2.18</div><div class="pname">Cris Carter</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">2.17</div><div class="pname">Steve Young</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="TE"><div><div class="num">2.16</div><div class="pname">Anthony Muñoz</div></div><div class="pos">TE</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">2.15</div><div class="pname">Joe Greene</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">2.14</div><div class="pname">Ronnie Lott</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">2.13</div><div class="pname">Earl Campbell</div></div><div class="pos">RB</div></div>
+
+                <!-- Round 3 (L→R again) -->
+                <div class="th-round">R3</div>
+                <div class="cell" data-pos="RB"><div><div class="num">3.25</div><div class="pname">Eric Dickerson</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">3.26</div><div class="pname">Terry Bradshaw</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">3.27</div><div class="pname">Ray Lewis</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">3.28</div><div class="pname">Curtis Martin</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="TE"><div><div class="num">3.29</div><div class="pname">Antonio Gates</div></div><div class="pos">TE</div></div>
+                <div class="cell me" data-pos="WR"><div><div class="num">3.30</div><div class="pname">M. Harrison</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">3.31</div><div class="pname">L. Fitzgerald</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="DEF"><div><div class="num">3.32</div><div class="pname">Champ Bailey</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">3.33</div><div class="pname">Steve Largent</div></div><div class="pos">WR</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">3.34</div><div class="pname">Tony Dorsett</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="TE"><div><div class="num">3.35</div><div class="pname">Joe Thomas</div></div><div class="pos">TE</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">3.36</div><div class="pname">Roger Staubach</div></div><div class="pos">QB</div></div>
+
+                <!-- Round 4 — in progress -->
+                <div class="th-round">R4</div>
+                <div class="cell" data-pos="DEF"><div><div class="num">4.37</div><div class="pname">Mel Blount</div></div><div class="pos">DEF</div></div>
+                <div class="cell" data-pos="RB"><div><div class="num">4.38</div><div class="pname">Marcus Allen</div></div><div class="pos">RB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">4.39</div><div class="pname">Lamar Jackson</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="QB"><div><div class="num">4.40</div><div class="pname">Russell Wilson</div></div><div class="pos">QB</div></div>
+                <div class="cell" data-pos="WR"><div><div class="num">4.41</div><div class="pname">Don Hutson</div></div><div class="pos">WR</div></div>
+                <div class="cell current"><div><div class="num">4.42</div><div class="pname">On the clock…</div></div><div class="pos">0:47</div></div>
+                <div class="cell empty"><div><div class="num">4.43</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.44</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.45</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.46</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.47</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+                <div class="cell empty"><div><div class="num">4.48</div><div class="pname" style="color:var(--text-mute);">—</div></div><div class="pos"></div></div>
+
+                <div class="th-round">R5</div>
+                <div class="cell empty" style="grid-column: 2 / span 12; justify-content:center; align-items:center;">
+                  <div style="color:var(--text-mute);font-family:var(--f-body);font-style:italic;font-size:12px;">Rounds 5–16 unlock as picks happen · Scroll ↓</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Player dock — collapsed to a bar so the grid owns the
+                 view; the CTA or the chevron slides the list up. -->
+            <div class="bd-dock" data-open="false">
+              <div class="bar">
+                <div>
+                  <div class="lbl">Your pick · #42</div>
+                  <div class="sub"><span data-sport="baseball">1,148 available · open slots: 1B, SS</span><span data-sport="football">742 available · open slots: RB, WR</span></div>
+                </div>
+                <div class="spacer"></div>
+                <span class="sub">0:47 left</span>
+                <button class="cta" data-dock-toggle>Pick a player</button>
+                <button class="chev" data-dock-toggle aria-label="Toggle player list">▴</button>
+              </div>
+              <div class="body">
+                <div class="inner">
+                  <div class="tools">
+                    <input type="text" placeholder="Search available players…" />
+                    <button class="chip on">MY NEEDS</button>
+                    <button class="chip">ALL</button>
+                    <span data-sport="baseball" style="display:contents;"><button class="chip">C</button><button class="chip">1B</button><button class="chip">SS</button><button class="chip">OF</button><button class="chip">P</button></span>
+                    <span data-sport="football" style="display:contents;"><button class="chip">QB</button><button class="chip">RB</button><button class="chip">WR</button><button class="chip">TE</button><button class="chip">DEF</button></span>
+                  </div>
+                  <div class="rows" data-sport="baseball">
+                    <div class="prow fits"><div class="rk">14</div><div><div class="nm">Lou Gehrig</div><div class="mt">1B · NYY · 1923–39 · .340 AVG</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">45</div><div><div class="nm">Ernie Banks</div><div class="mt">SS · CHC · 1953–71 · 512 HR</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">15</div><div><div class="nm">Rogers Hornsby</div><div class="mt">2B · STL · 1915–37 · .358 AVG</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">41</div><div><div class="nm">Greg Maddux</div><div class="mt">P · ATL · 1986–08 · 355 W</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">43</div><div><div class="nm">Jimmie Foxx</div><div class="mt">1B · PHA · 1925–45 · 534 HR</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">47</div><div><div class="nm">Mike Piazza</div><div class="mt">C · NYM · 1992–07 · 427 HR</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">49</div><div><div class="nm">Robin Yount</div><div class="mt">SS · MIL · 1974–93 · 3,142 H</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">50</div><div><div class="nm">Steve Carlton</div><div class="mt">P · PHI · 1965–88 · 329 W</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">53</div><div><div class="nm">Mike Schmidt</div><div class="mt">3B · PHI · 1972–89 · 548 HR</div></div><button class="go">DRAFT</button></div>
+                  </div>
+                  <div class="rows" data-sport="football">
+                    <div class="prow fits"><div class="rk">14</div><div><div class="nm">Emmitt Smith</div><div class="mt">RB · DAL · 1990–04 · 18,355 YDS</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">25</div><div><div class="nm">Randy Moss</div><div class="mt">WR · MIN · 1998–12 · 156 TD</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">23</div><div><div class="nm">Adrian Peterson</div><div class="mt">RB · MIN · 2007–21 · 14,918 YDS</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">32</div><div><div class="nm">Terrell Owens</div><div class="mt">WR · SFO · 1996–10 · 153 TD</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">43</div><div><div class="nm">Deion Sanders</div><div class="mt">DEF · DAL · 1989–05 · 53 INT</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">45</div><div><div class="nm">Travis Kelce</div><div class="mt">TE · KAN · 2013– · 12,151 YDS</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">47</div><div><div class="nm">John Elway</div><div class="mt">QB · DEN · 1983–98 · 300 TD</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow"><div class="rk">60</div><div><div class="nm">Justin Tucker</div><div class="mt">K · BAL · 2012– · 90.2 FG%</div></div><button class="go">DRAFT</button></div>
+                    <div class="prow fits"><div class="rk">62</div><div><div class="nm">Tony Gonzalez</div><div class="mt">TE · ATL · 1997–13 · 111 TD</div></div><button class="go">DRAFT</button></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div><!-- /board pane -->
+        </section>
+      </div>
+    </div>
+  </div>
+
+</section>
+<script src="../scripts/draft.js"></script>
+</body>
+</html>

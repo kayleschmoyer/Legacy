@@ -1,0 +1,404 @@
+<!-- @intent production surface="draft-room" note="Data Table view — component prototype extracted from DraftRoom.html" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Data Table view · Legacy Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="../styles/harness.css" />
+<link rel="stylesheet" href="../styles/board.css" />
+<link rel="stylesheet" href="../styles/states.css" />
+<link rel="stylesheet" href="../styles/mobile.css" />
+<link rel="stylesheet" href="../styles/adaptive.css" />
+</head>
+<body data-viewport="desktop" data-role="member" data-sport="baseball" data-vp-base="../">
+<div class="state-switcher">
+  <span class="label" style="margin-left:8px;">Role</span>
+  <div class="group role-toggle" id="role-group">
+    <button data-role="member" class="active">Member</button>
+    <button data-role="commissioner">Commissioner</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Sport</span>
+  <div class="group sport-toggle" id="sport-group">
+    <button data-sport="baseball" class="active">Baseball</button>
+    <button data-sport="football">Football</button>
+  </div>
+  <span class="label" style="margin-left:8px;">Viewport</span>
+  <div class="group viewport-toggle" id="vp-group">
+    <button data-vp="mobile">375 · $xxs</button>
+    <button data-vp="tablet">860 · $md</button>
+    <button data-vp="land">980 · $lg</button>
+    <button data-vp="desktop">1280 · $xxl</button>
+    <button data-vp="wide">1440 · $xxl</button>
+  </div>
+</div>
+<section class="stage active" data-stage="populated">
+  <div class="viewports">
+    <div class="viewport vp-desktop">
+      <div class="viewport-chrome"><span class="vp-size"></span> · Data Table view</div>
+      <div class="board" style="grid-template-columns:minmax(0,1fr);">
+        <section class="main">
+          <div class="view-tabs" role="tablist" aria-label="Player view">
+            <a href="../DraftRoom.html" data-view="cards" role="tab"><span class="glyph">▦</span>Cards</a>
+            <a href="PlayerTable.html" class="active" data-view="table" role="tab"><span class="glyph">≡</span>Data Table</a>
+            <a href="DraftGrid.html" data-view="board" role="tab"><span class="glyph">⊞</span>Draft Board</a>
+            <a href="DepthChart.html" data-view="depth" role="tab"><span class="glyph">▤</span>My Depth Chart</a>
+          </div>
+          <div class="view-pane active" data-view="table">
+            <div class="toolbar">
+              <label class="search">
+                <span class="glyph" aria-hidden="true">⌕</span>
+                <input type="text" placeholder="Search all players…" />
+              </label>
+              <button class="toggle on" role="switch" aria-checked="true">
+                <span class="sw"></span>Available only
+              </button>
+            </div>
+            <div class="data-table" data-sport="baseball">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:40px;">#</th>
+                    <th style="width:60px;">Pos</th>
+                    <th>Player</th>
+                    <th>Team</th>
+                    <th>Career</th>
+                    <th class="num sorted">ADP <span class="sort-ind">▲</span></th>
+                    <th class="num">AVG <span class="sort-ind">▲▼</span></th>
+                    <th class="num">HR <span class="sort-ind">▲▼</span></th>
+                    <th class="num">RBI <span class="sort-ind">▲▼</span></th>
+                    <th class="num">SB <span class="sort-ind">▲▼</span></th>
+                    <th class="num">WAR <span class="sort-ind">▲▼</span></th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="num">1</td>
+                    <td><span class="pill pill-OF">OF</span></td>
+                    <td><span class="tbl-name">Babe Ruth</span></td>
+                    <td>NYY</td>
+                    <td class="tbl-span">1914–1935</td>
+                    <td class="num">1</td>
+                    <td class="num">.342</td>
+                    <td class="num">714</td>
+                    <td class="num">2,214</td>
+                    <td class="num">123</td>
+                    <td class="num">182.6</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">2</td>
+                    <td><span class="pill pill-OF">OF</span></td>
+                    <td><span class="tbl-name">Barry Bonds</span></td>
+                    <td>SF</td>
+                    <td class="tbl-span">1986–2007</td>
+                    <td class="num">2</td>
+                    <td class="num">.298</td>
+                    <td class="num">762</td>
+                    <td class="num">1,996</td>
+                    <td class="num">514</td>
+                    <td class="num">162.8</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr class="taken">
+                    <td class="num">3</td>
+                    <td><span class="pill pill-OF">OF</span></td>
+                    <td><span class="tbl-name">Willie Mays</span></td>
+                    <td>SF</td>
+                    <td class="tbl-span">1951–1973</td>
+                    <td class="num">3</td>
+                    <td class="num">.301</td>
+                    <td class="num">660</td>
+                    <td class="num">1,909</td>
+                    <td class="num">338</td>
+                    <td class="num">156.1</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="num">4</td>
+                    <td><span class="pill pill-OF">OF</span><span class="alt" style="margin-left:4px;font-size:10px;color:var(--text-mute);">/1B</span></td>
+                    <td><span class="tbl-name">Ted Williams</span></td>
+                    <td>BOS</td>
+                    <td class="tbl-span">1939–1960</td>
+                    <td class="num">4</td>
+                    <td class="num">.344</td>
+                    <td class="num">521</td>
+                    <td class="num">1,839</td>
+                    <td class="num">24</td>
+                    <td class="num">121.9</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">5</td>
+                    <td><span class="pill pill-P">P</span></td>
+                    <td><span class="tbl-name">Cy Young</span></td>
+                    <td>CLE</td>
+                    <td class="tbl-span">1890–1911</td>
+                    <td class="num">5</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">168.4</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">6</td>
+                    <td><span class="pill pill-P">P</span></td>
+                    <td><span class="tbl-name">Roger Clemens</span></td>
+                    <td>BOS</td>
+                    <td class="tbl-span">1984–2007</td>
+                    <td class="num">6</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">139.2</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">7</td>
+                    <td><span class="pill pill-OF">OF</span></td>
+                    <td><span class="tbl-name">Ty Cobb</span></td>
+                    <td>DET</td>
+                    <td class="tbl-span">1905–1928</td>
+                    <td class="num">7</td>
+                    <td class="num">.366</td>
+                    <td class="num">117</td>
+                    <td class="num">1,944</td>
+                    <td class="num">897</td>
+                    <td class="num">151.5</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">8</td>
+                    <td><span class="pill pill-3B">3B</span><span class="alt" style="margin-left:4px;font-size:10px;color:var(--text-mute);">/SS</span></td>
+                    <td><span class="tbl-name">Alex Rodriguez</span></td>
+                    <td>NYY</td>
+                    <td class="tbl-span">1994–2016</td>
+                    <td class="num">8</td>
+                    <td class="num">.295</td>
+                    <td class="num">696</td>
+                    <td class="num">2,086</td>
+                    <td class="num">329</td>
+                    <td class="num">117.5</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">9</td>
+                    <td><span class="pill pill-1B">1B</span><span class="alt" style="margin-left:4px;font-size:10px;color:var(--text-mute);">/OF</span></td>
+                    <td><span class="tbl-name">Lou Gehrig</span></td>
+                    <td>NYY</td>
+                    <td class="tbl-span">1923–1939</td>
+                    <td class="num">14</td>
+                    <td class="num">.340</td>
+                    <td class="num">493</td>
+                    <td class="num">1,995</td>
+                    <td class="num">102</td>
+                    <td class="num">114.1</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">10</td>
+                    <td><span class="pill pill-2B">2B</span><span class="alt" style="margin-left:4px;font-size:10px;color:var(--text-mute);">/SS</span></td>
+                    <td><span class="tbl-name">Rogers Hornsby</span></td>
+                    <td>STL</td>
+                    <td class="tbl-span">1915–1937</td>
+                    <td class="num">15</td>
+                    <td class="num">.358</td>
+                    <td class="num">301</td>
+                    <td class="num">1,584</td>
+                    <td class="num">135</td>
+                    <td class="num">127.1</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- ── FOOTBALL DATA TABLE — same shape, NFL stat columns ── -->
+            <div class="data-table" data-sport="football">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:40px;">#</th>
+                    <th style="width:60px;">Pos</th>
+                    <th>Player</th>
+                    <th>Team</th>
+                    <th>Career</th>
+                    <th class="num sorted">ADP <span class="sort-ind">▲</span></th>
+                    <th class="num">YDS <span class="sort-ind">▲▼</span></th>
+                    <th class="num">TD <span class="sort-ind">▲▼</span></th>
+                    <th class="num">PB <span class="sort-ind">▲▼</span></th>
+                    <th class="num">AP <span class="sort-ind">▲▼</span></th>
+                    <th class="num">AV <span class="sort-ind">▲▼</span></th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="taken">
+                    <td class="num">1</td>
+                    <td><span class="pill pill-QB">QB</span></td>
+                    <td><span class="tbl-name">Tom Brady</span></td>
+                    <td>NE/TB</td>
+                    <td class="tbl-span">2000–2022</td>
+                    <td class="num">1</td>
+                    <td class="num">89,214</td>
+                    <td class="num">649</td>
+                    <td class="num">15</td>
+                    <td class="num">3</td>
+                    <td class="num">313</td>
+                    <td></td>
+                  </tr>
+                  <tr class="taken">
+                    <td class="num">2</td>
+                    <td><span class="pill pill-WR">WR</span></td>
+                    <td><span class="tbl-name">Jerry Rice</span></td>
+                    <td>SF</td>
+                    <td class="tbl-span">1985–2004</td>
+                    <td class="num">2</td>
+                    <td class="num">22,895</td>
+                    <td class="num">208</td>
+                    <td class="num">13</td>
+                    <td class="num">10</td>
+                    <td class="num">192</td>
+                    <td></td>
+                  </tr>
+                  <tr class="taken">
+                    <td class="num">3</td>
+                    <td><span class="pill pill-RB">RB</span></td>
+                    <td><span class="tbl-name">Jim Brown</span></td>
+                    <td>CLE</td>
+                    <td class="tbl-span">1957–1965</td>
+                    <td class="num">3</td>
+                    <td class="num">12,312</td>
+                    <td class="num">126</td>
+                    <td class="num">9</td>
+                    <td class="num">8</td>
+                    <td class="num">144</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="num">4</td>
+                    <td><span class="pill pill-QB">QB</span></td>
+                    <td><span class="tbl-name">Patrick Mahomes</span></td>
+                    <td>KC</td>
+                    <td class="tbl-span">2017–present</td>
+                    <td class="num">4</td>
+                    <td class="num">31,438</td>
+                    <td class="num">245</td>
+                    <td class="num">7</td>
+                    <td class="num">2</td>
+                    <td class="num">128</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">5</td>
+                    <td><span class="pill pill-QB">QB</span></td>
+                    <td><span class="tbl-name">Peyton Manning</span></td>
+                    <td>IND/DEN</td>
+                    <td class="tbl-span">1998–2015</td>
+                    <td class="num">5</td>
+                    <td class="num">71,940</td>
+                    <td class="num">539</td>
+                    <td class="num">14</td>
+                    <td class="num">7</td>
+                    <td class="num">271</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">6</td>
+                    <td><span class="pill pill-RB">RB</span></td>
+                    <td><span class="tbl-name">Walter Payton</span></td>
+                    <td>CHI</td>
+                    <td class="tbl-span">1975–1987</td>
+                    <td class="num">6</td>
+                    <td class="num">16,726</td>
+                    <td class="num">125</td>
+                    <td class="num">9</td>
+                    <td class="num">7</td>
+                    <td class="num">172</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">7</td>
+                    <td><span class="pill pill-QB">QB</span></td>
+                    <td><span class="tbl-name">Joe Montana</span></td>
+                    <td>SF</td>
+                    <td class="tbl-span">1979–1994</td>
+                    <td class="num">7</td>
+                    <td class="num">40,551</td>
+                    <td class="num">273</td>
+                    <td class="num">8</td>
+                    <td class="num">3</td>
+                    <td class="num">158</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">8</td>
+                    <td><span class="pill pill-DEF">DEF</span></td>
+                    <td><span class="tbl-name">Lawrence Taylor</span></td>
+                    <td>NYG</td>
+                    <td class="tbl-span">1981–1993</td>
+                    <td class="num">8</td>
+                    <td class="num">132.5</td>
+                    <td class="num">9</td>
+                    <td class="num">10</td>
+                    <td class="num">8</td>
+                    <td class="num">138</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">9</td>
+                    <td><span class="pill pill-WR">WR</span></td>
+                    <td><span class="tbl-name">Randy Moss</span></td>
+                    <td>MIN</td>
+                    <td class="tbl-span">1998–2012</td>
+                    <td class="num">14</td>
+                    <td class="num">15,292</td>
+                    <td class="num">156</td>
+                    <td class="num">6</td>
+                    <td class="num">4</td>
+                    <td class="num">115</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                  <tr>
+                    <td class="num">10</td>
+                    <td><span class="pill pill-RB">RB</span></td>
+                    <td><span class="tbl-name">Emmitt Smith</span></td>
+                    <td>DAL</td>
+                    <td class="tbl-span">1990–2004</td>
+                    <td class="num">15</td>
+                    <td class="num">18,355</td>
+                    <td class="num">164</td>
+                    <td class="num">8</td>
+                    <td class="num">4</td>
+                    <td class="num">131</td>
+                    <td><button class="btn primary tbl-draft">Draft</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty-inline" style="text-align:center;"><span data-sport="baseball">Showing 10 of 214 · Scroll or filter to see more</span><span data-sport="football">Showing 10 of 156 · Scroll or filter to see more</span></div>
+          </div><!-- /table pane -->
+
+          <!-- ───── DRAFT BOARD VIEW ─────
+               The traditional snake-draft grid: one column per team,
+               one row per round. Your column highlighted with a navy
+               header; the current on-the-clock cell glows gold. This
+               is the "league-wide" view — everyone's picks at a glance. -->
+        </section>
+      </div>
+    </div>
+  </div>
+
+</section>
+<script src="../scripts/draft.js"></script>
+</body>
+</html>
