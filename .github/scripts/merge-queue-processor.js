@@ -1524,29 +1524,122 @@ module.exports = async ({
     }
   }
 
-  // LS-9404: fetch both commits' trees and compare. A squash merge's commit
-  // tree is, by definition, identical to the tree of the head SHA it merged —
-  // any divergence means the merge landed different content than validation
-  // saw. Fails open (returns null → no mismatch reported) on any lookup
-  // error: this is a best-effort detector layered on top of an already-
-  // completed merge, not a gate, and must never throw out of performMerge.
+  // LS-9404 / LS-9969: confirm the merge landed the patch that was validated.
+  //
+  // The original detector compared the squash commit's *tree* against the head
+  // commit's tree. That premise only holds when the branch already sits at the
+  // base tip: a squash merge lands `base + PR diff`, so the moment main advances
+  // past the PR's merge-base the trees legitimately differ. With a busy queue
+  // that is every merge, which drove a ~100% false-positive rate (LS-9969).
+  //
+  // Compare the *patch* instead — the invariant a squash merge actually
+  // guarantees. Per file the PR changed, the blob that landed must equal the
+  // blob at the validated head. Files the base also changed during the queue
+  // wait are exempt: there the merge legitimately reconciles both sides, so a
+  // differing blob is expected rather than evidence of a dropped commit.
+  //
+  // Fails open (returns null → no mismatch reported) on any lookup error: this
+  // is a best-effort detector layered on top of an already-completed merge, not
+  // a gate, and must never throw out of performMerge.
   async function verifyMergedContent(pr, mergeCommitSha) {
     try {
-      const [mergedCommit, headCommit] = await Promise.all([
-        github.rest.repos.getCommit({ owner, repo, ref: mergeCommitSha }),
-        github.rest.repos.getCommit({ owner, repo, ref: pr.head.sha }),
-      ]);
-      const mergedTree = mergedCommit.data.commit.tree.sha;
-      const headTree = headCommit.data.commit.tree.sha;
-      if (mergedTree === headTree) {
+      const mergedCommit = await github.rest.repos.getCommit({
+        owner,
+        repo,
+        ref: mergeCommitSha,
+      });
+      // The squash commit's first parent is the base tip the merge landed on.
+      // Anchoring every comparison to it keeps them stable no matter how far
+      // main has advanced by the time this runs.
+      const parentSha = mergedCommit.data.parents?.[0]?.sha;
+      if (!parentSha) {
+        console.warn(
+          `⚠️ PR #${pr.number}: merge commit ${mergeCommitSha} has no parent — ` +
+            `skipping content verification`,
+        );
         return null;
       }
-      console.error(
-        `🚨 PR #${pr.number}: merge commit ${mergeCommitSha} tree (${mergedTree}) does ` +
-          `not match validated head ${pr.head.sha}'s tree (${headTree}) — the merged ` +
-          `content diverges from what was reviewed and approved (LS-9404)`,
+
+      const [validatedPatch, landedPatch] = await Promise.all([
+        // `...` resolves to merge-base(parent, head) → head: the PR's own diff.
+        github.rest.repos.compareCommitsWithBasehead({
+          owner,
+          repo,
+          basehead: `${parentSha}...${pr.head.sha}`,
+        }),
+        // parent → squash commit: exactly what the merge put on the base branch.
+        github.rest.repos.compareCommitsWithBasehead({
+          owner,
+          repo,
+          basehead: `${parentSha}...${mergeCommitSha}`,
+        }),
+      ]);
+
+      const mergeBaseSha = validatedPatch.data.merge_base_commit?.sha;
+      if (!mergeBaseSha) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not resolve the merge-base of ${pr.head.sha} ` +
+            `and ${parentSha} — skipping content verification`,
+        );
+        return null;
+      }
+
+      // Files the base branch changed while this PR sat in the queue. A squash
+      // merge folds those changes together with the PR's, so the landed blob is
+      // legitimately neither side's — exempt them from the strict check.
+      const basePatch = await github.rest.repos.compareCommitsWithBasehead({
+        owner,
+        repo,
+        basehead: `${mergeBaseSha}...${parentSha}`,
+      });
+      // The compare API caps `files` at 300 entries with no truncation flag. A
+      // truncated listing would read as "these files never landed" and escalate
+      // a perfectly good merge — the exact failure mode this change exists to
+      // remove — so fail open instead of guessing.
+      const COMPARE_FILE_CAP = 300;
+      const truncated = [validatedPatch, landedPatch, basePatch].some(
+        (c) => (c.data.files ?? []).length >= COMPARE_FILE_CAP,
       );
-      return { mergedTree, headTree };
+      if (truncated) {
+        console.warn(
+          `⚠️ PR #${pr.number}: a comparison hit the ${COMPARE_FILE_CAP}-file API cap — ` +
+            `skipping content verification rather than risk a false mismatch`,
+        );
+        return null;
+      }
+
+      const baseChanged = new Set(
+        (basePatch.data.files ?? []).map((f) => f.filename),
+      );
+
+      // Keyed by blob SHA alone, deliberately: identical blob means identical
+      // content, and `status` is not stable between the two comparisons. The
+      // landed diff carries the base's drift as well as the PR's changes, which
+      // can re-pair GitHub's rename detection and turn one `renamed` entry into
+      // an `added` + `removed` pair. The blob is unaffected by that.
+      const landed = new Map(
+        (landedPatch.data.files ?? []).map((f) => [f.filename, f.sha]),
+      );
+
+      const dropped = [];
+      for (const file of validatedPatch.data.files ?? []) {
+        if (baseChanged.has(file.filename)) continue;
+        if (landed.get(file.filename) !== file.sha) {
+          dropped.push(file.filename);
+        }
+      }
+
+      if (dropped.length === 0) {
+        return null;
+      }
+
+      console.error(
+        `🚨 PR #${pr.number}: squash commit ${mergeCommitSha} did not land the ` +
+          `validated head ${pr.head.sha}'s changes to ${dropped.length} file(s): ` +
+          `${dropped.join(', ')} — the merged content diverges from what was ` +
+          `reviewed and approved (LS-9404)`,
+      );
+      return { dropped, parentSha, mergeBaseSha };
     } catch (e) {
       console.warn(
         `⚠️ PR #${pr.number}: could not verify merged content against ${pr.head.sha}: ${e.message}`,
@@ -1634,11 +1727,13 @@ module.exports = async ({
         '`\n\n' +
         (contentMismatch
           ? '## 🚨 Merge Content Mismatch Detected (LS-9404)\n\n' +
-            `The squash-merge commit's tree (\`${contentMismatch.mergedTree}\`) does not match ` +
-            `the validated head \`${pr.head.sha}\`'s tree (\`${contentMismatch.headTree}\`). ` +
-            'The content that landed on the base branch differs from what was reviewed and ' +
-            `approved — **this merge needs immediate human review**. The \`${ARBITRATION_LABEL}\` ` +
-            'label has been applied.\n\n'
+            `The squash-merge commit did not land the validated head \`${pr.head.sha}\`'s ` +
+            `changes to the following file(s):\n\n` +
+            contentMismatch.dropped.map((f) => `- \`${f}\``).join('\n') +
+            '\n\nThese files were not touched by the base branch while this PR was queued, ' +
+            'so the merge should have landed their reviewed content verbatim. What landed ' +
+            'differs from what was reviewed and approved — **this merge needs immediate ' +
+            `human review**. The \`${ARBITRATION_LABEL}\` label has been applied.\n\n`
           : '') +
         'Thank you for your contribution! 🚀\n\n' +
         '---\n*Automated message from merge queue system*';

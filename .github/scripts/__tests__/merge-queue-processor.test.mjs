@@ -35,6 +35,15 @@ const processor = require(
 // ── Fixture helpers ──────────────────────────────────────────────────────────
 
 const HEAD_SHA = 'abc123def456abc123def456abc123def456abc123';
+// LS-9969: the base tip a squash merge lands on — the anchor for every
+// post-merge content comparison.
+const MERGE_PARENT_SHA = 'parent0000parent0000parent0000parent0000';
+
+// LS-9969: post-merge content verification issues its own compares, all of them
+// anchored to the squash commit's parent. Assertions about the pre-merge
+// staleness guard care only about the compares made during validation.
+const validationCompares = (calls) =>
+  calls.compares.filter((basehead) => !basehead.includes(MERGE_PARENT_SHA));
 
 function makePR(overrides = {}) {
   return {
@@ -117,11 +126,13 @@ function makeGithub({
   // LS-9774: when set, reRunWorkflow throws this Error instead of
   // succeeding — used to exercise the "too old to rerun" fallback path.
   reRunWorkflowError = null,
-  // LS-9404: tree SHAs served to getCommit, keyed by commit ref. Defaults to
-  // the same tree for both the merge commit ('merged-sha') and any head SHA,
-  // so existing tests see no content mismatch. Override to exercise the
-  // mismatch-detection path.
-  commitTrees = { 'merged-sha': 'same-tree', [HEAD_SHA]: 'same-tree' },
+  // LS-9404 / LS-9969: parent SHAs served to getCommit, keyed by commit ref.
+  // Post-merge content verification anchors every comparison to the squash
+  // commit's first parent (the base tip it landed on), so the merge commit
+  // needs one. Defaults leave the compare stub returning empty file lists,
+  // which reads as "nothing dropped" — override `compareResults` to exercise
+  // the mismatch-detection path.
+  commitParents = { 'merged-sha': [{ sha: MERGE_PARENT_SHA }] },
 } = {}) {
   const calls = {
     merges: [],
@@ -215,11 +226,9 @@ function makeGithub({
           calls.statuses.push(args);
           return { data: {} };
         },
-        // LS-9404: merge-commit / head-commit tree lookup (content verification)
+        // LS-9404 / LS-9969: merge-commit parent lookup (content verification)
         getCommit: async (args) => ({
-          data: {
-            commit: { tree: { sha: commitTrees[args.ref] ?? 'unknown-tree' } },
-          },
+          data: { parents: commitParents[args.ref] ?? [] },
         }),
         // LS-9662: gap comparison + merge-base fallback (staleness guard)
         compareCommitsWithBasehead: async (args) => {
@@ -2861,7 +2870,7 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
       assert.strictEqual(calls.merges.length, 1, 'should merge directly');
       assert.strictEqual(calls.updateBranch.length, 0);
       assert.deepStrictEqual(
-        calls.compares,
+        validationCompares(calls),
         [GAP_BASEHEAD],
         'gap comparison must use the CI-Gate-run base SHA (exact, not merge-base)',
       );
@@ -2995,7 +3004,7 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
       const logs = await runCapturingLogs(github);
 
       assert.deepStrictEqual(
-        calls.compares,
+        validationCompares(calls),
         [MERGE_BASE_BASEHEAD, GAP_BASEHEAD],
         'should resolve the merge-base first, then compare it against main',
       );
@@ -3095,7 +3104,11 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
       1,
       'without a manifest the guard must not change LS-4183 behavior',
     );
-    assert.strictEqual(calls.compares.length, 0, 'no API spend when skipped');
+    assert.strictEqual(
+      validationCompares(calls).length,
+      0,
+      'no API spend when skipped',
+    );
     assert.match(logs, /verdict=fail-open:manifest-unavailable/);
   });
 
@@ -3126,10 +3139,30 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
   );
 });
 
-describe('merge-queue-processor — post-merge content verification (LS-9404)', () => {
-  it('reports no mismatch and applies no arbitration label when trees match', async () => {
+describe('merge-queue-processor - post-merge content verification (LS-9404)', () => {
+  // Shorthand for the three comparisons verifyMergedContent makes, keyed the
+  // way compareCommitsWithBasehead receives them.
+  const compares = ({ validated = [], landed = [], baseDrift = [] }) => ({
+    [`${MERGE_PARENT_SHA}...${HEAD_SHA}`]: {
+      merge_base_commit: { sha: 'mergebase-sha' },
+      files: validated,
+    },
+    [`${MERGE_PARENT_SHA}...merged-sha`]: { files: landed },
+    [`mergebase-sha...${MERGE_PARENT_SHA}`]: { files: baseDrift },
+  });
+
+  const file = (filename, sha, status = 'modified') => ({
+    filename,
+    sha,
+    status,
+  });
+
+  it('applies no arbitration label when the validated patch landed intact', async () => {
     const { github, calls } = makeGithub({
-      commitTrees: { 'merged-sha': 'tree-a', [HEAD_SHA]: 'tree-a' },
+      compareResults: compares({
+        validated: [file('lib/a.ts', 'blob-a')],
+        landed: [file('lib/a.ts', 'blob-a')],
+      }),
     });
 
     await processor({
@@ -3144,7 +3177,7 @@ describe('merge-queue-processor — post-merge content verification (LS-9404)', 
     assert.strictEqual(
       calls.labels.length,
       0,
-      'matching trees should not apply needs-human-arbitration',
+      'an intact patch should not apply needs-human-arbitration',
     );
     assert.ok(
       calls.comments.some(
@@ -3156,9 +3189,73 @@ describe('merge-queue-processor — post-merge content verification (LS-9404)', 
     );
   });
 
-  it('flags a content mismatch and applies needs-human-arbitration when trees diverge', async () => {
+  // LS-9969: the regression that made this detector fire on ~100% of merges.
+  // A squash merge lands `base + PR diff`, so once main advances past the PR's
+  // merge-base the merge commit's tree necessarily differs from the head's.
+  // Base drift alone must never be reported as dropped content.
+  it('applies no arbitration label when the base advanced during the queue wait', async () => {
     const { github, calls } = makeGithub({
-      commitTrees: { 'merged-sha': 'tree-stale', [HEAD_SHA]: 'tree-fixed' },
+      compareResults: compares({
+        validated: [file('lib/a.ts', 'blob-a')],
+        // The squash commit also carries the commits main gained while this PR
+        // was queued - the PR's own file still landed verbatim.
+        landed: [
+          file('lib/a.ts', 'blob-a'),
+          file('lib/unrelated.ts', 'blob-drift'),
+        ],
+        baseDrift: [file('lib/unrelated.ts', 'blob-drift')],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 1, 'should merge');
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'base drift is not a content mismatch',
+    );
+  });
+
+  // A file both sides touched is legitimately reconciled by the merge, so its
+  // landed blob matches neither side. Exempt, not a mismatch.
+  it('applies no arbitration label when the base also changed a PR-touched file', async () => {
+    const { github, calls } = makeGithub({
+      compareResults: compares({
+        validated: [file('lib/shared.ts', 'blob-pr')],
+        landed: [file('lib/shared.ts', 'blob-reconciled')],
+        baseDrift: [file('lib/shared.ts', 'blob-base')],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'a file changed on both sides is reconciled by the merge, not dropped',
+    );
+  });
+
+  it('flags a content mismatch when a validated file never landed', async () => {
+    const { github, calls } = makeGithub({
+      compareResults: compares({
+        validated: [file('lib/a.ts', 'blob-a'), file('lib/b.ts', 'blob-b')],
+        // lib/b.ts is missing - the squash landed an older head's content.
+        landed: [file('lib/a.ts', 'blob-a')],
+      }),
     });
 
     await processor({
@@ -3172,23 +3269,125 @@ describe('merge-queue-processor — post-merge content verification (LS-9404)', 
     assert.strictEqual(
       calls.merges.length,
       1,
-      'merge still proceeds — this is detection, not a gate',
+      'merge still proceeds - this is detection, not a gate',
     );
     assert.ok(
       calls.labels.some((l) => l.labels?.includes('needs-human-arbitration')),
-      'a tree mismatch should apply needs-human-arbitration',
+      'a dropped file should apply needs-human-arbitration',
     );
     assert.ok(
       calls.comments.some(
         (c) =>
           c.body?.includes('Merge Content Mismatch Detected') &&
-          c.body?.includes('tree-stale') &&
-          c.body?.includes('tree-fixed'),
+          c.body?.includes('lib/b.ts') &&
+          !c.body?.includes('`lib/a.ts`'),
       ),
-      'success comment should carry the mismatch warning with both tree SHAs',
+      'success comment should name only the dropped file',
     );
   });
 
+  it('flags a content mismatch when a validated file landed with a stale blob', async () => {
+    const { github, calls } = makeGithub({
+      compareResults: compares({
+        validated: [file('lib/a.ts', 'blob-fixed')],
+        landed: [file('lib/a.ts', 'blob-stale')],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.ok(
+      calls.labels.some((l) => l.labels?.includes('needs-human-arbitration')),
+      'a stale blob should apply needs-human-arbitration',
+    );
+  });
+
+  // The landed diff carries the base's drift too, which can re-pair GitHub's
+  // rename detection: one `renamed` entry on the validated side can surface as
+  // `added` on the landed side. The blob is the same, so it is not a mismatch.
+  it('applies no arbitration label when rename detection re-pairs a file', async () => {
+    const { github, calls } = makeGithub({
+      compareResults: compares({
+        validated: [file('lib/new-name.ts', 'blob-x', 'renamed')],
+        landed: [file('lib/new-name.ts', 'blob-x', 'added')],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'a differing status with an identical blob is not a mismatch',
+    );
+  });
+
+  // The compare API caps `files` at 300 with no truncation flag, so a truncated
+  // listing would read as "these files never landed".
+  it('fails open (no mismatch reported) when a comparison hits the 300-file API cap', async () => {
+    const many = (prefix, count) =>
+      Array.from({ length: count }, (_, i) =>
+        file(`lib/${prefix}${i}.ts`, `blob-${prefix}${i}`),
+      );
+
+    const { github, calls } = makeGithub({
+      compareResults: compares({
+        validated: many('a', 300),
+        // Truncation would make every validated file look dropped.
+        landed: [],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'a capped comparison must fail open, not escalate 300 false drops',
+    );
+  });
+
+  it('fails open (no mismatch reported) when the merge commit has no parent', async () => {
+    const { github, calls } = makeGithub({
+      commitParents: {},
+      compareResults: compares({
+        validated: [file('lib/a.ts', 'blob-a')],
+        landed: [],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'an unresolvable parent must fail open, not escalate',
+    );
+  });
   it('fails open (no mismatch reported) when the commit lookup errors', async () => {
     const { github: baseGithub, calls } = makeGithub();
     const github = {

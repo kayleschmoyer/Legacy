@@ -5,6 +5,12 @@ name: Label Pager (W4)
 # payload uses the 'content' field); channel routing is configured at the webhook side.
 # bot:ready-for-review is intentionally excluded — it is NOT an escalation.
 #
+# Merged PRs still page (LS-9969). Some escalations are post-merge by nature —
+# the LS-9404 merge-content check runs after the squash lands — so suppressing
+# them would blind the on-call to the most urgent class of page. Instead the
+# page is prefixed with the PR state, so "already merged, nothing to review"
+# is legible from the channel without opening the link.
+#
 # workflow_dispatch: manual trigger for test workflows running in workflow_dispatch
 # context where GitHub does not deliver pull_request.labeled events (LS-4120).
 
@@ -45,9 +51,20 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             PR_URL="https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }}"
             PR_TITLE=$(gh pr view "${{ inputs.pr_number }}" --json title --jq '.title')
+            PR_MERGED=$(gh pr view "${{ inputs.pr_number }}" --json merged --jq '.merged')
           else
             PR_URL="${{ github.event.pull_request.html_url }}"
             PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_MERGED="${{ github.event.pull_request.merged }}"
+          fi
+
+          # LS-9969: a page for an already-merged PR is not a review request —
+          # there is nothing left to approve or block. Say so up front so the
+          # on-call can triage it from the channel instead of opening a PR that
+          # turns out to have merged minutes earlier.
+          PREFIX="Escalation"
+          if [ "$PR_MERGED" = "true" ]; then
+            PREFIX="Escalation (POST-MERGE, already merged - review the landed commit)"
           fi
 
           # For needs-human-arbitration, fetch the bot's arbitration summary
@@ -75,11 +92,11 @@ jobs:
           if [ -n "$DETAILS" ]; then
             curl -fsS -X POST "$WEBHOOK" \
               -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" \
-                    '{ content: ("Escalation: \($lbl) on \($pr_url) — \($title)\n\n\($details)") }')"
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" --arg prefix "$PREFIX" \
+                    '{ content: ("\($prefix): \($lbl) on \($pr_url) — \($title)\n\n\($details)") }')"
           else
             curl -fsS -X POST "$WEBHOOK" \
               -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" \
-                    '{ content: ("Escalation: \($lbl) on \($pr_url) — \($title)") }')"
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg prefix "$PREFIX" \
+                    '{ content: ("\($prefix): \($lbl) on \($pr_url) — \($title)") }')"
           fi
