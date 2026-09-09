@@ -72,4 +72,11 @@ export const CLIENT_FACING_CODES = new Set([
   // "draft order not generated yet" message for it, but only works off the
   // real error message, so it must reach the client unscrubbed (LS-4853).
   'DRAFT_TEAMS_NOT_CONFIGURED',
+  // A roster move rejected because the player is not eligible for the target
+  // slot (LS-6427's assertPositionAssignmentsEligible gate). This is a
+  // rejected user input, not a server defect, but was missing from this set —
+  // formatError fell through to the "unexpected internal error" branch and
+  // reported every rejection to Rollbar as `GraphQL internal error` (LS-9879 /
+  // LS-9878).
+  'POSITION_INELIGIBLE',
 ]);
