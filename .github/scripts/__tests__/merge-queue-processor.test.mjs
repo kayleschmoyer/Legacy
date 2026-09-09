@@ -133,6 +133,12 @@ function makeGithub({
   // which reads as "nothing dropped" — override `compareResults` to exercise
   // the mismatch-detection path.
   commitParents = { 'merged-sha': [{ sha: MERGE_PARENT_SHA }] },
+  // LS-9831: run-integration-tests.yml runs served to
+  // checkInFlightIntegrationRun, kept separate from `workflowRuns` (which
+  // feeds the unrelated ci-orchestrator.yml lookups) so existing orchestrator
+  // fixtures don't accidentally trip the new in-flight-integration merge
+  // guard. Defaults to [] (no in-flight integration run).
+  integrationWorkflowRuns = [],
 } = {}) {
   const calls = {
     merges: [],
@@ -267,9 +273,16 @@ function makeGithub({
       },
       git: { deleteRef: async () => {} },
       actions: {
-        // remediateCancelledCiRun (LS-9053)
-        listWorkflowRuns: async () => ({
-          data: { workflow_runs: workflowRuns },
+        // remediateCancelledCiRun (LS-9053) and checkInFlightIntegrationRun
+        // (LS-9831) share this endpoint but query different workflow files —
+        // route by workflow_id so each gets its own fixture list.
+        listWorkflowRuns: async (args) => ({
+          data: {
+            workflow_runs:
+              args.workflow_id === 'run-integration-tests.yml'
+                ? integrationWorkflowRuns
+                : workflowRuns,
+          },
         }),
         reRunWorkflow: async (args) => {
           calls.reruns.push(args);
@@ -554,6 +567,106 @@ describe('merge-queue-processor — mergeable_state=behind merges directly (LS-4
       calls.merges.length,
       1,
       'behind PR with all gates green should merge directly',
+    );
+  });
+});
+
+// ── LS-9831 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — in-flight integration run blocks merge (LS-9831)', () => {
+  it('does not merge while run-integration-tests.yml is still in_progress for the head SHA', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      integrationWorkflowRuns: [
+        {
+          id: 42,
+          status: 'in_progress',
+          html_url: 'https://github.com/example/repo/actions/runs/42',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      0,
+      'must not merge while the integration suite is still in flight',
+    );
+  });
+
+  it('merges once run-integration-tests.yml has completed for the head SHA', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      integrationWorkflowRuns: [
+        {
+          id: 42,
+          status: 'completed',
+          conclusion: 'success',
+          html_url: 'https://github.com/example/repo/actions/runs/42',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'a completed integration run must not block an otherwise-green merge',
+    );
+  });
+
+  it('fails open (merges) when listing integration-test runs errors', async () => {
+    const { github: baseGithub, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    const github = {
+      ...baseGithub,
+      rest: {
+        ...baseGithub.rest,
+        actions: {
+          ...baseGithub.rest.actions,
+          listWorkflowRuns: async (args) => {
+            if (args.workflow_id === 'run-integration-tests.yml') {
+              throw new Error('API unavailable');
+            }
+            return baseGithub.rest.actions.listWorkflowRuns(args);
+          },
+        },
+      },
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'an API error checking for in-flight integration runs should fail open, not wedge the queue',
     );
   });
 });

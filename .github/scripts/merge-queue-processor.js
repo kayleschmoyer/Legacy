@@ -118,6 +118,15 @@ const ARBITRATION_LABEL = 'needs-human-arbitration';
 // it, and the required contexts stay "(not yet registered)" on the head SHA
 // forever. The queue self-heals by re-running the cancelled run.
 const ORCHESTRATOR_WORKFLOW_FILE = 'ci-orchestrator.yml';
+// LS-9831: "Run Integration Suite" (run-integration-tests.yml) is opt-in via
+// the `run:integration` label and is NOT a branch-protection required check
+// (it only covers touched specs, not every PR), so validateStatusChecks never
+// evaluates it. Without a dedicated guard, merge-when-ready + a green CI Gate
+// can merge a PR while its integration run is still `in_progress` — the merge
+// squashes and deletes the source branch, orphaning the run forever with no
+// result ever recorded. Observed on PR #7516 (second recurrence after
+// LS-7876/PR #5023). See checkInFlightIntegrationRun below.
+const INTEGRATION_WORKFLOW_FILE = 'run-integration-tests.yml';
 // Stop re-running a run that keeps getting cancelled — after this many
 // attempts something other than a transient displacement is wrong.
 const MAX_ORCHESTRATOR_RUN_ATTEMPTS = 3;
@@ -469,6 +478,22 @@ module.exports = async ({
           reviewDecision === 'REVIEW_REQUIRED'
             ? 'PR requires CODEOWNER approval for sensitive path(s)'
             : `PR cannot be merged: reviewDecision is ${reviewDecision}`,
+      };
+    }
+
+    // LS-9831: block outright while a live-backend integration run is still
+    // in flight for this exact head SHA — it is not a required check, so
+    // validateStatusChecks below would never see it and would otherwise let
+    // this merge proceed and orphan the run (PR #7516).
+    const integrationRun = await checkInFlightIntegrationRun(pr);
+    if (integrationRun.inFlight) {
+      return {
+        canMerge: false,
+        reason:
+          'Integration suite (run:integration) is still running for this commit — ' +
+          'merging now would orphan it (LS-9831): ' +
+          integrationRun.runUrls.join(', '),
+        isPending: true,
       };
     }
 
@@ -1303,6 +1328,32 @@ module.exports = async ({
   // jobs is dead, not in flight — cancel it (freeing the shared concurrency
   // group, see ci-orchestrator.yml's `concurrency:` block) so the rerun below
   // isn't queued behind it.
+  async function checkInFlightIntegrationRun(pr) {
+    let runs;
+    try {
+      const res = await github.rest.actions.listWorkflowRuns({
+        owner,
+        repo,
+        workflow_id: INTEGRATION_WORKFLOW_FILE,
+        head_sha: pr.head.sha,
+        per_page: 100,
+      });
+      runs = res.data.workflow_runs ?? [];
+    } catch (e) {
+      // Fail open — an API hiccup here should not permanently wedge the
+      // queue. The existing status-check gate (bot-review/CI Gate) still
+      // protects correctness; this guard is defense-in-depth against
+      // orphaning, not the only merge gate.
+      console.warn(
+        `⚠️ PR #${pr.number}: could not list integration-test runs for ${pr.head.sha}: ${e.message} — failing open`,
+      );
+      return { inFlight: false };
+    }
+    const activeRuns = runs.filter((r) => r.status !== 'completed');
+    if (activeRuns.length === 0) return { inFlight: false };
+    return { inFlight: true, runUrls: activeRuns.map((r) => r.html_url) };
+  }
+
   async function isDeadZeroJobRun(run) {
     if (Date.now() - new Date(run.created_at).getTime() < STUCK_RUN_MS) {
       return false;

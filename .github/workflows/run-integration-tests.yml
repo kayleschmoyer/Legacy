@@ -8,17 +8,22 @@
 #
 # Triggers:
 #   * pull_request `labeled` with `run:integration` — author/operator opts in
+#   * pull_request `synchronize` while `run:integration` is already applied —
+#     LS-9831: a force-push (rebase/amend) fires no new `labeled` event, so
+#     without this the label stayed visibly applied while the new SHA was
+#     never actually tested. `synchronize` re-dispatches against the new head
+#     so the label can't go stale relative to HEAD.
 #   * workflow_dispatch — manual run with a specific PR number
 #
 # The label is removed automatically when the run completes (success or
-# failure) so re-applying it re-runs the suite.
+# failure) — for either trigger above — so re-applying it re-runs the suite.
 # =============================================================================
 
 name: "Run Integration Tests"
 
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize]
   workflow_dispatch:
     inputs:
       pr-number:
@@ -32,18 +37,30 @@ permissions:
   issues: write
 
 concurrency:
-  # Include the label name (or a fixed workflow_dispatch sentinel) in the group
-  # so an unrelated `pull_request.labeled` event on the same PR — which will be
-  # skipped by every job's `if` guard anyway — does not land in the same
-  # concurrency group and cancel an active integration run via cancel-in-progress.
-  group: run-integration-tests-pr-${{ github.event.pull_request.number || inputs.pr-number }}-${{ github.event.label.name || 'workflow-dispatch' }}
+  # Include the label name (or a fixed sentinel for synchronize/workflow_dispatch
+  # events, which don't carry a label payload) in the group so an unrelated
+  # `pull_request.labeled` event on the same PR — which will be skipped by
+  # every job's `if` guard anyway — does not land in the same concurrency
+  # group and cancel an active integration run via cancel-in-progress. A
+  # `synchronize` event (new push) DOES intentionally share its group across
+  # pushes so a new push's run cancels a stale run still validating an old SHA.
+  group: run-integration-tests-pr-${{ github.event.pull_request.number || inputs.pr-number }}-${{ github.event.label.name || github.event_name }}
   cancel-in-progress: true
 
 jobs:
   resolve:
     name: "Resolve PR & Touched Specs"
-    # Skip label events that aren't ours; always run for workflow_dispatch.
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run:integration'
+    # Run for: workflow_dispatch (manual); a `labeled` event applying our own
+    # label (author/operator opt-in); or a `synchronize` event (new push) on a
+    # PR that already carries the label (LS-9831 — re-validates the new SHA
+    # instead of leaving a stale "tested" label sitting on untested code).
+    # Skip every other label event — those still spawn a workflow run (GitHub
+    # can't gate `on:` by label value), but that run shows as `skipped`, not
+    # `success`, so it can't be mistaken for a real integration pass.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'run:integration') ||
+      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run:integration'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -256,12 +273,16 @@ jobs:
   cleanup-label:
     name: "Remove run:integration label"
     needs: [resolve, run]
-    # Always attempt cleanup when the run was kicked off by the label event,
-    # regardless of whether `run` passed, failed, or was skipped (e.g. no
-    # touched specs). Skipped only when `resolve` itself didn't complete (so
-    # we have no PR number to operate on) or when the workflow was dispatched
-    # manually (no label to remove).
-    if: always() && needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' && github.event_name == 'pull_request' && github.event.label.name == 'run:integration'
+    # Always attempt cleanup when the run actually executed against the
+    # label (whether kicked off by the `labeled` event itself or by a
+    # `synchronize` re-dispatch while the label was already applied —
+    # LS-9831), regardless of whether `run` passed, failed, or was skipped
+    # (e.g. no touched specs). Checking the PR's current labels (rather than
+    # `github.event.label.name`, which is empty on `synchronize`) covers both
+    # triggers uniformly. Skipped only when `resolve` itself didn't complete
+    # (so we have no PR number to operate on) or when the workflow was
+    # dispatched manually (no label to remove).
+    if: always() && needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run:integration')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
