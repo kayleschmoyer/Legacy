@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   buildCompactOutput,
   compressFormatterOutput,
+  labelBenignEslintPreFixCrash,
   truncateOutput,
   truncateStepErrors,
 } from './truncate-output.js';
@@ -96,6 +97,43 @@ describe('truncateStepErrors', () => {
   it('returns output unchanged when no step headers are present', () => {
     const output = 'just some output\nno step headers';
     expect(truncateStepErrors(output)).toBe(output);
+  });
+});
+
+describe('labelBenignEslintPreFixCrash', () => {
+  it('prefixes the known-benign eslint --fix crash banner as non-fatal', () => {
+    const output = [
+      '6/9 Linting...',
+      '  Fixing 3 file(s) in tools/mcp/worktree-server...',
+      '',
+      'Oops! Something went wrong! :(',
+      '',
+      'ESLint: 9.39.5',
+      '',
+      'No files matching the pattern "src/index.ts" were found.',
+      'Please check for typing mistakes in the pattern.',
+      '',
+      ' NX   Running target lint for project mcp-worktree-server:',
+      ' NX   Successfully ran target lint for project mcp-worktree-server',
+    ].join('\n');
+
+    const result = labelBenignEslintPreFixCrash(output);
+    expect(result).toContain('[non-fatal, pre-fix step');
+    expect(result).toContain('Oops! Something went wrong! :(');
+    expect(result).toContain('Successfully ran target lint');
+  });
+
+  it('leaves output unchanged when the banner is absent', () => {
+    const output = '6/9 Linting...\nNX  Successfully ran target lint';
+    expect(labelBenignEslintPreFixCrash(output)).toBe(output);
+  });
+
+  it('labels every occurrence when the crash repeats across projects', () => {
+    const banner =
+      'Oops! Something went wrong! :(\n\nESLint: 9.39.5\n\nNo files matching the pattern "src/index.ts" were found.\nPlease check for typing mistakes in the pattern.\n';
+    const output = `${banner}\n${banner}`;
+    const result = labelBenignEslintPreFixCrash(output);
+    expect(result.match(/\[non-fatal, pre-fix step/g)).toHaveLength(2);
   });
 });
 

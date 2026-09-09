@@ -10,6 +10,7 @@ import { runJobWithPluginWorkerRetry } from '../plugin-worker-retry.js';
 import { getRepoRoot } from '../run-command.js';
 import {
   buildCompactOutput,
+  labelBenignEslintPreFixCrash,
   MAX_OUTPUT_CHARS,
   truncateOutput,
 } from '../truncate-output.js';
@@ -91,9 +92,10 @@ export function formatPcChunkLogTail(
   logTail: string,
   verbose: boolean | undefined,
 ): string {
+  const labeled = labelBenignEslintPreFixCrash(logTail);
   return verbose
-    ? truncateOutput(logTail, MAX_OUTPUT_CHARS)
-    : buildCompactOutput(logTail, MAX_OUTPUT_CHARS);
+    ? truncateOutput(labeled, MAX_OUTPUT_CHARS)
+    : buildCompactOutput(labeled, MAX_OUTPUT_CHARS);
 }
 
 /**
@@ -109,7 +111,7 @@ function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
   const chunk = typeof meta.chunk === 'string' ? meta.chunk : undefined;
   const verbose = meta.verbose === true;
   const passed = snapshot.status === 'done';
-  const log = snapshot.log ?? '';
+  const log = labelBenignEslintPreFixCrash(snapshot.log ?? '');
 
   return {
     body: {

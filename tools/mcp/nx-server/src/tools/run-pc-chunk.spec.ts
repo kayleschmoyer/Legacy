@@ -190,6 +190,44 @@ describe('runPcChunk — compaction shared with nx_job_wait (LS-9814)', () => {
     expect(parsed.logTail).not.toContain('File0.tsx');
   });
 
+  it('labels the benign eslint --fix pre-step crash banner as non-fatal (LS-9950)', async () => {
+    const eslintCrash = [
+      '6/9 Linting...',
+      '  Fixing 3 file(s) in tools/mcp/worktree-server...',
+      '',
+      'Oops! Something went wrong! :(',
+      '',
+      'ESLint: 9.39.5',
+      '',
+      'No files matching the pattern "src/index.ts" were found.',
+      'Please check for typing mistakes in the pattern.',
+      '',
+      ' NX   Successfully ran target lint for project mcp-worktree-server',
+    ].join('\n');
+
+    mockRunJob.mockResolvedValue({
+      jobId: 'pc-5',
+      status: 'done',
+      label: 'pc-lint',
+      cwd: '/repo',
+      elapsedSec: 60,
+      exitCode: 0,
+      error: null,
+      meta: { kind: 'pc-chunk', chunk: 'pc-lint', verbose: false },
+      log: eslintCrash,
+    } satisfies JobSnapshot);
+
+    const result = await runPcChunk({ chunk: 'pc-lint' });
+
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      output: string;
+    };
+    expect(parsed.passed).toBe(true);
+    expect(parsed.output).toContain('[non-fatal, pre-fix step');
+    expect(parsed.output).toContain('Oops! Something went wrong! :(');
+  });
+
   it('returns raw output/logTail when verbose:true is requested', async () => {
     mockRunJob.mockResolvedValue({
       jobId: 'pc-4',

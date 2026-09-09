@@ -130,3 +130,25 @@ export function buildCompactOutput(output: string, maxChars: number): string {
     maxChars,
   );
 }
+
+/**
+ * scripts/lint-fix-changed.js's scoped `eslint --fix` pre-step (LS-8777) can
+ * crash with ESLint's own fatal-looking CLI banner — e.g. when a changed
+ * file's relative pattern doesn't resolve from the per-config-dir invocation
+ * cwd — but that script's try/catch swallows the non-zero exit, and the
+ * unscoped `nx affected -t lint` check that follows still reports real
+ * violations. The raw banner is visually indistinguishable from an actual
+ * failure once it lands in a pc-lint chunk's output, so label it as the
+ * known non-fatal pre-fix step instead of leaving it looking like a crash
+ * (LS-9950).
+ */
+const ESLINT_PRE_FIX_CRASH_RE =
+  /Oops! Something went wrong! :\(\n\nESLint: [^\n]*\n\nNo files matching the pattern "[^\n]*\n[^\n]*\n?/g;
+
+export function labelBenignEslintPreFixCrash(output: string): string {
+  return output.replace(
+    ESLINT_PRE_FIX_CRASH_RE,
+    (match) =>
+      `[non-fatal, pre-fix step — scripts/lint-fix-changed.js's scoped eslint --fix hit an unresolved pattern and was ignored; the unscoped lint check below is authoritative]\n${match}`,
+  );
+}
