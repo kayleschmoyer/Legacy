@@ -1004,7 +1004,14 @@ _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 # sessions); when absent this prints an explicit skip instead of silently
 # doing nothing. See .agents/skills/cloud-agent-mode/SKILL.md Quirk 11 for
 # installing pwsh in a cloud session.
+# The recipe shell differs per platform (SHELL := cmd on Windows, /bin/bash
+# elsewhere), so this needs one form per shell: the POSIX form below is a
+# syntax error under cmd.exe (`-v was unexpected at this time.`, LS-9959).
+ifeq ($(DETECTED_OS),Windows)
+_PC_TEST_PS_CMD = powershell -NonInteractive -NoProfile -Command "$$ErrorActionPreference = 'Stop'; if (Get-Command pwsh -ErrorAction SilentlyContinue) { Write-Host '  Running PowerShell script tests (test:scripts:ps)...'; pnpm run test:scripts:ps; exit $$LASTEXITCODE } else { Write-Host '  PowerShell script tests SKIPPED (pwsh not installed -- see .agents/skills/cloud-agent-mode/SKILL.md Quirk 11)' }"
+else
 _PC_TEST_PS_CMD = if command -v pwsh >/dev/null 2>&1; then echo "  Running PowerShell script tests (test:scripts:ps)..." && pnpm run test:scripts:ps; else echo "  PowerShell script tests SKIPPED (pwsh not installed -- see .agents/skills/cloud-agent-mode/SKILL.md Quirk 11)"; fi
+endif
 
 # Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
 # Canned recipe so the `pre-commit` pipeline and the standalone `pc-format` target
