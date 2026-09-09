@@ -361,6 +361,41 @@ jobs:
           echo "::error::${MSG}"
           exit 1
 
+      # LS-9979: `gh api ... POST` above only creates the release object — it
+      # never runs softprops/action-gh-release's `files:` upload, so a release
+      # recovered via the retry step above (including the "already exists"
+      # branch, which can be a release a prior attempt created but never
+      # finished attaching assets to) would otherwise ship with no IPA.
+      - name: Upload release asset (retry path)
+        id: release-asset-retry
+        if: steps.release-retry.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          IPA_PATH: ${{ steps.artifacts.outputs.ipa_path }}
+        run: |
+          # --clobber makes each attempt idempotent: a retry-of-retry that
+          # re-uploads an asset a prior attempt already attached succeeds
+          # instead of failing on "asset already exists".
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            if gh release upload "${TAG}" "${IPA_PATH}" --clobber; then
+              echo "::notice::Uploaded release asset(s) for ${TAG}"
+              exit 0
+            fi
+            echo "::warning::Release asset upload retry ${attempt}/3 failed for ${TAG}"
+            backoff=$((attempt * 30))
+            sleep "${backoff}"
+          done
+
+          # Assembled in parts so the annotation stays a single line without
+          # tripping yamllint's 200-character limit.
+          MSG="Could not upload release asset(s) for ${TAG} after 3 retries."
+          MSG="${MSG} The release exists but has no attached IPA — upload"
+          MSG="${MSG} manually with: gh release upload ${TAG} <file> --clobber"
+          echo "::error::${MSG}"
+          exit 1
+
       - name: Build Summary
         run: |
           echo "## 🎉 iOS Build Successful!" >> $GITHUB_STEP_SUMMARY

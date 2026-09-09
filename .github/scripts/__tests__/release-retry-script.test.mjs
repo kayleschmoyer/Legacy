@@ -1,26 +1,42 @@
 /**
- * Unit tests for the "Retry release creation" step in build-android-app.yml
- * and build-ios-app.yml (LS-9913).
+ * Unit tests for the "Retry release creation" and "Upload release asset
+ * (retry path)" steps in build-android-app.yml and build-ios-app.yml
+ * (LS-9913, LS-9979).
  *
  * LS-9907 found that `softprops/action-gh-release` classifies *any* 403 as a
  * permanent permission error and refuses to retry, losing a release whenever
  * a GitHub App installation throttle (not an actual permission problem)
  * returns a transient 403. That fix ported a `gh api` retry loop into
- * deploy-web.yml's create-release job; this ticket ports the identical
- * pattern into build-android-app.yml and build-ios-app.yml.
+ * deploy-web.yml's create-release job; LS-9913 ported the identical pattern
+ * into build-android-app.yml and build-ios-app.yml.
+ *
+ * LS-9979 found that the `gh api ... POST` retry only creates the release
+ * object — it never runs softprops/action-gh-release's `files:` upload — so
+ * a release recovered via the retry path shipped with no attached APK/IPA.
+ * The fix adds an "Upload release asset (retry path)" step gated on
+ * `steps.release-retry.outcome == 'success'` that runs `gh release upload`.
  *
  * Neither workflow's release path is reachable from a PR (it only runs on
  * push to main / manual dispatch), so this cannot be exercised via a live
- * workflow dispatch. Instead this suite extracts the retry step's shell
- * script verbatim out of the parsed workflow YAML (the same "run:" block
- * body GitHub Actions would execute) and runs it against a stubbed `gh` on
- * PATH, covering all three branches:
+ * workflow dispatch. Instead this suite extracts each step's shell script
+ * verbatim out of the parsed workflow YAML (the same "run:" block body
+ * GitHub Actions would execute) and runs it against a stubbed `gh` on PATH.
+ *
+ * For "Retry release creation", covering all three branches:
  *  - immediate success: `gh release view` already finds the release (the
  *    duplicate-prevention check), so no `gh api` POST is made.
  *  - retry-then-success: the first attempt fails, the second succeeds.
  *  - exhaustion: all 3 attempts fail — the script must still `exit 1` so the
  *    job (and everything gated on `needs.create-release.result`) reports
  *    failure rather than silently going green over a lost release.
+ *
+ * For "Upload release asset (retry path)", covering:
+ *  - immediate success: the first `gh release upload` call succeeds.
+ *  - retry-then-success: the first attempt fails, the second succeeds.
+ *  - exhaustion: all 3 attempts fail — the script must still `exit 1`.
+ *  - idempotency: `--clobber` is present on the upload call, so a
+ *    retry-of-retry re-uploading an asset a prior attempt already attached
+ *    succeeds instead of failing on "asset already exists".
  *
  * A fake `sleep` is also put on PATH so the 30/60/90s backoff doesn't slow
  * the test suite down.
@@ -171,6 +187,89 @@ exit 1
 }
 
 /**
+ * Builds a stub `gh` on PATH whose `gh release upload` behavior is driven by
+ * an env var, plus a fake `sleep` that skips the real 30/60/90s backoff.
+ *
+ * @param {{ uploadSucceedsAtAttempt: number }} opts 0 means "never succeeds".
+ * @returns {{ binDir: string, cleanup: () => void }}
+ */
+function makeStubGhUpload({ uploadSucceedsAtAttempt }) {
+  const binDir = mkdtempSync(path.join(tmpdir(), 'gh-upload-stub-'));
+  const attemptFile = path.join(binDir, 'attempt.txt');
+  writeFileSync(attemptFile, '0');
+
+  writeFileSync(path.join(binDir, 'sleep'), '#!/usr/bin/env bash\nexit 0\n');
+  chmodSync(path.join(binDir, 'sleep'), 0o755);
+
+  writeFileSync(
+    path.join(binDir, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+ATTEMPT_FILE="${attemptFile}"
+
+if [ "\${1:-}" = "release" ] && [ "\${2:-}" = "upload" ]; then
+  attempt=$(( $(cat "\${ATTEMPT_FILE}") + 1 ))
+  echo "\${attempt}" > "\${ATTEMPT_FILE}"
+  if [[ "$*" != *"--clobber"* ]]; then
+    echo "missing --clobber" >&2
+    exit 1
+  fi
+  if [ "${uploadSucceedsAtAttempt}" != "0" ] && [ "\${attempt}" -ge "${uploadSucceedsAtAttempt}" ]; then
+    exit 0
+  fi
+  exit 1
+fi
+
+echo "unexpected gh invocation: $*" >&2
+exit 1
+`,
+  );
+  chmodSync(path.join(binDir, 'gh'), 0o755);
+
+  return {
+    binDir,
+    cleanup: () => rmSync(binDir, { recursive: true, force: true }),
+  };
+}
+
+/**
+ * Runs an extracted upload-retry script against a stubbed `gh`/`sleep`.
+ *
+ * @returns {{ status: number, stdout: string, stderr: string }}
+ */
+function runUploadScript(script, { uploadSucceedsAtAttempt }, extraEnv = {}) {
+  const stub = makeStubGhUpload({ uploadSucceedsAtAttempt });
+  const workDir = mkdtempSync(path.join(tmpdir(), 'release-upload-run-'));
+
+  const scriptPath = path.join(workDir, 'upload.sh');
+  writeFileSync(scriptPath, script);
+  chmodSync(scriptPath, 0o755);
+
+  let status = 0;
+  let stdout = '';
+  let stderr = '';
+  try {
+    stdout = execFileSync('bash', [scriptPath], {
+      env: {
+        ...extraEnv,
+        PATH: `${stub.binDir}:${process.env.PATH}`,
+        GH_TOKEN: 'stub-token',
+      },
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    status = err.status ?? 1;
+    stdout = err.stdout ?? '';
+    stderr = err.stderr ?? '';
+  } finally {
+    stub.cleanup();
+    rmSync(workDir, { recursive: true, force: true });
+  }
+
+  return { status, stdout, stderr };
+}
+
+/**
  * Runs an extracted retry script against a stubbed `gh`/`sleep` on PATH.
  *
  * @returns {{ status: number, stdout: string, stderr: string, outputFileContents: string }}
@@ -241,6 +340,85 @@ const WORKFLOWS = [
     },
   },
 ];
+
+const UPLOAD_WORKFLOWS = [
+  {
+    label: 'build-android-app.yml',
+    file: path.join(REPO_ROOT, '.github/workflows/build-android-app.yml'),
+    env: {
+      TAG: 'android-v1.2.3-45',
+      APK_NAME: 'legacy-sports-1.2.3-45.apk',
+    },
+  },
+  {
+    label: 'build-ios-app.yml',
+    file: path.join(REPO_ROOT, '.github/workflows/build-ios-app.yml'),
+    env: {
+      TAG: 'ios-v1.2.3-45',
+      IPA_PATH: '/tmp/artifacts/legacy-sports.ipa',
+    },
+  },
+];
+
+for (const workflow of UPLOAD_WORKFLOWS) {
+  describe(`${workflow.label} — Upload release asset (retry path)`, () => {
+    const script = extractStepRunScript(
+      workflow.file,
+      'Upload release asset (retry path)',
+    );
+
+    it('extracted script is non-empty, loops 3 attempts, and passes --clobber', () => {
+      assert.match(script, /for attempt in 1 2 3/);
+      assert.match(script, /gh release upload/);
+      assert.match(script, /--clobber/);
+    });
+
+    it('immediate success: first upload attempt succeeds', () => {
+      const result = runUploadScript(
+        script,
+        { uploadSucceedsAtAttempt: 1 },
+        workflow.env,
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /Uploaded release asset/);
+      assert.doesNotMatch(result.stdout, /retry 2\/3|retry 3\/3/);
+    });
+
+    it('retry-then-success: first attempt fails, second attempt succeeds', () => {
+      const result = runUploadScript(
+        script,
+        { uploadSucceedsAtAttempt: 2 },
+        workflow.env,
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /retry 1\/3.*failed/s);
+      assert.match(result.stdout, /Uploaded release asset/);
+    });
+
+    it('exhaustion: all 3 attempts fail, exits 1', () => {
+      const result = runUploadScript(
+        script,
+        { uploadSucceedsAtAttempt: 0 },
+        workflow.env,
+      );
+      assert.equal(result.status, 1);
+      assert.match(result.stdout, /Could not upload release asset/);
+      assert.match(result.stdout, /gh release upload .* --clobber/);
+    });
+
+    it('idempotent: passes --clobber so a retry-of-retry re-upload does not fail on a duplicate asset', () => {
+      // The stub itself asserts --clobber is present on every invocation
+      // (see makeStubGhUpload) — a script missing it would fail attempt 1
+      // even though uploadSucceedsAtAttempt says it should succeed.
+      const result = runUploadScript(
+        script,
+        { uploadSucceedsAtAttempt: 1 },
+        workflow.env,
+      );
+      assert.equal(result.status, 0, result.stderr);
+    });
+  });
+}
 
 for (const workflow of WORKFLOWS) {
   describe(`${workflow.label} — Retry release creation`, () => {
