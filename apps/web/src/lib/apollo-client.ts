@@ -345,6 +345,40 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
 // Types with an `id` field use Apollo's default and are omitted here.
 
 const typePolicies = {
+  // League.playoffEnabled flap fix (LS-9928): investigation found no query or
+  // mutation ever selects `League` without `playoffEnabled` (it's included in
+  // both the `League` and `AppLeague` fragments), and Apollo's default entity
+  // merge already preserves any cached field a given write's selection set
+  // omits — so a field can only regress to null/undefined here if some
+  // operation's response explicitly carries that value (e.g. a resolver read
+  // racing a not-yet-committed write on `UpdateLeagueSettings` / a WS-driven
+  // `refetchLeague()`). That produced the ~70ms window where every
+  // `LeagueDetailPageV2` consumer of `league.playoffEnabled` — the Standings
+  // bracket gate (already fixed for other reasons in LS-9901) and the Commish
+  // tab's settings panel — could transiently observe a falsy value despite
+  // the server's authoritative response being `true`.
+  //
+  // Fix at the cache layer so every consumer gets a stable value without its
+  // own defensive workaround: an incoming null/undefined is treated as
+  // "unknown — keep the last known value" rather than overwriting it, while
+  // an explicit `false` is always honored (a commissioner can genuinely turn
+  // playoffs off) so this never masks a real change.
+  League: {
+    fields: {
+      playoffEnabled: {
+        merge(
+          existing: boolean | null | undefined,
+          incoming: boolean | null | undefined,
+        ) {
+          if (incoming === null || incoming === undefined) {
+            return existing === undefined ? incoming : existing;
+          }
+          return incoming;
+        },
+      },
+    },
+  },
+
   // ── Entity types with non-standard identity ───────────────────────────
 
   // Join table: one membership per (league, user)
@@ -460,6 +494,11 @@ const typePolicies = {
   UserDataExport: { keyFields: false as const },
   VersionInfo: { keyFields: false as const },
 } as const;
+
+// Exported so cache-level behavior (e.g. the League.playoffEnabled merge
+// policy) can be unit-tested directly against InMemoryCache without spinning
+// up the full ApolloClient/network stack.
+export { typePolicies };
 
 export const apolloClient = new ApolloClient({
   link: from([retryLink, errorLink, authLink, rateLimitRetryLink, httpLink]),

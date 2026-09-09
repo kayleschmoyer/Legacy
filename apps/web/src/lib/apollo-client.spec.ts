@@ -12,12 +12,18 @@
 // jest.mock is hoisted above imports by Babel, so this factory runs before
 // apollo-client.ts is evaluated — providing a stub `createHttpLink` that
 // doesn't require global fetch.
-import { CombinedGraphQLErrors, Observable, ServerError } from '@apollo/client';
+import {
+  CombinedGraphQLErrors,
+  InMemoryCache,
+  Observable,
+  ServerError,
+} from '@apollo/client';
 import { captureError } from '@legacy-sports/rollbar/web';
 import {
   decodeJwtPayload,
   errorLink,
   syncUserProfileFromJwt,
+  typePolicies,
 } from './apollo-client';
 import { __resetJwtRefreshStateForTests } from './jwt-refresh';
 
@@ -914,5 +920,91 @@ describe('errorLink', () => {
     );
 
     dispatchSpy.mockRestore();
+  });
+});
+
+// ─── League.playoffEnabled cache merge policy (LS-9928) ───────────────────────
+//
+// Regression coverage for the transient falsy-read flap: a normalized League
+// entry's `playoffEnabled` must never regress to null/undefined once a
+// non-null value has been cached, but a genuine `false` write (a commissioner
+// disabling playoffs) must always be honored.
+
+describe('League.playoffEnabled cache merge policy', () => {
+  function makeCache(): InMemoryCache {
+    return new InMemoryCache({ typePolicies });
+  }
+
+  function readPlayoffEnabled(cache: InMemoryCache): unknown {
+    return cache.readFragment<{ playoffEnabled: boolean | null }>({
+      id: cache.identify({ __typename: 'League', id: 1 }),
+      fragment: LEAGUE_PLAYOFF_FRAGMENT,
+    })?.playoffEnabled;
+  }
+
+  const LEAGUE_PLAYOFF_FRAGMENT = {
+    kind: 'Document',
+    definitions: [
+      {
+        kind: 'FragmentDefinition',
+        name: { kind: 'Name', value: 'LeaguePlayoff' },
+        typeCondition: {
+          kind: 'NamedType',
+          name: { kind: 'Name', value: 'League' },
+        },
+        selectionSet: {
+          kind: 'SelectionSet',
+          selections: [
+            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+            {
+              kind: 'Field',
+              name: { kind: 'Name', value: 'playoffEnabled' },
+            },
+          ],
+        },
+      },
+    ],
+  } as never;
+
+  function writePlayoffEnabled(
+    cache: InMemoryCache,
+    playoffEnabled: boolean | null,
+  ): void {
+    cache.writeFragment({
+      id: cache.identify({ __typename: 'League', id: 1 }),
+      fragment: LEAGUE_PLAYOFF_FRAGMENT,
+      data: { __typename: 'League', id: 1, playoffEnabled },
+    });
+  }
+
+  it('keeps the last known true value when a later write carries null', () => {
+    const cache = makeCache();
+    writePlayoffEnabled(cache, true);
+    expect(readPlayoffEnabled(cache)).toBe(true);
+
+    // Simulates the flap: an operation's response carries playoffEnabled:
+    // null (e.g. a resolver read racing a not-yet-committed write).
+    writePlayoffEnabled(cache, null);
+    expect(readPlayoffEnabled(cache)).toBe(true);
+  });
+
+  it('honors an explicit false write (commissioner disables playoffs)', () => {
+    const cache = makeCache();
+    writePlayoffEnabled(cache, true);
+    writePlayoffEnabled(cache, false);
+    expect(readPlayoffEnabled(cache)).toBe(false);
+  });
+
+  it('honors a later explicit true write after a real false', () => {
+    const cache = makeCache();
+    writePlayoffEnabled(cache, false);
+    writePlayoffEnabled(cache, true);
+    expect(readPlayoffEnabled(cache)).toBe(true);
+  });
+
+  it('passes through null on first write when nothing was cached yet', () => {
+    const cache = makeCache();
+    writePlayoffEnabled(cache, null);
+    expect(readPlayoffEnabled(cache)).toBeNull();
   });
 });
