@@ -74,6 +74,7 @@ import {
   rebaseContinueStep,
 } from './rebase-continue-step';
 import { rerereForgetPaths } from './rerere-forget';
+import { filterAndLimitWorktrees } from './filter-and-limit-worktrees';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitish } from './resolve-commitish';
@@ -88,6 +89,7 @@ import {
   formatObject,
   formatRemoteBranches,
   formatWorktreeList,
+  metaLine,
   parseNumstat,
   type RemoteBranchRow,
   type WorktreeListEntry,
@@ -1446,7 +1448,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           pattern: {
             type: 'string',
             description:
-              'Glob pattern to filter remote branches (e.g. "*LS-193*"). Only used when remote=true.',
+              'Glob pattern to filter results (e.g. "*LS-193*"). Remote: branch names. Local: branch/key/path — plain text substrings, "*"/"?" globs the full value.',
           },
           merged: {
             type: 'string',
@@ -1455,8 +1457,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
           limit: {
             type: 'number',
+            description: 'Max results (default: 50 remote, 20 local).',
+          },
+          nodeModulesFilter: {
+            type: 'string',
+            enum: ['stale', 'active'],
             description:
-              'Maximum number of remote branches to return (default: 50). Only used when remote=true.',
+              'Local only: "stale" = no node_modules (abandoned); "active" = has node_modules.',
           },
         },
       },
@@ -4177,28 +4184,56 @@ const handleCallTool = async (
     // worktree_list
     // -----------------------------------------------------------------------
     case 'worktree_list': {
-      const { remote, pattern, limit, merged } = args as {
+      const {
+        remote,
+        pattern,
+        limit,
+        merged,
+        nodeModulesFilter: rawNodeModulesFilter,
+      } = args as {
         remote?: boolean;
         pattern?: string;
         limit?: number;
         merged?: string;
+        nodeModulesFilter?: unknown;
       };
+
+      // Validate pattern — only safe glob chars (shared by remote and local modes)
+      if (pattern && !/^[a-zA-Z0-9_./\-*?[\]{}]+$/.test(pattern)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid pattern: "${pattern}". Only alphanumeric, glob wildcards (*?[]{}) and '.', '/', '-', '_' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (
+        rawNodeModulesFilter !== undefined &&
+        rawNodeModulesFilter !== 'stale' &&
+        rawNodeModulesFilter !== 'active'
+      ) {
+        const shown =
+          typeof rawNodeModulesFilter === 'string'
+            ? rawNodeModulesFilter
+            : JSON.stringify(rawNodeModulesFilter);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid nodeModulesFilter: "${shown}". Must be "stale" or "active".`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      const nodeModulesFilter = rawNodeModulesFilter;
 
       // Remote branch listing mode
       if (remote) {
-        // Validate pattern — only safe glob chars
-        if (pattern && !/^[a-zA-Z0-9_./\-*?[\]{}]+$/.test(pattern)) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Invalid pattern: "${pattern}". Only alphanumeric, glob wildcards (*?[]{}) and '.', '/', '-', '_' allowed.`,
-              },
-            ],
-            isError: true,
-          };
-        }
-
         // Validate merged ref (reject flag injection and unsafe chars)
         if (merged) {
           if (merged.startsWith('-')) {
@@ -4355,12 +4390,12 @@ const handleCallTool = async (
       }
 
       // Default: list local worktrees
-      const worktrees = getWorktrees();
+      const allWorktrees = getWorktrees();
       const activeFooter = activeWorktree
         ? `_Active worktree: ${activeWorktree}_`
         : '_No active worktree set._';
 
-      if (worktrees.length === 0) {
+      if (allWorktrees.length === 0) {
         return {
           content: [
             { type: 'text', text: `No worktrees found.\n\n${activeFooter}` },
@@ -4368,30 +4403,74 @@ const handleCallTool = async (
         };
       }
 
-      const rows: WorktreeListEntry[] = worktrees.map((w) => {
+      const withNodeModulesStatus = allWorktrees.map((w) => {
         const nodeModules = w.hasLinkedNodeModules
           ? `symlinked -> ${w.nodeModulesTarget}`
           : existsSync(join(w.path, 'node_modules'))
             ? 'independent'
             : 'missing';
-        const lock = w.lock
-          ? w.lockStale
-            ? `STALE (agent: ${w.lock.agent}, acquired: ${w.lock.acquired})`
-            : `ACTIVE (agent: ${w.lock.agent}, task: ${w.lock.task ?? 'n/a'}, acquired: ${w.lock.acquired})`
-          : 'none';
         return {
-          key: w.key,
-          path: w.path,
-          branch: w.branch ?? 'unknown',
+          w,
           nodeModules,
-          lock,
+          key: w.key,
+          branch: w.branch ?? 'unknown',
+          path: w.path,
+          isStale: nodeModules === 'missing',
         };
       });
 
+      const {
+        filtered,
+        capped: cappedWorktrees,
+        truncated,
+      } = filterAndLimitWorktrees(withNodeModulesStatus, {
+        pattern,
+        nodeModulesFilter,
+        limit,
+      });
+
+      if (filtered.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No worktrees matched the given filters (${allWorktrees.length} total worktree(s)).\n\n${activeFooter}`,
+            },
+          ],
+        };
+      }
+
+      const rows: WorktreeListEntry[] = cappedWorktrees.map(
+        ({ w, nodeModules }) => {
+          const lock = w.lock
+            ? w.lockStale
+              ? `STALE (agent: ${w.lock.agent}, acquired: ${w.lock.acquired})`
+              : `ACTIVE (agent: ${w.lock.agent}, task: ${w.lock.task ?? 'n/a'}, acquired: ${w.lock.acquired})`
+            : 'none';
+          return {
+            key: w.key,
+            path: w.path,
+            branch: w.branch ?? 'unknown',
+            nodeModules,
+            lock,
+          };
+        },
+      );
+
+      const footer = [
+        metaLine({
+          count: cappedWorktrees.length,
+          totalMatched: filtered.length,
+          totalWorktrees: allWorktrees.length,
+          truncated: truncated || undefined,
+        }),
+        activeFooter,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
       return {
-        content: [
-          { type: 'text', text: formatWorktreeList(rows, activeFooter) },
-        ],
+        content: [{ type: 'text', text: formatWorktreeList(rows, footer) }],
       };
     }
 

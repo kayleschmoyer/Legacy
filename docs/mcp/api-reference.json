@@ -600,7 +600,7 @@
             "pattern": {
               "type": "string",
               "optional": true,
-              "description": "Glob pattern to filter remote branches (e.g. \"*LS-193*\"). Only used when remote=true."
+              "description": "Glob pattern to filter results (e.g. \"*LS-193*\"). Remote: branch names. Local: branch/key/path — plain text substrings, \"*\"/\"?\" globs the full value."
             },
             "merged": {
               "type": "string",
@@ -610,7 +610,16 @@
             "limit": {
               "type": "number",
               "optional": true,
-              "description": "Maximum number of remote branches to return (default: 50). Only used when remote=true."
+              "description": "Max results (default: 50 remote, 20 local)."
+            },
+            "nodeModulesFilter": {
+              "type": "string",
+              "optional": true,
+              "description": "Local only: \"stale\" = no node_modules (abandoned); \"active\" = has node_modules.",
+              "enum": [
+                "stale",
+                "active"
+              ]
             }
           },
           "transports": [
