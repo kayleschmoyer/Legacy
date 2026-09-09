@@ -15,6 +15,7 @@ import {
   createJobRunner,
   encodeCommandAndArgs,
   PS_WRAPPER_SCRIPT,
+  SIDECAR_INVOKE_FAILURE_MARKER,
 } from './index';
 
 /**
@@ -391,6 +392,86 @@ describe('background job registry', () => {
     expect(readFileSync(sidecarPath, 'utf-8').trim()).not.toBe('0');
   }, 25_000);
 
+  it(
+    'forces a job failed when its log carries the sidecar invoke-failure ' +
+      'marker even though the process exited 0 (LS-9970 — belt-and-braces: ' +
+      'the marker must win even if some future change miscomputes the exit ' +
+      "code as success, matching this ticket's 'no evidence of work done is " +
+      "not a pass' fix)",
+    async () => {
+      writeFileSync(
+        join(workDir, 'Makefile'),
+        'noop:\n\t@echo ok\n' +
+          'slow:\n\t@node -e "setTimeout(function () {}, 5000)"\n' +
+          `sidecar-invoke-failed:\n\t@echo "${SIDECAR_INVOKE_FAILURE_MARKER}: CommandNotFoundException: simulated"\n`,
+      );
+      const { jobId } = startJob({
+        command: 'make',
+        args: ['sidecar-invoke-failed'],
+        cwd: workDir,
+        label: 'sidecar-invoke-failed',
+        timeoutMs: 30_000,
+      });
+      const snapshot = await waitForJob(jobId, 20_000);
+      expect(snapshot?.status).toBe('failed');
+      expect(snapshot?.exitCode).toBe(0);
+      expect(snapshot?.error).toContain(SIDECAR_INVOKE_FAILURE_MARKER);
+    },
+    25_000,
+  );
+
+  it('negative control: a genuine passing job stays passed and carries no invoke-failure marker (LS-9970)', async () => {
+    writeFileSync(
+      join(workDir, 'Makefile'),
+      'noop:\n\t@echo ok\n' +
+        'slow:\n\t@node -e "setTimeout(function () {}, 5000)"\n',
+    );
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['noop'],
+      cwd: workDir,
+      label: 'noop-negative-control',
+      timeoutMs: 30_000,
+    });
+    const snapshot = await waitForJob(jobId, 20_000);
+    expect(snapshot?.status).toBe('done');
+    expect(snapshot?.exitCode).toBe(0);
+    expect(snapshot?.error).toBeNull();
+    expect(snapshot?.log).not.toContain(SIDECAR_INVOKE_FAILURE_MARKER);
+  }, 25_000);
+
+  it(
+    'always rewrites the materialized trampoline script rather than trusting ' +
+      'a stale cached copy on disk (LS-9970 Defect 1 — a script materialized ' +
+      'by an older server version must not survive a source fix because ' +
+      'ensureWrapperScript skipped writing when the file already existed)',
+    async () => {
+      const wrapperName =
+        process.platform === 'win32'
+          ? 'run-with-exit-sidecar.ps1'
+          : 'run-with-exit-sidecar.sh';
+      const wrapperPath = join(tmpdir(), TEST_DIR_NAME, wrapperName);
+      mkdirSync(join(tmpdir(), TEST_DIR_NAME), { recursive: true });
+      writeFileSync(
+        wrapperPath,
+        '# stale/corrupt wrapper from a previous server version\nexit 1\n',
+      );
+
+      const { jobId } = startJob({
+        command: 'make',
+        args: ['noop'],
+        cwd: workDir,
+        label: 'refresh-wrapper',
+        timeoutMs: 30_000,
+      });
+      const snapshot = await waitForJob(jobId, 20_000);
+
+      expect(snapshot?.status).toBe('done');
+      expect(readFileSync(wrapperPath, 'utf-8')).not.toContain('stale/corrupt');
+    },
+    25_000,
+  );
+
   it("recovers a done result from the exit-code sidecar for a job outside this process's in-memory registry (simulates a server restart, LS-8358)", () => {
     const jobId = `test-restart-done-${process.pid}`;
     const jobsDir = join(tmpdir(), TEST_DIR_NAME);
@@ -580,4 +661,40 @@ describe('PS_WRAPPER_SCRIPT (LS-9321 regression)', () => {
     expect(result.status).toBe(0);
     expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
   });
+
+  // LS-9970 regression: the exact failure mode reported in the ticket. A
+  // command name PowerShell cannot resolve (real-world cause: a botched
+  // base64 decode leaving `$command` holding the still-encoded payload
+  // string, reproduced directly here as any unresolvable command name)
+  // throws CommandNotFoundException. Before the fix that exception was
+  // non-fatal to the script: it fell through to `$code = $LASTEXITCODE`,
+  // still `$null` because no process ever ran, and the null-to-0 fallback
+  // silently reported success (exit 0) for a command that never executed.
+  maybeIt(
+    'reports a non-zero exit with the invoke-failure marker for a command PowerShell cannot resolve, instead of the null-exit-code-defaults-to-0 false green (LS-9970)',
+    () => {
+      const exitPath = join(scriptDir, 'test-not-found.exit');
+      const result = runWrapper(exitPath, 'ThisCommandDoesNotExist12345', []);
+
+      expect(result.status).not.toBe(0);
+      expect(readFileSync(exitPath, 'utf-8').trim()).not.toBe('0');
+      expect(result.stdout).toContain(SIDECAR_INVOKE_FAILURE_MARKER);
+      expect(result.stdout).toContain('CommandNotFoundException');
+    },
+  );
+
+  // Negative control for the marker itself: a command that genuinely runs
+  // and exits 0 must not carry the invoke-failure marker anywhere in its
+  // output — proves the fix doesn't turn every pass into a false failure.
+  maybeIt(
+    'a genuine passing command carries no invoke-failure marker (LS-9970 negative control)',
+    () => {
+      const exitPath = join(scriptDir, 'test-genuine-pass.exit');
+      const result = runWrapper(exitPath, 'true', []);
+
+      expect(result.status).toBe(0);
+      expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+      expect(result.stdout).not.toContain(SIDECAR_INVOKE_FAILURE_MARKER);
+    },
+  );
 });

@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// Materialized into each server's jobsDir() on first use (see
+// Materialized into each server's jobsDir() on every job start (see
 // `ensureWrapperScript`) rather than shipped as sibling files resolved via
 // `import.meta.url` — this package's test config (@swc/jest, CommonJS output)
 // cannot parse `import.meta` regardless of tsconfig module target, and a
@@ -106,7 +106,30 @@ function buildJobEnv(env?: Record<string, string>): NodeJS.ProcessEnv {
  * and the payload), neither containing a `-`, so there is nothing left for
  * PowerShell to misinterpret as a named-parameter reference regardless of
  * what the wrapped command or its args look like.
+ *
+ * `& $command @commandArgs` is wrapped in try/catch (LS-9970): invoking a
+ * command name that PowerShell cannot resolve (e.g. because a botched
+ * decode left `$command` holding the still-encoded payload string, or any
+ * other reason the resolved value isn't a real command) throws a
+ * `CommandNotFoundException` that try/catch *does* catch (it is a
+ * terminating error from command discovery, unlike a non-terminating
+ * cmdlet error). Without the try/catch, that exception is non-fatal to the
+ * script — execution falls through to `$code = $LASTEXITCODE`, which is
+ * still `$null` because no native process ever ran, and the
+ * `if ($null -eq $code) { $code = 0 }` fallback (meant for a real command
+ * that legitimately set no exit code) silently reports success for an
+ * invocation that never happened at all. That is exactly the false-green
+ * this ticket fixes: the two cases ("ran a real command that sets no exit
+ * code" and "never invoked a real command") are indistinguishable through
+ * `$LASTEXITCODE` alone, so the catch block must intercept the latter
+ * before it reaches that fallback. On catch, `$code` is forced non-zero and
+ * `SIDECAR_INVOKE_FAILURE_MARKER` is printed to the redirected log so the
+ * job runner can flag the failure with a distinguishing reason even in the
+ * (belt-and-braces) case some future change causes the exit code alone to
+ * misreport success again.
  */
+export const SIDECAR_INVOKE_FAILURE_MARKER = 'MCP_JOB_SIDECAR_INVOKE_FAILED';
+
 export const PS_WRAPPER_SCRIPT = `param(
   [Parameter(Mandatory = $true, Position = 0)]
   [string]$ExitCodePath,
@@ -123,10 +146,15 @@ if ($commandAndArgs.Count -gt 1) {
   $commandArgs = $commandAndArgs[1..($commandAndArgs.Count - 1)]
 }
 
-& $command @commandArgs
-$code = $LASTEXITCODE
-if ($null -eq $code) {
-  $code = 0
+try {
+  & $command @commandArgs
+  $code = $LASTEXITCODE
+  if ($null -eq $code) {
+    $code = 0
+  }
+} catch {
+  Write-Output "${SIDECAR_INVOKE_FAILURE_MARKER}: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
+  $code = 127
 }
 Set-Content -LiteralPath $ExitCodePath -Value $code -NoNewline
 exit $code
@@ -320,6 +348,25 @@ function readLog(logPath: string): string {
   }
 }
 
+/**
+ * True when the job's log shows the trampoline itself never invoked the
+ * wrapped command (see `SIDECAR_INVOKE_FAILURE_MARKER`). Checked in addition
+ * to the exit code — not instead of it — as belt-and-braces (LS-9970): the
+ * marker forces a job failed even in a hypothetical future where the exit
+ * code alone is again miscomputed as 0, matching the "no evidence of work
+ * done is not a pass" principle first established for the Nx daemon
+ * (LS-8819) and the e2e webServer/zero-tests cases (LS-9936) — this is the
+ * shared enforcement point both recommended extracting, since every
+ * `startJob` caller across every in-repo MCP server routes through here.
+ */
+function sidecarInvokeFailed(log: string): boolean {
+  return log.includes(SIDECAR_INVOKE_FAILURE_MARKER);
+}
+
+function sidecarInvokeFailureMessage(label: string): string {
+  return `${label}: the job trampoline failed to invoke the command (see log for ${SIDECAR_INVOKE_FAILURE_MARKER}) — no evidence the command ran, not a pass.`;
+}
+
 function isPidAlive(pid: number): boolean {
   if (pid <= 0) return false;
   try {
@@ -405,9 +452,21 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
 
   /**
    * Materialize the platform trampoline script into this runner's jobsDir()
-   * (idempotent — only written if missing) and return its path. Written per
-   * runner rather than shared repo-wide since jobsDir() is namespaced per
-   * server and each server's tmpdir may be cleared independently.
+   * and return its path. Written per runner rather than shared repo-wide
+   * since jobsDir() is namespaced per server and each server's tmpdir may be
+   * cleared independently.
+   *
+   * Always overwritten, never written-once-if-missing (LS-9970): a job's
+   * tmpdir is long-lived and outlives any single MCP server process, so a
+   * script materialized by an older server version stays on disk — and a
+   * once-only `existsSync` guard would trust that stale copy forever, even
+   * after a source fix (like this ticket's) ships. That was Defect 1 behind
+   * the false-green: the on-disk `run-with-exit-sidecar.ps1` a real session
+   * hit never decoded its argv at all, despite `PS_WRAPPER_SCRIPT` in source
+   * control already being correct — nothing had ever refreshed it. The
+   * rewrite is a few-hundred-byte in-memory string write on every job start;
+   * comparing content to skip it isn't worth the risk of re-introducing this
+   * exact bug through a subtly-wrong equality check.
    */
   function ensureWrapperScript(): string {
     const isWindows = process.platform === 'win32';
@@ -415,9 +474,7 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
       jobsDir(),
       isWindows ? 'run-with-exit-sidecar.ps1' : 'run-with-exit-sidecar.sh',
     );
-    if (!existsSync(path)) {
-      writeFileSync(path, isWindows ? PS_WRAPPER_SCRIPT : SH_WRAPPER_SCRIPT);
-    }
+    writeFileSync(path, isWindows ? PS_WRAPPER_SCRIPT : SH_WRAPPER_SCRIPT);
     return path;
   }
 
@@ -530,11 +587,17 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     };
 
     if (record.done) {
-      const failed = record.exitCode !== 0 || record.error !== null;
+      const log = readLog(record.logPath);
+      const sidecarFailed = sidecarInvokeFailed(log);
+      const failed =
+        sidecarFailed || record.exitCode !== 0 || record.error !== null;
       return {
         ...base,
+        error:
+          record.error ??
+          (sidecarFailed ? sidecarInvokeFailureMessage(record.label) : null),
         status: failed ? 'failed' : 'done',
-        log: readLog(record.logPath),
+        log,
       };
     }
 
@@ -550,15 +613,19 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     if (!inMemory) {
       const sidecarExitCode = readExitSidecar(jobId);
       if (sidecarExitCode !== null) {
-        const failed = sidecarExitCode !== 0;
+        const log = readLog(record.logPath);
+        const sidecarInvokeMarkerFound = sidecarInvokeFailed(log);
+        const failed = sidecarExitCode !== 0 || sidecarInvokeMarkerFound;
         return {
           ...base,
           exitCode: sidecarExitCode,
-          error: failed
-            ? `${record.label} exited with code ${sidecarExitCode}`
-            : null,
+          error: sidecarInvokeMarkerFound
+            ? sidecarInvokeFailureMessage(record.label)
+            : failed
+              ? `${record.label} exited with code ${sidecarExitCode}`
+              : null,
           status: failed ? 'failed' : 'done',
-          log: readLog(record.logPath),
+          log,
         };
       }
       const deadlinePassed =
@@ -704,7 +771,9 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
       }
       record.exitCode = code;
       record.done = true;
-      if (code !== 0 && !record.error) {
+      if (sidecarInvokeFailed(readLog(logPath))) {
+        record.error = sidecarInvokeFailureMessage(opts.label);
+      } else if (code !== 0 && !record.error) {
         record.error = `${opts.label} exited with code ${code}`;
       }
       persistMeta(record);
