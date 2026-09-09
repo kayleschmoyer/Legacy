@@ -113,6 +113,42 @@ describe('selectSpecs', () => {
     assert.equal(r.runAll, true);
   });
 
+  it('does not select surfaces for a co-located Jest spec file change (LS-9842)', () => {
+    const r = selectSpecs({
+      changedFiles: ['apps/web/src/pages/draft/Board.spec.tsx'],
+      manifest: FIXTURE,
+    });
+    assert.equal(r.runAll, false);
+    assert.deepEqual(r.specs, []);
+  });
+
+  it('still selects surfaces for a genuine source-file change in the same directory as a Jest spec (LS-9842)', () => {
+    const r = selectSpecs({
+      changedFiles: ['apps/web/src/pages/draft/Board.tsx'],
+      manifest: FIXTURE,
+    });
+    assert.deepEqual(r.specs, [
+      'apps/web-e2e/src/integration/tests/live-draft-ui.integration.spec.ts',
+    ]);
+  });
+
+  it('does not run ALL specs when a Jest spec file coincidentally matches a runAllWhenChanged glob (LS-9842)', () => {
+    const r = selectSpecs({
+      changedFiles: [
+        'apps/web-e2e/src/integration/helpers/cleanup-league.spec.ts',
+      ],
+      manifest: FIXTURE,
+    });
+    assert.equal(r.runAll, false);
+  });
+
+  it('still selects an edited integration spec itself even though it is a .spec.ts file', () => {
+    const spec =
+      'apps/web-e2e/src/integration/tests/live-draft-ui.integration.spec.ts';
+    const r = selectSpecs({ changedFiles: [spec], manifest: FIXTURE });
+    assert.deepEqual(r.specs, [spec]);
+  });
+
   it('unions surface matches across multiple changed files without duplicates', () => {
     const r = selectSpecs({
       changedFiles: [

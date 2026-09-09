@@ -54,6 +54,18 @@ export function matchesAny(file, globs) {
   return globs.some((g) => globToRegExp(g).test(file));
 }
 
+// A co-located Jest unit spec (e.g. LeagueCreatePage.spec.tsx next to
+// LeagueCreatePage.tsx) sits inside the same directory-level glob as its
+// real source file, so it isn't a distinct surface for glob-matching
+// purposes — only an edited manifest spec itself (matched separately, by
+// exact path, below) should select specs on its own (LS-9842).
+const TEST_ONLY_FILE_RE = /\.spec\.tsx?$/;
+
+/** Changed files eligible to trigger a directory-level glob (runAll or per-spec surface) match. */
+function globMatchCandidates(changedFiles) {
+  return changedFiles.filter((f) => !TEST_ONLY_FILE_RE.test(f));
+}
+
 /**
  * @param {{ changedFiles: string[], manifest: { runAllWhenChanged?: string[], specs: Record<string, string[]> } }} args
  * @returns {{ runAll: boolean, reason: string, specs: string[] }}
@@ -61,8 +73,9 @@ export function matchesAny(file, globs) {
 export function selectSpecs({ changedFiles, manifest }) {
   const allSpecs = Object.keys(manifest.specs).sort();
   const runAllGlobs = manifest.runAllWhenChanged ?? [];
+  const globCandidates = globMatchCandidates(changedFiles);
 
-  const runAllHit = changedFiles.find((f) => matchesAny(f, runAllGlobs));
+  const runAllHit = globCandidates.find((f) => matchesAny(f, runAllGlobs));
   if (runAllHit) {
     return {
       runAll: true,
@@ -76,7 +89,7 @@ export function selectSpecs({ changedFiles, manifest }) {
     if (manifest.specs[f]) selected.add(f); // edited spec selects itself
   }
   for (const [spec, surfaces] of Object.entries(manifest.specs)) {
-    if (changedFiles.some((f) => matchesAny(f, surfaces))) selected.add(spec);
+    if (globCandidates.some((f) => matchesAny(f, surfaces))) selected.add(spec);
   }
 
   return {
