@@ -32,7 +32,13 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_vpc" {
 
 # OAuth Lambda secrets - OAuth + Database secrets for secure user management
 resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
-  name        = "${local.name_prefix}-oauth-proxy-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-oauth-proxy-lambda-secrets-"
   description = "IAM policy for OAuth Lambda to access OAuth and database secrets securely"
 
   policy = jsonencode({
@@ -67,16 +73,33 @@ resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_secrets" {
   policy_arn = aws_iam_policy.oauth_proxy_lambda_secrets.arn
   role       = aws_iam_role.oauth_proxy_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # OAuth Lambda RDS access for secure user management operations
 resource "aws_iam_policy" "oauth_proxy_lambda_rds" {
-  name        = "${local.name_prefix}-oauth-proxy-lambda-rds-v2"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-oauth-proxy-lambda-rds-v2-"
   description = "IAM policy for OAuth Lambda to access RDS for secure user management"
 
   policy = jsonencode({
@@ -95,11 +118,22 @@ resource "aws_iam_policy" "oauth_proxy_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
   policy_arn = aws_iam_policy.oauth_proxy_lambda_rds.arn
   role       = aws_iam_role.oauth_proxy_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Read access to the signed Android APKs (LS-9454, bucket in app-downloads.tf).
@@ -108,7 +142,13 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
 # so without GetObject here every download 403s at fetch time rather than at
 # signing time.
 resource "aws_iam_policy" "oauth_proxy_lambda_app_downloads" {
-  name        = "${local.name_prefix}-oauth-proxy-lambda-app-downloads"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-oauth-proxy-lambda-app-downloads-"
   description = "IAM policy for OAuth Lambda to presign reads of the Android APK"
 
   policy = jsonencode({
@@ -127,11 +167,22 @@ resource "aws_iam_policy" "oauth_proxy_lambda_app_downloads" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_app_downloads" {
   policy_arn = aws_iam_policy.oauth_proxy_lambda_app_downloads.arn
   role       = aws_iam_role.oauth_proxy_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # DynamoDB table for persisting OAuth device-flow codes
@@ -196,7 +247,13 @@ resource "aws_dynamodb_table" "oauth_login_throttle" {
 # IAM policy granting the OAuth Lambda read/write access to the device-flow and
 # login-throttle tables
 resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
-  name = "${local.name_prefix}-oauth-proxy-lambda-dynamodb"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-oauth-proxy-lambda-dynamodb-"
   # NOTE: An IAM policy `description` is immutable in AWS (no update API), so the
   # provider treats any change as ForceNew. Editing this string triggers a
   # destroy+recreate of a same-named global IAM policy, which races into a 409
@@ -228,11 +285,22 @@ resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_dynamodb" {
   policy_arn = aws_iam_policy.oauth_proxy_lambda_dynamodb.arn
   role       = aws_iam_role.oauth_proxy_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # CloudWatch Log Group
