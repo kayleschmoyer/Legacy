@@ -102,6 +102,10 @@ Cap Jest worker parallelism with `MAXWORKERS`/`maxWorkers` (forwarded as `-- --m
 
 No effect on non-test targets/chunks.
 
+### Makefile else-branches: no `@true`/`@:` (LS-9959)
+
+`pc` and `pc-test` gate the PowerShell-test step on `PC_HAS_PS1` via `$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),)` — note the **empty** else-branch. Do not fill that branch with `@true` or `@:` as a "no-op" placeholder: Make's default `SHELL` on native Windows is `cmd.exe`, where `true` is not a builtin (fails the recipe) and `:` is a label token, not a portable no-op either. An `$(if ...)` branch that expands to nothing is skipped by Make entirely — no subshell is spawned — which is the actual cross-platform no-op for a conditional recipe line. Keep the else-branch empty rather than reaching for a shell no-op command.
+
 ### pc-lint scopes autofix to the diff, then checks the whole affected set (LS-8777)
 
 `pc-lint` runs two passes, not one: `node scripts/lint-fix-changed.js --base=$(NX_BASE)` autofixes only files changed vs the merge-base (grouped by nearest `eslint.config.*`, same resolution `nx_run_eslint` uses), then an unscoped `pnpm exec nx affected -t lint --base=$(NX_BASE)` (no `--fix`) checks every affected project and fails pc-lint on any violation the scoped pass didn't touch. Before this split, `nx affected -t lint --fix` ran `eslint . --fix` per affected _project_ — fixing every file in the project tree, not just the ones changed, which silently stripped BOMs and deleted `eslint-disable` directives from unrelated specs/configs that then rode along into the commit via `git add -A`. `make lint-fix` (the standalone developer target, not part of `make pc`) still runs the old whole-project `--fix` deliberately — that command's entire purpose is a full auto-fix pass, invoked explicitly by a human, not a silent side effect of validation.
