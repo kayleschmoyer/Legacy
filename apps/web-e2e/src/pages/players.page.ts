@@ -770,6 +770,11 @@ class PlayerDetailSurface {
     await this.#dialog.byTestId('player-detail-empty').expectVisible();
   }
 
+  /** Assert the empty-state (no seasons) is NOT visible. */
+  async expectEmptyStateHidden(): Promise<void> {
+    await this.#dialog.byTestId('player-detail-empty').expectHidden();
+  }
+
   /** Assert the error-state is visible. */
   async expectErrorState(): Promise<void> {
     await this.#dialog.byTestId('player-detail-error').expectVisible();

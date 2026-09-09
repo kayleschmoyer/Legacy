@@ -7,11 +7,11 @@ import {
   Observable,
   ServerError,
 } from '@apollo/client';
+import type { FieldNode } from 'graphql';
 import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
-import type { FieldNode } from 'graphql';
 import { captureError } from '@legacy-sports/rollbar/web';
 import { CSRF_HEADER, getCsrfToken } from './csrf';
 import {

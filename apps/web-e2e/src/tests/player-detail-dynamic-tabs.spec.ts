@@ -324,6 +324,39 @@ const NO_CAREER_ARC = {
   },
 };
 
+/**
+ * Career arc response for a pitcher with NO arc rows at all (LS-9830 repro
+ * shape). GetAllPlayerSeasonStats (PITCHER_SEASON_STATS below) returns real
+ * pitching-season data for this same player id — the two queries both select
+ * the root `player(id:)` field, and GetPlayerCareerArc aliases
+ * `playerSeasonBatting`/`playerSeasonPitching` to `arcBatting`/`arcPitching`
+ * (LS-6969). Before the fix, Apollo's default cache key ignores the alias, so
+ * this empty-array response clobbered the season-stats query's normalized
+ * cache entry for the same underlying field, and the modal fell through to
+ * the "No season statistics found" empty state with no tab bar at all.
+ */
+const EMPTY_CAREER_ARC = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Walker',
+      lastName: 'Buehler',
+      eligiblePositions: ['SP'],
+      careerAchievements: {
+        allStarSelections: 0,
+        goldGloves: 0,
+        silverSluggers: 0,
+        mvpAwards: 0,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: false,
+      },
+    },
+    arcBatting: [],
+    arcPitching: [],
+  },
+};
+
 // ── Route Setup ───────────────────────────────────────────────────────────────
 
 interface SetupOptions {
@@ -455,6 +488,45 @@ test.describe('Player Detail — dynamic tab bar: Career Arc tab visibility @reg
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.expectTabHidden('Career Arc');
+  });
+});
+
+// ── Regression: empty career-arc response must not blank the season-stats tabs ─
+
+test.describe('Player Detail — empty career arc does not clobber season stats @regression', () => {
+  test('pitcher: real season pitching data survives an empty career-arc response (LS-9830)', async ({
+    page,
+    playersPage,
+  }) => {
+    // GetAllPlayerSeasonStats returns real pitching-season data for this
+    // player; GetPlayerCareerArc (a separate query aliasing the same
+    // underlying playerSeasonBatting/playerSeasonPitching fields, LS-6969)
+    // returns no arc rows at all. Before the Apollo cache-key fix, the
+    // second query's empty arrays clobbered the first query's normalized
+    // cache entry for the same field, and the modal rendered the "No
+    // season statistics found" empty state with no tab bar.
+    await setupMocks(page, {
+      seasonStats: PITCHER_SEASON_STATS,
+      careerArc: EMPTY_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(2);
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    // The empty-state must not appear — real season stats exist.
+    await playersPage.detail.expectEmptyStateHidden();
+
+    // No arc data exists, so Career Arc is correctly absent, but the tab bar
+    // itself must still render with the Pitching tab (and its data table).
+    await playersPage.detail.expectTabHidden('Career Arc');
+    await playersPage.detail.expectTabHidden('Batting');
+    await playersPage.detail.expectTabHidden('Fielding');
+    await playersPage.detail.expectTabVisible('Pitching');
+
+    // Pitching table content confirms real data rendered, not a blank panel.
+    await playersPage.detail.expectText('Year');
+    await playersPage.detail.expectText('2.14');
   });
 });
 
