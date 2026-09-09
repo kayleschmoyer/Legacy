@@ -835,6 +835,67 @@ function quarantineSlot(findings) {
         'Stop those processes (e.g. `make kill-stale`) and re-run this script.',
     );
   }
+  sweepDanglingNestedSymlinks();
+}
+
+/**
+ * After quarantining a slot, the worktree's nested per-package node_modules
+ * entries from a PREVIOUS linkNestedWorkspaceModules() run may still point
+ * (directly, or via an entry inside them) at the slot that was just renamed
+ * away — leaving them dangling. materialiseSlot() only clears the root
+ * node_modules before running `pnpm install`, so a dangling nested link is
+ * left in place and pnpm's mkdir through it fails with ENOENT (LS-9745).
+ * Sweep and remove any dangling node_modules symlink — the outer per-package
+ * dir itself (older whole-dir-symlink layout, pre-LS-9563) or an individual
+ * entry inside a real, per-worktree directory (current layout) — so the
+ * install proceeds against a clean tree. linkNestedWorkspaceModules() rebuilds
+ * whatever it removes once materialisation completes.
+ */
+function sweepDanglingNestedSymlinks() {
+  let removed = 0;
+  for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
+    const dest = join(worktree, rel, 'node_modules');
+    const st = safeLstat(dest);
+    if (!st) continue;
+    if (st.isSymbolicLink()) {
+      // Outer whole-dir symlink (pre-LS-9563 layout) — remove if dangling.
+      if (!existsSync(dest)) {
+        removeNodeModulesEntry(dest);
+        removed++;
+      }
+      continue;
+    }
+    if (!st.isDirectory()) continue;
+    // Current layout: dest is a real, per-worktree directory; sweep its
+    // entries (including one level into @scopes) for dangling symlinks.
+    for (const entry of safeReaddirNames(dest)) {
+      const entryPath = join(dest, entry);
+      const entrySt = safeLstat(entryPath);
+      if (!entrySt) continue;
+      if (entrySt.isSymbolicLink()) {
+        if (!existsSync(entryPath)) {
+          rmSync(entryPath, { force: true });
+          removed++;
+        }
+        continue;
+      }
+      if (entry.startsWith('@') && entrySt.isDirectory()) {
+        for (const sub of safeReaddirNames(entryPath)) {
+          const subPath = join(entryPath, sub);
+          const subSt = safeLstat(subPath);
+          if (subSt && subSt.isSymbolicLink() && !existsSync(subPath)) {
+            rmSync(subPath, { force: true });
+            removed++;
+          }
+        }
+      }
+    }
+  }
+  if (removed > 0) {
+    console.log(
+      `[quarantine] removed ${removed} dangling nested node_modules symlink(s) left pointing at the quarantined slot.`,
+    );
+  }
 }
 
 function safeReaddirNames(p) {

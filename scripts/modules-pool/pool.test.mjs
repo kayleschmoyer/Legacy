@@ -1001,6 +1001,106 @@ test(
 );
 
 test(
+  'quarantine sweeps a dangling nested node_modules symlink left pointing at the renamed-away slot (LS-9745)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'dangling-nested-wt', LOCK_WORKSPACE);
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const pool = join(root, '.modules-pool');
+      const slotNm = join(pool, hash, 'node_modules');
+      makeHealthyNodeModules(slotNm);
+      // A non-scoped nested capture — relinkNestedNodeModulesDir falls back to
+      // linking straight at the slot's own copy for these (only @legacy-sports
+      // scoped entries resolve to the worktree's own source per LS-9563), so
+      // this entry is exactly the kind that goes dangling when the slot is
+      // quarantined out from under it.
+      const slotNested = join(
+        pool,
+        hash,
+        'nested',
+        'apps',
+        'app',
+        'node_modules',
+      );
+      mkdirSync(slotNested, { recursive: true });
+      writeFileSync(join(slotNested, 'marker.txt'), 'x');
+
+      // Pool hit: links the nested entry back into the worktree as a real,
+      // per-worktree directory containing a symlink to the slot's capture.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      const appNm = join(wt, 'apps', 'app', 'node_modules');
+      const markerLink = join(appNm, 'marker.txt');
+      assert.ok(
+        lstatSync(markerLink).isSymbolicLink(),
+        'precondition: marker.txt must be linked into the worktree',
+      );
+
+      // Corrupt the slot so the next run quarantines (renames aside) the
+      // ENTIRE slot dir — node_modules AND its nested/ capture — leaving
+      // markerLink dangling.
+      corruptSlot(slotNm);
+      const shim = join(root, 'fake-bin');
+      makeFakePnpm(shim); // plain fake install — no nested output, isolates the sweep
+      const out = runLink(
+        [`--worktree=${wt}`, `--main-repo=${root}`],
+        fakePnpmEnv(shim),
+      );
+
+      assert.match(out, /\[quarantine\]/);
+      assert.match(
+        out,
+        /removed \d+ dangling nested node_modules symlink/,
+        'quarantine must report sweeping the dangling nested symlink',
+      );
+      assert.match(out, /slot materialised and linked/);
+      assert.ok(
+        !lstatExistsHelper(markerLink),
+        'the dangling nested symlink must be swept, not left pointing at nothing',
+      );
+
+      // The quarantined copy must still hold the original nested capture —
+      // sweeping the worktree's dangling link must not touch the quarantined
+      // content itself.
+      const quarantined = readdirSync(pool).filter((n) =>
+        n.startsWith(`${hash}.corrupt-`),
+      );
+      assert.equal(quarantined.length, 1);
+      assert.ok(
+        existsSync(
+          join(
+            pool,
+            quarantined[0],
+            'nested',
+            'apps',
+            'app',
+            'node_modules',
+            'marker.txt',
+          ),
+        ),
+        'quarantined slot must retain its original nested capture',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+function lstatExistsHelper(p) {
+  try {
+    lstatSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test(
   '--rebuild quarantines and re-materialises even a healthy slot',
   { skip: SYMLINK_OK ? false : 'no symlink capability' },
   () => {
