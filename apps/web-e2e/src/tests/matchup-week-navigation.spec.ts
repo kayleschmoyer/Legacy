@@ -16,6 +16,7 @@
 import { customAuthTest, expect, test } from '../fixtures/pages';
 import {
   extractOperationName,
+  extractRequestOperationName,
   unmockedGraphQLFallback,
   useTier,
 } from '../fixtures/shared-mocks';
@@ -250,9 +251,20 @@ async function mockMatchupGraphQL(
           // fall through
         }
 
+        // LS-9868: prefer `currentMatchup` whenever its id matches the
+        // requested id, rather than falling back to it only when `.find()`
+        // misses. `currentMatchup` defaults to WEEK3_MATCHUP (already the
+        // same object present in ALL_MATCHUPS), so this is a no-op for every
+        // test that doesn't pass an override — but a test overriding
+        // `currentMatchup` (e.g. to a completed-status matchup) for the same
+        // id that's also present in ALL_MATCHUPS previously never actually
+        // exercised that override, since `.find()` always found the
+        // ALL_MATCHUPS entry first.
         const found =
-          ALL_MATCHUPS.find((m) => m.id === String(requestedId)) ??
-          currentMatchup;
+          currentMatchup.id === String(requestedId)
+            ? currentMatchup
+            : (ALL_MATCHUPS.find((m) => m.id === String(requestedId)) ??
+              currentMatchup);
 
         await route.fulfill({
           status: 200,
@@ -347,6 +359,20 @@ async function mockMatchupGraphQL(
                     winProbability: null,
                   },
             },
+          }),
+        });
+      } else if (opName === 'getmatchuprecap') {
+        // LS-9868: MatchupRecapPanel renders for completed-status matchups
+        // and fires GetMatchupRecap regardless of entitlement (PremiumGate
+        // always mounts its children) — mirrors the established pattern in
+        // games-remaining-visualization.spec.ts. A null recap keeps the
+        // panel's narrative content out of scope for this suite while
+        // satisfying the hermetic API-isolation guard.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { getMatchupById: { ...currentMatchup, recap: null } },
           }),
         });
       } else if (opName === 'getmysubscription') {
@@ -583,8 +609,36 @@ premiumTest.describe(
           // against that exact string.
           currentMatchup: makeMatchup({ status: 'completed' }),
         });
+        // LS-9868: `expectHidden()` (a negated Playwright web-first
+        // assertion) succeeds the instant the element is absent — including
+        // before it's had any chance to mount — so checking right after
+        // navigation passes vacuously whether or not the panel would
+        // eventually render. `useGetMatchupWinProbabilityQuery` fires
+        // unconditionally on mount (the status-based early return happens
+        // after the hooks), so wait for that response, then flush the
+        // pending React commit it triggers (`page.waitForLoadState`
+        // ('networkidle') doesn't work here — MatchupDetailPage holds an
+        // open WebSocket connection, so the network never goes idle) before
+        // asserting absence. Confirmed empirically that without the
+        // post-response flush, the assertion below still passed even when
+        // the panel rendered moments later.
+        const winProbabilityResponse = page.waitForResponse(
+          (response) =>
+            isGraphQLEndpoint(response.url()) &&
+            response.request().method() === 'POST' &&
+            extractRequestOperationName(response.request()).toLowerCase() ===
+              'getmatchupwinprobability',
+        );
         await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
-
+        await winProbabilityResponse;
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) => {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve()),
+              );
+            }),
+        );
         await matchupPage.winProbabilityPanel.expectHidden();
       },
     );
