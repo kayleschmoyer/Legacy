@@ -38,7 +38,13 @@ resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_vpc" {
 
 # Policy granting access to Stripe secrets in Secrets Manager
 resource "aws_iam_policy" "stripe_webhook_lambda_secrets" {
-  name        = "${local.name_prefix}-stripe-webhook-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-stripe-webhook-lambda-secrets-"
   description = "Allow Stripe Webhook Lambda to read Stripe secrets from Secrets Manager"
 
   policy = jsonencode({
@@ -63,16 +69,33 @@ resource "aws_iam_policy" "stripe_webhook_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_secrets" {
   policy_arn = aws_iam_policy.stripe_webhook_lambda_secrets.arn
   role       = aws_iam_role.stripe_webhook_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # RDS Proxy access for database connectivity
 resource "aws_iam_policy" "stripe_webhook_lambda_rds" {
-  name        = "${local.name_prefix}-stripe-webhook-lambda-rds"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-stripe-webhook-lambda-rds-"
   description = "Allow Stripe Webhook Lambda to connect to RDS via Proxy"
 
   policy = jsonencode({
@@ -89,16 +112,33 @@ resource "aws_iam_policy" "stripe_webhook_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_rds" {
   policy_arn = aws_iam_policy.stripe_webhook_lambda_rds.arn
   role       = aws_iam_role.stripe_webhook_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Policy granting WebSocket notification permissions (DynamoDB + execute-api)
 resource "aws_iam_policy" "stripe_webhook_lambda_websocket" {
-  name        = "${local.name_prefix}-stripe-webhook-lambda-websocket"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-stripe-webhook-lambda-websocket-"
   description = "Allow Stripe Webhook Lambda to send WebSocket notifications"
 
   policy = jsonencode({
@@ -125,17 +165,34 @@ resource "aws_iam_policy" "stripe_webhook_lambda_websocket" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_websocket" {
   policy_arn = aws_iam_policy.stripe_webhook_lambda_websocket.arn
   role       = aws_iam_role.stripe_webhook_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Permission to publish trial_will_end / subscription_updated push notification
 # events onto the notifications queue (lib/aws-utils NotificationPublisher). LS-6838.
 resource "aws_iam_policy" "stripe_webhook_lambda_notifications_sqs" {
-  name        = "${local.name_prefix}-stripe-webhook-lambda-notifications-sqs"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-stripe-webhook-lambda-notifications-sqs-"
   description = "Allow Stripe Webhook Lambda to publish to the notifications queue"
 
   policy = jsonencode({
@@ -150,11 +207,22 @@ resource "aws_iam_policy" "stripe_webhook_lambda_notifications_sqs" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_notifications_sqs" {
   policy_arn = aws_iam_policy.stripe_webhook_lambda_notifications_sqs.arn
   role       = aws_iam_role.stripe_webhook_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # CloudWatch Log Group

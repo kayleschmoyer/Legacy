@@ -56,7 +56,13 @@ resource "aws_iam_role_policy_attachment" "notifications_lambda_vpc" {
 
 # Secrets manager policy — database credentials + Rollbar (both fetched at cold-start)
 resource "aws_iam_policy" "notifications_lambda_secrets" {
-  name        = "${local.name_prefix}-notifications-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-notifications-lambda-secrets-"
   description = "Allow notifications lambda to read secrets"
 
   policy = jsonencode({
@@ -77,16 +83,33 @@ resource "aws_iam_policy" "notifications_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "notifications_lambda_secrets" {
   policy_arn = aws_iam_policy.notifications_lambda_secrets.arn
   role       = aws_iam_role.notifications_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # RDS connection policy
 resource "aws_iam_policy" "notifications_lambda_rds" {
-  name        = "${local.name_prefix}-notifications-lambda-rds"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-notifications-lambda-rds-"
   description = "Allow notifications lambda to connect to RDS"
 
   policy = jsonencode({
@@ -103,16 +126,33 @@ resource "aws_iam_policy" "notifications_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "notifications_lambda_rds" {
   policy_arn = aws_iam_policy.notifications_lambda_rds.arn
   role       = aws_iam_role.notifications_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # SQS permission policy for receiving messages from the notifications queue
 resource "aws_iam_policy" "notifications_lambda_sqs" {
-  name        = "${local.name_prefix}-notifications-lambda-sqs"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-notifications-lambda-sqs-"
   description = "Allow notifications lambda to receive SQS messages"
 
   policy = jsonencode({
@@ -131,16 +171,33 @@ resource "aws_iam_policy" "notifications_lambda_sqs" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "notifications_lambda_sqs" {
   policy_arn = aws_iam_policy.notifications_lambda_sqs.arn
   role       = aws_iam_role.notifications_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # WebSocket/DynamoDB permissions for the notification-received badge push
 resource "aws_iam_policy" "notifications_lambda_websocket" {
-  name        = "${local.name_prefix}-notifications-lambda-websocket"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-notifications-lambda-websocket-"
   description = "Allow notifications lambda to send WebSocket notifications"
 
   policy = jsonencode({
@@ -169,11 +226,22 @@ resource "aws_iam_policy" "notifications_lambda_websocket" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "notifications_lambda_websocket" {
   policy_arn = aws_iam_policy.notifications_lambda_websocket.arn
   role       = aws_iam_role.notifications_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Notifications Lambda function

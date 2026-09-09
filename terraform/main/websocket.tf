@@ -113,7 +113,13 @@ resource "aws_iam_role_policy_attachment" "websocket_lambda_vpc" {
 
 # DynamoDB policy for WebSocket Lambda
 resource "aws_iam_policy" "websocket_lambda_dynamodb" {
-  name        = "${local.name_prefix}-websocket-lambda-dynamodb"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-websocket-lambda-dynamodb-"
   description = "Allow websocket lambda to manage connections in DynamoDB"
 
   policy = jsonencode({
@@ -138,16 +144,33 @@ resource "aws_iam_policy" "websocket_lambda_dynamodb" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "websocket_lambda_dynamodb" {
   policy_arn = aws_iam_policy.websocket_lambda_dynamodb.arn
   role       = aws_iam_role.websocket_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # API Gateway Management API policy
 resource "aws_iam_policy" "websocket_lambda_apigw" {
-  name        = "${local.name_prefix}-websocket-lambda-apigw"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-websocket-lambda-apigw-"
   description = "Allow websocket lambda to post to connections"
 
   policy = jsonencode({
@@ -164,16 +187,33 @@ resource "aws_iam_policy" "websocket_lambda_apigw" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "websocket_lambda_apigw" {
   policy_arn = aws_iam_policy.websocket_lambda_apigw.arn
   role       = aws_iam_role.websocket_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Secrets Manager policy for WebSocket Lambda to read DB credentials
 resource "aws_iam_policy" "websocket_lambda_secrets" {
-  name        = "${local.name_prefix}-websocket-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-websocket-lambda-secrets-"
   description = "Allow websocket lambda to read database credentials and JWT secret"
 
   policy = jsonencode({
@@ -194,11 +234,22 @@ resource "aws_iam_policy" "websocket_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "websocket_lambda_secrets" {
   policy_arn = aws_iam_policy.websocket_lambda_secrets.arn
   role       = aws_iam_role.websocket_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # SSM parameter for websocket lambda version
