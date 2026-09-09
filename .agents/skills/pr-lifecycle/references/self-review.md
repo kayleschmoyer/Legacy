@@ -46,6 +46,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 4. **Read changed files in full** — not just diff hunks. Context matters for identifying dead code, missing imports, and type mismatches.
 
 5. **Check project rules** (each is a hard failure — most are now caught by `make lint-review-patterns` above, but verify these specifically):
+   - **Tool-first for file operations** — scan back through this session's own Bash calls (not the diff — this pattern never shows up in committed code) for `grep`, `find`, `ls`, or `cat`/`head`/`tail` invoked directly instead of `Grep`, `Glob`, or `Read`. `make lint-review-patterns` cannot catch this: it checks the committed diff for code patterns, not the shell commands issued during the session. If you find any, that's a signal to default to the MCP-equivalent tool next time (AGENTS.md "Tool-first for file operations") — no code fix is needed, but note it in the Self-Review Summary below so the pattern is visible.
    - No `console.*` — use `LOGGER` from `@legacy-sports/logging`
    - No `@ts-ignore` or `eslint-disable` — fix root causes
    - No `route.continue()` in E2E tests — use `route.fulfill()`
@@ -88,6 +89,7 @@ After reviewing, produce a structured summary. This summary is your proof that s
 ## Self-Review Summary
 - **Files reviewed**: <list of files read in full>
 - **Common patterns checked**: #1–#20 (list any that matched and were fixed)
+- **Shell fallback usage this session**: <count of grep/find/ls/cat calls that should have used Grep/Glob/Read, or "None">
 - **Project rule violations**: <list, or "None">
 - **Code quality issues fixed**: <list with file:line, or "None">
 - **Issues needing human decision**: <list, or "None">
