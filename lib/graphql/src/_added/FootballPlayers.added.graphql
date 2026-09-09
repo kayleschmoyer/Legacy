@@ -13,33 +13,40 @@ fragment FootballPlayerHeader on FootballPlayer {
   careerStats {
     fantasyPoints
     passing {
+      g
       yds
       td
       int
       rating
     }
     rushing {
+      g
       yds
       td
     }
     receiving {
+      g
       rec
       yds
       td
     }
     kicking {
+      g
       fgm
       fga
       fgPct
     }
     defense {
+      g
       sacks
       int
       ptsAllowedPerG
     }
     idp {
+      g
       soloTkl
       astTkl
+      totalTkl
       sacks
       int
       ff

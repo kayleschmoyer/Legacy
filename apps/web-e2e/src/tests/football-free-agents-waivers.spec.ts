@@ -1,5 +1,5 @@
 /**
- * Football Free Agents / Waivers Tab — hermetic E2E tests (LS-5417)
+ * Football Free Agents / Waivers Tab — hermetic E2E tests (LS-5417, LS-9772)
  *
  * Covers the football branch of `LeagueDetailFreeAgentsTab`
  * (`lib/shared-components/src/features/baseball/LeagueDetailFreeAgentsTab.tsx`)
@@ -10,6 +10,9 @@
  *         position
  *   AC3 — triggering the claim action opens the waiver claim modal and, on
  *         submit, shows the success confirmation
+ *   AC4 — position-specific stat columns render from `careerStats`, and PROJ
+ *         derives a real value instead of the always-null
+ *         `projectedFantasyPoints` field (LS-9772 regression coverage)
  *
  * All GraphQL queries are mocked so this spec runs without a live backend
  * (per LS-5268's epic goal: QA coverage for this page is delivered as
@@ -74,6 +77,11 @@ function makeFootballLeague(overrides: Record<string, unknown> = {}) {
 
 // ── Mock Football Players ────────────────────────────────────────────────────
 
+/**
+ * `projectedFantasyPoints` is always NULL in production (LS-9772 — no
+ * projections/ADP pipeline exists yet); real fixtures reflect that and
+ * exercise the `careerStats`-derived PROJ column instead.
+ */
 function mockFootballPlayer(overrides: Record<string, unknown> = {}) {
   return {
     __typename: 'FootballPlayer',
@@ -86,7 +94,7 @@ function mockFootballPlayer(overrides: Record<string, unknown> = {}) {
     pfrId: 'MahoPa00',
     headshotUrl: null,
     previousTeams: null,
-    projectedFantasyPoints: 24.5,
+    projectedFantasyPoints: null,
     adpRank: 5,
     careerStats: null,
     ...overrides,
@@ -100,7 +108,23 @@ const MOCK_FOOTBALL_PLAYERS = [
     lastName: 'Mahomes',
     position: 'QB',
     nflTeam: 'KC',
-    projectedFantasyPoints: 24.5,
+    careerStats: {
+      __typename: 'FootballCareerStats',
+      fantasyPoints: 340,
+      passing: {
+        __typename: 'FootballCareerPassing',
+        g: 17,
+        yds: 4800,
+        td: 38,
+        int: 10,
+        rating: 105.2,
+      },
+      rushing: null,
+      receiving: null,
+      kicking: null,
+      defense: null,
+      idp: null,
+    },
   }),
   mockFootballPlayer({
     id: 202,
@@ -108,7 +132,21 @@ const MOCK_FOOTBALL_PLAYERS = [
     lastName: 'McCaffrey',
     position: 'RB',
     nflTeam: 'SF',
-    projectedFantasyPoints: 22.1,
+    careerStats: {
+      __typename: 'FootballCareerStats',
+      fantasyPoints: 272,
+      passing: null,
+      rushing: {
+        __typename: 'FootballCareerRushing',
+        g: 16,
+        yds: 1459,
+        td: 14,
+      },
+      receiving: null,
+      kicking: null,
+      defense: null,
+      idp: null,
+    },
   }),
   mockFootballPlayer({
     id: 203,
@@ -116,7 +154,22 @@ const MOCK_FOOTBALL_PLAYERS = [
     lastName: 'Jefferson',
     position: 'WR',
     nflTeam: 'MIN',
-    projectedFantasyPoints: 19.8,
+    careerStats: {
+      __typename: 'FootballCareerStats',
+      fantasyPoints: 238,
+      passing: null,
+      rushing: null,
+      receiving: {
+        __typename: 'FootballCareerReceiving',
+        g: 17,
+        rec: 128,
+        yds: 1809,
+        td: 10,
+      },
+      kicking: null,
+      defense: null,
+      idp: null,
+    },
   }),
 ];
 
@@ -278,6 +331,70 @@ test.describe('Football Free Agents / Waivers — position filter @critical', ()
     await expect(page.getByText('Patrick Mahomes')).toBeVisible();
     await expect(page.getByText('Christian McCaffrey')).not.toBeVisible();
     await expect(page.getByText('Justin Jefferson')).not.toBeVisible();
+  });
+});
+
+// ── Tests: Stat Columns and Projections (AC4, LS-9772 regression) ───────────
+
+test.describe('Football Free Agents / Waivers — stats and projections @critical', () => {
+  test('shows a non-empty PROJ value derived from career stats, not the always-null field', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await gotoFreeAgents(page);
+
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+
+    // Mahomes: careerStats.fantasyPoints 340 / passing.g 17 * gamesPerMatchup 1 = 20.0
+    await expect(page.getByTestId('fa-col-PROJ')).toBeVisible();
+    const projCell = page.getByText('20.0', { exact: true });
+    await expect(projCell).toBeVisible();
+  });
+
+  test('selecting the QB position chip reveals passing stat columns with real values', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await gotoFreeAgents(page);
+
+    await page
+      .getByRole('button', { name: 'Filter by position: QB', exact: true })
+      .click();
+
+    await expect(page.getByTestId('fa-col-QB_YDS')).toBeVisible();
+    await expect(page.getByTestId('fa-col-QB_TD')).toBeVisible();
+    await expect(page.getByTestId('fa-col-QB_INT')).toBeVisible();
+    await expect(page.getByTestId('fa-col-QB_RTG')).toBeVisible();
+
+    // Mahomes's passing.yds (4800) renders as a formatted integer.
+    await expect(page.getByText('4,800', { exact: true })).toBeVisible();
+  });
+
+  test('selecting the RB position chip reveals rushing stat columns with real values', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await gotoFreeAgents(page);
+
+    await page
+      .getByRole('button', { name: 'Filter by position: RB', exact: true })
+      .click();
+
+    await expect(page.getByTestId('fa-col-RB_YDS')).toBeVisible();
+    await expect(page.getByTestId('fa-col-RB_TD')).toBeVisible();
+    await expect(page.getByText('1,459', { exact: true })).toBeVisible();
+  });
+
+  test('a player with no career stats for the category shows a placeholder, not a crash', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      players: [mockFootballPlayer({ id: 301, careerStats: null })],
+    });
+    await gotoFreeAgents(page);
+
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await expect(page.getByTestId('fa-col-PROJ')).toBeVisible();
   });
 });
 

@@ -6010,6 +6010,7 @@ export type FootballPlayerHeaderFragment = {
     fantasyPoints?: number | null;
     passing?: {
       __typename?: 'FootballCareerPassing';
+      g?: number | null;
       yds?: number | null;
       td?: number | null;
       int?: number | null;
@@ -6017,31 +6018,37 @@ export type FootballPlayerHeaderFragment = {
     } | null;
     rushing?: {
       __typename?: 'FootballCareerRushing';
+      g?: number | null;
       yds?: number | null;
       td?: number | null;
     } | null;
     receiving?: {
       __typename?: 'FootballCareerReceiving';
+      g?: number | null;
       rec?: number | null;
       yds?: number | null;
       td?: number | null;
     } | null;
     kicking?: {
       __typename?: 'FootballCareerKicking';
+      g?: number | null;
       fgm?: number | null;
       fga?: number | null;
       fgPct?: number | null;
     } | null;
     defense?: {
       __typename?: 'FootballCareerDefense';
+      g?: number | null;
       sacks?: number | null;
       int?: number | null;
       ptsAllowedPerG?: number | null;
     } | null;
     idp?: {
       __typename?: 'FootballCareerIdp';
+      g?: number | null;
       soloTkl?: number | null;
       astTkl?: number | null;
+      totalTkl?: number | null;
       sacks?: number | null;
       int?: number | null;
       ff?: number | null;
@@ -6170,6 +6177,7 @@ export type FootballPlayersQuery = {
         fantasyPoints?: number | null;
         passing?: {
           __typename?: 'FootballCareerPassing';
+          g?: number | null;
           yds?: number | null;
           td?: number | null;
           int?: number | null;
@@ -6177,31 +6185,37 @@ export type FootballPlayersQuery = {
         } | null;
         rushing?: {
           __typename?: 'FootballCareerRushing';
+          g?: number | null;
           yds?: number | null;
           td?: number | null;
         } | null;
         receiving?: {
           __typename?: 'FootballCareerReceiving';
+          g?: number | null;
           rec?: number | null;
           yds?: number | null;
           td?: number | null;
         } | null;
         kicking?: {
           __typename?: 'FootballCareerKicking';
+          g?: number | null;
           fgm?: number | null;
           fga?: number | null;
           fgPct?: number | null;
         } | null;
         defense?: {
           __typename?: 'FootballCareerDefense';
+          g?: number | null;
           sacks?: number | null;
           int?: number | null;
           ptsAllowedPerG?: number | null;
         } | null;
         idp?: {
           __typename?: 'FootballCareerIdp';
+          g?: number | null;
           soloTkl?: number | null;
           astTkl?: number | null;
+          totalTkl?: number | null;
           sacks?: number | null;
           int?: number | null;
           ff?: number | null;
@@ -6240,6 +6254,7 @@ export type FootballPlayerQuery = {
       fantasyPoints?: number | null;
       passing?: {
         __typename?: 'FootballCareerPassing';
+        g?: number | null;
         yds?: number | null;
         td?: number | null;
         int?: number | null;
@@ -6247,35 +6262,40 @@ export type FootballPlayerQuery = {
       } | null;
       rushing?: {
         __typename?: 'FootballCareerRushing';
+        g?: number | null;
         yds?: number | null;
         td?: number | null;
       } | null;
       receiving?: {
         __typename?: 'FootballCareerReceiving';
+        g?: number | null;
         rec?: number | null;
         yds?: number | null;
         td?: number | null;
       } | null;
       kicking?: {
         __typename?: 'FootballCareerKicking';
+        g?: number | null;
         fgm?: number | null;
         fga?: number | null;
         fgPct?: number | null;
       } | null;
       defense?: {
         __typename?: 'FootballCareerDefense';
+        g?: number | null;
         sacks?: number | null;
         int?: number | null;
         ptsAllowedPerG?: number | null;
-        g?: number | null;
         fumRec?: number | null;
         defTd?: number | null;
         ydsAllowedPerG?: number | null;
       } | null;
       idp?: {
         __typename?: 'FootballCareerIdp';
+        g?: number | null;
         soloTkl?: number | null;
         astTkl?: number | null;
+        totalTkl?: number | null;
         sacks?: number | null;
         int?: number | null;
         ff?: number | null;
@@ -15513,33 +15533,40 @@ export const FootballPlayerHeaderFragmentDoc = gql`
     careerStats {
       fantasyPoints
       passing {
+        g
         yds
         td
         int
         rating
       }
       rushing {
+        g
         yds
         td
       }
       receiving {
+        g
         rec
         yds
         td
       }
       kicking {
+        g
         fgm
         fga
         fgPct
       }
       defense {
+        g
         sacks
         int
         ptsAllowedPerG
       }
       idp {
+        g
         soloTkl
         astTkl
+        totalTkl
         sacks
         int
         ff

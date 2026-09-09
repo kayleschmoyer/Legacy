@@ -107,17 +107,193 @@ interface FootballCol {
   bold?: boolean;
 }
 
-const FOOTBALL_COLS: FootballCol[] = [
-  { id: 'TEAM', label: 'Team' },
-  { id: 'PROJ', label: 'Proj', bold: true },
-];
+/**
+ * Football's position-group filter drives which stat columns are relevant
+ * (LS-9772) — mirrors the way baseball's HITTER_COLS/PITCHER_COLS vary with
+ * `group`. `ALL` (no single filter selected) shows a generic Proj + career
+ * Pts pair since the position-specific categories below don't apply across
+ * the whole pool.
+ */
+type FootballStatGroup = 'ALL' | 'QB' | 'RB' | 'WR_TE' | 'K' | 'DST' | 'IDP';
 
-const renderFootballCell = (p: FootballPlayer, col: FootballCol): string => {
+const footballStatGroup = (pos: string): FootballStatGroup => {
+  switch (pos) {
+    case 'QB':
+      return 'QB';
+    case 'RB':
+      return 'RB';
+    case 'WR':
+    case 'TE':
+      return 'WR_TE';
+    case 'K':
+      return 'K';
+    case 'DST':
+      return 'DST';
+    case 'DL':
+    case 'LB':
+    case 'DB':
+      return 'IDP';
+    default:
+      return 'ALL';
+  }
+};
+
+const FOOTBALL_COLS_BY_GROUP: Record<FootballStatGroup, FootballCol[]> = {
+  ALL: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'PTS', label: 'Pts' },
+  ],
+  QB: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'QB_YDS', label: 'Yds' },
+    { id: 'QB_TD', label: 'TD' },
+    { id: 'QB_INT', label: 'Int' },
+    { id: 'QB_RTG', label: 'Rtg' },
+  ],
+  RB: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'RB_YDS', label: 'Yds' },
+    { id: 'RB_TD', label: 'TD' },
+  ],
+  WR_TE: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'REC', label: 'Rec' },
+    { id: 'REC_YDS', label: 'Yds' },
+    { id: 'REC_TD', label: 'TD' },
+  ],
+  K: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'FGM', label: 'FGM' },
+    { id: 'FGA', label: 'FGA' },
+    { id: 'FG_PCT', label: 'FG%' },
+  ],
+  DST: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'DST_SACK', label: 'Sack' },
+    { id: 'DST_INT', label: 'Int' },
+    { id: 'DST_PA_G', label: 'PA/G' },
+  ],
+  IDP: [
+    { id: 'TEAM', label: 'Team' },
+    { id: 'PROJ', label: 'Proj', bold: true },
+    { id: 'IDP_TKL', label: 'Tkl' },
+    { id: 'IDP_SACK', label: 'Sack' },
+    { id: 'IDP_INT', label: 'Int' },
+  ],
+};
+
+/**
+ * Games played backing the `PROJ` per-game projection — pulled from whichever
+ * stat category the current group cares about (career `g` is tracked
+ * per-category, not on the player). `ALL` falls back to the first populated
+ * category so a projection still renders outside a specific position filter.
+ */
+const footballGamesPlayed = (
+  p: FootballPlayer,
+  group: FootballStatGroup,
+): number | null => {
+  const cs = p.careerStats;
+  switch (group) {
+    case 'QB':
+      return cs?.passing?.g ?? null;
+    case 'RB':
+      return cs?.rushing?.g ?? null;
+    case 'WR_TE':
+      return cs?.receiving?.g ?? null;
+    case 'K':
+      return cs?.kicking?.g ?? null;
+    case 'DST':
+      return cs?.defense?.g ?? null;
+    case 'IDP':
+      return cs?.idp?.g ?? null;
+    default:
+      return (
+        cs?.passing?.g ??
+        cs?.rushing?.g ??
+        cs?.receiving?.g ??
+        cs?.kicking?.g ??
+        cs?.defense?.g ??
+        cs?.idp?.g ??
+        null
+      );
+  }
+};
+
+/**
+ * Football has no projections/ADP pipeline yet (`players.projected_fantasy_points`
+ * is always NULL in production — LS-9772), so `PROJ` is derived the same way
+ * baseball's is: career fantasy points averaged per game and scaled to a
+ * matchup, using `compute_career_scores`-backed `careerStats.fantasyPoints`
+ * which *is* populated. Returns null (rendered as "—") for a player with no
+ * career games in the selected stat category, same as baseball's nulls.
+ */
+const footballProjection = (
+  p: FootballPlayer,
+  group: FootballStatGroup,
+  gamesPerMatchup: number,
+): number | null => {
+  const total = p.careerStats?.fantasyPoints;
+  const g = footballGamesPlayed(p, group);
+  if (total == null || !g) return null;
+  return (total / g) * gamesPerMatchup;
+};
+
+const renderFootballCell = (
+  p: FootballPlayer,
+  col: FootballCol,
+  group: FootballStatGroup,
+  gamesPerMatchup: number,
+): string => {
+  const cs = p.careerStats;
   switch (col.id) {
     case 'TEAM':
       return p.nflTeam ?? (p.isDst ? '—' : 'FA');
     case 'PROJ':
-      return fmtF1(p.projectedFantasyPoints);
+      return fmtF1(footballProjection(p, group, gamesPerMatchup));
+    case 'PTS':
+      return fmtF1(cs?.fantasyPoints);
+    case 'QB_YDS':
+      return fmtInt(cs?.passing?.yds);
+    case 'QB_TD':
+      return fmtInt(cs?.passing?.td);
+    case 'QB_INT':
+      return fmtInt(cs?.passing?.int);
+    case 'QB_RTG':
+      return cs?.passing?.rating != null ? fmtF1(cs.passing.rating) : '—';
+    case 'RB_YDS':
+      return fmtInt(cs?.rushing?.yds);
+    case 'RB_TD':
+      return fmtInt(cs?.rushing?.td);
+    case 'REC':
+      return fmtInt(cs?.receiving?.rec);
+    case 'REC_YDS':
+      return fmtInt(cs?.receiving?.yds);
+    case 'REC_TD':
+      return fmtInt(cs?.receiving?.td);
+    case 'FGM':
+      return fmtInt(cs?.kicking?.fgm);
+    case 'FGA':
+      return fmtInt(cs?.kicking?.fga);
+    case 'FG_PCT':
+      return cs?.kicking?.fgPct != null ? `${fmtF1(cs.kicking.fgPct)}%` : '—';
+    case 'DST_SACK':
+      return fmtF1(cs?.defense?.sacks);
+    case 'DST_INT':
+      return fmtInt(cs?.defense?.int);
+    case 'DST_PA_G':
+      return fmtF1(cs?.defense?.ptsAllowedPerG);
+    case 'IDP_TKL':
+      return fmtInt(cs?.idp?.totalTkl);
+    case 'IDP_SACK':
+      return fmtF1(cs?.idp?.sacks);
+    case 'IDP_INT':
+      return fmtInt(cs?.idp?.int);
     default:
       return '—';
   }
@@ -642,13 +818,24 @@ const PlayerRow = React.memo<PlayerRowProps>(function PlayerRow({
 
 interface FootballPlayerRowProps {
   p: FootballPlayer;
+  cols: FootballCol[];
+  group: FootballStatGroup;
+  gamesPerMatchup: number;
   canClaim: boolean;
   isMember: boolean;
   renderClaimAction?: (player: FreeAgentClaimPlayer) => React.ReactNode;
 }
 
 const FootballPlayerRow = React.memo<FootballPlayerRowProps>(
-  function FootballPlayerRow({ p, canClaim, isMember, renderClaimAction }) {
+  function FootballPlayerRow({
+    p,
+    cols,
+    group,
+    gamesPerMatchup,
+    canClaim,
+    isMember,
+    renderClaimAction,
+  }) {
     const primaryPos = p.isDst ? 'DST' : (p.position ?? null);
     return (
       <XStack
@@ -677,7 +864,7 @@ const FootballPlayerRow = React.memo<FootballPlayerRowProps>(
             </Text>
           )}
         </YStack>
-        {FOOTBALL_COLS.map((c) => (
+        {cols.map((c) => (
           <Text
             key={c.id}
             width={COL_WIDTH}
@@ -688,7 +875,7 @@ const FootballPlayerRow = React.memo<FootballPlayerRowProps>(
             color={c.bold ? '$color' : '$color11'}
             {...TABULAR_NUMS}
           >
-            {renderFootballCell(p, c)}
+            {renderFootballCell(p, c, group, gamesPerMatchup)}
           </Text>
         ))}
         <XStack width={ACTION_COL_WIDTH} justifyContent="flex-end">
@@ -843,10 +1030,17 @@ export const LeagueDetailFreeAgentsTab: React.FC<
     [data?.players, takenPlayerIds],
   );
 
+  // Position-group-aware stat columns (LS-9772) — mirrors baseball's
+  // hitters/pitchers `cols` split just below.
+  const footballGroup = footballStatGroup(footballPos);
+  const footballCols = FOOTBALL_COLS_BY_GROUP[footballGroup];
+
   // The `fpts`/`fpg` pool sorts (LS-9071) rank career totals server-side, not
   // this-season projections — footballPlayers has no server-side sort for
-  // `projectedFantasyPoints` yet, so the projection sort re-orders the
-  // already-fetched page client-side rather than the whole pool.
+  // projections yet, so the projection sort re-orders the already-fetched
+  // page client-side rather than the whole pool. Sorts on the same derived
+  // `footballProjection` the PROJ column renders (LS-9772) rather than the
+  // always-null `projectedFantasyPoints` field.
   const footballPlayers = useMemo(() => {
     const filtered = (footballData?.footballPlayers?.nodes ?? []).filter(
       (p): p is FootballPlayer => p?.id != null && !takenPlayerIds.has(p.id),
@@ -854,11 +1048,19 @@ export const LeagueDetailFreeAgentsTab: React.FC<
     if (footballSortDir == null) return filtered;
     const dir = footballSortDir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
-      const av = a.projectedFantasyPoints ?? -Infinity;
-      const bv = b.projectedFantasyPoints ?? -Infinity;
+      const av =
+        footballProjection(a, footballGroup, gamesPerMatchup) ?? -Infinity;
+      const bv =
+        footballProjection(b, footballGroup, gamesPerMatchup) ?? -Infinity;
       return (av - bv) * dir;
     });
-  }, [footballData?.footballPlayers?.nodes, takenPlayerIds, footballSortDir]);
+  }, [
+    footballData?.footballPlayers?.nodes,
+    takenPlayerIds,
+    footballSortDir,
+    footballGroup,
+    gamesPerMatchup,
+  ]);
 
   const cols = group === 'pitchers' ? PITCHER_COLS : HITTER_COLS;
   const positions = group === 'pitchers' ? PITCHER_POSITIONS : HITTER_POSITIONS;
@@ -886,7 +1088,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
     const footballTableMinWidth =
       PLAYER_COL_WIDTH +
       POS_COL_WIDTH +
-      FOOTBALL_COLS.length * COL_WIDTH +
+      footballCols.length * COL_WIDTH +
       ACTION_COL_WIDTH;
 
     const handleFootballNext = () => {
@@ -1037,7 +1239,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                 >
                   <HeaderCell width={PLAYER_COL_WIDTH}>Player</HeaderCell>
                   <HeaderCell width={POS_COL_WIDTH}>Pos</HeaderCell>
-                  {FOOTBALL_COLS.map((c) => (
+                  {footballCols.map((c) => (
                     <HeaderCell
                       key={c.id}
                       width={COL_WIDTH}
@@ -1057,6 +1259,9 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                     <FootballPlayerRow
                       key={p.id}
                       p={p}
+                      cols={footballCols}
+                      group={footballGroup}
+                      gamesPerMatchup={gamesPerMatchup}
                       canClaim={canClaim}
                       isMember={isMember}
                       renderClaimAction={renderClaimAction}

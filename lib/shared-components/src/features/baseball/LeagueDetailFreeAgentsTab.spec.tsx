@@ -135,6 +135,11 @@ const claimAction = (player: { id: number }) => (
   </button>
 );
 
+/**
+ * `projectedFantasyPoints` is always NULL in production (LS-9772 — no
+ * projections/ADP pipeline exists yet); the default fixture reflects that
+ * and drives PROJ from `careerStats` instead, the way the component now does.
+ */
 const makeFootballPlayer = (overrides: Record<string, unknown> = {}) => ({
   id: 20,
   firstName: 'Patrick',
@@ -142,7 +147,16 @@ const makeFootballPlayer = (overrides: Record<string, unknown> = {}) => ({
   position: 'QB',
   isDst: false,
   nflTeam: 'KC',
-  projectedFantasyPoints: 24.5,
+  projectedFantasyPoints: null,
+  careerStats: {
+    fantasyPoints: 340,
+    passing: { g: 17, yds: 4800, td: 38, int: 10, rating: 105.2 },
+    rushing: null,
+    receiving: null,
+    kicking: null,
+    defense: null,
+    idp: null,
+  },
   ...overrides,
 });
 
@@ -300,12 +314,28 @@ describe('LeagueDetailFreeAgentsTab', () => {
       makeFootballPlayer({
         id: 1,
         lastName: 'LowProj',
-        projectedFantasyPoints: 5,
+        careerStats: {
+          fantasyPoints: 85,
+          passing: { g: 17, yds: null, td: null, int: null, rating: null },
+          rushing: null,
+          receiving: null,
+          kicking: null,
+          defense: null,
+          idp: null,
+        },
       }),
       makeFootballPlayer({
         id: 2,
         lastName: 'HighProj',
-        projectedFantasyPoints: 30,
+        careerStats: {
+          fantasyPoints: 510,
+          passing: { g: 17, yds: null, td: null, int: null, rating: null },
+          rushing: null,
+          receiving: null,
+          kicking: null,
+          defense: null,
+          idp: null,
+        },
       }),
     ];
     render(
@@ -320,6 +350,68 @@ describe('LeagueDetailFreeAgentsTab', () => {
       .getAllByText(/Patrick (HighProj|LowProj)/)
       .map((el) => el.textContent);
     expect(names).toEqual(['Patrick HighProj', 'Patrick LowProj']);
+  });
+
+  it('renders passing stat columns with real values from careerStats for the QB filter (LS-9772)', () => {
+    mockFootballPlayers = [makeFootballPlayer()];
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football', defensiveFormat: 'dst' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('position-filter-QB'));
+    expect(screen.getByTestId('fa-col-QB_YDS')).toBeInTheDocument();
+    expect(screen.getByTestId('fa-col-QB_TD')).toBeInTheDocument();
+    expect(screen.getByText('4,800')).toBeInTheDocument();
+    expect(screen.getByText('38')).toBeInTheDocument();
+    // 340 career fantasy points / 17 games * 5 games-per-matchup = 100.0
+    expect(screen.getByText('100.0')).toBeInTheDocument();
+  });
+
+  it('renders rushing stat columns with real values from careerStats for the RB filter (LS-9772)', () => {
+    mockFootballPlayers = [
+      makeFootballPlayer({
+        id: 21,
+        firstName: 'Christian',
+        lastName: 'McCaffrey',
+        position: 'RB',
+        careerStats: {
+          fantasyPoints: 272,
+          passing: null,
+          rushing: { g: 16, yds: 1459, td: 14 },
+          receiving: null,
+          kicking: null,
+          defense: null,
+          idp: null,
+        },
+      }),
+    ];
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football', defensiveFormat: 'dst' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('position-filter-RB'));
+    expect(screen.getByTestId('fa-col-RB_YDS')).toBeInTheDocument();
+    expect(screen.getByTestId('fa-col-RB_TD')).toBeInTheDocument();
+    expect(screen.getByText('1,459')).toBeInTheDocument();
+  });
+
+  it('shows a "—" PROJ placeholder rather than crashing when a player has no careerStats', () => {
+    mockFootballPlayers = [makeFootballPlayer({ careerStats: null })];
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    expect(screen.getByTestId('fa-col-PROJ')).toBeInTheDocument();
+    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument();
   });
 
   describe('FAAB budget display (FLD-028)', () => {
