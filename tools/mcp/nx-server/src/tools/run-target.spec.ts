@@ -4,6 +4,9 @@ jest.mock('../run-command.js', () => ({
   getRepoRoot: jest.fn(() => '/repo'),
 }));
 jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
+jest.mock('../project-resolution.js', () => ({
+  buildProjectNotFoundHint: jest.fn(),
+}));
 
 import {
   coalesceWindowsTestPathPatterns,
@@ -12,11 +15,16 @@ import {
   runTarget,
 } from './run-target.js';
 import { runJobWithBudget } from '../jobs.js';
+import { buildProjectNotFoundHint } from '../project-resolution.js';
 import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 
 const mockRunJob = runJobWithBudget as jest.MockedFunction<
   typeof runJobWithBudget
 >;
+const mockBuildProjectNotFoundHint =
+  buildProjectNotFoundHint as jest.MockedFunction<
+    typeof buildProjectNotFoundHint
+  >;
 
 /** Configure runJobWithBudget to resolve with a terminal "done" snapshot. */
 function setupJob(): void {
@@ -418,6 +426,67 @@ describe('runTarget', () => {
       error: 'nx run shared-components:test exited with code 1',
       output: 'FAIL shared-components/LoginPage.spec.ts',
     });
+    expect(JSON.parse(result.content[0].text)).not.toHaveProperty('hint');
+  });
+
+  it('surfaces a suggested project name hint when nx reports Cannot find project (LS-9880)', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-6',
+      status: 'failed',
+      label: 'nx run ci-server:typecheck',
+      cwd: '/repo',
+      elapsedSec: 1,
+      exitCode: 1,
+      error: 'nx run ci-server:typecheck exited with code 1',
+      log: " NX   Cannot find project 'ci-server'\n",
+    } satisfies JobSnapshot);
+    mockBuildProjectNotFoundHint.mockResolvedValue(
+      'No nx project named "ci-server" exists. Did you mean one of these? "mcp-ci-server"',
+    );
+
+    const result = await runTarget({
+      project: 'ci-server',
+      target: 'typecheck',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockBuildProjectNotFoundHint).toHaveBeenCalledWith(
+      " NX   Cannot find project 'ci-server'\n",
+      '/repo',
+    );
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      passed: false,
+      hint: 'No nx project named "ci-server" exists. Did you mean one of these? "mcp-ci-server"',
+    });
+  });
+
+  it('omits the hint when no project-name suggestion could be resolved', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-7',
+      status: 'failed',
+      label: 'nx run nonexistent:typecheck',
+      cwd: '/repo',
+      elapsedSec: 1,
+      exitCode: 1,
+      error: 'nx run nonexistent:typecheck exited with code 1',
+      log: " NX   Cannot find project 'nonexistent'\n",
+    } satisfies JobSnapshot);
+    mockBuildProjectNotFoundHint.mockResolvedValue(undefined);
+
+    const result = await runTarget({
+      project: 'nonexistent',
+      target: 'typecheck',
+    });
+
+    expect(JSON.parse(result.content[0].text)).not.toHaveProperty('hint');
+  });
+
+  it('does not consult project-name resolution when the run passes', async () => {
+    setupJob();
+
+    await runTarget({ project: 'shared-components', target: 'test' });
+
+    expect(mockBuildProjectNotFoundHint).not.toHaveBeenCalled();
   });
 
   it('passes a cwd/args-derived idempotencyKey so a duplicate call joins the in-flight job', async () => {

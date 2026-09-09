@@ -6,6 +6,7 @@ import {
   PLUGIN_WORKER_TIMEOUT_HINT,
 } from '../plugin-worker-failure.js';
 import { runJobWithPluginWorkerRetry } from '../plugin-worker-retry.js';
+import { buildProjectNotFoundHint } from '../project-resolution.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -329,6 +330,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         ? PLUGIN_WORKER_TIMEOUT_HINT
         : PLUGIN_WORKER_RETRY_EXHAUSTED_HINT
       : undefined;
+    // A failed run whose `project` param didn't resolve to a real nx project
+    // gets a bare "Cannot find project '<name>'" from the nx CLI with no
+    // suggestion (LS-9880) — fuzzy-resolve the likely correct name(s) so the
+    // caller doesn't have to grep project.json files by hand.
+    const projectNotFoundHint =
+      !passed && !daemonFailed
+        ? await buildProjectNotFoundHint(rawOutput, cwd)
+        : undefined;
     return {
       content: [
         {
@@ -344,7 +353,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             ...(snapshot.error ? { error: snapshot.error } : {}),
             ...(pluginWorkerHint && !daemonFailed
               ? { hint: pluginWorkerHint }
-              : {}),
+              : projectNotFoundHint
+                ? { hint: projectNotFoundHint }
+                : {}),
             output: truncateOutput(rawOutput, MAX_OUTPUT_CHARS),
           }),
         },
