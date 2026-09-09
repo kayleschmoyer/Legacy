@@ -32,7 +32,13 @@ resource "aws_iam_role_policy_attachment" "game_selection_lambda_vpc" {
 
 # Custom policy for Game Selection Lambda
 resource "aws_iam_policy" "game_selection_lambda_secrets" {
-  name        = "${local.name_prefix}-game-selection-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-game-selection-lambda-secrets-"
   description = "IAM policy for Game Selection Lambda to access secrets"
 
   policy = jsonencode({
@@ -93,16 +99,33 @@ resource "aws_iam_policy" "game_selection_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "game_selection_lambda_secrets" {
   policy_arn = aws_iam_policy.game_selection_lambda_secrets.arn
   role       = aws_iam_role.game_selection_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # IAM policy for RDS access
 resource "aws_iam_policy" "game_selection_lambda_rds" {
-  name        = "${local.name_prefix}-game-selection-lambda-rds"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-game-selection-lambda-rds-"
   description = "IAM policy for Game Selection Lambda to access RDS"
 
   policy = jsonencode({
@@ -121,11 +144,22 @@ resource "aws_iam_policy" "game_selection_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "game_selection_lambda_rds" {
   policy_arn = aws_iam_policy.game_selection_lambda_rds.arn
   role       = aws_iam_role.game_selection_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # CloudWatch Log Group

@@ -30,7 +30,13 @@ resource "aws_iam_role_policy_attachment" "rollbar_discord_lambda_basic" {
 
 # Policy granting access to the Discord webhook URL secret
 resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
-  name        = "${local.name_prefix}-rollbar-discord-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-rollbar-discord-lambda-secrets-"
   description = "IAM policy for Rollbar Discord Lambda to access secrets in Secrets Manager"
 
   policy = jsonencode({
@@ -52,11 +58,22 @@ resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "rollbar_discord_lambda_secrets" {
   policy_arn = aws_iam_policy.rollbar_discord_lambda_secrets.arn
   role       = aws_iam_role.rollbar_discord_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # CloudWatch Log Group

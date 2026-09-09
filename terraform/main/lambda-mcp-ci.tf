@@ -31,7 +31,13 @@ resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_basic" {
 }
 
 resource "aws_iam_policy" "mcp_ci_lambda_secrets" {
-  name = "${local.name_prefix}-mcp-ci-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-mcp-ci-lambda-secrets-"
   # NOTE: `description` is immutable for aws_iam_policy (AWS UpdatePolicy has no
   # description field) — Terraform marks it ForceNew, so editing this string
   # forces a destroy+recreate of this policy (and its role attachment), with a
@@ -56,11 +62,22 @@ resource "aws_iam_policy" "mcp_ci_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_secrets" {
   policy_arn = aws_iam_policy.mcp_ci_lambda_secrets.arn
   role       = aws_iam_role.mcp_ci_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Read-only access to Playwright blob artifacts so ci_get_playwright_test_result
@@ -69,7 +86,13 @@ resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_secrets" {
 # role (ci-artifacts.tf). LS-8330: the tool shipped before this grant existed,
 # so S3 mode 403'd for every agent.
 resource "aws_iam_policy" "mcp_ci_lambda_artifacts_read" {
-  name        = "${local.name_prefix}-mcp-ci-lambda-artifacts-read"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-mcp-ci-lambda-artifacts-read-"
   description = "Allows the MCP CI Lambda read-only access to CI artifact handoffs in S3"
 
   policy = jsonencode({
@@ -94,11 +117,22 @@ resource "aws_iam_policy" "mcp_ci_lambda_artifacts_read" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_artifacts_read" {
   policy_arn = aws_iam_policy.mcp_ci_lambda_artifacts_read.arn
   role       = aws_iam_role.mcp_ci_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ── CloudWatch Log Group ──────────────────────────────────────────────────────
