@@ -131,7 +131,9 @@ type BaseMutationOptions<TData, TVariables> = any;`;
 }
 
 function processFile(filePath) {
-  const fullPath = path.join(process.cwd(), filePath);
+  const fullPath = path.isAbsolute(filePath)
+    ? filePath
+    : path.join(process.cwd(), filePath);
 
   if (!fs.existsSync(fullPath)) {
     console.log(`⚠️  Skipping ${filePath} (not found)`);
@@ -156,12 +158,30 @@ function processFile(filePath) {
   }
 }
 
-function main() {
+function main(argv) {
   console.log('\n🔧 Fixing Apollo Client 4.x imports in generated files...\n');
+
+  // graphql-codegen's `afterAllFileWrite` hook (see codegen.ts / codegen.base.ts)
+  // passes the file(s) that specific codegen run just wrote as CLI args. When
+  // called that way, fix only those files — not the full FILES_TO_FIX list.
+  //
+  // This matters because `nx run-many -t codegen` runs multiple packages'
+  // codegen targets concurrently (nx.json parallel: 5), and each package's
+  // hook used to unconditionally rewrite ALL FILES_TO_FIX regardless of which
+  // file it actually generated. That meant several Node processes performed
+  // unsynchronized read-modify-write passes over the *same* shared generated
+  // files at the same time, and a write from one process could land mid-read
+  // (or mid-write) of another, truncating/corrupting the file into invalid
+  // TypeScript (LS-9958). Scoping to the caller's own file(s) removes the
+  // cross-package race entirely.
+  //
+  // With no args (e.g. `pnpm run codegen:fix-apollo` invoked directly), fall
+  // back to fixing every known generated file.
+  const files = argv.length > 0 ? argv : FILES_TO_FIX;
 
   let fixedCount = 0;
 
-  for (const file of FILES_TO_FIX) {
+  for (const file of files) {
     const result = processFile(file);
     if (result) fixedCount++;
   }
@@ -173,7 +193,7 @@ function main() {
 
 // Run if called directly
 if (require.main === module) {
-  process.exit(main());
+  process.exit(main(process.argv.slice(2)));
 }
 
 module.exports = { fixApolloImports, processFile };

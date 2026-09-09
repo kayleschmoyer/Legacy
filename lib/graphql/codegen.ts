@@ -52,7 +52,15 @@ const config: CodegenConfig = {
     },
   },
   hooks: {
-    afterAllFileWrite: ['pnpm -w run codegen:fix-apollo', 'prettier --write'],
+    // Invoke the fix-apollo script directly (not via `pnpm -w run`, which
+    // would force cwd to the workspace root) so it keeps this package's cwd
+    // and the file path graphql-codegen appends to this command resolves to
+    // *this* package's own generated file, not the whole monorepo's set.
+    // See scripts/fix-apollo-codegen.js for why that scoping matters (LS-9958).
+    afterAllFileWrite: [
+      `node ${path.resolve(__dirname, '../../scripts/fix-apollo-codegen.js')}`,
+      'prettier --write',
+    ],
   },
 };
 
