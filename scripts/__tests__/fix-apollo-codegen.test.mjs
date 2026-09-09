@@ -35,12 +35,16 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
 import {
   fixApolloImports,
   processFile,
   main,
   FILES_TO_FIX,
+  looksTruncated,
+  readGeneratedFileWithRetry,
+  TruncatedGeneratedFileError,
 } from '../fix-apollo-codegen.js';
 
 const SCRATCH_ROOT = join(process.cwd(), 'scratch');
@@ -163,6 +167,116 @@ test('main() with no argv falls back to sweeping every entry in FILES_TO_FIX (ma
     process.chdir(dir);
     assert.ok(FILES_TO_FIX.length > 1);
     assert.doesNotThrow(() => main([]));
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- write/flush race (LS-9872) ---
+//
+// Reproduces the reported failure mode directly: `afterAllFileWrite` reads
+// `graphql.generated.ts` while codegen's own write to it is still landing,
+// sees content truncated mid-identifier (e.g. `export type Lineu`), and
+// without this guard would "fix" and prettify that truncation into a
+// permanently corrupt file even though the source commit/schema was fine.
+
+test('looksTruncated flags content that is not syntactically valid TypeScript', () => {
+  assert.equal(looksTruncated('export type Lineu'), true);
+  assert.equal(looksTruncated(''), true);
+  assert.equal(looksTruncated('   \n'), true);
+});
+
+test('looksTruncated accepts well-formed generated-file content', () => {
+  assert.equal(
+    looksTruncated(
+      "import * as Apollo from '@apollo/client';\nexport type Lineup = { id: string };\n",
+    ),
+    false,
+  );
+});
+
+test('readGeneratedFileWithRetry self-heals when a lagging write catches up before retries run out', () => {
+  const dir = mkdtempSync(join(SCRATCH_ROOT, 'fix-apollo-codegen-'));
+  try {
+    const target = join(dir, 'graphql.generated.ts');
+    // File starts mid-write, exactly like the reported truncation.
+    writeFileSync(target, 'export type Lineu', 'utf8');
+
+    // A separate OS process finishes the write shortly after — independent
+    // of this process's event loop, which readGeneratedFileWithRetry blocks
+    // synchronously while retrying (same shape as the real race: codegen's
+    // write and this hook's read are different processes).
+    const finishWrite = spawn(
+      process.execPath,
+      [
+        '-e',
+        `setTimeout(() => require('fs').writeFileSync(${JSON.stringify(
+          target,
+        )}, 'export type Lineup = { id: string };\\n'), 120)`,
+      ],
+      { stdio: 'ignore', detached: true },
+    );
+    finishWrite.unref();
+
+    const content = readGeneratedFileWithRetry(target, 'graphql.generated.ts');
+    assert.match(content, /export type Lineup/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readGeneratedFileWithRetry throws a self-describing TruncatedGeneratedFileError when the file never stops looking truncated', () => {
+  const dir = mkdtempSync(join(SCRATCH_ROOT, 'fix-apollo-codegen-'));
+  try {
+    const target = join(dir, 'graphql.generated.ts');
+    writeFileSync(target, 'export type Lineu', 'utf8');
+
+    assert.throws(
+      () => readGeneratedFileWithRetry(target, 'graphql.generated.ts'),
+      (error) => {
+        assert.ok(error instanceof TruncatedGeneratedFileError);
+        assert.match(error.message, /truncated/);
+        assert.match(error.message, /LS-9872/);
+        return true;
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('processFile throws instead of silently fixing/writing back a still-truncated file', () => {
+  const dir = mkdtempSync(join(SCRATCH_ROOT, 'fix-apollo-codegen-'));
+  try {
+    const target = join(dir, 'graphql.generated.ts');
+    writeFileSync(target, 'export type Lineu', 'utf8');
+
+    assert.throws(() => processFile(target), TruncatedGeneratedFileError);
+
+    // Must never "fix" and write the truncated content back — that would
+    // hand a corrupt-but-stable-looking file on to `prettier --write` next.
+    assert.equal(readFileSync(target, 'utf8'), 'export type Lineu');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('main() propagates a TruncatedGeneratedFileError instead of swallowing it and reporting success', () => {
+  const dir = mkdtempSync(join(SCRATCH_ROOT, 'fix-apollo-codegen-'));
+  const originalCwd = process.cwd();
+  try {
+    writeFileSync(
+      join(dir, 'graphql.generated.ts'),
+      'export type Lineu',
+      'utf8',
+    );
+    process.chdir(dir);
+
+    assert.throws(
+      () => main(['graphql.generated.ts']),
+      TruncatedGeneratedFileError,
+    );
   } finally {
     process.chdir(originalCwd);
     rmSync(dir, { recursive: true, force: true });

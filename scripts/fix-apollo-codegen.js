@@ -16,6 +16,93 @@
 
 const fs = require('fs');
 const path = require('path');
+const ts = require('typescript');
+
+// --- LS-9872: guard against reading a partially-flushed generated file ---
+//
+// graphql-codegen's `afterAllFileWrite` hook (this script) is spawned right
+// after codegen's own write of `graphql.generated.ts` resolves, but on some
+// filesystems/CI runners that write isn't guaranteed to be fully visible to
+// a freshly-spawned child process yet. When that race loses, this script
+// (or, downstream, `prettier --write`) reads a partial file — observed as
+// output truncated mid-identifier, e.g. `export type Lineu` — and happily
+// writes that truncation back out, corrupting the generated file. Re-running
+// codegen on the identical commit succeeds, which is the signature of a
+// write/flush race, not a schema or codegen-config problem.
+//
+// `readGeneratedFileWithRetry` below re-reads and syntax-checks the file a
+// few times before giving up, so a lagging write self-heals instead of
+// getting fixed-up and prettified into a permanently broken file. If it's
+// still truncated after all retries, it throws a `TruncatedGeneratedFileError`
+// with a message that says so explicitly — never letting the corrupt content
+// reach `prettier --write`, whose resulting SyntaxError would otherwise look
+// like a codegen config bug rather than what it actually is.
+const TRUNCATION_RETRY_ATTEMPTS = 5;
+const TRUNCATION_RETRY_BASE_DELAY_MS = Number(
+  process.env.FIX_APOLLO_CODEGEN_RETRY_DELAY_MS || 60,
+);
+
+class TruncatedGeneratedFileError extends Error {}
+
+// Synchronous sleep (no async/await plumbing needed through processFile's
+// call chain, and the retry only ever runs from a one-shot CLI script).
+function sleepSync(ms) {
+  const sab = new SharedArrayBuffer(4);
+  Atomics.wait(new Int32Array(sab), 0, 0, ms);
+}
+
+// A generated file that's been cut off mid-write is, by construction, not
+// syntactically valid TypeScript (e.g. `export type Lineu` has no closing
+// declaration). Parsing it and checking for parse errors catches that
+// directly, rather than guessing at heuristics like "ends with a semicolon".
+function looksTruncated(content) {
+  if (content.trim().length === 0) {
+    return true;
+  }
+  const sourceFile = ts.createSourceFile(
+    'graphql.generated.ts',
+    content,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
+  return (sourceFile.parseDiagnostics || []).length > 0;
+}
+
+function readGeneratedFileWithRetry(fullPath, filePath) {
+  let content = '';
+  for (let attempt = 1; attempt <= TRUNCATION_RETRY_ATTEMPTS; attempt++) {
+    content = fs.readFileSync(fullPath, 'utf8');
+    if (!looksTruncated(content)) {
+      return content;
+    }
+    if (attempt < TRUNCATION_RETRY_ATTEMPTS) {
+      console.warn(
+        `⚠️  ${filePath} appears truncated (attempt ${attempt}/${TRUNCATION_RETRY_ATTEMPTS}) — ` +
+          `this looks like the codegen write/flush race (LS-9872), not a schema or config problem. Retrying read...`,
+      );
+      sleepSync(TRUNCATION_RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+  throw new TruncatedGeneratedFileError(
+    `${filePath} still appears truncated after ${TRUNCATION_RETRY_ATTEMPTS} read retries. ` +
+      `This is the codegen write/flush race (LS-9872) — the generated file was still being ` +
+      `written when this hook read it, and never caught up. Re-run codegen for this project; ` +
+      `this is not a schema or codegen-config bug.`,
+  );
+}
+
+// fs.writeFileSync + fsync so the bytes are durably flushed before the next
+// hook in the chain (`prettier --write`) reads this same file back.
+function writeFileSynced(fullPath, content) {
+  const fd = fs.openSync(fullPath, 'w');
+  try {
+    fs.writeSync(fd, content, 0, 'utf8');
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 
 // Files to fix (relative to workspace root)
 const FILES_TO_FIX = [
@@ -160,11 +247,11 @@ function processFile(filePath) {
   }
 
   try {
-    const content = fs.readFileSync(fullPath, 'utf8');
+    const content = readGeneratedFileWithRetry(fullPath, filePath);
     const fixed = fixApolloImports(content);
 
     if (content !== fixed) {
-      fs.writeFileSync(fullPath, fixed, 'utf8');
+      writeFileSynced(fullPath, fixed);
       console.log(`✅ Fixed: ${filePath}`);
       return true;
     } else {
@@ -172,6 +259,12 @@ function processFile(filePath) {
       return false;
     }
   } catch (error) {
+    if (error instanceof TruncatedGeneratedFileError) {
+      // Re-thrown (not swallowed): a truncated file must hard-fail this
+      // hook so `prettier --write` never runs on it — see LS-9872 above.
+      console.error(`❌ ${error.message}`);
+      throw error;
+    }
     console.error(`❌ Error processing ${filePath}:`, error.message);
     return false;
   }
@@ -212,7 +305,24 @@ function main(argv) {
 
 // Run if called directly
 if (require.main === module) {
-  process.exit(main(process.argv.slice(2)));
+  try {
+    process.exit(main(process.argv.slice(2)));
+  } catch (error) {
+    // A TruncatedGeneratedFileError (LS-9872) or any other failure here
+    // must stop the hook chain with a message that says what actually
+    // happened — otherwise `prettier --write` runs next on a corrupt file
+    // and its resulting SyntaxError is the only thing anyone sees.
+    console.error(`\n❌ codegen:fix-apollo failed: ${error.message}\n`);
+    process.exit(1);
+  }
 }
 
-module.exports = { fixApolloImports, processFile, main, FILES_TO_FIX };
+module.exports = {
+  fixApolloImports,
+  processFile,
+  main,
+  FILES_TO_FIX,
+  looksTruncated,
+  readGeneratedFileWithRetry,
+  TruncatedGeneratedFileError,
+};

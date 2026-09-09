@@ -57,6 +57,14 @@ const config: CodegenConfig = {
     // and the file path graphql-codegen appends to this command resolves to
     // *this* package's own generated file, not the whole monorepo's set.
     // See scripts/fix-apollo-codegen.js for why that scoping matters (LS-9958).
+    //
+    // fix-apollo-codegen.js also guards against reading this file before
+    // codegen's own write to it has fully landed on disk — a lagging write
+    // otherwise reads as truncated content (e.g. `export type Lineu`) that
+    // gets "fixed" and prettified into a permanently corrupt file, even
+    // though the source commit/schema was fine (LS-9872). That guard read-
+    // verifies and retries before this hook, and its own write is fsync'd
+    // before `prettier --write` (next) reads the file back.
     afterAllFileWrite: [
       `node ${path.resolve(__dirname, '../../scripts/fix-apollo-codegen.js')}`,
       'prettier --write',
