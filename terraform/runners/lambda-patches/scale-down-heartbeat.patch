@@ -11,7 +11,7 @@ index 7e9bf0f..b2685fe 100644
  
  export interface RunnerInfo {
 diff --git a/lambdas/functions/control-plane/src/aws/runners.ts b/lambdas/functions/control-plane/src/aws/runners.ts
-index 7f7f575..2fed9c0 100644
+index 7f7f575..6691d8e 100644
 --- a/lambdas/functions/control-plane/src/aws/runners.ts
 +++ b/lambdas/functions/control-plane/src/aws/runners.ts
 @@ -94,6 +94,7 @@ function getRunnerInfo(runningInstances: DescribeInstancesResult) {
@@ -22,11 +22,74 @@ index 7f7f575..2fed9c0 100644
            });
          }
        }
+@@ -121,6 +122,27 @@ export async function untag(instanceId: string, tags: Tag[]): Promise<void> {
+   await ec2.send(new DeleteTagsCommand({ Resources: [instanceId], Tags: tags }));
+ }
+ 
++// LS-9836: a single scale-down invocation walks every runner in the fleet
++// sequentially, each iteration doing several awaited GitHub API round-trips
++// (see removeRunner/evaluateAndRemoveRunners in scale-runners/scale-down.ts).
++// The `ghr:job_heartbeat` value on a RunnerInfo/RunnerList object comes from
++// the ONE DescribeInstances snapshot taken at the very top of scaleDown(), so
++// for a runner processed late in a slow invocation (large fleet, GitHub API
++// latency/pagination) that snapshot can be stale well past
++// SCALE_DOWN_HEARTBEAT_TTL_SECONDS even though the runner has kept
++// heartbeating in real time — the job-heartbeat override in removeRunner was
++// silently defeated by its own snapshot, not by the runner going idle. Fetch
++// the tag live, immediately before the termination decision, so a
++// still-fresh heartbeat is never missed due to invocation-latency staleness.
++export async function getJobHeartbeatTag(instanceId: string): Promise<string | undefined> {
++  const ec2 = getTracedAWSV3Client(new EC2Client({ region: process.env.AWS_REGION }));
++  const result: DescribeInstancesResult = await ec2.send(
++    new DescribeInstancesCommand({ InstanceIds: [instanceId] }),
++  );
++  const instance = result.Reservations?.[0]?.Instances?.[0];
++  return instance?.Tags?.find((t) => t.Key === 'ghr:job_heartbeat')?.Value;
++}
++
+ function generateFleetOverrides(
+   subnetIds: string[],
+   instancesTypes: string[],
 diff --git a/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts b/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
-index 2dfb190..ae0a52e 100644
+index 2dfb190..56597b5 100644
 --- a/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
 +++ b/lambdas/functions/control-plane/src/scale-runners/scale-down.test.ts
-@@ -286,6 +286,41 @@ describe('Scale down runners', () => {
+@@ -5,7 +5,7 @@ import nock from 'nock';
+ 
+ import { RunnerInfo, RunnerList } from '../aws/runners.d';
+ import * as ghAuth from '../github/auth';
+-import { listEC2Runners, terminateRunner, tag, untag } from './../aws/runners';
++import { listEC2Runners, terminateRunner, tag, untag, getJobHeartbeatTag } from './../aws/runners';
+ import { githubCache } from './cache';
+ import { newestFirstStrategy, oldestFirstStrategy, scaleDown } from './scale-down';
+ import { describe, it, expect, beforeEach, vi } from 'vitest';
+@@ -39,6 +39,7 @@ vi.mock('./../aws/runners', async (importOriginal) => {
+     untag: vi.fn(),
+     terminateRunner: vi.fn(),
+     listEC2Runners: vi.fn(),
++    getJobHeartbeatTag: vi.fn(),
+   };
+ });
+ vi.mock('./../github/auth', async () => ({
+@@ -68,6 +69,7 @@ const mockListRunners = vi.mocked(listEC2Runners);
+ const mockTagRunners = vi.mocked(tag);
+ const mockUntagRunners = vi.mocked(untag);
+ const mockTerminateRunners = vi.mocked(terminateRunner);
++const mockGetJobHeartbeatTag = vi.mocked(getJobHeartbeatTag);
+ 
+ export interface TestData {
+   repositoryName: string;
+@@ -120,6 +122,9 @@ describe('Scale down runners', () => {
+     }));
+ 
+     mockOctokit.paginate.mockResolvedValue([]);
++    // Default: no live heartbeat tag present, matching a genuinely idle runner.
++    // Individual tests override this to simulate a fresh/stale/absent tag.
++    mockGetJobHeartbeatTag.mockResolvedValue(undefined);
+     mockOctokit.actions.deleteSelfHostedRunnerFromRepo.mockImplementation((repo) => {
+       // check if repo.runner_id contains the word "busy". If yes, throw an error else return 204
+       if (repo.runner_id.includes('busy')) {
+@@ -286,6 +291,88 @@ describe('Scale down runners', () => {
          checkNonTerminated(runners);
        });
  
@@ -38,7 +101,7 @@ index 2dfb190..ae0a52e 100644
 +        ];
 +        // Fresh heartbeat (just now) — the runner is treated as active and
 +        // skipped even though GitHub reports it idle.
-+        runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000)}`;
++        mockGetJobHeartbeatTag.mockResolvedValue(`${Math.floor(Date.now() / 1000)}`);
 +
 +        mockGitHubRunners(runners);
 +        mockAwsRunners(runners);
@@ -55,7 +118,54 @@ index 2dfb190..ae0a52e 100644
 +        ];
 +        // Heartbeat far older than the TTL — the override lapses and the runner
 +        // is reaped by the normal idle path (self-healing).
-+        runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000) - 100000}`;
++        mockGetJobHeartbeatTag.mockResolvedValue(`${Math.floor(Date.now() / 1000) - 100000}`);
++
++        mockGitHubRunners(runners);
++        mockAwsRunners(runners);
++
++        await scaleDown();
++
++        checkTerminated(runners);
++      });
++
++      // ── LS-9836: live re-check closes the invocation-snapshot staleness gap ─
++      it(
++        `Should defer removal when the batch-fetched EC2 snapshot's job heartbeat is stale but the live ` +
++          `heartbeat is still fresh (invocation-latency staleness, not runner idleness).`,
++        async () => {
++          process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS = '180';
++          const runners = [
++            createRunnerTestData('heartbeat-snapshot-stale', type, MINIMUM_TIME_RUNNING_IN_MINUTES + 5, true, false, false),
++          ];
++          // The snapshot returned by listEC2Runners() (as read at the top of the
++          // scaleDown() invocation) carries a heartbeat old enough to have lapsed
++          // the TTL by itself...
++          runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000) - 100000}`;
++          // ...but the job kept heartbeating in real time, so a LIVE re-check
++          // (getJobHeartbeatTag, called immediately before the termination
++          // decision) sees a fresh tag. removeRunner must trust the live read,
++          // not the stale batch snapshot, and defer removal.
++          mockGetJobHeartbeatTag.mockResolvedValue(`${Math.floor(Date.now() / 1000)}`);
++
++          mockGitHubRunners(runners);
++          mockAwsRunners(runners);
++
++          await scaleDown();
++
++          expect(terminateRunner).not.toHaveBeenCalled();
++        },
++      );
++
++      it(`Should terminate an idle runner with no live job heartbeat, even if a stale snapshot value is present.`, async () => {
++        process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS = '180';
++        const runners = [
++          createRunnerTestData('heartbeat-live-absent', type, MINIMUM_TIME_RUNNING_IN_MINUTES + 5, true, false, true),
++        ];
++        // A leftover/incidental snapshot value is irrelevant — the live re-check
++        // is authoritative and reports no heartbeat tag at all (job completed
++        // and the job_completed hook deleted it since the snapshot was taken).
++        runners[0].jobHeartbeat = `${Math.floor(Date.now() / 1000)}`;
++        mockGetJobHeartbeatTag.mockResolvedValue(undefined);
 +
 +        mockGitHubRunners(runners);
 +        mockAwsRunners(runners);
@@ -69,10 +179,19 @@ index 2dfb190..ae0a52e 100644
          // setup
          const runners = [
 diff --git a/lambdas/functions/control-plane/src/scale-runners/scale-down.ts b/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
-index 6086af7..1ad703c 100644
+index 6086af7..0aac6bc 100644
 --- a/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
 +++ b/lambdas/functions/control-plane/src/scale-runners/scale-down.ts
-@@ -146,6 +146,31 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
+@@ -5,7 +5,7 @@ import { createChildLogger } from '@aws-github-runner/aws-powertools-util';
+ import moment from 'moment';
+ 
+ import { createGithubAppAuth, createGithubInstallationAuth, createOctokitClient } from '../github/auth';
+-import { bootTimeExceeded, listEC2Runners, tag, untag, terminateRunner } from './../aws/runners';
++import { bootTimeExceeded, getJobHeartbeatTag, listEC2Runners, tag, untag, terminateRunner } from './../aws/runners';
+ import { RunnerInfo, RunnerList } from './../aws/runners.d';
+ import { GhRunners, githubCache } from './cache';
+ import { ScalingDownConfig, getEvictionStrategy, getIdleRunnerCount } from './scale-down-config';
+@@ -146,6 +146,45 @@ async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promi
      );
  
      if (states.every((busy) => busy === false)) {
@@ -90,15 +209,29 @@ index 6086af7..1ad703c 100644
 +      // lapses and normal scale-down resumes, so a forgotten heartbeat can never
 +      // leak an instance the way a sticky `ghr:bypass-removal` tag would.
 +      const heartbeatTtl = parseInt(process.env.SCALE_DOWN_HEARTBEAT_TTL_SECONDS || '180', 10);
-+      if (heartbeatTtl > 0 && runnerList.jobHeartbeat) {
-+        const heartbeatEpoch = parseInt(runnerList.jobHeartbeat, 10);
-+        const ageSeconds = Date.now() / 1000 - heartbeatEpoch;
-+        if (Number.isFinite(heartbeatEpoch) && ageSeconds >= 0 && ageSeconds < heartbeatTtl) {
-+          logger.info(
-+            `Runner '${ec2runner.instanceId}' has a fresh job heartbeat (age ${Math.round(ageSeconds)}s < ` +
-+              `${heartbeatTtl}s); treating as active and deferring removal (LS-7874).`,
-+          );
-+          return;
++      if (heartbeatTtl > 0) {
++        // LS-9836 (drain-before-stop): re-fetch the tag live instead of trusting
++        // `runnerList.jobHeartbeat`, which is a snapshot taken once at the top of
++        // this whole scaleDown() invocation. A single invocation walks every
++        // runner in the fleet sequentially with several awaited GitHub API calls
++        // per runner, so by the time a runner near the end of a large/slow
++        // invocation reaches this check, that snapshot can already be older than
++        // SCALE_DOWN_HEARTBEAT_TTL_SECONDS even though the runner kept
++        // heartbeating in real time the whole way through — silently defeating
++        // the LS-7874/LS-7877 override for no reason related to job activity.
++        // This is the final, authoritative check right before termination: it
++        // must see the runner's true current state, not a stale batch read.
++        const liveHeartbeat = await getJobHeartbeatTag(ec2runner.instanceId);
++        if (liveHeartbeat) {
++          const heartbeatEpoch = parseInt(liveHeartbeat, 10);
++          const ageSeconds = Date.now() / 1000 - heartbeatEpoch;
++          if (Number.isFinite(heartbeatEpoch) && ageSeconds >= 0 && ageSeconds < heartbeatTtl) {
++            logger.info(
++              `Runner '${ec2runner.instanceId}' has a fresh job heartbeat (age ${Math.round(ageSeconds)}s < ` +
++                `${heartbeatTtl}s); treating as active and deferring removal (LS-7874/LS-9836).`,
++            );
++            return;
++          }
 +        }
 +      }
        const statuses = await Promise.all(

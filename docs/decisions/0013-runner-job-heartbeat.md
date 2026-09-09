@@ -120,6 +120,20 @@ and Lambda reach live runners; survival is then confirmed by observing live CI
 runs (0 runner-shutdown cancellations across ≥2 runs of each long job) and that
 idle runners still scale to zero.
 
+## Amendment (LS-9836)
+
+The heartbeat override's freshness check originally trusted the
+`ghr:job_heartbeat` value from the single EC2 snapshot `scaleDown()` takes at
+the top of its invocation, not a live read at decision time. Because
+`evaluateAndRemoveRunners` walks the whole fleet sequentially with multiple
+awaited GitHub API calls per runner, that snapshot could go stale (relative
+to `SCALE_DOWN_HEARTBEAT_TTL_SECONDS`) purely from invocation latency, on a
+runner that was heartbeating the entire time — killing two genuinely-busy E2E
+shards on PR #7503. The patch (`scale-down-heartbeat.patch`) now re-fetches
+the tag live, immediately before the termination decision, closing that gap.
+See `terraform/runners/lambda-patches/README.md` § LS-9836 for the full
+analysis.
+
 ## Consequences
 
 ### Easier

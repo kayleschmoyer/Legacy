@@ -95,6 +95,47 @@ needed.
 > job (LS-7877), the debounce became redundant and was removed, shrinking the
 > patch to the single heartbeat-TTL check documented above.
 
+### LS-9836 — drain-before-stop: the heartbeat check read a stale snapshot
+
+Two E2E shards on PR #7503 were killed mid-run (`##[error]The runner has
+received a shutdown signal`) while genuinely busy — one 92% through its test
+list, the other mid-setup — roughly two minutes apart on two different
+instances. That is graceful scale-down terminating a busy runner, the exact
+failure mode LS-7874/LS-7877 exists to prevent, so this was either a
+regression of that mechanism or a code path it never covered.
+
+Reading the real upstream `scale-down.ts` (not just the patch hunks) found
+the gap: `scaleDown()` takes **one** `listEC2Runners()` snapshot at the top of
+the invocation, then `evaluateAndRemoveRunners()` walks every runner in the
+fleet **sequentially**, each iteration awaiting several GitHub API round-trips
+(`removeRunner`'s per-runner `getGitHubRunnerBusyState` calls, uncached "to
+minimize race condition"). The heartbeat check reused `runnerList.jobHeartbeat`
+— a field read off that same top-of-invocation snapshot — as if it were
+current. For a runner near the end of a large or GitHub-API-slow invocation,
+that snapshot can already be older than `SCALE_DOWN_HEARTBEAT_TTL_SECONDS`
+(default 180) purely from Lambda-side latency, even though the runner kept
+tagging `ghr:job_heartbeat` every 60 seconds the entire time. The override was
+silently defeated by its own input being stale, not by the job actually going
+idle — a gap the original design never accounted for, since it assumed the
+check ran effectively at poll time rather than at the end of a
+variable-length per-invocation loop.
+
+**Fix (drain-before-stop):** `removeRunner` now calls a new
+`getJobHeartbeatTag(instanceId)` (`aws/runners.ts`) that fetches the
+`ghr:job_heartbeat` tag live via a single-instance `DescribeInstances`,
+immediately before the termination decision — not the batch snapshot from the
+top of the run. This is the last possible check before `terminateRunner` is
+called, so it always sees the runner's true current state regardless of how
+long the invocation took to reach it. AWS confirmation via CloudTrail
+`TerminateInstances`/scale-down CloudWatch logs was not obtainable for this
+investigation — the CCR session has no AWS CLI — so this fix is grounded in
+the GitHub Actions job logs (exact "shutdown signal" wording, matching the
+graceful-stop signature already established as production fact by LS-7874)
+and in reading the real upstream source rather than in a CloudTrail verdict;
+confirming the CloudTrail `death-verdict` for `i-0302a5868cfff4425` /
+`i-09db4ca34e6c3b3ef` from a local/AWS-CLI-enabled session remains open
+follow-up, tracked on LS-9836.
+
 ## Maintenance contract
 
 The patch is pinned to a specific upstream version. When you bump the module
