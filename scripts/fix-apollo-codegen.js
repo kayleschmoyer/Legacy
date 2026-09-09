@@ -130,10 +130,29 @@ type BaseMutationOptions<TData, TVariables> = any;`;
   return content;
 }
 
+// This script's own directory is <workspaceRoot>/scripts, so its parent is
+// the workspace root regardless of the caller's cwd.
+const WORKSPACE_ROOT = path.resolve(__dirname, '..');
+
 function processFile(filePath) {
   const fullPath = path.isAbsolute(filePath)
     ? filePath
     : path.join(process.cwd(), filePath);
+
+  // The hook that invokes this script (see codegen.ts / codegen.base.ts)
+  // passes graphql-codegen's own output filenames, so this should never
+  // resolve outside the workspace — but process.argv is still
+  // caller-controlled input, so guard against a path (e.g. `../../../etc/x`)
+  // that escapes the workspace root before touching the filesystem.
+  const relativeToRoot = path.relative(WORKSPACE_ROOT, fullPath);
+  const escapesRoot =
+    relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot);
+  if (escapesRoot) {
+    console.error(
+      `❌ Refusing to process ${filePath}: resolves outside the workspace root (${fullPath})`,
+    );
+    return false;
+  }
 
   if (!fs.existsSync(fullPath)) {
     console.log(`⚠️  Skipping ${filePath} (not found)`);
@@ -196,4 +215,4 @@ if (require.main === module) {
   process.exit(main(process.argv.slice(2)));
 }
 
-module.exports = { fixApolloImports, processFile };
+module.exports = { fixApolloImports, processFile, main, FILES_TO_FIX };
