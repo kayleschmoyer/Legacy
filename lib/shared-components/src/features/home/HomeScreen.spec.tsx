@@ -623,12 +623,25 @@ describe('HomeScreen', () => {
       expect(onOpenProfile).toHaveBeenCalledTimes(1);
     });
 
-    it('fires onSeeAllLeagues from "See all"', () => {
+    // LS-9783: home caps the inline league list at 2 (hero + 1 row); "Show
+    // all leagues" only appears once there's a third league to hide.
+    const secondLeague: HomeLeagueSummary = {
+      ...league,
+      leagueId: 44,
+      leagueName: 'Second League',
+    };
+    const thirdLeague: HomeLeagueSummary = {
+      ...league,
+      leagueId: 45,
+      leagueName: 'Third League',
+    };
+
+    it('fires onSeeAllLeagues from "Show all leagues" when there are more than 2 leagues', () => {
       const onSeeAllLeagues = jest.fn();
       const { getByTestId } = render(
         <HomeScreen
           {...baseProps}
-          leagues={[league]}
+          leagues={[league, secondLeague, thirdLeague]}
           onSeeAllLeagues={onSeeAllLeagues}
         />,
       );
@@ -636,11 +649,39 @@ describe('HomeScreen', () => {
       expect(onSeeAllLeagues).toHaveBeenCalledTimes(1);
     });
 
-    it('omits "See all" when no handler is supplied', () => {
+    it('omits "Show all leagues" when a handler is supplied but there are 2 or fewer leagues', () => {
       const { queryByTestId } = render(
-        <HomeScreen {...baseProps} leagues={[league]} />,
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, secondLeague]}
+          onSeeAllLeagues={jest.fn()}
+        />,
       );
       expect(queryByTestId('home-see-all-leagues')).toBeNull();
+    });
+
+    it('omits "Show all leagues" when no handler is supplied', () => {
+      const { queryByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, secondLeague, thirdLeague]}
+        />,
+      );
+      expect(queryByTestId('home-see-all-leagues')).toBeNull();
+    });
+
+    it('caps the inline league list at 2 leagues (hero + one row)', () => {
+      const { getByText, queryByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, secondLeague, thirdLeague]}
+          onSeeAllLeagues={jest.fn()}
+        />,
+      );
+      // `league` is the hero (rendered via the hero card, not a list row);
+      // `secondLeague` fills the one remaining inline slot.
+      expect(getByText('Second League')).toBeTruthy();
+      expect(queryByText('Third League')).toBeNull();
     });
 
     describe('live matchup ticker', () => {

@@ -142,7 +142,11 @@ export interface HomeScreenProps {
   /* ── Narrow-viewport ("Scoreboard First") returning-user layout ──
      Folded in from MobileHomeScreen (LS-8794) by LS-9055; unused by the
      wide-viewport branch. */
-  /** Navigates to the Leagues tab — the narrow layout's "See all ›" control. */
+  /**
+   * Navigates to the full Leagues list — the narrow layout's "Show all
+   * leagues" control, shown only once the user has more than
+   * `MAX_INLINE_LEAGUES` leagues (LS-9783).
+   */
   onSeeAllLeagues?: () => void;
   /** Navigates to the You/profile tab — the narrow greeting's avatar. */
   onOpenProfile?: () => void;
@@ -168,6 +172,11 @@ export interface HomeScreenProps {
    */
   scrollRef?: React.Ref<ScrollViewHandle>;
 }
+
+/** Max leagues shown inline on the Home page (narrow layout) before the rest
+ *  are pushed behind "Show all leagues" (LS-9783). Counts the hero card as
+ *  one of the visible leagues. */
+const MAX_INLINE_LEAGUES = 2;
 
 /* ─── Sport config ─── */
 
@@ -2983,6 +2992,14 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   if (hasLeagues) {
     const heroLeague = sortedSummaries[0];
     const secondaryLeagues = sortedSummaries.slice(1);
+    // Home page shows at most MAX_INLINE_LEAGUES leagues inline (hero card +
+    // remaining rows); anything beyond that is reached via "Show all
+    // leagues", which routes to the full Leagues tab list (LS-9783).
+    const visibleSecondaryLeagues = secondaryLeagues.slice(
+      0,
+      MAX_INLINE_LEAGUES - 1,
+    );
+    const hasMoreLeagues = sortedSummaries.length > MAX_INLINE_LEAGUES;
 
     /* ── Narrow-viewport ("Scoreboard First") branch (LS-8794, folded in by
        LS-9055) — greeting + live-matchup ticker + the same hero
@@ -3027,11 +3044,13 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             <YStack gap="$5">
               <XStack alignItems="center" justifyContent="space-between">
                 <SectionHead eyebrow="Active Season" title="Your Leagues" />
-                <LinkAction
-                  label="See all"
-                  onPress={onSeeAllLeagues}
-                  testID="home-see-all-leagues"
-                />
+                {hasMoreLeagues ? (
+                  <LinkAction
+                    label="Show all leagues"
+                    onPress={onSeeAllLeagues}
+                    testID="home-see-all-leagues"
+                  />
+                ) : null}
               </XStack>
               {heroLeague.sport === 'football' ? (
                 <PlayboardHeroCard
@@ -3050,9 +3069,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   }
                 />
               )}
-              {secondaryLeagues.length > 0 ? (
+              {visibleSecondaryLeagues.length > 0 ? (
                 <YStack gap={10}>
-                  {secondaryLeagues.map((s) => (
+                  {visibleSecondaryLeagues.map((s) => (
                     <LeagueListRow
                       key={s.leagueId}
                       summary={s}
