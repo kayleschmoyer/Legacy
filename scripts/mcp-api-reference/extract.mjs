@@ -445,7 +445,7 @@ function applyZodModifier(method, args, descriptor, ctx) {
       return;
     }
     case 'regex': {
-      const text = args[0] ? args[0].getText(ctx.sourceFile) : '';
+      const text = args[0] ? args[0].getText(args[0].getSourceFile()) : '';
       descriptor.constraints.push(`matches ${text}`);
       return;
     }

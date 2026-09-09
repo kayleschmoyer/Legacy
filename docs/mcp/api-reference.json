@@ -7094,7 +7094,7 @@
         },
         {
           "name": "jira_transition",
-          "description": "Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: ${COMMON_STATUSES.join(', ')}); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS/POSSIBLE_DUPLICATE). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.",
+          "description": "Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: Backlog, To Do, In Progress, In Review, Done, Won't Do); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS/POSSIBLE_DUPLICATE). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.",
           "inputs": {
             "keys": {
               "type": "union",
@@ -7104,7 +7104,7 @@
                   "type": "string",
                   "optional": false,
                   "constraints": [
-                    "matches t } from './tools/delete-ticket.js"
+                    "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
                   ]
                 },
                 {
@@ -7118,7 +7118,7 @@
                     "type": "string",
                     "optional": false,
                     "constraints": [
-                      "matches rom './tools/transition.js';\nimport { "
+                      "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
                     ]
                   }
                 }
@@ -7133,7 +7133,7 @@
                   "type": "string",
                   "optional": false,
                   "constraints": [
-                    "matches t } from './tools/delete-ticket.js"
+                    "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
                   ]
                 },
                 {
@@ -7147,7 +7147,7 @@
                     "type": "string",
                     "optional": false,
                     "constraints": [
-                      "matches rom './tools/transition.js';\nimport { "
+                      "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
                     ]
                   }
                 }
@@ -7183,7 +7183,7 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Target status, resolved dynamically against the issue's available workflow transitions (common: ${COMMON_STATUSES.join(', ')})"
+              "description": "Target status, resolved dynamically against the issue's available workflow transitions (common: Backlog, To Do, In Progress, In Review, Done, Won't Do)"
             },
             "action": {
               "type": "enum",

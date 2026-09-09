@@ -209,14 +209,14 @@ Semantic one-shot for Step 3 of the ticket spine ("Jira → In Progress"). Verif
 
 ### `jira_transition`
 
-Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: ${COMMON_STATUSES.join(', ')}); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS/POSSIBLE_DUPLICATE). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.
+Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: Backlog, To Do, In Progress, In Review, Done, Won't Do); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS/POSSIBLE_DUPLICATE). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `keys` | string \| string[] |  | min 1, max 50 | Ticket key (string) or array of ticket keys |
 | `key` | string \| string[] |  | min 1, max 50 | Deprecated: use `keys`. |
 | `openPrs` | object[] |  | — | action='claim' only. Open PRs the caller already found for this key (this server has no GitHub credentials and cannot look them up). When non-empty, claim returns 'PR_EXISTS' instead of 'PROCEED'. See .agents/skills/work-ticket/references/leaf-mode.md. |
-| `status` | string | **required** | min 1 | Target status, resolved dynamically against the issue's available workflow transitions (common: ${COMMON_STATUSES.join(', ')}) |
+| `status` | string | **required** | min 1 | Target status, resolved dynamically against the issue's available workflow transitions (common: Backlog, To Do, In Progress, In Review, Done, Won't Do) |
 | `action` | enum |  | — | 'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress. |
 | `assignee` | string |  | email | action='claim' only. Assignee email — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is attributed to the caller, not the shared server default. Overridden by `assigneeAccountId`. Resolution caveats: .agents/skills/work-ticket/references/leaf-mode.md. |
 | `assigneeAccountId` | string |  | — | action='claim' only. Assignee accountId — assigned directly with no lookup, so it is the most reliable path. Takes precedence over `assignee` and the JIRA_ASSIGNEE_* env vars. |
