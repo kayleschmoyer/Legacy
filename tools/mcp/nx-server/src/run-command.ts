@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { escapeCmdShellArg } from './cmd-escape.js';
 import { buildChildEnv } from './child-env.js';
 import {
+  isPnpmInstallMissingError,
   isStaleProjectGraphError,
   PROJECT_GRAPH_CACHE_DIRS,
 } from './stale-project-graph.js';
@@ -139,8 +140,31 @@ async function clearProjectGraphCache(workspaceRoot: string): Promise<void> {
 }
 
 /**
- * Run an Nx command via pnpm exec. Retries on daemon race errors, and once
- * on a stale project-graph cache (clearing the cache first).
+ * Finish a `pnpm install` that never completed (LS-9863): mirrors `make
+ * install`'s non-Windows branch (LS-9577) by skipping puppeteer's Chrome
+ * postinstall download, which otherwise aborts the install before
+ * `node_modules/.modules.yaml` is written — the same env vars are harmless
+ * here since Chromium is pre-installed in these containers regardless.
+ */
+async function installMissingPnpmState(workspaceRoot: string): Promise<void> {
+  await runPnpm(
+    ['install', '--frozen-lockfile'],
+    workspaceRoot,
+    COMMAND_TIMEOUT,
+    {
+      PUPPETEER_SKIP_DOWNLOAD: '1',
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: '1',
+    },
+  );
+}
+
+/**
+ * Run an Nx command via pnpm exec. Retries on daemon race errors; on a
+ * genuinely incomplete pnpm install (LS-9863), by running `pnpm install`
+ * once; and on a stale project-graph cache, by clearing the cache once.
+ * The incomplete-install check runs first because it is the more specific
+ * signature — clearing the cache cannot fix it, so checking cache-staleness
+ * first would burn a retry attempt reproducing the identical failure.
  */
 export async function runNx(
   args: string[],
@@ -151,6 +175,7 @@ export async function runNx(
     includeStderr?: boolean;
   },
 ): Promise<string> {
+  let ranPnpmInstall = false;
   let clearedStaleCache = false;
   for (let attempt = 0; attempt <= DAEMON_MAX_RETRIES; attempt++) {
     if (attempt > 0) {
@@ -166,6 +191,12 @@ export async function runNx(
       );
     } catch (err) {
       if (isDaemonRaceError(err) && attempt < DAEMON_MAX_RETRIES) {
+        continue;
+      }
+      if (!ranPnpmInstall && isPnpmInstallMissingError(err)) {
+        ranPnpmInstall = true;
+        await installMissingPnpmState(cwd);
+        attempt--;
         continue;
       }
       if (!clearedStaleCache && isStaleProjectGraphError(err)) {
