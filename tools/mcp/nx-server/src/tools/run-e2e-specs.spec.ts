@@ -421,12 +421,64 @@ describe('runE2ESpecs', () => {
       expect(result.isError).toBe(true);
       const payload = JSON.parse(result.content[0].text) as {
         success: boolean;
+        reason?: string;
         error?: string;
         stats: { total: number };
       };
       expect(payload.success).toBe(false);
       expect(payload.stats.total).toBe(0);
+      expect(payload.reason).toBe('no-tests-matched');
       expect(payload.error).toMatch(/matched 0 tests/);
+    });
+
+    it('reports webserver-failed distinctly from no-tests-matched when the webServer fails to start (LS-9936)', async () => {
+      setupJob(
+        'Error: No tests found. Make sure that arguments are regular expressions matching test files.\n' +
+          '[WebServer] error when starting preview server: [WebServer] Error: Port 4280 is already in use\n' +
+          'ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1',
+        { failed: true },
+      );
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 0 },
+          suites: [],
+        }),
+      );
+
+      const result = await runE2ESpecs({
+        specs: ['src/tests/player-detail-modal.spec.ts'],
+      });
+
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text) as {
+        success: boolean;
+        reason?: string;
+        error?: string;
+        stats: { total: number };
+      };
+      expect(payload.success).toBe(false);
+      expect(payload.stats.total).toBe(0);
+      expect(payload.reason).toBe('webserver-failed');
+      expect(payload.error).toMatch(/webServer failed to start/);
+    });
+
+    it('reports process-exit-nonzero when the process fails despite stats showing no failures (LS-9936)', async () => {
+      setupJob('teardown crashed after tests completed', { failed: true });
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      const result = await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+      });
+
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text) as {
+        success: boolean;
+        reason?: string;
+        error?: string;
+      };
+      expect(payload.success).toBe(false);
+      expect(payload.reason).toBe('process-exit-nonzero');
+      expect(payload.error).toMatch(/exited non-zero/);
     });
 
     it('appends --grep flag when grep option is provided', async () => {

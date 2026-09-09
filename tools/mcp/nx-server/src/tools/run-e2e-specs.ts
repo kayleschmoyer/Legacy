@@ -616,21 +616,68 @@ async function buildE2eResult(
   // (LS-9330).
   const zeroTestsRequested = total === 0;
 
+  // Mirrors the LS-8819 daemon-failure principle (isDaemonFailure in
+  // daemon-failure.ts) for this tool's own failure shape: Playwright spawns
+  // through pnpm rather than `nx run`, so the markers are webServer-specific
+  // rather than Nx-specific (LS-9936). A results.json with an empty suite
+  // set can be written either because the requested spec/project/grep
+  // matched nothing (a caller/arg bug) or because the webServer never came
+  // up (e.g. a port collision with a foreign process) — those need
+  // distinct reasons so a caller doesn't chase the wrong cause.
+  const webServerFailed =
+    combinedOutput.includes('[WebServer]') &&
+    (combinedOutput.includes('error when starting') ||
+      combinedOutput.includes('is already in use') ||
+      combinedOutput.includes('EADDRINUSE'));
+
+  // The job runner marks a job 'failed' when the child process exits
+  // non-zero or errors out (lib/mcp-jobs/src/index.ts). A non-zero exit
+  // with tests recorded as failed/flaky is Playwright's ordinary "some
+  // tests failed" contract and is already reflected in `success` below via
+  // stats — only an exit failure the stats don't explain (e.g. a teardown
+  // crash after all recorded tests passed) needs its own reason so it
+  // isn't silently reported as a pass.
+  const unexplainedProcessFailure =
+    snapshot.status === 'failed' &&
+    !webServerFailed &&
+    !zeroTestsRequested &&
+    failed === 0 &&
+    flaky === 0;
+
+  const reason = webServerFailed
+    ? 'webserver-failed'
+    : zeroTestsRequested
+      ? 'no-tests-matched'
+      : unexplainedProcessFailure
+        ? 'process-exit-nonzero'
+        : undefined;
+
+  const success = reason == null && failed === 0 && flaky === 0;
+
+  const reasonMessages: Record<string, string> = {
+    'webserver-failed':
+      'The Playwright webServer failed to start (see output) — this run ' +
+      'never reached the browser and its stats (if any) are not trustworthy. ' +
+      "Common cause: another process (e.g. a foreign worktree's `vite preview`) " +
+      'is already holding the port.',
+    'no-tests-matched':
+      'Playwright ran but matched 0 tests for the given specs/project/grep — ' +
+      'this almost always means the spec path, project, or grep filter did not ' +
+      'match anything, not that the suite passed. Check the spec paths exist ' +
+      'under apps/web-e2e/ and that project/grep are correct.',
+    'process-exit-nonzero':
+      `Playwright's process exited non-zero (exitCode ${String(snapshot.exitCode)}) ` +
+      'even though recorded stats show no failed or flaky tests — treat this run ' +
+      'as not trustworthy rather than a pass.',
+  };
+
   return {
     body: {
-      success: !zeroTestsRequested && failed === 0 && flaky === 0,
+      success,
       mode: integration ? 'integration' : 'hermetic',
       ...(port != null ? { port } : {}),
       ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
-      ...(zeroTestsRequested
-        ? {
-            error:
-              'Playwright ran but matched 0 tests for the given specs/project/grep — ' +
-              'this almost always means the spec path, project, or grep filter did not ' +
-              'match anything, not that the suite passed. Check the spec paths exist ' +
-              'under apps/web-e2e/ and that project/grep are correct.',
-          }
-        : {}),
+      ...(reason != null ? { reason, error: reasonMessages[reason] } : {}),
       stats: {
         total,
         passed,
@@ -644,10 +691,13 @@ async function buildE2eResult(
       ...(graphqlErrors ? { graphqlErrors } : {}),
       output: combinedOutput,
     },
-    // Failing tests are reported via success:false in the body, not as a tool
-    // error — matches the pre-conversion contract. Zero-tests-matched is
-    // promoted to a tool error since it means the run never happened.
-    isError: zeroTestsRequested,
+    // Failing tests are reported via success:false in the body, not as a
+    // tool error — matches the pre-conversion contract. Any of the
+    // false-green shapes above (zero tests matched, webServer never came
+    // up, or an unexplained non-zero exit) is promoted to a tool error
+    // since it means the run itself can't be trusted, not just that tests
+    // failed.
+    isError: reason != null,
   };
 }
 
