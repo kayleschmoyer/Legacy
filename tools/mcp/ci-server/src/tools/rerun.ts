@@ -1,7 +1,15 @@
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
-import { isAlreadyRunningError, isTimeoutError } from '../http-retry.js';
+import {
+  isAlreadyRunningError,
+  isTimeoutError,
+  isTransientServerError,
+} from '../http-retry.js';
 import { checkStaleMergeRef } from '../merge-ref-staleness.js';
 import type { ToolResult } from '../types.js';
+
+interface GitHubRunStatus {
+  status: string;
+}
 
 interface RerunParams {
   runId: number;
@@ -228,6 +236,58 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
           },
         ],
       };
+    }
+
+    // LS-9646's transient-503 retry (withRetryOnAlreadyRunning) already
+    // absorbed a short-lived GitHub-side blip; a match here means it gave up
+    // after ~6s still getting 502/503/504. That short budget cannot wait out
+    // the actual root cause reported in LS-9862: GitHub's rerun endpoints
+    // reject requests until the run's overall status reaches "completed"
+    // (trailing cleanup/summarize jobs can take many minutes after the
+    // substantive jobs finish), and it returns a bare 503 for that
+    // precondition rather than a clear error. Check the run's current status
+    // before surfacing a bare "gave up" message — if it isn't completed yet,
+    // hand the caller the same actionable ci_wait_run hint as the sibling
+    // "already running" 403 case above, instead of a 503 indistinguishable
+    // from a genuine GitHub outage.
+    if (isTransientServerError(message)) {
+      let runStatus: string | undefined;
+      try {
+        const run = await githubGet<GitHubRunStatus>(
+          `/actions/runs/${params.runId}`,
+        );
+        runStatus = run.status;
+      } catch {
+        runStatus = undefined;
+      }
+
+      if (runStatus && runStatus !== 'completed') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  runId: params.runId,
+                  status: 'not_yet_reschedulable',
+                  message,
+                  hint:
+                    `Run ${params.runId} has not finished yet (status: ${runStatus}) — GitHub's rerun ` +
+                    'endpoints reject requests until every job on the run, including trailing cleanup/summarize ' +
+                    'steps, has completed, and can return a raw "Service Unavailable" 503 while that precondition ' +
+                    `isn't met instead of a clear error. Call ci_wait_run({ runId: ${params.runId} }) and ` +
+                    're-invoke it per its hint until it returns status: "completed", then retry this rerun call.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+      // Run status lookup failed, or the run genuinely is completed — this
+      // is either a real transient GitHub outage or an unrelated error the
+      // retry budget already exhausted; fall through to the generic error.
     }
 
     // A client-side per-attempt timeout (LS-8704) — GitHub's rerun endpoint

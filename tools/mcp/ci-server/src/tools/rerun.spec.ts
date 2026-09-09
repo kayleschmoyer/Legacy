@@ -342,6 +342,74 @@ describe('rerun', () => {
     });
   });
 
+  describe('transient 503 exhausted-retry handling (LS-9862)', () => {
+    it('hands off to ci_wait_run when the run has not reached completed', async () => {
+      mockPostWithRetry.mockRejectedValue(
+        new Error(
+          'GitHub API 503: Service Unavailable (gave up after 3 attempts waiting for GitHub to recover)',
+        ),
+      );
+      mockGithubGet.mockResolvedValue({ status: 'in_progress' });
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text) as {
+        runId: number;
+        status: string;
+        hint: string;
+      };
+      expect(payload.runId).toBe(123);
+      expect(payload.status).toBe('not_yet_reschedulable');
+      expect(payload.hint).toMatch(/status: in_progress/);
+      expect(payload.hint).toMatch(/ci_wait_run\(\{ runId: 123 \}\)/);
+      expect(payload.hint).toMatch(/status: "completed"/);
+    });
+
+    it('surfaces the raw error when the run is already completed (genuine outage)', async () => {
+      mockPostWithRetry.mockRejectedValue(
+        new Error(
+          'GitHub API 503: Service Unavailable (gave up after 3 attempts waiting for GitHub to recover)',
+        ),
+      );
+      mockGithubGet.mockResolvedValue({ status: 'completed' });
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/GitHub API 503/);
+    });
+
+    it('surfaces the raw error when the run-status lookup itself fails', async () => {
+      mockPostWithRetry.mockRejectedValue(
+        new Error(
+          'GitHub API 503: Service Unavailable (gave up after 3 attempts waiting for GitHub to recover)',
+        ),
+      );
+      mockGithubGet.mockRejectedValue(new Error('network error'));
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/GitHub API 503/);
+    });
+
+    it('does not intercept a non-transient error status', async () => {
+      mockPostWithRetry.mockRejectedValue(
+        new Error('GitHub API 422: Unprocessable Entity'),
+      );
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/GitHub API 422/);
+      expect(mockGithubGet).not.toHaveBeenCalledWith(
+        '/actions/runs/123',
+        undefined,
+      );
+    });
+  });
+
   describe('client-side POST timeout (LS-8704)', () => {
     it('returns an actionable retry hint instead of an opaque failure when the request times out', async () => {
       const timeoutError = new Error(
