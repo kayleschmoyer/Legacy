@@ -287,10 +287,17 @@ export async function runE2ESpecs(
   const withTracing = params.withTracing ?? false;
   const cwd = params.worktreePath ?? getRepoRoot();
   const e2eAppDir = path.join(cwd, 'apps', 'web-e2e');
-  const configPath = path.join(
-    e2eAppDir,
-    integration ? 'playwright.integration.config.ts' : 'playwright.config.ts',
-  );
+  // Config filename only — passed with cwd: e2eAppDir below (not cwd: cwd) so
+  // this is the exact `--config=playwright.config.ts` invocation used by the
+  // known-working manual repro (`npx playwright test <spec> --config=playwright.config.ts`
+  // run directly from apps/web-e2e/, LS-9955). Playwright resolves both the
+  // config file and its relative `testDir` from the process's cwd when the
+  // config arg itself is relative, so spawning from repo root while pointing
+  // at an absolute/differently-cased config path was the actual cwd
+  // mismatch — not just the spec-arg separator LS-9330 already fixed.
+  const configFile = integration
+    ? 'playwright.integration.config.ts'
+    : 'playwright.config.ts';
   const distDir = path.join(cwd, 'dist', 'apps', 'web');
   // Both configs declare outputFile: 'test-results/results.json',
   // which Playwright resolves relative to the config file's directory.
@@ -399,11 +406,20 @@ export async function runE2ESpecs(
   // ...) rather than literal path separators — the resulting pattern is
   // silently corrupted and matches zero files, which is why this tool
   // returned "No tests found" / stats.total === 0 despite valid, existing
-  // spec paths (LS-9330). Forward slashes are not regex metacharacters, and
-  // Playwright's own file matcher additionally tests patterns against a
-  // `file://` URL form of the path on win32 (which also uses forward
-  // slashes), so passing posix-style paths as args matches correctly on both
-  // platforms.
+  // spec paths (LS-9330). Forward slashes are not regex metacharacters, so
+  // converting them fixes the pattern corruption — but it isn't the whole
+  // story: Playwright's file matcher tests the pattern against the
+  // discovered test file's *native* absolute path first (backslash-separated
+  // on Windows, so a forward-slash-only pattern still won't match that form)
+  // and only falls back to a forward-slash `file://` URL form as a second
+  // attempt. Passing specs *relative to e2eAppDir* (below) instead of
+  // absolute, combined with spawning the process with cwd: e2eAppDir (see
+  // runJobWithBudget call), reproduces the exact
+  // `playwright test src/tests/<name>.spec.ts --config=playwright.config.ts`
+  // invocation known to work when run manually from apps/web-e2e/ (LS-9955) —
+  // both the config's relative testDir and the relative spec filter resolve
+  // against the same cwd Playwright itself is running from, rather than
+  // depending on the native-vs-URL matcher fallback at all.
   const resolvedSpecs: string[] = [];
   for (const spec of params.specs) {
     const fullPath = path.isAbsolute(spec) ? spec : path.join(e2eAppDir, spec);
@@ -422,19 +438,23 @@ export async function runE2ESpecs(
         isError: true,
       };
     }
-    // Use a literal backslash replace rather than path.sep — path.sep is '/'
-    // on the CI/dev machines that run this server, but a caller-supplied
-    // absolute Windows path (e.g. "D:\\code\\...\\spec.ts") still carries
-    // literal backslashes that need converting regardless of the current
-    // platform's separator.
-    resolvedSpecs.push(normalized.replace(/\\/g, '/'));
+    // Relative to e2eAppDir (the process's cwd, set below) and forward-slash
+    // only. Use a literal backslash replace rather than path.sep — path.sep
+    // is '/' on the CI/dev machines that run this server, but a
+    // caller-supplied absolute Windows path (e.g. "D:\\code\\...\\spec.ts")
+    // still carries literal backslashes that need converting regardless of
+    // the current platform's separator. path.relative itself already
+    // normalizes to the platform separator, so this also strips any
+    // backslashes it introduces on win32.
+    const relative = path.relative(e2eAppDir, normalized) || '.';
+    resolvedSpecs.push(relative.replace(/\\/g, '/'));
   }
 
   const args = [
     'exec',
     'playwright',
     'test',
-    `--config=${configPath}`,
+    `--config=${configFile}`,
     `--project=${project}`,
     ...resolvedSpecs,
   ];
@@ -471,10 +491,14 @@ export async function runE2ESpecs(
       command: jobSpec.command,
       args: jobSpec.args,
       shell: jobSpec.shell,
-      cwd,
+      // Spawned from e2eAppDir, not repo root, to match the manually-verified
+      // working invocation (`playwright test <spec> --config=playwright.config.ts`
+      // run from apps/web-e2e/) exactly — see the resolvedSpecs/configFile
+      // comments above (LS-9955).
+      cwd: e2eAppDir,
       label: `playwright ${integration ? 'integration' : 'e2e'} (${resolvedSpecs.length} spec${resolvedSpecs.length === 1 ? '' : 's'})`,
       timeoutMs,
-      idempotencyKey: `e2e-specs:${cwd}:${args.join(' ')}`,
+      idempotencyKey: `e2e-specs:${e2eAppDir}:${args.join(' ')}`,
       env,
       meta: {
         kind: 'e2e-specs',

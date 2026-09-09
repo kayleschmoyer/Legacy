@@ -405,6 +405,29 @@ describe('runE2ESpecs', () => {
       expect(specArg).toMatch(/\/tests\/player-detail-modal\.spec\.ts$/);
     });
 
+    it('spawns from apps/web-e2e with relative spec and config args, matching the working manual `playwright test <spec> --config=playwright.config.ts` invocation (LS-9955)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+
+      const opts = jobCallOpts();
+      expect(opts.cwd).toBe('/repo/apps/web-e2e');
+      expect(opts.args).toContain('--config=playwright.config.ts');
+      expect(opts.args).toContain('src/tests/auth.spec.ts');
+    });
+
+    it('resolves an absolute spec path to a cwd-relative arg (LS-9955)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({
+        specs: ['/repo/apps/web-e2e/src/tests/auth.spec.ts'],
+      });
+
+      expect(jobCallOpts().args).toContain('src/tests/auth.spec.ts');
+    });
+
     it('treats a Playwright run that matches zero tests as an error, not a silent pass (LS-9330)', async () => {
       setupJob('');
       mockReadFile.mockResolvedValue(
