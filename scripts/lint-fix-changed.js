@@ -15,6 +15,19 @@
  * follows this with an unscoped `nx affected -t lint` (no --fix) so
  * violations this pass can't autofix still fail pc-lint and get reported.
  *
+ * Each group is then invoked with whichever cwd/path convention that
+ * project's *real* lint target actually uses (LS-9869): most projects
+ * inherit nx.json's `nx:run-commands` targetDefault (`eslint .` with cwd at
+ * the project root), so this script cd's into the config directory and
+ * passes project-relative paths. A handful of projects (apps/web-e2e among
+ * them) instead run their `lint` target through Nx's `@nx/eslint:lint`
+ * executor, which always resolves eslint's cwd to the workspace root and
+ * uses root-relative `lintFilePatterns` — invoking those with the default
+ * convention makes ESLint 9's file enumerator resolve the given path
+ * against the wrong directory, so it aborts with "No files matching the
+ * pattern" and the fix step silently does nothing. See
+ * usesRootRelativeLintExecutor below.
+ *
  * Usage: node scripts/lint-fix-changed.js --base <ref>
  *
  * Fail-safe: if git diff fails or nothing changed, exits 0 without fixing
@@ -22,7 +35,7 @@
  */
 
 const { execFileSync } = require('child_process');
-const { existsSync } = require('fs');
+const { existsSync, readFileSync } = require('fs');
 const { dirname, extname, join, relative, resolve } = require('path');
 
 // pnpm is a `.cmd` shim on Windows — execFileSync needs the explicit
@@ -53,6 +66,21 @@ const ESLINT_CONFIG_FILENAMES = [
   'eslint.config.cts',
 ];
 
+const PROJECT_JSON_FILENAME = 'project.json';
+
+// Projects whose real `lint` target uses this executor (apps/web-e2e,
+// apps/app, apps/app-e2e, lambdas/websocket, lib/scheduling,
+// lib/ui-abstractions as of LS-9869) run eslint with the *workspace root* as
+// cwd and workspace-root-relative `lintFilePatterns` — see e.g.
+// apps/web-e2e/project.json. Every other project inherits nx.json's
+// `nx:run-commands` targetDefault (`eslint .`), which Nx runs with cwd at
+// the *project* root. The two conventions need opposite invocations from
+// this script, or ESLint 9's file enumerator resolves the given path
+// against the wrong directory and aborts with "No files matching the
+// pattern" — silently, since the caller only sees a non-zero exit it
+// already treats as "unfixable violations remain" (LS-9869).
+const ROOT_RELATIVE_LINT_EXECUTOR = '@nx/eslint:lint';
+
 function parseBaseRef(argv) {
   const idx = argv.indexOf('--base');
   return idx !== -1 && idx + 1 < argv.length ? argv[idx + 1] : 'origin/main';
@@ -68,6 +96,35 @@ function resolveConfigDir(absFile, root) {
     if (dir === root) return root;
     const parent = dirname(dir);
     if (parent === dir) return root;
+    dir = parent;
+  }
+}
+
+/**
+ * Whether the project owning `configDir` runs its real `lint` target via
+ * Nx's `@nx/eslint:lint` executor, which needs cwd=root + root-relative
+ * paths (see ROOT_RELATIVE_LINT_EXECUTOR above). Walks up from `configDir`
+ * to the nearest `project.json`, bounded by `root`; a config directory with
+ * no owning project.json (or one that fails to parse) falls back to the
+ * default project-root convention.
+ *
+ * Exported for unit testing.
+ */
+function usesRootRelativeLintExecutor(configDir, root) {
+  let dir = configDir;
+  for (;;) {
+    const projectJsonPath = join(dir, PROJECT_JSON_FILENAME);
+    if (existsSync(projectJsonPath)) {
+      try {
+        const project = JSON.parse(readFileSync(projectJsonPath, 'utf-8'));
+        return project?.targets?.lint?.executor === ROOT_RELATIVE_LINT_EXECUTOR;
+      } catch {
+        return false;
+      }
+    }
+    if (dir === root) return false;
+    const parent = dirname(dir);
+    if (parent === dir) return false;
     dir = parent;
   }
 }
@@ -153,6 +210,15 @@ function main() {
     process.stdout.write(
       `  Fixing ${relFiles.length} file(s) in ${label}...\n`,
     );
+
+    const rootRelative = usesRootRelativeLintExecutor(configDir, root);
+    const cwd = rootRelative ? root : configDir;
+    const files = rootRelative
+      ? relFiles.map((relFile) =>
+          relative(root, resolve(configDir, relFile)).replace(/\\/g, '/'),
+        )
+      : relFiles;
+
     try {
       execFileSync(
         PNPM_COMMAND,
@@ -161,9 +227,9 @@ function main() {
           'eslint',
           '--fix',
           '--fix-type=problem,suggestion,layout',
-          ...relFiles,
+          ...files,
         ],
-        { cwd: configDir, stdio: 'inherit' },
+        { cwd, stdio: 'inherit' },
       );
     } catch {
       // eslint --fix exits non-zero when unfixable violations remain — expected.
@@ -177,4 +243,9 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { resolveConfigDir, groupByConfigDir, getChangedFiles };
+module.exports = {
+  resolveConfigDir,
+  groupByConfigDir,
+  getChangedFiles,
+  usesRootRelativeLintExecutor,
+};

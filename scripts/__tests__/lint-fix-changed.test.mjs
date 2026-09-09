@@ -20,9 +20,12 @@ import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { resolveConfigDir, groupByConfigDir, getChangedFiles } = require(
-  resolve(__dirname, '..', 'lint-fix-changed.js'),
-);
+const {
+  resolveConfigDir,
+  groupByConfigDir,
+  getChangedFiles,
+  usesRootRelativeLintExecutor,
+} = require(resolve(__dirname, '..', 'lint-fix-changed.js'));
 
 function git(root, args) {
   execFileSync('git', args, { cwd: root, stdio: 'pipe' });
@@ -153,6 +156,59 @@ test('getChangedFiles returns [] with no changes vs base', () => {
   try {
     git(root, ['checkout', '-q', '-b', 'feature']);
     assert.deepEqual(getChangedFiles('main', root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('usesRootRelativeLintExecutor is true for a project whose lint target uses @nx/eslint:lint (LS-9869)', () => {
+  const root = makeFixture();
+  try {
+    const projectDir = join(root, 'apps', 'web');
+    writeFileSync(
+      join(projectDir, 'project.json'),
+      JSON.stringify({
+        targets: { lint: { executor: '@nx/eslint:lint' } },
+      }),
+    );
+    assert.equal(usesRootRelativeLintExecutor(projectDir, root), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('usesRootRelativeLintExecutor is false for the default nx:run-commands lint target', () => {
+  const root = makeFixture();
+  try {
+    const projectDir = join(root, 'apps', 'web');
+    writeFileSync(
+      join(projectDir, 'project.json'),
+      JSON.stringify({
+        targets: { lint: { executor: 'nx:run-commands' } },
+      }),
+    );
+    assert.equal(usesRootRelativeLintExecutor(projectDir, root), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('usesRootRelativeLintExecutor is false when no project.json owns the config dir', () => {
+  const root = makeFixture();
+  try {
+    const projectDir = join(root, 'lib', 'utils');
+    assert.equal(usesRootRelativeLintExecutor(projectDir, root), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('usesRootRelativeLintExecutor is false when project.json has no explicit lint target', () => {
+  const root = makeFixture();
+  try {
+    const projectDir = join(root, 'apps', 'web');
+    writeFileSync(join(projectDir, 'project.json'), JSON.stringify({}));
+    assert.equal(usesRootRelativeLintExecutor(projectDir, root), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
