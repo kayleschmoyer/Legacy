@@ -321,3 +321,51 @@ describe('retriggerCheck — checkName matching on names containing "&" (LS-9884
     expect(result.content[0].text).toMatch(/GraphQL Schema & Codegen/);
   });
 });
+
+describe('retriggerCheck — checkName substring match on the emoji-prefixed CI Pipeline name (LS-9973)', () => {
+  it('matches the short name "lint" against the full "🚀 CI Pipeline / lint & format" check name', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 1,
+        check_runs: [
+          makeCheckRun('🚀 CI Pipeline / lint & format', {
+            conclusion: 'cancelled',
+          }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 7756,
+      checkName: 'lint',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    expect(body.failed).toBe(0);
+  });
+
+  it('matches "lint & format" against the full "🚀 CI Pipeline / lint & format" check name', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 1,
+        check_runs: [
+          makeCheckRun('🚀 CI Pipeline / lint & format', {
+            conclusion: 'cancelled',
+          }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 7756,
+      checkName: 'lint & format',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    expect(body.failed).toBe(0);
+  });
+});
