@@ -428,6 +428,82 @@ describe('openPR', () => {
     });
   });
 
+  describe('Lambda mode push:true no-op on an unpushed branch (LS-9290)', () => {
+    it('errors with actionable guidance when the branch does not exist on the remote', async () => {
+      mockIsLambda.mockReturnValue(true);
+      mockGithubRest.mockRejectedValueOnce(
+        new Error(
+          'GitHub API GET /repos/bkrupa/legacy-sports/git/ref/heads/feature-branch failed (404): Not Found',
+        ),
+      );
+      const result = await openPR({
+        title: 'LS-9290 test',
+        body: 'body',
+        head: 'feature-branch',
+        // push omitted — default true
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/does not exist on the remote/);
+      expect(result.content[0].text).toContain(
+        'git push -u origin feature-branch',
+      );
+      expect(result.content[0].text).toContain('push: false');
+      // Never reaches the PR-create call.
+      expect(mockGithubRest).toHaveBeenCalledTimes(1);
+    });
+
+    it('proceeds when the branch already exists on the remote', async () => {
+      mockIsLambda.mockReturnValue(true);
+      mockGithubRest.mockImplementation((req: { path: string }) =>
+        req.path === '/repos/bkrupa/legacy-sports/git/ref/heads/feature-branch'
+          ? Promise.resolve({})
+          : Promise.resolve({ number: 99, html_url: 'https://example/pr/99' }),
+      );
+      const result = await openPR({
+        title: 'LS-9290 test',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        // push omitted — default true, but the branch already exists remotely
+      });
+      expect(result.isError).toBeFalsy();
+    });
+
+    it('surfaces a clear error when the existence check itself fails for a non-404 reason', async () => {
+      mockIsLambda.mockReturnValue(true);
+      mockGithubRest.mockRejectedValueOnce(
+        new Error(
+          'GitHub API GET /repos/bkrupa/legacy-sports/git/ref/heads/feature-branch failed (500): server error',
+        ),
+      );
+      const result = await openPR({
+        title: 'LS-9290 test',
+        body: 'body',
+        head: 'feature-branch',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/Failed to check whether branch/);
+    });
+
+    it('does not perform the remote-existence check when push:false is passed', async () => {
+      mockIsLambda.mockReturnValue(true);
+      const result = await openPR({
+        title: 'LS-9290 test',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(result.isError).toBeFalsy();
+      const paths = (
+        mockGithubRest.mock.calls as unknown as Array<[{ path: string }]>
+      ).map(([req]) => req.path);
+      expect(paths).not.toContain(
+        '/repos/bkrupa/legacy-sports/git/ref/heads/feature-branch',
+      );
+    });
+  });
+
   describe('bodyFile (LS-9581)', () => {
     it('errors when both body and bodyFile are provided', async () => {
       const result = await openPR({

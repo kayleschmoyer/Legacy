@@ -120,6 +120,33 @@ function getUpstreamBranch(cwd: string): Promise<string | null> {
 }
 
 /**
+ * Whether `branch` already exists on the remote. Used to catch the Lambda-mode
+ * gap where `push: true` (the default) cannot actually push anything — the
+ * server has no local git checkout — so a brand-new, never-pushed branch would
+ * otherwise sail through to the PR-create call and surface as a bare 422
+ * `{"field":"head","code":"invalid"}` with no indication a push was ever
+ * expected (LS-9290).
+ */
+async function branchExistsOnRemote(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<boolean> {
+  try {
+    await githubRest({
+      method: 'GET',
+      path: `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof Error && /failed \(404\)/.test(e.message)) {
+      return false;
+    }
+    throw e;
+  }
+}
+
+/**
  * Semantic one-shot for Step 12 of the ticket spine (Ship):
  * push branch → create PR as draft → mark ready for review → apply bot:ready-for-review label.
  *
@@ -298,9 +325,38 @@ async function openPRWorker(
   const title = ensureTitleHasPrimaryKey(params.title, primary);
   const prBody = ensureJiraLinkMarker(body, { primary, related: [] });
 
+  let repo: { owner: string; name: string };
   try {
-    const repo = await getRepoOwnerName();
+    repo = await getRepoOwnerName();
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e));
+  }
 
+  // In Lambda mode `shouldPush` never actually pushes (see the push section
+  // above — the server has no local git checkout to push from). If the
+  // branch doesn't already exist on the remote, the PR-create call below
+  // will 422 with an opaque `{"field":"head","code":"invalid"}` and no hint
+  // that a push was ever expected. Fail clearly here instead (LS-9290).
+  if (lambda && shouldPush) {
+    let existsRemotely: boolean;
+    try {
+      existsRemotely = await branchExistsOnRemote(repo.owner, repo.name, head);
+    } catch (e) {
+      return err(
+        `Failed to check whether branch "${head}" exists on the remote: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    if (!existsRemotely) {
+      return err(
+        `Branch "${head}" does not exist on the remote and cannot be pushed from here: in ` +
+          'Lambda mode this server has no local git checkout, so `push: true` (the default) ' +
+          'is a no-op rather than an actual push. Push the branch manually first ' +
+          `(e.g. \`git push -u origin ${head}\` from the worktree), then retry \`github_open_pr\` with \`push: false\`.`,
+      );
+    }
+  }
+
+  try {
     // Step 1: Create PR (always as draft initially, per Author Agent Contract)
     jobLog('Creating PR...');
     const pr = await githubRest<GitHubPRResponse>({
