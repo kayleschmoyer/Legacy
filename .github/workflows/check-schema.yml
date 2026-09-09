@@ -151,6 +151,49 @@ jobs:
           set -o pipefail
           pnpm run codegen 2>&1 | tee "$RUNNER_TEMP/schema-codegen.log"
 
+      # --- Generated-client drift check ---
+      # codegen exiting 0 only means it didn't crash — it says nothing about
+      # whether the output matches what's committed. A stale selection set
+      # (e.g. a field present in the schema but missing from a committed
+      # *.generated.ts because it was hand-edited or generated against an
+      # older schema) passes the step above silently. Catch that class of
+      # drift explicitly so it can't land and then surface as a confusing
+      # unrelated-looking diff on the next PR that happens to run codegen.
+
+      - name: "Check for generated-client drift"
+        id: generated-drift-check
+        if: steps.codegen-check.outcome == 'success'
+        shell: bash
+        run: |
+          if git diff --exit-code -- '*.generated.ts'; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            echo "✅  *.generated.ts files match the schema"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            echo "❌  *.generated.ts files are out of sync with the schema"
+            git diff -- '*.generated.ts' > "$RUNNER_TEMP/generated-drift.diff" || true
+          fi
+
+      - name: "Show generated-client drift diff"
+        if: steps.generated-drift-check.outputs.drift == 'true'
+        shell: bash
+        run: |
+          echo ""
+          echo "==================================================================="
+          echo "  Generated GraphQL client files (*.generated.ts) are out of sync"
+          echo "==================================================================="
+          echo ""
+          echo "Run the following command locally and commit the result:"
+          echo ""
+          echo "  pnpm run codegen"
+          echo ""
+          echo "--- Diff (committed vs generated) ---"
+          git diff -- '*.generated.ts'
+
+      - name: "Fail on generated-client drift"
+        if: steps.generated-drift-check.outputs.drift == 'true'
+        run: exit 1
+
       # --- Contract gate: breaking-change diff + operation validation ---
       # Runs even when codegen failed (always()) so the clean, human-readable
       # contract report is produced regardless. The breaking-change diff is the
