@@ -1,9 +1,4 @@
-import {
-  GetObjectCommand,
-  ListObjectsV2Command,
-  S3Client,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { S3Client } from '@aws-sdk/client-s3';
 import { githubGet } from './github-api.js';
 
 const BUCKET =
@@ -15,8 +10,18 @@ const PRESIGN_EXPIRY_SECONDS = 3600;
 
 let s3: S3Client | undefined;
 
-function getS3(): S3Client {
-  if (!s3) s3 = new S3Client({ region: REGION });
+// `@aws-sdk/client-s3` (and its `@smithy/*` transitive tree) is only needed by
+// the two S3-fallback code paths below, which are exercised on a small
+// minority of calls (a GH Pages credentials gap, or an explicit
+// `source: "s3"` request). Importing it lazily — instead of as a top-level
+// static import — keeps it out of this MCP server's startup path entirely,
+// so every other tool call (the overwhelming majority) never pays its
+// resolve/transform cost under `tsx` (LS-9874).
+async function getS3(): Promise<S3Client> {
+  if (!s3) {
+    const { S3Client: S3ClientCtor } = await import('@aws-sdk/client-s3');
+    s3 = new S3ClientCtor({ region: REGION });
+  }
   return s3;
 }
 
@@ -80,7 +85,12 @@ export async function listPlaywrightS3Artifacts(
   sha: string,
   artifactType: PlaywrightArtifactType = 'blobs',
 ): Promise<S3ArtifactsResult> {
-  const client = getS3();
+  const [{ ListObjectsV2Command, GetObjectCommand }, { getSignedUrl }, client] =
+    await Promise.all([
+      import('@aws-sdk/client-s3'),
+      import('@aws-sdk/s3-request-presigner'),
+      getS3(),
+    ]);
   const prefix = `ci-artifacts/${sha}/${ARTIFACT_TYPE_PREFIXES[artifactType]}/`;
 
   const objects: Array<{ Key?: string; Size?: number; LastModified?: Date }> =
