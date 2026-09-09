@@ -210,10 +210,26 @@ const RUNNER_BOOTSTRAP_NOISE = /hook_job_started\.sh/;
 const JSDOM_NOISE =
   /Not implemented:\s|A suspended resource finished loading inside a test/;
 
+/** Hard cap on the number of curated lines `extractErrorSummary` returns. */
+const ERROR_SUMMARY_LINE_CAP = 200;
+
+/** Result of {@link extractErrorSummary}: the curated lines plus how many candidate lines didn't fit. */
+interface ErrorSummaryResult {
+  lines: string[];
+  /**
+   * Number of matched candidate lines (priority + generic-pattern matches,
+   * after dedup) that were cut by the {@link ERROR_SUMMARY_LINE_CAP} cap
+   * (LS-9700 AC3) — so a caller whose real failure still didn't make the cut
+   * knows the summary may be incomplete, instead of silently trusting a
+   * truncated result as exhaustive.
+   */
+  droppedCount: number;
+}
+
 function extractErrorSummary(
   allLines: string[],
   priorityLines: string[] = [],
-): string[] {
+): ErrorSummaryResult {
   const result: string[] = [];
   const contextLines = 2;
   let inNxFailedSection = false;
@@ -302,7 +318,15 @@ function extractErrorSummary(
   const rest = deduped.filter(
     (line) => !prioritySeen.has(line) && !isSuccessMarkerLine(line),
   );
-  return [...filteredPriority, ...rest].slice(0, 200);
+  // Priority lines (jest/playwright/eslint markers, ##[error] annotations)
+  // are ranked first so they are the last to be cut by the cap (LS-9700
+  // AC3) — a failing-step signal always outranks an incidental generic-
+  // pattern mention for the same 200-line budget.
+  const merged = [...filteredPriority, ...rest];
+  return {
+    lines: merged.slice(0, ERROR_SUMMARY_LINE_CAP),
+    droppedCount: Math.max(0, merged.length - ERROR_SUMMARY_LINE_CAP),
+  };
 }
 
 /** Default hard cap on total output characters to prevent context overflow. */
@@ -497,7 +521,10 @@ async function buildRunPayload(
   }
 
   if (params.errorSummary) {
-    const summary = extractErrorSummary(lines, priorityLines);
+    const { lines: summary, droppedCount } = extractErrorSummary(
+      lines,
+      priorityLines,
+    );
     // Strip ANSI escape sequences (LS-9557) after line selection — the
     // selection heuristics above (##[group] blocks, command-echo detection
     // via ANSI_ESCAPE_PREFIX) rely on the raw escape codes — but before the
@@ -514,20 +541,40 @@ async function buildRunPayload(
       params.truncateLineLength,
       maxChars,
     );
+    const summaryHints: string[] = [];
+    if (skippedJobs) {
+      summaryHints.push(
+        `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+      );
+    }
+    // LS-9700 AC3: priorityLines itself is already capped at
+    // PRIORITY_LINES_CAP upstream (fetchRunLogsRing) — flag that too, since
+    // a run with more failure-signal lines than the cap would otherwise look
+    // identical to one with far fewer.
+    if ((priorityLines?.length ?? 0) >= PRIORITY_LINES_CAP) {
+      summaryHints.push(
+        `priority failure-line matches capped at ${PRIORITY_LINES_CAP} — narrow the scope with jobName or jobId to see the rest`,
+      );
+    }
+    // LS-9700 AC3: tell the caller when the curated summary couldn't fit
+    // every matched line, so a truncated result is never mistaken for an
+    // exhaustive one — a dropped match could be the real failure.
+    if (droppedCount > 0) {
+      summaryHints.push(
+        `${droppedCount} additional matching line(s) dropped by the ${ERROR_SUMMARY_LINE_CAP}-line summary cap — use grep or jobName/jobId to narrow scope and see them`,
+      );
+    }
     return {
       meta: {
         ...base,
         errorSummary: true,
         totalLogLines: totalLines,
         errorLines: summary.length,
+        droppedErrorLines: droppedCount,
         offset: errorOffset,
         charTruncated,
-        ...(skippedJobs
-          ? {
-              skippedJobs,
-              hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
-            }
-          : {}),
+        ...(skippedJobs ? { skippedJobs } : {}),
+        ...(summaryHints.length > 0 ? { hint: summaryHints.join('; ') } : {}),
       },
       logs: processedLines.join('\n'),
     };

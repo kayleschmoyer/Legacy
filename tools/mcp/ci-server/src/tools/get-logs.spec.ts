@@ -944,6 +944,106 @@ describe('getLogs', () => {
     });
   });
 
+  describe('LS-9700: errorSummary repro (run 32648411666 / PR #7324)', () => {
+    it('surfaces a no-unsafe-assignment ESLint failure within the first ~20 lines, even alongside hundreds of "error"-named branches', async () => {
+      // Reproduces the exact reported failure mode: a checkout step that
+      // fetches hundreds of branches, many containing the literal word
+      // "error" in their name (as this repo's branches routinely do), plus
+      // one real ESLint failure buried in the middle of the job log.
+      const gitFetchNoise = Array.from(
+        { length: 300 },
+        (_, i) =>
+          `   * [new branch]      LS-${1000 + i}-fix-error-handling-${i} -> origin/LS-${1000 + i}-fix-error-handling-${i}`,
+      );
+      const realFailure =
+        '  159:7  error  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment';
+      const lines = [
+        ...gitFetchNoise.slice(0, 150),
+        'apps/app/src/app/(app)/football/team/[teamId].spec.tsx',
+        realFailure,
+        '✖ 1 problem (1 error, 0 warnings)',
+        ...gitFetchNoise.slice(150),
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: [realFailure, '✖ 1 problem (1 error, 0 warnings)'],
+      });
+
+      const result = await getLogs({ runId: 32648411666, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).not.toContain('new branch');
+      expect(logsText).toContain(realFailure);
+
+      const failureLineIndex = logsText
+        .split('\n')
+        .findIndex((l) => l.includes('no-unsafe-assignment'));
+      expect(failureLineIndex).toBeGreaterThanOrEqual(0);
+      expect(failureLineIndex).toBeLessThan(20);
+    });
+
+    it('never leaks a "* [new branch]"/"* [new tag]" line into the summary, including one literally named to contain "error"', async () => {
+      const lines = [
+        '   * [new branch]      release/error-reporting-v2 -> origin/release/error-reporting-v2',
+        '   * [new tag]         v1.0.0-error-fix -> v1.0.0-error-fix',
+        '##[error]Process completed with exit code 1.',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: ['##[error]Process completed with exit code 1.'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).not.toContain('* [new branch]');
+      expect(logsText).not.toContain('* [new tag]');
+      expect(logsText).not.toContain('error-reporting-v2');
+      expect(logsText).not.toContain('error-fix');
+      expect(logsText).toContain(
+        '##[error]Process completed with exit code 1.',
+      );
+    });
+
+    it('AC3: reports how many matching lines were dropped by the summary cap', async () => {
+      // 250 distinct ESLint diagnostic rows all match the generic pattern —
+      // well over the 200-line summary cap.
+      const diagnostics = Array.from(
+        { length: 250 },
+        (_, i) =>
+          `  ${i}:1  error  Unexpected console statement (${i})  no-console`,
+      );
+      mockFetch.mockResolvedValue({
+        lines: diagnostics,
+        totalLines: diagnostics.length,
+        priorityLines: diagnostics,
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const header = parseHeader(result.content[0].text);
+
+      expect(header.droppedErrorLines).toBe(50);
+      expect(header.errorLines).toBe(200);
+      expect(header.hint).toContain('50 additional matching line(s) dropped');
+    });
+
+    it('AC3: reports zero dropped lines when everything fits under the cap', async () => {
+      mockFetch.mockResolvedValue({
+        lines: ['##[error]boom'],
+        totalLines: 1,
+        priorityLines: ['##[error]boom'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const header = parseHeader(result.content[0].text);
+
+      expect(header.droppedErrorLines).toBe(0);
+      expect(header.hint).toBeUndefined();
+    });
+  });
+
   describe('char limits (maxChars / truncateLineLength)', () => {
     it('truncates per-line when truncateLineLength is set', async () => {
       const longLine = 'x'.repeat(1000);
