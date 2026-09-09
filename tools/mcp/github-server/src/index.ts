@@ -1831,7 +1831,7 @@ export function createServer(): McpServer {
   // --- github_set_commit_status ---
   server.tool(
     'github_set_commit_status',
-    'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'Set a commit status on a PR (auto-resolves head SHA). Pass PR number as "number" or "prNumber". May be denied even for a sanctioned stale-status fix — don\'t retry; surface evidence.',
     {
       number: prNumberField('number').optional().describe('PR number'),
       prNumber: prNumberField('prNumber')

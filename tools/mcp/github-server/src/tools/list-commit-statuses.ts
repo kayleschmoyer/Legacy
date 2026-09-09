@@ -16,7 +16,7 @@ const STATUS_COLUMNS = [
 // Guidance preserved verbatim from the prior JSON `note` field: commit statuses
 // (Statuses API) are not Check Runs, so github_retrigger_check won't find them.
 const STATUS_NOTE =
-  'These are GitHub commit statuses (Statuses API), not Check Runs (Checks API). github_retrigger_check will NOT find these. To update them, push a new commit or re-run/dispatch the workflow or external system that owns the status. Only use github_set_commit_status to correct a genuinely stale or incorrect status after verifying the underlying result, never to override required checks or branch protection intent.';
+  "These are GitHub commit statuses (Statuses API), not Check Runs (Checks API). github_retrigger_check will NOT find these. To update them, push a new commit or re-run/dispatch the workflow or external system that owns the status. github_set_commit_status exists to correct a genuinely stale or incorrect status after verifying the underlying result, never to override required checks or branch protection intent — but expect that call to require explicit human confirmation even for this exact case (rewriting a commit status changes a PR's visible merge-readiness signal), so it will not always go through unattended. If it is denied, surface the verified evidence (the log/check output that shows the status is stale) to the user instead of retrying the call.";
 
 // Surfaced when the Statuses API 403s and this tool falls back to the
 // statusCheckRollup-derived view instead (LS-5234). The fallback only works
