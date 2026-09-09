@@ -355,6 +355,25 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueMessages: [] } }),
       });
+    } else if (operation === 'sendleaguechatmessage') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            sendLeagueMessage: {
+              __typename: 'LeagueChatMessage',
+              id: '99',
+              userId: 1,
+              messageText: 'Hello league!',
+              timestamp: new Date().toISOString(),
+              messageType: 'text',
+              gifUrl: null,
+              sender: { username: 'manager1', avatarUrl: null },
+            },
+          },
+        }),
+      });
     } else if (operation === 'getleagueannouncements') {
       await route.fulfill({
         status: 200,
