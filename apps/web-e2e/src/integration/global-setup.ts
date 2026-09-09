@@ -461,12 +461,47 @@ async function sweepStaleLeaguesByManagerMembership(
  * above the free-tier cap. A quota exhaustion that survives the sweep is an
  * environment/infra condition, not a code regression — this makes that
  * legible to whoever triages the next red run instead of leaving them to
- * rediscover LS-9280 from scratch. Best-effort — never throws, so a read
- * failure here can never block the suite.
+ * rediscover LS-9280 from scratch.
+ *
+ * Reads are best-effort: a network/auth failure here is swallowed and skipped
+ * (it must never itself block the suite). But a *confirmed* over-cap reading
+ * is thrown as a single aggregated error after every persona has been checked
+ * (LS-9867) — this fails the run here, in ~seconds, with the cap condition as
+ * the failure reason, instead of leaving every spec that authenticates as the
+ * over-cap persona to independently time out ~30-50 minutes later on an
+ * unrelated-looking UI assertion (the sweep skipping "young leagues likely in
+ * active use" under heavy concurrent-run overlap is the usual cause — see
+ * LS-9831 for the orphaned-run source of those young leagues).
  */
 const FREE_TIER_LEAGUE_CAP = 3;
 
+interface ManagerQuotaOverCap {
+  persona: string;
+  total: number;
+}
+
+/** Pure formatter, unit-tested independently of the network calls above it. */
+export function formatManagerQuotaOverCapError(
+  overCap: ManagerQuotaOverCap[],
+): string {
+  const personas = overCap
+    .map(
+      ({ persona, total }) => `${persona} (${total}/${FREE_TIER_LEAGUE_CAP})`,
+    )
+    .join(', ');
+  return (
+    `[integration setup] pre-flight: manager persona(s) still over the free-tier ` +
+    `league cap after the manager-membership sweep: ${personas}. ` +
+    'joinLeagueByCode will fail for every spec using these personas. This is a ' +
+    'shared-environment quota condition (LS-9280/LS-8915), most often caused by ' +
+    'the sweep skipping young leagues under heavy concurrent-run overlap ' +
+    '(LS-9867/LS-9831), not a code regression in the current run. Failing fast ' +
+    'here instead of letting affected specs time out individually.'
+  );
+}
+
 async function preflightCheckManagerQuota(): Promise<void> {
+  const overCap: ManagerQuotaOverCap[] = [];
   for (const persona of ['MANAGER_1', 'MANAGER_2', 'MANAGER_3'] as const) {
     const creds = TEST_USERS[persona];
     if (!creds.email || !creds.password) continue;
@@ -479,13 +514,7 @@ async function preflightCheckManagerQuota(): Promise<void> {
       );
       const total = data?.userLeagueCount;
       if (typeof total === 'number' && total >= FREE_TIER_LEAGUE_CAP) {
-        LOGGER.error(
-          `[integration setup] pre-flight: manager persona ${persona} is at ` +
-            `${total}/${FREE_TIER_LEAGUE_CAP} leagues after the manager-membership ` +
-            'sweep — the free-tier league cap will fail joinLeagueByCode for every ' +
-            'spec using this persona. This is a shared-environment quota condition ' +
-            '(LS-9280/LS-8915), not a code regression in the current run.',
-        );
+        overCap.push({ persona, total });
       }
     } catch (err) {
       LOGGER.info(
@@ -494,6 +523,11 @@ async function preflightCheckManagerQuota(): Promise<void> {
         }`,
       );
     }
+  }
+  if (overCap.length > 0) {
+    const message = formatManagerQuotaOverCapError(overCap);
+    LOGGER.error(message);
+    throw new Error(message);
   }
 }
 
