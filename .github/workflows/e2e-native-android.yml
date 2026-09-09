@@ -450,6 +450,23 @@ jobs:
             ~/.android/adb*
           key: avd-api35-x86_64-google_apis
 
+      # LS-9865: this job runs on GitHub-hosted ubuntu-latest — a fresh VM per
+      # run, unlike the self-hosted AMI (see run-playwright-tests.yml /
+      # cross-browser-e2e.yml) that pre-bakes Playwright browsers at
+      # /opt/playwright-browsers. That AMI bake is why those workflows
+      # deliberately DON'T run a runtime `playwright install` (it would race
+      # unattended-upgrades for the dpkg lock on a long-lived host). Neither
+      # concern applies here: there is no AMI bake to verify against, and the
+      # VM is ephemeral, so there's no persistent dpkg lock contention to
+      # race. Without this step the proof spec's dual fixtures (LS-9864) fail
+      # at browserType.launch with "Executable doesn't exist ...
+      # chromium_headless_shell ... Please run pnpm exec playwright install".
+      # `playwright install` is idempotent, so this is a no-op if a future
+      # runner image ever ships the binaries pre-cached.
+      - name: Install Playwright Browsers
+        shell: bash
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run native E2E on emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
