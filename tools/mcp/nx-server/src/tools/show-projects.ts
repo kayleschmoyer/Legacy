@@ -1,4 +1,5 @@
 import { projectListText } from '../format.js';
+import { parseProjectNames } from '../project-resolution.js';
 import { getRepoRoot, runNx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -47,10 +48,7 @@ export async function showProjects(
 
   try {
     const output = await runNx(args, cwd);
-    const filtered = output
-      .split('\n')
-      .map((p) => p.trim())
-      .filter(Boolean);
+    const filtered = parseProjectNames(output);
 
     return {
       content: [

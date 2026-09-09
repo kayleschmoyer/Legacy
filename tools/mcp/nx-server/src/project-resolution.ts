@@ -20,7 +20,7 @@ interface ProjectJsonShape {
  * parse that shape first, falling back to newline-per-project splitting for
  * forward/backward compatibility with Nx versions that print it that way.
  */
-function parseProjectNames(output: string): string[] {
+export function parseProjectNames(output: string): string[] {
   const trimmed = output.trim();
   try {
     const parsed: unknown = JSON.parse(trimmed);
