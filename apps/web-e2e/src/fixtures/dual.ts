@@ -88,7 +88,6 @@ export interface DualFixtures {
   rosterPage: RosterPage;
   navHeader: NavHeader;
   _backendEnv: void;
-  _coverage: void;
 }
 
 /** Worker-scoped fixtures (one per Playwright worker process). */
@@ -151,73 +150,83 @@ export const test = base.extend<
   },
 
   /**
-   * Per-test backend environment (`auto`, so it runs for every test).
+   * Per-test NATIVE backend environment (`auto`, so it runs for every test):
+   * starts the per-worker mock server, points the emulator at it via `adb
+   * reverse` (when an emulator harness is configured), and `reset()`s it so
+   * per-test overrides never leak between specs — the native analogue of
+   * web's fresh-page-per-test isolation. Runs here (not in `testData`) so the
+   * reset happens even for a native spec that declares no preconditions.
    *
-   *   • Web mock: install hermetic `page.route()` API isolation.
-   *   • Native mock: start the per-worker mock server, point the emulator at it
-   *     via `adb reverse` (when an emulator harness is configured), and `reset()`
-   *     it so per-test overrides never leak between specs — the native analogue
-   *     of web's fresh-page-per-test isolation. Runs here (not in `testData`) so
-   *     the reset happens even for a native spec that declares no preconditions.
-   *   • Live (either platform): no isolation — specs hit the real API.
+   * Deliberately does NOT destructure `page` (LS-9864): Playwright resolves
+   * every fixture named in a function's destructured parameters before the
+   * body runs, regardless of which branch executes. An `auto: true` fixture
+   * that named `page` here would force a browser launch on every
+   * native-project test, even though this branch never touches `page` — and
+   * `e2e-native-android.yml` never installs Playwright browsers, so that
+   * launch fails outright. The web-only counterpart (API isolation +
+   * coverage) lives in the `page` fixture override below instead, which is
+   * only resolved when something actually requests `page`.
    */
   _backendEnv: [
     async (
       {
         backend,
         platform,
-        page,
         nativeMockServer,
       }: {
         backend: BackendMode;
         platform: PlatformMode;
-        page: Page;
         nativeMockServer: GraphQLMockServer;
       },
       use: () => Promise<void>,
-      testInfo: TestInfo,
     ) => {
-      if (platform === 'native') {
-        if (backend === 'mock') {
-          await nativeMockServer.start();
-          if (isNativeEmulatorConfigured()) {
-            await reverseForwardToDevice(nativeMockServer.port);
-          }
-          nativeMockServer.reset();
+      if (platform === 'native' && backend === 'mock') {
+        await nativeMockServer.start();
+        if (isNativeEmulatorConfigured()) {
+          await reverseForwardToDevice(nativeMockServer.port);
         }
-        await use();
-        return;
+        nativeMockServer.reset();
       }
-      if (backend === 'mock') {
-        await withApiIsolation(page, testInfo, use);
-      } else {
-        await use();
-      }
+      await use();
     },
     { auto: true },
   ],
 
   /**
-   * Per-test source-coverage collection — mirrors auth-enhanced (LS-7849).
-   * V8 coverage is a Playwright/CDP web-only concern, so native runs skip it
-   * (the native driver has no `page` to instrument).
+   * Web-only `page` override: installs hermetic API isolation (mock backend)
+   * and collects per-test source coverage (mirrors auth-enhanced, LS-7849).
+   * Both are web/CDP concerns, so native tests pass `page` through untouched.
+   *
+   * This lives on `page` itself — rather than on a separate `auto: true`
+   * fixture that destructures `page` — precisely so that native-project
+   * tests, which never request `page` via this graph, never trigger it
+   * (LS-9864).
    */
-  _coverage: [
-    async (
-      { page, platform }: { page: Page; platform: PlatformMode },
-      use: () => Promise<void>,
-      testInfo: TestInfo,
-    ) => {
-      if (platform === 'native') {
-        await use();
-        return;
-      }
-      const baseline = await snapshotCoverageBaseline(page);
-      await use();
-      await attributePageCoverage(page, testInfo, baseline);
-    },
-    { auto: true },
-  ],
+  page: async (
+    {
+      backend,
+      platform,
+      page,
+    }: { backend: BackendMode; platform: PlatformMode; page: Page },
+    use: (page: Page) => Promise<void>,
+    testInfo: TestInfo,
+  ) => {
+    if (platform === 'native') {
+      await use(page);
+      return;
+    }
+    if (backend === 'mock') {
+      await withApiIsolation(page, testInfo, async () => {
+        const baseline = await snapshotCoverageBaseline(page);
+        await use(page);
+        await attributePageCoverage(page, testInfo, baseline);
+      });
+      return;
+    }
+    const baseline = await snapshotCoverageBaseline(page);
+    await use(page);
+    await attributePageCoverage(page, testInfo, baseline);
+  },
 
   testData: async (
     {
