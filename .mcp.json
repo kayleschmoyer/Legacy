@@ -85,8 +85,13 @@
       ]
     },
     "stripe": {
-      "command": "npx",
-      "args": ["-y", "@stripe/mcp@0.3.3", "--tools=all"],
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "node_modules/@stripe/mcp/dist/index.js",
+        "--tools=all"
+      ],
       "env": {
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
       }
