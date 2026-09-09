@@ -165,7 +165,7 @@ Terraform is a **two-state split** (post-LS-2425): `main/` and `runners/` are se
 
 ## MCP Servers (`tools/mcp/`)
 
-Per-server tool lists, server IDs, and stdio-vs-hosted transport live in `tools/mcp/README.md` (stdio registrations: `.mcp.json`); the tool-vs-shell routing table lives in [mcp-first](../mcp-first/SKILL.md).
+Per-server tool lists, server IDs, and stdio-vs-hosted transport live in `tools/mcp/README.md` (stdio registrations: `.mcp.json`); the tool-vs-shell routing table lives in [mcp-first](../mcp-first/references/substitutions.md).
 
 | Server dir                      | What it serves                                                                             |
 | ------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -204,7 +204,7 @@ Per-server tool lists, server IDs, and stdio-vs-hosted transport live in `tools/
 | Common review patterns | `.agents/skills/pr-lifecycle/references/common-review-patterns.md` |
 | Workflow checklist     | `.agents/skills/workflow-overview/SKILL.md`                        |
 | MCP gap audit          | `.agents/skills/mcp-first/references/gaps.md`                      |
-| MCP tool mapping       | `.agents/skills/mcp-first/SKILL.md`                                |
+| MCP tool mapping       | `.agents/skills/mcp-first/references/tool-surfaces.md`             |
 | Subagent templates     | `.agents/skills/subagent-templates/SKILL.md`                       |
 
 ## Provenance and maintenance

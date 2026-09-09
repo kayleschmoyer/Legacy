@@ -18,7 +18,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 1. Retry the same call once after ~5 seconds — transient network blips resolve themselves.
 2. If still failing, check whether other MCP tools on the same server work (e.g., if `worktree_push` fails, try `worktree_status`).
-   - If the whole server is down: fall back to shell equivalents (see `mcp-first/SKILL.md` substitution table). Treat this as a degraded mode, not normal — note the failure for the MCP gap audit.
+   - If the whole server is down: fall back to shell equivalents (see `mcp-first/references/substitutions.md` substitution table). Treat this as a degraded mode, not normal — note the failure for the MCP gap audit.
    - If only one tool fails: the tool may have a bug. Try the shell equivalent for that specific operation only.
 3. If the `legacy-sports-github` or `legacy-sports-jira` server is down, do NOT silently fall back — these require auth. Stop and tell the user.
 
@@ -166,7 +166,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 **Root cause is not confirmed.** No file in this repository implements or names a "budget governor" — it is not a concept defined in AGENTS.md, any skill, or `.claude/settings.json`. Do not assume the mechanism this note describes is exactly what's happening; treat it as the best available read on a harness-level circuit breaker, not a verified spec. If you can capture the raw system-reminder/tool-error text from a session where this fires, update this scenario with the confirmed mechanism instead of the description below.
 
-**Working hypothesis**: sessions that fall into manual re-polling (checking `ci_view_run`/`github_view_pr`/PR notifications in a loop instead of arming `Monitor`/`subscribe_pr_activity`, per [mcp-first "Waiting on CI"](../../mcp-first/SKILL.md#waiting-on-ci-no-polling-no-sleep) and [pr-lifecycle SKILL.md](../../pr-lifecycle/SKILL.md)) burn through a session-wide call budget that a harness-level governor eventually trips. Once tripped, the block is reported as blanket — it does not appear to distinguish read-only checks from mutating calls.
+**Working hypothesis**: sessions that fall into manual re-polling (checking `ci_view_run`/`github_view_pr`/PR notifications in a loop instead of arming `Monitor`/`subscribe_pr_activity`, per [mcp-first "Waiting on CI"](../../mcp-first/references/auth-and-routing.md#waiting-on-ci-no-polling-no-sleep) and [pr-lifecycle SKILL.md](../../pr-lifecycle/SKILL.md)) burn through a session-wide call budget that a harness-level governor eventually trips. Once tripped, the block is reported as blanket — it does not appear to distinguish read-only checks from mutating calls.
 
 **Decision tree**:
 

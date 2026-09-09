@@ -111,7 +111,7 @@ packer_build({ action: "validate", hclPath: "terraform/runners/packer/runner-ami
 // -> { ok, errors[] } — HCL syntax check, no AWS credentials needed (syntaxOnly defaults true)
 ```
 
-Both are synchronous (no job polling) and pass through the underlying `packer` exit code via `ok`. See the [substitution table](../../mcp-first/SKILL.md#aws-operations) for the shell-command mapping.
+Both are synchronous (no job polling) and pass through the underlying `packer` exit code via `ok`. See the [substitution table](../../mcp-first/references/service-operations.md#aws-operations) for the shell-command mapping.
 
 ## Prerequisites
 

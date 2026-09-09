@@ -128,7 +128,7 @@ The canonical setup + tool preferences block lives in [`.agents/shared/subagent-
 
 @../../shared/subagent-setup.md
 
-Work subagents inherit all MCP connections from the parent session (the full stdio + connector surface — see [mcp-first → Tool Surfaces](../mcp-first/SKILL.md#tool-surfaces)), so `github_open_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Use this pattern only when `mcp__ccd_session__spawn_task` is confirmed unavailable — chips are always preferred over `Agent(isolation: "worktree")` for multi-ticket orchestration.
+Work subagents inherit all MCP connections from the parent session (the full stdio + connector surface — see [mcp-first → Tool Surfaces](../mcp-first/references/tool-surfaces.md#tool-surfaces)), so `github_open_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Use this pattern only when `mcp__ccd_session__spawn_task` is confirmed unavailable — chips are always preferred over `Agent(isolation: "worktree")` for multi-ticket orchestration.
 
 ## Parent-Agent Recovery
 

@@ -101,8 +101,8 @@ SELECT * FROM public.leagues WHERE id = 16;
 
 Hosted `db_query` / `db_migrate` need `MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` (set by the MCP client on connect). Shell commands need `.env` with `DATABASE_URL` and Docker running.
 
-| Issue                       | Fix                                                                                                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL is not set`   | Copy `.env` from main repo or run `make wt-setup`                                                                                                    |
-| Postgres connection refused | Start Docker: `docker compose up -d postgres`                                                                                                        |
-| AWS SSO expired (dump)      | Stop; prompt the user to run `aws sso login` in their terminal (user-only, Tier 1 — see [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model)) |
+| Issue                       | Fix                                                                                                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL is not set`   | Copy `.env` from main repo or run `make wt-setup`                                                                                                                          |
+| Postgres connection refused | Start Docker: `docker compose up -d postgres`                                                                                                                              |
+| AWS SSO expired (dump)      | Stop; prompt the user to run `aws sso login` in their terminal (user-only, Tier 1 — see [mcp-first Auth Model](../../mcp-first/references/auth-and-routing.md#auth-model)) |

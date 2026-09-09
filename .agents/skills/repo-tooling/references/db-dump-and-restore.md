@@ -82,7 +82,7 @@ aws_sso_status();
 aws sts get-caller-identity
 ```
 
-If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model)).
+If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/references/auth-and-routing.md#auth-model)).
 
 **Docker not running**
 Start Docker Desktop, then retry.
@@ -168,7 +168,7 @@ aws_sso_status();
 aws sts get-caller-identity
 ```
 
-If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model)).
+If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/references/auth-and-routing.md#auth-model)).
 
 **Postgres container not running**
 

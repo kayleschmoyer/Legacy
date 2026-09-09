@@ -57,7 +57,7 @@ For agents: every command above is long-running and never exits. Run it with `ru
 | Linux / macOS / Git Bash | `make sync-env` → `scripts/sync-env.sh`          | Same; requires AWS CLI credentials                                                                                         |
 | Cloud agent (no AWS)     | `cp .env.example .env` then use the Docker stack | `.env.docker` (committed) overrides `.env` with working local DB creds and dev auth secrets, so the stack runs without AWS |
 
-Precondition for `sync-env`: valid AWS credentials already exist. When any command fails with an auth/expired-token error, stop and surface the hint verbatim per [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model) — re-auth commands (`aws sso login`, `gh auth login`, `ls-cli auth login`) are **user-only** actions (AGENTS.md Tier 1).
+Precondition for `sync-env`: valid AWS credentials already exist. When any command fails with an auth/expired-token error, stop and surface the hint verbatim per [mcp-first Auth Model](../mcp-first/references/auth-and-routing.md#auth-model) — re-auth commands (`aws sso login`, `gh auth login`, `ls-cli auth login`) are **user-only** actions (AGENTS.md Tier 1).
 
 ## Two ways to run the stack
 
@@ -138,7 +138,7 @@ Destructive commands (`reset-database`, `delete-league`, `merge-accounts`, `clea
 
 - [database](../database/SKILL.md) — migrations, queries, schema, dev RDS access
 - [repo-tooling](../repo-tooling/SKILL.md) — build/lint/typecheck, Make targets, modules pool
-- [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model) — auth-error protocol (check before use; never generate tokens)
+- [mcp-first Auth Model](../mcp-first/references/auth-and-routing.md#auth-model) — auth-error protocol (check before use; never generate tokens)
 - [cloud-agent-mode](../cloud-agent-mode/SKILL.md) — cloud platform bindings and validation paths
 - [testing](../testing/SKILL.md) — running unit/E2E/integration suites
 - [debugging](../debugging/SKILL.md) — when a running service misbehaves

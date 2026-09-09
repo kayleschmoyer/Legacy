@@ -15,7 +15,7 @@ This skill documents when to reach for CloudWatch (and the live RDS) instead of 
 
 This is the second-most common debugging gotcha in this repo (after "make pc passes but live behavior is broken" — see the `debugging` skill). Reach for it early on any distributed system failure where the test narrative is opaque. Production-error triage (Rollbar tool surface + error-classification convention) is homed in [debugging/references/prod-errors.md](../debugging/references/prod-errors.md) — pivot here from there when the Rollbar payload lacks the server-side story.
 
-**Access precondition:** every step needs AWS read access. Prefer the MCP tools (`aws_logs_filter`, `aws_logs_tail`, `aws_secretsmanager_*` from the aws server; `db_query` from the hosted DB server) over raw `aws` CLI — see [mcp-first](../mcp-first/SKILL.md). If any call returns an auth/expired-token error, stop and surface the hint verbatim; auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model)). Cloud agents have no AWS — route through [cloud-teleport](../cloud-teleport/SKILL.md).
+**Access precondition:** every step needs AWS read access. Prefer the MCP tools (`aws_logs_filter`, `aws_logs_tail`, `aws_secretsmanager_*` from the aws server; `db_query` from the hosted DB server) over raw `aws` CLI — see [mcp-first](../mcp-first/SKILL.md). If any call returns an auth/expired-token error, stop and surface the hint verbatim; auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../mcp-first/references/auth-and-routing.md#auth-model)). Cloud agents have no AWS — route through [cloud-teleport](../cloud-teleport/SKILL.md).
 
 ## When to Invoke
 

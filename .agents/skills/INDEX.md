@@ -65,4 +65,4 @@ skill's SKILL.md before proceeding. Routing contract: [AGENTS.md § Skills](../.
 Tombstones kept for inbound links — read the successor skill instead.
 
 - [`cli-usage`](cli-usage/SKILL.md) — Merged into dev-environment (2026-07-02). Load when: running CLI commands or CLI-based admin tasks — then read dev-environment instead.
-- [`credentials`](credentials/SKILL.md) — Deprecated pointer — the auth model and pre-flight checks moved to mcp-first. Load when: an inbound link brought you here; then load ../mcp-first/SKILL.md (Auth Model + Pre-flight Auth Check sections) instead.
+- [`credentials`](credentials/SKILL.md) — Deprecated pointer — the auth model and pre-flight checks moved to mcp-first. Load when: an inbound link brought you here; then load ../mcp-first/references/auth-and-routing.md (Auth Model + Pre-flight Auth Check sections) instead.

@@ -1,6 +1,6 @@
 ---
 name: credentials
-description: 'Deprecated pointer — the auth model and pre-flight checks moved to mcp-first. Load when: an inbound link brought you here; then load ../mcp-first/SKILL.md (Auth Model + Pre-flight Auth Check sections) instead.'
+description: 'Deprecated pointer — the auth model and pre-flight checks moved to mcp-first. Load when: an inbound link brought you here; then load ../mcp-first/references/auth-and-routing.md (Auth Model + Pre-flight Auth Check sections) instead.'
 metadata:
   scope: '**'
   deprecated: 'true'
@@ -14,8 +14,8 @@ Current homes:
 
 | Need                                                                                | Go to                                                                                                               |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Auth model per tool surface (OAuth connectors, Copilot bearers, stdio env, e2e JWT) | [mcp-first — Auth Model](../mcp-first/SKILL.md#auth-model)                                                          |
-| Pre-flight check (`auth_check_all`, per-service `*_auth_status`)                    | [mcp-first — Pre-flight Auth Check](../mcp-first/SKILL.md#pre-flight-auth-check)                                    |
+| Auth model per tool surface (OAuth connectors, Copilot bearers, stdio env, e2e JWT) | [mcp-first — Auth Model](../mcp-first/references/auth-and-routing.md#auth-model)                                    |
+| Pre-flight check (`auth_check_all`, per-service `*_auth_status`)                    | [mcp-first — Pre-flight Auth Check](../mcp-first/references/auth-and-routing.md#pre-flight-auth-check)              |
 | Mid-session 401 → `/mcp` re-consent protocol                                        | [mcp-first/references/diagnostics.md](../mcp-first/references/diagnostics.md#mid-session-401--token-expiry-ls-4874) |
 | Tier-1 rule: never run auth-generation commands                                     | AGENTS.md — Critical Rules → Safety                                                                                 |
 | Developer connector onboarding (Track A/B setup)                                    | [`docs/dev-process/mcp-connector-access.md`](../../../docs/dev-process/mcp-connector-access.md)                     |

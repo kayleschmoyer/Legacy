@@ -4,7 +4,7 @@ Every command registered in `apps/cli/src/main.ts`, grouped by task. Invocation 
 
 **Global options** (any command): `--use-dotenv-file` (default true — reads `.env`), `--log-file <path>` (tee logs to a file).
 
-**Auth model**: commands marked 🔐 call the GraphQL API and need a CLI login (`auth login` — **user-only**, opens a device flow and by default an SSM DB tunnel). Commands without 🔐 talk to the database directly via `.env` credentials. On any auth/expired-token error: stop and surface the hint per [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model).
+**Auth model**: commands marked 🔐 call the GraphQL API and need a CLI login (`auth login` — **user-only**, opens a device flow and by default an SSM DB tunnel). Commands without 🔐 talk to the database directly via `.env` credentials. On any auth/expired-token error: stop and surface the hint per [mcp-first Auth Model](../../mcp-first/references/auth-and-routing.md#auth-model).
 
 **Destructive commands** are marked ⚠️ and gated behind `--confirm`/`--yes`; run `--dry-run` first where available.
 
@@ -121,12 +121,12 @@ Agents may run `auth status` / `auth list` / `decode-jwt`; `auth login`, `auth s
 
 ## Troubleshooting
 
-| Symptom                              | Action                                                                                                                                                                                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tsx: not found` / module not found  | `make install` (worktrees: `node scripts/modules-pool/link.mjs`)                                                                                                                                                                                                |
-| DB connection fails                  | `make dev-env-health`; verify `.env` (`DATABASE_URL`/`DB_*`); local stack up? (`docker compose ps`). If the error is auth/expired-token: stop and surface the hint per [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model) — do not run `aws sso login` |
-| `Authentication required` on 🔐 cmds | Ask the user to run `auth login`; verify with `auth status`                                                                                                                                                                                                     |
-| Unknown command                      | `./ls-cli.sh --help` prints the live list — it is the ground truth over this doc                                                                                                                                                                                |
+| Symptom                              | Action                                                                                                                                                                                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tsx: not found` / module not found  | `make install` (worktrees: `node scripts/modules-pool/link.mjs`)                                                                                                                                                                                                                      |
+| DB connection fails                  | `make dev-env-health`; verify `.env` (`DATABASE_URL`/`DB_*`); local stack up? (`docker compose ps`). If the error is auth/expired-token: stop and surface the hint per [mcp-first Auth Model](../../mcp-first/references/auth-and-routing.md#auth-model) — do not run `aws sso login` |
+| `Authentication required` on 🔐 cmds | Ask the user to run `auth login`; verify with `auth status`                                                                                                                                                                                                                           |
+| Unknown command                      | `./ls-cli.sh --help` prints the live list — it is the ground truth over this doc                                                                                                                                                                                                      |
 
 ## Provenance and maintenance
 
