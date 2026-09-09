@@ -400,6 +400,27 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   // ── History tab ─────────────────────────────────────────────────
   getleaguehistory: { data: { getLeagueHistory: [] } },
   getalltimerecords: { data: { getAllTimeRecords: [] } },
+
+  // ── Minigames hub (MinigamesHub, mounts on /games) ─────────────────
+  // GetSeasonDraftGames, GetDisclosureGameBestScore and GetMinigamesStats
+  // fire from MinigamesHub (lib/shared-components/src/features/minigames-hub/
+  // MinigamesHub.tsx). Baselined per LS-9840 so any spec that happens to
+  // reach /games without its own mock (e.g. via redirect or shared
+  // navigation) doesn't get flagged by API isolation as leaking unmocked
+  // requests; specs that assert on hub content (minigames-hub.spec.ts)
+  // register their own override.
+  getseasondraftgames: { data: { seasonDraftGames: [] } },
+  getdisclosuregamebestscore: { data: { disclosureGameBestScore: null } },
+  getminigamesstats: {
+    data: {
+      minigamesStats: {
+        __typename: 'MinigamesStats',
+        playerSeasons: 1_000_000,
+        earliestYear: 1871,
+        playersTracked: 20_000,
+      },
+    },
+  },
 });
 
 /**
