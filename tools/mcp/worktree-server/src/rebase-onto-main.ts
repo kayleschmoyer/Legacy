@@ -13,6 +13,20 @@ export interface RebaseDeps {
   ) => string;
   runShell: (cmd: string, cwd: string) => string;
   nonInteractiveEnv: Record<string, string>;
+  /**
+   * Deepens `cwd` when it is a shallow clone and no merge-base exists against
+   * `baseRef` yet. A shallow CCR clone rebasing onto a freshly fetched
+   * `origin/<onto>` has no visible common ancestor beyond the shallow
+   * boundary, so git replays every changed file as an add/add conflict
+   * instead of a normal three-way merge — indistinguishable at a glance from
+   * a bad rerere replay, but not actually one (LS-9967, same root cause as
+   * LS-9956's `worktree_merge_main` fix). Injected so callers can reuse the
+   * same deepen→verify→unshallow sequence `shallow-utils.ts` already applies
+   * at worktree-creation time.
+   */
+  ensureSufficientDepth: (cwd: string, baseRef?: string) => string[];
+  /** True when `cwd` is still a shallow clone (used to attribute conflicts correctly). */
+  isShallowRepository: (cwd: string) => boolean;
 }
 
 interface ToolContent {
@@ -31,7 +45,13 @@ export function rebaseOntoMain(
   deps: RebaseDeps,
 ): ToolResult {
   const { onto, upstream, disableRerere, pushTimeoutMs } = opts;
-  const { runGit, runShell, nonInteractiveEnv } = deps;
+  const {
+    runGit,
+    runShell,
+    nonInteractiveEnv,
+    ensureSufficientDepth,
+    isShallowRepository,
+  } = deps;
   const log: string[] = [`[cwd: ${cwd}]`];
 
   // Refuse to rebase on the main branch itself
@@ -55,6 +75,13 @@ export function rebaseOntoMain(
   log.push(`$ git fetch origin ${onto}`);
   const fetchOut = runGit(['fetch', 'origin', onto], cwd, { timeout: 60_000 });
   if (fetchOut.trim()) log.push(fetchOut.trim());
+
+  // Shallow clones (CCR sessions) have no visible common ancestor with the
+  // freshly fetched origin/<onto>, which makes git replay the rebase as a
+  // wall of add/add conflicts rather than a real three-way merge. Deepen
+  // first — a no-op on a full clone or one that already has a merge-base.
+  const depthLog = ensureSufficientDepth(cwd, `origin/${onto}`);
+  if (depthLog.length) log.push(...depthLog);
 
   // Get commit count before rebase for reporting. When `upstream` is given,
   // that's the true exclusion boundary for what gets replayed; otherwise fall
@@ -114,6 +141,13 @@ export function rebaseOntoMain(
       }
     })();
 
+    // A wide add/add conflict spread (near-every-file) after fetch+deepen is
+    // the shallow-history signature, not a bad rerere replay (LS-9967). Flag
+    // it when the repo is still shallow so the message points at the real
+    // cause instead of leaving the caller to suspect rerere.
+    const stillShallowAfterDeepen =
+      hasConflicts && isShallowRepository(cwd) && conflictedFiles.length > 10;
+
     return {
       isError: true,
       content: [
@@ -124,7 +158,13 @@ export function rebaseOntoMain(
             pushed: false,
             head: beforeSha,
             message: hasConflicts
-              ? `Rebase onto origin/${onto} encountered conflicts. Rebase aborted — resolve conflicts manually then use worktree_rebase + worktree_push.`
+              ? stillShallowAfterDeepen
+                ? `Rebase onto origin/${onto} encountered conflicts in ${conflictedFiles.length} files. ` +
+                  'This worktree is still a shallow clone with insufficient history — that (not a bad ' +
+                  'rerere resolution) is the likely cause of this many simultaneous add/add-style ' +
+                  'conflicts. The automatic `git fetch --unshallow` attempted before this rebase did not ' +
+                  'resolve it; retry once the deepen succeeds, or run `git fetch --unshallow origin` manually.'
+                : `Rebase onto origin/${onto} encountered conflicts. Rebase aborted — resolve conflicts manually then use worktree_rebase + worktree_push.`
               : `Rebase failed: ${output.slice(0, 500)}`,
             conflictedFiles,
           }),
@@ -153,6 +193,7 @@ export function rebaseOntoMain(
     } catch {
       // Best-effort reset
     }
+    const stillShallow = isShallowRepository(cwd);
     return {
       isError: true,
       content: [
@@ -162,9 +203,15 @@ export function rebaseOntoMain(
             conflictDetected: true,
             pushed: false,
             head: beforeSha,
-            message:
-              'Conflict markers detected in rebase output. Reset to pre-rebase state. ' +
-              'Pass disableRerere: true if a bad rr-cache entry is causing this.',
+            message: stillShallow
+              ? 'Conflict markers detected in rebase output. Reset to pre-rebase state. ' +
+                'This worktree is still a shallow clone with insufficient history against ' +
+                `origin/${onto} — that (not a bad rerere resolution) is the likely cause of ` +
+                'spurious conflicts across many files. The automatic `git fetch --unshallow` ' +
+                'attempted before this rebase did not resolve it; retry once the deepen ' +
+                'succeeds, or run `git fetch --unshallow origin` manually.'
+              : 'Conflict markers detected in rebase output. Reset to pre-rebase state. ' +
+                'Pass disableRerere: true if a bad rr-cache entry is causing this.',
           }),
         },
       ],

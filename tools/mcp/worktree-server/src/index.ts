@@ -52,7 +52,7 @@ import {
   type FetchArgs,
   tryRefreshRemoteTrackingRef,
 } from './fetch-utils';
-import { ensureSufficientDepth } from './shallow-utils';
+import { ensureSufficientDepth, isShallowRepository } from './shallow-utils';
 import {
   executeWorktreeFileMode,
   executeWorktreeSetExecutable,
@@ -5832,6 +5832,24 @@ const handleCallTool = async (
           log.push(`(warning: could not update origin/main — ${reason})`);
         }
 
+        // Shallow clones (CCR sessions) have no visible common ancestor with
+        // the freshly fetched remote-tracking ref, which makes git replay
+        // the rebase as a wall of add/add conflicts across nearly every file
+        // instead of a normal three-way merge — easy to mistake for a bad
+        // rerere replay, but not actually one (LS-9967, same root cause as
+        // LS-9956's worktree_merge_main fix). Deepen first — a no-op on a
+        // full clone or one that already has a merge-base.
+        const depthBaseRef =
+          base !== undefined
+            ? !/[/~^@:]/.test(base) &&
+              !/^[0-9a-f]{40}$/.test(base) &&
+              base !== 'HEAD'
+              ? `origin/${base}`
+              : base
+            : 'origin/main';
+        const depthLog = ensureSufficientDepth({ runGit }, cwd, depthBaseRef);
+        if (depthLog.length) log.push(...depthLog);
+
         // Rebase: use explicit base if provided, otherwise try twig, fall back to origin/main
         let rebaseOut = '';
         if (base) {
@@ -5955,15 +5973,23 @@ const handleCallTool = async (
         // Scan staged files for conflict markers — rerere can silently commit them
         const markerFiles = scanStagedForConflictMarkers(cwd, runGit);
         if (markerFiles.length > 0) {
+          const stillShallow = isShallowRepository({ runGit }, cwd);
           return {
             content: [
               {
                 type: 'text',
                 text:
                   `Conflict markers detected in staged files after rebase:\n${markerFiles.join('\n')}\n\n` +
-                  'rerere likely replayed a bad cached resolution. Inspect the listed files, ' +
-                  'remove all conflict markers, stage the fixes, then run worktree_rebase_continue. ' +
-                  'Or retry with disableRerere: true to bypass rr-cache entirely.',
+                  (stillShallow
+                    ? 'This worktree is still a shallow clone with insufficient history — that ' +
+                      '(not a bad rerere resolution) is the likely cause of spurious conflicts across ' +
+                      'many files. The automatic `git fetch --unshallow` attempted before this rebase ' +
+                      'did not resolve it; retry once the deepen succeeds, or run ' +
+                      '`git fetch --unshallow origin` manually, then remove any remaining conflict ' +
+                      'markers, stage the fixes, and run worktree_rebase_continue.'
+                    : 'rerere likely replayed a bad cached resolution. Inspect the listed files, ' +
+                      'remove all conflict markers, stage the fixes, then run worktree_rebase_continue. ' +
+                      'Or retry with disableRerere: true to bypass rr-cache entirely.'),
               },
             ],
             isError: true,
@@ -6081,16 +6107,28 @@ const handleCallTool = async (
             } => {
               const markerFiles = scanForConflictMarkers();
               if (markerFiles.length > 0) {
+                const stillShallow = isShallowRepository({ runGit }, cwd);
                 log.push(
                   summary,
                   '',
                   '⚠ Conflict markers detected in rebased files despite rerere reporting success:',
                   markerFiles.join('\n'),
                   '',
-                  'rerere likely stored a bad resolution. Inspect the listed files,',
-                  'remove all conflict markers, stage the fixes, then:',
-                  '  worktree_rebase_continue',
-                  'Or: worktree_rebase(abort: true) to abort and retry from a clean state.',
+                  ...(stillShallow
+                    ? [
+                        'This worktree is still a shallow clone with insufficient history — that',
+                        '(not a bad rerere resolution) is the likely cause of spurious conflicts',
+                        'across many files. The automatic `git fetch --unshallow` attempted before',
+                        'this rebase did not resolve it; retry once the deepen succeeds, or run',
+                        '`git fetch --unshallow origin` manually, then remove any remaining conflict',
+                        'markers, stage the fixes, and run worktree_rebase_continue.',
+                      ]
+                    : [
+                        'rerere likely stored a bad resolution. Inspect the listed files,',
+                        'remove all conflict markers, stage the fixes, then:',
+                        '  worktree_rebase_continue',
+                        'Or: worktree_rebase(abort: true) to abort and retry from a clean state.',
+                      ]),
                 );
                 return {
                   content: [{ type: 'text', text: log.join('\n') }],
@@ -6239,13 +6277,38 @@ const handleCallTool = async (
           }
 
           // rerere did not resolve all conflicts — manual resolution needed
-          log.push(
-            '',
-            'Rebase paused due to conflicts. Resolve them, then:',
-            '  git add <resolved-files>',
-            '  worktree_rebase_continue',
-            'Or: worktree_rebase(abort: true) to abort.',
-          );
+          const unresolvedCount = (() => {
+            try {
+              return run('git diff --name-only --diff-filter=U', cwd)
+                .trim()
+                .split('\n')
+                .filter(Boolean).length;
+            } catch {
+              return 0;
+            }
+          })();
+          const stillShallow = isShallowRepository({ runGit }, cwd);
+          if (stillShallow && unresolvedCount > 10) {
+            log.push(
+              '',
+              `Rebase paused with ${unresolvedCount} conflicting files. This worktree is still a ` +
+                'shallow clone with insufficient history — that (not a bad rerere resolution) is the ' +
+                'likely cause of this many simultaneous add/add-style conflicts. The automatic ' +
+                '`git fetch --unshallow` attempted before this rebase did not resolve it; retry once ' +
+                'the deepen succeeds, or run `git fetch --unshallow origin` manually, then:',
+              '  git add <resolved-files>',
+              '  worktree_rebase_continue',
+              'Or: worktree_rebase(abort: true) to abort.',
+            );
+          } else {
+            log.push(
+              '',
+              'Rebase paused due to conflicts. Resolve them, then:',
+              '  git add <resolved-files>',
+              '  worktree_rebase_continue',
+              'Or: worktree_rebase(abort: true) to abort.',
+            );
+          }
         }
 
         return {
@@ -6451,6 +6514,10 @@ const handleCallTool = async (
             runGit,
             runShell: run,
             nonInteractiveEnv: NON_INTERACTIVE_GIT_ENV,
+            ensureSufficientDepth: (rebaseCwd, baseRef) =>
+              ensureSufficientDepth({ runGit }, rebaseCwd, baseRef),
+            isShallowRepository: (rebaseCwd) =>
+              isShallowRepository({ runGit }, rebaseCwd),
           },
         );
       } catch (err: unknown) {
