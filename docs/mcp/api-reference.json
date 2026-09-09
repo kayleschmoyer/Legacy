@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 267,
+  "toolCount": 268,
   "servers": [
     {
       "dir": "worktree-server",
@@ -7409,7 +7409,7 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 25,
+      "toolCount": 26,
       "tools": [
         {
           "name": "aws_apigateway_inspect",
@@ -7722,6 +7722,20 @@
               "optional": true,
               "default": false,
               "description": "Also return a summary of all policy versions (versionId, isDefault, createDate). Default: false."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "aws_iam_list_attached_role_policies",
+          "description": "List the managed IAM policies attached to a role. Returns each attached policy's name and ARN. Wraps `aws iam list-attached-role-policies --role-name <roleName>`.",
+          "inputs": {
+            "roleName": {
+              "type": "string",
+              "optional": false,
+              "description": "The IAM role name (not ARN), e.g. \"legacy-sports-graphql-lambda-role\"."
             }
           },
           "transports": [

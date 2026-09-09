@@ -10,7 +10,7 @@
 
 CloudWatch logs, Lambda/EC2/API Gateway inspection, Secrets Manager, SSM, and SSO auth health.
 
-Local stdio process only — not exposed as a hosted connector. 25 tools.
+Local stdio process only — not exposed as a hosted connector. 26 tools.
 
 ---
 
@@ -115,6 +115,14 @@ Fetch an IAM policy document by ARN. Returns the default policy version document
 | --- | --- | --- | --- | --- |
 | `policyArn` | string | **required** | — | Full IAM policy ARN (e.g. "arn:aws:iam::123456789012:policy/MyPolicy" or a managed policy ARN like "arn:aws:iam::aws:policy/ReadOnlyAccess"). |
 | `listVersions` | boolean |  | — | Also return a summary of all policy versions (versionId, isDefault, createDate). Default: false. |
+
+### `aws_iam_list_attached_role_policies`
+
+List the managed IAM policies attached to a role. Returns each attached policy's name and ARN. Wraps `aws iam list-attached-role-policies --role-name <roleName>`.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `roleName` | string | **required** | — | The IAM role name (not ARN), e.g. "legacy-sports-graphql-lambda-role". |
 
 ### `aws_lambda_status`
 

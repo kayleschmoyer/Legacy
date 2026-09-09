@@ -12,6 +12,7 @@ import {
   ec2NetworkInspect,
 } from './tools/ec2.js';
 import { iamGetPolicy } from './tools/iam-get-policy.js';
+import { iamListAttachedRolePolicies } from './tools/iam-list-attached-role-policies.js';
 import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
@@ -661,6 +662,20 @@ server.tool(
       ),
   },
   async (params) => iamGetPolicy(params),
+);
+
+// --- aws_iam_list_attached_role_policies ---
+server.tool(
+  'aws_iam_list_attached_role_policies',
+  "List the managed IAM policies attached to a role. Returns each attached policy's name and ARN. Wraps `aws iam list-attached-role-policies --role-name <roleName>`.",
+  {
+    roleName: z
+      .string()
+      .describe(
+        'The IAM role name (not ARN), e.g. "legacy-sports-graphql-lambda-role".',
+      ),
+  },
+  async (params) => iamListAttachedRolePolicies(params),
 );
 
 // --- packer_build ---

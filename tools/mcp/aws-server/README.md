@@ -6,6 +6,7 @@ Exposes AWS CloudWatch logs and SSO authentication health as structured MCP tool
 
 - **aws_logs_tail** — Fetch recent CloudWatch logs for a Legacy Sports Lambda function. Supports time range (`since`), filter patterns, and dev/prod environments. Returns markdown by default — an `### Errors` section extracted by matching `ERROR`/`WARN`/`Exception`/`Error:` plus the following stack frames, followed by a `### Recent` code-block with the last 50 lines; pass `format: "json"` for the original structured payload. Automatically sets `AWS_PAGER=""` and `PYTHONIOENCODING=utf-8` to avoid common encoding and pagination issues.
 - **aws_sso_status** — Check AWS SSO authentication health by running `aws sts get-caller-identity`. Returns caller identity on success or a clear error with remedy instructions on failure.
+- **aws_iam_list_attached_role_policies** — List the managed IAM policies attached to a role (name + ARN for each). Wraps `aws iam list-attached-role-policies --role-name <roleName>`.
 
 ## How It Works
 
