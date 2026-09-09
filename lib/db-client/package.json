@@ -19,6 +19,7 @@
     "db:env": "tsx --require tsconfig-paths/register src/scripts/load-db-env.ts",
     "db:verify": "tsx --require tsconfig-paths/register src/scripts/verify-schema.ts",
     "db:manual-migration": "tsx --require tsconfig-paths/register src/scripts/manual-migration.ts",
+    "db:resync-role": "tsx --require tsconfig-paths/register src/scripts/resync-mcp-role-password.ts",
     "db:test-draft": "tsx --require tsconfig-paths/register src/scripts/test-draft-status.ts",
     "db:generate": "drizzle-migrations generate",
     "db:up": "tsx --require tsconfig-paths/register src/scripts/rollback-migrations.ts up",
