@@ -1,4 +1,42 @@
-import { isReadOnlyQuery } from './db-cli';
+import { isReadOnlyQuery, resolveQuerySslConfig } from './db-cli';
+
+describe('resolveQuerySslConfig', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env.DB_SSL_SELF_SIGNED;
+    delete process.env.DB_CERT_PATH;
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('disables verification when DB_SSL_SELF_SIGNED=true, regardless of DB_CERT_PATH', () => {
+    process.env.DB_SSL_SELF_SIGNED = 'true';
+    process.env.DB_CERT_PATH = '/does/not/matter.pem';
+
+    expect(resolveQuerySslConfig()).toEqual({ rejectUnauthorized: false });
+  });
+
+  it('defaults to strict verification (never weakened implicitly)', () => {
+    process.env.DB_CERT_PATH = __filename;
+
+    const result = resolveQuerySslConfig();
+
+    expect(result.rejectUnauthorized).toBe(true);
+    expect(result.ca).toBeDefined();
+  });
+
+  it('surfaces a clear, actionable error when the CA bundle cannot be read (not a raw chain dump)', () => {
+    process.env.DB_CERT_PATH = '/definitely/does/not/exist.pem';
+
+    expect(() => resolveQuerySslConfig()).toThrow(
+      /Failed to read CA certificate.*DB_SSL_SELF_SIGNED=true/s,
+    );
+  });
+});
 
 describe('isReadOnlyQuery', () => {
   it.each([

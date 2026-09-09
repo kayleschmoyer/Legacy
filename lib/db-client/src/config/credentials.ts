@@ -180,9 +180,7 @@ function resolveLocalCredentials(
     host,
     port: parseInt(portStr, 10),
     database:
-      getEnvVarOptional('DB_NAME') ||
-      config.defaultDatabase ||
-      'legacy_sports_dev',
+      getEnvVarOptional('DB_NAME') || config.defaultDatabase || 'postgres',
     user: getEnvVarOptional('DB_USER') || 'postgres',
     password: getEnvVarRequired('DB_PASSWORD'),
   };
@@ -214,5 +212,9 @@ export const ProductionCredentialConfig: CredentialConfig = {
  */
 export const DevelopmentCredentialConfig: CredentialConfig = {
   useLocalCredentials: true,
-  defaultDatabase: 'legacy_sports_dev',
+  // Matches the AWS Secrets Manager path's default ('postgres', always
+  // present on RDS) rather than the docker-compose-only 'legacy_sports_dev'
+  // database, which doesn't exist on the dev RDS instance. Callers targeting
+  // the local docker-compose Postgres set DB_NAME explicitly (see .env.docker).
+  defaultDatabase: 'postgres',
 };

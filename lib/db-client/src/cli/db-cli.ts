@@ -50,6 +50,7 @@ if (process.env.DEBUG === 'env') {
 if (envPath) {
   config({ path: envPath, override: false });
 }
+import { readFileSync } from 'fs';
 import {
   DevelopmentCredentialConfig,
   getDatabaseUrl,
@@ -96,6 +97,42 @@ export const isReadOnlyQuery = (sql: string): boolean => {
     );
   }
   return false;
+};
+
+/**
+ * Resolve the `pg` SSL config for the `query` command.
+ *
+ * Defaults to strict verification (safe by default — never weakened
+ * implicitly): reads a CA bundle from `DB_CERT_PATH` (falling back to the
+ * conventional `certs/us-east-1-bundle.pem` location documented in
+ * `.env.example`) and rejects unauthorized certs.
+ *
+ * Set `DB_SSL_SELF_SIGNED=true` to explicitly opt into skipping certificate
+ * verification — required when connecting through an SSM tunnel, since the
+ * tunnel terminates at 127.0.0.1 while the RDS cert's CN is the real
+ * hostname, so hostname verification can never pass through it even with a
+ * valid CA bundle.
+ */
+export const resolveQuerySslConfig = (): {
+  rejectUnauthorized: boolean;
+  ca?: string;
+} => {
+  if (process.env.DB_SSL_SELF_SIGNED === 'true') {
+    return { rejectUnauthorized: false };
+  }
+
+  const certPath =
+    process.env.DB_CERT_PATH ||
+    path.join(__dirname, '../../../../certs/us-east-1-bundle.pem');
+  try {
+    return { rejectUnauthorized: true, ca: readFileSync(certPath).toString() };
+  } catch (error) {
+    throw new Error(
+      `Failed to read CA certificate at "${certPath}": ${String(error instanceof Error ? error.message : error)}. ` +
+        'Set DB_CERT_PATH to a valid certificate file, or set DB_SSL_SELF_SIGNED=true to skip ' +
+        'certificate verification (e.g. when connecting through an SSM tunnel).',
+    );
+  }
 };
 
 const program = new Command();
@@ -314,7 +351,6 @@ program
 
         // Create database connection
         const { Pool } = await import('pg');
-        const { readFileSync } = await import('fs');
 
         const pool = new Pool({
           host: credentials.host,
@@ -322,12 +358,7 @@ program
           user: credentials.user,
           password: credentials.password,
           database: credentials.database,
-          ssl: {
-            rejectUnauthorized: true,
-            ca: readFileSync(
-              path.join(__dirname, '../../../../certs/us-east-1-bundle.pem'),
-            ).toString(),
-          },
+          ssl: resolveQuerySslConfig(),
         });
 
         try {
