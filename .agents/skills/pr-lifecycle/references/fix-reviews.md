@@ -23,7 +23,7 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 
 ## Workflow (single PR)
 
-1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available. If this session did not create the PR, also stamp it for provenance: `bash scripts/link-pr-session.sh <PR#>` ([why](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570)).
+1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available. If this session did not create the PR, also stamp it for provenance: `bash scripts/link-pr-session.sh <PR#>` ([why](create-pr.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570)).
 2. **Fetch threads**: `github_get_review_threads(number: <PR#>)`
 3. **Fix ALL threads before modifying files**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
    - **Re-ground in ticket scope before applying any fix**: extract the Jira ticket key from the PR title (`LS-\d+` pattern), then call `jira_view(key: "LS-####")` and re-read the ticket's **Acceptance Criteria** and **Out of Scope** sections. Use them as a guardrail when triaging suggestions:
@@ -95,9 +95,46 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 
 > **Why split tools?** Fetching/resolving threads uses the custom server (only source of GraphQL thread node IDs). Replying uses built-in tools (platform auth ensures bot identity, not user's personal token).
 
+## Review Thread Workflow (bot-review failures)
+
+When `bot-review` CI check fails or Copilot posts review comments, use this MCP-first workflow:
+
+> **Classification rule**: `bot-review`, `Copilot review blocked`, and `Copilot review has unresolved comments` are review blockers, not generic CI-debugging tasks. Fetch unresolved review threads first; do not start by reading Actions logs unless another non-review check is also failing.
+
+1. **Get unresolved threads**: `github_get_review_threads({ number: PR# })`
+   - Default (no `includeResolved`) returns only unresolved threads — exactly the ones blocking merge.
+   - Returns thread-level fields: `id` (PRRT\_ node ID), `isResolved`, `isOutdated`, `isCollapsed`, `path`, `line`, `startLine` — plus a `comments` array with `databaseId`, `author`, `body`, `path`, `line` per comment.
+2. **Inspect the returned comments and fix the code** in the flagged files/lines
+3. **Reply to threads** (when a comment needs acknowledgment or explanation rather than a code fix):
+   - Use `github_reply_to_review` — available for **both local and cloud** sessions via the custom `legacy-sports-github` MCP server.
+   - Pass either `threadId` (GraphQL node ID from `github_get_review_threads`) or `commentId` + `number` (REST databaseId + PR number): `github_reply_to_review({ threadId: "PRRT_...", body: "explanation" })`
+   - **ToolSearch query**: search `"reply review"`, `"reply to review comment"`, or `"github_reply_to_review"` — not `"reply to PR comment"` (which may not surface it).
+   - Do **not** reach for `gh api repos/.../pulls/.../comments` or a Python scratch script — the MCP tool handles both auth paths.
+4. **Commit and push** the fix
+5. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
+   - Thread node IDs come from the `id` field of each thread in `github_get_review_threads` output (PRRT\_... format).
+   - **Alternative**: if you only have numeric comment `databaseId` values (e.g. from `mcp__github__*` `get_review_comments`), pass them as `commentDatabaseIds` instead — the tool maps them to thread IDs internally: `github_resolve_threads({ commentDatabaseIds: [<databaseId>, ...], prNumber: PR# })`.
+   - **If bot-review still fails after resolution**: `github_resolve_threads` with `prNumber` attempts to re-dispatch the Copilot Auto-Approve workflow, but may be silently skipped if the app token lacks `actions: write`. If `bot-review` still shows failure after thread resolution, re-dispatch manually: `ci_dispatch_workflow({ workflow: "Copilot Auto-Approve", ref: "<branch>", inputs: { pr_number: "<PR#>" } })`. Wait ~20 seconds for the recheck job and verify `bot-review` flips to success before attempting merge.
+6. **Apply `bot:ready-for-review` label**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this fires the next Reviewer (W1) cycle. Copilot review is triggered automatically by the platform; no explicit `github_request_review` call is needed.
+   - **Events arrive — do not poll**: the review event arrives automatically as a push notification. Call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` only if that built-in tool is present in the session's tool list (it is absent from most current sessions — absence is not a monitoring failure). In environments with no event delivery at all (cloud/headless), do **not** fall back to a retry loop — arm a wake per [waiting-and-wakeups](../../mcp-first/references/waiting-and-wakeups.md) and end the turn.
+
+> **`bot-review` still stuck after resolving threads?** Manually re-dispatch the recheck using the `ci_dispatch_workflow` MCP tool — **never** `gh workflow run copilot-auto-approve.yml` via Bash:
+>
+> ```
+> ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })
+> ```
+>
+> In cloud sessions, this may return 403 (app lacks `actions:write`) — see [cloud-agent-mode/references/known-quirks.md](../../cloud-agent-mode/references/known-quirks.md#quirk-4-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite).
+
+Before the next push, also check whether any other blockers are already known on the PR (conflicts, non-review failing checks). Batch all currently known fixes into one validation + push round whenever possible. Do **not** push a CI-only change while known review threads remain unresolved, or vice versa, unless one blocker must be cleared first to reveal the next.
+
+> **Avoid `gh api graphql` to enumerate review threads** — prefer `github_get_review_threads`, which returns structured data including GraphQL thread node IDs (required for resolution). Use `gh api graphql` only as a last resort when MCP or another documented tool is unavailable or does not return the needed thread IDs.
+
+> **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
+
 ## Guardrails
 
 - **Never** suppress a lint/type error to satisfy a review comment — fix the root cause
 - **Never** resolve a thread without either fixing it or explaining why it's not applicable
 - **Never** enter more than 2 fix-review rounds on the same PR
-- After resolving all threads and pushing fixes, (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — **never apply it manually** (see [Label Ownership](../SKILL.md#label-ownership))
+- After resolving all threads and pushing fixes, (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — **never apply it manually** (see [Label Ownership](label-ownership.md#label-ownership))

@@ -240,4 +240,4 @@ After processing every PR, print a summary table:
   and leave a reply on the thread explaining why: `gh api ... --method POST`.
 - **Do not manually add `merge-when-ready`** — the **Reviewer Bot** adds it
   automatically on APPROVED verdict (label-add in `.github/scripts/reviewer/index.mjs`). See
-  [Label Ownership](../SKILL.md#label-ownership).
+  [Label Ownership](label-ownership.md#label-ownership).

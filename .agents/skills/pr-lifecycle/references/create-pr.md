@@ -9,7 +9,7 @@ You are a **PR creation operator**. Your job is to verify prerequisites, create 
 
 ## Prerequisites
 
-> **⛔ Draft-PR-first ordering (timeout resilience) — do NOT run `make pc` before the draft PR exists.** Open the draft PR **early**, right after the branch is pushed and **before** the long `make pc` validation. A draft PR is inert (CI and the Reviewer Bot are gated on `draft == false`, so opening it triggers nothing), but it gives an ephemeral/cloud container a durable substrate: a reap during `make pc` is then non-fatal, and a fresh container resumes from the continuation checkpoint instead of losing all work. The validated gate is **mark-ready, not open-draft** — `make pc` must pass before `github_mark_pr_ready`, but it does **not** need to pass before the draft PR is created. Running the full validation first is the dominant cloud-agent timeout failure mode. See the spine's [draft-PR-before-validation gate](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience).
+> **⛔ Draft-PR-first ordering (timeout resilience) — do NOT run `make pc` before the draft PR exists.** Open the draft PR **early**, right after the branch is pushed and **before** the long `make pc` validation. A draft PR is inert (CI and the Reviewer Bot are gated on `draft == false`, so opening it triggers nothing), but it gives an ephemeral/cloud container a durable substrate: a reap during `make pc` is then non-fatal, and a fresh container resumes from the continuation checkpoint instead of losing all work. The validated gate is **mark-ready, not open-draft** — `make pc` must pass before `github_mark_pr_ready`, but it does **not** need to pass before the draft PR is created. Running the full validation first is the dominant cloud-agent timeout failure mode. See the spine's [draft-PR-before-validation gate](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) and [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/references/container-timeout-resilience.md#container-timeout-resilience).
 
 ### Gate A — before opening the draft PR (verify in order, stop on first failure)
 
@@ -24,11 +24,37 @@ Then create the draft PR (see [Command](#command) below) and apply `agent-in-pro
 4. **Validation passes** — validation exits cleanly; if `format:write` changes files, commit them and re-run. Locally, `make pc` (or `make_run({ target: "pc" })`) is fine. In **cloud** sessions, never run monolithic `make pc` — run the seven `pc-*` chunks **in order** via the environment's binding (`nx_run_pc_chunk` when present — mandatory; degraded CC web: background Bash chunks), checkpointing after each (LS-7906). Binding home: the [spine's binding table](../../workflow-overview/references/ticket-to-merge-spine.md#tool-binding-by-environment) and [`cloud-agent-mode/SKILL.md`](../../cloud-agent-mode/SKILL.md).
 5. **Bug-fix verification** — if the branch contains `fix(` or the Jira ticket type is Bug, the PR body **must** include a `## Verification` section with before/after evidence. Stop and collect evidence before marking ready if missing. See [bug-verification-templates.md](bug-verification-templates.md) for the required format per bug category.
 
+## PR-Creation Tool Routing (one home — link here, do not restate)
+
+Pick the creation tool by which servers your session actually has (check the tool list / `ToolSearch`), in this preference order:
+
+| #   | Environment signal                                                                  | Tool                                                                                                                                 | What it does / follow-ups                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Hosted `legacy-sports-github` connector available (tools named `github_*`)          | `github_open_pr(title, body, jiraKey, head)`                                                                                         | **One-shot Ship step**: push branch → create draft → mark ready → apply `bot:ready-for-review`; auto-inserts the jira-link marker from `jiraKey`. Pass `draft: true` to stop at draft (then apply `agent-in-progress` and finish the label sequence below yourself); `push: false` if already pushed. **Always pass `head` explicitly whenever the `legacy-sports-github` MCP server is hosted/Lambda-backed** — this includes local worktree sessions using the hosted connector, not just cloud sessions. A hosted server has no git checkout to auto-detect the branch from and can never stat a caller-side `worktreePath` (that path only exists on the caller's filesystem); omitting `head` fails with `"In Lambda mode, head must be passed explicitly"`. Passing `head` explicitly is never harmful, so do it unconditionally rather than relying on `worktreePath`. The default `push: true` is also a no-op in this mode (nothing to push from); push the branch manually via Bash first and pass `push: false`, or the create call 422s with `head invalid` on the unpushed branch. |
+| 2   | Claude Code on the web without the connector (built-in `mcp__github__*` tools only) | `mcp__github__create_pull_request({ owner, repo, draft: true, ... })` then `mcp__github__update_pull_request({ ..., draft: false })` | Authenticates via the platform token (avoids attributing the PR to the user's personal account). Neither call applies any label or the jira-link marker — include the marker in the body yourself and run the full label sequence below via `github_manage_labels` (or built-in label tools if the connector is absent).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 3   | No MCP path at all AND the user explicitly authorized CLI                           | `gh pr create --draft --body-file ...`                                                                                               | Last resort only (`github_auth_status()` returned `configured: false` and the user confirmed). `gh pr create` silently uses the shell's cwd and targets the wrong branch in multi-worktree sessions — pass `--head` explicitly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+> **Row 2 caveat (LS-9279, refining LS-9463):** every built-in read path — `mcp__github__pull_request_read` and `mcp__github__list_pull_requests` alike — strips `<!-- ... -->` HTML comments from the body it returns, so **a read-back can never confirm the jira-link marker and must not be used to decide whether the write landed** (it reads as missing every time), and **a body edit composed from a read-back deletes the marker**. On row 2: put the key in the title, put the marker in `create_pull_request`'s initial body, and treat it as written. Jira Link Check repairs a missing or malformed marker from the title key and passes, so the only escalation is a check that actually fails — read its job log (`mcp__github__get_job_logs`), which prints `✅ Jira Link Check passed (primary: LS-####)` or names every violation. PR #7128 is the worked example of the false negative: marker written, invisible to two read-backs, present in the stored body and passing CI throughout. Full playbook: [§ Seeing and fixing linkage on an open PR](#seeing-and-fixing-linkage-on-an-open-pr) and [mcp-first § Built-in GitHub Tools](../../mcp-first/references/service-operations.md#built-in-github-tools-claude-code-on-the-web).
+
+> **Row 2 label caveat (LS-8933):** `mcp__github__update_pull_request` has no `labels` param — passing one either errors ("No update parameters provided", if `labels` is the only field) or is silently dropped (when combined with other fields like `draft`). On the row-2 built-in-only path (no hosted `legacy-sports-github` connector, so no `github_manage_labels`), the only way to set labels is `mcp__github__issue_write({ method: "update", issue_number, labels: [...] })` — but it **replaces the PR's entire label set**, not just the ones you pass. Always **read the PR's current labels first** (`mcp__github__pull_request_read` or `mcp__github__issue_read`) and include them in the `labels` array alongside whatever you're adding, or you will silently clobber labels set by other bots (e.g. `CI: Lint Failure`, `jira-mismatch`). Verified end-to-end (LS-8939, 2026-08-03): `issue_write({ method: "update", issue_number: <PR#>, labels: ["bot:ready-for-review"] })` applied the label and triggered the Reviewer Bot cycle — but note that call form drops every other label the PR had, so it's only safe when you've merged the current set in first.
+
+**Mandatory label sequence after any non-one-shot create** (rows 2–3, and row 1 with `draft: true`): apply `agent-in-progress` while the PR is a draft → `github_mark_pr_ready(number)` — which applies `bot:ready-for-review` itself as its last, idempotent step. Only the CC-web built-in path (row 2) needs an explicit `bot:ready-for-review` label call after `update_pull_request({ draft: false })`, and it must be the **last** label op (see the "must be last label op" note in [quick-commands.md](quick-commands.md)). `github_open_pr` without `draft: true` performs the ready + label steps itself.
+
+Before creating a PR, verify GitHub auth is working:
+
+```
+github_auth_status()
+```
+
+If `configured: false`, **stop and prompt the user** — do not silently fall back to `gh` CLI. Tell them their GitHub credentials are missing or expired and direct them to set `GH_TOKEN` or `GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY`. Only fall back to `gh` CLI after the user confirms their auth is working or explicitly asks you to try the CLI fallback.
+
+**Cloud (Claude Code on the web)**: row 2 of the routing table above; see [`cloud-agent-mode/SKILL.md`](../../cloud-agent-mode/SKILL.md) for the full platform tool mapping.
+
 ## Command
 
 > **⚠️ MCP tool string parameters are not shell-evaluated.** Unlike the Bash tool's `git commit -m "$(cat <<'EOF' ... EOF)"` heredoc convention, an MCP tool call is a plain JSON call — there is no shell to expand `$(...)` or backticks. Passing `body: "$(cat /tmp/pr-body.md)"` to `github_open_pr`/`create_pull_request` (or `commentBody` to a Jira comment tool) lands as the literal string `$(cat /tmp/pr-body.md)`, not the file's contents (LS-8591, caught while opening the draft PR for LS-6031). If you assembled the body in a scratch file via `Write`/`Edit`, `Read` it back and inline the actual text into the `body` param instead. This is cheap to catch: after creating a PR from a scratch-file body, re-read it once (`pull_request_read`/`jira_view`) to confirm the content landed correctly before moving on.
 
-Tool selection is homed in the [PR-creation tool routing table](../SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate) — the flow below shows the `github_open_pr` (hosted `legacy-sports-github`) path. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
+Tool selection is homed in the [PR-creation tool routing table](#pr-creation-tool-routing-one-home--link-here-do-not-restate) below — the flow below shows the `github_open_pr` (hosted `legacy-sports-github`) path. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
 
 ```
 github_open_pr(
@@ -274,7 +300,7 @@ primary: LS-####
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
 2. **Apply `agent-in-progress` label** (while still a draft): `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` — marks the PR as actively watched so sweep and review agents skip it. Applying before marking ready closes the race window. **Remove this label when you exit the task** (PR merged or session ends without completion). Shell fallback: `gh pr edit <PR#> --add-label "agent-in-progress"`
    2a. **Now run Gate B (the validated gate) — this is where `make pc` runs, AFTER the draft PR exists**: apply migrations (prereq 3), run `make pc` to green (prereq 4), collect bug-fix verification if required (prereq 5), and complete the self-review. The draft PR + `agent-in-progress` label already exist, so a container reap during `make pc` here is non-fatal. **Do not mark ready until `make pc` is green.**
-3. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` — this fires the `ready_for_review` event that triggers the `Reviewer (W1)` workflow (Cycle 1 of the [Author Agent Contract](../SKILL.md#author-agent-contract-bot-pr-flow)). The bot's resulting `pull_request_review` event then fires the `Legacy Sports CI Orchestrator`. Shell fallback (only if MCP unavailable): `gh pr ready <PR#>`
+3. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` — this fires the `ready_for_review` event that triggers the `Reviewer (W1)` workflow (Cycle 1 of the [Author Agent Contract](author-agent-contract.md)). The bot's resulting `pull_request_review` event then fires the `Legacy Sports CI Orchestrator`. Shell fallback (only if MCP unavailable): `gh pr ready <PR#>`
 4. **⛔ Apply `bot:ready-for-review` label — MANDATORY and MUST BE LAST**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. Cycle 1 fires from the `ready_for_review` event on its own, but **without this label any subsequent `synchronize` event (push of additional commits before the bot has reviewed, or any later fix-push) starts no reviewer run** — `Reviewer (W1)` only honors `synchronize` while this label is present (`.github/workflows/review.yml`). Applying it at PR creation closes that gap. Per LS-4678, the reviewer **preserves the label through merge — including on APPROVED** (see `.github/scripts/reviewer/index.mjs` — `cleanupOperationalLabels(..., { preserveReadyLabel: true })`) so post-approval pushes still fire a fresh cycle and don't silently stall behind the `bot-review` ruleset gate on the new HEAD SHA. Review Label Guard (W7) acts as a belt-and-suspenders: if something external strips the label between cycles, the next push re-applies it as long as a prior bot APPROVED exists. Re-application is required only if a prior cycle was rate-limited and the label was force-removed (see [fix-reviews.md](fix-reviews.md) step 8 for the remove-then-re-add pattern that re-triggers a stalled cycle). Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`. **⛔ `bot:ready-for-review` must be the last label operation in this session.** `Reviewer (W1)` uses `concurrency.cancel-in-progress: true` — any label applied after this one queues a new workflow run that cancels the reviewer run before it can post a review, then skips itself because the new label is not a qualifying trigger. If `agent-in-progress` is missing when you reach this step, go back and apply it first (step 2), then apply `bot:ready-for-review`.
 5. **Subscribe to PR activity (only if the built-in tool is present)**: `mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)`. **Current Claude Code sessions surface PR events (CI results, review threads, merge) automatically once the PR exists — no subscribe call is needed, and this built-in tool is absent from most sessions' tool lists** (it was never part of the `legacy-sports-github` MCP server and is unavailable in cloud/headless environments like Copilot Coding Agent and CI). **The tool being absent is NOT a monitoring failure** — do not conclude event delivery is broken, and do not fall back to polling; continue to the next step and react to events as they arrive (pr-lifecycle Critical Rule 9). Call the tool only if it actually appears in the session's tool list. In environments with no event delivery at all (e.g. Copilot), use event-triggered one-shot lookups (`github_view_pr` + `ci_list_runs`) when an external signal arrives — never a sleep/polling loop.
 6. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
@@ -317,3 +343,64 @@ Claude Code's built-in auto-create paths (the desktop "Create PR" affordance, cl
 - **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed
 - **Batch review comments** via "Start a review" before clicking "Fix with Copilot" — submitting each comment individually spawns a separate Copilot agent session per comment, causing duplicate or conflicting fixes
 - If prerequisites fail, stop and report the failure — do not create the PR anyway
+
+## Agent-Session Marker (PR ↔ Session Linkage + Provenance) — one home, LS-8570
+
+Any local session that picks up an existing PR it did not create (drive-pr, fix-pr, respond-to-review, sweep chips) must stamp itself onto the PR before entering the work loop:
+
+```bash
+bash scripts/link-pr-session.sh <PR#>
+```
+
+The script appends one idempotent marker line to the PR body via `gh pr edit --body-file`:
+
+```
+<!-- agent-session: <CLAUDE_CODE_SESSION_ID> (<YYYY-MM-DD>) -->
+```
+
+Two effects, and why `gh` (not MCP) is load-bearing here:
+
+- **Provenance (guaranteed).** Marker lines accumulate over the PR's life — a durable record of every agent session that worked it, resolvable back to transcripts via the session id.
+- **Desktop linkage (best-effort).** Claude Code Desktop links a session to a PR by detecting a PR on the _session's own branch_, or by parsing **harness-visible** `gh`/`git` PR interactions. MCP connector calls (`github_open_pr`, `github_manage_labels`, …) are invisible to the harness and never establish linkage — which is why pickup sessions historically showed an empty PR status bar. Caveat from live testing (desktop 2.1.215, LS-8570): `gh pr create` in-session reliably links (any branch) and Bash `git push` to the PR branch has been observed to link, but a `gh pr edit` body edit alone did **not**. Treat foreign-branch status-bar linkage as best-effort — the stamp is still the right first move (it is the only harness-visible interaction most pickup sessions perform), and an empty status bar after stamping is an upstream desktop limitation, not a workflow bug.
+
+Skip only when: the PR is on the session's own branch (linkage is automatic — though stamping is still harmless and keeps provenance complete), or the environment has no `gh`/`CLAUDE_CODE_SESSION_ID` (cloud/API-only sessions — the script fails loudly and the miss is acceptable).
+
+## Parent-Agent PR Recovery
+
+When a subagent fails to push or create a PR, the parent agent should **prefer MCP tools** to recover — use `gh` only when MCP is unavailable. The subagent's commits already exist in its ephemeral worktree; the parent just needs to push and ship.
+
+**Recovery sequence (MCP-first):**
+
+```
+# 1. Push the subagent's commits (include worktree path and setUpstream for new branches)
+worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
+# OR if worktree_set is active for the subagent's worktree:
+worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
+
+# 2. Create the PR as a draft, using the subagent's branch name (from worktree_status().headRefName)
+github_open_pr(
+  head: "<branch-name>",    # from worktree_status().headRefName
+  title: "LS-#### type(scope): msg",
+  body: <markdown>,
+  jiraKey: "LS-####",
+  push: false,              # step 1 already pushed
+  draft: true
+)
+
+# 3. Apply the agent-in-progress label
+github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
+
+# 4. Mark ready for review
+github_mark_pr_ready(number: <PR#>)
+```
+
+**Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_open_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `head` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.
+
+**Shell fallback (only if MCP server is unavailable):**
+
+```bash
+gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
+bash scripts/cleanup-pr-body.sh
+gh pr edit <PR#> --add-label "agent-in-progress"
+gh pr ready <PR#>
+```

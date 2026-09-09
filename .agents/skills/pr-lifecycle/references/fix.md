@@ -20,7 +20,7 @@ Unified single-PR remediation. Takes one PR number and drives it toward mergeabl
 1. **GitHub auth**: `github_auth_status()` must return `configured: true`. If not, stop and prompt.
 2. **Jira auth** (optional but recommended): `jira_auth_status()` — used to fetch ticket context before applying review fixes.
 3. **Worktree**: you must be in a worktree for the PR's branch. If not, use `worktree_attach({ branch: "<branch>" })` or create one. This is also what binds PR event notifications to the session: a session spawned on an auto-generated `claude/<name>` branch (chip or launcher worktree) is **not** connected to the PR. Either check out the PR's head branch and call `worktree_set` (see [drive.md Step 4](./drive.md#step-4-enter-worktree-local-only)), or treat the session as fire-and-forget — fix → push → re-arm `bot:ready-for-review` → report — and never end the turn "waiting for the next event": an unbound session is never woken (branch binding is cached at session start — anthropics/claude-code#18690).
-4. **Stamp the session onto the PR**: `bash scripts/link-pr-session.sh <PR#>` — leaves a provenance marker in the body and gives the desktop its best chance to link the session to the PR. See [pr-lifecycle SKILL.md § Agent-session marker](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570).
+4. **Stamp the session onto the PR**: `bash scripts/link-pr-session.sh <PR#>` — leaves a provenance marker in the body and gives the desktop its best chance to link the session to the PR. See [create-pr.md § Agent-Session Marker](create-pr.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570).
 
 ## Workflow
 
@@ -108,7 +108,7 @@ After all fixes are applied and pushed:
 1. Re-check PR status: `github_pr_batch_status({ numbers: [<PR#>] })`
 2. Confirm: `mergeable != CONFLICTING`, `CI: Conflicts` label gone (it clears automatically once the re-run check passes — never remove it yourself), no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
-4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](../SKILL.md#label-ownership)).
+4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](label-ownership.md#label-ownership)).
 
 ## Iteration Cap
 

@@ -61,9 +61,9 @@ Two consumers already bridge the config/live gap — useful when debugging:
 
 **HEAD-SHA gating (LS-4678):** the ruleset evaluates `bot-review` against the PR's HEAD SHA — a `success` on an older SHA never carries forward; every push needs a fresh cycle on the new tip. The bot keeps `bot:ready-for-review` on the PR through merge so post-approval pushes auto-fire a new cycle; if the label is externally stripped, Review Label Guard (`review-label-guard.yml`, W7) re-applies it on the next push when a prior bot APPROVED exists.
 
-**Fix (normal path):** the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures) — get unresolved threads, fix, push, `github_resolve_threads`. Thread resolution without a push re-triggers the reviewer via `copilot-auto-approve.yml` ("Copilot Auto-Approve Recheck", dispatched by the `github_resolve_threads` tool — LS-8121).
+**Fix (normal path):** the [Review Thread Workflow](fix-reviews.md#review-thread-workflow-bot-review-failures) — get unresolved threads, fix, push, `github_resolve_threads`. Thread resolution without a push re-triggers the reviewer via `copilot-auto-approve.yml` ("Copilot Auto-Approve Recheck", dispatched by the `github_resolve_threads` tool — LS-8121).
 
-**Fix (override):** a maintainer applies `review-bot-override` — `review-bot-override.yml` (W5) sets `bot-review` to `success`, posts an audit comment, and suppresses W1 while present; removing the label restores `pending`. This is the formal escape hatch when the bot persistently misapplies a rule (after `CANNOT-COMPLY` at Cycle 3 — see the Author Agent Contract in [pr-lifecycle/SKILL.md](../SKILL.md)). As Author Agent you never apply it yourself.
+**Fix (override):** a maintainer applies `review-bot-override` — `review-bot-override.yml` (W5) sets `bot-review` to `success`, posts an audit comment, and suppresses W1 while present; removing the label restores `pending`. This is the formal escape hatch when the bot persistently misapplies a rule (after `CANNOT-COMPLY` at Cycle 3 — see §5 of the [Author Agent Contract](author-agent-contract.md)). As Author Agent you never apply it yourself.
 
 ### `No Merge Conflicts`
 
@@ -174,6 +174,26 @@ The merge queue waits for _all_ checks to finish and blocks on failing ones, so 
 ### `needs-human-security-review` Label (CODEOWNER gate)
 
 Applied by the reviewer on critical security findings. The actual gate is `require_code_owner_review: true` — the author cannot satisfy it on their own PR. A maintainer resolves the deadlock with the `security-review-override` label → `security-review-override.yml` submits an APPROVE as the Reviewer Bot App (a non-author identity), removes the label, and posts an audit comment; removing the override label dismisses that approval again. Contrast with `review-bot-override` (W5): W5 **rejects** a wrong finding by flipping `bot-review`; the security override **ratifies** a correct finding after human review. Maintenance contract: the unlabeled path finds the approval to dismiss by matching the `Security Review Override Applied` marker string — if you change the marker in the workflow, update the matcher constant in the same file in lockstep.
+
+---
+
+<a id="withholding--could-not-post-status-is-a-rate-limit-signature-not-a-verdict-ls-9570"></a>
+
+## "Withholding / could not post status" is a rate-limit signature, not a verdict (LS-9570)
+
+A CI gate or workflow step can compute the correct result and still fail to report it. Recognize this pattern:
+
+- `actions/github-script` steps die with `API rate limit exceeded for installation`.
+- A gate script (e.g. `ci-gate.js`) logs that it computed a verdict but explicitly withholds posting it (e.g. `withholding 'success' ... (run-lookup-failed)`) because an API call it needed for corroboration 403'd.
+- A step logs `Setting commit status: success - ...` immediately followed by the actual `POST /statuses/...` call 403ing and the job then `setFailed`.
+
+All three **look like a verdict was reached and something else went wrong** — they are not. They are the installation GitHub App token's rate limit being exhausted mid-run. Don't spend time reproducing the underlying check, re-running the summarize/reporting job immediately, or bumping the SHA to force a rebuild — none of those touch the actual cause and the retry will 403 identically seconds later.
+
+**Confirm and remedy:**
+
+1. Call `ci_installation_rate_limit` (not `gh api rate_limit` — that reports a different token's bucket and will misleadingly show plenty of headroom; see [mcp-first § Installation rate limit vs. `gh api rate_limit`](../../mcp-first/references/auth-and-routing.md#installation-vs-user-rate-limit-ls-9570)). A low/zero `remaining` confirms this failure mode.
+2. Wait until the returned `resetsAt`.
+3. Re-run only the reporting/summarize job that failed to post (`ci_rerun`/`github_retrigger_check` as appropriate) — do not push a new commit or otherwise widen the PR to "fix" it.
 
 ---
 

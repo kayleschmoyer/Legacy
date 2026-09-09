@@ -9,6 +9,9 @@
 //         consumed by scripts/generate-skill-index.mjs (INDEX.md drift is checked
 //         separately by .github/checks/skill-index-sync.sh)
 //     3. Relative markdown links (outside code blocks/spans) must resolve on disk
+//     7. SKILL.md size budget — must be <= SKILL_MD_SIZE_BUDGET_BYTES. SKILL.md is
+//        always-resident (loaded on every substantive task per AGENTS.md routing),
+//        so lookup-table content belongs in references/*.md, loaded on demand.
 //   WARNINGS (reported, exit 0):
 //     4. `file.ext:NNN` line-number citations — cite anchors/symbols instead
 //     5. Known-retired tool names (they may legitimately appear when documenting
@@ -33,6 +36,40 @@ const SPINE_FILE = join(
   'references',
   'ticket-to-merge-spine.md',
 );
+
+// SKILL.md is always-resident context (loaded on every substantive task, per
+// AGENTS.md's "Before starting work, Read .agents/skills/INDEX.md, and load
+// every skill whose scope matches"), re-sent on every tool-call round trip and
+// re-paid in full after every /compact. Lookup-table content (per-service ops
+// tables, exhaustive troubleshooting) belongs in references/*.md, loaded only
+// when a task actually matches. 15KB is roughly 3.5-4k tokens; a dispatcher
+// SKILL.md (purpose, preconditions, a references table, critical rules) fits
+// comfortably under it. See .agents/skills/skill-authoring/SKILL.md.
+const SKILL_MD_SIZE_BUDGET_BYTES = 15 * 1024;
+
+// Grandfathered oversized skills: the budget landed with LS-9822, which
+// restructured mcp-first/pr-lifecycle/cloud-agent-mode (the highest-traffic
+// always-loaded skills) but left every other pre-existing oversized SKILL.md
+// alone — a full corpus-wide restructure is out of scope for one ticket (see
+// LS-9822's ticket notes). Follow-up: LS-9982. These are WARNINGS, not
+// errors, so CI doesn't block on backlog this check didn't create. Remove an
+// entry here (so it reverts to a normal ERROR) as part of restructuring that
+// skill; never add a newly created or freshly-rewritten SKILL.md to this list.
+const SIZE_BUDGET_GRANDFATHERED = new Set([
+  'cloudwatch-archaeology',
+  'design-sync',
+  'dev-environment',
+  'domain-reference',
+  'fix-integration-tests',
+  'nightly-green-campaign',
+  'read-playwright-report',
+  'repo-tooling',
+  'sweep-dependabot',
+  'testing',
+  'work-ticket',
+  'workflow-overview',
+  'worktree-workflow',
+]);
 
 // Tool names retired from the MCP servers / harness. Mentions are warnings,
 // not errors, because docs may legitimately name them when documenting the
@@ -157,6 +194,24 @@ for (const name of dirs) {
           `path-glob routing scope ('**' = repo-wide), then run ` +
           `'make sync-skill-index'. See skill-authoring/SKILL.md.`,
       });
+    }
+
+    // 7. SKILL.md size budget — always-resident content must stay thin
+    const sizeBytes = Buffer.byteLength(skillMdText, 'utf8');
+    if (sizeBytes > SKILL_MD_SIZE_BUDGET_BYTES) {
+      const msg =
+        `${(sizeBytes / 1024).toFixed(1)}KB exceeds the ${SKILL_MD_SIZE_BUDGET_BYTES / 1024}KB ` +
+        `SKILL.md size budget — move lookup-table/reference content into ` +
+        `references/*.md and leave SKILL.md a thin dispatcher. See ` +
+        `skill-authoring/SKILL.md.`;
+      if (SIZE_BUDGET_GRANDFATHERED.has(name)) {
+        warnings.push({
+          file: `${name}/SKILL.md`,
+          msg: `[grandfathered, LS-9822] ${msg}`,
+        });
+      } else {
+        errors.push({ file: `${name}/SKILL.md`, msg });
+      }
     }
   }
 

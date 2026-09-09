@@ -1,0 +1,59 @@
+# Claude Code Remote (CCR)
+
+A fourth configuration, distinct from the three in [Step 0](platform-detection.md#step-0-identify-your-platform): the managed remote execution product described in this session's own system prompt ("Your current remote execution environment"), reached via a dedicated `mcp__Claude_Code_Remote__*` server (`create_session`, `create_trigger`, `list_repos`, `add_repo`, `send_later`, `subscribe_pr_activity`, etc.) — **not** the `ccd_session` server that hosted "chip dispatch" sessions use. Identify it by: `mcp__Claude_Code_Remote__*` tools present; `mcp__ccd_session__spawn_task` and `nx_run_pc_chunk` both absent (confirm with `ToolSearch`); hosted `legacy-sports-{jira,github,ci}` connectors and built-in `mcp__github__*` present (same as Connector CC web). Only the chip-dispatch gap below is verified for CCR — everything else in this file (spine bindings, validation, Jira transition IDs) is unconfirmed here. In particular, do **not** assume Connector CC web's `nx_run_pc_chunk` validation binding — that tool is absent by definition in CCR (see the Step 0 check above); until verified, the safer assumption is Default CC web's degraded validation path (Bash `make pc-<chunk>` in background, one chunk at a time). Verify each capability against the tools actually present in your session rather than assuming any platform's full binding, and update this section with what you find.
+
+Known CCR-specific failure modes and quirks (dead sessions, stale Nx caches, OAuth expiry on long loops) are documented separately in [ccr-known-failures.md](ccr-known-failures.md).
+
+## AWS/Packer tools non-functional in CCR (LS-9537, LS-8736)
+
+`legacy-sports-aws` connects normally in a CCR session — schemas load via `ToolSearch`, tool calls execute rather than timing out — but every `aws_*`/`packer_*` tool still fails, because the server implementation shells out to the `aws`/`terraform` CLI binaries and neither is installed on PATH in this environment. This is distinct from Copilot/CC-web, where no AWS credentials exist at all; here the server tries to run and simply can't find the binary.
+
+As of LS-9537 this surfaces as an actionable error naming the missing binary and the CCR limitation, not the raw `spawn aws ENOENT` Node throws by default — but the underlying capability gap is real, not just a confusing error message. There is no in-session workaround: don't retry `aws_*`/`packer_*` calls expecting a different result, and don't burn time re-diagnosing "aws: not found" as a startup race (a server disconnect/reconnect does not change the outcome). Fall back to what the deploy/CI run itself reports (e.g. a Terraform apply output or `aws` invocation in the GitHub Actions log) for anything that would otherwise need direct AWS-side verification (EC2/AMI inspection, log tailing via `aws_logs_tail`, etc.). Full detail: [mcp-first § AWS Operations](../../mcp-first/references/service-operations.md#aws-operations).
+
+Baking the `aws`/`terraform` CLIs into the CCR base image, or migrating `aws-server`'s ~20 tool implementations off the CLI onto the AWS SDK for JS directly, are both CCR-platform/large-refactor changes outside a single ticket's reach — this section is the documented-fallback half of LS-8736, not the fix.
+
+## Chip dispatch substitute (LS-8510)
+
+[work-ticket leaf-mode step 4](../../work-ticket/references/leaf-mode.md) requires spawning a chip via `mcp__ccd_session__spawn_task` whenever a follow-up ticket is filed mid-implementation. That tool does not exist in CCR sessions and `ToolSearch` cannot locate it (confirmed LS-8510) — a platform capability gap in this product surface, not a repo bug to route around.
+
+**Current compliant behavior**: file the follow-up ticket and add a one-line note (description or `jira_add_comment`) that it needs manual pickup — do not stop the current ticket to work it. leaf-mode.md step 4 branches to this fallback for CCR sessions; it satisfies the "MANDATORY" contract without a dispatch primitive.
+
+**VERIFIED substitute (LS-9597)**: `mcp__Claude_Code_Remote__create_session({ prompt, title, source_url })` spawns a real independent session in this environment. Confirmed end-to-end 2026-08-23: `session_01QxoS5F8SPKkL991oHP3sMX` was created from a CCR session, consumed its `prompt`, ran a turn, and reported back (`post_turn_summary`, `usage.output_tokens: 270`). `environment_id` is optional — it inherits the caller's environment; pass it only to target a different one.
+
+**`source_url` is mandatory.** Omitting it produces a session that dies before its first turn while the call still returns success — see [ccr-known-failures.md](ccr-known-failures.md#known-failure-mode-create_session-without-source_url-produces-a-dead-session-reported-as-success-ls-9597). This is the single reason the earlier chip fan-outs appeared to "never work".
+
+Two caveats before relying on it. First, whether this satisfies [leaf-mode](../../work-ticket/references/leaf-mode.md) step 4's dispatch contract is a separate decision — that file still branches CCR sessions to the file-a-ticket-and-note-it fallback, and changing that branch is its own change, not implied by this verification. Second, `create_session` can fail with `failed to create session: the service is temporarily unavailable — try again`, which is [VM allocation capacity](https://code.claude.com/docs/en/claude-code-on-the-web#session-creation-failed), not a caller error: it reproduces with any payload, in any environment, and with or without `source_url`. Retry rather than rewriting the call — see the bounded protocol below for how long.
+
+### `create_session` outage: bounded retry protocol, not blind retry (LS-9639)
+
+There is no `mcp__Claude_Code_Remote__*` health-check or status tool that distinguishes "transient blip, retry in 30s" from "down for hours, stop retrying" — the `the service is temporarily unavailable` string carries no error code, no `retryAfter`, no incident ID. That tool surface is the hosted CCR platform, not one of the 10 in-repo MCP servers this repo can patch (see [gaps.md](../../mcp-first/references/gaps.md#phase-2-triage-quick-reference)), so the fix here is a bounded, documented protocol rather than a tool change.
+
+Three independently observed outages set the bounds: 7 retries over ~2h (self-recovered), 5 retries over ~90min (self-recovered), 5 retries over ~15min (never recovered in-session). Recovery, when it happens, has taken tens of minutes to ~2 hours — never seconds.
+
+**Do not blind-loop the retries in-context** — that violates the [never-poll rule](../../mcp-first/references/waiting-and-wakeups.md#the-rule) the same way an in-context `ci_view_run` loop would. Use the same chained-one-shot mechanism as the [Periodic Wake Protocol](../../mcp-first/references/waiting-and-wakeups.md#periodic-wake-protocol):
+
+1. On first `create_session` failure, retry once immediately (covers true one-off blips).
+2. Still failing → `send_later({ delay_minutes: 20, message: "retry create_session for <ticket/purpose>" })` and end the turn. Re-arm on each subsequent failure, same as the wake protocol's re-arm invariant — never more than one outstanding reminder.
+3. **Cap at 6 retries (~2h elapsed, matching the longest observed self-recovery).** If still failing at the cap, stop — per AGENTS.md's chip-dispatch rule ("if unavailable, stop and inform the user") — do the work directly in the current session instead of dispatching a chip, and note the outage (duration, attempt count) in the ticket or PR so the next audit has data.
+4. A success after a prior failure needs no special handling — just proceed; there is no lingering half-broken state to detect.
+
+**Also available, confirmed but unnecessary**: `create_trigger({ name, prompt, create_new_session_on_fire: true, run_once_at: "<RFC3339>" })` spawns a fresh session once and then self-disables (`ended_reason: "run_once_fired"`). That self-disable is not an incidental observation — it is the documented contract for one-off schedules ([routines docs](https://code.claude.com/docs/en/routines#schedule-a-one-off-run): "After the routine fires, it auto-disables and the web UI marks it as **Ran**"). Structurally close to a one-shot `spawn_task`, but `create_session` is verified end-to-end and does not depend on a future firing time — prefer it.
+
+## Trigger lifecycle: never call `delete_trigger` (LS-9648)
+
+`delete_trigger` **cannot be auto-approved, in any session, by any configuration.** Its permission prompt offers only "Deny" / "Allow once" with no "don't ask again" — the signature of an MCP tool whose server sets `_meta["anthropic/requiresUserInteraction"]: true`. Per the [MCP docs](https://code.claude.com/docs/en/mcp#require-approval-for-a-specific-tool), such a tool prompts on every call "even in `acceptEdits`, `auto`, and `bypassPermissions` permission modes… Allow rules that match the tool don't skip the prompt either", and in `dontAsk` mode is **denied** instead. Adding it to `permissions.allow` in [`.claude/settings.json`](../../../../.claude/settings.json), changing permission mode, and returning `"allow"` from a hook therefore all fail. Do not spend a ticket trying.
+
+That is also a simpler explanation for the LS-8381 half of [Quirk 5](known-quirks.md#quirk-5-askuserquestion-can-fail-outright-in-any-autonomous-session-not-just-webhook-subscribed-ones) than shared-plumbing failure: in an unattended session the by-design forced prompt has nowhere to land, so the call dies rather than prompting.
+
+**The fix is to not call it.** A one-off trigger consumes itself; the other trigger types do not:
+
+| Trigger type            | Self-consumes on fire?                | How to stop it from an agent session                   |
+| ----------------------- | ------------------------------------- | ------------------------------------------------------ |
+| `run_once_at` (one-off) | **Yes** — auto-disables, marked `Ran` | Nothing. Let it fire.                                  |
+| Recurring schedule      | No — fires on its cadence forever     | `RemoteTrigger action: "update"`, `{ enabled: false }` |
+| API (`/fire` endpoint)  | No — persists until revoked           | Same, or revoke the token on the web                   |
+| GitHub event            | No — persists                         | Same                                                   |
+
+A fired one-off is inert: it will not re-fire, and one-off runs do not count against the daily routine run cap. What remains is cosmetic clutter at [claude.ai/code/routines](https://claude.ai/code/routines), safe to bulk-clean by hand from a browser — where no agent permission prompt is in the loop. Unlike `delete_trigger`, the `update` path takes the ordinary permission route and **is** allowlistable as `mcp__<server>__update_trigger`.
+
+One caveat when substituting a trigger for a wake-up: `create_new_session_on_fire: true` starts a **fresh** session carrying the trigger's saved prompt — it does not resume the current one, and that session starts cold. Write the prompt to stand alone, per [subagent-templates](../../subagent-templates/SKILL.md).

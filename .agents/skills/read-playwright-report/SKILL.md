@@ -95,7 +95,7 @@ for it manually:
 - Confirm the deploy once via the "Deploy Playwright Report" job in CI logs if in doubt.
 - For nightly/integration runs, use `ci_get_playwright_test_result(source: "s3")` with the numeric run ID (S3 access does not use the deploys-repo token).
 - Or fetch the report from a local session, where the `gh` CLI fallback works.
-- **Do not fall back to a direct `WebFetch`/`curl` of the `bkrupa.github.io` report URL in cloud/remote sessions** — that host is blocked at the session's own network-egress layer (CCR platform policy, not this credentials gap) and 403s on every attempt regardless of token. See [cloud-agent-mode Quirk 7](../cloud-agent-mode/SKILL.md#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions) (LS-8556) before spending time on it.
+- **Do not fall back to a direct `WebFetch`/`curl` of the `bkrupa.github.io` report URL in cloud/remote sessions** — that host is blocked at the session's own network-egress layer (CCR platform policy, not this credentials gap) and 403s on every attempt regardless of token. See [cloud-agent-mode Quirk 7](../cloud-agent-mode/references/known-quirks.md#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions) (LS-8556) before spending time on it.
 
 ## `ci_get_playwright_test_result` — lookup modes and S3 blobs
 
@@ -155,7 +155,7 @@ Fall back to the embedded-zip parse below only for reports that predate this fea
 
 The Playwright HTML report is a client-side SPA — the `index.html` is a JS bundle that renders test data at runtime. `WebFetch` only retrieves static HTML, so it returns minified JS with no readable test data. Use the GitHub API instead.
 
-In cloud/remote sessions there is also a second, independent reason a direct `bkrupa.github.io` fetch fails: the session's outbound egress proxy denies `CONNECT` to that host outright (bare 403, no body), regardless of whether the target is `index.html` or `summary.md`. See [cloud-agent-mode Quirk 7](../cloud-agent-mode/SKILL.md#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions).
+In cloud/remote sessions there is also a second, independent reason a direct `bkrupa.github.io` fetch fails: the session's outbound egress proxy denies `CONNECT` to that host outright (bare 403, no body), regardless of whether the target is `index.html` or `summary.md`. See [cloud-agent-mode Quirk 7](../cloud-agent-mode/references/known-quirks.md#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions).
 
 ## How to Extract Test Data
 

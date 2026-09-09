@@ -54,7 +54,7 @@ If either returns `configured: false`, stop and prompt the user. Sweep results d
   1. Opened >30 days ago
   2. The bumped package has shipped a newer version since the PR opened
      Closing triggers Dependabot to recreate against the current version.
-- **`merge-when-ready` is never applied manually — including on Dependabot PRs.** The Reviewer Bot applies it itself on APPROVED verdict; the agent's job is to apply `bot:ready-for-review` so the Bot runs. See the [Label Ownership table and boxed Dependabot ruling (2026-07-02)](../pr-lifecycle/SKILL.md#label-ownership) — that table is the single home for this rule.
+- **`merge-when-ready` is never applied manually — including on Dependabot PRs.** The Reviewer Bot applies it itself on APPROVED verdict; the agent's job is to apply `bot:ready-for-review` so the Bot runs. See the [Label Ownership table and boxed Dependabot ruling (2026-07-02)](../pr-lifecycle/references/label-ownership.md#label-ownership) — that table is the single home for this rule.
 - **`needs-human-review` / `needs-human-security-review` PRs**: skip entirely. Operator decision.
 - **No code changes inline.** Lint-toolchain fixes happen in a dispatched chip (one chip per PR), not in the orchestrator's context.
 

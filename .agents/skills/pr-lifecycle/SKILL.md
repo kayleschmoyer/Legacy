@@ -7,538 +7,112 @@ metadata:
 
 # Skill: PR Lifecycle
 
-Covers the complete pull request lifecycle from self-review through creation, review fixing, and maintenance.
+Covers the complete pull request lifecycle: self-review, PR creation with Jira linkage, watching a PR to merge, fixing Copilot review comments, and ongoing PR maintenance/sweep. This file is a thin dispatcher — each phase links to the reference doc that carries the actual procedure; load the reference before acting on it.
 
-## Checking PR Status Without Bash
+**You are the Author Agent** in every PR this skill touches — not the Reviewer Bot, Copilot, the Merge Queue, or the maintainer. See [references/label-ownership.md](references/label-ownership.md) for the full actor/label map and [references/author-agent-contract.md](references/author-agent-contract.md) for the exact bot-review reply protocol.
 
-Prefer MCP tools; use `gh pr view --json` only when MCP is unavailable or the user explicitly confirms a CLI fallback:
-
-| Instead of                           | Use                                                                                             |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `gh pr view N --json state,mergedAt` | `github_view_pr({ number: N })` — returns `state` + `mergedAt`                                  |
-| `gh pr view N --json mergeable`      | `github_pr_batch_status({ numbers: [N] })` — returns `mergeable`, `ciSummary`, `reviewDecision` |
-
-**`mergeable: UNKNOWN` does not mean blocked** — it can mean GitHub is still computing mergeability, and it can also appear for PRs that are already merged or closed. Do not treat `UNKNOWN` as a merge-queue signal by itself. To confirm the actual PR outcome, call `github_view_pr({ number: N })` and check `state` plus `mergedAt`/`closedAt`: `state: "MERGED"` or a populated `mergedAt` means it merged successfully; a closed PR with `closedAt` and no `mergedAt` means it was closed without merging.
-
-**Merge-conflict signals (three, any one means "rebase")**: `mergeable: CONFLICTING` (GraphQL hint — goes `UNKNOWN`/stale every time main advances), the **`CI: Conflicts` label**, and a red **"No Merge Conflicts" required check**. The label and check come from a deterministic `git merge` test (`check-conflicts.yml` + the base-push sweep) and are the source of truth when signals disagree. A red "No Merge Conflicts" check is never a CI failure to debug — it means rebase ([fix reference Step 1](references/fix.md)). Both the label and the check clear automatically after the rebase push; never remove the label yourself. `github_pr_why_blocked` / `github_pr_diagnose` / `github_pr_dashboard` already union all three signals into their `MERGE_CONFLICT` / `merge conflict` verdicts.
+For quick PR-status checks without `gh`, merge-conflict signal triage, enabling auto-merge from a worktree, or clearing a stuck merge queue, see [references/unblock.md](references/unblock.md).
 
 ## Phases
 
-Work through these phases sequentially. Each phase links to a detailed reference doc.
+Work through these phases sequentially. Each phase links to a detailed reference doc — load it before acting.
 
 ### Phase 1: Self-Review Before Mark-Ready (MANDATORY GATE)
 
-Run a structured review of all branch changes before marking the PR ready — and before any push to a Ready (non-draft) PR. This is a **Tier 2 workflow rule** — do NOT mark ready without completing it. (Draft-checkpoint pushes may precede self-review — the spine opens the draft PR before validation; spine Step 13 is where the review runs.) Catches project-rule violations, common Copilot review patterns, and code quality issues that `make pc` does not check (semantic issues, dead code, reuse opportunities).
+Run a structured review of all branch changes before marking the PR ready — and before any push to a Ready (non-draft) PR. This is a **Tier 2 workflow rule**. Produce a **Self-Review Summary** (files reviewed, patterns checked, issues fixed) as proof of thoroughness. Draft-checkpoint pushes may precede it — the spine opens the draft PR before validation; spine Step 13 is where the review runs.
 
-You must produce a **structured Self-Review Summary** (see the template in the reference doc) listing files reviewed, patterns checked, and issues fixed. This summary is your proof of thoroughness — without it, self-review did not happen.
-
-> Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../plan-ticket/references/planning.md) — consider stopping and re-planning.
-
-> **Premium-gating product changes — keep test specs premium-default.** If your PR adds or changes a premium-gated feature (touches `entitlements.ts`, `requireEntitlement`, `PremiumGate`, `useIsPremium`, etc.), the E2E/integration specs covering it must default to the **premium** tier, with `free` used **only** for explicit gate assertions. A gated-feature spec that runs as `free` without asserting the gate silently inverts the feature's tested state — the LS-5030 regression. See the [Tiered Test-User Model](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates) (testing skill) and the [add-entitlement skill](../add-entitlement/SKILL.md).
-
-> Details: [references/self-review.md](references/self-review.md)
+> Details: [references/self-review.md](references/self-review.md) · [references/common-review-patterns.md](references/common-review-patterns.md)
 
 ### Phase 2: Create PR with Jira Linkage
 
-#### PR-creation tool routing (one home — link here, do not restate)
+Pick the creation tool per environment, create the PR **as a draft**, apply `agent-in-progress`, run Gate B validation, mark ready, apply `bot:ready-for-review` (must be the last label op), then transition Jira to "In Review". The **jira-link marker** in the PR body (not the branch name or title) is the source of truth for ticket linkage — every built-in GitHub read path strips it on display, so never verify a write by reading it back.
 
-Pick the creation tool by which servers your session actually has (check the tool list / `ToolSearch`), in this preference order:
-
-| #   | Environment signal                                                                  | Tool                                                                                                                                 | What it does / follow-ups                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Hosted `legacy-sports-github` connector available (tools named `github_*`)          | `github_open_pr(title, body, jiraKey, head)`                                                                                         | **One-shot Ship step**: push branch → create draft → mark ready → apply `bot:ready-for-review`; auto-inserts the jira-link marker from `jiraKey`. Pass `draft: true` to stop at draft (then apply `agent-in-progress` and finish the label sequence below yourself); `push: false` if already pushed. **Always pass `head` explicitly whenever the `legacy-sports-github` MCP server is hosted/Lambda-backed** — this includes local worktree sessions using the hosted connector, not just cloud sessions. A hosted server has no git checkout to auto-detect the branch from and can never stat a caller-side `worktreePath` (that path only exists on the caller's filesystem); omitting `head` fails with `"In Lambda mode, head must be passed explicitly"`. Passing `head` explicitly is never harmful, so do it unconditionally rather than relying on `worktreePath`. The default `push: true` is also a no-op in this mode (nothing to push from); push the branch manually via Bash first and pass `push: false`, or the create call 422s with `head invalid` on the unpushed branch. |
-| 2   | Claude Code on the web without the connector (built-in `mcp__github__*` tools only) | `mcp__github__create_pull_request({ owner, repo, draft: true, ... })` then `mcp__github__update_pull_request({ ..., draft: false })` | Authenticates via the platform token (avoids attributing the PR to the user's personal account). Neither call applies any label or the jira-link marker — include the marker in the body yourself and run the full label sequence below via `github_manage_labels` (or built-in label tools if the connector is absent).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 3   | No MCP path at all AND the user explicitly authorized CLI                           | `gh pr create --draft --body-file ...`                                                                                               | Last resort only (`github_auth_status()` returned `configured: false` and the user confirmed). `gh pr create` silently uses the shell's cwd and targets the wrong branch in multi-worktree sessions — pass `--head` explicitly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-
-> **Row 2 caveat (LS-9279, refining LS-9463):** every built-in read path — `mcp__github__pull_request_read` and `mcp__github__list_pull_requests` alike — strips `<!-- ... -->` HTML comments from the body it returns, so **a read-back can never confirm the jira-link marker and must not be used to decide whether the write landed** (it reads as missing every time), and **a body edit composed from a read-back deletes the marker**. On row 2: put the key in the title, put the marker in `create_pull_request`'s initial body, and treat it as written. Jira Link Check repairs a missing or malformed marker from the title key and passes, so the only escalation is a check that actually fails — read its job log (`mcp__github__get_job_logs`), which prints `✅ Jira Link Check passed (primary: LS-####)` or names every violation. PR #7128 is the worked example of the false negative: marker written, invisible to two read-backs, present in the stored body and passing CI throughout. Full playbook: [create-pr.md § Seeing and fixing linkage on an open PR](references/create-pr.md#seeing-and-fixing-linkage-on-an-open-pr) and [mcp-first § Built-in GitHub Tools](../mcp-first/references/service-operations.md#built-in-github-tools-claude-code-on-the-web).
-
-> **Row 2 label caveat (LS-8933):** `mcp__github__update_pull_request` has no `labels` param — passing one either errors ("No update parameters provided", if `labels` is the only field) or is silently dropped (when combined with other fields like `draft`). On the row-2 built-in-only path (no hosted `legacy-sports-github` connector, so no `github_manage_labels`), the only way to set labels is `mcp__github__issue_write({ method: "update", issue_number, labels: [...] })` — but it **replaces the PR's entire label set**, not just the ones you pass. Always **read the PR's current labels first** (`mcp__github__pull_request_read` or `mcp__github__issue_read`) and include them in the `labels` array alongside whatever you're adding, or you will silently clobber labels set by other bots (e.g. `CI: Lint Failure`, `jira-mismatch`). Verified end-to-end (LS-8939, 2026-08-03): `issue_write({ method: "update", issue_number: <PR#>, labels: ["bot:ready-for-review"] })` applied the label and triggered the Reviewer Bot cycle — but note that call form drops every other label the PR had, so it's only safe when you've merged the current set in first.
-
-**Mandatory label sequence after any non-one-shot create** (rows 2–3, and row 1 with `draft: true`): apply `agent-in-progress` while the PR is a draft → `github_mark_pr_ready(number)` — which applies `bot:ready-for-review` itself as its last, idempotent step. Only the CC-web built-in path (row 2) needs an explicit `bot:ready-for-review` label call after `update_pull_request({ draft: false })`, and it must be the **last** label op (see the "must be last label op" note in Quick Commands). `github_open_pr` without `draft: true` performs the ready + label steps itself.
-
-Before creating a PR, verify GitHub auth is working:
-
-```
-github_auth_status()
-```
-
-If `configured: false`, **stop and prompt the user** — do not silently fall back to `gh` CLI. Tell them their GitHub credentials are missing or expired and direct them to set `GH_TOKEN` or `GITHUB_TOKEN`, run `gh auth login`, or configure `AGENT_AUTHOR_APP_PRIVATE_KEY`. Only fall back to `gh` CLI after the user confirms their auth is working or explicitly asks you to try the CLI fallback.
-
-**Cloud (Claude Code on the web)**: row 2 of the routing table above; see [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) for the full platform tool mapping.
-
-Verify prerequisites (validation, migrations, branch pushed), create the PR **as a draft** using the routing table above, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
-
-> **The jira-link marker in the PR body is the source of truth for ticket linkage** (RFC: `docs/rfcs/draft-declared-ticket-linkage.md`, LS-7893). Every actor — branch sync, status audit, reviewer bot, sweep agents, humans — reads the marker's `primary` key to answer "which ticket is this PR for"; branch names, titles, and commit messages are secondary signals. `github_open_pr` emits the marker automatically (explicit `jiraKey` param → first `LS-####` in the title → `none`); `related` keys are informational only and never auto-transitioned. To correct a PR's linkage, **edit the PR body** — never force-push or rename the branch. See [references/create-pr.md](references/create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage) for the marker format.
-
-When a planning phase was run (see [planning reference](../plan-ticket/references/planning.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
-
-> **A rich PR description is required for Copilot to fix review comments correctly.** When reviewers use "Fix with Copilot" or `@copilot` to address a review thread, Copilot's only context is the PR title, description, and diff. A thin description (e.g., 1-2 summary bullets with no context) causes Copilot to make repeated, incomplete, or misaligned fixes — leading to 3-4 redundant agent runs per review round. Always include a `## Context` section with the Jira link and a clear problem statement. Write the description as a prompt to a capable engineer who has never seen the ticket.
-
-> **Batch review comments before "Fix with Copilot".** Submitting individual review comments (one at a time) and clicking "Fix with Copilot" on each one spawns a separate Copilot agent session per comment. These sessions race each other and frequently produce conflicting patches. Always use "Start a review" to batch all comments, then submit the review in a single action before requesting Copilot fixes.
-
-> Details: [references/create-pr.md](references/create-pr.md)
+> Details: [references/create-pr.md](references/create-pr.md) (tool routing, jira-link marker, PR body templates, post-creation steps, agent-session marker, parent-agent PR recovery)
 
 ### Phase 2b: Watch PR to Merge
 
-After creating the PR and transitioning Jira, shepherd the PR through CI and reviews — do **not** treat PR creation as the end of the task.
+After creating the PR and transitioning Jira, shepherd it through CI and reviews until `MERGED` or `CLOSED` — do not treat PR creation as the end of the task. Claude Code surfaces CI results and review events automatically as push notifications; react to each as it arrives. Responding to a review is **not** a terminal state — a `JUSTIFY:` does not clear `CHANGES_REQUESTED`.
 
-Claude Code surfaces CI results and review events **as push notifications**. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
-
-> **⛔ Desktop Auto-fix / Auto-merge toggles must stay OFF for PRs in this repo.** The Claude Code desktop app's CI status bar offers Auto-fix and Auto-merge toggles; both fight this repo's bot-review flow. Auto-fix replies to review threads in free-form text — the Reviewer Bot accepts only `FIX:`/`JUSTIFY:`/`CANNOT-COMPLY:` structured replies, so free-form replies trip its format-error path and inflate the cycle counter toward false `needs-human-arbitration` — and it pushes fixes without re-applying `bot:ready-for-review`, so its own fix-push fires no reviewer cycle. Auto-merge squash-merges as soon as checks pass, bypassing the Reviewer Bot → `merge-when-ready` → merge-queue gate (see [Label Ownership](#label-ownership)). Handle review replies and merging through the [Author Agent Contract](#author-agent-contract-bot-pr-flow) instead.
-
-> **Responding to a review is NOT a terminal state.** The single most common stall is a session that replies to every thread (or runs `/respond-to-review`), writes a summary, and ends its turn while the PR is still `CHANGES_REQUESTED` — which reads, from the outside, as "the PR got a review but nothing happened." A `JUSTIFY:` does not clear `CHANGES_REQUESTED`, and a passing review is moot while CI is red or `SKIPPED`. The loop may only stop at a true terminal state: `MERGED`, `CLOSED`, or a genuine human-only blocker that you have **surfaced with a label and an explicit message** (e.g. asking the maintainer to apply `review-bot-override` on a persistent bot false positive). See [drive.md "Terminal states"](references/drive.md#terminal-states-the-only-places-this-loop-may-stop) and ["JUSTIFY standoff"](references/drive.md#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed).
-
-> **Precondition for any CI status read**: a push event has arrived (CI failure/pass, review, merge). Treat `ci_view_run`, `github_view_pr`, and `gh pr view --json statusCheckRollup` as one-shot lookups triggered by an event — not as poll targets. Repeated calls in a `sleep` loop have been observed burning 1–2M tokens per session for zero earlier signal than the native push notification.
-
-See [references/drive.md](references/drive.md) Step 6 for the full event-handling table.
-
-> **`run:integration` runs can be orphaned by merge — accepted by design.** A PR-branch integration run still in flight when the PR merges (merge-queue squash + branch deletion) is cancelled or its result never consumed; the nightly full Playwright run on `main` is the backstop ([ADR 0014](../../../docs/decisions/0014-integration-nightly-bisect.md)). When a `run:integration` result matters to the merge decision, **confirm the run completed before merging**, or re-validate on `main` afterward. Do not treat an in-flight run as a green signal (this bit LS-7876 / #5023).
+> Details: [references/drive.md](references/drive.md) Step 6 (full event-handling table, terminal states, Desktop Auto-fix/Auto-merge caveat, `run:integration` orphan-on-merge caveat)
 
 ### Phase 3: Fix Copilot Review Comments
 
-Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threads. Cap at 2 fix-review rounds -- after round 2, resolve remaining threads as "acknowledged" and proceed. After re-requesting review, the next review event arrives automatically as a push notification (call `mcp__github__subscribe_pr_activity` only if that built-in tool is actually present in the session — it is absent from most current sessions, and its absence is not a monitoring failure) — do **not** use `sleep N && gh api .../reviews` polling (see Critical Rule 13).
+Fetch unresolved threads, apply fixes, validate, commit, push once, resolve threads, re-apply `bot:ready-for-review`. Cap at 2 fix-review rounds — after round 2, resolve remaining threads as "acknowledged" and proceed. Do not poll for the next review event; it arrives as a push notification.
 
-**Cloud (Claude Code on the web)**: Use built-in tools for operations where authorship is visible (e.g. replying to threads). This prevents agent comments from appearing under the user's personal GitHub username. See the cloud review workflow in [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) and the cloud section in [references/fix-reviews.md](references/fix-reviews.md).
-
-> Details: [references/fix-reviews.md](references/fix-reviews.md)
+> Details: [references/fix-reviews.md](references/fix-reviews.md) (includes the Review Thread Workflow for `bot-review` CI failures)
 
 ### Phase 4: PR Maintenance and Sweep
 
-Orchestrate maintenance across all open PRs: one-pass triage that handles API-only actions inline and dispatches one chip per PR needing code work (rebase, review fixes, CI fixes).
+Orchestrate maintenance across all open PRs: one-pass triage that handles API-only actions inline and dispatches one chip per PR needing code work.
 
 > Details: [references/sweep.md](references/sweep.md) (local, chip-dispatch) · [references/sweep-cloud.md](references/sweep-cloud.md) (cloud, API-only). Dependabot queue triage: [sweep-dependabot skill](../sweep-dependabot/SKILL.md).
-
-### Agent-session marker (PR ↔ session linkage + provenance) — one home, LS-8570
-
-Any local session that picks up an existing PR it did not create (drive-pr, fix-pr, respond-to-review, sweep chips) must stamp itself onto the PR before entering the work loop:
-
-```bash
-bash scripts/link-pr-session.sh <PR#>
-```
-
-The script appends one idempotent marker line to the PR body via `gh pr edit --body-file`:
-
-```
-<!-- agent-session: <CLAUDE_CODE_SESSION_ID> (<YYYY-MM-DD>) -->
-```
-
-Two effects, and why `gh` (not MCP) is load-bearing here:
-
-- **Provenance (guaranteed).** Marker lines accumulate over the PR's life — a durable record of every agent session that worked it, resolvable back to transcripts via the session id.
-- **Desktop linkage (best-effort).** Claude Code Desktop links a session to a PR by detecting a PR on the _session's own branch_, or by parsing **harness-visible** `gh`/`git` PR interactions. MCP connector calls (`github_open_pr`, `github_manage_labels`, …) are invisible to the harness and never establish linkage — which is why pickup sessions historically showed an empty PR status bar. Caveat from live testing (desktop 2.1.215, LS-8570): `gh pr create` in-session reliably links (any branch) and Bash `git push` to the PR branch has been observed to link, but a `gh pr edit` body edit alone did **not**. Treat foreign-branch status-bar linkage as best-effort — the stamp is still the right first move (it is the only harness-visible interaction most pickup sessions perform), and an empty status bar after stamping is an upstream desktop limitation, not a workflow bug.
-
-Skip only when: the PR is on the session's own branch (linkage is automatic — though stamping is still harmless and keeps provenance complete), or the environment has no `gh`/`CLAUDE_CODE_SESSION_ID` (cloud/API-only sessions — the script fails loudly and the miss is acceptable).
 
 ## Sub-skills
 
 This skill consolidates the full PR-lifecycle cluster. Load the matching reference for your specific trigger:
 
-| Reference                                                          | Trigger                                                                                     |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| [references/drive.md](references/drive.md)                         | Drive/land/ship a specific PR to merge (single PR, by number/URL)                           |
-| [references/fix.md](references/fix.md)                             | Fix all outstanding issues on one PR (conflicts + reviews + CI)                             |
-| [references/unblock.md](references/unblock.md)                     | Investigate and unblock stuck PRs; detect Expected CI / false positives                     |
-| [references/sweep.md](references/sweep.md)                         | Local chip-dispatch sweep across all open PRs (`/sweep-prs`)                                |
-| [references/sweep-cloud.md](references/sweep-cloud.md)             | Cloud-mode sweep algorithm (API-only actions + report)                                      |
-| [references/respond-to-review.md](references/respond-to-review.md) | Scaffold FIX/JUSTIFY/CANNOT-COMPLY replies to bot review threads (`/respond-to-review`)     |
-| [references/fix-reviews.md](references/fix-reviews.md)             | Fix Copilot review comments on a PR (single-PR review workflow)                             |
-| [references/ci-event-response.md](references/ci-event-response.md) | Triage and respond to CI/GitHub events on a watched PR (event-driven cloud agent)           |
-| [references/e2e-hold.md](references/e2e-hold.md)                   | E2E failures not caused by this PR: attribution gate, blocker ticket, hold, monitor, resume |
-
-## Who's Who in the PR Flow
-
-Several distinct actors operate on every PR. Most docs in this repo predate the current bot lineup and refer generically to "the bot" or "agents" — those terms are ambiguous, so use this table as the canonical reference.
-
-**You are the Author Agent.** You are not the Reviewer Bot, not Copilot, not the Merge Queue, and not the maintainer. Your responsibilities end where the Reviewer Bot's begin.
-
-| Actor               | Identity                                                                                         | What it does                                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Author Agent**    | Your Claude session. Commits authored by `claude[bot]` (or human collaborators).                 | Writes code, opens the PR, replies to review threads, pushes fixes, applies `bot:ready-for-review` after every fix-push.                      |
-| **Reviewer Bot**    | `legacy-sports-review-bot` running `.github/workflows/review.yml` → `.github/scripts/reviewer/`. | Posts reviews on `ready_for_review` / `synchronize` (when `bot:ready-for-review` is present). Applies `merge-when-ready` on APPROVED verdict. |
-| **Copilot**         | GitHub's `copilot-pull-request-reviewer`.                                                        | Posts line-level review comments. Lower-priority signal than the Reviewer Bot.                                                                |
-| **Merge Queue**     | `.github/workflows/merge-queue.yml` + `.github/scripts/merge-queue-processor.js`.                | Watches for `merge-when-ready` and auto-merges PRs whose required checks are green.                                                           |
-| **CI Orchestrator** | `.github/workflows/ci-orchestrator.yml`.                                                         | Runs the CI test suite. Adds `CI: *` failure labels.                                                                                          |
-| **Maintainer**      | Human user (`bkrupa`).                                                                           | Applies escape-hatch labels (`review-bot-override`, `security-review-override`, `merge-to-parent`). Author Agent never touches these.         |
-
-### Label Ownership
-
-Single source of truth for which actor applies which label. If guidance elsewhere in this repo contradicts this table, **this table wins** — open a ticket to reconcile the stale doc.
-
-| Label                         | Applied by       | When                                                                                                              | Author Agent should…                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ----------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent-in-progress`           | Author Agent     | While the PR is in draft / still iterating                                                                        | Apply on draft. The Reviewer Bot does not need it; it's a coordination signal for sweep agents.                                                                                                                                                                                                                                                                                                                                                     |
-| `bot:ready-for-review`        | **Author Agent** | After `github_mark_pr_ready` AND after every fix-push                                                             | **Apply / re-apply.** This is the trigger that fires the Reviewer Bot. Without it, no new review cycle runs. See Critical Rule #14 in this skill's Critical Rules.                                                                                                                                                                                                                                                                                  |
-| `merge-when-ready`            | **Reviewer Bot** | On APPROVED verdict (label-add in `.github/scripts/reviewer/index.mjs`)                                           | **Never apply manually — no exceptions, including Dependabot PRs (see the boxed ruling below).** Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected. If a clean PR is missing it, fix the upstream cause (Reviewer Bot didn't run, didn't approve) — don't paper over with the label. Same reasoning applies to `github_merge_pr(strategy: "direct")` — it merges without this gate too; see Critical Rule #11. |
-| `merge-to-parent`             | Maintainer       | For stacked PRs targeting a non-`main` branch                                                                     | Never touch.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `review-bot-override`         | Maintainer       | Formal escape hatch when Reviewer Bot is wrong                                                                    | Never touch. See §5 of the Author Agent Contract.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `security-review-override`    | Maintainer       | After human security review on `needs-human-security-review` PR                                                   | Never touch. See §6 of the Author Agent Contract.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `needs-human-security-review` | Reviewer Bot     | Critical security finding                                                                                         | Never touch.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `needs-human-arbitration`     | Reviewer Bot     | Cycle exceeds MAX_CYCLE, or a `CANNOT-COMPLY` claim is still unresolved after the bot's Cycle 3 verification pass | Push new commits to address outstanding findings — the bot auto-removes this label and resets the cycle counter on the next push. Never apply or remove manually. See §4a of the Author Agent Contract.                                                                                                                                                                                                                                             |
-| `review-bot-degraded`         | Reviewer Bot     | Cycle was rate-limited                                                                                            | Re-apply `bot:ready-for-review` to retry. See `references/fix-reviews.md` step 8.                                                                                                                                                                                                                                                                                                                                                                   |
-| `review-bot-billing`          | Reviewer Bot     | LLM provider credits are depleted (billing-class 429, LS-9812)                                                    | **Do not retry.** Re-applying `bot:ready-for-review` cannot succeed — the reviewer has no API credits. Escalate to the account owner to top up billing; the label self-clears on the first successful run afterwards.                                                                                                                                                                                                                               |
-| `CI: *` failure labels        | CI Orchestrator  | Auto, when a check fails                                                                                          | Never touch — they clear automatically when the failing check passes. `CI: Runner Flake` specifically: don't clear it as "stale housekeeping" while a run may still need retrying — `ci_retry_runner_flake` also accepts the immutable runner-shutdown bot comment as an independent signal, so a missing label no longer blocks the retry, but leaving the label alone avoids losing one of the two signals it checks.                             |
-
-> Historical note: some docs still credit `copilot-auto-approve` with adding `merge-when-ready`. That attribution is stale — the current code path is Reviewer (W1) (`grep -n "merge-when-ready" .github/scripts/reviewer/index.mjs` shows the label-add on the APPROVED and override paths). The `copilot-auto-approve.yml` workflow that exists at HEAD is only the W6 thread-resolution recheck (it toggles `bot:ready-for-review`); the old Lambda-driven auto-approve pipeline is retired.
-
-> **Dependabot ruling (reconciled 2026-07-02)** — `merge-when-ready` is applied by the Reviewer Bot **only, on all PRs including Dependabot's**. Older sweep docs taught a "Dependabot exception" (apply the label manually because "the bot doesn't review Dependabot PRs"); that described the retired auto-approve pipeline, which auto-passed bot-review for `dependabot[bot]`. Verified at HEAD: the Reviewer (W1) trigger (`.github/workflows/review.yml` `jobs.review.if`) gates only on non-draft + same-repo head + qualifying label events — no author exclusion — so Dependabot PRs are reviewed like any other once triggered. The correct Dependabot flow is therefore: apply **`bot:ready-for-review`** (Dependabot never applies it itself) and let the Reviewer Bot approve and label. Triage of the Dependabot queue lives in the [sweep-dependabot skill](../sweep-dependabot/SKILL.md).
-
-## Author Agent Contract (Bot-PR Flow)
-
-When a PR is authored by the Author Agent and reviewed by the Reviewer Bot, the Author Agent must follow this protocol exactly. Deviations cause the Reviewer Bot to flag format errors or escalate to a human.
-
-> **Known gap — Lambda-hosted `legacy-sports-github` server can have no usable identity (LS-4743).** Every `github_reply_to_review_thread` / `github_reply_to_review` call below routes through the hosted `legacy-sports-github` MCP server. When that server runs on Lambda and its GitHub App credentials aren't resolving (missing/misconfigured `GITHUB_TOKEN_SECRET_NAME` secret, or a revoked App installation), every call fails with `GitHub MCP server (Lambda): could not provision a GitHub token ... Interactive sources (.netrc, gh CLI, device flow) are not available in Lambda.` This is a server-side credential/config problem, not something fixable from inside a session — diagnosing and fixing it requires AWS access (see [`mcp-github-lambda-ops.md`](../../../docs/dev-process/mcp-github-lambda-ops.md)), which most agent sessions, including CCR, do not have. **Do not** fall back to `gh api graphql` (or any call) with a personal/OAuth token — that authors the reply as a human identity instead of the bot, breaking the Author Agent Contract this section exists to enforce. Instead fall back to `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` — the platform-authenticated built-in GitHub connector, unaffected by this Lambda's credential state — passing the numeric REST `commentId` (`databaseId` from `github_get_review_threads`), not the GraphQL `threadId`. Report the failure once (a PR or Jira comment) so a human can run the ops runbook; do not retry the same call in a loop.
-
-### 1. PR Creation
-
-- Open the PR as a **draft**. Work locally; push freely — pushes do NOT fire bot reviews while in draft.
-- When initial code is complete: mark the PR **ready_for_review**. This fires **Cycle 1**.
-- Immediately after marking ready, apply the **`bot:ready-for-review`** label via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. **This must be the last label applied** — `Reviewer (W1)` uses `concurrency.cancel-in-progress: true`, so any label applied after this cancels the reviewer run before it posts a review, then skips itself because the new label is not a qualifying trigger. Ensure `agent-in-progress` is already on the PR (applied while still a draft, step 2 of [create-pr.md](references/create-pr.md)) before applying `bot:ready-for-review`. The `ready_for_review` event alone fires Cycle 1, but `Reviewer (W1)` only honors subsequent `synchronize` events while this label is present — without it, any push made before the bot finishes reviewing (or any later fix-push) starts no reviewer run. The reviewer **preserves the label through merge** (including on APPROVED, per LS-4678) so post-approval pushes still fire a fresh cycle and don't silently stall behind the `bot-review` ruleset gate on the new HEAD SHA. You generally do not need to re-apply between cycles; the only cases requiring re-application are (a) a prior cycle was rate-limited (`review-bot-degraded` label applied with no review) — see [fix-reviews.md](references/fix-reviews.md) step 8, or (b) a non-rate-limit terminal infra failure stripped the label (Review Label Guard (W7) will auto-reapply on the next push if a prior bot APPROVED exists, but for the first push after such a failure you may need to re-apply manually).
-
-### 2. Response to Cycle 1 Review
-
-After the bot posts its Cycle 1 review, the agent must:
-
-> **Prefer the one-shot.** `github_finish_fix_round({ prNumber, replies: [{ threadId, kind: "FIX"|"JUSTIFY", sha?, body? }, ...] })` performs steps 1, 3, and 4 below in a single tool call: it validates every reply before any side effect, emits FIX bodies as exactly `FIX: <sha>` (strict bot format), resolves only the FIX threads (JUSTIFY remains open for Cycle 2 adjudication), and applies `bot:ready-for-review`. Partial reply failures surface in `errors[]` and do not block successful replies. The explicit steps below remain valid when you are mid-stream or only need part of the sequence.
-
-1. Reply to **every open thread** with exactly one of — post each reply via `github_reply_to_review_thread({ threadId: "PRRT_...", body: "..." })` (local/headless; ToolSearch: `"reply_to_review_thread"`) or `mcp__github__add_reply_to_pull_request_comment` (preferred on Claude Code on the web to avoid OAuth attribution to user's personal token):
-   - `FIX: <sha>` — the fix is already committed at `<sha>`
-   - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why. **When the finding is a false positive** (the pattern is intentional, not just out of scope), also add an inline code comment at the flagged line(s) or a note in the nearest relevant doc (e.g. a `SKILL.md` or `references/` entry) explaining the intent — so future contributors and reviewers don't raise the same flag again.
-2. Push any fix commits (including inline comments or doc notes added for JUSTIFY false positives).
-3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call. Do **not** resolve threads answered with `JUSTIFY:` — those need bot adjudication in the next cycle.
-4. Apply the **`bot:ready-for-review`** label via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This fires **Cycle 2**. If the label is already present (e.g., a prior cycle was rate-limited), remove then re-add it — `github_manage_labels(prs: [<PR#>], remove: ["bot:ready-for-review"])` followed by `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])` — so GitHub emits a fresh `labeled` event.
-
-> Skipping a thread is not allowed — unaddressed threads become mandates in Cycle 2.
-
-### 3. Response to Cycle 2 Mandates
-
-> **If the Cycle 2 review is LGTM/APPROVED with no new findings, stop — no action is needed.** JUSTIFY threads that were not escalated into mandates are considered accepted by the bot. Do **not** post any further replies (not `FIX:`, not `CANNOT-COMPLY:`, nothing). The PR is ready to merge pending CI.
-
-If the Cycle 2 review contains mandates (CHANGES_REQUESTED), the agent must:
-
-1. Reply to **every open thread** with (use `github_reply_to_review_thread({ threadId: "PRRT_...", body: "FIX: <sha>" })`):
-   - `FIX: <sha>` — the fix is committed at `<sha>` (the only accepted reply in Cycle 2)
-2. Push any fix commits.
-3. **Resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call.
-4. Apply **`bot:ready-for-review`** again via `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This fires **Cycle 3**. If the label is already present, remove then re-add it as above.
-
-> Neither `JUSTIFY:` nor `CANNOT-COMPLY:` is accepted in Cycle 2. `JUSTIFY:` closed at Cycle 1; `CANNOT-COMPLY:` is only valid in Cycle 3+.
-
-### 4. Response to Cycle 3+ (Escalation)
-
-If a mandate persists into Cycle 3, the agent may reply with:
-
-1. `FIX: <sha>` — fix committed at `<sha>`
-2. `CANNOT-COMPLY: <issue-id>` with the reason on the **next line** — the mandate is claimed impossible
-
-`CANNOT-COMPLY` no longer escalates to a human unconditionally. The bot evaluates the claim on its merits (same accept-or-refute-with-reason treatment as `JUSTIFY`, LS-8337): if it **accepts** the claim, the finding is dropped from output with no further action needed; if it **refutes** the claim, the finding survives as a normal mandate (its body will directly address why the claim doesn't hold — do not expect the identical original finding text). Escalation to `needs-human-arbitration` now only happens if the claim is **still unresolved** after the bot's Cycle 3 verification pass — a genuine standoff with no more review cycles left to negotiate.
-
-After replying, **resolve every thread answered with `FIX:`** in a single batched `github_resolve_threads({ threadIds: [...], prNumber: PR# })` call. Do **not** resolve `CANNOT-COMPLY:` threads — leave them open until you see whether the bot accepted, refuted, or (rarely) escalated the claim.
-
-Example:
-
-```
-CANNOT-COMPLY: LS-1234
-This change requires modifying a generated file that must not be edited manually.
-```
-
-> `CANNOT-COMPLY:` is a Cycle 3+ token. Using it in Cycle 2 will be treated as malformed.
-
-### 4a. If the bot escalates to `needs-human-arbitration` (cycle limit hit)
-
-When the cycle limit (MAX_CYCLE = 3) is reached, the bot posts an arbitration comment listing the outstanding findings, applies `needs-human-arbitration`, and sets `bot-review` to failure.
-
-> Prior `APPROVED` bot reviews do **not** count toward `MAX_CYCLE` (LS-4904) — only unresolved `CHANGES_REQUESTED` cycles consume slots, so post-approval pushes start fresh.
-
-**Author agent response:**
-
-1. Push new commits addressing each outstanding finding listed in the arbitration comment.
-2. The bot **automatically resets the cycle counter** on the next push (`synchronize` event with `needs-human-arbitration` present): it dismisses prior reviews, removes the `needs-human-arbitration` label, and posts a fresh Cycle 1 review. No `bot:reset-cycle-counter` or maintainer action is needed.
-3. Ensure `bot:ready-for-review` is present (it is preserved by the bot through merge — re-apply only if it was stripped).
-
-> **Do NOT** ask the maintainer to apply `bot:reset-cycle-counter` just because the cycle limit was hit and you have new code to push. The auto-reset handles this. `bot:reset-cycle-counter` is only needed if you cannot push new commits (e.g. the bot finding is wrong and you are using `review-bot-override`, or a maintainer wants to reset without requiring a push).
-
-### 5. If bot-review remains blocked after CANNOT-COMPLY
-
-`CANNOT-COMPLY` filed and then silently accepted or refuted by the bot needs no maintainer action — the finding is dropped or continues as a normal mandate, respectively. Only when the bot's Cycle 3 verification pass still finds the claim unresolved (see §4) does it escalate to `needs-human-arbitration` and set `bot-review` to `failure` (blocking merge). At that point a maintainer must apply the `review-bot-override` label:
-
-```
-github_manage_labels(prs: [PR#], add: ["review-bot-override"])
-```
-
-This triggers W5 (`.github/workflows/review-bot-override.yml`), which sets `bot-review` to `success` and posts an audit comment. It is the **formal escape hatch** for persistent bot disagreement — prefer it over GitHub's admin "Merge without waiting for requirements" button, which leaves no audit trail. See [ci-checks-reference.md](references/ci-checks-reference.md#bot-review-commit-status) for details.
-
-### 6. If `needs-human-security-review` is applied and the author can't satisfy CODEOWNER review
-
-When the reviewer flags a critical security finding it applies the `needs-human-security-review` label. The label itself is informational — the actual gate is the **CODEOWNER review requirement**, which the PR author cannot satisfy on their own PR. After a human security reviewer has examined the finding and confirmed it inapplicable, mitigated, or accepted, a maintainer applies the `security-review-override` label:
-
-```
-github_manage_labels(prs: [PR#], add: ["security-review-override"])
-```
-
-This triggers W6 (`.github/workflows/security-review-override.yml`), which submits an `APPROVE` review as the Code Reviewer Bot App (satisfying the CODEOWNER requirement with a non-author identity), removes `needs-human-security-review`, and posts an audit comment. Removing the label dismisses the override approval and re-applies the security label. See [ci-checks-reference.md](references/ci-checks-reference.md#needs-human-security-review-label-codeowner-gate) for details.
-
-### Format Rules
-
-- **A `FIX:` reply must be exactly `FIX: <sha>` — no trailing prose.** Text after the sha (`FIX: abc123 — fixed the thing`) trips the bot's format-error path. The corrective reply GitHub records is an empty-body `COMMENTED` bot review that **inflates the cycle counter** toward `MAX_CYCLE`, accelerating false `needs-human-arbitration`. Prefer `github_finish_fix_round` (emits the exact format) over hand-writing replies. See [cycle-limit-arbitration-troubleshooting.md](references/cycle-limit-arbitration-troubleshooting.md).
-- **Format errors get corrective replies** — the bot will reply in-thread when a response is malformed; re-post correctly.
-- **Never edit the bot's review comments or threads** — the bot reads its own thread state to determine cycle progression; mutation breaks this.
-- **No free-form text outside structured replies** — the bot ignores unstructured content and will not count it as a thread response.
-
-### Shortcut
-
-Use `/respond-to-review` to scaffold structured replies for all open threads on the current PR.
-
-## Review Thread Workflow (bot-review failures)
-
-When `bot-review` CI check fails or Copilot posts review comments, use this MCP-first workflow:
-
-> **Classification rule**: `bot-review`, `Copilot review blocked`, and `Copilot review has unresolved comments` are review blockers, not generic CI-debugging tasks. Fetch unresolved review threads first; do not start by reading Actions logs unless another non-review check is also failing.
-
-1. **Get unresolved threads**: `github_get_review_threads({ number: PR# })`
-   - Default (no `includeResolved`) returns only unresolved threads — exactly the ones blocking merge.
-   - Returns thread-level fields: `id` (PRRT\_ node ID), `isResolved`, `isOutdated`, `isCollapsed`, `path`, `line`, `startLine` — plus a `comments` array with `databaseId`, `author`, `body`, `path`, `line` per comment.
-2. **Inspect the returned comments and fix the code** in the flagged files/lines
-3. **Reply to threads** (when a comment needs acknowledgment or explanation rather than a code fix):
-   - Use `github_reply_to_review` — available for **both local and cloud** sessions via the custom `legacy-sports-github` MCP server.
-   - Pass either `threadId` (GraphQL node ID from `github_get_review_threads`) or `commentId` + `number` (REST databaseId + PR number): `github_reply_to_review({ threadId: "PRRT_...", body: "explanation" })`
-   - **ToolSearch query**: search `"reply review"`, `"reply to review comment"`, or `"github_reply_to_review"` — not `"reply to PR comment"` (which may not surface it).
-   - Do **not** reach for `gh api repos/.../pulls/.../comments` or a Python scratch script — the MCP tool handles both auth paths.
-4. **Commit and push** the fix
-5. **Resolve threads**: `github_resolve_threads({ threadIds: [<thread-id>, ...], prNumber: PR# })`
-   - Thread node IDs come from the `id` field of each thread in `github_get_review_threads` output (PRRT\_... format).
-   - **Alternative**: if you only have numeric comment `databaseId` values (e.g. from `mcp__github__*` `get_review_comments`), pass them as `commentDatabaseIds` instead — the tool maps them to thread IDs internally: `github_resolve_threads({ commentDatabaseIds: [<databaseId>, ...], prNumber: PR# })`.
-   - **If bot-review still fails after resolution**: `github_resolve_threads` with `prNumber` attempts to re-dispatch the Copilot Auto-Approve workflow, but may be silently skipped if the app token lacks `actions: write`. If `bot-review` still shows failure after thread resolution, re-dispatch manually: `ci_dispatch_workflow({ workflow: "Copilot Auto-Approve", ref: "<branch>", inputs: { pr_number: "<PR#>" } })`. Wait ~20 seconds for the recheck job and verify `bot-review` flips to success before attempting merge.
-6. **Apply `bot:ready-for-review` label**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this fires the next Reviewer (W1) cycle. Copilot review is triggered automatically by the platform; no explicit `github_request_review` call is needed.
-   - **Events arrive — do not poll**: the review event arrives automatically as a push notification. Call `mcp__github__subscribe_pr_activity({ owner, repo, pullNumber: PR# })` only if that built-in tool is present in the session's tool list (it is absent from most current sessions — absence is not a monitoring failure). In environments with no event delivery at all (cloud/headless), do **not** fall back to a retry loop — arm a wake per [waiting-and-wakeups](../mcp-first/references/waiting-and-wakeups.md) and end the turn.
-
-> **`bot-review` still stuck after resolving threads?** Manually re-dispatch the recheck using the `ci_dispatch_workflow` MCP tool — **never** `gh workflow run copilot-auto-approve.yml` via Bash:
->
-> ```
-> ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })
-> ```
->
-> In cloud sessions, this may return 403 (app lacks `actions:write`) — see [cloud-agent-mode/SKILL.md](../cloud-agent-mode/SKILL.md#quirk-4-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite).
-
-Before the next push, also check whether any other blockers are already known on the PR (conflicts, non-review failing checks). Batch all currently known fixes into one validation + push round whenever possible. Do **not** push a CI-only change while known review threads remain unresolved, or vice versa, unless one blocker must be cleared first to reveal the next.
-
-> **Avoid `gh api graphql` to enumerate review threads** — prefer `github_get_review_threads`, which returns structured data including GraphQL thread node IDs (required for resolution). Use `gh api graphql` only as a last resort when MCP or another documented tool is unavailable or does not return the needed thread IDs.
-
-> **Mapping comment IDs to thread IDs**: `github_resolve_threads` now handles this automatically. If you have a comment's `databaseId` (numeric) but not its thread's PRRT\_ node ID, pass the `databaseId` values via `commentDatabaseIds` with `prNumber` — no raw GraphQL fallback needed.
-
-## Enabling Auto-Merge from Worktrees
-
-> **Precondition for enabling auto-merge**: use `github_pr_enable_auto_merge` (GraphQL — no local git ops). `gh pr merge --auto` shells out to `git` to check out the base branch locally, which fails in worktree sessions because the parent repo already has `main` checked out:
->
-> ```
-> fatal: 'main' is already used by worktree at 'D:/code/legacy-sports'
-> ```
-
-Use `github_pr_enable_auto_merge` instead — it calls the `enablePullRequestAutoMerge` GraphQL mutation directly with no local git operations:
-
-```
-github_pr_enable_auto_merge(number: <PR#>)                          # default: SQUASH
-github_pr_enable_auto_merge(number: <PR#>, mergeMethod: "REBASE")  # or MERGE
-```
-
-The PR will auto-merge once all required checks pass. This works from any worktree, cloud session, or headless environment.
-
-> `github_merge_pr(strategy: "queue")` also uses GraphQL under the hood and is equivalent for the default SQUASH case. Use `github_pr_enable_auto_merge` when you want explicit control over `mergeMethod` or want to make the auto-merge intent clear without triggering a full merge attempt.
-
-## Merge Queue Blocked: "A conversation must be resolved"
-
-When the merge queue rejects a PR with **"Repository rule violations found: A conversation must be resolved before this pull request can be merged"**, follow this workflow:
-
-> **Critical non-obvious rule**: `isOutdated: true` does NOT mean the thread is resolved. "Outdated" means the code changed after the comment was posted (the diff hunk no longer exists). Outdated threads that are **not** resolved still block the merge queue. Never assume outdated = safe to ignore.
-
-1. **List threads blocking merge**:
-
-   ```
-   github_get_review_threads({ number: PR# })
-   ```
-
-   Default returns only unresolved threads (including outdated-but-unresolved). Inspect `isOutdated` on each — these are the ones that may have been overlooked.
-
-2. **Collect thread IDs** from the `id` field (PRRT\_ prefix) of all returned threads.
-
-3. **Resolve all blocking threads**:
-
-   ```
-   github_resolve_threads({ threadIds: ["PRRT_...", "PRRT_..."], prNumber: PR# })
-   ```
-
-   The `prNumber` parameter triggers a bot-review recheck after resolution.
-
-4. **Wait for the next merge queue cycle** — the PR will be re-evaluated automatically after the commit status updates. No manual re-enqueue is needed unless the PR was removed from the queue.
-
-<a id="withholding--could-not-post-status-is-a-rate-limit-signature-not-a-verdict-ls-9570"></a>
-
-## "Withholding / could not post status" is a rate-limit signature, not a verdict (LS-9570)
-
-A CI gate or workflow step can compute the correct result and still fail to report it. Recognize this pattern:
-
-- `actions/github-script` steps die with `API rate limit exceeded for installation`.
-- A gate script (e.g. `ci-gate.js`) logs that it computed a verdict but explicitly withholds posting it (e.g. `withholding 'success' ... (run-lookup-failed)`) because an API call it needed for corroboration 403'd.
-- A step logs `Setting commit status: success - ...` immediately followed by the actual `POST /statuses/...` call 403ing and the job then `setFailed`.
-
-All three **look like a verdict was reached and something else went wrong** — they are not. They are the installation GitHub App token's rate limit being exhausted mid-run. Don't spend time reproducing the underlying check, re-running the summarize/reporting job immediately, or bumping the SHA to force a rebuild — none of those touch the actual cause and the retry will 403 identically seconds later.
-
-**Confirm and remedy:**
-
-1. Call `ci_installation_rate_limit` (not `gh api rate_limit` — that reports a different token's bucket and will misleadingly show plenty of headroom; see [mcp-first § Installation rate limit vs. `gh api rate_limit`](../mcp-first/references/auth-and-routing.md#installation-vs-user-rate-limit-ls-9570)). A low/zero `remaining` confirms this failure mode.
-2. Wait until the returned `resetsAt`.
-3. Re-run only the reporting/summarize job that failed to post (`ci_rerun`/`github_retrigger_check` as appropriate) — do not push a new commit or otherwise widen the PR to "fix" it.
+| Reference                                                                  | Trigger                                                                                                                          |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [references/drive.md](references/drive.md)                                 | Drive/land/ship a specific PR to merge (single PR, by number/URL)                                                                |
+| [references/fix.md](references/fix.md)                                     | Fix all outstanding issues on one PR (conflicts + reviews + CI)                                                                  |
+| [references/unblock.md](references/unblock.md)                             | Investigate and unblock stuck PRs; detect Expected CI / false positives; auto-merge; merge-queue "conversation must be resolved" |
+| [references/sweep.md](references/sweep.md)                                 | Local chip-dispatch sweep across all open PRs (`/sweep-prs`)                                                                     |
+| [references/sweep-cloud.md](references/sweep-cloud.md)                     | Cloud-mode sweep algorithm (API-only actions + report)                                                                           |
+| [references/respond-to-review.md](references/respond-to-review.md)         | Scaffold FIX/JUSTIFY/CANNOT-COMPLY replies to bot review threads (`/respond-to-review`)                                          |
+| [references/fix-reviews.md](references/fix-reviews.md)                     | Fix Copilot review comments on a PR; Review Thread Workflow for `bot-review` failures                                            |
+| [references/ci-event-response.md](references/ci-event-response.md)         | Triage and respond to CI/GitHub events on a watched PR (event-driven cloud agent)                                                |
+| [references/e2e-hold.md](references/e2e-hold.md)                           | E2E failures not caused by this PR: attribution gate, blocker ticket, hold, monitor, resume                                      |
+| [references/label-ownership.md](references/label-ownership.md)             | Who's who in the PR flow; which actor applies which label                                                                        |
+| [references/author-agent-contract.md](references/author-agent-contract.md) | Exact bot-review reply protocol (Cycles 1–3+, format rules, escalation)                                                          |
+| [references/critical-rules.md](references/critical-rules.md)               | Full detail behind each Critical Rule below                                                                                      |
+| [references/quick-commands.md](references/quick-commands.md)               | Copy-pasteable MCP command sequences for the full PR-creation → merge flow                                                       |
+
+## Agent-Session Marker (PR ↔ Session Linkage)
+
+Any local session that picks up an existing PR it did not create (drive-pr, fix-pr, respond-to-review, sweep chips) must stamp itself onto the PR before entering the work loop: `bash scripts/link-pr-session.sh <PR#>`. Skip only when the PR is on the session's own branch, or the environment has no `gh`/`CLAUDE_CODE_SESSION_ID`.
+
+> Details: [references/create-pr.md § Agent-Session Marker](references/create-pr.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570)
 
 ## Critical Rules
 
-1.  **Always self-review before mark-ready (Tier 2 gate)** -- Phase 1 is mandatory. Read every changed file in full, check all 20 common review patterns, and produce a Self-Review Summary before marking the PR ready — and before any push to a Ready (non-draft) PR. Draft-checkpoint pushes may precede it (the spine opens the draft PR before validation). Skipping this is the #1 cause of avoidable Copilot review cycles.
-2.  **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3.  **Resolve threads after fixing** -- use `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` after pushing fixes. Thread IDs come from `github_get_review_threads({ number: <PR#> })` (returns unresolved threads by default; pass `includeResolved: true` for all). If you only have numeric comment `databaseId` values, use `github_resolve_threads({ commentDatabaseIds: [...], prNumber: <PR#> })` — the tool maps them to thread IDs internally (no raw GraphQL needed). The `prNumber` parameter triggers a bot-review recheck attempt when all thread resolutions succeed; if the app token lacks `actions: write` the dispatch is skipped/non-fatal and the tool returns a `recheckNote` instead of erroring — **if bot-review still shows failure after thread resolution, re-dispatch manually (see Review Thread Workflow)**. When all threads are resolved and the Reviewer Bot's verdict is APPROVED, the bot applies `merge-when-ready` itself — never add it manually (see [Label Ownership](#label-ownership)). **Do NOT use `gh api graphql`** to resolve — `github_resolve_threads` works with both user and GitHub App tokens and handles batching. Fall back to `gh api graphql` only if the custom server is confirmed unavailable after retry.
-4.  **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
-5.  **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
-6.  **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
-7.  **Always create PRs as drafts, then mark ready before handoff** -- use `draft: true` in the `github_open_pr` MCP tool. Apply the `agent-in-progress` label while still a draft, then call `github_mark_pr_ready(number: <PR#>)`. **Draft is a working state, not an ending state.** It is fine to keep a PR in draft while you are still actively pushing commits, iterating on CI, or waiting on a user question. It is NOT fine to end a turn or hand off with a PR still in draft. **Stopping at `draft: true` is a Tier 2 failure** — draft PRs are skipped by `Reviewer (W1)` (which checks `draft == false`), skipped by the bot-review-gated CI orchestration path, and skipped by sweep agents. A forgotten draft sits forever and nobody picks it up. Before ending a turn, handing off, or requesting review, verify `github_view_pr({ number: N })` returns `isDraft: false`. If you genuinely cannot mark it ready (real blocker), surface that blocker explicitly to the user — do not silently leave the PR in draft. See [create-pr.md](references/create-pr.md) for the canonical step order.
+Full explanations, examples, and the CI-tool instant-snapshot reference table: [references/critical-rules.md](references/critical-rules.md).
 
-    > **"CI is red" is not, by itself, a real blocker.** The mark-ready gate is your own diff validated (`make pc` green, self-review done) plus checked-off ACs — not "every CI check on the PR is green." If a check is red for a reason **proven** unrelated to this PR's diff (a pre-existing base-branch break confirmed by reproducing it on `main`, or flaky infra) — not merely suspected — mark ready anyway: (1) mark the PR ready and apply `bot:ready-for-review`, (2) post a PR comment stating the failure is pre-existing/unrelated with the evidence, (3) track the underlying issue via a linked ticket (and a fix PR, if you're the one fixing it), (4) rebase and re-validate once the blocker resolves. Do not sit on a draft PR waiting for someone else's fix to land — that was the LS-9127/#6805 → LS-9186 incident this rule codifies. See the [CI-red-≠-blocked-on-mark-ready gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) for the canonical statement (spine wins on any disagreement).
-
-8.  **Check Runs ≠ Commit Statuses** -- `github_retrigger_check` only works on **Check Runs** (Checks API). `bot-review` and other bot-set statuses use the **Statuses API** and will NOT be found by `github_retrigger_check`. If you get "No check run named 'X' found", use `github_list_commit_statuses({ prNumber: <PR#> })` (that tool takes `prNumber` or `sha` — not `number`) to see commit statuses instead. To clear a stale commit status: push a new commit (re-triggers the workflow) or dispatch via `ci_dispatch_workflow`. Note: `github_merge_pr(strategy: "direct")` does NOT bypass required commit statuses — it uses the standard merge API which still enforces branch protection rules.
-9.  **Precondition for PR event handling**: react to each push notification as it arrives. After marking a PR ready, Claude Code surfaces CI results, review threads, and other agent-actionable events automatically — no wait tool is needed.
-    - **Precondition for any status-read call**: a push event has arrived. `sleep N && gh run view`, `sleep N && gh pr view --json statusCheckRollup`, `sleep N && gh pr checks <pr>`, and `ci_view_run every ~60s` loops never deliver earlier signal than the native notification. Native event streaming works regardless of which MCP servers are connected, so the "CI server not loaded" rationalization does not justify polling.
-10. **Batch known PR fixes into one push** -- when a PR simultaneously has unresolved review threads and failing checks, gather both the thread set and CI evidence before editing. The default remediation unit is one review/CI round -> one validation -> one push. Multiple pushes for already-known issues create avoidable Copilot re-reviews and CI cycles.
-11. **Never call `github_merge_pr(strategy: "direct")`** -- agents merge only through the queue (`github_merge_pr(strategy: "queue")` or `github_pr_enable_auto_merge`), which is gated on the Reviewer Bot's `merge-when-ready` label (see [Label Ownership](#label-ownership)). `strategy: "direct"` merges immediately via the standard merge API — it still enforces branch protection/required statuses, but it bypasses the `merge-when-ready` gate itself, i.e. the Reviewer Bot's approval. That gate exists specifically to hold back PRs the bot rejected; a direct merge skips that check the same way manually applying the label would. If a queue-eligible PR seems stuck, diagnose why (`github_pr_why_blocked`) rather than reaching for a direct merge.
-12. **`ci_list_runs`, `ci_view_run`, `github_view_pr`, `github_list_prs` are instant snapshots — use for targeted lookups only.** Calling them in a loop burns 1–2M tokens per session (each call re-reads the full conversation context). Use them exactly once for a targeted lookup. **Even a single such call can be denied** by Auto Mode's permission classifier (`"Blocked by classifier"`) — that is a harness-side false positive, not a signal to retry; see [cloud-agent-mode Quirk 9](../cloud-agent-mode/SKILL.md#quirk-9-auto-modes-permission-classifier-can-block-a-legitimate-single-shot-ci_list_runssend_later-call-ls-8931) and fall back to native event delivery instead.
-13. **Re-dispatch `bot-review` via MCP — never `gh workflow run`** -- if `bot-review` remains stuck after resolving threads, use `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<PR#>" })`. Never use `gh workflow run copilot-auto-approve.yml` via Bash — always use the `ci_dispatch_workflow` MCP tool. See [cloud-agent-mode/SKILL.md](../cloud-agent-mode/SKILL.md#quirk-4-ci_dispatch_workflow-returns-403-in-cloud--agent_author_app-lacks-actionswrite) for the 403 fallback in cloud sessions.
-14. **Precondition after every fix-push: apply `bot:ready-for-review`.** `Reviewer (W1)` fires on `opened`, `ready_for_review`, `labeled` (with `bot:ready-for-review`/`review-bot-degraded`/`bot:reset-cycle-counter`), and `synchronize` **only when `bot:ready-for-review` is already present**. A plain push without the label starts no reviewer cycle and no orchestrated CI. After resolving threads and pushing, call `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — this is the most common workflow stall. Not needed at PR creation (`github_mark_pr_ready` fires `ready_for_review` for Cycle 1). The reviewer workflow auto-removes the label; if still present (rate-limited prior cycle), remove and re-add it. Shell fallback: `gh pr edit <PR#> --add-label "bot:ready-for-review"`.
-
-**CI tool reference — instant snapshots:**
-
-| Tool              | Correct usage                                                       |
-| ----------------- | ------------------------------------------------------------------- |
-| `ci_list_runs`    | ONE-SHOT: get the runId for a failing CI run — do not loop          |
-| `ci_get_logs`     | ONE-SHOT: read failed-step output after getting runId — do not loop |
-| `ci_view_run`     | ONE-SHOT: inspect a specific run — do not loop                      |
-| `github_view_pr`  | ONE-SHOT: verify merge state or read PR metadata — do not loop      |
-| `github_list_prs` | ONE-SHOT: find an existing PR — do not loop                         |
-
-## Quick Commands
-
-```
-# MCP (preferred) — full post-creation sequence
-github_open_pr(title: "LS-#### type(scope): msg", body: <markdown>, jiraKey: "LS-####", draft: true, head: <branch-name>)
-github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])   # while still draft — MUST come before bot:ready-for-review
-github_mark_pr_ready(number: <PR#>)  # NOTE: this now applies bot:ready-for-review itself (last label op, idempotent)
-github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # redundant-but-harmless after github_mark_pr_ready; REQUIRED on the CC-web built-in mark-ready path (update_pull_request draft:false does NOT apply it). MUST be last label op — see note below
-mcp__github__subscribe_pr_activity(pullRequestNumber: <PR#>)  # OPTIONAL — call only if this built-in exists in the session tool list (absent from most current sessions; events arrive automatically without it). NOT in legacy-sports-github; unavailable in cloud/headless. Fallback: event-triggered one-shot lookups (github_view_pr / ci_list_runs) — no sleep/polling loops (Critical Rule 9)
-jira_transition(key: "LS-####", status: "In Review")
-
-# After EACH fix-and-push round (resolve threads → push → re-trigger review + CI)
-github_resolve_threads(threadIds: [...], prNumber: <PR#>)
-github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MANDATORY and MUST be last label op — fires Reviewer (W1) → bot review → CI Orchestrator. Plain pushes do NOT trigger CI.
-
-# ⛔ Why bot:ready-for-review must be last: Reviewer (W1) uses concurrency.cancel-in-progress: true.
-# Since PR #4738 irrelevant-label events land in a separate `noop` concurrency group and CANNOT
-# cancel the active reviewer run — only the review-trigger labels themselves (bot:ready-for-review,
-# review-bot-degraded, bot:reset-cycle-counter, review-bot-override) and pushes land in the `active`
-# group. Label-last ordering remains required hygiene: it guarantees the labeled event that fires W1
-# is the final state GitHub delivers. If a W1 run still dies before posting any bot-review status
-# (external cancellation, runner failure/starvation), the merge-queue processor's review-stall sweep
-# self-heals it on its next wake by cycling the label; after 2 dead re-triggers per SHA it escalates
-# to a terminal bot-review failure + needs-human-arbitration (LS-9209).
-# If agent-in-progress is missing when you reach this step, apply it first, then bot:ready-for-review.
-
-# Enable auto-merge (worktree-safe — use instead of `gh pr merge --auto`)
-github_pr_enable_auto_merge(number: <PR#>)                         # SQUASH (default)
-github_pr_enable_auto_merge(number: <PR#>, mergeMethod: "REBASE")  # or MERGE
-```
-
-<details>
-<summary>Script (single command — when MCP tools are unavailable)</summary>
-
-`make ship-pr` runs the full 5-step pipeline in one shot: create draft PR → label → mark ready → request Copilot review → transition Jira to "In Review". Requires `JIRA_API_TOKEN` + `JIRA_EMAIL` env vars for the Jira step. Use `NO_JIRA=1`, `BODY_FILE=`, `BASE=`, and `ARGS=` Make variables to pass additional options; or invoke `node scripts/ship-pr.js` directly for full flag control.
-
-```bash
-# Minimal Make target — auto-detects body from .github/tmp-pr-body.md if it exists
-make ship-pr TITLE="LS-#### type(scope): description"
-
-# Make target with options
-make ship-pr TITLE="LS-#### type(scope): desc" NO_JIRA=1
-make ship-pr TITLE="LS-#### type(scope): desc" BODY_FILE=.github/tmp-pr-body.md BASE=my-branch
-
-# Direct script — use for full flag control (--dry-run, --json, --no-jira, --body-file, etc.)
-node scripts/ship-pr.js --title="LS-#### type(scope): desc" --body-file=.github/tmp-pr-body.md
-node scripts/ship-pr.js --title="LS-#### type(scope): desc" --no-jira
-node scripts/ship-pr.js --title="LS-#### type(scope): desc" --dry-run
-```
-
-</details>
-
-<details>
-<summary>CLI fallback (only when both MCP and ship-pr script are unavailable)</summary>
-
-```bash
-gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
-bash scripts/cleanup-pr-body.sh
-gh pr ready <PR#>
-```
-
-</details>
+1.  Always self-review before mark-ready (Tier 2 gate).
+2.  2-round cap on Copilot fix iterations.
+3.  Resolve threads after fixing, via `github_resolve_threads`.
+4.  Never skip `make pc`.
+5.  Always use `--body-file` or an MCP tool for the PR body — never inline `--body` in any shell.
+6.  Never create a PR from `main`.
+7.  Always create PRs as drafts, then mark ready before handoff — draft is a working state, not an ending state.
+8.  Check Runs ≠ Commit Statuses — `github_retrigger_check` cannot find `bot-review` or other commit statuses.
+9.  React to each push notification as it arrives — never poll (`sleep N && gh ...`) for CI/PR status.
+10. Batch known PR fixes into one push.
+11. Never call `github_merge_pr(strategy: "direct")` — merge only through the queue.
+12. `ci_list_runs`/`ci_view_run`/`github_view_pr`/`github_list_prs` are instant snapshots — one-shot only, never loop.
+13. Re-dispatch `bot-review` via `ci_dispatch_workflow` — never `gh workflow run`.
+14. Precondition after every fix-push: apply `bot:ready-for-review` (last label op).
 
 ## Reference Documents
 
-| Document                                                                                                                  | Content                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [references/self-review.md](references/self-review.md)                                                                    | Self-review checklist and steps                                             |
-| [references/create-pr.md](references/create-pr.md)                                                                        | PR creation prerequisites, template, and post-creation steps                |
-| [references/fix-reviews.md](references/fix-reviews.md)                                                                    | Fix Copilot review comments (single PR and batch)                           |
-| [references/common-review-patterns.md](references/common-review-patterns.md)                                              | Top 20 Copilot review patterns and fixes                                    |
-| [references/fix-copilot-reviews-workflow.md](references/fix-copilot-reviews-workflow.md)                                  | Batch workflow for fixing reviews across all open PRs                       |
-| [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)                                    | PowerShell encoding issues with PR bodies                                   |
-| [references/pr-common-issues.md](references/pr-common-issues.md)                                                          | Common PR creation issues and fixes                                         |
-| [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)                                                        | When and how to include UI screenshots                                      |
-| [references/agent-screenshots.md](references/agent-screenshots.md)                                                        | Capture before/after screenshots for UI PRs using browser MCP               |
-| [references/bug-verification-templates.md](references/bug-verification-templates.md)                                      | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
-| [references/ci-checks-reference.md](references/ci-checks-reference.md)                                                    | Every PR check: what it validates, why it fails, and how to fix it locally  |
-| [references/e2e-hold.md](references/e2e-hold.md)                                                                          | External E2E blocker protocol: attribute, ticket, hold, monitor, resume     |
-| [workflow-overview (PR Preview section)](../workflow-overview/references/post-merge-and-deploy.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)  |
-
-## Parent-Agent PR Recovery
-
-When a subagent fails to push or create a PR, the parent agent should **prefer MCP tools** to recover — use `gh` only when MCP is unavailable. The subagent's commits already exist in its ephemeral worktree; the parent just needs to push and ship.
-
-**Recovery sequence (MCP-first):**
-
-```
-# 1. Push the subagent's commits (include worktree path and setUpstream for new branches)
-worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
-# OR if worktree_set is active for the subagent's worktree:
-worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
-
-# 2. Create the PR as a draft, using the subagent's branch name (from worktree_status().headRefName)
-github_open_pr(
-  head: "<branch-name>",    # from worktree_status().headRefName
-  title: "LS-#### type(scope): msg",
-  body: <markdown>,
-  jiraKey: "LS-####",
-  push: false,              # step 1 already pushed
-  draft: true
-)
-
-# 3. Apply the agent-in-progress label
-github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
-
-# 4. Mark ready for review
-github_mark_pr_ready(number: <PR#>)
-```
-
-**Prefer MCP; use `gh` only when MCP is unavailable.** The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_open_pr`, `github_mark_pr_ready`, `github_manage_labels`, `github_request_review`) and should always be preferred. `gh pr create` / `gh pr ready` / `gh pr edit --add-label` are shell-level fallbacks for when MCP servers are unavailable. Using `gh` CLI in a recovery context can also silently use the wrong working directory, bypasses the `head` parameter that routes the PR to the correct branch, and produces shell-history noise that MCP gap audits flag.
-
-**Shell fallback (only if MCP server is unavailable):**
-
-```bash
-gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
-bash scripts/cleanup-pr-body.sh
-gh pr edit <PR#> --add-label "agent-in-progress"
-gh pr ready <PR#>
-```
+| Document                                                                                                                  | Content                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [references/self-review.md](references/self-review.md)                                                                    | Self-review checklist and steps                                                                                                     |
+| [references/create-pr.md](references/create-pr.md)                                                                        | PR-creation tool routing, prerequisites, template, post-creation steps, agent-session marker, parent-agent recovery                 |
+| [references/fix-reviews.md](references/fix-reviews.md)                                                                    | Fix Copilot review comments (single PR and batch); Review Thread Workflow                                                           |
+| [references/common-review-patterns.md](references/common-review-patterns.md)                                              | Top ~20 Copilot review patterns checklist (detail: [common-review-patterns-detail.md](references/common-review-patterns-detail.md)) |
+| [references/fix-copilot-reviews-workflow.md](references/fix-copilot-reviews-workflow.md)                                  | Batch workflow for fixing reviews across all open PRs                                                                               |
+| [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)                                    | PowerShell encoding issues with PR bodies                                                                                           |
+| [references/pr-common-issues.md](references/pr-common-issues.md)                                                          | Common PR creation issues and fixes                                                                                                 |
+| [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)                                                        | When and how to include UI screenshots                                                                                              |
+| [references/agent-screenshots.md](references/agent-screenshots.md)                                                        | Capture before/after screenshots for UI PRs using browser MCP                                                                       |
+| [references/bug-verification-templates.md](references/bug-verification-templates.md)                                      | PR body templates for proving bug fixes (screenshots, tests, queries, logs)                                                         |
+| [references/ci-checks-reference.md](references/ci-checks-reference.md)                                                    | Every PR check: what it validates, why it fails, how to fix it locally; rate-limit "withholding" troubleshooting                    |
+| [references/e2e-hold.md](references/e2e-hold.md)                                                                          | External E2E blocker protocol: attribute, ticket, hold, monitor, resume                                                             |
+| [references/label-ownership.md](references/label-ownership.md)                                                            | Who's-who + Label Ownership tables                                                                                                  |
+| [references/author-agent-contract.md](references/author-agent-contract.md)                                                | Bot-review reply protocol (Cycles 1–3+)                                                                                             |
+| [references/critical-rules.md](references/critical-rules.md)                                                              | Full detail behind the Critical Rules above                                                                                         |
+| [references/quick-commands.md](references/quick-commands.md)                                                              | Copy-pasteable MCP command sequences                                                                                                |
+| [workflow-overview (PR Preview section)](../workflow-overview/references/post-merge-and-deploy.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)                                                          |
 
 ## Related Skills
 

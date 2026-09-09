@@ -136,6 +136,64 @@ Print a summary table:
 | #N   | ...   | bot-review      | Spawned fix-pr chip |
 | #N   | ...   | Real CI failure | Spawned fix-pr chip |
 
+## Checking PR Status Without Bash
+
+Prefer MCP tools; use `gh pr view --json` only when MCP is unavailable or the user explicitly confirms a CLI fallback:
+
+| Instead of                           | Use                                                                                             |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `gh pr view N --json state,mergedAt` | `github_view_pr({ number: N })` — returns `state` + `mergedAt`                                  |
+| `gh pr view N --json mergeable`      | `github_pr_batch_status({ numbers: [N] })` — returns `mergeable`, `ciSummary`, `reviewDecision` |
+
+**`mergeable: UNKNOWN` does not mean blocked** — it can mean GitHub is still computing mergeability, and it can also appear for PRs that are already merged or closed. Do not treat `UNKNOWN` as a merge-queue signal by itself. To confirm the actual PR outcome, call `github_view_pr({ number: N })` and check `state` plus `mergedAt`/`closedAt`: `state: "MERGED"` or a populated `mergedAt` means it merged successfully; a closed PR with `closedAt` and no `mergedAt` means it was closed without merging.
+
+**Merge-conflict signals (three, any one means "rebase")**: `mergeable: CONFLICTING` (GraphQL hint — goes `UNKNOWN`/stale every time main advances), the **`CI: Conflicts` label**, and a red **"No Merge Conflicts" required check**. The label and check come from a deterministic `git merge` test (`check-conflicts.yml` + the base-push sweep) and are the source of truth when signals disagree. A red "No Merge Conflicts" check is never a CI failure to debug — it means rebase (Step 1 above). Both the label and the check clear automatically after the rebase push; never remove the label yourself. `github_pr_why_blocked` / `github_pr_diagnose` / `github_pr_dashboard` already union all three signals into their `MERGE_CONFLICT` / `merge conflict` verdicts.
+
+## Enabling Auto-Merge from Worktrees
+
+> **Precondition for enabling auto-merge**: use `github_pr_enable_auto_merge` (GraphQL — no local git ops). `gh pr merge --auto` shells out to `git` to check out the base branch locally, which fails in worktree sessions because the parent repo already has `main` checked out:
+>
+> ```
+> fatal: 'main' is already used by worktree at 'D:/code/legacy-sports'
+> ```
+
+Use `github_pr_enable_auto_merge` instead — it calls the `enablePullRequestAutoMerge` GraphQL mutation directly with no local git operations:
+
+```
+github_pr_enable_auto_merge(number: <PR#>)                          # default: SQUASH
+github_pr_enable_auto_merge(number: <PR#>, mergeMethod: "REBASE")  # or MERGE
+```
+
+The PR will auto-merge once all required checks pass. This works from any worktree, cloud session, or headless environment.
+
+> `github_merge_pr(strategy: "queue")` also uses GraphQL under the hood and is equivalent for the default SQUASH case. Use `github_pr_enable_auto_merge` when you want explicit control over `mergeMethod` or want to make the auto-merge intent clear without triggering a full merge attempt.
+
+## Merge Queue Blocked: "A conversation must be resolved"
+
+When the merge queue rejects a PR with **"Repository rule violations found: A conversation must be resolved before this pull request can be merged"**, follow this workflow:
+
+> **Critical non-obvious rule**: `isOutdated: true` does NOT mean the thread is resolved. "Outdated" means the code changed after the comment was posted (the diff hunk no longer exists). Outdated threads that are **not** resolved still block the merge queue. Never assume outdated = safe to ignore.
+
+1. **List threads blocking merge**:
+
+   ```
+   github_get_review_threads({ number: PR# })
+   ```
+
+   Default returns only unresolved threads (including outdated-but-unresolved). Inspect `isOutdated` on each — these are the ones that may have been overlooked.
+
+2. **Collect thread IDs** from the `id` field (PRRT\_ prefix) of all returned threads.
+
+3. **Resolve all blocking threads**:
+
+   ```
+   github_resolve_threads({ threadIds: ["PRRT_...", "PRRT_..."], prNumber: PR# })
+   ```
+
+   The `prNumber` parameter triggers a bot-review recheck after resolution.
+
+4. **Wait for the next merge queue cycle** — the PR will be re-evaluated automatically after the commit status updates. No manual re-enqueue is needed unless the PR was removed from the queue.
+
 ## Related Skills
 
 - [sweep-prs](./sweep.md) — full overnight sweep with chip dispatch for all PR issues

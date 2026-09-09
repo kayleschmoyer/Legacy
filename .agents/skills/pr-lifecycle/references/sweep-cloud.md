@@ -24,7 +24,7 @@ Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecis
 
 ## Step 2: Verify Reviewer Bot labeling on clean PRs
 
-`merge-when-ready` is applied by the Reviewer Bot only — on all PRs, including Dependabot's. See the [Label Ownership table and boxed Dependabot ruling](../SKILL.md#label-ownership); never apply it manually. For a clean PR (MERGEABLE, CI green, 0 threads) missing the label, fix the upstream cause:
+`merge-when-ready` is applied by the Reviewer Bot only — on all PRs, including Dependabot's. See the [Label Ownership table and boxed Dependabot ruling](label-ownership.md#label-ownership); never apply it manually. For a clean PR (MERGEABLE, CI green, 0 threads) missing the label, fix the upstream cause:
 
 - `bot:ready-for-review` missing on current HEAD → `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`
 - `review-bot-degraded` present (rate-limited cycle) → remove then re-add `bot:ready-for-review`

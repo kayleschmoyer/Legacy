@@ -141,7 +141,7 @@ Quick reference:
 
 > **A `JUSTIFY:` does not clear `CHANGES_REQUESTED`.** It leaves the thread open for the bot to adjudicate next cycle. If the bot re-raises the **same** finding you justified (a false positive), that is a standoff — drive it to the cycle cap and escalate to the maintainer for `review-bot-override` rather than ending your turn on an open JUSTIFY. Full playbook: [drive.md "JUSTIFY standoff"](drive.md#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed). Never put trailing prose after `FIX: <sha>` — it inflates the cycle counter (see [cycle-limit-arbitration-troubleshooting.md](cycle-limit-arbitration-troubleshooting.md)).
 
-The full protocol, cycle rules, and format requirements live in [pr-lifecycle](../SKILL.md#author-agent-contract-bot-pr-flow). Load it now if responding to a bot review cycle.
+The full protocol, cycle rules, and format requirements live in [Author Agent Contract](author-agent-contract.md). Load it now if responding to a bot review cycle.
 
 ### From `copilot-pull-request-reviewer`
 
