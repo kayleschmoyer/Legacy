@@ -85,7 +85,7 @@ For subagents that perform git operations in worktrees, also include:
   - Use worktree_is_tracked({ paths }) instead of git ls-files
   - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
   - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
-  - Use worktree_reset({ ref: "<ref>" }) for mixed reset (replaces git reset <ref> / git reset origin/main); use worktree_reset({ ref: "<ref>", hard: true }) for hard reset (replaces git reset --hard <ref>)
+  - Use worktree_reset({ sha: "<sha>", mode: "mixed" }) for mixed reset (replaces git reset <ref> / git reset origin/main); use worktree_reset({ sha: "<sha>" }) for hard reset (mode defaults to 'hard'; replaces git reset --hard <ref>)
   - Use worktree_run only as a last resort for git operations without a dedicated tool (e.g. git merge-base, git cherry-pick, git tag, git add after manual conflict resolution)
 ```
 

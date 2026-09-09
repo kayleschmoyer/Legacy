@@ -74,7 +74,7 @@ if (Test-Path .git/rebase-merge) {
    # MCP-first: find the pre-rebase state in reflog
    worktree_reflog({ limit: 20 })
    # Reset to the state before the rebase (use SHA from reflog entries)
-   worktree_reset({ ref: "<sha>", hard: true })
+   worktree_reset({ sha: "<sha>" })
    ```
    Shell fallback:
    ```powershell
