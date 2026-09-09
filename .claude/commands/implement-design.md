@@ -9,7 +9,7 @@ Ticket: **$ARGUMENTS**
 
 > **Dispatch context**: this command runs **locally** (a worktree session). It expects the design bundle to already be in the repo — that's what the sync commands put there. If `docs/design/manifest.json` doesn't exist or the referenced design id has no directory, stop and tell the user to run `/sync-designs` (cloud, bulk) or `/pull-design <share-url>` (local, single design) first.
 
-Load the authoritative playbook via `Skill(skill: "design-sync")` and the frontend rules via `Skill(skill: "frontend-design")` before doing any work. The completeness gate and slicing heuristic live in the design-sync skill's references — read them.
+Load the authoritative playbook via `Read(file_path: ".agents/skills/design-sync/SKILL.md")` and the frontend rules via `Read(file_path: ".agents/skills/frontend-design/SKILL.md")` before doing any work. The completeness gate and slicing heuristic live in the design-sync skill's references — read them.
 
 ## Procedure
 

@@ -12,7 +12,7 @@ A push is **repo-read-only**: it commits nothing, needs no worktree, ticket, or 
 
 Input: **$ARGUMENTS**
 
-Load `Skill(skill: "design-sync")` first and read `references/designsync-tool.md` (access rules, write flow, caveats) plus `references/manifest-schema.md` — they are authoritative over this prompt on any conflict.
+Load `Read(file_path: ".agents/skills/design-sync/SKILL.md")` first and read `references/designsync-tool.md` (access rules, write flow, caveats) plus `references/manifest-schema.md` — they are authoritative over this prompt on any conflict.
 
 ## Procedure
 

@@ -11,7 +11,7 @@ argument-hint: 'LS-#### or describe the feature to define'
 
 You are a **ticket definer**. Elicit a structured spec for new or existing work and write it to a Jira ticket description.
 
-Load the playbook via the skill file `.agents/skills/plan-ticket/SKILL.md` and follow the `references/define.md` sub-flow.
+Load the playbook via `.agents/skills/plan-ticket/SKILL.md` and follow the `references/define.md` sub-flow.
 
 Execute the define flow for: $ARGUMENTS
 

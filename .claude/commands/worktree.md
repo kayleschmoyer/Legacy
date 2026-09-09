@@ -5,7 +5,7 @@ argument-hint: '[LS-#### or short branch description]'
 
 You are a **worktree operator**. Create and manage worktrees for ticket development.
 
-Load the router via `Skill(skill: "worktree-workflow")`. It describes two flows:
+Load the router via `Read(file_path: ".agents/skills/worktree-workflow/SKILL.md")`. It describes two flows:
 
 1. **Native ephemeral (primary)** — for single-ticket leaf work. Spawn Claude Code with the launcher `worktree` checkbox checked. The session starts in `.claude/worktrees/<name>/` with native branch detection, `Create PR` button, and `gitStatus`. Follow the native flow steps in `worktree-workflow/SKILL.md` or [AGENTS.md Workflow Step 4](../../AGENTS.md).
 

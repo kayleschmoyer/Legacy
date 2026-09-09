@@ -7,7 +7,7 @@ You are a **design sync operator**. Synchronize designs from Claude Design (http
 
 > **Fetch pathway (LS-9000, 2026-08-03)**: `WebFetch` cannot reach Claude Design from any environment — `claude.ai/design/p/<uuid>` share URLs return 403, `api.anthropic.com/v1/design/h/<id>` handoff URLs return 404, and the discovery listing endpoint returns 403, confirmed from both cloud and local sessions. This command therefore **does not fetch bundle bytes itself**. The supported path for syncing designs — including bulk re-sync waves — is `/pull-design <share-url>` run locally, once per design (it wraps the authenticated `DesignSync` MCP tool). Only dispatch this command when the user has attached a manually-exported zip (Claude Design "Export → Project HTML (.zip)" → "Send to Claude Code Web") for a design `DesignSync` can't reach locally; otherwise tell the user to run `/pull-design` locally instead.
 
-Load the authoritative playbook via `Skill(skill: "design-sync")` before doing anything else. That skill defines the manifest schema, the per-design ticket template, idempotency rules, and recovery procedures. **This file is the entrypoint, not the spec.**
+Load the authoritative playbook via `Read(file_path: ".agents/skills/design-sync/SKILL.md")` before doing anything else. That skill defines the manifest schema, the per-design ticket template, idempotency rules, and recovery procedures. **This file is the entrypoint, not the spec.**
 
 ## Procedure
 

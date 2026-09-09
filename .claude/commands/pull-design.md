@@ -8,7 +8,7 @@ You are a **local design-sync agent**. Pull one Claude Design project into `docs
 
 Input: **$ARGUMENTS**
 
-Load `Skill(skill: "design-sync")` first and read `references/designsync-tool.md` (access rules, caveats) plus `references/manifest-schema.md` (hashing) — they are authoritative over this prompt on any conflict.
+Load `Read(file_path: ".agents/skills/design-sync/SKILL.md")` first and read `references/designsync-tool.md` (access rules, caveats) plus `references/manifest-schema.md` (hashing) — they are authoritative over this prompt on any conflict.
 
 ## Procedure
 
