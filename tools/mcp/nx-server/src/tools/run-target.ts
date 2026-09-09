@@ -1,7 +1,11 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
-import { runJobWithBudget } from '../jobs.js';
 import { nxJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
+import {
+  PLUGIN_WORKER_RETRY_EXHAUSTED_HINT,
+  PLUGIN_WORKER_TIMEOUT_HINT,
+} from '../plugin-worker-failure.js';
+import { runJobWithPluginWorkerRetry } from '../plugin-worker-retry.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -250,7 +254,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     // The job log captures stdout and stderr interleaved, so Jest's
     // stderr-written test summary is always included.
     const spec = nxJobSpec(nxArgs);
-    const snapshot = await runJobWithBudget(
+    const { snapshot, pluginWorkerRetried } = await runJobWithPluginWorkerRetry(
       {
         command: spec.command,
         args: spec.args,
@@ -277,6 +281,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
               status: snapshot.status,
               jobId: snapshot.jobId,
               elapsedSec: snapshot.elapsedSec,
+              ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
               logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
               hint: snapshot.hint,
             }),
@@ -294,6 +299,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     const daemonFailed =
       snapshot.status === 'done' && isDaemonFailure(rawOutput);
     const passed = snapshot.status === 'done' && !daemonFailed;
+    // runJobWithPluginWorkerRetry already retried once with
+    // NX_ISOLATE_PLUGINS=false if the first attempt failed with the isolated
+    // plugin-worker IPC handshake timeout signature (LS-9282) — surface why.
+    const pluginWorkerHint = pluginWorkerRetried
+      ? passed
+        ? PLUGIN_WORKER_TIMEOUT_HINT
+        : PLUGIN_WORKER_RETRY_EXHAUSTED_HINT
+      : undefined;
     return {
       content: [
         {
@@ -302,10 +315,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             project: params.project,
             target: params.target,
             passed,
+            ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
             ...(daemonFailed
               ? { daemonError: true, hint: DAEMON_FAILURE_HINT }
               : {}),
             ...(snapshot.error ? { error: snapshot.error } : {}),
+            ...(pluginWorkerHint && !daemonFailed
+              ? { hint: pluginWorkerHint }
+              : {}),
             output: truncateOutput(rawOutput, MAX_OUTPUT_CHARS),
           }),
         },

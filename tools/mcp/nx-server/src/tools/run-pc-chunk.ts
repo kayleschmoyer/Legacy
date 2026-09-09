@@ -1,8 +1,12 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
-import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
+import {
+  PLUGIN_WORKER_RETRY_EXHAUSTED_HINT,
+  PLUGIN_WORKER_TIMEOUT_HINT,
+} from '../plugin-worker-failure.js';
+import { runJobWithPluginWorkerRetry } from '../plugin-worker-retry.js';
 import { getRepoRoot } from '../run-command.js';
 import {
   buildCompactOutput,
@@ -172,7 +176,7 @@ export async function runPcChunk(
     args.push(`PARALLEL=${params.parallel}`);
   }
 
-  const snapshot = await runJobWithBudget(
+  const { snapshot, pluginWorkerRetried } = await runJobWithPluginWorkerRetry(
     {
       command: 'make',
       args,
@@ -202,6 +206,7 @@ export async function runPcChunk(
             status: 'running',
             jobId: snapshot.jobId,
             elapsedSec: snapshot.elapsedSec,
+            ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
             logTail: formatPcChunkLogTail(
               snapshot.logTail ?? '',
               params.verbose,
@@ -222,6 +227,7 @@ export async function runPcChunk(
             chunk: params.chunk,
             status: 'orphaned',
             jobId: snapshot.jobId,
+            ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
             logTail: formatPcChunkLogTail(
               snapshot.logTail ?? '',
               params.verbose,
@@ -233,9 +239,25 @@ export async function runPcChunk(
     };
   }
 
+  // runJobWithPluginWorkerRetry already retried once if the first attempt
+  // failed with the plugin-worker signature — surface why, either way.
+  const pluginWorkerHint = pluginWorkerRetried
+    ? snapshot.status === 'done'
+      ? PLUGIN_WORKER_TIMEOUT_HINT
+      : PLUGIN_WORKER_RETRY_EXHAUSTED_HINT
+    : undefined;
   const formatted = buildPcChunkResult(snapshot);
   return {
-    content: [{ type: 'text', text: minifiedJson(formatted.body) }],
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          ...formatted.body,
+          ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
+          ...(pluginWorkerHint ? { hint: pluginWorkerHint } : {}),
+        }),
+      },
+    ],
     ...(formatted.isError ? { isError: true } : {}),
   };
 }
