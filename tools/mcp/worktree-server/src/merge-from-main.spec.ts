@@ -170,6 +170,89 @@ describe('mergeFromMain', () => {
     expect(payload.conflictInfoError).toMatch(/git diff exploded/);
   });
 
+  it('dryRun: reports mergeable on a clean merge-tree and never merges or pushes', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'merge-tree') return 'sometreeoid\n';
+      throw new Error(`unexpected call: ${args.join(' ')}`);
+    });
+    const result = mergeFromMain('/cwd', { ...OPTS, dryRun: true }, deps);
+    expect(result.isError).toBeFalsy();
+    const payload = parsePayload(result.content[0].text) as MergePayload & {
+      dryRun?: boolean;
+      mergeable?: boolean;
+    };
+    expect(payload.dryRun).toBe(true);
+    expect(payload.mergeable).toBe(true);
+    expect(payload.conflictDetected).toBe(false);
+    expect(payload.files).toEqual([]);
+    expect(deps.runGit).not.toHaveBeenCalledWith(
+      ['merge', 'origin/main', '--no-edit'],
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(deps.runGit).not.toHaveBeenCalledWith(
+      ['push'],
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('dryRun: reports conflicted with the conflicting file list on a conflicting merge-tree', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'merge-tree') {
+        throw Object.assign(new Error('merge-tree conflict'), {
+          status: 1,
+          stdout:
+            'sometreeoid\nfoo.ts\nbar.ts\n\nAuto-merging foo.ts\nCONFLICT (content): Merge conflict in foo.ts\n',
+          stderr: '',
+        });
+      }
+      throw new Error(`unexpected call: ${args.join(' ')}`);
+    });
+    const result = mergeFromMain('/cwd', { ...OPTS, dryRun: true }, deps);
+    expect(result.isError).toBeFalsy();
+    const payload = parsePayload(result.content[0].text) as MergePayload & {
+      dryRun?: boolean;
+      mergeable?: boolean;
+    };
+    expect(payload.dryRun).toBe(true);
+    expect(payload.mergeable).toBe(false);
+    expect(payload.conflictDetected).toBe(true);
+    expect(payload.files).toEqual(['foo.ts', 'bar.ts']);
+  });
+
+  it('dryRun: surfaces a real merge-tree failure (bad ref) as an error, not a conflict', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'merge-tree') {
+        throw Object.assign(new Error('bad ref'), {
+          status: 128,
+          stdout: '',
+          stderr: 'fatal: not a valid object name origin/main',
+        });
+      }
+      throw new Error(`unexpected call: ${args.join(' ')}`);
+    });
+    const result = mergeFromMain('/cwd', { ...OPTS, dryRun: true }, deps);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/dryRun failed/);
+    expect(result.content[0].text).toMatch(/not a valid object name/);
+  });
+
   it('reports pushError when push fails', () => {
     let call = 0;
     jest.mocked(deps.runGit).mockImplementation((args) => {

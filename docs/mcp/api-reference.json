@@ -770,7 +770,7 @@
         },
         {
           "name": "worktree_merge_main",
-          "description": "Semantic one-shot merge: fetch origin/main → merge it into the current branch → push. Complements worktree_rebase_onto_main for the merge-resolution path AGENTS.md sanctions for PR merge-conflict notices (\"merge the base branch ... into your PR head — or rebase\"). On conflict, leaves the merge in progress (does not abort) and returns the same structured conflict info worktree_conflict_info provides (conflicted file list + marker locations) — resolve, then worktree_commit + worktree_push, or worktree_run(command: \"git merge --abort\") to back out. Refuses to operate on the main branch.",
+          "description": "Semantic one-shot merge: fetch origin/main → merge it into the current branch → push. Complements worktree_rebase_onto_main for the merge-resolution path AGENTS.md sanctions for PR merge-conflict notices (\"merge the base branch ... into your PR head — or rebase\"). On conflict, leaves the merge in progress (does not abort) and returns the same structured conflict info worktree_conflict_info provides (conflicted file list + marker locations) — resolve, then worktree_commit + worktree_push, or worktree_run(command: \"git merge --abort\") to back out. Refuses to operate on the main branch. `dryRun: true` — see that param.",
           "inputs": {
             "worktree": {
               "type": "string",
@@ -786,6 +786,11 @@
               "type": "number",
               "optional": true,
               "description": "Timeout for git push in milliseconds (default: 120000)."
+            },
+            "dryRun": {
+              "type": "boolean",
+              "optional": true,
+              "description": "No mutation: report mergeable/conflicted + conflicting files (default: false)."
             }
           },
           "transports": [

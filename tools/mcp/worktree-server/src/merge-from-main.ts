@@ -8,6 +8,13 @@ const SAFE_BRANCH_NAME = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 export interface MergeFromMainOpts {
   from: string;
   pushTimeoutMs: number;
+  /**
+   * Report mergeability without merging: fetch, then run
+   * `git merge-tree --write-tree --name-only` and report the result. Never
+   * touches the working tree or index (no checkout, no merge commit, no
+   * push) — safe to call from a clean or dirty worktree at any time.
+   */
+  dryRun?: boolean;
 }
 
 export interface MergeDeps {
@@ -46,7 +53,7 @@ export function mergeFromMain(
   opts: MergeFromMainOpts,
   deps: MergeDeps,
 ): ToolResult {
-  const { from, pushTimeoutMs } = opts;
+  const { from, pushTimeoutMs, dryRun } = opts;
   const { runGit, runShell, nonInteractiveEnv } = deps;
   const log: string[] = [`[cwd: ${cwd}]`];
 
@@ -85,6 +92,10 @@ export function mergeFromMain(
   if (fetchOut.trim()) log.push(fetchOut.trim());
 
   const beforeSha = runGit(['rev-parse', 'HEAD'], cwd).trim();
+
+  if (dryRun) {
+    return mergeTreeDryRun(cwd, from, beforeSha, runGit, log);
+  }
 
   // Step 2: Merge origin/<from> into the current branch
   log.push(`$ git merge origin/${from} --no-edit`);
@@ -211,4 +222,103 @@ export function mergeFromMain(
       },
     ],
   };
+}
+
+/**
+ * Side-effect-free mergeability check: `git merge-tree --write-tree
+ * --name-only HEAD origin/<from>` computes the merge purely against the
+ * object database — it never touches the working tree or the index (no
+ * checkout, no index update), so it's safe to call at any time, including
+ * mid-conflict or against a dirty worktree. Exits 0 with just the written
+ * tree's OID when the merge is clean; exits 1 with the tree OID, a blank
+ * line, and the newline-separated list of conflicted paths otherwise
+ * (followed by human-readable `Auto-merging`/`CONFLICT` lines we don't need).
+ */
+function mergeTreeDryRun(
+  cwd: string,
+  from: string,
+  head: string,
+  runGit: MergeDeps['runGit'],
+  log: string[],
+): ToolResult {
+  const args = [
+    'merge-tree',
+    '--write-tree',
+    '--name-only',
+    'HEAD',
+    `origin/${from}`,
+  ];
+  log.push(`$ git ${args.join(' ')}`);
+
+  let mergeable: boolean;
+  let stdout: string;
+  try {
+    stdout = runGit(args, cwd);
+    mergeable = true;
+  } catch (err: unknown) {
+    const e = err as {
+      status?: number;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
+    if (e.status !== 1) {
+      // Not a conflict result (exit 1) — a real failure (bad ref, etc.).
+      const detail =
+        e.stderr?.trim() || e.stdout?.trim() || e.message || String(err);
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `worktree_merge_main dryRun failed: ${detail}`,
+          },
+        ],
+      };
+    }
+    stdout = e.stdout ?? '';
+    mergeable = false;
+  }
+
+  const files = mergeable ? [] : parseMergeTreeConflictedPaths(stdout);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            dryRun: true,
+            mergeable,
+            conflictDetected: !mergeable,
+            head,
+            from: `origin/${from}`,
+            files,
+            message: mergeable
+              ? `origin/${from} would merge cleanly into the current branch. No changes made (dry run).`
+              : `origin/${from} would conflict with the current branch in ${files.length} file(s). No changes made (dry run).`,
+            log: log.join('\n'),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
+/**
+ * Parses `git merge-tree --write-tree --name-only` stdout into the list of
+ * conflicted file paths. Format: the written tree's OID on line 1, then one
+ * conflicted path per line, then a blank line, then human-readable
+ * `Auto-merging`/`CONFLICT (...)` messages we ignore.
+ */
+function parseMergeTreeConflictedPaths(stdout: string): string[] {
+  const lines = stdout.split('\n');
+  const paths: string[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === '') break;
+    paths.push(lines[i]);
+  }
+  return paths;
 }
