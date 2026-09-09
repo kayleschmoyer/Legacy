@@ -1,0 +1,233 @@
+<!--
+  SYNTHETIC FIXTURE — not captured from live profootballarchives.com.
+  Network egress to profootballarchives.com is blocked in this dev
+  environment, so this fixture is built from the exact column headers and
+  sample rows documented in LS-9948's description and its 2026-09-09
+  comment (id 20612), not from a real page. It exercises:
+    - the ALL-CAPS caption + header-row table convention BoxScoreParser
+      expects (see HtmlParser.findStatTable's doc comment for why this
+      convention is itself an inference, not a verified fact)
+    - the trailing "t" touchdown marker on LG values (PASSING row LG=57t)
+    - a PUNT RETURNS row missing its FC cell entirely, reproducing the
+      documented pre-1970 column-misalignment bug so the row-count
+      mismatch guard can be tested
+  MUST be replaced/validated against a real captured 1960s box score
+  before the live crawl (LS-9993/LS-9997) begins.
+-->
+<html>
+  <body>
+    <table>
+      <tr>
+        <th colspan="6">RUSHING</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>ATT</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+      </tr>
+      <tr>
+        <td><a href="/players/h/hamm00100.html">Mal Hammack</a></td>
+        <td>13</td>
+        <td>65</td>
+        <td>5.0</td>
+        <td>13</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="12">PASSING</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>ATT</th>
+        <th>COM</th>
+        <th>PCT</th>
+        <th>INT</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+        <th>TS</th>
+        <th>YL</th>
+        <th>RTG</th>
+      </tr>
+      <tr>
+        <td><a href="/players/g/gabr00200.html">Bobby Gabriel</a></td>
+        <td>20</td>
+        <td>11</td>
+        <td>55.0</td>
+        <td>1</td>
+        <td>180</td>
+        <td>9.0</td>
+        <td>57t</td>
+        <td>2</td>
+        <td></td>
+        <td></td>
+        <td>78.4</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="6">RECEIVING</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>NO</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+      </tr>
+      <tr>
+        <td><a href="/players/t/tayl00300.html">Otis Taylor</a></td>
+        <td>5</td>
+        <td>90</td>
+        <td>18.0</td>
+        <td>34</td>
+        <td>1</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="6">INTERCEPTIONS</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>NO</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+      </tr>
+      <tr>
+        <td><a href="/players/b/blou00400.html">Mel Blount</a></td>
+        <td>1</td>
+        <td>12</td>
+        <td>12.0</td>
+        <td>12</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="6">PUNTING</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>NO</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>BL</th>
+      </tr>
+      <tr>
+        <td><a href="/players/w/west00500.html">Willie West</a></td>
+        <td>4</td>
+        <td>160</td>
+        <td>40.0</td>
+        <td>52</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <!--
+  Documented bug reproduction: header carries FC, but this data row has no
+  cell behind it (6 cells instead of 7) — the parser must reject this row
+  via the header/cell-count mismatch guard rather than silently shifting
+  YDS into the FC slot.
+-->
+    <table>
+      <tr>
+        <th colspan="7">PUNT RETURNS</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>NO</th>
+        <th>FC</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+      </tr>
+      <tr>
+        <td><a href="/players/w/west00500.html">Willie West</a></td>
+        <td>4</td>
+        <td>57</td>
+        <td>14.3</td>
+        <td>36</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="7">KICKOFF RETURNS</th>
+      </tr>
+      <tr>
+        <th>PLAYER</th>
+        <th>NO</th>
+        <th>FC</th>
+        <th>YDS</th>
+        <th>AVG</th>
+        <th>LG</th>
+        <th>TD</th>
+      </tr>
+      <tr>
+        <td><a href="/players/w/west00500.html">Willie West</a></td>
+        <td>2</td>
+        <td></td>
+        <td>45</td>
+        <td>22.5</td>
+        <td>30</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="5">SCORE BY QUARTER</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>1</th>
+        <th>2</th>
+        <th>3</th>
+        <th>4</th>
+      </tr>
+      <tr>
+        <th>STL</th>
+        <td>0</td>
+        <td>7</td>
+        <td>0</td>
+        <td>0</td>
+      </tr>
+      <tr>
+        <th>LARM</th>
+        <td>7</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr>
+        <th colspan="1">SCORING PLAYS</th>
+      </tr>
+      <tr>
+        <th>Play</th>
+      </tr>
+      <tr>
+        <td>Q1 Otis Taylor 34 pass from Bobby Gabriel (kick failed)</td>
+      </tr>
+    </table>
+  </body>
+</html>

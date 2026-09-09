@@ -1873,6 +1873,15 @@ importers:
 
   lib/narrative: {}
 
+  lib/pfa-client:
+    dependencies:
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
+      tslib:
+        specifier: '*'
+        version: 2.8.1
+
   lib/pfr-client:
     dependencies:
       '@legacy-sports/logging':

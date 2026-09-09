@@ -1,0 +1,12 @@
+{
+  "name": "@legacy-sports/pfa-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@legacy-sports/logging": "workspace:*",
+    "tslib": "*"
+  }
+}
