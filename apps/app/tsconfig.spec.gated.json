@@ -1,0 +1,44 @@
+{
+  // LS-9873: same file set as tsconfig.spec.json (used unmodified by ESLint's
+  // typed-linting parserOptions.project), but with a temporary exclude list for
+  // spec files that had pre-existing type errors before this tsconfig was ever
+  // wired into a typecheck target (247 errors across these 32 files). Excluded
+  // here so `typecheck` can gate on tsconfig.spec.json's file set today instead
+  // of redding every apps/app PR; tracked in LS-9977 to fix and remove entries.
+  "extends": "./tsconfig.spec.json",
+  "exclude": [
+    "src/app/(app)/(tabs)/games.spec.tsx",
+    "src/app/(app)/(tabs)/home.spec.tsx",
+    "src/app/(app)/(tabs)/leagues.spec.tsx",
+    "src/app/(app)/(tabs)/players.spec.tsx",
+    "src/app/(app)/WaiversPage.spec.tsx",
+    "src/app/(app)/_layout.spec.tsx",
+    "src/app/(app)/baseball/index.spec.tsx",
+    "src/app/(app)/baseball/league/[leagueId].spec.tsx",
+    "src/app/(app)/baseball/league/create.spec.tsx",
+    "src/app/(app)/baseball/league/join.spec.tsx",
+    "src/app/(app)/baseball/players.spec.tsx",
+    "src/app/(app)/baseball/team/[teamId].spec.tsx",
+    "src/app/(app)/football/index.spec.tsx",
+    "src/app/(app)/football/league/[leagueId].spec.tsx",
+    "src/app/(app)/football/league/create.spec.tsx",
+    "src/app/(app)/football/league/join.spec.tsx",
+    "src/app/(app)/football/players.spec.tsx",
+    "src/app/(app)/football/team/[teamId].spec.tsx",
+    "src/app/_layout.spec.tsx",
+    "src/common/auth/AuthHooks.spec.tsx",
+    "src/context/ThemeContext.spec.tsx",
+    "src/features/bug-report/BugReportModal.spec.tsx",
+    "src/features/commissioner/CommissionerScreen.spec.tsx",
+    "src/features/leagues/LeagueChatTab.spec.tsx",
+    "src/features/leagues/LeagueHistoryTab.spec.tsx",
+    "src/features/matchup/components/MatchupCard.spec.tsx",
+    "src/features/matchup/components/MatchupWinProbabilityPanel.spec.tsx",
+    "src/features/notifications/hooks/usePushNotifications.registration.spec.ts",
+    "src/features/scoring/LeagueScoringEditor.spec.tsx",
+    "src/features/subscription/withPremiumScreen.spec.tsx",
+    "src/screens/BaseballHomeScreen.spec.tsx",
+    "src/screens/FootballHomeScreen.spec.tsx",
+    "src/screens/leagues/football/FootballMatchupScreen.component.spec.tsx"
+  ]
+}

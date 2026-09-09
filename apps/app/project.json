@@ -127,7 +127,7 @@
         }
       ],
       "options": {
-        "command": "tsc --noEmit -p tsconfig.app.json",
+        "command": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.gated.json",
         "cwd": "apps/app"
       }
     },
