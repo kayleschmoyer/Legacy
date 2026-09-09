@@ -51,7 +51,7 @@ export interface PRCommitResponse {
         }>;
       };
     } | null;
-  };
+  } | null;
 }
 
 export const PR_HEAD_COMMIT_QUERY = `
@@ -70,6 +70,11 @@ query($owner: String!, $repo: String!, $number: Int!) {
 /**
  * Resolve the head commit SHA for a pull request.
  * Returns the SHA string, or null if the PR is not found or has no commits.
+ *
+ * Throws with the underlying GraphQL error text (attached as `warnings` by
+ * `githubGraphQL`) when `repository` itself resolves to null — e.g. a
+ * permission-gated or per-field GraphQL error — rather than letting callers
+ * dereference `.pullRequest` off null and surface a raw TypeError.
  */
 export async function resolveHeadShaFromPrNumber(
   prNumber: number,
@@ -79,6 +84,13 @@ export async function resolveHeadShaFromPrNumber(
     PR_HEAD_COMMIT_QUERY,
     { owner: repo.owner, repo: repo.name, number: prNumber },
   );
+
+  if (!prResponse.data.repository) {
+    const warningText = prResponse.warnings?.map((w) => w.message).join('; ');
+    throw new Error(
+      `GitHub GraphQL could not resolve the repository for PR #${prNumber}${warningText ? `: ${warningText}` : ' (no error details returned).'}`,
+    );
+  }
 
   const commits = prResponse.data.repository.pullRequest?.commits.nodes;
   if (!commits?.length) {
