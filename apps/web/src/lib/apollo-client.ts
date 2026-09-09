@@ -11,6 +11,7 @@ import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
+import type { FieldNode } from 'graphql';
 import { captureError } from '@legacy-sports/rollbar/web';
 import { CSRF_HEADER, getCsrfToken } from './csrf';
 import {
@@ -344,7 +345,46 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
 //                         aggregate, embedded object, or pagination type)
 // Types with an `id` field use Apollo's default and are omitted here.
 
+// `Query.playerSeasonBatting` / `Query.playerSeasonPitching` are queried under
+// multiple aliases for the same `playerId` — e.g. `arcBatting:
+// playerSeasonBatting(playerId: $playerId)` in GetPlayerCareerArc alongside the
+// unaliased `playerSeasonBatting(playerId: $playerId)` in GetAllPlayerSeasonStats.
+// LS-6969 introduced that alias believing it would keep the two cache entries
+// separate, but Apollo's default store key is derived from the field's *name*,
+// not its alias (`storeKeyNameFromField` reads `field.name.value`), so every
+// aliased call computes the exact same store key as the unaliased one and both
+// write to the same slot — whichever query resolves last silently overwrites
+// the other's (differently-shaped) result. Because `SeasonBatting` /
+// `SeasonPitching` are non-normalizable (`keyFields: false` below), an
+// overwrite can leave the cache holding a value missing fields the other query
+// selected, so a `cache-first` read of it looks like a cache miss — which is
+// what made the Player Detail Modal's derived tab default and season tables
+// racy (LS-9843, LS-9830). Folding the field's alias into `keyArgs` gives each
+// aliased call its own store slot, closing the gap the LS-6969 alias was
+// supposed to close.
+function keyArgsByAlias(argNames: string[]) {
+  return {
+    keyArgs: (
+      args: Record<string, unknown> | null,
+      { field }: { field: FieldNode | null },
+    ): string => {
+      const alias = field?.alias?.value ?? field?.name.value ?? '';
+      const argsKey = argNames
+        .map((name) => `${name}:${JSON.stringify(args?.[name] ?? null)}`)
+        .join(',');
+      return `${alias}(${argsKey})`;
+    },
+  };
+}
+
 const typePolicies = {
+  Query: {
+    fields: {
+      playerSeasonBatting: keyArgsByAlias(['playerId']),
+      playerSeasonPitching: keyArgsByAlias(['playerId']),
+    },
+  },
+
   // League.playoffEnabled flap fix (LS-9928): investigation found no query or
   // mutation ever selects `League` without `playoffEnabled` (it's included in
   // both the `League` and `AppLeague` fragments), and Apollo's default entity

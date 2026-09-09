@@ -1008,3 +1008,137 @@ describe('League.playoffEnabled cache merge policy', () => {
     expect(readPlayoffEnabled(cache)).toBeNull();
   });
 });
+
+// ─── playerSeasonBatting / playerSeasonPitching alias isolation (LS-9843 /
+// LS-9830) ──────────────────────────────────────────────────────────────────
+//
+// Regression coverage for the cache collision the LS-6969 alias was supposed
+// to prevent but didn't: Apollo derives the store key from the field's real
+// name, not its alias, so `arcBatting: playerSeasonBatting(playerId: 1)` and
+// an unaliased `playerSeasonBatting(playerId: 1)` used to land in the same
+// cache slot and overwrite each other regardless of which query asked for
+// which fields.
+
+describe('playerSeasonBatting alias isolation', () => {
+  function makeCache(): InMemoryCache {
+    return new InMemoryCache({ typePolicies });
+  }
+
+  const ALL_SEASON_STATS_QUERY = {
+    kind: 'Document',
+    definitions: [
+      {
+        kind: 'OperationDefinition',
+        operation: 'query',
+        name: { kind: 'Name', value: 'GetAllPlayerSeasonStats' },
+        variableDefinitions: [],
+        selectionSet: {
+          kind: 'SelectionSet',
+          selections: [
+            {
+              kind: 'Field',
+              name: { kind: 'Name', value: 'playerSeasonBatting' },
+              arguments: [
+                {
+                  kind: 'Argument',
+                  name: { kind: 'Name', value: 'playerId' },
+                  value: { kind: 'IntValue', value: '1' },
+                },
+              ],
+              selectionSet: {
+                kind: 'SelectionSet',
+                selections: [
+                  { kind: 'Field', name: { kind: 'Name', value: 'season' } },
+                  { kind: 'Field', name: { kind: 'Name', value: 'hits' } },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  } as never;
+
+  const CAREER_ARC_QUERY = {
+    kind: 'Document',
+    definitions: [
+      {
+        kind: 'OperationDefinition',
+        operation: 'query',
+        name: { kind: 'Name', value: 'GetPlayerCareerArc' },
+        variableDefinitions: [],
+        selectionSet: {
+          kind: 'SelectionSet',
+          selections: [
+            {
+              kind: 'Field',
+              alias: { kind: 'Name', value: 'arcBatting' },
+              name: { kind: 'Name', value: 'playerSeasonBatting' },
+              arguments: [
+                {
+                  kind: 'Argument',
+                  name: { kind: 'Name', value: 'playerId' },
+                  value: { kind: 'IntValue', value: '1' },
+                },
+              ],
+              selectionSet: {
+                kind: 'SelectionSet',
+                selections: [
+                  { kind: 'Field', name: { kind: 'Name', value: 'season' } },
+                  {
+                    kind: 'Field',
+                    name: { kind: 'Name', value: 'onBasePlusSlugging' },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  } as never;
+
+  it('keeps the unaliased and aliased results in separate cache slots', () => {
+    const cache = makeCache();
+
+    // GetAllPlayerSeasonStats resolves with its own field selection...
+    cache.writeQuery({
+      query: ALL_SEASON_STATS_QUERY,
+      data: {
+        playerSeasonBatting: [
+          { __typename: 'SeasonBatting', season: 2024, hits: 165 },
+        ],
+      },
+    });
+
+    // ...then GetPlayerCareerArc resolves with a different, aliased selection
+    // for the same playerId. Before the fix this write clobbered the slot
+    // GetAllPlayerSeasonStats had just populated.
+    cache.writeQuery({
+      query: CAREER_ARC_QUERY,
+      data: {
+        arcBatting: [
+          {
+            __typename: 'SeasonBatting',
+            season: 2024,
+            onBasePlusSlugging: 0.89,
+          },
+        ],
+      },
+    });
+
+    const seasonStats = cache.readQuery<{
+      playerSeasonBatting: { season: number; hits: number }[];
+    }>({ query: ALL_SEASON_STATS_QUERY });
+    const careerArc = cache.readQuery<{
+      arcBatting: { season: number; onBasePlusSlugging: number }[];
+    }>({ query: CAREER_ARC_QUERY });
+
+    expect(seasonStats?.playerSeasonBatting).toEqual([
+      { __typename: 'SeasonBatting', season: 2024, hits: 165 },
+    ]);
+    expect(careerArc?.arcBatting).toEqual([
+      { __typename: 'SeasonBatting', season: 2024, onBasePlusSlugging: 0.89 },
+    ]);
+  });
+});
