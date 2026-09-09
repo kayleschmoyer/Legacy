@@ -112,6 +112,20 @@ The classification is wake-source-agnostic and the burst guard collapses a webho
 
 **Do not disable notification delivery before step 2** — until the timer path is proven it is the only wake source, and a silent failure there is an abandoned PR.
 
+## The stop hook recognizes three idle channels (LS-9961)
+
+`.claude/hooks/check-open-pr.sh` (the stop hook backing [Drive to merge](../../../../AGENTS.md)) used to recognize only an armed `Monitor` watch on `scripts/watch-pr.sh` (`.claude/.pr-watch-armed-<N>`, heartbeated every poll) as proof a session is safe to idle on an open PR. CCR sessions have no `gh` CLI, so that channel never applies to them — they follow the Periodic Wake Protocol above instead — and the hook wrongly blocked them even when they were doing exactly the right thing.
+
+The hook now also treats a fresh `.claude/.pr-state-<N>.json` — the Periodic Wake Protocol's own [state file](#wake-procedure--one-turn-two-calls) — as proof that a chained CronCreate/scheduled-task one-shot reminder is outstanding. No new breadcrumb format was invented: the protocol's [invariant #2](#invariants) ("exactly one outstanding reminder") already guarantees that a non-terminal PR has a live reminder chained at all times, so the state file's own mtime is sufficient evidence. Concretely, the hook allows stop when:
+
+- `.claude/.pr-state-<N>.json` exists,
+- its mtime is less than 1800s (30 min — the ~20 min cadence plus buffer for a wake still in flight) old, and
+- it does **not** record a terminal condition (`idleCount >= 6` or `cycleCount >= 12`) — those branches deliberately do not re-arm, so a stale-but-recent terminal file must NOT be read as "a reminder is armed."
+
+This makes writing/refreshing the state file on every wake (as the protocol already requires) double as the detectability breadcrumb — no extra file, no extra write. A session following the protocol correctly is automatically unblocked; a session that stops writing the state file (i.e. actually abandons the loop) falls through to the normal block/bypass guard, which is the desired behavior.
+
+The (a) Monitor-watch and (b)/(c) state-file channels are checked independently and either one is sufficient — a session is never required to run both. When neither is fresh, the hook's blocking message names all three sanctioned idle channels ((a) Monitor watch where `gh` is available, (b) the Periodic Wake Protocol's chained one-shot with a fresh state file, (c) "any equivalent breadcrumb this hook recognizes" as a forward-compatible catch-all) rather than only the `gh`-dependent one.
+
 ## Sanctioned carve-outs
 
 Exactly two, both `Monitor`-based and both long-poll by design:
@@ -133,3 +147,5 @@ Re-verify volatile facts:
 - `watch-pr.sh` emission contract: header comment in `scripts/watch-pr.sh`
 
 2026-09-04 (LS-9835): §Cadence previously ranked scheduling channels on durability alone, named `send_later` / `run_once_at` (a CCR-only tool and a cloud-routine field, neither reachable from a local session), and mentioned `CronCreate` only as a disqualifier — so it steered a local session to a cloud routine, which structurally cannot run the Wake procedure defined three sections below it. Replaced with the three-channel comparison above, modelled on [Two different `subscribe_pr_activity` tools](#two-different-subscribe_pr_activity-tools).
+
+2026-09-09 (LS-9961): The stop hook only recognized the `Monitor`-watch channel, wrongly blocking CCR sessions correctly following this file's own Periodic Wake Protocol. Added [The stop hook recognizes three idle channels](#the-stop-hook-recognizes-three-idle-channels-ls-9961) documenting that the hook now also treats a fresh, non-terminal `.claude/.pr-state-<N>.json` as proof a reminder is armed.

@@ -153,6 +153,48 @@ if [ -f "$WATCH_FLAG" ]; then
   } >&2
 fi
 
+# --- Periodic Wake Protocol breadcrumb: allow idle when a chained one-shot
+# reminder is presumably armed (LS-9961). CCR sessions have no `gh` CLI, so
+# the WATCH_FLAG channel above never applies to them; they instead follow the
+# Periodic Wake Protocol (.agents/skills/mcp-first/references/waiting-and-wakeups.md),
+# whose own state file (`.claude/.pr-state-<N>.json`) is already the doctrine's
+# memory of record. Its invariant #2 ("exactly one outstanding reminder") means
+# a state file updated within the last cadence window (~20 min, +buffer) is
+# itself proof that a reminder is outstanding — no separate flag needed. Skip
+# the allowance once the protocol's own terminal thresholds (idleCount >= 6 or
+# cycleCount >= 12) are recorded, since those branches deliberately do NOT
+# re-arm and the file falls through to the normal block/bypass guard below.
+STATE_FILE=".claude/.pr-state-${PR_NUMBER}.json"
+if [ -f "$STATE_FILE" ]; then
+  state_mtime=$(stat -c %Y "$STATE_FILE" 2>/dev/null || \
+                stat -f %m "$STATE_FILE" 2>/dev/null || \
+                echo 0)
+  state_age=$(( $(date +%s) - state_mtime ))
+  STATE_STALE_SECONDS=1800
+  if [ "$state_age" -lt "$STATE_STALE_SECONDS" ]; then
+    STATE_TERMINAL=$(python -c '
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        state = json.load(f)
+except Exception:
+    print("unknown")
+    sys.exit(0)
+idle = state.get("idleCount") or 0
+cycle = state.get("cycleCount") or 0
+print("terminal" if idle >= 6 or cycle >= 12 else "ok")
+' "$STATE_FILE" 2>/dev/null || echo "unknown")
+    if [ "$STATE_TERMINAL" = "ok" ]; then
+      {
+        echo ""
+        echo "✅ PR #${PR_NUMBER} periodic-wake state (${STATE_FILE}, ${state_age}s old) — stop allowed; per the Periodic Wake Protocol a chained one-shot reminder is presumed outstanding and will re-invoke this session."
+        echo ""
+      } >&2
+      exit 0
+    fi
+  fi
+fi
+
 # --- Max-block bypass to avoid infinite stop loops ---
 # Same pattern as check-incomplete-work.sh: per-worktree counter with 1-hour
 # staleness window. After MAX_BLOCKS attempts, allow stop with a warning.
@@ -184,7 +226,7 @@ fi
 if [ "$PR_IS_DRAFT" = "true" ]; then
   MSG="Draft PR #${PR_NUMBER} is not a terminal state. Mark ready with github_mark_pr_ready before ending the session, or explain why you cannot."
 else
-  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge): fix anything actionable now; if you are only waiting on in-flight CI/review, arm the watch monitor (Monitor tool + \"bash ${WORKTREE_NORM}/scripts/watch-pr.sh ${PR_NUMBER}\", persistent: true — the absolute path is required, a relative one exits 127) so this session is re-invoked on the next event — an armed watch makes stopping safe and is the sanctioned way to idle."
+  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge): fix anything actionable now; if you are only waiting on in-flight CI/review, idle via one of the sanctioned channels (see waiting-and-wakeups.md): (a) where \`gh\` is available, arm the watch monitor (Monitor tool + \"bash ${WORKTREE_NORM}/scripts/watch-pr.sh ${PR_NUMBER}\", persistent: true — the absolute path is required, a relative one exits 127); (b) in a CCR session without \`gh\`, follow the Periodic Wake Protocol — a chained CronCreate/scheduled-task one-shot reminder, with \`${STATE_FILE}\` written/updated within the last 30 minutes so this hook can detect it; (c) any equivalent breadcrumb this hook recognizes. Do not stop with none of these armed."
 fi
 
 if [ "$block_count" -ge "$MAX_BLOCKS" ]; then
