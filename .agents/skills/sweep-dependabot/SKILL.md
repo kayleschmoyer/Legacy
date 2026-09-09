@@ -158,7 +158,7 @@ mcp__ccd_session__spawn_task({
 
 Branch: <branch> (a Dependabot branch — pushing to it is allowed for maintainers; Dependabot will not force-push over agent commits unless explicitly told to via @dependabot rebase).
 
-1. Load Skill(skill: "pr-lifecycle") and Skill(skill: "debugging"); then Read(".agents/skills/pr-lifecycle/references/fix.md").
+1. Load Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md") and Skill(skill: "debugging"); then Read(".agents/skills/pr-lifecycle/references/fix.md").
 2. Enter the PR's worktree (worktree_attach if the branch isn't already tracked locally).
 3. Pull the failing CI logs via ci_view_run + ci_get_logs to identify the lint failures.
 4. Fix each surfaced lint issue at the root (no eslint-disable, no @ts-ignore — see AGENTS.md Code Quality).

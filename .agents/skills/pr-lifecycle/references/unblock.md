@@ -98,7 +98,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Fix <bot-review threads / CI failures> on PR #<N>.",
   prompt: `PR #<N> on branch <branch> has <unresolved bot-review threads / failing CI checks: <list check names>>.
 
-Load Skill(skill: "pr-lifecycle") and follow it: enter the PR's worktree, address the issues, make pc, push, resolve threads, re-apply bot:ready-for-review.
+Load Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md") and follow it: enter the PR's worktree, address the issues, make pc, push, resolve threads, re-apply bot:ready-for-review.
 
 Failing checks (snapshot): <check names + runId from github_pr_why_blocked>. Fetch logs via ci_get_logs(runId, errorSummary: true) — do not paste raw logs.`
 })

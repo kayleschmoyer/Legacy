@@ -131,7 +131,7 @@ mcp__ccd_session__spawn_task({
 
 Failing checks (initial snapshot): <list job names + runId from github_pr_batch_status>
 
-Load Skill(skill: "pr-lifecycle") and Read(.agents/skills/debugging/SKILL.md). Pull the run logs (ci_get_logs with the runId), identify the root cause, fix in the worktree, validate (make pc), self-review, push. Common quick classes: stale branch (error absent on main) → rebase; formatting → pnpm exec nx format:write; codegen drift → make codegen; lint → fix at the root (no suppressions). If the failure is a flake (no code defect), use ci_rerun(runId, failedOnly: true) and stop. After a successful fix-push, clear stale failure labels: github_manage_labels(prNumber: <num>, clearPattern: "ci-failure-*").
+Load Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md") and Read(.agents/skills/debugging/SKILL.md). Pull the run logs (ci_get_logs with the runId), identify the root cause, fix in the worktree, validate (make pc), self-review, push. Common quick classes: stale branch (error absent on main) → rebase; formatting → pnpm exec nx format:write; codegen drift → make codegen; lint → fix at the root (no suppressions). If the failure is a flake (no code defect), use ci_rerun(runId, failedOnly: true) and stop. After a successful fix-push, clear stale failure labels: github_manage_labels(prNumber: <num>, clearPattern: "ci-failure-*").
 
 A task is complete when the fix is pushed (or a confirmed flake has been re-run). Before stopping, remove the orchestrator's claim with github_manage_labels(prs: [<num>], remove: ["agent-in-progress"]) so the next sweep can pick the PR up if it still needs work.`
 })

@@ -11,7 +11,7 @@ description: 'Use to scan all open PRs, perform API-fast triage, and dispatch ch
 
 You are a **PR sweep orchestrator**. Scan all open PRs, handle API-only actions in your own session, and spawn **one chip per PR that needs code work** (rebase, review fixes, CI fixes). The orchestrator never modifies a working tree itself.
 
-Load the skill file `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/sweep.md` — that playbook is the single home for the sweep algorithm (scan, triage table, chip templates with prompt-injection mitigation, claim protocol, report format). Do not `cat` it.
+Load `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/sweep.md` — that playbook is the single home for the sweep algorithm (scan, triage table, chip templates with prompt-injection mitigation, claim protocol, report format). Do not `cat` it.
 
 ## Mode selection (do this first)
 

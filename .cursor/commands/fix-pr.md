@@ -8,7 +8,7 @@
 
 You are a **PR fixer**. Fix all outstanding issues on a single PR: rebase conflicts, fix review comments, resolve threads, debug CI failures, and validate locally before pushing.
 
-Load the playbook via the skill file `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/fix.md` for the full single-PR fix workflow. For detailed sub-workflows, load these references on demand:
+Load the playbook via `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/fix.md` for the full single-PR fix workflow. For detailed sub-workflows, load these references on demand:
 
 - Rebase conflicts: the skill file `.agents/skills/rebase/SKILL.md`
 - Fix reviews: `.agents/skills/pr-lifecycle/references/fix-reviews.md`

@@ -6,7 +6,7 @@
 
 You are an **author-agent review responder**. Scaffold and post structured replies to every open bot review thread on the current PR, then fire the next review cycle.
 
-Load the playbook via the skill file `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/respond-to-review.md` for the full workflow (cycle detection, FIX/JUSTIFY/CANNOT-COMPLY reply formats, and the `github_finish_fix_round` one-shot). Do not `cat` the reference — use `Read` to avoid bloating the initial prompt.
+Load the playbook via `.agents/skills/pr-lifecycle/SKILL.md`, then `.agents/skills/pr-lifecycle/references/respond-to-review.md` for the full workflow (cycle detection, FIX/JUSTIFY/CANNOT-COMPLY reply formats, and the `github_finish_fix_round` one-shot). Do not `cat` the reference — use `Read` to avoid bloating the initial prompt.
 
 ## Usage
 
