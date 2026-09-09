@@ -160,6 +160,53 @@ describe('background job registry', () => {
     expect(snapshot?.meta).toEqual({ kind: 'test-kind', extra: 42 });
   }, 25_000);
 
+  it('strips leaked TSX_TSCONFIG_PATH from the spawned child env (LS-9310)', async () => {
+    // Simulate the env `.mcp.json` injects into an MCP server's own process
+    // (e.g. `legacy-sports-nx`) — a job spawned by that server must not pass
+    // it through to the child, whether or not the caller supplies its own
+    // `env` override.
+    const original = process.env.TSX_TSCONFIG_PATH;
+    process.env.TSX_TSCONFIG_PATH = 'tools/mcp/nx-server/tsconfig.json';
+    try {
+      writeFileSync(
+        join(workDir, 'Makefile'),
+        'noop:\n\t@echo ok\n' +
+          'slow:\n\t@node -e "setTimeout(function () {}, 5000)"\n' +
+          'noop-env:\n\t@node -e "process.stdout.write(String(process.env.MCP_JOBS_TEST_VAR))"\n' +
+          'echo-tsx:\n\t@node -e "process.stdout.write(String(process.env.TSX_TSCONFIG_PATH))"\n',
+      );
+
+      const noEnvOverride = startJob({
+        command: 'make',
+        args: ['echo-tsx'],
+        cwd: workDir,
+        label: 'echo-tsx-no-override',
+        timeoutMs: 30_000,
+      });
+      const noEnvSnapshot = await waitForJob(noEnvOverride.jobId, 20_000);
+      expect(noEnvSnapshot?.status).toBe('done');
+      expect(noEnvSnapshot?.log).toContain('undefined');
+
+      const withEnvOverride = startJob({
+        command: 'make',
+        args: ['echo-tsx'],
+        cwd: workDir,
+        label: 'echo-tsx-with-override',
+        timeoutMs: 30_000,
+        env: { MCP_JOBS_TEST_VAR: 'irrelevant' },
+      });
+      const withEnvSnapshot = await waitForJob(withEnvOverride.jobId, 20_000);
+      expect(withEnvSnapshot?.status).toBe('done');
+      expect(withEnvSnapshot?.log).toContain('undefined');
+    } finally {
+      if (original === undefined) {
+        delete process.env.TSX_TSCONFIG_PATH;
+      } else {
+        process.env.TSX_TSCONFIG_PATH = original;
+      }
+    }
+  }, 25_000);
+
   it('marks a job failed with an internal-timeout error when it exceeds timeoutMs', async () => {
     const { jobId } = startJob({
       command: 'make',

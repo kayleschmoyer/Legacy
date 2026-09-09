@@ -37,6 +37,44 @@ exit "$code"
 `;
 
 /**
+ * Env vars that some MCP servers' own `.mcp.json`/bootstrap config injects
+ * into their process (e.g. `legacy-sports-nx`'s `TSX_TSCONFIG_PATH`, scoped
+ * to that server's own tsx bootstrap) and that must never reach a spawned
+ * job. Without stripping, a job like `nx_run_pc_chunk` spawns `make -> nx ->
+ * jest`, and if the jest suite under test itself shells out to `tsx` (e.g.
+ * `lib/db-client/src/scripts/tsx-workspace-resolution.spec.ts`), that
+ * grandchild inherits the server's own (relative) `TSX_TSCONFIG_PATH` and
+ * resolves it against the wrong cwd, producing a false test failure that has
+ * nothing to do with the code under test (LS-9310, LS-9681, LS-9806 — those
+ * fixed `runCommand` in each server's own `run-command.ts`, but jobs started
+ * via `startJob`/`runJobWithBudget` bypass `runCommand` entirely and go
+ * straight through this file's `spawn` call, so the leak persisted here).
+ */
+const ENV_LEAK_KEYS = ['TSX_TSCONFIG_PATH'] as const;
+
+/**
+ * Build the env for a spawned job: the host env with known bootstrap-only
+ * leak keys stripped, then the caller-supplied overrides layered on top.
+ * Always returns an explicit env object (never `undefined`) so callers can't
+ * accidentally fall back to Node's raw `process.env` inheritance, which
+ * would re-leak the stripped keys.
+ */
+function buildJobEnv(env?: Record<string, string>): NodeJS.ProcessEnv {
+  const sanitized: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of ENV_LEAK_KEYS) {
+    delete sanitized[key];
+  }
+  return {
+    ...sanitized,
+    ...env,
+    // Preserve the host PATH so spawned processes can find binaries
+    // even if the caller-supplied env includes a PATH/Path key.
+    ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
+    ...(process.env.Path ? { Path: process.env.Path } : {}),
+  };
+}
+
+/**
  * Windows wrapper: same contract as the sh wrapper above, invoked as
  * `powershell -File run-with-exit-sidecar.ps1 <exitCodePath> <command> [args...]`.
  * Args after `-File` arrive as a true array (`ValueFromRemainingArguments`),
@@ -552,19 +590,10 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
           stdio: ['ignore', fd, fd],
           windowsHide: true,
           shell: spawnTarget.shell,
-          ...(opts.env
-            ? {
-                env: {
-                  ...process.env,
-                  ...opts.env,
-                  // Preserve the host PATH so spawned processes can find
-                  // binaries even if the caller-supplied env includes a
-                  // PATH/Path key (mirrors nx-server's run-command.ts).
-                  ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-                  ...(process.env.Path ? { Path: process.env.Path } : {}),
-                },
-              }
-            : {}),
+          // Always pass an explicit env (never fall back to Node's raw
+          // process.env inheritance) so the leak keys above are stripped
+          // whether or not the caller supplied its own overrides.
+          env: buildJobEnv(opts.env),
           // POSIX: make the child a process-group leader so killJobTree can
           // signal the whole tree via -pid. Windows tree-kill uses taskkill /T.
           detached: process.platform !== 'win32',
