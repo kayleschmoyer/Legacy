@@ -5423,7 +5423,7 @@
         },
         {
           "name": "github_pr_diff",
-          "description": "Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as \"prNumber\" (preferred) or \"number\" (alias). Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).",
+          "description": "Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as \"prNumber\" (preferred) or \"number\" (alias). Use maxBytes to cap response size for very large PRs (default: 100 000 bytes).",
           "inputs": {
             "prNumber": {
               "type": "number",
@@ -5449,7 +5449,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Maximum bytes of diff to return (default: 500 000). Increase for large PRs."
+              "description": "Maximum bytes of diff to return (default: 100 000). Increase for large PRs."
             }
           },
           "transports": [

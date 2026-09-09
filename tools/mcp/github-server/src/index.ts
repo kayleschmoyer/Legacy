@@ -1586,7 +1586,7 @@ export function createServer(): McpServer {
   // --- github_pr_diff ---
   server.tool(
     'github_pr_diff',
-    'Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber" (preferred) or "number" (alias). Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).',
+    'Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber" (preferred) or "number" (alias). Use maxBytes to cap response size for very large PRs (default: 100 000 bytes).',
     {
       prNumber: prNumberField('prNumber')
         .optional()
@@ -1600,7 +1600,7 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe(
-          'Maximum bytes of diff to return (default: 500 000). Increase for large PRs.',
+          'Maximum bytes of diff to return (default: 100 000). Increase for large PRs.',
         ),
     },
     async (params) => {

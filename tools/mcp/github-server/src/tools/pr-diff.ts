@@ -6,7 +6,10 @@ interface PrDiffParams {
   maxBytes?: number;
 }
 
-const DEFAULT_MAX_BYTES = 500_000;
+// Empirically safe under the MCP result token cap (LS-9803): a 178,940-byte/3,696-line
+// diff overflowed the transport's token limit even though it was well under the old
+// 500,000-byte default, because token density (not byte count) is the real constraint.
+const DEFAULT_MAX_BYTES = 100_000;
 const BASE_URL = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 
@@ -55,7 +58,7 @@ export async function prDiff(params: PrDiffParams): Promise<ToolResult> {
         {
           type: 'text',
           text: truncated
-            ? `${diff}\n\n[Diff truncated at ${maxBytes} bytes. Pass a larger maxBytes to see more.]`
+            ? `${diff}\n\n[Diff truncated at ${maxBytes} bytes (full diff is ${raw.length} bytes). Increasing maxBytes risks exceeding the MCP result token cap on large PRs — prefer a targeted re-fetch (e.g. a single file's diff, or \`git diff --stat\`) over raising this value.]`
             : diff,
         },
       ],
