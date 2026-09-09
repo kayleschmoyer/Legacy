@@ -417,7 +417,39 @@ jobs:
             "s3://${BUCKET}/android/current/legacy-sports-latest.apk.sha256"
           echo "Updated s3://${BUCKET}/android/current/legacy-sports-latest.apk"
 
+      # Composed once and shared by both the primary action and the `gh api`
+      # retry below, so the two paths cannot drift apart.
+      - name: Compose release body
+        env:
+          VERSION: ${{ needs.build-android.outputs.version }}
+          BUILD_NUMBER: ${{ needs.build-android.outputs.build_number }}
+          COMMIT_SHA: ${{ needs.build-android.outputs.commit_sha }}
+          BUILD_TYPE: ${{ needs.build-android.outputs.build_type }}
+        run: |
+          cat > "${RUNNER_TEMP}/release-body.md" <<EOF
+          ## 🤖 Android APK Release
+
+          **Version:** ${VERSION}
+          **Build Number:** ${BUILD_NUMBER}
+          **Commit:** ${COMMIT_SHA}
+          **Build Type:** ${BUILD_TYPE}
+
+          ### 📱 Installation Instructions
+          1. Download the APK file below
+          2. Enable "Install from Unknown Sources" in Android settings
+          3. Install the APK on your Android device
+
+          ### 🔧 Build Information
+          - **Platform:** Android
+          - **Build Type:** ${BUILD_TYPE}
+          - **Java Version:** ${{ env.JAVA_VERSION }}
+          - **Built with:** React Native 0.81 + Expo SDK 54
+          EOF
+
       - name: Create Release
+        id: release
+        # Failure here is handled by the retry step below, not by ending the job.
+        continue-on-error: true
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
@@ -426,28 +458,81 @@ jobs:
           prerelease: ${{ needs.build-android.outputs.build_type == 'debug' }}
           make_latest: ${{ needs.build-android.outputs.build_type == 'release' }}
           generate_release_notes: true
-          body: |
-            ## 🤖 Android APK Release
-
-            **Version:** ${{ needs.build-android.outputs.version }}  
-            **Build Number:** ${{ needs.build-android.outputs.build_number }}  
-            **Commit:** ${{ needs.build-android.outputs.commit_sha }}  
-            **Build Type:** ${{ needs.build-android.outputs.build_type }}
-
-            ### 📱 Installation Instructions
-            1. Download the APK file below
-            2. Enable "Install from Unknown Sources" in Android settings
-            3. Install the APK on your Android device
-
-            ### 🔧 Build Information
-            - **Platform:** Android
-            - **Build Type:** ${{ needs.build-android.outputs.build_type }}
-            - **Java Version:** ${{ env.JAVA_VERSION }}
-            - **Built with:** React Native 0.81 + Expo SDK 54
+          body_path: ${{ runner.temp }}/release-body.md
           files: |
             ./artifacts/${{ needs.build-android.outputs.apk_name }}
             ./artifacts/legacy-sports-latest.apk
             ./artifacts/legacy-sports-latest.apk.sha256
+
+      # LS-9913: port of the LS-9907 fix — softprops/action-gh-release classifies
+      # *any* 403 as a permanent permission error and refuses to retry ("Skip
+      # retry — your GitHub token/PAT does not have the required permission to
+      # create a release"). That 403 is frequently a transient GitHub App
+      # installation throttle rather than a real permission problem. Retrying
+      # with backoff recovers the release instead of silently losing it.
+      - name: Retry release creation
+        id: release-retry
+        if: steps.release.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
+          TITLE: "Android Release v${{ needs.build-android.outputs.version }} (${{ needs.build-android.outputs.commit_sha }})"
+          BUILD_TYPE: ${{ needs.build-android.outputs.build_type }}
+        run: |
+          # Deliberately no `set -e`: a failed attempt inside the loop must fall
+          # through to the next retry rather than abort the step.
+          set -uo pipefail
+          BODY="$(cat "${RUNNER_TEMP}/release-body.md")"
+          PRERELEASE=false
+          MAKE_LATEST=false
+          if [ "${BUILD_TYPE}" = "debug" ]; then
+            PRERELEASE=true
+          fi
+          if [ "${BUILD_TYPE}" = "release" ]; then
+            MAKE_LATEST=true
+          fi
+
+          for attempt in 1 2 3; do
+            backoff=$((attempt * 30))
+            echo "::notice::Release retry ${attempt}/3 — waiting ${backoff}s for the transient failure to clear"
+            sleep "${backoff}"
+
+            # The first attempt can create the release and still report failure,
+            # so check for an existing one before POSTing a duplicate.
+            if url="$(gh release view "${TAG}" --json url --jq .url 2>/dev/null)"; then
+              echo "::notice::Release ${TAG} already exists: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            if url="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --method POST \
+              -f tag_name="${TAG}" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="${TITLE}" \
+              -F draft=false \
+              -F prerelease="${PRERELEASE}" \
+              -F generate_release_notes=true \
+              -f make_latest="${MAKE_LATEST}" \
+              -f body="${BODY}" \
+              --jq .html_url)"; then
+              echo "::notice::Created release ${TAG} on retry ${attempt}: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            echo "::warning::Release retry ${attempt}/3 failed for ${TAG}"
+          done
+
+          # Assembled in parts so the annotation stays a single line without
+          # tripping yamllint's 200-character limit.
+          MSG="Could not create GitHub release ${TAG} after 3 retries."
+          MSG="${MSG} THE ANDROID BUILD ITSELF SUCCEEDED — the APK is still"
+          MSG="${MSG} available as a workflow artifact on this run."
+          MSG="${MSG} Only the release artifact is missing; create it manually"
+          MSG="${MSG} with: gh release create ${TAG} --target ${GITHUB_SHA}"
+          echo "::error::${MSG}"
+          exit 1
 
       # Self-publish the "Released" date badge to the CI badges gist so the
       # README badge no longer depends on shields.io's shared GitHub token pool

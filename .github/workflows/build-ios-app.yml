@@ -237,49 +237,129 @@ jobs:
           retention-days: 3
           if-no-files-found: error
 
-      - name: Create Release (Release builds only)
+      # Composed once and shared by both the primary action and the `gh api`
+      # retry below, so the two paths cannot drift apart.
+      - name: Compose release body
         if: |
-          steps.version.outputs.build_config == 'Release' && 
+          steps.version.outputs.build_config == 'Release' &&
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+          COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
+          BUILD_CONFIG: ${{ steps.version.outputs.build_config }}
+          ARTIFACT_NAME: ${{ steps.version.outputs.artifact_name }}
+        run: |
+          cat > "${RUNNER_TEMP}/release-body.md" <<EOF
+          ## iOS IPA Release
+
+          **Version:** ${VERSION}
+          **Build:** ${BUILD_NUMBER}
+          **Commit:** ${COMMIT_SHA}
+          **Configuration:** ${BUILD_CONFIG}
+          **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          ### Download
+          - 📱 **IPA File:** \`${ARTIFACT_NAME}.ipa\`
+
+          ### Installation Options
+
+          #### Option 1: Sideload with Tools
+          - Use tools like **AltStore**, **Sideloadly**, or **3uTools**
+          - Requires Apple ID (free developer account works)
+
+          #### Option 2: Xcode Installation
+          1. Download and extract the IPA
+          2. Open Xcode → Window → Devices and Simulators
+          3. Connect your iOS device
+          4. Drag the .app bundle to your device
+
+          #### Option 3: TestFlight (if configured)
+          - Upload to App Store Connect for TestFlight distribution
+
+          > **Note:** This is a development build without proper code signing. For production use, proper provisioning profiles and distribution certificates are required.
+          EOF
+
+      - name: Create Release (Release builds only)
+        id: release
+        # Failure here is handled by the retry step below, not by ending the job.
+        continue-on-error: true
+        if: |
+          steps.version.outputs.build_config == 'Release' &&
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
           name: iOS IPA v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})
-          body: |
-            ## iOS IPA Release
-
-            **Version:** ${{ steps.version.outputs.version }}  
-            **Build:** ${{ steps.version.outputs.build_number }}  
-            **Commit:** ${{ steps.version.outputs.commit_sha }}  
-            **Configuration:** ${{ steps.version.outputs.build_config }}  
-            **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-
-            ### Download
-            - 📱 **IPA File:** `${{ steps.version.outputs.artifact_name }}.ipa`
-
-            ### Installation Options
-
-            #### Option 1: Sideload with Tools
-            - Use tools like **AltStore**, **Sideloadly**, or **3uTools**
-            - Requires Apple ID (free developer account works)
-
-            #### Option 2: Xcode Installation
-            1. Download and extract the IPA
-            2. Open Xcode → Window → Devices and Simulators
-            3. Connect your iOS device
-            4. Drag the .app bundle to your device
-
-            #### Option 3: TestFlight (if configured)
-            - Upload to App Store Connect for TestFlight distribution
-
-            > **Note:** This is a development build without proper code signing. For production use, proper provisioning profiles and distribution certificates are required.
+          body_path: ${{ runner.temp }}/release-body.md
           files: ${{ steps.artifacts.outputs.ipa_path }}
           draft: false
           prerelease: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # LS-9913: port of the LS-9907 fix — softprops/action-gh-release classifies
+      # *any* 403 as a permanent permission error and refuses to retry ("Skip
+      # retry — your GitHub token/PAT does not have the required permission to
+      # create a release"). That 403 is frequently a transient GitHub App
+      # installation throttle rather than a real permission problem. Retrying
+      # with backoff recovers the release instead of silently losing it.
+      - name: Retry release creation
+        id: release-retry
+        if: steps.release.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ios-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          TITLE: "iOS IPA v${{ steps.version.outputs.version }} (${{ steps.version.outputs.commit_sha }})"
+        run: |
+          # Deliberately no `set -e`: a failed attempt inside the loop must fall
+          # through to the next retry rather than abort the step.
+          set -uo pipefail
+          BODY="$(cat "${RUNNER_TEMP}/release-body.md")"
+
+          for attempt in 1 2 3; do
+            backoff=$((attempt * 30))
+            echo "::notice::Release retry ${attempt}/3 — waiting ${backoff}s for the transient failure to clear"
+            sleep "${backoff}"
+
+            # The first attempt can create the release and still report failure,
+            # so check for an existing one before POSTing a duplicate.
+            if url="$(gh release view "${TAG}" --json url --jq .url 2>/dev/null)"; then
+              echo "::notice::Release ${TAG} already exists: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            if url="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --method POST \
+              -f tag_name="${TAG}" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="${TITLE}" \
+              -F draft=false \
+              -F prerelease=true \
+              -F generate_release_notes=true \
+              -f body="${BODY}" \
+              --jq .html_url)"; then
+              echo "::notice::Created release ${TAG} on retry ${attempt}: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            echo "::warning::Release retry ${attempt}/3 failed for ${TAG}"
+          done
+
+          # Assembled in parts so the annotation stays a single line without
+          # tripping yamllint's 200-character limit.
+          MSG="Could not create GitHub release ${TAG} after 3 retries."
+          MSG="${MSG} THE IOS BUILD ITSELF SUCCEEDED — the IPA is still"
+          MSG="${MSG} available as a workflow artifact on this run."
+          MSG="${MSG} Only the release artifact is missing; create it manually"
+          MSG="${MSG} with: gh release create ${TAG} --target ${GITHUB_SHA}"
+          echo "::error::${MSG}"
+          exit 1
 
       - name: Build Summary
         run: |
