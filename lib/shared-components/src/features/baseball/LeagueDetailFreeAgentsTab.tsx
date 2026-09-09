@@ -581,6 +581,7 @@ const FilterPill: React.FC<{
       color={active ? 'white' : '$textMuted'}
       borderWidth={1}
       borderColor={active ? '$brandNavy' : '$surfacePanelBorder'}
+      cursor="pointer"
       pressStyle={{ opacity: 0.7 }}
       accessibilityRole="button"
       aria-pressed={active}
@@ -609,6 +610,7 @@ const GroupToggle: React.FC<{
     backgroundColor={active ? '$brandNavy' : 'transparent'}
     color={active ? 'white' : '$textMuted'}
     borderRadius="$3"
+    cursor="pointer"
     pressStyle={{ opacity: 0.7 }}
     accessibilityRole="button"
     accessibilityLabel={label}
