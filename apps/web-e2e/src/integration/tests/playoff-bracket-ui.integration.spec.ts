@@ -25,6 +25,7 @@
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
@@ -410,10 +411,18 @@ test.describe
     });
 
     await test.step('Standings table is visible', async () => {
-      // The standings section must render (LeagueStandings component)
-      await expect(
+      // The standings section renders only once the browser-side standings
+      // query resolves. Under sustained live-backend throttling that query
+      // can be starved (LS-9833 observed this exact toBeVisible timeout on
+      // main with no relevant code change in range — the same 429-throttled
+      // tail LS-8138/LS-8211 already hardened matchup-roster-recap-ui's
+      // equivalent gate against). Reload to re-fire the starved query rather
+      // than walking a single fixed timeout.
+      await reloadUntilVisible(
+        page,
         page.getByText('Standings', { exact: false }).first(),
-      ).toBeVisible({ timeout: 15_000 });
+        { finalTimeoutMs: 15_000, budgetMs: 40_000 },
+      );
     });
 
     await test.step('Playoff bracket section appears', async () => {
