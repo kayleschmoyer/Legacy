@@ -76,22 +76,51 @@ function buildJobEnv(env?: Record<string, string>): NodeJS.ProcessEnv {
 
 /**
  * Windows wrapper: same contract as the sh wrapper above, invoked as
- * `powershell -File run-with-exit-sidecar.ps1 <exitCodePath> <command> [args...]`.
- * Args after `-File` arrive as a true array (`ValueFromRemainingArguments`),
- * not text-interpolated, so no escaping is needed regardless of their content.
+ * `powershell -File run-with-exit-sidecar.ps1 <exitCodePath> <base64Payload>`,
+ * where `<base64Payload>` base64-encodes a JSON array `[command, ...args]`
+ * (see `encodeCommandAndArgs` below).
+ *
+ * The command and its args are **not** forwarded as separate positional
+ * script arguments (LS-9321). PowerShell's parameter binder resolves
+ * named-parameter references *before* positional ones, matching any
+ * `-token` against declared parameter names (allowing an unambiguous
+ * prefix match) — and once a script declares a `param()` block, *every*
+ * extra positional value must bind to a declared parameter or binding
+ * fails outright (there is no implicit overflow into `$args`, despite that
+ * being true for param-less functions). A previous version declared a
+ * second, `ValueFromRemainingArguments` parameter named `$CommandAndArgs`
+ * to soak up the remaining args positionally — but every
+ * `worktree_run`/`worktree_run_long` invocation forwards `bash.exe -c
+ * <script>` as its wrapped command, and `-c` unambiguously prefix-matches
+ * `CommandAndArgs` (the only declared parameter starting with "c"). That
+ * bound the *value* following `-c` to `-CommandAndArgs` by name, leaving no
+ * positional parameter left for the actual command executable that
+ * precedes it — surfacing as `A positional parameter cannot be found that
+ * accepts argument '<bash.exe path>'`, on effectively every invocation,
+ * independent of the wrapped command's own shape (verified by reproducing
+ * and fixing this against real `pwsh`, not just reasoning about it).
+ *
+ * Encoding the whole `[command, ...args]` array into a single opaque
+ * base64 string sidesteps per-token parameter binding entirely: exactly
+ * two plain positional values ever reach the script (the exit-code path
+ * and the payload), neither containing a `-`, so there is nothing left for
+ * PowerShell to misinterpret as a named-parameter reference regardless of
+ * what the wrapped command or its args look like.
  */
-const PS_WRAPPER_SCRIPT = `param(
+export const PS_WRAPPER_SCRIPT = `param(
   [Parameter(Mandatory = $true, Position = 0)]
   [string]$ExitCodePath,
 
-  [Parameter(Mandatory = $true, Position = 1, ValueFromRemainingArguments = $true)]
-  [string[]]$CommandAndArgs
+  [Parameter(Mandatory = $true, Position = 1)]
+  [string]$EncodedCommandAndArgs
 )
 
-$command = $CommandAndArgs[0]
+$json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($EncodedCommandAndArgs))
+$commandAndArgs = @($json | ConvertFrom-Json)
+$command = $commandAndArgs[0]
 $commandArgs = @()
-if ($CommandAndArgs.Count -gt 1) {
-  $commandArgs = $CommandAndArgs[1..($CommandAndArgs.Count - 1)]
+if ($commandAndArgs.Count -gt 1) {
+  $commandArgs = $commandAndArgs[1..($commandAndArgs.Count - 1)]
 }
 
 & $command @commandArgs
@@ -102,6 +131,16 @@ if ($null -eq $code) {
 Set-Content -LiteralPath $ExitCodePath -Value $code -NoNewline
 exit $code
 `;
+
+/**
+ * Encode `[command, ...args]` into the single opaque payload string the
+ * `.ps1` wrapper above expects — see its doc comment for why this exists.
+ */
+export function encodeCommandAndArgs(command: string, args: string[]): string {
+  return Buffer.from(JSON.stringify([command, ...args]), 'utf-8').toString(
+    'base64',
+  );
+}
 
 // Shared background-job runner for our in-repo MCP servers (`tools/mcp/*`).
 //
@@ -420,8 +459,10 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
           '-File',
           wrapperPath,
           exitPath,
-          opts.command,
-          ...opts.args,
+          // Single opaque payload, not `opts.command, ...opts.args` as
+          // separate positional script args — see PS_WRAPPER_SCRIPT's doc
+          // comment for why per-token forwarding broke (LS-9321).
+          encodeCommandAndArgs(opts.command, opts.args),
         ],
         shell: false,
       };

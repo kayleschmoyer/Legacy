@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,7 +11,26 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createJobRunner } from './index';
+import {
+  createJobRunner,
+  encodeCommandAndArgs,
+  PS_WRAPPER_SCRIPT,
+} from './index';
+
+/**
+ * PowerShell Core (`pwsh`) is cross-platform and preinstalled on GitHub-hosted
+ * `ubuntu-latest` runners, so this regression test can exercise the real
+ * `run-with-exit-sidecar.ps1` parameter-binding behavior in CI even though CI
+ * runs on Linux (see ci-pipeline.yml — no windows-latest job exists for this
+ * package). Skips locally when `pwsh` isn't installed rather than failing.
+ */
+function findPwsh(): string | null {
+  for (const candidate of ['pwsh', 'pwsh.exe']) {
+    const probe = spawnSync(candidate, ['-Version'], { encoding: 'utf-8' });
+    if (!probe.error && probe.status === 0) return candidate;
+  }
+  return null;
+}
 
 const TEST_DIR_NAME = 'mcp-jobs-test';
 
@@ -474,4 +494,90 @@ describe('background job registry', () => {
     expect(entry?.label).toBe('noop-list');
     expect(['done', 'failed']).toContain(entry?.status ?? '');
   }, 25_000);
+});
+
+describe('PS_WRAPPER_SCRIPT (LS-9321 regression)', () => {
+  const pwsh = findPwsh();
+  const maybeIt = pwsh ? it : it.skip;
+  let scriptDir: string;
+  let scriptPath: string;
+
+  beforeAll(() => {
+    scriptDir = mkdtempSync(join(tmpdir(), 'mcp-jobs-ps-wrapper-'));
+    scriptPath = join(scriptDir, 'run-with-exit-sidecar.ps1');
+    writeFileSync(scriptPath, PS_WRAPPER_SCRIPT);
+  });
+
+  afterAll(() => {
+    rmSync(scriptDir, { recursive: true, force: true });
+  });
+
+  function runWrapper(
+    exitPath: string,
+    command: string,
+    args: string[],
+  ): ReturnType<typeof spawnSync> {
+    return spawnSync(
+      pwsh as string,
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-File',
+        scriptPath,
+        exitPath,
+        encodeCommandAndArgs(command, args),
+      ],
+      { encoding: 'utf-8' },
+    );
+  }
+
+  // Reproduces the exact command shape worktree_run/worktree_run_long forward
+  // on Windows: command=<shell path>, args=['-c', <wrapped script>]. Before
+  // the fix, forwarding these as separate positional script arguments meant
+  // PowerShell's parameter binder unambiguously prefix-matched the leading
+  // `-c` against a declared `$CommandAndArgs` parameter and bound it by name,
+  // leaving no positional slot for the shell path — surfacing as "A
+  // positional parameter cannot be found that accepts argument '<path>'" on
+  // effectively every invocation, regardless of the wrapped command.
+  maybeIt(
+    'runs a -c-flagged command via the encoded payload and records the real exit code',
+    () => {
+      const exitPath = join(scriptDir, 'test.exit');
+      const result = runWrapper(exitPath, 'sh', ['-c', 'exit 7']);
+
+      expect(result.stderr).not.toContain('PositionalParameterNotFound');
+      expect(result.stderr).not.toContain(
+        'A positional parameter cannot be found',
+      );
+      expect(result.status).toBe(7);
+      expect(readFileSync(exitPath, 'utf-8').trim()).toBe('7');
+    },
+  );
+
+  // Original ticket repro: a quoted --grep="..." value plus a trailing flag.
+  maybeIt('runs a git-log-grep-shaped command end to end', () => {
+    const exitPath = join(scriptDir, 'test-grep.exit');
+    const result = runWrapper(exitPath, 'sh', [
+      '-c',
+      'git log --all --oneline --grep="LS-8364" -i >/dev/null; exit $?',
+    ]);
+
+    expect(result.stderr).not.toContain(
+      'A positional parameter cannot be found',
+    );
+    expect(result.status).toBe(0);
+    expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+  });
+
+  // A single-element command array (no args at all) must not be unwrapped
+  // into a scalar by ConvertFrom-Json — a documented PowerShell gotcha for
+  // single-element JSON arrays.
+  maybeIt('runs a plain command with no args', () => {
+    const exitPath = join(scriptDir, 'test-plain.exit');
+    const result = runWrapper(exitPath, 'true', []);
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+  });
 });
