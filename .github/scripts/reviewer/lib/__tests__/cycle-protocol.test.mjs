@@ -3164,7 +3164,14 @@ describe('unresolvedCannotComplyEntries', () => {
     assert.strictEqual(unresolved.length, 1);
   });
 
-  it('an untitled (PR-level) entry is always treated as unresolved', () => {
+  // LS-9849: an untitled (PR-level, issue-comment) entry previously escalated
+  // unconditionally regardless of the bot's current findings, because
+  // `!e.title` short-circuited to unresolved with no fallback check. It now
+  // resolves once the bot's Cycle 3 output is empty -- there is nothing left
+  // for the untitled reply to be about -- and stays unresolved while any
+  // finding still survives, exercised by the two tests below.
+
+  it('LS-9849: an untitled (PR-level) entry resolves once zero findings survive Cycle 3', () => {
     const entries = [
       {
         source: 'issue',
@@ -3175,7 +3182,29 @@ describe('unresolvedCannotComplyEntries', () => {
         title: null,
       },
     ];
+    // A later review pass reports zero findings -- the escalation should clear.
     const unresolved = unresolvedCannotComplyEntries(entries, []);
+    assert.strictEqual(unresolved.length, 0);
+  });
+
+  it('LS-9849: an untitled (PR-level) entry stays unresolved while findings still survive', () => {
+    const entries = [
+      {
+        source: 'issue',
+        commentId: 22,
+        issueId: 'LS-2',
+        reason: 'PR-level claim.',
+        createdAt: AFTER_REVIEW,
+        title: null,
+      },
+    ];
+    // Unrelated findings still exist -- an untitled reply can't be correlated
+    // to any of them, so it must not be silently cleared just because it has
+    // no title. Negative control: don't let the fix make everything resolve.
+    const filteredFindings = [
+      makeFinding({ title: 'Unrelated finding still open' }),
+    ];
+    const unresolved = unresolvedCannotComplyEntries(entries, filteredFindings);
     assert.strictEqual(unresolved.length, 1);
     assert.strictEqual(unresolved[0].issueId, 'LS-2');
   });

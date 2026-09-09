@@ -854,8 +854,13 @@ export function withCannotComplyTitles(entries, reviewComments, botLogins) {
  * `filteredFindings` — Cycle 3 is the final review cycle, so a claim the bot
  * still cannot resolve here is a genuine standoff worth a human decision
  * rather than waiting for the generic MAX_CYCLE overflow. An entry with no
- * matched title (a PR-level reply with no originating thread) cannot be
- * correlated to a specific finding and is always treated as unresolved.
+ * matched title (a PR-level reply with no originating thread — e.g. a
+ * CANNOT-COMPLY posted as an issue comment because the bot had no inline
+ * thread to reply to) cannot be correlated to a specific finding, so it is
+ * treated as resolved once there are no surviving findings at all, and
+ * unresolved only while at least one finding still survives (LS-9849 —
+ * previously this was unconditional and never resolved, even after a later
+ * review pass reported zero findings).
  *
  * @param {Array<CannotComplyEntry & { title: string | null }>} entries
  * @param {import('./findings.mjs').Finding[]} filteredFindings  Cycle 3 kept findings, post filterFindingsCycle3
@@ -865,7 +870,9 @@ export function unresolvedCannotComplyEntries(entries, filteredFindings) {
   const survivingTitles = new Set(
     filteredFindings.map((f) => f.title.toLowerCase()),
   );
-  return entries.filter(
-    (e) => !e.title || survivingTitles.has(e.title.toLowerCase()),
+  return entries.filter((e) =>
+    e.title
+      ? survivingTitles.has(e.title.toLowerCase())
+      : filteredFindings.length > 0,
   );
 }
