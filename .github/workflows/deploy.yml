@@ -75,6 +75,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip-ci-check:
+        description: "Skip CI status verification on the lambda upload (emergency deploys only — e.g. a merge-queue-produced main HEAD with no CI run of its own)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write # create-release in web child needs this
@@ -252,6 +257,14 @@ jobs:
       statuses: read
     uses: ./.github/workflows/upload-lambdas.yml
     secrets: inherit
+    with:
+      # Forwarded so the escape hatch upload-lambdas.yml's own error message
+      # points to is actually reachable from the documented umbrella dispatch
+      # (LS-9875) — a merge-queue squash-merge produces a main HEAD SHA with
+      # no CI run of its own, so "Verify CI Status" reliably fails there even
+      # though main is healthy, and this was previously unforwardable through
+      # deploy.yml.
+      skip-ci-check: ${{ inputs['skip-ci-check'] == true }}
 
   # ---------------------------------------------------------------------------
   # Child: Apply Lambda Infrastructure

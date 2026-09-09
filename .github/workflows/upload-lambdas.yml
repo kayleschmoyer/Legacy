@@ -294,7 +294,9 @@ jobs:
                 core.setFailed(
                   `No CI pipeline run found for commit ${sha}. ` +
                   `CI must pass before uploading lambdas. ` +
-                  `Use workflow_dispatch with skip-ci-check=true to bypass.`
+                  `Dispatch the "Deploy" workflow (deploy.yml) with skip-ci-check=true to bypass ` +
+                  `(the documented umbrella entry point — it forwards this input here), or dispatch ` +
+                  `this workflow (upload-lambdas.yml) directly with skip-ci-check=true.`
                 );
               }
               return;
