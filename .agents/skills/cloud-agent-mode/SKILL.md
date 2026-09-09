@@ -29,6 +29,10 @@ Full decision tree with secondary confirmation probes: [references/platform-dete
 
 **Validation is safety-critical and platform-dependent** — never run monolithic `make pc` in cloud on any platform; read [references/platform-detection.md](references/platform-detection.md#validation-binding-safety-critical--read-before-running-anything) before running any `pc-*` chunk.
 
+## E2E auth: use `E2E_AUTH_MODE=ci`, not `make e2e-auth`
+
+`apps/web-e2e/src/global-setup.ts` picks its auth path via `CI || E2E_AUTH_MODE === 'ci'`: when set, it uses a hermetic JWT and needs no OAuth proxy URL and no human interaction. `make e2e-auth` is a **different, interactive** path (device-flow OAuth handshake) that an agent cannot complete — never run it from a cloud session. If `scripts/e2e-auth.mjs` throws "Neither VITE_OAUTH_PROXY_URL nor OAUTH_PROXY_URL is set", that error is naming the live-OAuth path's requirements only; the actual fix for a cloud/CI run is `E2E_AUTH_MODE=ci`, not sourcing a proxy URL.
+
 ## References
 
 | Topic                                                                                         | File                                                                                     |

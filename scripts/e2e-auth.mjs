@@ -179,7 +179,10 @@ export function resolveOAuthUrl() {
   if (!url) {
     throw new Error(
       `[E2E Auth] Neither VITE_OAUTH_PROXY_URL nor OAUTH_PROXY_URL is set. ` +
-        `Checked ${REPO_ROOT_ENV_PATH} — set one of these vars there (see .env.example).`,
+        `Checked ${REPO_ROOT_ENV_PATH} — set one of these vars there (see .env.example). ` +
+        `Note: this device-flow path requires a human to complete an interactive browser handshake — ` +
+        `an agent cannot complete it. For a hermetic/CI-style run that needs no proxy URL and no human, ` +
+        `set E2E_AUTH_MODE=ci (or run in CI, where this is automatic) to use the hermetic-JWT auth path instead.`,
     );
   }
   return url;
