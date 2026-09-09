@@ -298,7 +298,7 @@ lint-skill-index: ## Check .agents/skills/INDEX.md is in sync with SKILL.md fron
 	@$(call echo_blue,Checking skill index sync...)
 	@node scripts/generate-skill-index.mjs --check
 
-mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} from the tools/mcp/ servers
+mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} and .agents/skills/mcp-first/references/tool-catalog/*.md from the tools/mcp/ servers
 	@$(call echo_blue,Generating MCP API reference...)
 	@node scripts/generate-mcp-api-reference.mjs
 

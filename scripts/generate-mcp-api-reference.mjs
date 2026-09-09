@@ -9,6 +9,12 @@
  *   lib/mcp-docs/src/pages/<id>.generated.ts — one single-server page per hosted
  *       server, embedded in its Lambda bundle and served from `GET /docs`
  *
+ * Also writes:
+ *   .agents/skills/mcp-first/references/tool-catalog/<id>.md — one generated
+ *       skill-reference file per server (LS-9701 Tier 2), so an agent loading
+ *       a skill gets the CURRENT schema instead of hand-maintained prose that
+ *       can drift from it (see ./mcp-api-reference/render-catalog.mjs header).
+ *
  * Also enforces the tool-definition budget (LS-9704): `--check` fails when a
  * server exceeds its ceiling in docs/mcp/tool-budget.json, and equally when it
  * drops well below one without the ceiling being lowered — see
@@ -29,6 +35,7 @@ import {
 } from './mcp-api-reference/budget.mjs';
 import { collect } from './mcp-api-reference/collect.mjs';
 import { computeInlineCsp } from './mcp-api-reference/csp.mjs';
+import { renderCatalog } from './mcp-api-reference/render-catalog.mjs';
 import { render } from './mcp-api-reference/render.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,6 +44,15 @@ const HTML_PATH = join(OUT_DIR, 'api-reference.html');
 const JSON_PATH = join(OUT_DIR, 'api-reference.json');
 const BUDGET_PATH = join(OUT_DIR, 'tool-budget.json');
 const PAGES_DIR = join(REPO_ROOT, 'lib/mcp-docs/src/pages');
+const CATALOG_DIR = join(
+  REPO_ROOT,
+  '.agents/skills/mcp-first/references/tool-catalog',
+);
+
+/** Filename for a server's generated catalog page, e.g. 'legacy-sports-jira.md'. */
+function catalogPath(server) {
+  return join(CATALOG_DIR, `${server.id}.md`);
+}
 
 /** Filename key for a server's generated page, e.g. 'db-admin'. */
 function pageKey(server) {
@@ -120,6 +136,14 @@ function main() {
     });
   }
 
+  // One skill-reference catalog per server, local or hosted alike.
+  for (const server of model.servers) {
+    outputs.push({
+      path: catalogPath(server),
+      content: `${renderCatalog(server)}\n`,
+    });
+  }
+
   if (check) {
     const stale = outputs.filter(
       (output) => readIfPresent(output.path) !== output.content,
@@ -168,6 +192,7 @@ function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
   mkdirSync(PAGES_DIR, { recursive: true });
+  mkdirSync(CATALOG_DIR, { recursive: true });
   for (const output of outputs) writeFileSync(output.path, output.content);
 
   const summary = model.servers

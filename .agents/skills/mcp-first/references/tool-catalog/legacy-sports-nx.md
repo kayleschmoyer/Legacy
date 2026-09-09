@@ -1,0 +1,182 @@
+# Nx MCP Tool Catalog
+
+> GENERATED FILE — DO NOT EDIT.
+>
+> Source: `tools/mcp/nx-server/src/{index,lambda}.ts`. Regenerate with 
+> `make mcp-api-reference`; CI fails on drift (LS-9701 Tier 2, review pattern #48).
+>
+> For the interactive, filterable version of this same data across every
+> server: [`docs/mcp/api-reference.html`](../../../../../docs/mcp/api-reference.html).
+
+Nx project graph, affected-target runs, per-chunk pc execution, lint/format/test runners, and package health checks.
+
+Local stdio process only — not exposed as a hosted connector. 16 tools.
+
+---
+
+### `nx_affected`
+
+Show affected projects. Optionally filter by target.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `target` | string |  | — | Filter to projects with this target |
+| `base` | string |  | — | Base ref (default: origin/main) |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_check_package_health`
+
+Scan for package issues: nested node_modules, wildcard ranges, missing overrides, missing @types/.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_dep_graph`
+
+Query dependency graph: what a project depends on or what depends on it.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `project` | string | **required** | — | Project name |
+| `direction` | enum |  | — | "dependencies" or "dependents" |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_install_package`
+
+Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a symlink. Checks for @types/ companion. Install an npm package at workspace root. Fast installs return in one call; an install still running after ~45s returns { status: "running", jobId } — poll nx_job_wait({ jobId }), do NOT re-run (re-invoking joins the in-flight install).
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `name` | string | **required** | — | Package name |
+| `version` | string |  | — | Version (default: latest) |
+| `dev` | boolean |  | — | Install as devDependency |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_job_list`
+
+List recent background jobs (newest first), including jobs started by a previous MCP server process. Use after a session resume or lost tool result to recover a job handle instead of re-running validation.
+
+_No parameters._
+
+### `nx_job_status`
+
+Cheap, instant snapshot of a background job started by a job-backed nx tool (nx_run_pc_chunk, nx_run, nx_run_affected, nx_run_e2e_specs, nx_install_package). Returns { status, elapsedSec, logTail } while running (never an error), or the final pass/fail output once done. Use nx_job_wait to block until completion.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `jobId` | string | **required** | — | Job ID returned by a { status: "running" } result |
+
+### `nx_job_wait`
+
+Wait for a background job to finish, bounded at 55s per call (stays under the MCP transport timeout). If the job is still running when the wait expires, returns a { status: "running" } snapshot with logTail — re-invoke to continue waiting. Never re-run the underlying command while a job is in progress.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `jobId` | string | **required** | — | Job ID returned by a { status: "running" } result |
+| `maxWaitMs` | number |  | coerced, integer, > 0, max 55000 | Max wait per call in ms (default and cap: 55000) |
+
+### `nx_run`
+
+Prefer this over `pnpm exec nx run <project>:<target>` / `pnpm exec nx run-many -t <target>` via shell. Runs an Nx target on one project, or fans out across every project declaring it if `project` is omitted. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format (colon-suffixed variants accepted). Fast targets return pass/fail in one call; a slow run returns { status: "running", jobId } after ~45s — call nx_job_wait({ jobId }); do NOT re-run.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `project` | string |  | — | Project name. Omit or pass "all" to fan out across every project declaring the target. |
+| `target` | string | **required** | — | Target to run |
+| `configuration` | string |  | — | Named configuration |
+| `noCache` | boolean |  | — | Bypass Nx cache |
+| `updateSnapshot` | boolean |  | — | Update Jest snapshots (appends --updateSnapshot). Only applies to the "test" target. |
+| `args` | string \| string[] |  | — | Extra flags after "--" (e.g. ["--verbose"] for verbose output). Array preferred; string split on whitespace. For multiple test patterns, pipe is preferred: ["--testPathPatterns", "FileA\|FileB"]. Separate array elements also work: ["--testPathPatterns", "FileA", "FileB"] — on Windows these are automatically coalesced into a single pipe-separated token. |
+| `env` | object (key-value) |  | — | Environment variables to set for the command (e.g. { "PLAYWRIGHT_GREP": "@regression" }). |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_run_affected`
+
+Prefer this over `pnpm exec nx affected -t <target>` via shell. Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen. A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `target` | string | **required** | — | Target to run on affected projects |
+| `base` | string |  | — | Base ref (default: origin/main) |
+| `fix` | boolean |  | — | Pass --fix for lint target |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_run_e2e_specs`
+
+Prefer this over raw `npx playwright test` shell commands. Hermetic mode (default): runs specs from src/tests/ against a local static build, auto-selects a free E2E_PORT, and forces E2E_AUTH_MODE=ci (no OAuth needed). Requires dist/apps/web — run nx_run({ project: "web", target: "build" }) first if missing. Integration mode (integration: true): runs specs from src/integration/tests/ against the live backend (api.legacy-fantasy.com) with workers=1 to avoid throttling. Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. Set withTracing: true to enable Playwright tracing in either mode; trace.zip paths are returned in traceArtifacts. Returns a compact summary: pass/fail counts, failing test details, raw output, traceArtifacts, and (integration only) graphqlErrors. A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }) for the same structured summary once done; do NOT re-run (re-invoking joins the in-flight run). The underlying Playwright process is hard-killed after 30 minutes (hermetic) / 8 minutes (integration) independent of how many nx_job_wait calls you make — large hermetic batches (100+ specs) usually finish well within that, but if you hit the kill, split specs into smaller batches across multiple calls.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `specs` | string[] | **required** | min 1 | Spec file paths relative to apps/web-e2e/ (e.g. ["src/tests/roster-management.spec.ts"] for hermetic, "src/integration/tests/league.spec.ts" for integration). Absolute paths are also accepted. |
+| `project` | string |  | — | Playwright project/browser to run against. Allowed: chromium, firefox, webkit, Mobile Chrome, Mobile Safari (default: chromium). |
+| `grep` | string |  | — | Filter tests by title regex (Playwright --grep). E.g. "@critical" or "should show roster". |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+| `integration` | boolean |  | — | When true, runs specs against the live backend using playwright.integration.config.ts instead of the hermetic config. Enforces workers=1. Checks JWT freshness and E2EPOOLPASSWORD before launching. |
+| `withTracing` | boolean |  | — | When true, enables Playwright tracing (--trace=on) in either mode. Trace zip paths are returned in traceArtifacts. |
+
+### `nx_run_eslint`
+
+Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint a small, explicit file list. Runs eslint --max-warnings=0 — the same threshold as the nx lint target — against exactly the given files, and from the nearest directory owning an eslint.config.* so the project's flat config actually applies (ESLint 9 resolves flat config from its cwd, not per file). A file list spanning two config roots is rejected — split it into one call per root. Capped at ${ESLINT_MAX_FILES} files. IMPORTANT — NOT a fast path in this repo: type-aware parserOptions.project rules force a full TypeScript program build even for one file (~280s, measured in lambdas/db), and that cost is per-run not per-file. Use this for a narrow report; use nx_run({ project, target: "lint" }) for a whole (Nx-cached) project and nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. Typecheck cannot be file-scoped (tsc rejects source files combined with -p) — use nx_run({ target: "typecheck" }) instead. Works on any file in the repo, including files outside every Nx project (e.g. top-level scripts/) — the config-root walk above is filesystem-based, not the Nx project graph, so it falls back to the repo-root eslint.config.* when no nearer one exists. A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait to continue waiting; do NOT re-run (re-invoking joins the in-flight run).
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `files` | string[] | **required** | min 1 | File paths (relative to worktreePath/repo root, or absolute) to lint. All files must live under the same eslint.config.* root. |
+| `mode` | enum |  | — | "check" reports lint errors without modifying files (default); "fix" applies eslint --fix in place. |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_run_pc_chunk`
+
+Prefer this over `make pc-<chunk>` via shell for cloud agents. Run a single pre-commit validation chunk. Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build. Fast chunks return structured pass/fail output in one call. A chunk still running after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — the chunk keeps running in the background; call nx_job_wait({ jobId }) to continue waiting. Do NOT re-run the chunk: re-invoking while it runs joins the in-flight job.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `chunk` | enum | **required** | — | Pre-commit validation chunk to run. One of: ${PC_CHUNKS.join(', ')} |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+| `verbose` | boolean |  | — | When true, include the full raw output (up to 30k chars) in the response instead of the default compact summary. Default false: prettier per-file listings (pc-format) are collapsed to a count, and the step body (e.g. eslint output for pc-lint) is truncated to 20 lines with a note to run the step directly for the rest. Use verbose: true only when you need the complete output for debugging. |
+| `maxWorkers` | number |  | integer, > 0 | Cap Jest worker parallelism for the pc-test chunk by passing MAXWORKERS=<n>, which the pc-test recipe forwards to `nx affected -t test` as `-- --maxWorkers=<n>`. Use on memory-constrained machines to avoid "Fatal process out of memory: Zone" crashes (with "spawn UNKNOWN" in jest-worker) from full-parallelism Jest workers across every affected project — that failure signature means retry pc-test with a lower maxWorkers, not that the code under test regressed. E.g. maxWorkers: 2. Ignored by chunks other than pc-test. |
+| `parallel` | number |  | integer, > 0 | Cap nx project-level parallelism for the pc-lint chunk by passing PARALLEL=<n>, which the pc-lint recipe forwards to `nx affected -t lint --fix` as `--parallel=<n>` (nx.json default: 5). Use on memory-constrained machines to avoid individual large projects (e.g. lambdas/db, cli) getting "Killed" (OOM) when several `eslint . --fix` processes run concurrently, each ballooning to 2-5GB RSS — nx may then mislabel the OOM-killed project "flaky" on retry, masking the real cause. E.g. parallel: 2. Ignored by chunks other than pc-lint. |
+
+### `nx_run_prettier`
+
+Prefer this over raw `pnpm exec prettier --check/--write <files>` via shell, and over nx_run_pc_chunk({ chunk: "pc-format" }) when you only need a small, explicit file list (e.g. fixing Prettier drift in 1-3 files after a rebase). Runs prettier --check or --write against exactly the given files — never the whole repo diff — so it carries none of pc-format's auto-amend-already-pushed-commit risk (LS-8367) or full per-file-listing overflow risk (LS-8423). Capped at ${PRETTIER_MAX_FILES} files — for broader formatting use nx_run_pc_chunk({ chunk: "pc-format" }) instead. Works on any file in the repo, including files outside every Nx project (e.g. top-level scripts/, like scripts/modules-pool/link.mjs) — there is no Nx project resolution here at all, just prettier run directly against the given paths.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `files` | string[] | **required** | min 1 | File paths (relative to worktreePath/repo root, or absolute) to check or format. |
+| `mode` | enum |  | — | "check" reports formatting issues without modifying files (default); "write" reformats in place. |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_run_test`
+
+Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern>` via shell when iterating on a single spec file or pattern. Thin wrapper over nx_run: resolves `config` to the matching colon-suffixed jest target (e.g. "mobile" -> "test:mobile") and passes testPathPatterns through. Omit `config` for a single "test" target; if that target aggregates config-scoped jest targets (e.g. shared-components), testPathPatterns fans out and results merge, instead of silently running everything unfiltered. Same job semantics as nx_run: fast runs return pass/fail in one call; a run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }); do NOT re-run (re-invoking joins the in-flight run).
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `project` | string | **required** | — | Project name |
+| `testPathPatterns` | string | **required** | — | Jest --testPathPatterns value: a spec filename or regex pattern (e.g. "LeagueListRow"). For multiple patterns, pipe-separate: "FileA\|FileB". Capped at 300 characters and rejects nested-quantifier shapes like "(a+)+" (ReDoS mitigation) — use a simple spec name/pattern. |
+| `config` | string |  | — | Jest config variant, mapped to the "test:<config>" target (e.g. "mobile", "web", "stories"). Omit for projects with a single "test" target. |
+| `updateSnapshot` | boolean |  | — | Update Jest snapshots (appends --updateSnapshot). |
+| `noCache` | boolean |  | — | Bypass Nx cache |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_show_project`
+
+Inspect a project: root, targets, tags, type.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `project` | string | **required** | — | Project name |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
+### `nx_show_projects`
+
+List Nx projects. Filter by affected, target, or tag.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `affected` | boolean |  | — | Only affected projects vs origin/main |
+| `withTarget` | string |  | — | Filter to projects with this target |
+| `tag` | string |  | — | Nx tag filter |
+| `worktreePath` | string |  | — | Worktree path (default: repo root) |
+
