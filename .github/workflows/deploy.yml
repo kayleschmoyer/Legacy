@@ -13,6 +13,7 @@ name: Deploy
 #   - Upload Lambdas               (.github/workflows/upload-lambdas.yml)
 #   - Apply Lambda Infrastructure  (.github/workflows/lambda-terraform-apply.yml)
 #   - Deploy Web                   (.github/workflows/deploy-web.yml)
+#   - Build Android App            (.github/workflows/build-android-app.yml)
 #   - Deploy Storybook             (.github/workflows/deploy-storybook.yml)
 #
 # Apply Lambda Infrastructure runs synchronously, right after Upload Lambdas
@@ -31,6 +32,16 @@ name: Deploy
 # triggerable via workflow_run off "Upload Lambdas" completing, for manual
 # one-off upload-lambdas.yml dispatches. See lambda-terraform-apply.yml's own
 # header for the full trigger inventory.
+#
+# Build Android App joined this ordering under the same `needs` gate
+# (LS-8765): it used to trigger off its own independent `push: branches:
+# [main]`, so an Android build carrying a client change that depended on a
+# new/changed server field could ship (APK release + "current" S3 pointer)
+# before the `graphql` Lambda serving that field actually went live —
+# exactly the race already closed for Deploy Web above, just left open on
+# the mobile side. Production surfaced it as `Cannot query field "nflTeam"
+# on type "Player"` CombinedGraphQLErrors on GetTeamMembers/GetTeamTradeOffers
+# for the ~9 days until the lagging Lambda deploy caught up (Rollbar #212).
 #
 # detect-changes emits a separate `terraform` boolean alongside `lambdas`
 # (LS-9871). Apply Lambda Infrastructure runs on `lambdas || terraform`, while
@@ -51,6 +62,11 @@ on:
         type: boolean
       force-web:
         description: "Force the web deploy child (bypass paths filter)"
+        required: false
+        default: false
+        type: boolean
+      force-android:
+        description: "Force the Android build child (bypass paths filter)"
         required: false
         default: false
         type: boolean
@@ -94,6 +110,7 @@ jobs:
       lambdas: ${{ steps.result.outputs.lambdas }}
       terraform: ${{ steps.result.outputs.terraform }}
       web: ${{ steps.result.outputs.web }}
+      android: ${{ steps.result.outputs.android }}
       storybook: ${{ steps.result.outputs.storybook }}
 
     steps:
@@ -150,6 +167,19 @@ jobs:
               - 'lib/shared-components/**'
               - '.github/workflows/deploy-web.yml'
               - '.github/workflows/deploy.yml'
+            android:
+              - 'apps/app/**'
+              - 'lib/shared-components/**'
+              - 'lib/ui-abstractions/**'
+              - 'lib/utils/**'
+              - 'lib/api/**'
+              - 'lib/analytics/**'
+              - 'lib/websocket-client/**'
+              - 'lib/tamagui-config/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/build-android-app.yml'
+              - '.github/workflows/deploy.yml'
             storybook:
               - 'lib/shared-components/**'
               - '.github/workflows/deploy-storybook.yml'
@@ -164,6 +194,7 @@ jobs:
           LAMBDAS="${{ steps.filter.outputs.lambdas }}"
           TERRAFORM="${{ steps.filter.outputs.terraform }}"
           WEB="${{ steps.filter.outputs.web }}"
+          ANDROID="${{ steps.filter.outputs.android }}"
           STORYBOOK="${{ steps.filter.outputs.storybook }}"
 
           # force-lambdas forces the terraform apply too, so the manual
@@ -176,6 +207,9 @@ jobs:
           if [ "${{ inputs['force-web'] }}" = "true" ]; then
             WEB="true"
           fi
+          if [ "${{ inputs['force-android'] }}" = "true" ]; then
+            ANDROID="true"
+          fi
           if [ "${{ inputs['force-storybook'] }}" = "true" ]; then
             STORYBOOK="true"
           fi
@@ -183,6 +217,7 @@ jobs:
           echo "lambdas=$LAMBDAS" >> "$GITHUB_OUTPUT"
           echo "terraform=$TERRAFORM" >> "$GITHUB_OUTPUT"
           echo "web=$WEB" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
           echo "storybook=$STORYBOOK" >> "$GITHUB_OUTPUT"
 
           {
@@ -193,6 +228,7 @@ jobs:
             echo "| Lambdas | $LAMBDAS |"
             echo "| Terraform | $TERRAFORM |"
             echo "| Web | $WEB |"
+            echo "| Android | $ANDROID |"
             echo "| Storybook | $STORYBOOK |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -302,6 +338,29 @@ jobs:
     # and accessible here via needs.deploy-web.outputs.* in rollup-status
 
   # ---------------------------------------------------------------------------
+  # Child: Build Android App
+  # ---------------------------------------------------------------------------
+  # Same ordering rationale and gate as Deploy Web above (LS-8765): an Android
+  # build that depends on a new/changed server schema must never ship (release
+  # + "current" S3 pointer) before that schema is live on the graphql Lambda.
+  build-android:
+    name: Build Android App
+    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure]
+    if: >-
+      !cancelled() &&
+      needs.detect-changes.outputs.android == 'true' &&
+      (needs.upload-lambdas.result == 'success' ||
+      needs.upload-lambdas.result == 'skipped') &&
+      (needs.apply-lambda-infrastructure.result == 'success' ||
+      needs.apply-lambda-infrastructure.result == 'skipped')
+    permissions:
+      actions: read # nx-set-shas base SHA resolution
+      contents: write # create-release
+      id-token: write # OIDC auth to AWS when publishing the APK to S3
+    uses: ./.github/workflows/build-android-app.yml
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
   # Child: Deploy Storybook
   # ---------------------------------------------------------------------------
   deploy-storybook:
@@ -320,7 +379,7 @@ jobs:
   # ---------------------------------------------------------------------------
   rollup-status:
     name: Rollup Status
-    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure, deploy-web, deploy-storybook]
+    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure, deploy-web, build-android, deploy-storybook]
     if: always()
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -338,10 +397,12 @@ jobs:
           LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
           TERRAFORM_TARGETED: ${{ needs.detect-changes.outputs.terraform }}
           WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          ANDROID_TARGETED: ${{ needs.detect-changes.outputs.android }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
           LAMBDAS_UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
           LAMBDAS_APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
           WEB_RESULT: ${{ needs.deploy-web.result }}
+          ANDROID_RESULT: ${{ needs.build-android.result }}
           STORYBOOK_RESULT: ${{ needs.deploy-storybook.result }}
         run: |
           set -euo pipefail
@@ -393,6 +454,7 @@ jobs:
           LAMBDAS_APPLY_STATE=$(translate "$INFRA_TARGETED" "$LAMBDAS_APPLY_RESULT")
           LAMBDAS_STATE=$(worse_of "$LAMBDAS_UPLOAD_STATE" "$LAMBDAS_APPLY_STATE")
           WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
+          ANDROID_STATE=$(translate "$ANDROID_TARGETED" "$ANDROID_RESULT")
           STORYBOOK_STATE=$(translate "$STORYBOOK_TARGETED" "$STORYBOOK_RESULT")
 
           # If detect-changes itself failed/cancelled, no per-target booleans are
@@ -415,7 +477,7 @@ jobs:
             ANY_FAILURE=false
             ANY_CANCELLED=false
             ANY_SUCCESS=false
-            for STATE in "$LAMBDAS_STATE" "$WEB_STATE" "$STORYBOOK_STATE"; do
+            for STATE in "$LAMBDAS_STATE" "$WEB_STATE" "$ANDROID_STATE" "$STORYBOOK_STATE"; do
               case "$STATE" in
                 failure)   ANY_FAILURE=true ;;
                 cancelled) ANY_CANCELLED=true ;;
@@ -433,6 +495,7 @@ jobs:
 
           echo "lambdas_state=$LAMBDAS_STATE" >> "$GITHUB_OUTPUT"
           echo "web_state=$WEB_STATE" >> "$GITHUB_OUTPUT"
+          echo "android_state=$ANDROID_STATE" >> "$GITHUB_OUTPUT"
           echo "storybook_state=$STORYBOOK_STATE" >> "$GITHUB_OUTPUT"
           echo "overall=$OVERALL" >> "$GITHUB_OUTPUT"
 
@@ -462,11 +525,13 @@ jobs:
 
           LAMBDAS_EMOJI=$(emoji_for "$LAMBDAS_STATE")
           WEB_EMOJI=$(emoji_for "$WEB_STATE")
+          ANDROID_EMOJI=$(emoji_for "$ANDROID_STATE")
           STORYBOOK_EMOJI=$(emoji_for "$STORYBOOK_STATE")
 
-          DESCRIPTION=$(printf "%s Lambdas: %s\\n%s Web: %s\\n%s Storybook: %s" \
+          DESCRIPTION=$(printf "%s Lambdas: %s\\n%s Web: %s\\n%s Android: %s\\n%s Storybook: %s" \
             "$LAMBDAS_EMOJI" "$LAMBDAS_STATE" \
             "$WEB_EMOJI" "$WEB_STATE" \
+            "$ANDROID_EMOJI" "$ANDROID_STATE" \
             "$STORYBOOK_EMOJI" "$STORYBOOK_STATE")
 
           {
@@ -482,6 +547,7 @@ jobs:
             echo "| --- | --- |"
             echo "| Lambdas | $LAMBDAS_EMOJI $LAMBDAS_STATE |"
             echo "| Web | $WEB_EMOJI $WEB_STATE |"
+            echo "| Android | $ANDROID_EMOJI $ANDROID_STATE |"
             echo "| Storybook | $STORYBOOK_EMOJI $STORYBOOK_STATE |"
             echo ""
             echo "**Overall:** $OVERALL"
@@ -543,6 +609,7 @@ jobs:
         shell: bash
         env:
           WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          ANDROID_TARGETED: ${{ needs.detect-changes.outputs.android }}
           LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
           TERRAFORM_TARGETED: ${{ needs.detect-changes.outputs.terraform }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
@@ -559,6 +626,9 @@ jobs:
             LINES+=("**Web** v${WEB_VERSION}-${WEB_BUILD} deployed")
           elif [ "$WEB_TARGETED" = "true" ]; then
             LINES+=("**Web** deployed")
+          fi
+          if [ "$ANDROID_TARGETED" = "true" ]; then
+            LINES+=("**Android** built")
           fi
           if [ "$LAMBDAS_TARGETED" = "true" ]; then
             LINES+=("**Lambdas** uploaded — Terraform applied")

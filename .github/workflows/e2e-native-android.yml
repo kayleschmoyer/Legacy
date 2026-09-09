@@ -9,12 +9,24 @@ name: E2E Native (Android)
 # to a booted emulator.
 #
 # Schedule-free per the repo CI policy (LS-8487): no cron — manual dispatch plus
-# an automated run after each "Build Android App" on main, debounced to at most
+# an automated run after each "Deploy" completes on main, debounced to at most
 # one attempt per ANDROID_E2E_MIN_INTERVAL_HOURS (repo var, default 156h ≈
 # weekly) — see the `gate` job, which mirrors run-maestro-sweep.yml (LS-8897).
 # Manual dispatch always runs. Tradeoff: native Android regressions are caught
 # on the gate cadence rather than on every merge to main — the same tradeoff
 # already accepted for the sibling Maestro sweep.
+#
+# Triggers off "Deploy" (not "Build Android App") since LS-8765: Build Android
+# App now runs as a workflow_call child of the umbrella Deploy workflow — gated
+# behind the graphql Lambda deploy completing, closing the same client-ahead-
+# of-server race deploy-web.yml already closed for the web app — and a
+# workflow invoked only via workflow_call never independently fires its own
+# workflow_run completion event for a listener to key off. The gate below
+# reads the "Build Android App" job's own conclusion out of the upstream
+# Deploy run (via the API) rather than the run-level conclusion, so an
+# unrelated failure in another Deploy child (e.g. Storybook) doesn't
+# incorrectly skip this suite, and a Deploy push that didn't target Android at
+# all is treated the same as "no build to test".
 #
 # A run that skips the real jobs does NOT mean the native suite passed. It grows
 # a `skipped` job whose name says so outright, because GitHub rolls a run whose
@@ -33,7 +45,7 @@ name: E2E Native (Android)
 on:
   workflow_dispatch: {}
   workflow_run:
-    workflows: ["Build Android App"]
+    workflows: ["Deploy"]
     types: [completed]
     branches: [main]
 
@@ -68,7 +80,7 @@ jobs:
   # Post-merge debounce gate (schedule-free CI policy). Mirrors the `gate` job
   # in run-maestro-sweep.yml.
   # workflow_dispatch: always runs.
-  # workflow_run (Build Android App completed on main): runs at most once per
+  # workflow_run (Deploy completed on main): runs at most once per
   # ANDROID_E2E_MIN_INTERVAL_HOURS. A debounced run skips both real jobs, so its
   # run conclusion is still "success"; the debounce check therefore inspects the
   # "Build Bypass APK" job of prior automated runs (non-skipped = real attempt)
@@ -100,21 +112,44 @@ jobs:
           fi
 
           # Upstream-conclusion check lives HERE, not on build-bypass-apk's `if:`.
-          # When it sat on the build job, a run whose upstream "Build Android App"
-          # failed left should-run == 'true' while every real job skipped — so the
-          # skip marker below did not fire and the run was, once again, a bare
-          # green tick with nothing run. The gate is now the single decision point:
-          # should-run == 'true' and the skip marker are exactly complementary.
-          UPSTREAM="${{ github.event.workflow_run.conclusion }}"
-          if [ "$UPSTREAM" != "success" ]; then
+          # When it sat on the build job, a run whose upstream build failed left
+          # should-run == 'true' while every real job skipped — so the skip marker
+          # below did not fire and the run was, once again, a bare green tick with
+          # nothing run. The gate is now the single decision point: should-run ==
+          # 'true' and the skip marker are exactly complementary.
+          #
+          # Build Android App is a workflow_call child of Deploy (LS-8765), so it
+          # never fires its own workflow_run event — this listens on Deploy
+          # instead and reads the "Build Android App" job's own conclusion out of
+          # that run via the API, rather than Deploy's run-level conclusion, so an
+          # unrelated failure in another Deploy child (e.g. Storybook) doesn't
+          # incorrectly skip this suite.
+          ANDROID_JOB=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name == "Build Android App")] | .[0]')
+
+          if [ -z "$ANDROID_JOB" ] || [ "$ANDROID_JOB" = "null" ]; then
             echo "should-run=false" >> "$GITHUB_OUTPUT"
-            echo "skip-reason=Upstream 'Build Android App' concluded '${UPSTREAM}' — there is no build to test." >> "$GITHUB_OUTPUT"
+            echo "skip-reason=Upstream Deploy run had no 'Build Android App' job (Android not targeted this push) — there is no build to test." >> "$GITHUB_OUTPUT"
             {
               echo "## Native Android E2E — SKIPPED (no upstream build)"
               echo
               echo "**No emulator test ran in this run.**"
               echo
-              echo "Upstream \"Build Android App\" concluded \`${UPSTREAM}\`."
+              echo "Upstream Deploy run had no \"Build Android App\" job — Android was not targeted this push."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          UPSTREAM=$(printf '%s' "$ANDROID_JOB" | jq -r '.conclusion')
+          if [ "$UPSTREAM" != "success" ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            echo "skip-reason=Upstream 'Build Android App' job concluded '${UPSTREAM}' — there is no build to test." >> "$GITHUB_OUTPUT"
+            {
+              echo "## Native Android E2E — SKIPPED (no upstream build)"
+              echo
+              echo "**No emulator test ran in this run.**"
+              echo
+              echo "Upstream \"Build Android App\" job concluded \`${UPSTREAM}\`."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
