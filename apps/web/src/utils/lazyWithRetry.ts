@@ -2,6 +2,83 @@ import React from 'react';
 
 const RELOAD_KEY = 'chunk-load-reload-attempted';
 
+// Set by the 'pagehide' listener below. `pagehide` fires on *this* document
+// the moment the browser commits to navigating away from it (new-document
+// navigation, tab close, or back/forward) — including the window where a
+// same-tab `page.goto()`-style navigation cancels an in-flight chunk fetch
+// before this document has finished unloading. Module-scoped and never
+// reset: once a document starts unloading it never becomes active again, so
+// there's nothing to reset for.
+let pageIsUnloading = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    pageIsUnloading = true;
+  });
+}
+
+/**
+ * Heuristic for "this chunk import rejected because the user navigated away
+ * mid-load", as opposed to "the chunk genuinely 404'd after a deploy".
+ *
+ * Browsers don't give a reliable, consistent error signature for a dynamic
+ * import cancelled by navigation (Chromium and WebKit both throw a plain
+ * TypeError with engine-specific wording, occasionally an AbortError), so
+ * this leans on out-of-band signals instead of the rejection's shape:
+ *
+ *  - `pageIsUnloading`: the 'pagehide' listener above already fired, meaning
+ *    a navigation away from this document is in progress.
+ *  - `document.visibilityState === 'hidden'`: covers engines/timings where
+ *    visibility flips before 'pagehide' is observed.
+ *  - `DOMException` named 'AbortError': the rare case where the browser does
+ *    surface an explicit abort signature for the cancelled request.
+ *
+ * A backgrounded-but-not-navigating tab (e.g. the user alt-tabbed) can also
+ * read as "hidden" here, which means a genuine stale-chunk 404 in a
+ * backgrounded tab is deliberately left unhandled rather than reloaded out
+ * from under the user — the next navigation attempt in that route re-runs
+ * `factory()` and gets another chance to detect a real 404 once the tab is
+ * foregrounded again.
+ */
+function isLikelyNavigationAbort(error: unknown): boolean {
+  if (pageIsUnloading) {
+    return true;
+  }
+  if (
+    typeof document !== 'undefined' &&
+    document.visibilityState === 'hidden'
+  ) {
+    return true;
+  }
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+// sessionStorage can throw (private browsing, quota exceeded); this flag is
+// best-effort recovery bookkeeping, not correctness-critical, so failures to
+// read/write it are silently ignored rather than breaking the reload flow.
+function getReloadFlag(): string | null {
+  try {
+    return sessionStorage.getItem(RELOAD_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setReloadFlag(): void {
+  try {
+    sessionStorage.setItem(RELOAD_KEY, 'true');
+  } catch {
+    // Ignore — best-effort.
+  }
+}
+
+function removeReloadFlag(): void {
+  try {
+    sessionStorage.removeItem(RELOAD_KEY);
+  } catch {
+    // Ignore — best-effort.
+  }
+}
+
 /**
  * Wraps React.lazy() to recover from stale-chunk 404s after a new deployment.
  *
@@ -14,6 +91,11 @@ const RELOAD_KEY = 'chunk-load-reload-attempted';
  * Strategy: on the first chunk-load failure per browser session, reload the
  * page (which fetches fresh HTML → fresh chunk URLs). A sessionStorage flag
  * prevents reload loops if the chunk is genuinely absent even after a refresh.
+ *
+ * That reload must NOT fire when the import instead rejected because the
+ * user navigated away mid-load (see `isLikelyNavigationAbort` above) — doing
+ * so yanks the user back to the page they just left, interrupting the
+ * navigation they actually wanted.
  */
 export function lazyWithRetry<T extends React.ComponentType>(
   factory: () => Promise<{ default: T }>,
@@ -48,14 +130,20 @@ export function lazyWithRetry<T extends React.ComponentType>(
         window.removeEventListener('vite:preloadError', handlePreloadError);
         // Successful load: clear any prior retry flag so future chunk failures
         // (e.g. after another deployment) can trigger a fresh reload.
-        sessionStorage.removeItem(RELOAD_KEY);
+        removeReloadFlag();
         return module;
       })
       .catch((error: unknown) => {
         window.removeEventListener('vite:preloadError', handlePreloadError);
-        const alreadyRetried = sessionStorage.getItem(RELOAD_KEY) === 'true';
+        if (isLikelyNavigationAbort(error)) {
+          // Not a stale-chunk 404 — the user navigated away mid-load. Let
+          // the navigation they actually wanted proceed instead of yanking
+          // them back to the page they just left.
+          throw error;
+        }
+        const alreadyRetried = getReloadFlag() === 'true';
         if (!alreadyRetried) {
-          sessionStorage.setItem(RELOAD_KEY, 'true');
+          setReloadFlag();
           window.location.reload();
           // Never-settling promise keeps React suspended while the reload fires.
           return new Promise<never>((_resolve) => {
@@ -64,7 +152,7 @@ export function lazyWithRetry<T extends React.ComponentType>(
         }
         // Second failure: clear the flag so future navigations can retry again,
         // then let the error bubble to the nearest ErrorBoundary.
-        sessionStorage.removeItem(RELOAD_KEY);
+        removeReloadFlag();
         throw error;
       });
   });
