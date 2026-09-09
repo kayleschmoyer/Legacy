@@ -204,4 +204,63 @@ if [ -z "${GITHUB_REPO_OWNER:-}" ] && [ -z "${GITHUB_REPO_NAME:-}" ]; then
   fi
 fi
 
-echo "=== Cloud setup complete (merge-base, pnpm deps, GitHub repo identity) ==="
+# ---------------------------------------------------------------------------
+# Fallback: local Postgres for `pnpm db:*` scripts (LS-9779)
+# ---------------------------------------------------------------------------
+# CCR containers have no Docker daemon (`docker ps` fails with "no such file
+# or directory" on /var/run/docker.sock), so docker-compose's postgres
+# service is unreachable, and `pnpm --prefix lib/db-client run db:status`
+# previously failed outright on a missing DB_PASSWORD with nothing to point
+# it at (LS-9765/LS-9779). The hosted `legacy-sports-db` MCP server
+# (db_query/db_migration_status/db_execute) is the preferred way to inspect
+# the dev RDS from a CCR session when it's available — this block is
+# strictly the documented fallback for local schema/migration work, using
+# the postgresql-16 server package already baked into the CCR base image
+# (confirmed present; no docker required). It mirrors docker-compose's local
+# DB naming (.env.docker: legacy_sports/legacy_sports_dev) so the same
+# migration scripts work unmodified against either backend. Best-effort and
+# non-fatal throughout — failures only warn, they never abort the rest of
+# setup (this script runs under `set -euo pipefail`). Idempotent: safe to
+# re-run on every SessionStart, same as the rest of this script.
+DB_FALLBACK_USER=legacy_sports
+DB_FALLBACK_PASSWORD=legacy_sports_dev
+DB_FALLBACK_NAME=legacy_sports_dev
+pg_bootstrap_ok=true
+
+if command -v pg_lsclusters &>/dev/null && command -v psql &>/dev/null && command -v su &>/dev/null; then
+  if ! pg_lsclusters 2>/dev/null | awk '$4=="online"{f=1} END{exit !f}'; then
+    echo "Starting local postgresql cluster (fallback for pnpm db:* scripts)..."
+    service postgresql start >/dev/null 2>&1 || pg_bootstrap_ok=false
+  fi
+
+  if [ "$pg_bootstrap_ok" = true ]; then
+    su postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='${DB_FALLBACK_USER}'\"" 2>/dev/null | grep -q 1 \
+      || su postgres -c "psql -c \"CREATE ROLE ${DB_FALLBACK_USER} LOGIN PASSWORD '${DB_FALLBACK_PASSWORD}';\"" >/dev/null 2>&1 \
+      || pg_bootstrap_ok=false
+
+    su postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${DB_FALLBACK_NAME}'\"" 2>/dev/null | grep -q 1 \
+      || su postgres -c "psql -c \"CREATE DATABASE ${DB_FALLBACK_NAME} OWNER ${DB_FALLBACK_USER};\"" >/dev/null 2>&1 \
+      || pg_bootstrap_ok=false
+
+    if [ "$pg_bootstrap_ok" = true ] && [ -f "$REPO_DIR/docker/postgres/init.sql" ]; then
+      su postgres -c "psql -d '${DB_FALLBACK_NAME}' -f '$REPO_DIR/docker/postgres/init.sql'" >/dev/null 2>&1 || true
+    fi
+  fi
+else
+  pg_bootstrap_ok=false
+fi
+
+if [ "$pg_bootstrap_ok" = true ] && PGPASSWORD="$DB_FALLBACK_PASSWORD" psql -h localhost -U "$DB_FALLBACK_USER" -d "$DB_FALLBACK_NAME" -tAc "SELECT 1" >/dev/null 2>&1; then
+  export USE_LOCAL_CREDENTIALS=true
+  export DB_HOST=localhost
+  export DB_PORT=5432
+  export DB_USER="$DB_FALLBACK_USER"
+  export DB_PASSWORD="$DB_FALLBACK_PASSWORD"
+  export DB_NAME="$DB_FALLBACK_NAME"
+  export DATABASE_URL="postgresql://${DB_FALLBACK_USER}:${DB_FALLBACK_PASSWORD}@localhost:5432/${DB_FALLBACK_NAME}"
+  echo "Local Postgres fallback ready: DB_* env vars exported — 'pnpm --prefix lib/db-client run db:status'/'db:up' now work against an empty local schema (not dev RDS data). Prefer the hosted legacy-sports-db MCP server for real data."
+else
+  echo "NOTE: local Postgres fallback not bootstrapped (postgresql-16 package, cluster, or admin access unavailable) — DB_* env vars not set. 'pnpm db:*' scripts will still fail until DB_PASSWORD is set manually; use the hosted legacy-sports-db MCP server (db_query/db_migration_status) instead if it's available in this session."
+fi
+
+echo "=== Cloud setup complete (merge-base, pnpm deps, GitHub repo identity, local Postgres fallback) ==="
