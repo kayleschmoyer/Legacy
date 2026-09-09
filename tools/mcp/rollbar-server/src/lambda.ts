@@ -129,7 +129,7 @@ function createMcpServer(): McpServer {
 
   server.tool(
     'rollbar_get_occurrence',
-    'Fetch the full payload of a Rollbar occurrence (instance) — returns the complete `data.body` (trace_chain, message, custom, logArgs) without truncation. Use `occurrenceId` for a specific occurrence or `itemId` to fetch the most recent occurrence of an item. READ-ONLY.',
+    'Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.',
     {
       occurrenceId: z
         .number()
@@ -137,16 +137,14 @@ function createMcpServer(): McpServer {
         .positive()
         .optional()
         .describe(
-          'Specific occurrence (instance) id returned by rollbar_list_occurrences',
+          'Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 "not found" — use the list summary instead.',
         ),
       itemId: z
         .number()
         .int()
         .positive()
         .optional()
-        .describe(
-          'Internal item id — fetches the most recent occurrence of this item',
-        ),
+        .describe('Internal item id (fetches latest occurrence)'),
     },
     async (params) => getOccurrence(params),
   );

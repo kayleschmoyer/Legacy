@@ -8375,7 +8375,7 @@
         },
         {
           "name": "rollbar_get_occurrence",
-          "description": "Fetch the full payload of a Rollbar occurrence (instance) — returns the complete `data.body` (trace_chain, message, custom, logArgs) without truncation. Use `occurrenceId` for a specific occurrence or `itemId` to fetch the most recent occurrence of an item. READ-ONLY.",
+          "description": "Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.",
           "inputs": {
             "occurrenceId": {
               "type": "number",
@@ -8384,7 +8384,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Specific occurrence (instance) id returned by rollbar_list_occurrences"
+              "description": "Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 \"not found\" — use the list summary instead."
             },
             "itemId": {
               "type": "number",
@@ -8393,7 +8393,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Internal item id — fetches the most recent occurrence of this item"
+              "description": "Internal item id (fetches latest occurrence)"
             }
           },
           "transports": [

@@ -5,7 +5,13 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 export interface GetOccurrenceParams {
   /** Internal item ID — fetches the most recent occurrence of this item. */
   itemId?: number;
-  /** Specific occurrence (instance) ID — fetches that exact occurrence. */
+  /**
+   * Specific occurrence (instance) ID — fetches that exact occurrence.
+   *
+   * Known limitation (LS-9808): `/instance/{id}` reliably resolves only an
+   * item's most recent occurrence — older-but-in-retention ids commonly
+   * fail with "instance not found"; see the caught-error hint below.
+   */
   occurrenceId?: number;
 }
 
@@ -115,12 +121,22 @@ export async function getOccurrence(
       occurrenceId !== undefined
         ? `occurrence ${occurrenceId}`
         : `latest occurrence of item ${itemId}`;
+    // Known limitation (LS-9808): the Rollbar `/instance/{id}` endpoint
+    // reliably resolves only an item's most recent occurrence — ids for
+    // older-but-within-retention occurrences returned by
+    // rollbar_list_occurrences commonly 400 with "instance not found" even
+    // though they are not stale/expired. Surface this so the caller doesn't
+    // burn turns retrying ids that will never resolve.
+    const knownLimitationHint =
+      occurrenceId !== undefined && /instance not found/i.test(message)
+        ? ' This id came back "instance not found", which is a known Rollbar API limitation (LS-9808): `/instance/{id}` reliably resolves only an item\'s most recent occurrence, even for ids that are well within the item\'s retention window. For historical occurrences, use the summary rollbar_list_occurrences already returned for this id instead of retrying.'
+        : '';
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to fetch ${label}: ${message}`,
+          text: `Failed to fetch ${label}: ${message}${knownLimitationHint}`,
         },
       ],
     };

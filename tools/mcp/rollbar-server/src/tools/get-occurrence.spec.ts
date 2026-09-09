@@ -191,4 +191,52 @@ describe('getOccurrence', () => {
       /Failed to fetch occurrence 123/,
     );
   });
+
+  it('appends the LS-9808 known-limitation hint when occurrenceId lookup 400s with "instance not found"', async () => {
+    mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({ err: 1, message: 'instance not found' }),
+          {
+            status: 400,
+          },
+        ),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 1788139335 });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toMatch(/Failed to fetch occurrence 1788139335/);
+    expect(text).toMatch(/known Rollbar API limitation \(LS-9808\)/);
+    expect(text).toMatch(/most recent occurrence/);
+  });
+
+  it('does not append the LS-9808 hint for an itemId lookup failure', async () => {
+    mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({ err: 1, message: 'instance not found' }),
+          {
+            status: 400,
+          },
+        ),
+    );
+
+    const result = await getOccurrence({ itemId: 42 });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).not.toMatch(/LS-9808/);
+  });
+
+  it('does not append the LS-9808 hint for an unrelated occurrenceId failure', async () => {
+    mockFetch(() => new Response('Internal Server Error', { status: 500 }));
+
+    const result = await getOccurrence({ occurrenceId: 123 });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).not.toMatch(/LS-9808/);
+  });
 });

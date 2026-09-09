@@ -31,12 +31,12 @@ Fetch a single Rollbar item by internal id or by its per-project counter (the nu
 
 ### `rollbar_get_occurrence`
 
-Fetch the full payload of a Rollbar occurrence (instance) — returns the complete `data.body` (trace_chain, message, custom, logArgs) without truncation. Use `occurrenceId` for a specific occurrence or `itemId` to fetch the most recent occurrence of an item. READ-ONLY.
+Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `occurrenceId` | number |  | integer, > 0 | Specific occurrence (instance) id returned by rollbar_list_occurrences |
-| `itemId` | number |  | integer, > 0 | Internal item id — fetches the most recent occurrence of this item |
+| `occurrenceId` | number |  | integer, > 0 | Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 "not found" — use the list summary instead. |
+| `itemId` | number |  | integer, > 0 | Internal item id (fetches latest occurrence) |
 
 ### `rollbar_graphql_introspect_type`
 
