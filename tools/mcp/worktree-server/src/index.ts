@@ -45,6 +45,7 @@ import {
   getConflictInfo,
   scanStagedForConflictMarkers,
 } from './conflict-markers';
+import { resolveDiffBase } from './diff-utils';
 import {
   executeWorktreeFetch,
   type FetchArgs,
@@ -4045,8 +4046,13 @@ const handleCallTool = async (
 
       try {
         // staged=true → git diff --cached (index vs HEAD)
-        // staged=false/omitted → git diff <base> (working tree vs base ref)
-        const gitArgs = staged ? ['diff', '--cached'] : ['diff', base];
+        // staged=false/omitted → git diff <merge-base(base, HEAD)> (working
+        // tree vs the merge-base) — resolving to the merge-base instead of
+        // diffing against `base` directly keeps the diff scoped to only what
+        // changed on this branch, even when the branch is behind `base`
+        // (LS-9304).
+        const diffBase = staged ? base : resolveDiffBase(runGit, base, cwd);
+        const gitArgs = staged ? ['diff', '--cached'] : ['diff', diffBase];
         // --numstat (machine-readable: "ins\tdel\tpath") instead of --stat
         // (padded bar-chart) so the summary renders as a compact MD table.
         if (stat) gitArgs.push('--numstat');
