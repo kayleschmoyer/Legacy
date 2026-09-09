@@ -210,6 +210,30 @@ describe('openPR', () => {
         /`head` must be passed explicitly/,
       );
     });
+
+    // LS-4879: a Windows drive-letter worktreePath (e.g. from a local Windows
+    // Claude Code session) must never be resolve()'d against the Lambda's own
+    // cwd — that previously produced an invalid concatenated path like
+    // "/var/task/D:\...". In Lambda mode the path is never touched by
+    // resolve()/existsSync() at all; the caller must pass `head` explicitly.
+    it('never mangles a Windows drive-letter worktreePath into a /var/task/ path', async () => {
+      mockIsLambda.mockReturnValue(true);
+      const windowsPath =
+        'D:\\code\\legacy-sports\\.claude\\worktrees\\some-wt';
+      const result = await openPR({
+        title: 'LS-4879 test',
+        body: 'body',
+        worktreePath: windowsPath,
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain(windowsPath);
+      expect(result.content[0].text).not.toContain('/var/task/');
+      expect(result.content[0].text).toMatch(
+        /`head` must be passed explicitly/,
+      );
+    });
   });
 
   describe('Windows worktreePath resolution depends on the host platform (LS-8837)', () => {

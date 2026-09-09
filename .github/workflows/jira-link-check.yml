@@ -4,7 +4,7 @@ name: "Jira Link Check"
 # Validates the declared jira-link marker on every PR (LS-7896, phase 3 of
 # RFC docs/rfcs/draft-declared-ticket-linkage.md).
 #
-# The marker (emitted by github_create_pr and the PR-creation skills since
+# The marker (emitted by github_open_pr and the PR-creation skills since
 # LS-7895) is the single source of truth for "which ticket is this PR for?":
 #
 #   <!-- jira-link
