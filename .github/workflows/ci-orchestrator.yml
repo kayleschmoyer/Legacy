@@ -965,7 +965,28 @@ jobs:
       needs.determine-scope.result != 'skipped' &&
       (needs.ci-pipeline.result == 'cancelled' || needs.ci-pipeline.result == 'failure') &&
       github.event.pull_request.number
-    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
+    # LS-9710: deliberately pinned to ubuntu-latest, NOT
+    # `needs.determine-scope.outputs.runner-label || 'ubuntu-latest'` like the
+    # other post-pipeline jobs. This job's entire purpose is reporting that the
+    # self-hosted runner pool shut down — the exact circumstance under which
+    # that pool has no capacity to schedule it. On PR #7328 this job queued
+    # forever waiting for a self-hosted runner (`timeout-minutes` below only
+    # bounds execution time *after* a runner picks the job up — GitHub does
+    # not start that clock while a job is still queued for one), which kept
+    # this workflow run's jobs from ever all concluding. Because the
+    # concurrency group above is `orchestrator-<pr number>` with
+    # `cancel-in-progress: false` (see LS-9053/LS-9810 above), that undying
+    # run held the slot indefinitely and every subsequent push's orchestrator
+    # run queued behind it — so CI Gate never registered for the PR's actual
+    # current head, blocking the merge queue for 40 minutes until a manual
+    # `workflow_dispatch` worked around it. This is a different failure mode
+    # from LS-9053/LS-9810 above: those are about a *queued* run being
+    # displaced before it starts; this is about an *active* run's concurrency
+    # slot never being released because one of its own jobs can't be
+    # scheduled. Running this job on GitHub-hosted infrastructure — which
+    # always has capacity — closes that gap without touching the concurrency
+    # grouping those tickets established.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: "🚀 Checkout Repository"
