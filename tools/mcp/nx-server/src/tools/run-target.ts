@@ -66,7 +66,7 @@ export function isTargetAllowed(target: string): boolean {
 const SHELL_METACHAR_REGEX = /[;&`${}]/;
 
 interface RunTargetParams {
-  project: string;
+  project?: string;
   target: string;
   configuration?: string;
   noCache?: boolean;
@@ -74,6 +74,15 @@ interface RunTargetParams {
   args?: string | string[];
   env?: Record<string, string>;
   worktreePath?: string;
+}
+
+/**
+ * project omitted, or the literal "all", means "every project that declares
+ * this target" — equivalent to `nx run-many -t <target>`. Exported for unit
+ * testing.
+ */
+export function isRunMany(project: string | undefined): boolean {
+  return project == null || project === 'all';
 }
 
 /**
@@ -139,7 +148,9 @@ const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
 
-  if (!NX_NAME_REGEX.test(params.project)) {
+  const runMany = isRunMany(params.project);
+
+  if (!runMany && !NX_NAME_REGEX.test(params.project as string)) {
     return {
       content: [
         {
@@ -188,7 +199,16 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     const isTestTarget =
       params.target === 'test' || params.target.startsWith('test:');
 
-    const nxArgs = ['run', runSpec];
+    // run-many fans the target out across every project that declares it
+    // (equivalent to `nx run-many -t <target>`) instead of targeting one
+    // project:target pair — the -t/--configuration flag shapes differ from
+    // the single-project `run <project>:<target>` invocation.
+    const nxArgs = runMany
+      ? ['run-many', '-t', params.target]
+      : ['run', runSpec];
+    if (runMany && params.configuration) {
+      nxArgs.push(`--configuration=${params.configuration}`);
+    }
     if (params.noCache) nxArgs.push('--skip-nx-cache');
     if (params.args) {
       const tokens = Array.isArray(params.args)
@@ -260,7 +280,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         args: spec.args,
         shell: spec.shell,
         cwd,
-        label: `nx run ${runSpec}`,
+        label: runMany
+          ? `nx run-many -t ${params.target}`
+          : `nx run ${runSpec}`,
         timeoutMs: NX_RUN_TIMEOUT_MS,
         // Blind retries (e.g. after a lost transport) join the in-flight run
         // instead of spawning a duplicate nx process.
@@ -276,7 +298,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           {
             type: 'text',
             text: minifiedJson({
-              project: params.project,
+              project: params.project ?? 'all',
               target: params.target,
               status: snapshot.status,
               jobId: snapshot.jobId,
@@ -312,7 +334,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         {
           type: 'text',
           text: minifiedJson({
-            project: params.project,
+            project: params.project ?? 'all',
             target: params.target,
             passed,
             ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
@@ -335,7 +357,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         {
           type: 'text',
           text: truncateOutput(
-            `Failed to run ${params.project}:${params.target}: ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to run ${params.project ?? 'all'}:${params.target}: ${error instanceof Error ? error.message : String(error)}`,
             MAX_OUTPUT_CHARS,
           ),
         },

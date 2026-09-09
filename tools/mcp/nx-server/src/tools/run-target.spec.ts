@@ -7,6 +7,7 @@ jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
 
 import {
   coalesceWindowsTestPathPatterns,
+  isRunMany,
   isTargetAllowed,
   runTarget,
 } from './run-target.js';
@@ -148,9 +149,85 @@ describe('isTargetAllowed', () => {
   });
 });
 
+describe('isRunMany', () => {
+  it('treats an omitted project as run-many', () => {
+    expect(isRunMany(undefined)).toBe(true);
+  });
+
+  it('treats project "all" as run-many', () => {
+    expect(isRunMany('all')).toBe(true);
+  });
+
+  it('treats a real project name as a single-project run', () => {
+    expect(isRunMany('shared-components')).toBe(false);
+  });
+});
+
 describe('runTarget', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('builds a run-many invocation when project is omitted', async () => {
+    setupJob();
+    const result = await runTarget({ target: 'codegen' });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallArgs()).toEqual(['exec', 'nx', 'run-many', '-t', 'codegen']);
+    expect(jobCallOpts().label).toBe('nx run-many -t codegen');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      project: 'all',
+      target: 'codegen',
+    });
+  });
+
+  it('builds a run-many invocation when project is "all"', async () => {
+    setupJob();
+    await runTarget({ project: 'all', target: 'codegen' });
+
+    expect(jobCallArgs()).toEqual(['exec', 'nx', 'run-many', '-t', 'codegen']);
+  });
+
+  it('applies noCache to a run-many invocation', async () => {
+    setupJob();
+    await runTarget({ target: 'codegen', noCache: true });
+
+    expect(jobCallArgs()).toEqual([
+      'exec',
+      'nx',
+      'run-many',
+      '-t',
+      'codegen',
+      '--skip-nx-cache',
+    ]);
+  });
+
+  it('applies configuration to a run-many invocation as a flag', async () => {
+    setupJob();
+    await runTarget({ target: 'build', configuration: 'production' });
+
+    expect(jobCallArgs()).toEqual([
+      'exec',
+      'nx',
+      'run-many',
+      '-t',
+      'build',
+      '--configuration=production',
+    ]);
+  });
+
+  it('does not require a valid project name when running many', async () => {
+    setupJob();
+    const result = await runTarget({ target: 'lint' });
+
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('still builds a single-project run when project is given', async () => {
+    setupJob();
+    await runTarget({ project: 'graphql', target: 'codegen' });
+
+    expect(jobCallArgs()).toEqual(['exec', 'nx', 'run', 'graphql:codegen']);
   });
 
   it('accepts test:web and test:mobile variants', async () => {

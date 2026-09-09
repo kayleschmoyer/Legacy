@@ -118,10 +118,19 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format. Colon-suffixed variants of an allowed target (e.g. test:web, test:mobile) are also accepted. ' +
-    'Fast targets return pass/fail output in one call. A run still going after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
+  'Prefer this over `pnpm exec nx run <project>:<target>` / `pnpm exec nx run-many -t <target>` via shell. Runs an Nx target on one project, or fans out across every project declaring it if `project` is omitted. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format (colon-suffixed variants accepted). ' +
+    'Fast targets return pass/fail in one call; a slow run returns { status: "running", jobId } after ~45s — call nx_job_wait({ jobId }); do NOT re-run.',
   {
-    project: z.string().describe('Project name'),
+    // Deliberately widened from required to optional for the run-many mode (LS-9892).
+    // This is additive, not breaking: every call that always passed `project` before
+    // still type-checks and behaves identically — only the newly-allowed omit/"all"
+    // case is new.
+    project: z
+      .string()
+      .optional()
+      .describe(
+        'Project name. Omit or pass "all" to fan out across every project declaring the target.',
+      ),
     target: z.string().describe('Target to run'),
     configuration: z.string().optional().describe('Named configuration'),
     noCache: z.boolean().default(false).describe('Bypass Nx cache'),

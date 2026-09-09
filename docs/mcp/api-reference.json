@@ -2493,12 +2493,12 @@
         },
         {
           "name": "nx_run",
-          "description": "Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format. Colon-suffixed variants of an allowed target (e.g. test:web, test:mobile) are also accepted. Fast targets return pass/fail output in one call. A run still going after ~45s returns { status: \"running\", jobId } instead of blocking into the ~60s MCP transport timeout — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).",
+          "description": "Prefer this over `pnpm exec nx run <project>:<target>` / `pnpm exec nx run-many -t <target>` via shell. Runs an Nx target on one project, or fans out across every project declaring it if `project` is omitted. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format (colon-suffixed variants accepted). Fast targets return pass/fail in one call; a slow run returns { status: \"running\", jobId } after ~45s — call nx_job_wait({ jobId }); do NOT re-run.",
           "inputs": {
             "project": {
               "type": "string",
-              "optional": false,
-              "description": "Project name"
+              "optional": true,
+              "description": "Project name. Omit or pass \"all\" to fan out across every project declaring the target."
             },
             "target": {
               "type": "string",
