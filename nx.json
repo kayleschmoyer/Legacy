@@ -44,14 +44,7 @@
       "exclude": [
         "package.json",
         "tools/mcp/aws-server/**",
-        "tools/mcp/browser-server/**",
-        "tools/mcp/db-admin-server/**",
-        "tools/mcp/dev-process-server/**",
-        "tools/mcp/jira-server/**",
-        "tools/mcp/nx-server/**",
-        "tools/mcp/rollbar-server/**",
-        "tools/jira-sync/**",
-        "tools/rollbar-jira-reconcile/**"
+        "tools/mcp/rollbar-server/**"
       ]
     },
     {

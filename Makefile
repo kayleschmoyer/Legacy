@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
+	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -297,6 +297,10 @@ sync-skill-index: ## Regenerate .agents/skills/INDEX.md from SKILL.md frontmatte
 lint-skill-index: ## Check .agents/skills/INDEX.md is in sync with SKILL.md frontmatter
 	@$(call echo_blue,Checking skill index sync...)
 	@node scripts/generate-skill-index.mjs --check
+
+lint-eslint-nx-exclude-sync: ## Check nx.json's @nx/eslint/plugin.exclude matches eslint.config.mjs's tools/ ignores
+	@$(call echo_blue,Checking eslint.config.mjs / nx.json exclude-list sync...)
+	@node scripts/check-eslint-nx-exclude-sync.mjs
 
 mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} and .agents/skills/mcp-first/references/tool-catalog/*.md from the tools/mcp/ servers
 	@$(call echo_blue,Generating MCP API reference...)

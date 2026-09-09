@@ -1,7 +1,7 @@
 import {
+  type FlatRecord,
   markdownTable,
   pickFields,
-  type FlatRecord,
 } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {

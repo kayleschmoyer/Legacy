@@ -2,8 +2,8 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   BLOCKER_FIELD,
-  evaluateBlockers,
   type BlockerVerdict,
+  evaluateBlockers,
   type JiraIssueLink,
 } from '../blockers.js';
 import { searchJqlAll } from '../jql-search.js';

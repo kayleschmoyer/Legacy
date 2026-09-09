@@ -278,7 +278,7 @@ describe('search', () => {
 
       expect(mockSearchJql).toHaveBeenCalledWith(
         expect.not.objectContaining({
-          fields: expect.arrayContaining(['issuelinks']),
+          fields: expect.arrayContaining(['issuelinks']) as string[],
         }),
       );
       expect(out).not.toContain('blocked');
