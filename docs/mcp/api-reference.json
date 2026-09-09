@@ -2766,7 +2766,7 @@
         },
         {
           "name": "nx_run_test",
-          "description": "Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern>` via shell when iterating on a single spec file or pattern. Thin wrapper over nx_run: resolves `config` to the matching colon-suffixed jest target (e.g. project \"shared-components\", config \"mobile\" runs target \"test:mobile\" against jest.config.mobile.ts) and passes testPathPatterns through, so you never need to reference a jest config file path directly. Omit `config` for projects with a single \"test\" target. Same job semantics as nx_run: fast runs return pass/fail output in one call; a run still going after ~45s returns { status: \"running\", jobId } — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).",
+          "description": "Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern>` via shell when iterating on a single spec file or pattern. Thin wrapper over nx_run: resolves `config` to the matching colon-suffixed jest target (e.g. \"mobile\" -> \"test:mobile\") and passes testPathPatterns through. Omit `config` for a single \"test\" target; if that target aggregates config-scoped jest targets (e.g. shared-components), testPathPatterns fans out and results merge, instead of silently running everything unfiltered. Same job semantics as nx_run: fast runs return pass/fail in one call; a run still going after ~45s returns { status: \"running\", jobId } — call nx_job_wait({ jobId }); do NOT re-run (re-invoking joins the in-flight run).",
           "inputs": {
             "project": {
               "type": "string",
