@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { openPR } from './open-pr';
 
 jest.mock('../github-api', () => ({
@@ -539,7 +540,7 @@ describe('openPR', () => {
       });
       expect(result.isError).toBeFalsy();
       expect(mockReadFileSync).toHaveBeenCalledWith(
-        '/tmp/test-repo-root/scratch/pr-body.md',
+        resolve('/tmp/test-repo-root', 'scratch/pr-body.md'),
         'utf-8',
       );
       const calls = mockGithubRest.mock.calls as unknown as Array<
@@ -561,7 +562,7 @@ describe('openPR', () => {
       });
       expect(result.isError).toBeFalsy();
       expect(mockReadFileSync).toHaveBeenCalledWith(
-        '/tmp/test-repo-root/sub-wt/pr-body.md',
+        resolve('/tmp/test-repo-root/sub-wt', 'pr-body.md'),
         'utf-8',
       );
     });

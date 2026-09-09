@@ -7,6 +7,7 @@ jest.mock('../auth', () => ({
 jest.mock('node:fs', () => ({ readFileSync: jest.fn() }));
 
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { editPR } from './edit-pr';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth';
@@ -231,7 +232,7 @@ describe('editPR — bodyFile (LS-9581)', () => {
     const result = await editPR({ number: 21, bodyFile: 'scratch/pr-body.md' });
     expect(result.isError).toBeFalsy();
     expect(mockedReadFileSync).toHaveBeenCalledWith(
-      '/tmp/test-repo-root/scratch/pr-body.md',
+      resolve('/tmp/test-repo-root', 'scratch/pr-body.md'),
       'utf-8',
     );
     const patchCall = mockedRest.mock.calls.find(
