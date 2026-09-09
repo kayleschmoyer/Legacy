@@ -4332,7 +4332,10 @@ export function LeagueCreatePage(): React.JSX.Element {
           </YStack>
 
           {/* ── Sticky sidebar ── */}
+          {/* `$lg` widens this to full width once the parent XStack above
+              stacks to a column. The two must move together — see LS-9895. */}
           <YStack
+            testID="league-create-summary-sidebar"
             width={340}
             gap="$4"
             flexShrink={0}

@@ -22,33 +22,34 @@ wired directly into the `brandDark` / `brandLight` themes.
 
 ## What this package is NOT for
 
-**Do not use `breakpoints` to reason about what `$sm` / `$md` do in JSX.** Tamagui media props
-compile against `@tamagui/config`'s own `media` export, not this file, and the two disagree:
+**`breakpoints` values are band LOWER bounds — a Tamagui `$X` media key is a `maxWidth`.** As of
+LS-9885 `lib/tamagui-config` derives Tamagui's `media` config from this file, so the two finally
+describe the same scale, but they still bracket a band from opposite ends:
 
-| Token | This package | Tamagui (what `$token` actually fires at) |
-| ----- | ------------ | ----------------------------------------- |
-| `xxs` | 0            | ≤390                                      |
-| `xs`  | 660          | ≤660 ✅                                   |
-| `sm`  | 800          | ≤800 ✅                                   |
-| `md`  | 860          | **≤1020**                                 |
-| `lg`  | 980          | **≤1280**                                 |
-| `xl`  | 1120         | **≤1650**                                 |
+| Band  | Lower bound here | What `$X` fires at in JSX   |
+| ----- | ---------------- | --------------------------- |
+| `xxs` | 0                | ≤ 659                       |
+| `xs`  | 660              | ≤ 799                       |
+| `sm`  | 800              | ≤ 859                       |
+| `md`  | 860              | ≤ 979                       |
+| `lg`  | 980              | ≤ 1119                      |
+| `xl`  | 1120             | ≤ 1279                      |
+| `xxl` | 1280             | ≥ 1280 (top band, minWidth) |
 
-`md`/`lg`/`xl` fire at different widths than this file implies — e.g. `$md` fires 160px later
-than the number above suggests, so layout written against 860 will not reflow where you expect.
+A `$X` key matches its own band _and everything narrower_ — the mobile-first cascade — so it ends
+one pixel below the next band's lower bound. That also makes `$X` and `$gtX` exact complements,
+which is why `mediaQueries` here uses the next band's lower bound for each `gt` query.
 
-**LS-9416 resolution:** this package's band scale and Tamagui's `media` config are two
-deliberately separate vocabularies (option (c) from that ticket — see its comments for the
-consumer audit). `breakpoints`/`mediaQueries` stay the source for raw numbers in non-Tamagui
-contexts; they are not renamed, since `src/lib/breakpoints.ts` and this README already say
-outright that they don't govern `$token` behavior. What did change: the `xxl` band and the
-`gtXxs` / `gtXl` media queries were removed. Neither has a real `@tamagui/config` counterpart
-(no `xxl` media key exists at all, and Tamagui has no `gtXxs` — its first `gt*` query is
-`gtXs`), so keeping them was a silent no-op trap: `$xxl={{ … }}` compiled, typechecked, linted,
-and did nothing. An audit of `breakpoints`/`mediaQueries` consumers (`grep -rn
-"breakpoints\.\|mediaQueries\." lib apps`, recorded on LS-9416) found no code depending on
-either, only tests. The comment in `src/lib/breakpoints.ts` previously claimed these values
-mirror the Tamagui defaults; it's corrected to say they're an independent scale.
+**The alignment is landing in slices** (LS-9895 → LS-9896/9897/9898). Until they all land, the
+`md`, `xs` and `sm` rows above describe the target, not today's runtime. The Status column in
+[`responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md) is the live
+state.
+
+**History.** LS-9416 audited this drift and chose to keep the two as separate vocabularies
+(option (c)), removing `xxl`/`gtXl` because no `@tamagui/config` counterpart existed — `$xxl={{ … }}`
+compiled, linted, and did nothing. LS-9885 reversed that premise by giving the workspace its own
+`media` config, so `xxl`/`gtXl` are back and are now real. (`--bp-xxl` had never left `tokens.css`,
+so this also re-syncs the TS scale with the CSS one.)
 
 **For media props, use the tier table in
 [`.agents/skills/ui/references/responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md).**

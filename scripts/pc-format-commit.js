@@ -73,6 +73,30 @@ function runPrettier(args) {
   return result;
 }
 
+/**
+ * Paths git ignores, out of the given list.
+ *
+ * `git check-ignore` exits 1 when nothing matches, which is a normal answer
+ * here rather than a failure — so this deliberately does not go through
+ * `git()`, which throws on any non-zero status.
+ */
+function gitIgnoredPaths(paths) {
+  if (paths.length === 0) {
+    return new Set();
+  }
+  const result = spawnSync('git', ['check-ignore', '--', ...paths], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+  });
+  // status 0 = some matched, 1 = none matched. Anything else (128: not a repo,
+  // bad args) means we can't tell — return nothing rather than silently
+  // dropping files the caller intended to format.
+  if (result.status !== 0) {
+    return new Set();
+  }
+  return new Set(parseFileList(result.stdout));
+}
+
 function git(args) {
   const result = spawnSync('git', args, {
     cwd: process.cwd(),
@@ -106,7 +130,22 @@ function main() {
     process.exitCode = listResult.status ?? 1;
     return;
   }
-  const files = parseFileList(listResult.stdout);
+  const listed = parseFileList(listResult.stdout);
+
+  // Prettier honours `.prettierignore`, not `.gitignore`, so its list can name
+  // files git will never accept — e.g. `apps/web-e2e/.auth/state.json`, which a
+  // local E2E run drops into an ignored directory. Formatting one is harmless,
+  // but staging it makes `git add` exit non-zero and takes the whole pc-format
+  // step down with it, which reads as "your change broke formatting" when
+  // nothing of the sort happened. Drop them before either step sees them.
+  const ignored = gitIgnoredPaths(listed);
+  const files = listed.filter((file) => !ignored.has(file));
+
+  if (ignored.size > 0) {
+    console.log(
+      `  Skipping ${ignored.size} git-ignored file(s) prettier listed.`,
+    );
+  }
 
   if (files.length === 0) {
     console.log('  No formatting changes needed.');

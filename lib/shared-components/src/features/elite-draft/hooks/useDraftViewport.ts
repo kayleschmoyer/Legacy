@@ -56,14 +56,18 @@ export function resolveDraftViewportTier(width: number): DraftViewportTier {
  * of this feature's consumers supply (e.g. `apps/web/src/components/
  * EliteDraftBoard.a11y.spec.tsx` renders `DraftPlayerBoard` bare), which is
  * why `DraftPlayerBoard` already hand-rolled a `window.matchMedia` listener
- * instead. Second, and more importantly, the workspace's Tamagui media config
- * is `@tamagui/config`'s default set — `$sm` is `maxWidth: 800`, `$md` is
- * `maxWidth: 1020`, and `$xxl` does not exist — which does NOT match the
- * design-token scale the mock is annotated against (`$md` starts at 860,
- * `$lg` at 980). Reconciling those two scales globally would move 264 style
- * props across `lib/` and `apps/`, so it is tracked separately; until then,
- * anything in this feature that needs a *design-system* band must read it
- * from here, not from a `$token` style prop.
+ * instead. Second, the workspace's Tamagui media config did not match the
+ * design-token scale the mock is annotated against, so `$md` fired at 1020
+ * where the mock stacks at 979.
+ *
+ * That second reason is being retired. LS-9885 makes the workspace `media`
+ * config derive from `@legacy-sports/design-tokens` `breakpoints`; LS-9895 has
+ * landed the mechanism (and `$xxl` now genuinely exists, which this comment
+ * previously said it did not), but `$md`/`$gtMd` still carry stock values
+ * until LS-9896. Once that lands, `$md` IS 979 and this hook and the `$token`
+ * props agree — LS-9896 owns collapsing the two mechanisms into one. Until
+ * then, anything in this feature that needs a *design-system* band must still
+ * read it from here, not from a `$md`/`$gtMd` style prop.
  *
  * `useWindowDimensions` works unchanged on web (via react-native-web, which
  * tracks `window.innerWidth` and resize) and on native, needs no provider,

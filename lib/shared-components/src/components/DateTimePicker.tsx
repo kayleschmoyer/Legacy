@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Adapt, Button, Popover, Text, XStack, YStack } from 'tamagui';
+import {
+  Adapt,
+  Button,
+  Popover,
+  Text,
+  useMedia,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
 import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
 import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
@@ -7,12 +15,6 @@ import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { X } from '@tamagui/lucide-icons/icons/X';
 import { Platform } from 'react-native';
 import { to12Hour, to24Hour } from './dateTimePickerUtils';
-
-// `Adapt`'s `when` prop is typed as `MediaQueryKeyString`, which resolves to
-// `never` for this workspace's config in the shared-components typecheck, so a
-// bare media key is not assignable. Narrow through `unknown` the same way the
-// Select component does (its `asAdaptWhen` helper) to pass a media breakpoint.
-const asAdaptWhen = (value: unknown): never => value as never;
 
 export interface DateTimePickerProps {
   value?: Date;
@@ -51,6 +53,10 @@ export function DateTimePicker({
   inputStyle,
   onClear,
 }: DateTimePickerProps) {
+  // Tamagui's useMedia is any-typed under the strict lint config; bind it
+  // through an explicit signature the same way RosterBoard/HomeScreen do.
+  const readMedia = useMedia as () => { sm?: boolean; short?: boolean };
+  const media = readMedia();
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const base = value ?? new Date();
@@ -271,16 +277,25 @@ export function DateTimePicker({
         onOpenChange={setIsOpen}
       >
         {/*
-         * On small WEB viewports (phones) the anchored popover is taller than
-         * the screen and its bottom "Apply" button lands off the fold, where it
-         * cannot be scrolled into view (the popover is a viewport-anchored
-         * floating layer). Adapt it into a bottom Sheet there — anchored to the
-         * viewport and internally scrollable, so every control is reachable.
-         * Gated to `Platform.OS === 'web'` so native (which always renders this
+         * On small or SHORT WEB viewports the anchored popover can be taller
+         * than the screen, and its bottom "Apply" button lands off the fold
+         * where it cannot be scrolled into view (the popover is a
+         * viewport-anchored floating layer, not scrollable content).
+         * Adapt it into a bottom Sheet there — anchored to the viewport and
+         * internally scrollable, so every control is reachable.
+         *
+         * Gated on width (`sm`) OR height (`short`), not width alone
+         * (LS-9900): a wide-but-short window overflows just as readily as a
+         * narrow one, and where the trigger sits on the page (and therefore
+         * how much room the popover has below it) depends on the host
+         * page's own layout, not the picker. `short` (maxHeight 800) covers
+         * that axis; `sm` is kept for genuinely narrow viewports where the
+         * popover's own width also doesn't fit. Gated to
+         * `Platform.OS === 'web'` so native (which always renders this
          * custom picker) keeps its current behaviour (LS-8501).
          */}
         {Platform.OS === 'web' ? (
-          <Adapt when={asAdaptWhen('sm')}>
+          <Adapt when={media.sm || media.short}>
             <Popover.Sheet modal dismissOnSnapToBottom snapPoints={[90]}>
               <Popover.Sheet.Overlay
                 animation="quick"

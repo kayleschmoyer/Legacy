@@ -2,6 +2,7 @@ import { createAnimations } from '@tamagui/animations-react-native';
 import { config, createGenericFont } from '@tamagui/config';
 import {
   brand,
+  breakpoints,
   chromeDark,
   chromeLight,
   darkSurface,
@@ -468,6 +469,81 @@ const tokens = createTokens({
   },
 });
 
+// ── Media (breakpoint) config ────────────────────────────────────────────
+// Derived from `@legacy-sports/design-tokens` `breakpoints` — the scale the
+// design mocks are annotated against — rather than inherited from
+// `@tamagui/config`, whose stock values are a different scale entirely
+// (LS-9885). Before this, `$md` read as "the design system's md band" and
+// silently meant "≤1020"; `$lg` was off by 300px and `$xxl` did not exist.
+//
+// Bracket conversion: a `breakpoints` value is its band's LOWER bound, while a
+// Tamagui `$X` key is a `maxWidth` — it matches its own band and everything
+// narrower (the mobile-first cascade). So `$X` ends one pixel below the NEXT
+// band's lower bound, which makes `$X` and `$gtX` exact complements. `xxl` is
+// the top band and so is a `minWidth` query with no upper bound; there is no
+// `gtXxs` or `gtXxl` (Tamagui's first `gt*` key is `gtXs`).
+//
+// Note that Tamagui's `$`-prop typing is permissive — `$xxl={{ … }}` compiled
+// even when no `xxl` media key existed, which is exactly how the old no-op
+// trap (LS-9416) went unnoticed. Types are therefore NOT the guard here;
+// `tamagui-config.spec.ts` asserts the runtime scale instead.
+const designTokenMedia = {
+  xxs: { maxWidth: breakpoints.xs - 1 }, // ≤659
+  xs: { maxWidth: breakpoints.sm - 1 }, // ≤799
+  sm: { maxWidth: breakpoints.md - 1 }, // ≤859
+  md: { maxWidth: breakpoints.lg - 1 }, // ≤979
+  lg: { maxWidth: breakpoints.xl - 1 }, // ≤1119
+  xl: { maxWidth: breakpoints.xxl - 1 }, // ≤1279
+  xxl: { minWidth: breakpoints.xxl }, // ≥1280
+  gtXs: { minWidth: breakpoints.sm }, // ≥800
+  gtSm: { minWidth: breakpoints.md }, // ≥860
+  gtMd: { minWidth: breakpoints.lg }, // ≥980
+  gtLg: { minWidth: breakpoints.xl }, // ≥1120
+  gtXl: { minWidth: breakpoints.xxl }, // ≥1280
+} as const;
+
+// Staged rollout (LS-9885). Aligning a media key changes the width at which
+// every `$token` style prop using it fires, across ~51 files — a
+// visual-regression change, not a config one. So the scale migrates one
+// complementary pair at a time, each with its own call-site audit:
+//
+//   LS-9895 (this change) — xxs, lg, xl, xxl, gtLg, gtXl.  4 existing sites
+//   LS-9896               — md, gtMd  (53 sites) + elite-draft convergence
+//   LS-9897               — xs, gtXs  (17 sites)
+//   LS-9898               — sm, gtSm  (184 sites) — the bulk, landed last
+//
+// Two invariants hold at every step, so no intermediate state is broken:
+//   1. `$X` and `$gtX` always move together. Moving `$sm` to 859 while `$gtSm`
+//      stayed at 801 would make 801–859 match BOTH keys.
+//   2. Band order stays monotonic — each key's `maxWidth` is below the next's.
+//      Here: xxs 659 < xs 660 < sm 800 < md 1020 < lg 1119 < xl 1279 < xxl.
+//      (xxs 659 sitting one pixel under the still-stock xs 660 is the visible
+//      seam of the staging; LS-9897 widens xs to 799 and it disappears.)
+//
+// Each entry below is one line to delete when its slice lands.
+const media = {
+  ...designTokenMedia,
+  xs: config.media.xs, // → LS-9897
+  gtXs: config.media.gtXs, // → LS-9897
+  sm: config.media.sm, // → LS-9898
+  gtSm: config.media.gtSm, // → LS-9898
+  md: config.media.md, // → LS-9896
+  gtMd: config.media.gtMd, // → LS-9896
+  // Not a design-token band — a viewport-HEIGHT escape hatch (LS-9900).
+  // `DateTimePicker`'s popover-to-Sheet adaptation was gated on `sm`
+  // (viewport WIDTH), the wrong axis for "does this floating layer fit on
+  // screen": a wide-but-short window (e.g. the web-e2e desktop projects'
+  // 1280x720) overflows just as readily as a narrow phone. Realigning `$lg`
+  // to 1119 in this file flips the Create League page from stacked to
+  // two-column at exactly that 1280px viewport, moving the draft-date
+  // trigger low enough that the anchored popover's Apply control opens
+  // below the fold — width-gated Sheet adaptation never engages there.
+  // 800 clears both real targets: the Mobile Chrome/Safari projects
+  // (667px tall) and the desktop projects (720px tall) while staying under
+  // typical laptop/desktop viewport heights.
+  short: { maxHeight: 800 },
+};
+
 const customConfig = {
   ...config,
   tokens,
@@ -485,10 +561,27 @@ const customConfig = {
     legacy_dark: brandDark,
     legacy: brandLight,
   },
+  media,
   settings: {
     ...config.settings,
     // Follow system preference by default; fall back to light
     defaultTheme: 'light',
+    // `xxl` is new in LS-9885 and must be added here explicitly. Every key in
+    // this map is treated as MATCHING before the first measurement (SSR, first
+    // paint, jest). That default suits the `maxWidth` keys — the mobile-first
+    // cascade wants them live — but `xxl` is a `minWidth` query, so defaulting
+    // it active would apply `$xxl` styling at every width until measurement
+    // corrected it. Tamagui omits the `gt*` keys here for the same reason;
+    // `xxl` is listed as `false` rather than omitted only because it shares the
+    // `$`-band namespace and reads as an oversight otherwise.
+    mediaQueryDefaultActive: {
+      ...config.settings.mediaQueryDefaultActive,
+      xxl: false,
+      // `short` (maxHeight) is a new key with no stock counterpart to
+      // inherit a default from, so — like the other maxWidth-style bands
+      // above — it defaults active rather than falling back to `false`.
+      short: true,
+    },
   },
 };
 
@@ -508,8 +601,15 @@ export const tamaguiConfig: TamaguiInternalConfig = createTamagui(
 // pattern `useThemeTokens()` already uses for colors/shadows in
 // lib/shared-components. Colors are wired directly into `brandDark`/
 // `brandLight` above (the idiomatic Tamagui mechanism for themed values);
-// breakpoints are inherited unchanged from `config.media` (mirrors
-// @legacy-sports/design-tokens' `breakpoints`/`mediaQueries`).
+// breakpoints are wired into Tamagui's `media` config above, derived from
+// @legacy-sports/design-tokens' `breakpoints` (LS-9885) — so a `$md` style
+// prop and `breakpoints.md` describe the same widths. (This comment
+// previously claimed breakpoints were "inherited unchanged from
+// `config.media`", which mirrored the design tokens. That was false in both
+// halves: the config inherited @tamagui/config's own scale, which disagreed
+// with the design tokens by up to 300px. The claim is what kept the drift
+// invisible, so `tamagui-config.spec.ts` now asserts the derivation instead
+// of a comment asserting it.)
 //
 // `spacing`/`radii` are ALSO layered into Tamagui's internal `tokens.space`/
 // `tokens.radius` scale above (LS-9014), so bare `$N` props resolve to the

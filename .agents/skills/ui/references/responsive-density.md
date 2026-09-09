@@ -24,21 +24,29 @@ Adjacent Tamagui rendering traps that bite while restyling per tier — string `
 
 ## Tier table — ground truth
 
-These are the media tokens Tamagui actually compiles, read from `@tamagui/config`'s `media` export. **Use the token names, never raw pixel values** — pixels drift, token names do not.
+These are the media tokens Tamagui actually compiles. **Use the token names, never raw pixel values** — pixels drift, token names do not.
 
-| Token  | Fires at | `gt` counterpart   | Typical use                          |
-| ------ | -------- | ------------------ | ------------------------------------ |
-| `$xxs` | ≤ 390px  | —                  | Smallest phones. Last-resort tier.   |
-| `$xs`  | ≤ 660px  | `$gtXs` (≥ 661px)  | Phone. The main "compact" tier.      |
-| `$sm`  | ≤ 800px  | `$gtSm` (≥ 801px)  | Large phone / small tablet portrait. |
-| `$md`  | ≤ 1020px | `$gtMd` (≥ 1021px) | Tablet. Multi-column starts above.   |
-| `$lg`  | ≤ 1280px | `$gtLg` (≥ 1281px) | Laptop.                              |
-| `$xl`  | ≤ 1650px | `$gtXl` (≥ 1651px) | Desktop.                             |
+As of LS-9885 the workspace `media` config is **derived from `@legacy-sports/design-tokens` `breakpoints`**, so a `$md` prop and `breakpoints.md` finally describe the same widths. That alignment is landing in slices, because moving a key changes the width at which every call site using it fires. The **Status** column below is the live state — a row marked _stock_ still fires at the old @tamagui/config width.
 
-Two things that bite:
+| Token  | Fires at | `gt` counterpart   | Status                       | Typical use                          |
+| ------ | -------- | ------------------ | ---------------------------- | ------------------------------------ |
+| `$xxs` | ≤ 659px  | —                  | ✅ aligned                   | Smallest phones. Last-resort tier.   |
+| `$xs`  | ≤ 660px  | `$gtXs` (≥ 661px)  | ⏳ stock — LS-9897 → 799/800 | Phone. The main "compact" tier.      |
+| `$sm`  | ≤ 800px  | `$gtSm` (≥ 801px)  | ⏳ stock — LS-9898 → 859/860 | Large phone / small tablet portrait. |
+| `$md`  | ≤ 1020px | `$gtMd` (≥ 1021px) | ⏳ stock — LS-9896 → 979/980 | Tablet. Multi-column starts above.   |
+| `$lg`  | ≤ 1119px | `$gtLg` (≥ 1120px) | ✅ aligned                   | Laptop.                              |
+| `$xl`  | ≤ 1279px | `$gtXl` (≥ 1280px) | ✅ aligned                   | Desktop.                             |
+| `$xxl` | ≥ 1280px | —                  | ✅ aligned (new)             | Wide desktop. Top band.              |
 
-- **There is no `$xxl` and no `$gtXxs`.** Tamagui has no equivalent for either, so `$xxl={{ … }}` in JSX is silently inert — it compiles, lints, and does nothing. `lib/design-tokens/src/lib/breakpoints.ts` used to define both anyway (a trap for anyone pattern-matching off that file); LS-9416 removed them from there too. See [Known drift](#known-drift) before trusting that file for anything else.
-- **`$xxs` does not default to active.** Every other tier is treated as matching before measurement (`mediaQueryDefaultActive.xxs === false`); `$xxs` is not. So the first paint, SSR output, and jest renders all take the non-`$xxs` branch. Never put content-critical rendering behind `$xxs` alone — use it to tighten, never to reveal.
+Once LS-9896/9897/9898 land, the whole table reads off the design-token scale and the Status column goes away.
+
+Three things that bite:
+
+- **The two scales bracket differently.** A `breakpoints.X` value is its band's **lower** bound; a Tamagui `$X` key is a **maxWidth** — it matches its own band _and everything narrower_ (the mobile-first cascade). So `$X` ends one pixel below the _next_ band's lower bound, which is what makes `$X` and `$gtX` exact complements. Reading `breakpoints.md === 860` as "`$md` fires at 860" is the mistake; `$md` fires at ≤979, the top of the md band.
+- **`$xxl` is a `minWidth` band, and the only one.** Every other `$` token is a maxWidth that cascades downward; `$xxl` applies only from 1280 up. Don't reach for it expecting the usual cascade. (It did not exist at all before LS-9885 — `$xxl={{ … }}` compiled, linted, and did nothing.)
+- **`$xxs` does not default to active.** Every maxWidth tier is treated as matching before measurement (`mediaQueryDefaultActive`); `$xxs` is not, and neither is `$xxl` (it is a minWidth query — defaulting it on would apply it at every width). So the first paint, SSR output, and jest renders all take the non-`$xxs`, non-`$xxl` branch. Never put content-critical rendering behind either alone — use them to tighten, never to reveal.
+
+> **Unit tests are not evidence for breakpoint work.** Because every maxWidth tier defaults to active, a media-dependent component can pass in jest while rendering wrong in a browser. Verify breakpoint changes at real viewport widths.
 
 ## 1. Chrome shrinks before content
 
@@ -150,29 +158,30 @@ Consequences to plan around:
 
 ### The rest, in one place
 
-| Pitfall                                                        | Detail                                                                                         |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `hitSlop` silently dropped on web                              | [§2](#2-hit-areas-are-decoupled-from-visual-size)                                              |
-| `::after` / `::before` insets don't exist on native            | [§2](#2-hit-areas-are-decoupled-from-visual-size)                                              |
-| `$xxl` / `gtXxs` compile but never fire                        | [Tier table](#tier-table--ground-truth)                                                        |
-| `$xxs` inactive before measurement — SSR/first paint/jest      | [Tier table](#tier-table--ground-truth)                                                        |
-| `gap` + `padding` tightened together compound into collisions  | [§1](#1-chrome-shrinks-before-content)                                                         |
-| Responsive tokens dropped when extracting to shared-components | [`shared-components-first`](../../shared-components-first/SKILL.md) has a `grep -c` diagnostic |
-| Platform branch used where a breakpoint belongs                | [review pattern #47](../../pr-lifecycle/references/common-review-patterns.md) — blocks the PR  |
+| Pitfall                                                          | Detail                                                                                         |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `hitSlop` silently dropped on web                                | [§2](#2-hit-areas-are-decoupled-from-visual-size)                                              |
+| `::after` / `::before` insets don't exist on native              | [§2](#2-hit-areas-are-decoupled-from-visual-size)                                              |
+| `$xxl` is a minWidth band and does not cascade downward          | [Tier table](#tier-table--ground-truth)                                                        |
+| `$xxs`/`$xxl` inactive before measurement — SSR/first paint/jest | [Tier table](#tier-table--ground-truth)                                                        |
+| `gap` + `padding` tightened together compound into collisions    | [§1](#1-chrome-shrinks-before-content)                                                         |
+| Responsive tokens dropped when extracting to shared-components   | [`shared-components-first`](../../shared-components-first/SKILL.md) has a `grep -c` diagnostic |
+| Platform branch used where a breakpoint belongs                  | [review pattern #47](../../pr-lifecycle/references/common-review-patterns.md) — blocks the PR  |
 
 ## Known drift
 
-`lib/design-tokens/src/lib/breakpoints.ts` is a deliberately separate band scale from
-`@tamagui/config`, not a mirror of it — resolved in LS-9416 (option (c): keep both
-vocabularies, correct the file's own comment, drop the two exports that had no real Tamagui
-counterpart). The values still don't line up:
+**Largely resolved.** LS-9416 first recorded this as two deliberately separate vocabularies;
+LS-9885 then made `lib/tamagui-config` derive Tamagui's `media` config from
+`lib/design-tokens/src/lib/breakpoints.ts`, so the scales are converging rather than coexisting.
 
-| Token | design-tokens | Tamagui (real) |
-| ----- | ------------- | -------------- |
-| `xs`  | 660           | 660 ✅         |
-| `sm`  | 800           | 800 ✅         |
-| `md`  | 860           | **1020**       |
-| `lg`  | 980           | **1280**       |
-| `xl`  | 1120          | **1650**       |
+What remains is the staged rollout: `md`/`gtMd` (LS-9896), `xs`/`gtXs` (LS-9897) and
+`sm`/`gtSm` (LS-9898) still carry stock @tamagui/config values until each slice lands. The
+Status column in the [tier table](#tier-table--ground-truth) is the live state — read it there,
+not from a second table here.
 
-That file is the right source for **raw numbers in non-Tamagui contexts** (web-only CSS, canvas, native measurement). It is _not_ a guide to what `$md`/`$lg` do in JSX. When writing media props, this page's table wins.
+The one difference that is **not** drift and will never go away is the bracket direction:
+`breakpoints.X` is a band's lower bound, a `$X` media key is a maxWidth at the top of that band.
+See the first bullet under the tier table.
+
+`breakpoints.ts` remains the right source for **raw numbers in non-Tamagui contexts** (web-only
+CSS, canvas, native measurement). For what a media prop does in JSX, this page's table wins.

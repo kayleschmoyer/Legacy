@@ -98,6 +98,16 @@ export class LeaguePage extends BaseScreen {
     });
   }
 
+  /**
+   * The create form's sticky summary sidebar. Its width is breakpoint-driven —
+   * a fixed 340px column in the two-column layout, full width once `$lg`
+   * applies and the layout stacks — which makes it the probe for asserting
+   * where `$lg` actually fires in a real viewport (LS-9895).
+   */
+  get createSummarySidebar(): UIElement {
+    return this.driver.byTestId('league-create-summary-sidebar');
+  }
+
   /** The league-name text input. */
   get leagueNameInput(): UIElement {
     return this.driver.byPlaceholder('Enter your league name');

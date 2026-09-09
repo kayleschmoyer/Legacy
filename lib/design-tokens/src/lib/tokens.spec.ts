@@ -60,13 +60,18 @@ describe('design-tokens', () => {
     expect(radii.pill).toBe(9999);
   });
 
-  it('exposes the design-tokens band scale (independent of @tamagui/config media)', () => {
+  it('exposes the design-tokens band scale (the source Tamagui media derives from)', () => {
     expect(breakpoints.xxs).toBe(0);
     expect(breakpoints.xs).toBe(660);
     expect(breakpoints.sm).toBe(800);
     expect(breakpoints.md).toBe(860);
     expect(breakpoints.lg).toBe(980);
     expect(breakpoints.xl).toBe(1120);
+    // Re-added in LS-9885. LS-9416 had removed it because @tamagui/config had
+    // no `xxl` media key, making `$xxl={{ … }}` a silent no-op; the workspace
+    // config now derives its own `media` from this scale, so the band is real.
+    // `--bp-xxl` never left tokens.css, so this also re-syncs TS with the CSS.
+    expect(breakpoints.xxl).toBe(1280);
   });
 
   it('exposes position colors for the five baseball roles', () => {

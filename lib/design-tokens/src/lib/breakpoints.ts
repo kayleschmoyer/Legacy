@@ -1,12 +1,28 @@
-// Min-width thresholds (px) for design-tokens' own band vocabulary. These are
-// NOT the same scale as @tamagui/config's `media` export (see
-// node_modules/@tamagui/config/dist/cjs/media.js) — `md`/`lg`/`xl` in
-// particular fire at different widths in Tamagui JSX than the numbers below.
+// Band lower bounds (px) for the design system's viewport vocabulary. Each
+// value is the *lower* bound of its named band, so band N spans
+// `[breakpoints[N], breakpoints[next] - 1]` and `xxs` starts at 0:
+//
+//   xxs 0–659 | xs 660–799 | sm 800–859 | md 860–979
+//   lg 980–1119 | xl 1120–1279 | xxl 1280+
+//
+// This is the scale the design mocks are annotated against, and — as of
+// LS-9885 — the scale `lib/tamagui-config` derives Tamagui's `media` config
+// from, so a `$md` style prop in JSX and `breakpoints.md` here finally
+// describe the same widths. Note the bracket direction differs between the
+// two: values here are lower bounds, while a Tamagui `$X` media key is a
+// `maxWidth` (it matches its own band *and everything narrower*, the usual
+// mobile-first cascade). `lib/tamagui-config` owns that conversion; see
+// `buildDesignTokenMedia()` there.
+//
 // Use this file for raw numbers in non-Tamagui contexts (web-only CSS,
-// canvas, native measurement); for what a Tamagui `$md`/`$lg` prop actually
-// does, see .agents/skills/ui/references/responsive-density.md. Each value
-// below is the lower bound of the named band; `xxs` starts at 0. Drift
-// audited and this split made explicit in LS-9416 (see lib/design-tokens/README.md).
+// canvas, native measurement). For which style prop to reach for in JSX, see
+// `.agents/skills/ui/references/responsive-density.md`.
+//
+// History: LS-9416 audited a drift between this scale and `@tamagui/config`'s
+// stock `media` values and deliberately kept them as two separate
+// vocabularies, removing `xxl`/`gtXl` because no Tamagui counterpart existed.
+// LS-9885 reversed that premise by making Tamagui's `media` derive from this
+// file, so `xxl`/`gtXl` are back and are now real.
 export const breakpoints = {
   xxs: 0,
   xs: 660,
@@ -14,18 +30,21 @@ export const breakpoints = {
   md: 860,
   lg: 980,
   xl: 1120,
+  xxl: 1280,
 } as const;
 
 export type Breakpoint = keyof typeof breakpoints;
 
-// One entry per xs→sm→md→lg→xl band transition. There is deliberately no
-// `gtXxs` (xxs→xs) or `xxl`/`gtXl` band above `xl` — Tamagui's own media
-// config has no equivalent for either, so keeping them here was a silent
-// no-op trap for anyone who tried `$xxl` or `$gtXxs` in JSX. Removed in
-// LS-9416; see the README for the audit that found no real consumer of them.
+// One `min-width` query per band transition, for raw CSS contexts. Each is the
+// next band's lower bound, which makes `mediaQueries.gtX` the exact complement
+// of the Tamagui `$X` max-width key built from the same scale.
+//
+// There is deliberately no `gtXxs` (Tamagui's first `gt*` query is `gtXs`) and
+// no `gtXxl` (`xxl` is the top band — `$xxl` is itself a `min-width` query).
 export const mediaQueries = {
   gtXs: `(min-width: ${breakpoints.sm}px)`,
   gtSm: `(min-width: ${breakpoints.md}px)`,
   gtMd: `(min-width: ${breakpoints.lg}px)`,
   gtLg: `(min-width: ${breakpoints.xl}px)`,
+  gtXl: `(min-width: ${breakpoints.xxl}px)`,
 } as const;
