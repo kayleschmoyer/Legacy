@@ -10,6 +10,9 @@ function makeDeps(overrides: Partial<MergeDeps> = {}): MergeDeps {
     runGit: jest.fn<RunGitFn>().mockReturnValue(''),
     runShell: jest.fn<RunShellFn>().mockReturnValue(''),
     nonInteractiveEnv: { GIT_TERMINAL_PROMPT: '0' },
+    ensureSufficientDepth: jest
+      .fn<MergeDeps['ensureSufficientDepth']>()
+      .mockReturnValue([]),
     ...overrides,
   };
 }
@@ -251,6 +254,46 @@ describe('mergeFromMain', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/dryRun failed/);
     expect(result.content[0].text).toMatch(/not a valid object name/);
+  });
+
+  it('calls ensureSufficientDepth against origin/<from> before merging (LS-9956)', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse' && call === 3) return 'abc123\n';
+      if (args[0] === 'merge') return 'Merge made by the recursive strategy.';
+      if (args[0] === 'rev-parse') return 'def456\n';
+      if (args[0] === 'push') return '';
+      return '';
+    });
+    mergeFromMain('/cwd', OPTS, deps);
+    expect(deps.ensureSufficientDepth).toHaveBeenCalledWith(
+      '/cwd',
+      'origin/main',
+    );
+  });
+
+  it('deepens a shallow clone before merging so "unrelated histories" never surfaces', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse' && call === 3) return 'abc123\n';
+      if (args[0] === 'merge') return 'Merge made by the recursive strategy.';
+      if (args[0] === 'rev-parse') return 'def456\n';
+      if (args[0] === 'push') return '';
+      return '';
+    });
+    jest
+      .mocked(deps.ensureSufficientDepth)
+      .mockReturnValue(['Shallow clone detected — deepening...']);
+    const result = mergeFromMain('/cwd', OPTS, deps);
+    expect(result.isError).toBeFalsy();
+    const payload = parsePayload(result.content[0].text);
+    expect(payload.log).toMatch(/Shallow clone detected/);
   });
 
   it('reports pushError when push fails', () => {

@@ -6488,6 +6488,8 @@ const handleCallTool = async (
             runGit,
             runShell: run,
             nonInteractiveEnv: NON_INTERACTIVE_GIT_ENV,
+            ensureSufficientDepth: (mergeCwd, baseRef) =>
+              ensureSufficientDepth({ runGit }, mergeCwd, baseRef),
           },
         );
       } catch (err: unknown) {

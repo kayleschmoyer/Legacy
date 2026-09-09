@@ -25,6 +25,16 @@ export interface MergeDeps {
   ) => string;
   runShell: (cmd: string, cwd: string) => string;
   nonInteractiveEnv: Record<string, string>;
+  /**
+   * Deepens `cwd` when it is a shallow clone and no merge-base exists against
+   * `baseRef` yet. A shallow CCR clone has no visible common ancestor with a
+   * freshly fetched `origin/<from>` beyond the shallow boundary, so `git
+   * merge` fails outright with "refusing to merge unrelated histories" even
+   * though the histories are not actually unrelated (LS-9956). Injected so
+   * callers can reuse the same deepen→verify→unshallow sequence
+   * `shallow-utils.ts` already applies at worktree-creation time.
+   */
+  ensureSufficientDepth: (cwd: string, baseRef?: string) => string[];
 }
 
 interface ToolContent {
@@ -54,7 +64,7 @@ export function mergeFromMain(
   deps: MergeDeps,
 ): ToolResult {
   const { from, pushTimeoutMs, dryRun } = opts;
-  const { runGit, runShell, nonInteractiveEnv } = deps;
+  const { runGit, runShell, nonInteractiveEnv, ensureSufficientDepth } = deps;
   const log: string[] = [`[cwd: ${cwd}]`];
 
   if (!SAFE_BRANCH_NAME.test(from)) {
@@ -90,6 +100,13 @@ export function mergeFromMain(
   log.push(`$ git fetch origin ${from}`);
   const fetchOut = runGit(['fetch', 'origin', from], cwd, { timeout: 60_000 });
   if (fetchOut.trim()) log.push(fetchOut.trim());
+
+  // Shallow clones (CCR sessions) have no visible common ancestor with the
+  // fetched origin/<from>, which makes both the merge below and the dryRun's
+  // merge-tree fail as though the histories were genuinely unrelated. Deepen
+  // first — a no-op on a full clone or one that already has a merge-base.
+  const depthLog = ensureSufficientDepth(cwd, `origin/${from}`);
+  if (depthLog.length) log.push(...depthLog);
 
   const beforeSha = runGit(['rev-parse', 'HEAD'], cwd).trim();
 
