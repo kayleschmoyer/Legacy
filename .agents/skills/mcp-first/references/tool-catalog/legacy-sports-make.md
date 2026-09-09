@@ -10,7 +10,7 @@
 
 Whitelisted Makefile targets, the pre-commit (pc) pipeline and its chunks, PR validation, and Terraform state surgery.
 
-Local stdio process only — not exposed as a hosted connector. 15 tools.
+Local stdio process only — not exposed as a hosted connector. 17 tools.
 
 ---
 
@@ -85,6 +85,15 @@ Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modu
 | `removeSymlink` | boolean |  | — | Remove symlink and install independent node_modules |
 | `noFrozenLockfile` | boolean |  | — | Run pnpm install --no-frozen-lockfile first (for new workspace packages) |
 
+### `terraform_apply_status`
+
+Poll a terraform_plan job. Without `maxWaitMs`, returns an instant status snapshot (like make_run_status). With `maxWaitMs`, blocks until the job completes or the wait expires (like make_run_wait), capped at ~55s to stay under the ~60s MCP transport timeout. On completion returns the same structured { summary, resources } shape as terraform_plan.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `jobId` | string | **required** | — | Job ID from a terraform_plan result (status: "running") |
+| `maxWaitMs` | number |  | integer, > 0 | Maximum milliseconds to block waiting for completion. Omit for an instant non-blocking snapshot. |
+
 ### `terraform_fmt`
 
 Format .tf files in the terraform/ subdirectory.
@@ -103,6 +112,18 @@ Generate terraform/secrets.auto.tfvars from environment variables. Reads GOOGLE_
 | --- | --- | --- | --- | --- |
 | `worktreePath` | string |  | — | Repo or worktree root (default: repo root) |
 | `checkOnly` | boolean |  | — | Report missing vars without writing the file |
+
+### `terraform_plan`
+
+Prefer this over raw `terraform plan` via Bash. Runs `terraform plan` (via `terraform show -json` under the hood) and returns structured output — { summary: { add, change, destroy }, resources: [{ address, action, forcesReplacementOn? }] } — instead of raw text an agent would otherwise grep for resource replacements. Defaults to `lock: false` (passes `-lock=false`) so a routine plan never contends for the shared state lock that the Lock Watchdog polices; pass `lock: true` only when you specifically need the real locking behavior. Plans against `terraform/main` commonly take 2-6 minutes — a plan still running after ~45s returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `dir` | string | **required** | — | Terraform working directory, e.g. "terraform/main" or "terraform/runners". Relative to repo root, or absolute. |
+| `lock` | boolean |  | — | Whether to take the real Terraform state lock. Default false (passes -lock=false) — a plan is read-only and should not contend for the shared lock by accident. Set true only when you specifically need locking. |
+| `targets` | string[] |  | — | Optional resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags. |
+| `worktreePath` | string |  | — | Repo or worktree root (default: repo root). Used to resolve relative `dir` values. |
+| `timeoutMs` | number |  | integer, > 0 | Process-level timeout backstop in ms (default: 900000 / 15 minutes). Independent of the MCP transport timeout. |
 
 ### `terraform_state_list`
 

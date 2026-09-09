@@ -4,11 +4,13 @@ Exposes Makefile targets as structured MCP tools for AI agents. Prevents agents 
 
 ## Tools
 
-| Tool                   | Description                                                            |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `make_run`             | Run a whitelisted make target (pc, install, build, test, lint, etc.)   |
-| `make_wt_setup`        | Set up a worktree (symlink, .env, hooks) with optional symlink removal |
-| `make_worktree_create` | Create a new worktree for a Jira ticket                                |
+| Tool                     | Description                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `make_run`               | Run a whitelisted make target (pc, install, build, test, lint, etc.)             |
+| `make_wt_setup`          | Set up a worktree (symlink, .env, hooks) with optional symlink removal           |
+| `make_worktree_create`   | Create a new worktree for a Jira ticket                                          |
+| `terraform_plan`         | Run `terraform plan` with structured output (`-lock=false` by default); pollable |
+| `terraform_apply_status` | Poll a `terraform_plan` background job                                           |
 
 ## `make_run` Allowed Targets
 

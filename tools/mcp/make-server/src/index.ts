@@ -18,6 +18,7 @@ import {
   terraformStatePush,
   terraformStateRm,
 } from './tools/terraform-state.js';
+import { terraformApplyStatus, terraformPlan } from './tools/terraform-plan.js';
 
 // Absolute path: Windows (C:\... or C:/...) or Unix (/...)
 const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
@@ -567,6 +568,79 @@ server.tool(
       repoRoot,
     });
   },
+);
+
+// --- terraform_plan ---
+server.tool(
+  'terraform_plan',
+  'Prefer this over raw `terraform plan` via Bash. Runs `terraform plan` (via `terraform show -json` under the hood) and ' +
+    'returns structured output — { summary: { add, change, destroy }, resources: [{ address, action, forcesReplacementOn? }] } ' +
+    '— instead of raw text an agent would otherwise grep for resource replacements. Defaults to `lock: false` (passes ' +
+    '`-lock=false`) so a routine plan never contends for the shared state lock that the Lock Watchdog polices; pass `lock: true` ' +
+    'only when you specifically need the real locking behavior. Plans against `terraform/main` commonly take 2-6 minutes — a plan ' +
+    'still running after ~45s returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.',
+  {
+    dir: z
+      .string()
+      .describe(
+        'Terraform working directory, e.g. "terraform/main" or "terraform/runners". ' +
+          'Relative to repo root, or absolute.',
+      ),
+    lock: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Whether to take the real Terraform state lock. Default false (passes -lock=false) — a plan is read-only and ' +
+          'should not contend for the shared lock by accident. Set true only when you specifically need locking.',
+      ),
+    targets: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Optional resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe(
+        'Repo or worktree root (default: repo root). Used to resolve relative `dir` values.',
+      ),
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Process-level timeout backstop in ms (default: 900000 / 15 minutes). Independent of the MCP transport timeout.',
+      ),
+  },
+  async (params) => {
+    const repoRoot = params.worktreePath || getRepoRoot();
+    return terraformPlan(params, repoRoot);
+  },
+);
+
+// --- terraform_apply_status ---
+server.tool(
+  'terraform_apply_status',
+  'Poll a terraform_plan job. Without `maxWaitMs`, returns an instant status snapshot (like make_run_status). With ' +
+    '`maxWaitMs`, blocks until the job completes or the wait expires (like make_run_wait), capped at ~55s to stay under the ' +
+    '~60s MCP transport timeout. On completion returns the same structured { summary, resources } shape as terraform_plan.',
+  {
+    jobId: z
+      .string()
+      .describe('Job ID from a terraform_plan result (status: "running")'),
+    maxWaitMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum milliseconds to block waiting for completion. Omit for an instant non-blocking snapshot.',
+      ),
+  },
+  async (params) => terraformApplyStatus(params),
 );
 
 // --- terraform_state_mv_batch ---

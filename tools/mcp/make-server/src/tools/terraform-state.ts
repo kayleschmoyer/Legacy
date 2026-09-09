@@ -14,8 +14,11 @@ const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
 /**
  * Validate a `dir` parameter and resolve the working directory.
  * Returns the resolved path, or throws an Error if the directory doesn't exist.
+ *
+ * Exported for reuse by other terraform tools (e.g. terraform-plan.ts) that
+ * need the same containment/validation rules for their own `dir` parameter.
  */
-function resolveDir(dir: string, repoRoot: string): string {
+export function resolveDir(dir: string, repoRoot: string): string {
   const trimmed = dir.trim();
   if (!trimmed) {
     throw new Error(
@@ -55,8 +58,11 @@ function resolveDir(dir: string, repoRoot: string): string {
   return resolved;
 }
 
-/** Validate an address/resource name to prevent shell injection. */
-function validateAddress(addr: string): string | null {
+/**
+ * Validate an address/resource name to prevent shell injection.
+ * Exported for reuse by terraform-plan.ts (`-target=<address>` values).
+ */
+export function validateAddress(addr: string): string | null {
   // Reject addresses starting with '-' to prevent CLI flag injection
   if (addr.startsWith('-')) {
     return `Address must not start with '-': "${addr}"`;
