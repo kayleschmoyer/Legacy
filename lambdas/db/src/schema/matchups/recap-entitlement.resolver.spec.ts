@@ -62,6 +62,14 @@ async function captureRecapResolver(): Promise<
 
   jest.doMock('drizzle-orm', () => ({ eq: jest.fn() }));
 
+  // `types.ts` imports `./winProbability`, which pulls in `../scoring` and its
+  // module-level `createDatabaseService(getDbOptions())` call. Stub the module
+  // so importing the type definitions does not try to build a real DB service.
+  jest.doMock('./winProbability', () => ({
+    MatchupWinProbabilityType: {},
+    resolveMatchupWinProbability: jest.fn(),
+  }));
+
   jest.doMock('../leagues/types', () => ({ Team: {} }));
 
   jest.doMock('../statistics', () => ({
