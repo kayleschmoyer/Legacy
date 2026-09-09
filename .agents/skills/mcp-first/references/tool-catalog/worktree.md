@@ -73,7 +73,7 @@ Remove a worktree safely (symlink-aware). Uses `twig worktree remove` to avoid d
 
 ### `worktree_commit`
 
-Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By.
+Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By, unless the message already has one or `skipAutoTrailer: true` is passed.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -86,6 +86,7 @@ Stage and commit. Pass `files` (string or string[]) to stage only specific paths
 | `resetAuthor` | boolean |  | — | When combined with amend: true, passes --reset-author to git commit. Use this in cloud sessions to fix the commit author (git config user.email + --reset-author). Has no effect without amend: true. |
 | `addAll` | boolean |  | — | When combined with amend: true and no explicit files, stages tracked-modified AND untracked files (git add -A) before amending, instead of the default tracked-only git add -u — use this to fold newly-added files into the amended commit without enumerating every path. Has no effect without amend: true, and is ignored whenever files is provided (files already stages exactly the given paths, tracked or untracked — use it instead of addAll for surgical control). Default: false, preserving today's tracked-only amend behavior. |
 | `allowEmpty` | boolean |  | — | Pass --allow-empty to git commit, permitting a commit with no staged changes (e.g. an empty files list or a clean tree). Default: false. Use to retrigger CI, unstick a reviewer-bot cycle, or republish a changelog-only commit. |
+| `skipAutoTrailer` | boolean |  | — | Skip the auto-appended Co-Authored-By trailer. Auto-skipped already when `message` contains a Co-Authored-By:/Claude-Session: line. |
 
 ### `worktree_commit_batch`
 
@@ -93,7 +94,7 @@ Commit across multiple worktrees in one call. Each item is processed independent
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `items` | object[] | **required** | — | Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll. |
+| `items` | object[] | **required** | — | Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll, skipAutoTrailer. |
 
 ### `worktree_commit_stat`
 

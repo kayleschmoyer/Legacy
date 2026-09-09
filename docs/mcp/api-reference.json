@@ -167,7 +167,7 @@
         },
         {
           "name": "worktree_commit",
-          "description": "Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By.",
+          "description": "Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By, unless the message already has one or `skipAutoTrailer: true` is passed.",
           "inputs": {
             "message": {
               "type": "string",
@@ -227,6 +227,11 @@
               "type": "boolean",
               "optional": true,
               "description": "Pass --allow-empty to git commit, permitting a commit with no staged changes (e.g. an empty files list or a clean tree). Default: false. Use to retrigger CI, unstick a reviewer-bot cycle, or republish a changelog-only commit."
+            },
+            "skipAutoTrailer": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Skip the auto-appended Co-Authored-By trailer. Auto-skipped already when `message` contains a Co-Authored-By:/Claude-Session: line."
             }
           },
           "transports": [
@@ -240,7 +245,7 @@
             "items": {
               "type": "array",
               "optional": false,
-              "description": "Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll.",
+              "description": "Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll, skipAutoTrailer.",
               "items": {
                 "type": "object",
                 "optional": true,
@@ -288,6 +293,11 @@
                     "type": "boolean",
                     "optional": true,
                     "description": "Fold untracked files into an amended commit (git add -A instead of git add -u). Same semantics as worktree_commit.addAll."
+                  },
+                  "skipAutoTrailer": {
+                    "type": "boolean",
+                    "optional": true,
+                    "description": "Same semantics as worktree_commit.skipAutoTrailer."
                   }
                 }
               }

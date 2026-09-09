@@ -78,6 +78,7 @@ import { rerereForgetPaths } from './rerere-forget';
 import { filterAndLimitWorktrees } from './filter-and-limit-worktrees';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
+import { resolveCommitMessage } from './resolve-commit-message';
 import { resolveCommitish } from './resolve-commitish';
 import { resolveMainRepoPath } from './resolve-main-repo';
 import { resolveResetTarget } from './resolve-reset-target';
@@ -1303,7 +1304,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By.',
+        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By, unless the message already has one or `skipAutoTrailer: true` is passed.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1353,6 +1354,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'Pass --allow-empty to git commit, permitting a commit with no staged changes (e.g. an empty files list or a clean tree). Default: false. Use to retrigger CI, unstick a reviewer-bot cycle, or republish a changelog-only commit.',
+          },
+          skipAutoTrailer: {
+            type: 'boolean',
+            description:
+              'Skip the auto-appended Co-Authored-By trailer. Auto-skipped already when `message` contains a Co-Authored-By:/Claude-Session: line.',
           },
         },
         required: [],
@@ -2458,7 +2464,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           items: {
             type: 'array',
             description:
-              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll.',
+              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll, skipAutoTrailer.',
             items: {
               type: 'object',
               properties: {
@@ -2494,6 +2500,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
                   type: 'boolean',
                   description:
                     'Fold untracked files into an amended commit (git add -A instead of git add -u). Same semantics as worktree_commit.addAll.',
+                },
+                skipAutoTrailer: {
+                  type: 'boolean',
+                  description:
+                    'Same semantics as worktree_commit.skipAutoTrailer.',
                 },
               },
               required: ['worktree'],
@@ -3434,6 +3445,7 @@ const handleCallTool = async (
         resetAuthor,
         addAll,
         allowEmpty,
+        skipAutoTrailer,
       } = args as {
         message?: string;
         files?: unknown;
@@ -3444,6 +3456,7 @@ const handleCallTool = async (
         resetAuthor?: boolean;
         addAll?: boolean;
         allowEmpty?: boolean;
+        skipAutoTrailer?: boolean;
       };
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
@@ -3830,9 +3843,9 @@ const handleCallTool = async (
         // Commit
         if (amend && message !== undefined) {
           // Amend with a new message — message has already been validated above
-          const fullMessage =
-            message.trim() +
-            '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+          const fullMessage = resolveCommitMessage(message.trim(), {
+            skipAutoTrailer,
+          });
           const msgPath = join(
             tmpdir(),
             `worktree-commit-msg-${randomUUID()}.txt`,
@@ -3865,8 +3878,9 @@ const handleCallTool = async (
             env: NON_INTERACTIVE_COMMIT_ENV,
           });
         } else {
-          const fullMessage =
-            message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+          const fullMessage = resolveCommitMessage(message as string, {
+            skipAutoTrailer,
+          });
           const msgPath = join(
             tmpdir(),
             `worktree-commit-msg-${randomUUID()}.txt`,
