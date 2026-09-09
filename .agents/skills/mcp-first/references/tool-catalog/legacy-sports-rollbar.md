@@ -31,12 +31,14 @@ Fetch a single Rollbar item by internal id or by its per-project counter (the nu
 
 ### `rollbar_get_occurrence`
 
-Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.
+Rollbar occurrence (excl. telemetry). READ-ONLY.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `occurrenceId` | number |  | integer, > 0 | Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 "not found" — use the list summary instead. |
-| `itemId` | number |  | integer, > 0 | Internal item id (fetches latest occurrence) |
+| `occurrenceId` | number |  | integer, > 0 | — |
+| `itemId` | number |  | integer, > 0 | — |
+| `maxFrames` | number |  | integer, > 0 | — |
+| `include` | enum[] |  | — | — |
 
 ### `rollbar_graphql_introspect_type`
 

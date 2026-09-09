@@ -36,10 +36,18 @@ describe('getOccurrence', () => {
   interface ParsedOccurrence {
     id?: number;
     data: {
+      custom?: Record<string, unknown>;
+      request?: Record<string, unknown>;
+      client?: Record<string, unknown>;
       body: {
-        trace_chain?: { exception: { message: string } }[];
+        trace?: { frames?: unknown[]; exception?: { message: string } };
+        trace_chain?: {
+          exception: { message: string };
+          frames?: unknown[];
+        }[];
         message?: { body: string };
         custom?: Record<string, unknown>;
+        telemetry?: unknown[];
       };
     };
   }
@@ -238,5 +246,177 @@ describe('getOccurrence', () => {
     expect(result.isError).toBe(true);
     const text = (result.content[0] as { text: string }).text;
     expect(text).not.toMatch(/LS-9808/);
+  });
+
+  it('omits telemetry by default but keeps trace/custom/request/client (LS-9926)', async () => {
+    const fullOccurrence = {
+      id: 2001,
+      data: {
+        custom: { userId: 42 },
+        request: { url: '/foo' },
+        client: { os: 'ios' },
+        body: {
+          trace: { exception: { message: 'boom' }, frames: [{ lineno: 1 }] },
+          telemetry: [{ type: 'log' }, { type: 'network' }],
+        },
+      },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 2001 });
+
+    expect(result.isError).toBeUndefined();
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.body.telemetry).toBeUndefined();
+    expect(parsed.data.body.trace?.exception?.message).toBe('boom');
+    expect(parsed.data.custom?.userId).toBe(42);
+    expect(parsed.data.request?.url).toBe('/foo');
+    expect(parsed.data.client?.os).toBe('ios');
+  });
+
+  it('returns telemetry when explicitly included via `include`', async () => {
+    const fullOccurrence = {
+      id: 2002,
+      data: {
+        body: {
+          telemetry: [{ type: 'log' }],
+        },
+      },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({
+      occurrenceId: 2002,
+      include: ['telemetry'],
+    });
+
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.body.telemetry).toEqual([{ type: 'log' }]);
+  });
+
+  it('narrows to only the requested sections via `include`', async () => {
+    const fullOccurrence = {
+      id: 2003,
+      data: {
+        custom: { userId: 42 },
+        request: { url: '/foo' },
+        client: { os: 'ios' },
+        body: {
+          trace: { exception: { message: 'boom' } },
+          telemetry: [{ type: 'log' }],
+        },
+      },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({
+      occurrenceId: 2003,
+      include: ['custom'],
+    });
+
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.custom?.userId).toBe(42);
+    expect(parsed.data.request).toBeUndefined();
+    expect(parsed.data.client).toBeUndefined();
+    expect(parsed.data.body.trace).toBeUndefined();
+    expect(parsed.data.body.telemetry).toBeUndefined();
+  });
+
+  it('caps trace.frames to the innermost + outermost maxFrames, eliding the middle', async () => {
+    const frames = Array.from({ length: 10 }, (_, i) => ({ lineno: i }));
+    const fullOccurrence = {
+      id: 2004,
+      data: { body: { trace: { frames } } },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 2004, maxFrames: 4 });
+
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.body.trace?.frames).toEqual([
+      { lineno: 0 },
+      { lineno: 1 },
+      { elided_frames: 6 },
+      { lineno: 8 },
+      { lineno: 9 },
+    ]);
+  });
+
+  it('caps trace_chain[].frames the same way as trace.frames', async () => {
+    const frames = Array.from({ length: 6 }, (_, i) => ({ lineno: i }));
+    const fullOccurrence = {
+      id: 2005,
+      data: {
+        body: {
+          trace_chain: [{ exception: { message: 'e1' }, frames }],
+        },
+      },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 2005, maxFrames: 2 });
+
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.body.trace_chain?.[0].frames).toEqual([
+      { lineno: 0 },
+      { elided_frames: 4 },
+      { lineno: 5 },
+    ]);
+  });
+
+  it('leaves frames untouched when maxFrames is omitted or the array already fits', async () => {
+    const frames = [{ lineno: 0 }, { lineno: 1 }];
+    const fullOccurrence = {
+      id: 2006,
+      data: { body: { trace: { frames } } },
+    };
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 2006, maxFrames: 5 });
+
+    const parsed = JSON.parse(
+      (result.content[0] as { text: string }).text,
+    ) as ParsedOccurrence;
+    expect(parsed.data.body.trace?.frames).toEqual(frames);
   });
 });

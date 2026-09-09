@@ -136,22 +136,14 @@ function createMcpServer(): McpServer {
 
   server.tool(
     'rollbar_get_occurrence',
-    'Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.',
+    'Rollbar occurrence (excl. telemetry). READ-ONLY.',
     {
-      occurrenceId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(
-          'Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 "not found" — use the list summary instead.',
-        ),
-      itemId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('Internal item id (fetches latest occurrence)'),
+      occurrenceId: z.number().int().positive().optional(),
+      itemId: z.number().int().positive().optional(),
+      maxFrames: z.number().int().positive().optional(),
+      include: z
+        .array(z.enum(['trace', 'telemetry', 'custom', 'request', 'client']))
+        .optional(),
     },
     async (params) => getOccurrence(params),
   );

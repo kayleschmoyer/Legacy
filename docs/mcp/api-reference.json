@@ -8500,7 +8500,7 @@
         },
         {
           "name": "rollbar_get_occurrence",
-          "description": "Fetch full Rollbar occurrence payload (trace_chain, message, custom, logArgs) without truncation, by `occurrenceId` or `itemId` (latest occurrence). READ-ONLY.",
+          "description": "Rollbar occurrence (excl. telemetry). READ-ONLY.",
           "inputs": {
             "occurrenceId": {
               "type": "number",
@@ -8508,8 +8508,7 @@
               "constraints": [
                 "integer",
                 "> 0"
-              ],
-              "description": "Occurrence id from rollbar_list_occurrences. LS-9808: older ids often 400 \"not found\" — use the list summary instead."
+              ]
             },
             "itemId": {
               "type": "number",
@@ -8517,8 +8516,30 @@
               "constraints": [
                 "integer",
                 "> 0"
-              ],
-              "description": "Internal item id (fetches latest occurrence)"
+              ]
+            },
+            "maxFrames": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ]
+            },
+            "include": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "enum",
+                "optional": false,
+                "enum": [
+                  "trace",
+                  "telemetry",
+                  "custom",
+                  "request",
+                  "client"
+                ]
+              }
             }
           },
           "transports": [
