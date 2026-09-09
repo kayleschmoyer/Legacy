@@ -30,6 +30,7 @@ import { handleTestRawConnection } from './commands/testRawConnection';
 import { handleDecodeJwt } from './commands/decodeJwt';
 import { handleSetUserType } from './commands/setUserType';
 import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
+import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
 import { handleListUsers } from './commands/listUsers';
 import { handleAddUser } from './commands/addUser';
 import { handleAuth } from './commands/auth';
@@ -213,6 +214,19 @@ export function buildProgram(): Command {
         force?: boolean;
         dryRun?: boolean;
       }) => handleIngestRetrosheet(options),
+    );
+
+  program
+    .command('backfill-nflverse-multiteam-seasons')
+    .description(
+      'Repair multi-team football season rows for 1999+ players using nflverse (LS-9919, no PFR requests)',
+    )
+    .option(
+      '--apply',
+      'Write repairs to the database (default: dry-run report only)',
+    )
+    .action((options: { apply?: boolean }) =>
+      handleBackfillNflverseMultiTeamSeasons({ dryRun: !options.apply }),
     );
 
   program

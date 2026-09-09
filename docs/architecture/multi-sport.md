@@ -46,6 +46,8 @@ nflTeam: varchar('nfl_team', { length: 10 }),
 
 Baseball players use `brefId` (Baseball Reference). Football players use `pfrId` (Pro Football Reference). The `brefId` column is still populated for backwards compatibility even on football players, but `pfrId` is the identity key for PFR-sourced data.
 
+For the 1999+ multi-team season backfill (LS-9919), `pfrId` is also crosswalked against [nflverse](https://github.com/nflverse/nflverse-data)'s `gsis_id` via its published `players.csv` id-mapping file — see `backfill-nflverse-multiteam-seasons.ts` in `@legacy-sports/data-loaders`. nflverse-data is CC-BY 4.0 licensed (confirmed per LS-9908); attribute it as "nflverse" (https://nflverse.com) wherever its data is surfaced.
+
 ### Sport-tagged lookup tables
 
 Two tables allow per-sport configuration without code changes:

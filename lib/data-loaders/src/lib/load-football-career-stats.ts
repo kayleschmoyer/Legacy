@@ -333,7 +333,7 @@ async function upsertCareerDefense(
     });
 }
 
-async function upsertSeasonPassing(
+export async function upsertSeasonPassing(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonPassing.$inferInsert,
 ): Promise<void> {
@@ -364,7 +364,7 @@ async function upsertSeasonPassing(
     });
 }
 
-async function upsertSeasonRushing(
+export async function upsertSeasonRushing(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonRushing.$inferInsert,
 ): Promise<void> {
@@ -392,7 +392,7 @@ async function upsertSeasonRushing(
     });
 }
 
-async function upsertSeasonReceiving(
+export async function upsertSeasonReceiving(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonReceiving.$inferInsert,
 ): Promise<void> {
@@ -421,7 +421,7 @@ async function upsertSeasonReceiving(
     });
 }
 
-async function upsertSeasonKicking(
+export async function upsertSeasonKicking(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonKicking.$inferInsert,
 ): Promise<void> {
@@ -445,7 +445,7 @@ async function upsertSeasonKicking(
     });
 }
 
-async function upsertSeasonDefenseIdp(
+export async function upsertSeasonDefenseIdp(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonDefenseIdp.$inferInsert,
 ): Promise<void> {
@@ -490,14 +490,14 @@ async function upsertSeasonDefenseIdp(
 // construction. Seasons we did not fetch are left alone.
 // The season tables this prune may target. A literal union rather than `string`
 // so the sql.raw() below can only ever receive one of these names.
-type FootballSeasonTable =
+export type FootballSeasonTable =
   | 'football_season_passing'
   | 'football_season_rushing'
   | 'football_season_receiving'
   | 'football_season_kicking'
   | 'football_season_defense_idp';
 
-async function pruneSupersededSeasonRows(
+export async function pruneSupersededSeasonRows(
   db: PublicDb,
   table: FootballSeasonTable,
   playerId: number,
