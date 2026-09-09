@@ -19,6 +19,7 @@ import {
   terraformStateRm,
 } from './tools/terraform-state.js';
 import { terraformApplyStatus, terraformPlan } from './tools/terraform-plan.js';
+import { restartMcpServer } from './tools/restart-mcp-server.js';
 
 // Absolute path: Windows (C:\... or C:/...) or Unix (/...)
 const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
@@ -841,6 +842,27 @@ server.tool(
       ),
   },
   async (params) => validatePR(params),
+);
+
+// --- restart_mcp_server ---
+server.tool(
+  'restart_mcp_server',
+  'Cleanly restart a stdio MCP server (everything under tools/mcp/*-server, plus the worktree server) by ' +
+    'killing its running tsx process, looked up from its own .mcp.json entrypoint. Replaces the raw ' +
+    "`ps aux | grep <server>-server && kill <pid>` workaround: editing a stdio server's source has zero " +
+    'effect on live tool calls until its process is restarted, since it is a long-running process spawned ' +
+    'once at session start. The harness auto-reconnects a stdio server whose process exits, so no separate ' +
+    'reconnect step is needed — just retry the tool call (or ToolSearch it again if it was deferred) after ' +
+    'calling this. Pass the .mcp.json key, e.g. "worktree", "legacy-sports-make", "legacy-sports-nx". ' +
+    'Restarting "legacy-sports-make" restarts this server itself — the response is still returned first.',
+  {
+    server: z
+      .string()
+      .describe(
+        'MCP server name (the key under mcpServers in .mcp.json), e.g. "worktree", "legacy-sports-nx".',
+      ),
+  },
+  async (params) => restartMcpServer(params, { repoRoot: getRepoRoot() }),
 );
 
 // Start the server

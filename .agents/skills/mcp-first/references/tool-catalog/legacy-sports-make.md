@@ -10,7 +10,7 @@
 
 Whitelisted Makefile targets, the pre-commit (pc) pipeline and its chunks, PR validation, and Terraform state surgery.
 
-Local stdio process only — not exposed as a hosted connector. 17 tools.
+Local stdio process only — not exposed as a hosted connector. 18 tools.
 
 ---
 
@@ -84,6 +84,14 @@ Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modu
 | `worktreePath` | string | **required** | — | Absolute worktree path |
 | `removeSymlink` | boolean |  | — | Remove symlink and install independent node_modules |
 | `noFrozenLockfile` | boolean |  | — | Run pnpm install --no-frozen-lockfile first (for new workspace packages) |
+
+### `restart_mcp_server`
+
+Cleanly restart a stdio MCP server (everything under tools/mcp/*-server, plus the worktree server) by killing its running tsx process, looked up from its own .mcp.json entrypoint. Replaces the raw `ps aux | grep <server>-server && kill <pid>` workaround: editing a stdio server's source has zero effect on live tool calls until its process is restarted, since it is a long-running process spawned once at session start. The harness auto-reconnects a stdio server whose process exits, so no separate reconnect step is needed — just retry the tool call (or ToolSearch it again if it was deferred) after calling this. Pass the .mcp.json key, e.g. "worktree", "legacy-sports-make", "legacy-sports-nx". Restarting "legacy-sports-make" restarts this server itself — the response is still returned first.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `server` | string | **required** | — | MCP server name (the key under mcpServers in .mcp.json), e.g. "worktree", "legacy-sports-nx". |
 
 ### `terraform_apply_status`
 
