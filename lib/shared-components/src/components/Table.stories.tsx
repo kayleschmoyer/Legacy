@@ -1,5 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { Text, XStack } from 'tamagui';
+import { AvatarImage } from './AvatarImage';
 import { Table } from './Table';
+
+/** Player name + avatar, matching `preview/components-table.html` `.player` cell. */
+function PlayerCell({ name }: { name: string }) {
+  return (
+    <XStack alignItems="center" gap={8}>
+      <AvatarImage username={name} size="xs" />
+      <Text fontFamily="$body" fontSize={14} color="$color12">
+        {name}
+      </Text>
+    </XStack>
+  );
+}
 
 const meta: Meta<typeof Table> = {
   title: 'Components/Table',
@@ -25,7 +39,10 @@ export const StatsTable: Story = {
     ],
     rows: [
       [
-        'Barry Bonds',
+        {
+          value: 'Barry Bonds',
+          render: () => <PlayerCell name="Barry Bonds" />,
+        },
         'SF · 2001',
         664,
         '.328',
@@ -34,7 +51,7 @@ export const StatsTable: Story = {
         11.8,
       ],
       [
-        'Babe Ruth',
+        { value: 'Babe Ruth', render: () => <PlayerCell name="Babe Ruth" /> },
         'NYY · 1923',
         697,
         '.393',
@@ -43,7 +60,7 @@ export const StatsTable: Story = {
         14.1,
       ],
       [
-        'Ty Cobb',
+        { value: 'Ty Cobb', render: () => <PlayerCell name="Ty Cobb" /> },
         'DET · 1911',
         684,
         '.420',
@@ -52,7 +69,7 @@ export const StatsTable: Story = {
         10.5,
       ],
       [
-        'Lou Gehrig',
+        { value: 'Lou Gehrig', render: () => <PlayerCell name="Lou Gehrig" /> },
         'NYY · 1927',
         717,
         '.373',
@@ -61,7 +78,10 @@ export const StatsTable: Story = {
         11.8,
       ],
       [
-        'Rogers Hornsby',
+        {
+          value: 'Rogers Hornsby',
+          render: () => <PlayerCell name="Rogers Hornsby" />,
+        },
         'STL · 1924',
         640,
         '.424',
