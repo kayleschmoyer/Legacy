@@ -26,6 +26,8 @@ The output is a **static HTML mockup**. In a Claude Design session, that is the 
 - Cover every conditional state the page reference doc defines (loading skeleton, error, empty, populated, plus any page-specific states)
 - Be annotated with design intent comments — not implementation notes
 
+> **No React/Babel/other framework CDN scripts — this is not optional (LS-9909).** A handful of older bundles under `docs/design/` (e.g. Admin Console, Public Leagues, Draft Board) load React, ReactDOM, and Babel from `unpkg.com` via `<script>` tags. Do not treat them as precedent — they predate this rule and are non-conforming, not an exception to it. Agent sessions verify mockups from behind a network proxy that denies `CONNECT` to `unpkg.com` and most other CDNs (only Google Fonts is allowlisted); a mockup that loads a framework from any other CDN renders blank when an agent tries to visually verify it, silently defeating the AGENTS.md-mandated "use the feature in a browser before reporting complete" step. State-toggling and conditional rendering must be done with vanilla `<script>` (plain DOM APIs, `classList`, event listeners) — the state complexity these mockups need does not require React.
+
 This file is a communication tool for handoff, not a code scaffold. **The implementation agent reads your HTML and CSS source directly — it does not render or screenshot the file.** Everything it needs (dimensions, colors, layout rules, states, intent) must be legible in the source itself.
 
 ---
@@ -215,6 +217,7 @@ Before marking the design complete, verify:
 - [ ] Read the design system, the brand guidelines (`docs/design/brand.md` or the mirrored sections above), and the page reference doc before starting
 - [ ] Output is a single self-contained HTML file (Claude Design project file, or `scratch/mockups/<page-name>.html` locally)
 - [ ] All four core states are present and togglable (loading, error, empty, populated), plus every page-specific state the reference doc defines
+- [ ] No framework or library `<script src>` from any CDN (React, Babel, Vue, etc.) — vanilla JS only; the only allowed external CDN is Google Fonts
 - [ ] Fonts loaded from Google Fonts CDN (Big Shoulders Display + Literata)
 - [ ] All colors/fonts/spacing declared as CSS custom properties in one `:root` block; no repeated raw hex values
 - [ ] No hardcoded colors outside the palette table above
