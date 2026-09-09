@@ -1719,7 +1719,7 @@ export function createServer(): McpServer {
   // --- github_retrigger_check ---
   server.tool(
     'github_retrigger_check',
-    'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures. Pass the PR number via "number" or its alias "prNumber".',
+    'Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. PR number via "number"/"prNumber".',
     {
       number: z.coerce
         .number()

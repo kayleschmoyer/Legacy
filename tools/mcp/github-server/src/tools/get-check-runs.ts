@@ -63,8 +63,10 @@ const BATCH_CONCURRENCY = 5;
 // Parse workflowRunId and jobId from GitHub Actions URLs.
 // details_url pattern: .../actions/runs/<runId>/job/<jobId>
 // html_url pattern:    .../actions/runs/<runId>/job/<jobId>
-function parseRunIds(
-  run: CheckRun,
+// Exported so other tools (e.g. retrigger-check.ts) can resolve a check
+// run's owning Actions workflow run without duplicating the parse logic.
+export function parseRunIds(
+  run: Pick<CheckRun, 'details_url' | 'html_url'>,
 ): { workflowRunId: number; jobId: number; detailsUrl: string } | undefined {
   const url = run.details_url ?? run.html_url;
   if (!url) return undefined;

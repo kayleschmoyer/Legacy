@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { parseRunIds } from './get-check-runs.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
@@ -17,6 +18,18 @@ interface CheckRun {
   status: string;
   conclusion: string | null;
   app?: { slug: string };
+  details_url: string | null;
+  html_url: string | null;
+}
+
+// GitHub's rerun-failed-jobs/rerun endpoints 403 with this shape while a
+// previous run of the same workflow is still in flight — a transient state,
+// not a hard failure (mirrors ci-server's isAlreadyRunningError).
+function isActionsAlreadyRunningError(message: string): boolean {
+  return (
+    /failed \(403\)/.test(message) &&
+    /already running|already in progress/i.test(message)
+  );
 }
 
 interface CheckRunsResponse {
@@ -119,7 +132,7 @@ export async function retriggerCheck(
     id: number;
     retriggered: boolean;
     error?: string;
-    fallback?: string;
+    status?: string;
   }> = [];
 
   for (const run of toRetrigger) {
@@ -133,27 +146,66 @@ export async function retriggerCheck(
       const message = error instanceof Error ? error.message : String(error);
       // GitHub's rerequest API returns 403 "Invalid check_run_id" for check runs
       // owned by the github-actions app (e.g. workflow_dispatch checks). These
-      // cannot be re-requested via the Checks API and must be dispatched directly.
+      // cannot be re-requested via the Checks API — fall back to the Actions API's
+      // own rerun-failed-jobs endpoint on the check run's owning workflow run,
+      // which reschedules it with no new commit required (LS-9881).
       if (
         /invalid check_run_id/i.test(message) &&
         run.app?.slug === 'github-actions'
       ) {
-        results.push({
-          name: run.name,
-          id: run.id,
-          retriggered: false,
-          error:
-            `This check run belongs to GitHub Actions and cannot be re-requested via the Checks API. ` +
-            `Push a new commit to fire a fresh pull_request event instead (e.g. an empty commit: ` +
-            `worktree_commit({ message: 'chore: retrigger ci', allowEmpty: true }) + worktree_push()). ` +
-            `Do NOT use ci_dispatch_workflow(workflow, ref: '<pr-branch>') as a substitute unless you have ` +
-            `confirmed the workflow's AWS OIDC role trusts that ref -- required-check workflows that assume ` +
-            `the legacy-sports-dev-github-actions-plan role (e.g. check-migrations-applied.yml, terraform-plan.yml) ` +
-            `only trust pull_request events or ref:refs/heads/main (terraform/main/github-actions-oidc.tf), so a ` +
-            `workflow_dispatch run on any other branch is structurally guaranteed to fail ` +
-            `"sts:AssumeRoleWithWebIdentity" -- retrying it will not help (LS-9029).`,
-          fallback: 'push-empty-commit',
-        });
+        const ids = parseRunIds(run);
+        if (!ids) {
+          results.push({
+            name: run.name,
+            id: run.id,
+            retriggered: false,
+            error:
+              'This check run belongs to GitHub Actions and cannot be re-requested via the Checks API, ' +
+              "and its workflow run could not be resolved from the check run's details/html URL to attempt " +
+              'an Actions-API rerun. Investigate manually via the Actions tab.',
+          });
+          continue;
+        }
+        try {
+          await githubRest<undefined>({
+            method: 'POST',
+            path: `/repos/${repo.owner}/${repo.name}/actions/runs/${ids.workflowRunId}/rerun-failed-jobs`,
+          });
+          results.push({ name: run.name, id: run.id, retriggered: true });
+        } catch (actionsError) {
+          const actionsMessage =
+            actionsError instanceof Error
+              ? actionsError.message
+              : String(actionsError);
+          if (isActionsAlreadyRunningError(actionsMessage)) {
+            results.push({
+              name: run.name,
+              id: run.id,
+              retriggered: false,
+              status: 'not_yet_reschedulable',
+              error:
+                `Workflow run ${ids.workflowRunId} is still running — GitHub rejects a rerun-failed-jobs ` +
+                'request while a previous run of the same workflow is in flight. This is not a hard ' +
+                'failure: wait for the run to finish, then retry github_retrigger_check.',
+            });
+          } else {
+            results.push({
+              name: run.name,
+              id: run.id,
+              retriggered: false,
+              error:
+                `This check run belongs to GitHub Actions. The Checks API rerequest was rejected, and the ` +
+                `Actions API rerun-failed-jobs call for workflow run ${ids.workflowRunId} also failed: ` +
+                `${actionsMessage} Do NOT use ci_dispatch_workflow(workflow, ref: '<pr-branch>') as a ` +
+                `substitute unless you have confirmed the workflow's AWS OIDC role trusts that ref -- ` +
+                `required-check workflows that assume the legacy-sports-dev-github-actions-plan role (e.g. ` +
+                `check-migrations-applied.yml, terraform-plan.yml) only trust pull_request events or ` +
+                `ref:refs/heads/main (terraform/main/github-actions-oidc.tf), so a workflow_dispatch run on ` +
+                `any other branch is structurally guaranteed to fail "sts:AssumeRoleWithWebIdentity" -- ` +
+                `retrying it will not help (LS-9029). Investigate manually.`,
+            });
+          }
+        }
       } else {
         results.push({
           name: run.name,
@@ -167,14 +219,20 @@ export async function retriggerCheck(
 
   const retriggered = results.filter((r) => r.retriggered).length;
   const failed = results.filter((r) => !r.retriggered).length;
+  // "not_yet_reschedulable" (the owning Actions workflow run is still in
+  // flight) is a transient, retryable state rather than a hard failure —
+  // don't let it flip the overall call to isError (LS-9881 AC2).
+  const hardFailed = results.filter(
+    (r) => !r.retriggered && r.status !== 'not_yet_reschedulable',
+  ).length;
 
   return {
-    isError: failed > 0 ? true : undefined,
+    isError: hardFailed > 0 ? true : undefined,
     content: [
       {
         type: 'text',
         text: minifiedJson({
-          success: failed === 0,
+          success: hardFailed === 0,
           pr: params.number,
           sha: sha.slice(0, 7),
           retriggered,
