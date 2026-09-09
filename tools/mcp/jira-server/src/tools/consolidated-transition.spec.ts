@@ -12,6 +12,10 @@ jest.mock('../jql-search', () => ({
   searchJqlAll: jest.fn(),
 }));
 
+jest.mock('../netrc', () => ({
+  getJiraCredentials: jest.fn(),
+}));
+
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('../jira-api');
@@ -19,6 +23,17 @@ const { jiraRequest: mockJiraRequest } = jest.requireMock<{
 const { searchJqlAll: mockSearchJqlAll } = jest.requireMock<{
   searchJqlAll: jest.Mock;
 }>('../jql-search');
+
+const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
+  getJiraCredentials: jest.Mock;
+}>('../netrc');
+
+/**
+ * `consolidatedTransition`'s per-key result is an untyped JSON blob (mirrors
+ * `PerKeyResult` in `./transition.ts`, which isn't exported) — assert on
+ * individual fields as `unknown` rather than re-declaring its full shape.
+ */
+type PerKey = Record<string, unknown>;
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
@@ -48,6 +63,14 @@ beforeEach(() => {
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
   mockSearchJqlAll.mockResolvedValue([]);
+  // Basic auth by default so the pre-existing /myself-success test keeps
+  // exercising that path; the OAuth/hosted-Lambda skip path is covered by
+  // a dedicated test (LS-8773).
+  mockGetJiraCredentials.mockResolvedValue({
+    type: 'basic',
+    login: 'a',
+    password: 'b',
+  });
 });
 
 describe('consolidatedTransition — validation', () => {
@@ -273,6 +296,51 @@ describe('consolidatedTransition — claim action', () => {
       ([opts]) => opts.method === 'PUT' && opts.path.endsWith('/assignee'),
     );
     expect(putCalls).toHaveLength(1);
+  });
+
+  it('LS-8773: skips /myself under OAuth (hosted Lambda) and warns with an actionable remedy', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'oauth',
+      clientId: 'id',
+      clientSecret: 'secret',
+      cloudId: 'cloud-1',
+      siteUrl: 'https://example.atlassian.net',
+    });
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '21', name: 'Start', to: { name: 'In Progress' } },
+            ],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/LS-1')) {
+          return Promise.resolve(makeIssue('LS-1'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: 'In Progress',
+      action: 'claim',
+    });
+    const data = parse(result);
+    expect(data['success']).toBe(true);
+    const results = data['results'] as Record<string, PerKey>;
+    expect(results['LS-1']?.['action']).toBe('PROCEED');
+    expect(results['LS-1']?.status).toBe('In Progress');
+
+    const myselfCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.path === '/rest/api/3/myself');
+    expect(myselfCalls).toHaveLength(0);
+
+    const warnings = results['LS-1']?.['warnings'] as string[] | undefined;
+    expect(warnings?.join(' ')).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings?.join(' ')).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
   });
 
   it('passes assigneeAccountId through to claimTicket, skipping any lookup', async () => {

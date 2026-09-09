@@ -16,6 +16,10 @@ jest.mock('../jql-search', () => ({
   searchJql: jest.fn(),
 }));
 
+jest.mock('../netrc', () => ({
+  getJiraCredentials: jest.fn(),
+}));
+
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('../jira-api');
@@ -24,6 +28,10 @@ const { searchJqlAll: mockSearchJqlAll, searchJql: mockSearchJql } =
   jest.requireMock<{ searchJqlAll: jest.Mock; searchJql: jest.Mock }>(
     '../jql-search',
   );
+
+const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
+  getJiraCredentials: jest.Mock;
+}>('../netrc');
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
@@ -62,6 +70,16 @@ beforeEach(() => {
   _resetAssigneeCache();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+  // These tests model the hosted Lambda (client-credentials OAuth token) —
+  // the production environment claimTicket actually runs in. Override per
+  // test for basic-auth (local session) scenarios.
+  mockGetJiraCredentials.mockResolvedValue({
+    type: 'oauth',
+    clientId: 'id',
+    clientSecret: 'secret',
+    cloudId: 'cloud-1',
+    siteUrl: 'https://example.atlassian.net',
+  });
 
   // Default happy-path mock sequence:
   // 1. GET /issue/:key   → issue details
@@ -89,7 +107,13 @@ beforeEach(() => {
 });
 
 describe('claimTicket — auto-assign behaviour', () => {
-  it('assigns to the service account (self) when no assignee email is configured', async () => {
+  it('assigns to the current user (self) via /myself under basic auth (local sessions) when no assignee email is configured', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'basic',
+      login: 'a',
+      password: 'b',
+    });
+
     const result = await claimTicket({ key: 'LS-1' });
     const data = parse(result);
 
@@ -112,6 +136,36 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0].body).toEqual({ accountId: 'service-account' });
     expect((data['warnings'] as string[]).length).toBe(0);
+  });
+
+  it('LS-8773: skips the doomed /myself round trip under OAuth (hosted Lambda) and warns with an actionable remedy instead', async () => {
+    // No email or accountId configured, and credentials are OAuth (the
+    // hosted Lambda's client-credentials token, which always 401s on
+    // GET /rest/api/3/myself — LS-7891/LS-8773). The fix skips the call
+    // entirely rather than attempting and failing it.
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+
+    const myselfCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.path === '/rest/api/3/myself');
+    expect(myselfCalls).toHaveLength(0);
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putCalls).toHaveLength(0);
+
+    const warnings = data['warnings'] as string[];
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
+    expect(warnings[0]).toContain('assigneeAccountId');
   });
 
   it('assigns to the explicit assignee param, overriding the env var', async () => {
@@ -364,9 +418,15 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect((data['warnings'] as string[]).length).toBe(0);
   });
 
-  it('adds a warning and proceeds when /myself fails with a 401 scope error', async () => {
-    // No email or accountId configured — falls through to /myself, which
-    // 401s under the Lambda's client-credentials token (LS-7891).
+  it('adds a warning and proceeds when /myself fails under basic auth (e.g. an expired local token)', async () => {
+    // No email or accountId configured, basic-auth creds — falls through to
+    // /myself (the OAuth/hosted-Lambda case is covered by the LS-8773 test
+    // above, which never attempts this call).
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'basic',
+      login: 'a',
+      password: 'b',
+    });
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {
         if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {

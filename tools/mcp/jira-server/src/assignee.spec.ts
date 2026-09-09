@@ -12,6 +12,10 @@ jest.mock('./jql-search', () => ({
   searchJql: jest.fn(),
 }));
 
+jest.mock('./netrc', () => ({
+  getJiraCredentials: jest.fn(),
+}));
+
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('./jira-api');
@@ -19,6 +23,10 @@ const { jiraRequest: mockJiraRequest } = jest.requireMock<{
 const { searchJql: mockSearchJql } = jest.requireMock<{
   searchJql: jest.Mock;
 }>('./jql-search');
+
+const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
+  getJiraCredentials: jest.Mock;
+}>('./netrc');
 
 /** The 401 the hosted Lambda's client-credentials token gets on user lookups. */
 const scopeError = new Error(
@@ -41,6 +49,11 @@ beforeEach(() => {
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
   mockJiraRequest.mockResolvedValue(undefined);
   mockSearchJql.mockResolvedValue({ issues: [] });
+  mockGetJiraCredentials.mockResolvedValue({
+    type: 'basic',
+    login: 'a',
+    password: 'b',
+  });
 });
 
 describe('resolveAndAssign — email resolution (LS-9513)', () => {
@@ -267,6 +280,94 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
       mockJiraRequest.mock.calls as Array<[{ path: string }]>
     ).filter(([opts]) => opts.path.startsWith('/rest/api/3/user'));
     expect(lookups).toHaveLength(0);
+  });
+});
+
+describe('resolveAndAssign — current-user fallback (LS-8773)', () => {
+  it('skips the GET /rest/api/3/myself round trip under OAuth and warns with a concrete remedy', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'oauth',
+      clientId: 'id',
+      clientSecret: 'secret',
+      cloudId: 'cloud-1',
+      siteUrl: 'https://example.atlassian.net',
+    });
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(putAssigneeCalls()).toHaveLength(0);
+    const myselfCalls = (
+      mockJiraRequest.mock.calls as Array<[{ path: string }]>
+    ).filter(([opts]) => opts.path === '/rest/api/3/myself');
+    expect(myselfCalls).toHaveLength(0);
+    expect(result.warnings.join(' ')).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(result.warnings.join(' ')).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
+    expect(result.warnings.join(' ')).toContain('assigneeAccountId');
+  });
+
+  it('surfaces a warning (not an uncaught rejection) when getJiraCredentials itself throws', async () => {
+    mockGetJiraCredentials.mockRejectedValue(
+      new Error('No Jira credentials found.'),
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(putAssigneeCalls()).toHaveLength(0);
+    expect(result.warnings.join(' ')).toContain('Assignee update failed');
+    expect(result.warnings.join(' ')).toContain('No Jira credentials found');
+  });
+
+  it('still attempts GET /rest/api/3/myself under basic auth (local sessions)', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'basic',
+      login: 'a',
+      password: 'b',
+    });
+    mockJiraRequest.mockImplementation((opts: { path: string }) =>
+      opts.path === '/rest/api/3/myself'
+        ? Promise.resolve({ accountId: 'acct-self', displayName: 'Self' })
+        : Promise.resolve(undefined),
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBe('acct-self');
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: 'acct-self' });
+  });
+
+  it('names the current-user remedy (not the generic bypass-email one) when the basic-auth /myself call itself fails', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'basic',
+      login: 'a',
+      password: 'b',
+    });
+    mockJiraRequest.mockImplementation((opts: { path: string }) =>
+      opts.path === '/rest/api/3/myself'
+        ? Promise.reject(
+            new Error('Jira API GET /rest/api/3/myself failed (401)'),
+          )
+        : Promise.resolve(undefined),
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(result.warnings.join(' ')).toContain('current-user lookup');
+    expect(result.warnings.join(' ')).toContain('JIRA_ASSIGNEE_EMAIL');
   });
 });
 

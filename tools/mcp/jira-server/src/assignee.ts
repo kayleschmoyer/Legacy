@@ -1,5 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging/server';
 import { jiraRequest } from './jira-api.js';
+import { getJiraCredentials } from './netrc.js';
 import { searchJql } from './jql-search.js';
 
 export interface ResolveAndAssignParams {
@@ -219,8 +220,10 @@ export async function applyAssigneeChange({
  * they need no lookup at all. Email resolution itself is two-stage — see
  * {@link resolveEmailToAccountId}: `/rest/api/3/user/search` where the
  * `read:jira-user` scope is available, otherwise a JQL search that works
- * under `read:jira-work` (LS-9513). The `/myself` last resort still 401s on
- * the hosted Lambda (LS-7891) and remains a local-session-only path.
+ * under `read:jira-work` (LS-9513). The `/myself` last resort always 401s on
+ * the hosted Lambda's OAuth token (LS-7891), so it is skipped entirely there
+ * in favor of an actionable warning (LS-8773) — it remains a local-session
+ * (basic auth) only path.
  */
 export async function resolveAndAssign({
   key,
@@ -268,6 +271,56 @@ export async function resolveAndAssign({
     warnEnvFallback(toolName, key, 'JIRA_ASSIGNEE_EMAIL', warnings);
   }
 
+  // Nothing explicit or env-configured — the only remaining path is the
+  // "current user" fallback (`GET /rest/api/3/myself`). That endpoint
+  // requires `read:jira-user`, which the hosted Lambda's OAuth
+  // client-credentials token does not carry and cannot be granted (the
+  // token endpoint rejects the scope as `invalid_scope` — see
+  // resolveEmailViaJql's doc comment) — it 401s there on *every* call, not
+  // just intermittently (LS-7891, recurring as LS-8773). Skip the doomed
+  // round trip under OAuth and surface the actionable remedy directly,
+  // instead of a generic "non-fatal" 401 warning that reads like a fixable
+  // transient error.
+  if (accountId === undefined && !emailToLookUp) {
+    // getJiraCredentials() itself can throw (e.g. no ~/.netrc and no env
+    // vars configured at all) — treat that the same as any other
+    // assignee-resolution failure below: non-fatal, surfaced as a warning,
+    // not an uncaught rejection out of this function.
+    try {
+      const creds = await getJiraCredentials();
+      if (creds.type === 'oauth') {
+        const msg =
+          `${toolName}: no assignee param and no JIRA_ASSIGNEE_EMAIL/` +
+          `JIRA_ASSIGNEE_ACCOUNT_ID env var were set for ${key}, and this ` +
+          "server's OAuth token cannot resolve the current user (GET " +
+          '/rest/api/3/myself always 401s under the hosted client-credentials ' +
+          'token — a known, permanent scope gap, not a transient failure). ' +
+          'Ticket left unassigned. Remedy: pass `assignee` (email) or ' +
+          '`assigneeAccountId` explicitly, or set JIRA_ASSIGNEE_EMAIL / ' +
+          'JIRA_ASSIGNEE_ACCOUNT_ID in the environment.';
+        LOGGER.warn(msg, { key, toolName });
+        warnings.push(msg);
+        return { accountId: undefined, displayName: undefined, warnings };
+      }
+    } catch (credsErr) {
+      const msg =
+        credsErr instanceof Error ? credsErr.message : String(credsErr);
+      LOGGER.error(
+        `${toolName}: assignee update failed (non-fatal)`,
+        credsErr instanceof Error ? credsErr : new Error(msg),
+        { key },
+      );
+      warnings.push(
+        `Assignee update failed (non-fatal): ${msg} Remedy: set ` +
+          'JIRA_CLIENT_ID/JIRA_CLIENT_SECRET/JIRA_CLOUD_ID or ' +
+          'JIRA_EMAIL/JIRA_API_TOKEN, or set the assignee manually in Jira.',
+      );
+      return { accountId: undefined, displayName: undefined, warnings };
+    }
+  }
+
+  let usedMyselfFallback = false;
+
   try {
     let displayName: string | undefined;
 
@@ -290,8 +343,9 @@ export async function resolveAndAssign({
       }
     } else if (accountId === undefined) {
       // No explicit/env accountId or email configured — default to the
-      // authenticated service account. Requires read:jira-user; works under
-      // basic auth, 401s under the Lambda's client-credentials token.
+      // authenticated user. Only reached under basic auth (the OAuth path
+      // returned earlier without attempting this call — see above).
+      usedMyselfFallback = true;
       const self = await jiraRequest<{
         accountId: string;
         displayName?: string;
@@ -321,11 +375,15 @@ export async function resolveAndAssign({
       { key },
     );
     const remedy =
-      accountId === undefined
-        ? 'pass `assigneeAccountId` explicitly instead of `assignee` to bypass ' +
-          'email lookup entirely'
-        : 'the PUT to /issue/{key}/assignee itself failed — verify the ' +
-          'accountId is valid and the token has write:jira-work';
+      accountId === undefined && usedMyselfFallback
+        ? 'pass `assignee` (email) or `assigneeAccountId` explicitly, or set ' +
+          'JIRA_ASSIGNEE_EMAIL / JIRA_ASSIGNEE_ACCOUNT_ID in the environment, ' +
+          'instead of relying on the current-user lookup'
+        : accountId === undefined
+          ? 'pass `assigneeAccountId` explicitly instead of `assignee` to bypass ' +
+            'email lookup entirely'
+          : 'the PUT to /issue/{key}/assignee itself failed — verify the ' +
+            'accountId is valid and the token has write:jira-work';
     warnings.push(
       `Assignee update failed (non-fatal): ${msg} Remedy: ${remedy}, or set ` +
         'the assignee manually in Jira.',

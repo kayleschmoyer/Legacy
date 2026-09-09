@@ -9,9 +9,17 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
+jest.mock('../netrc', () => ({
+  getJiraCredentials: jest.fn(),
+}));
+
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('../jira-api');
+
+const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
+  getJiraCredentials: jest.Mock;
+}>('../netrc');
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
@@ -39,6 +47,14 @@ beforeEach(() => {
   _resetAssigneeCache();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+  // Basic auth by default so the pre-existing /myself-success tests keep
+  // exercising that path; the OAuth/hosted-Lambda skip path (LS-8773) gets
+  // its own dedicated test below.
+  mockGetJiraCredentials.mockResolvedValue({
+    type: 'basic',
+    login: 'a',
+    password: 'b',
+  });
 
   mockJiraRequest.mockImplementation(
     (opts: { method: string; path: string }) => {
@@ -377,6 +393,32 @@ describe('startWork', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('Assignee update failed');
     expect(warnings[0]).toContain('scope does not match');
+  });
+
+  it('LS-8773: skips the doomed /myself round trip under OAuth (hosted Lambda) and warns with an actionable remedy instead', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'oauth',
+      clientId: 'id',
+      clientSecret: 'secret',
+      cloudId: 'cloud-1',
+      siteUrl: 'https://example.atlassian.net',
+    });
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(data['status']).toBe('In Progress');
+
+    const myselfCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.path === '/rest/api/3/myself');
+    expect(myselfCalls).toHaveLength(0);
+
+    const warnings = data['warnings'] as string[];
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
   });
 
   it('returns an error when no In Progress transition is available', async () => {
