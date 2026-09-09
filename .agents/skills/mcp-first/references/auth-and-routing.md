@@ -71,6 +71,12 @@ Use `ci_installation_rate_limit` (`legacy-sports-ci`/`legacy-sports-ci-local`) i
 
 A CI step that computes a verdict but can't post it — GitHub App API calls failing with `API rate limit exceeded for installation`, or a gate/status step logging its computed result and then silently withholding the actual `POST`/status update — is a **rate-limit signature, not a real verdict**. See [pr-lifecycle troubleshooting](../../pr-lifecycle/SKILL.md#withholding--could-not-post-status-is-a-rate-limit-signature-not-a-verdict-ls-9570) for the failure pattern and remedy.
 
+<a id="deploys-repo-credentials-gap-ls-8788"></a>
+
+### Deploys-repo credentials gap: diagnose, don't re-derive (LS-8788)
+
+`ci_get_playwright_report`/`ci_get_playwright_test_result` read the private `bkrupa/legacy-sports-deploys` repo via `getDeploysToken()`, which tries `PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID` first, then the agent-author App's own installation on that repo, before falling back to the main (deploys-repo-blind) token. In CCR/cloud sessions neither of the first two tiers is currently provisioned, so every fetch 404s with a credentials-gap message. Call `ci_installation_rate_limit`'s sibling tool **`ci_deploys_repo_auth_status`** (`legacy-sports-ci`/`legacy-sports-ci-local`) to check which tier is configured/failing and why, in one call — instead of re-triggering a real report fetch and re-deriving the same diagnosis from a 404, which is what caused this gap to be independently rediscovered and re-ticketed four times. Full root cause and remedy: [read-playwright-report](../../read-playwright-report/SKILL.md#404s-from-ci_get_playwright_report-may-be-a-credentials-gap-ls-8546-fixed-in-code-by-ls-8322-and-ls-8547-recurred-4x-as-ls-8788).
+
 ## Auth Model
 
 This section absorbed the former `credentials` skill (2026-07-02). One rule dominates everything below:

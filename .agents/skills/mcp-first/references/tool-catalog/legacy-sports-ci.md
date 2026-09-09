@@ -10,7 +10,7 @@
 
 GitHub Actions run triage: list/view runs, fetch and search logs, rerun failed jobs, and read Playwright reports.
 
-Available both locally (stdio) and via the hosted connector. 22 tools.
+Available both locally (stdio) and via the hosted connector. 23 tools.
 
 ---
 
@@ -55,6 +55,12 @@ Prefer this over `gh run cancel` via shell. Cancel a single in-flight run via ru
 | `runId` | number |  | coerced, integer, > 0 | Run ID to cancel (single-run mode). Use the "id" field from ci_list_runs output ("databaseId" is an alias). |
 | `workflow` | string \| number |  | integer | Workflow filename, display name, or numeric ID (bulk mode, with branch). |
 | `branch` | string |  | min 1 | Branch to scope bulk cancellation to (bulk mode, with workflow). |
+
+### `ci_deploys_repo_auth_status`
+
+Diagnose why ci_get_playwright_report/ci_get_playwright_test_result might 404 on the private bkrupa/legacy-sports-deploys repo (LS-8788) — WITHOUT triggering a real report fetch. Explicitly exercises each credential tier getDeploysToken() tries, in order: (1) PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID (dedicated deploy App), (2) the agent-author App's own installation on the deploys repo. Reports which tier is configured, which succeeded/failed and why, and which source `resolvedSource` a real ci_get_playwright_report call would actually use right now. `resolvedSource: "fallback"` means both tiers are unavailable and reads will 404 with the "broad fallback token" credentials-gap message — see .agents/skills/read-playwright-report/SKILL.md for the two known remedies (both require one-time human action outside this repo). Call this to verify a credentials fix actually landed instead of re-triggering a report fetch and re-deriving the same diagnosis from a 404.
+
+_No parameters._
 
 ### `ci_dispatch_workflow`
 

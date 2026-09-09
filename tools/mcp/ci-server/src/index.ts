@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { z } from 'zod';
 import { auditSessionBash } from './tools/audit-session-bash.js';
 import { autoFix } from './tools/auto-fix.js';
@@ -24,6 +25,7 @@ import { workflowSetState } from './tools/workflow-state.js';
 import {
   buildHeaders,
   formatGithubApiError,
+  getDeploysTokenDiagnostics,
   getInstallationRateLimit,
   getToken,
 } from './github-api.js';
@@ -1181,6 +1183,28 @@ export function createServer(): McpServer {
           ],
         };
       }
+    },
+  );
+
+  server.tool(
+    'ci_deploys_repo_auth_status',
+    'Diagnose why ci_get_playwright_report/ci_get_playwright_test_result might 404 on the private ' +
+      'bkrupa/legacy-sports-deploys repo (LS-8788) — WITHOUT triggering a real report fetch. Explicitly ' +
+      'exercises each credential tier getDeploysToken() tries, in order: (1) PREVIEW_APP_PRIVATE_KEY + ' +
+      "PREVIEW_APP_ID (dedicated deploy App), (2) the agent-author App's own installation on the deploys " +
+      'repo. Reports which tier is configured, which succeeded/failed and why, and which source ' +
+      '`resolvedSource` a real ci_get_playwright_report call would actually use right now. ' +
+      '`resolvedSource: "fallback"` means both tiers are unavailable and reads will 404 with the ' +
+      '"broad fallback token" credentials-gap message — see .agents/skills/read-playwright-report/SKILL.md ' +
+      'for the two known remedies (both require one-time human action outside this repo). Call this to ' +
+      'verify a credentials fix actually landed instead of re-triggering a report fetch and re-deriving ' +
+      'the same diagnosis from a 404.',
+    {},
+    async () => {
+      const diagnostics = await getDeploysTokenDiagnostics();
+      return {
+        content: [{ type: 'text', text: minifiedJson(diagnostics) }],
+      };
     },
   );
 

@@ -693,6 +693,125 @@ describe('getDeploysToken (LS-8322)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// getDeploysTokenDiagnostics (LS-8788)
+// ---------------------------------------------------------------------------
+
+describe('getDeploysTokenDiagnostics (LS-8788)', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const savedFetch = global.fetch;
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
+    for (const key of ENV_KEYS) delete process.env[key];
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    global.fetch = savedFetch;
+  });
+
+  it('reports both tiers not-configured and resolvedSource "fallback" when neither is set', async () => {
+    const { getDeploysTokenDiagnostics } = await import('./github-api.js');
+    const diagnostics = await getDeploysTokenDiagnostics();
+
+    expect(diagnostics).toEqual({
+      previewAppConfigured: false,
+      previewAppResult: 'not-configured',
+      previewAppError: undefined,
+      agentAuthorConfigured: false,
+      agentAuthorResult: 'not-configured',
+      agentAuthorError: undefined,
+      resolvedSource: 'fallback',
+    });
+  });
+
+  it('reports previewAppResult "success" and resolvedSource "preview-app" when PREVIEW_APP mints cleanly', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+    process.env['PREVIEW_APP_ID'] = '999999';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      .mockResolvedValueOnce(makeJsonResponse(200, { id: 12345 }))
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'preview-app-scoped-token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      );
+    global.fetch = mockFetch;
+
+    const { getDeploysTokenDiagnostics } = await import('./github-api.js');
+    const diagnostics = await getDeploysTokenDiagnostics();
+
+    expect(diagnostics.previewAppConfigured).toBe(true);
+    expect(diagnostics.previewAppResult).toBe('success');
+    expect(diagnostics.previewAppError).toBeUndefined();
+    // PREVIEW_APP already succeeded, so the agent-author tier is never probed.
+    expect(diagnostics.agentAuthorResult).toBe('not-configured');
+    expect(diagnostics.resolvedSource).toBe('preview-app');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces the installation-discovery failure reason when PREVIEW_APP is configured but not installed on the deploys repo', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+    process.env['PREVIEW_APP_ID'] = '999999';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch.mockResolvedValueOnce(
+      makeJsonResponse(404, { message: 'Not Found' }),
+    );
+    global.fetch = mockFetch;
+
+    const { getDeploysTokenDiagnostics } = await import('./github-api.js');
+    const diagnostics = await getDeploysTokenDiagnostics();
+
+    expect(diagnostics.previewAppConfigured).toBe(true);
+    expect(diagnostics.previewAppResult).toBe('failed');
+    expect(diagnostics.previewAppError).toContain(
+      'installation discovery failed (404)',
+    );
+    expect(diagnostics.agentAuthorResult).toBe('not-configured');
+    expect(diagnostics.resolvedSource).toBe('fallback');
+  });
+
+  it('falls through to the agent-author tier and reports its own failure reason when PREVIEW_APP is unconfigured (LS-8547 pending-install case)', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch.mockResolvedValueOnce(
+      makeJsonResponse(404, { message: 'Not Found' }),
+    );
+    global.fetch = mockFetch;
+
+    const { getDeploysTokenDiagnostics } = await import('./github-api.js');
+    const diagnostics = await getDeploysTokenDiagnostics();
+
+    expect(diagnostics.previewAppConfigured).toBe(false);
+    expect(diagnostics.previewAppResult).toBe('not-configured');
+    expect(diagnostics.agentAuthorConfigured).toBe(true);
+    expect(diagnostics.agentAuthorResult).toBe('failed');
+    expect(diagnostics.agentAuthorError).toContain(
+      'installation discovery failed (404)',
+    );
+    expect(diagnostics.resolvedSource).toBe('fallback');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getInstallationRateLimit (LS-9570)
 // ---------------------------------------------------------------------------
 

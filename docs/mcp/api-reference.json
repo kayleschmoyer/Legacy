@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 263,
+  "toolCount": 264,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2867,7 +2867,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 22,
+      "toolCount": 23,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -3020,6 +3020,14 @@
               "description": "Branch to scope bulk cancellation to (bulk mode, with workflow)."
             }
           },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "ci_deploys_repo_auth_status",
+          "description": "Diagnose why ci_get_playwright_report/ci_get_playwright_test_result might 404 on the private bkrupa/legacy-sports-deploys repo (LS-8788) — WITHOUT triggering a real report fetch. Explicitly exercises each credential tier getDeploysToken() tries, in order: (1) PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID (dedicated deploy App), (2) the agent-author App's own installation on the deploys repo. Reports which tier is configured, which succeeded/failed and why, and which source `resolvedSource` a real ci_get_playwright_report call would actually use right now. `resolvedSource: \"fallback\"` means both tiers are unavailable and reads will 404 with the \"broad fallback token\" credentials-gap message — see .agents/skills/read-playwright-report/SKILL.md for the two known remedies (both require one-time human action outside this repo). Call this to verify a credentials fix actually landed instead of re-triggering a report fetch and re-deriving the same diagnosis from a 404.",
+          "inputs": {},
           "transports": [
             "stdio"
           ]

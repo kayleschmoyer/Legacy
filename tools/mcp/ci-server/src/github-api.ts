@@ -371,16 +371,19 @@ const DEPLOYS_REPO_SLUG = 'bkrupa/legacy-sports-deploys';
 /**
  * Mint an installation-access-token for `repoSlug` by signing an app-level
  * JWT with `privateKey`/`appId`, discovering that app's installation on the
- * repo, then exchanging it. Returns null (with a stderr warning) on any
- * non-2xx response instead of throwing, so callers can fall through to the
- * next credential source.
+ * repo, then exchanging it. Returns `{ error }` (with a stderr warning) on
+ * any non-2xx response instead of throwing, so callers can fall through to
+ * the next credential source. The `error` string is also surfaced by
+ * `getDeploysTokenDiagnostics()` (LS-8788) so a caller can distinguish
+ * *why* a tier failed without re-triggering a real report fetch and
+ * re-deriving the reason from a 404.
  */
 async function mintInstallationTokenForRepo(
   privateKey: string,
   appId: string,
   repoSlug: string,
   logLabel: string,
-): Promise<{ token: string; expiresAt?: Date } | null> {
+): Promise<{ token: string; expiresAt?: Date } | { error: string }> {
   const jwt = createAppJWT(privateKey, appId);
 
   const installRes = await fetch(
@@ -398,10 +401,9 @@ async function mintInstallationTokenForRepo(
 
   if (!installRes.ok) {
     const body = await installRes.text();
-    process.stderr.write(
-      `[ci-server] ${logLabel} installation discovery failed (${installRes.status}): ${sanitizeErrorBody(body)}\n`,
-    );
-    return null;
+    const error = `installation discovery failed (${installRes.status}): ${sanitizeErrorBody(body)}`;
+    process.stderr.write(`[ci-server] ${logLabel} ${error}\n`);
+    return { error };
   }
 
   const install = (await installRes.json()) as { id: number };
@@ -421,17 +423,20 @@ async function mintInstallationTokenForRepo(
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text();
-    process.stderr.write(
-      `[ci-server] ${logLabel} token exchange failed (${tokenRes.status}): ${sanitizeErrorBody(body)}\n`,
-    );
-    return null;
+    const error = `token exchange failed (${tokenRes.status}): ${sanitizeErrorBody(body)}`;
+    process.stderr.write(`[ci-server] ${logLabel} ${error}\n`);
+    return { error };
   }
 
   const data = (await tokenRes.json()) as {
     token?: string;
     expires_at?: string;
   };
-  if (!data.token) return null;
+  if (!data.token) {
+    const error = 'token exchange response had no token field';
+    process.stderr.write(`[ci-server] ${logLabel} ${error}\n`);
+    return { error };
+  }
 
   return {
     token: data.token,
@@ -477,7 +482,7 @@ export async function getDeploysToken(): Promise<string> {
       DEPLOYS_REPO_SLUG,
       'PREVIEW_APP',
     );
-    if (result) {
+    if ('token' in result) {
       cachedDeploysToken = result.token;
       cachedDeploysTokenExpiry = result.expiresAt;
       lastDeploysTokenWasFallback = false;
@@ -495,7 +500,7 @@ export async function getDeploysToken(): Promise<string> {
       DEPLOYS_REPO_SLUG,
       'agent-author App (deploys repo)',
     );
-    if (result) {
+    if ('token' in result) {
       cachedDeploysToken = result.token;
       cachedDeploysTokenExpiry = result.expiresAt;
       lastDeploysTokenWasFallback = false;
@@ -506,6 +511,102 @@ export async function getDeploysToken(): Promise<string> {
   // Fall back to the main token (works when GH_TOKEN is a PAT with access to both repos)
   lastDeploysTokenWasFallback = true;
   return getToken();
+}
+
+export type DeploysTokenTierResult = 'success' | 'not-configured' | 'failed';
+
+export interface DeploysTokenDiagnostics {
+  /** Whether PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID are both set in this process's env. */
+  previewAppConfigured: boolean;
+  previewAppResult: DeploysTokenTierResult;
+  previewAppError?: string;
+  /** Whether AGENT_AUTHOR_APP_PRIVATE_KEY is set in this process's env. */
+  agentAuthorConfigured: boolean;
+  agentAuthorResult: DeploysTokenTierResult;
+  agentAuthorError?: string;
+  /** Which tier getDeploysToken() would actually resolve to right now. */
+  resolvedSource: 'preview-app' | 'agent-author' | 'fallback';
+}
+
+/**
+ * Diagnose why `getDeploysToken()` would (or wouldn't) return a token scoped
+ * to the private `bkrupa/legacy-sports-deploys` repo, without needing a real
+ * `ci_get_playwright_report`/`ci_get_playwright_test_result` call to
+ * indirectly discover it via a 404 (LS-8788 — the credentials gap this
+ * diagnoses recurred four times across LS-8296/LS-8850/LS-9248/LS-8758
+ * despite LS-8547/LS-8556 both being marked Done, because those fixes'
+ * completion was never independently re-verifiable — each recurrence
+ * required re-triggering a report fetch and re-deriving the same "which
+ * tier is broken" answer from scratch).
+ *
+ * Exercises the same two credential tiers `getDeploysToken()` tries, in the
+ * same order, but reports the *reason* each tier failed instead of silently
+ * falling through — so a human provisioning credentials (or an agent
+ * verifying the provisioning landed) gets a direct answer. Mints throwaway
+ * tokens for the check; does not touch `getDeploysToken()`'s own cache.
+ */
+export async function getDeploysTokenDiagnostics(): Promise<DeploysTokenDiagnostics> {
+  const rawKey = process.env['PREVIEW_APP_PRIVATE_KEY'];
+  const appId = process.env['PREVIEW_APP_ID'];
+  const previewAppConfigured = Boolean(rawKey && appId);
+
+  let previewAppResult: DeploysTokenTierResult = 'not-configured';
+  let previewAppError: string | undefined;
+  if (previewAppConfigured && rawKey && appId) {
+    const privateKey = rawKey.includes('-----BEGIN')
+      ? rawKey
+      : rawKey.replace(/\\n/g, '\n');
+    const result = await mintInstallationTokenForRepo(
+      privateKey,
+      appId.trim(),
+      DEPLOYS_REPO_SLUG,
+      'PREVIEW_APP (diagnostics)',
+    );
+    if ('token' in result) {
+      previewAppResult = 'success';
+    } else {
+      previewAppResult = 'failed';
+      previewAppError = result.error;
+    }
+  }
+
+  const agentAuthorKey = getAppPrivateKey();
+  const agentAuthorConfigured = Boolean(agentAuthorKey);
+  let agentAuthorResult: DeploysTokenTierResult = 'not-configured';
+  let agentAuthorError: string | undefined;
+  if (agentAuthorConfigured && agentAuthorKey) {
+    const agentAuthorAppId =
+      process.env['GITHUB_APP_ID']?.trim() || DEFAULT_APP_ID;
+    const result = await mintInstallationTokenForRepo(
+      agentAuthorKey,
+      agentAuthorAppId,
+      DEPLOYS_REPO_SLUG,
+      'agent-author App (diagnostics)',
+    );
+    if ('token' in result) {
+      agentAuthorResult = 'success';
+    } else {
+      agentAuthorResult = 'failed';
+      agentAuthorError = result.error;
+    }
+  }
+
+  const resolvedSource: DeploysTokenDiagnostics['resolvedSource'] =
+    previewAppResult === 'success'
+      ? 'preview-app'
+      : agentAuthorResult === 'success'
+        ? 'agent-author'
+        : 'fallback';
+
+  return {
+    previewAppConfigured,
+    previewAppResult,
+    previewAppError,
+    agentAuthorConfigured,
+    agentAuthorResult,
+    agentAuthorError,
+    resolvedSource,
+  };
 }
 
 /** Parse owner/repo from the git remote origin URL. */

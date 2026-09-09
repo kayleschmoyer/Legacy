@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { ToolResult } from '../types.js';
 import {
   fetchDeployReportJobStatus,
@@ -8,7 +9,6 @@ import {
 } from '../playwright-report.js';
 import { deploysTokenWasFallback, githubGet } from '../github-api.js';
 import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /**
  * Return a Playwright report as compact, agent-targeted Markdown.
@@ -103,8 +103,10 @@ async function tryS3Fallback(params: {
       'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob ' +
       'zip containing test results. Use `playwright merge-reports` or inspect ' +
       'the zip to extract individual test error-context.md / trace.zip files. ' +
-      'For a rendered pass/fail summary instead of raw blobs, ask a human to ' +
-      'configure PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID for this session.',
+      'For a rendered pass/fail summary instead of raw blobs, call ' +
+      'ci_deploys_repo_auth_status (LS-8788) to see exactly which credential ' +
+      'tier is missing, then ask a human to fix it per ' +
+      '.agents/skills/read-playwright-report/SKILL.md.',
   };
 
   return {

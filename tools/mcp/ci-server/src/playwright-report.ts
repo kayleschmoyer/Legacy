@@ -37,7 +37,10 @@ export async function fetchFileContent(
         ? ' (PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured in this ' +
           'session, so the request used the broad fallback token, which typically ' +
           `lacks read access to the private ${DEPLOYS_REPO} repo — this 404 is a ` +
-          'credentials gap, not necessarily a missing/undeployed report.)'
+          'credentials gap, not necessarily a missing/undeployed report. Call ' +
+          'ci_deploys_repo_auth_status for a direct diagnosis of which credential ' +
+          'tier is missing/failing (LS-8788) instead of re-deriving it from this ' +
+          '404 — see .agents/skills/read-playwright-report/SKILL.md for remedies.)'
         : '';
     throw new Error(
       `GitHub API ${res.status} fetching ${path}: ${body.slice(0, 300)}${fallbackHint}`,
