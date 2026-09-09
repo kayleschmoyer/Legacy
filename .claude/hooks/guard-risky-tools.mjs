@@ -121,6 +121,37 @@ function isLinkedWorktree(root) {
 }
 
 /**
+ * Best-effort resolution of the cwd a shell command actually runs in, by
+ * replaying any `cd <path>` segments that precede it left to right. Handles
+ * the common chaining forms (`&&`, `;`, `|`, `then`/`do`) and quoted paths.
+ * Falls back to `root` when the command never `cd`s anywhere — which is the
+ * overwhelmingly common case and exactly what preserves prior behaviour.
+ *
+ * This is what lets `make lockfile`'s isolated-temp-dir procedure — which
+ * `cd`s into a scratch copy of just the manifest files before running
+ * `pnpm install --lockfile-only` there — read as running against that temp
+ * dir's (non-existent, non-symlinked) node_modules rather than the
+ * worktree's shared pool symlink two directories up.
+ */
+function commandCwd(root, cmd) {
+  let cwd = root;
+  const cdRe =
+    /(^|[;&|]|\bthen\b|\bdo\b)\s*cd\s+(?:--\s+)?("[^"]*"|'[^']*'|\S+)/g;
+  let m;
+  while ((m = cdRe.exec(cmd))) {
+    let path = m[2];
+    if (
+      (path.startsWith('"') && path.endsWith('"')) ||
+      (path.startsWith("'") && path.endsWith("'"))
+    ) {
+      path = path.slice(1, -1);
+    }
+    cwd = isAbsolute(path) ? path : join(cwd, path);
+  }
+  return cwd;
+}
+
+/**
  * pnpm subcommands that rewrite `package.json` + `pnpm-lock.yaml`. Because the
  * pool slot hash is sha256(pnpm-lock.yaml) (+ the pinned `packageManager`),
  * these are exactly the commands that mint a NEW slot rather than mutating the
@@ -149,19 +180,27 @@ const PNPM_LOCKFILE_ONLY =
  * install-packages.md removes the symlink precisely so pnpm can write a private
  * tree, and step 2 is `pnpm add -w <pkg>`. Firing there blocked our own
  * documented procedure at the step that makes it work.
+ *
+ * Scoped to the command's actual cwd (LS-9837), not the worktree root: a
+ * `cd <tmpdir> && pnpm install --lockfile-only` never touches the symlinked
+ * pool at the worktree root, so it should be judged against the tmpdir it
+ * really runs in — see `commandCwd`.
  */
 function pnpmInstallGate() {
   const root = projectDir(input);
+  const cwd = commandCwd(root, scannable);
   try {
     // lstat, not stat: Windows junctions (what modules-pool/link.mjs creates)
     // also report as symbolic links here, but resolve away under stat.
-    return lstatSync(join(root, 'node_modules')).isSymbolicLink()
+    return lstatSync(join(cwd, 'node_modules')).isSymbolicLink()
       ? { fire: true }
       : { fire: false };
   } catch (err) {
     if (err?.code !== 'ENOENT') return { fire: false }; // fail open
-    // No node_modules. In the main repo a real install is the legitimate one.
-    if (!isLinkedWorktree(root)) return { fire: false };
+    // No node_modules at the resolved cwd. In the main repo (or any plain
+    // directory that isn't a linked worktree — e.g. the isolated tmpdir) a
+    // real install/lockfile-only run is the legitimate one.
+    if (!isLinkedWorktree(cwd)) return { fire: false };
     // A linked worktree with no node_modules is the detached state. Nothing
     // here can reach the shared slot — the symlink is already gone — and a
     // lockfile-rewriting command is the documented next step, so let it run.

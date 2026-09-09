@@ -17,7 +17,7 @@
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
 	pc-db-prep pc-typecheck pc-format pc-lint pc-workflows pc-test pc-build \
-	wt-setup modules-link modules-gc \
+	wt-setup modules-link modules-gc lockfile \
 	stabilize-after-rebase lint-review-patterns lint-touch-map ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
 	ship-pr
 .DEFAULT_GOAL := help
@@ -178,6 +178,10 @@ endif
 # Pass WT/DAYS/DRY through make's exported environment — never interpolated into
 # the shell command line — so user-supplied values cannot inject extra arguments
 # or shell commands. The scripts read MODULES_POOL_* from process.env.
+lockfile: ## Regenerate pnpm-lock.yaml in an isolated temp dir, without touching the worktree's node_modules pool symlink (LS-9837)
+	@$(call echo_blue,Regenerating pnpm-lock.yaml in isolation...)
+	@bash scripts/lockfile-regen.sh
+
 modules-link: export MODULES_POOL_WT := $(WT)
 modules-link: ## Link this worktree's node_modules to a content-addressable pool slot (RFC: docs/rfcs/modules-pool). Usage: make modules-link [WT=<path>]
 	@node scripts/modules-pool/link.mjs

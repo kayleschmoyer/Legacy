@@ -1,19 +1,22 @@
 /**
  * Tests for .claude/hooks/guard-risky-tools.mjs — the `pnpm-install-symlink`
- * rule and its filesystem gate (LS-9828).
+ * rule and its filesystem gate (LS-9828, LS-9837).
  *
  * Run via: pnpm run test:scripts
  * Or:      node --test scripts/__tests__/guard-risky-tools.test.mjs
  *
  * The rule guards one specific hazard: pnpm writing THROUGH a worktree symlink
  * rewrites the immutable pool slot every other worktree on the machine is
- * linked to. It has been narrowed twice for firing outside that hazard — once
- * for main-repo checkouts where node_modules is a real directory (LS-8731), and
- * once for the detached state that install-packages.md's own step 1 creates
- * (LS-9828). Both narrowings are false-positive fixes, so the tests below pin
- * the hazard case just as hard as the allowed cases: a regression that reopens
- * the block is annoying, but a regression that lets `pnpm add` run through a
- * live symlink corrupts a slot other sessions are executing from.
+ * linked to. It has been narrowed three times for firing outside that hazard —
+ * once for main-repo checkouts where node_modules is a real directory
+ * (LS-8731), once for the detached state that install-packages.md's own step 1
+ * creates (LS-9828), and once for a `pnpm install --lockfile-only` that `cd`s
+ * into an isolated tmpdir with no node_modules of its own before running
+ * (LS-9837, `make lockfile`). All three narrowings are false-positive fixes, so
+ * the tests below pin the hazard case just as hard as the allowed cases: a
+ * regression that reopens the block is annoying, but a regression that lets
+ * `pnpm add` run through a live symlink corrupts a slot other sessions are
+ * executing from.
  */
 
 import { test } from 'node:test';
@@ -207,6 +210,61 @@ test('does not treat a package name starting with "add" as pnpm add', () => {
     'not a pnpm write verb',
   );
 });
+
+// --- Isolated-tmpdir installs (LS-9837) --------------------------------------
+//
+// `make lockfile`'s verified procedure `cd`s into a scratch copy of just the
+// manifest files (no node_modules of its own) before running
+// `pnpm install --lockfile-only` there. The gate must judge that install
+// against the tmpdir it actually runs in, not the worktree root two
+// directories up — otherwise the sanctioned regeneration path is blocked by
+// the very rule it was designed to route around.
+
+test(
+  'allows pnpm install --lockfile-only cd-ed into an isolated tmpdir, even from a live symlinked worktree root',
+  { skip: !SYMLINK_OK },
+  () => {
+    const root = makeRoot(SYMLINKED);
+    const tmp = mkdtempSync(join(tmpdir(), 'grt-lockfile-stage-'));
+    try {
+      const { code, stderr } = runHook(
+        `cd ${tmp} && pnpm install --lockfile-only --ignore-scripts`,
+        root,
+      );
+      assert.equal(code, 0, `expected no block, got stderr: ${stderr}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'still blocks pnpm install --lockfile-only when the cd target itself has a live symlink',
+  { skip: !SYMLINK_OK },
+  () => {
+    const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+    const target = join(root, 'wt1');
+    mkdirSync(target);
+    const slot = join(root, 'slot');
+    mkdirSync(slot);
+    makeDirSymlink(join(target, 'node_modules'), slot);
+    writeFileSync(
+      join(target, '.git'),
+      'gitdir: /somewhere/.git/worktrees/wt1\n',
+    );
+    try {
+      const { code, stderr } = runHook(
+        `cd ${target} && pnpm install --lockfile-only`,
+        root,
+      );
+      assert.equal(code, 2, 'expected a block');
+      assert.match(stderr, /pnpm-install-symlink/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 // --- Main repo / direct-branch checkouts (LS-8731) ---------------------------
 
