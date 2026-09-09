@@ -6,6 +6,7 @@ import {
   it,
   jest,
 } from '@jest/globals';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +34,7 @@ describe('scanStagedForConflictMarkers', () => {
     const result = scanStagedForConflictMarkers('/cwd', runGit);
     expect(result).toEqual(['src/foo.ts', 'src/bar.ts']);
     expect(runGit).toHaveBeenCalledWith(
-      ['grep', '--cached', '-l', '<<<<<<<'],
+      ['grep', '--cached', '-l', '-E', '^<<<<<<<'],
       '/cwd',
     );
   });
@@ -44,6 +45,51 @@ describe('scanStagedForConflictMarkers', () => {
       .mockReturnValue('\nsrc/baz.ts\n\n');
     expect(scanStagedForConflictMarkers('/cwd', runGit)).toEqual([
       'src/baz.ts',
+    ]);
+  });
+});
+
+describe('scanStagedForConflictMarkers against a real git repo (LS-9943)', () => {
+  let workDir: string;
+  const realRunGit = (args: string[], cwd: string): string =>
+    execFileSync('git', args, { cwd, encoding: 'utf-8' });
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), 'worktree-conflict-marker-test-'));
+    execFileSync('git', ['init', '-q'], { cwd: workDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], {
+      cwd: workDir,
+    });
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: workDir });
+  });
+
+  afterEach(() => {
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('does not flag a file whose marker-like substrings are not at the start of a line', () => {
+    // Mirrors the false positives reported in LS-9943: doc examples and test
+    // fixtures that legitimately discuss conflict-marker syntax mid-line.
+    writeFileSync(
+      join(workDir, 'conflict-markers.spec.ts'),
+      [
+        "it('detects <<<<<<< markers', () => {",
+        "  expect(scan(file)).toContain('<<<<<<<');",
+        '});',
+      ].join('\n'),
+    );
+    execFileSync('git', ['add', '.'], { cwd: workDir });
+    expect(scanStagedForConflictMarkers(workDir, realRunGit)).toEqual([]);
+  });
+
+  it('still flags a file with a genuine conflict marker at the start of a line', () => {
+    writeFileSync(
+      join(workDir, 'foo.ts'),
+      ['before', '<<<<<<< HEAD', 'ours', 'after'].join('\n'),
+    );
+    execFileSync('git', ['add', '.'], { cwd: workDir });
+    expect(scanStagedForConflictMarkers(workDir, realRunGit)).toEqual([
+      'foo.ts',
     ]);
   });
 });

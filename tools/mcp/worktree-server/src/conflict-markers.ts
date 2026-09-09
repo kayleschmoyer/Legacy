@@ -6,14 +6,18 @@ type RunShellFn = (cmd: string, cwd: string) => string;
 
 /**
  * Returns paths of staged files that contain git conflict markers.
- * Uses `git grep --cached -l '<<<<<<<'` — exits 1 (throws) when no matches, which we treat as empty.
+ * Uses `git grep --cached -l -E '^<<<<<<<'`, anchored to the start of a line
+ * (the same convention as `scanWorkingTreeForConflictMarkers` below and
+ * `getConflictInfo`'s own line-based parsing) so a `<<<<<<<` substring inside
+ * a string literal, comment, or doc example isn't mistaken for a real
+ * conflict marker. Exits 1 (throws) when no matches, which we treat as empty.
  */
 export function scanStagedForConflictMarkers(
   cwd: string,
   runGit: RunGitFn,
 ): string[] {
   try {
-    return runGit(['grep', '--cached', '-l', '<<<<<<<'], cwd)
+    return runGit(['grep', '--cached', '-l', '-E', '^<<<<<<<'], cwd)
       .trim()
       .split('\n')
       .filter(Boolean);
