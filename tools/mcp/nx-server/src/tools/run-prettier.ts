@@ -1,4 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+
+import { checkFileExists } from '../file-existence-check.js';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -49,6 +51,8 @@ export async function runPrettier(
         `Invalid file "${file}": contains shell metacharacters (;&\`\${}) which are not allowed.`,
       );
     }
+    const missingFileResult = checkFileExists(file, cwd, params.worktreePath);
+    if (missingFileResult) return missingFileResult;
   }
 
   const flag = mode === 'write' ? '--write' : '--check';

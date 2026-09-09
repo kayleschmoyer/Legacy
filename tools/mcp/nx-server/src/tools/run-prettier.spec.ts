@@ -5,16 +5,26 @@ jest.mock('../run-command.js', () => ({
   runPnpm: jest.fn(),
 }));
 
+jest.mock('node:fs', () => ({
+  existsSync: jest.fn(() => true),
+}));
+
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { MAX_FILES, runPrettier } from './run-prettier.js';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 
 const mockRunPnpm = runPnpm as jest.MockedFunction<typeof runPnpm>;
 const mockGetRepoRoot = getRepoRoot as jest.MockedFunction<typeof getRepoRoot>;
+const mockExistsSync = existsSync as jest.MockedFunction<typeof existsSync>;
 
 describe('runPrettier', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/repo');
+    // Default: every target file exists — only the explicit "not found"
+    // tests below override this.
+    mockExistsSync.mockReturnValue(true);
   });
 
   it('defaults to check mode and passes --check with the given files', async () => {
@@ -136,6 +146,64 @@ describe('runPrettier', () => {
 
     expect(result.isError).toBe(true);
     expect(mockRunPnpm).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file that does not exist under the repo root with an explicit message, not prettier's generic pattern error", async () => {
+    mockExistsSync.mockImplementation(
+      (p) => String(p) !== resolve('/repo', 'tools/missing.ts'),
+    );
+
+    const result = await runPrettier({ files: ['tools/missing.ts'] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /File "tools\/missing\.ts" not found under repo root/,
+    );
+    expect(mockRunPnpm).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file that does not exist under worktreePath, naming worktreePath explicitly (LS-9853 repro)', async () => {
+    const worktree = resolve('/worktree');
+    mockExistsSync.mockImplementation(
+      (p) => String(p) !== resolve(worktree, 'a.ts'),
+    );
+
+    const result = await runPrettier({
+      files: ['a.ts'],
+      worktreePath: worktree,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      new RegExp(
+        `File "a\\.ts" not found under worktreePath ${worktree.replace(/[/\\]/g, '\\$&')}`,
+      ),
+    );
+    expect(mockRunPnpm).not.toHaveBeenCalled();
+  });
+
+  it('formats a file that exists only under worktreePath (not the main repo checkout), confirming the LS-9853 repro is fixed', async () => {
+    const worktree = resolve('/worktree');
+    mockRunPnpm.mockResolvedValue('');
+
+    const result = await runPrettier({
+      files: ['apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts'],
+      worktreePath: worktree,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunPnpm).toHaveBeenCalledWith(
+      [
+        'exec',
+        'prettier',
+        '--check',
+        'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts',
+      ],
+      worktree,
+      expect.any(Number),
+      undefined,
+      true,
+    );
   });
 
   it('formats a file outside every Nx project (top-level scripts/) the same as any other file — there is no project scoping here at all (LS-9574)', async () => {

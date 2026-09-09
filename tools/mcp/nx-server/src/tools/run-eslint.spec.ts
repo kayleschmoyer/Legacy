@@ -34,14 +34,46 @@ const ROOT = resolve('/repo');
 const DB = resolve('/repo/lambdas/db');
 const WEB = resolve('/repo/apps/web');
 
-/** Make `eslint.config.mjs` appear to exist in exactly these directories. */
-function setConfigRoots(dirs: string[]): void {
-  const roots = new Set(dirs);
+// Real target files are assumed to exist unless explicitly listed as missing
+// via `setMissingFiles` — only `eslint.config.mjs` presence is governed by
+// `setConfigRoots`, mirroring the two independent things this tool checks
+// `existsSync` for.
+let missingFiles = new Set<string>();
+let configRoots = new Set<string>();
+
+const ESLINT_CONFIG_BASENAMES = new Set([
+  'eslint.config.js',
+  'eslint.config.mjs',
+  'eslint.config.cjs',
+  'eslint.config.ts',
+  'eslint.config.mts',
+  'eslint.config.cts',
+]);
+
+function refreshExistsSyncMock(): void {
   mockExistsSync.mockImplementation((p) => {
     const str = String(p);
-    if (!str.endsWith('eslint.config.mjs')) return false;
-    return roots.has(resolve(str, '..'));
+    const base = str.split(/[/\\]/).pop() ?? '';
+    if (ESLINT_CONFIG_BASENAMES.has(base)) {
+      // Fixtures below only ever materialise `eslint.config.mjs`.
+      return (
+        base === 'eslint.config.mjs' && configRoots.has(resolve(str, '..'))
+      );
+    }
+    return !missingFiles.has(str);
   });
+}
+
+/** Make `eslint.config.mjs` appear to exist in exactly these directories. */
+function setConfigRoots(dirs: string[]): void {
+  configRoots = new Set(dirs);
+  refreshExistsSyncMock();
+}
+
+/** Make the given absolute file paths appear not to exist on disk. */
+function setMissingFiles(paths: string[]): void {
+  missingFiles = new Set(paths);
+  refreshExistsSyncMock();
 }
 
 /** Configure runJobWithBudget to resolve with a terminal "done" snapshot. */
@@ -76,6 +108,7 @@ describe('runESLint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/repo');
+    missingFiles = new Set();
     // Default: only the workspace root owns a flat config.
     setConfigRoots([ROOT]);
   });
@@ -194,6 +227,59 @@ describe('runESLint', () => {
 
     expect(result.isError).toBe(true);
     expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file that does not exist under the repo root with an explicit message, not eslint's generic pattern error", async () => {
+    setMissingFiles([resolve(ROOT, 'tools/missing.ts')]);
+
+    const result = await runESLint({ files: ['tools/missing.ts'] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /File "tools\/missing\.ts" not found under repo root/,
+    );
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file that does not exist under worktreePath, naming worktreePath explicitly (LS-9853 repro)', async () => {
+    const worktree = resolve('/worktree');
+    setConfigRoots([worktree]);
+    setMissingFiles([
+      resolve(worktree, 'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts'),
+    ]);
+
+    const result = await runESLint({
+      files: ['apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts'],
+      worktreePath: worktree,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      new RegExp(
+        `File "apps/web-e2e/src/tests/zz-force-rule-probe\\.spec\\.ts" not found under worktreePath ${worktree.replace(/[/\\]/g, '\\$&')}`,
+      ),
+    );
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('lints a file that exists only under worktreePath (not the main repo checkout), confirming the LS-9853 repro is fixed', async () => {
+    const worktree = resolve('/worktree');
+    setConfigRoots([worktree]);
+    setupDoneJob('');
+
+    const result = await runESLint({
+      files: ['apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts'],
+      worktreePath: worktree,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallOpts().cwd).toBe(worktree);
+    expect(jobCallArgs()).toEqual([
+      'exec',
+      'eslint',
+      '--max-warnings=0',
+      'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts',
+    ]);
   });
 
   it('rejects a file that resolves outside the working directory', async () => {

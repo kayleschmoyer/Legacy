@@ -2,6 +2,7 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
+import { checkFileExists } from '../file-existence-check.js';
 import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
@@ -225,6 +226,9 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
         `Invalid file "${file}": resolves outside the working directory (${cwd}).`,
       );
     }
+
+    const missingFileResult = checkFileExists(file, cwd, params.worktreePath);
+    if (missingFileResult) return missingFileResult;
 
     const configDir = resolveConfigDir(absFile, cwd);
     const relFile = toPosix(relative(configDir, absFile));
