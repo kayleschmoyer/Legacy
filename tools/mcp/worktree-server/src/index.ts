@@ -1229,7 +1229,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_checkout_file',
       description:
-        'Restore files to a ref, or resolve conflicts with theirs/ours strategy.',
+        'Restore files to a ref, or resolve conflicts. Alias: paths/path.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1250,7 +1250,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
         },
-        required: ['files'],
       },
     },
     {
@@ -3127,16 +3126,61 @@ const handleCallTool = async (
     // -----------------------------------------------------------------------
     case 'worktree_checkout_file': {
       const {
-        files,
+        files: rawFiles,
+        paths: rawPaths,
+        path: rawPath,
         strategy,
         ref = 'HEAD',
         worktree: wtKey,
       } = args as {
-        files: string[];
+        files?: unknown;
+        paths?: unknown;
+        path?: unknown;
         strategy?: 'theirs' | 'ours';
         ref?: string;
         worktree?: string;
       };
+
+      const providedParamCount = [rawFiles, rawPaths, rawPath].filter(
+        (v) => v !== undefined,
+      ).length;
+      if (providedParamCount > 1) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Provide only one of "files", "paths", or "path" — they are aliases for the same file list.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const filesResult = normalizeFilesParam(rawFiles ?? rawPaths ?? rawPath);
+      if (
+        filesResult &&
+        typeof filesResult === 'object' &&
+        !Array.isArray(filesResult) &&
+        'error' in filesResult
+      ) {
+        return {
+          content: [{ type: 'text', text: filesResult.error }],
+          isError: true,
+        };
+      }
+      if (!filesResult || filesResult.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required file list: pass "files" (string[]), "paths" (string | string[]), or "path" (string) — at least one file path is required, e.g. { files: ["path/to/file.ts"] } or { path: "path/to/file.ts" }.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const files = filesResult;
+
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
         return {

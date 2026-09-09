@@ -106,11 +106,11 @@
         },
         {
           "name": "worktree_checkout_file",
-          "description": "Restore files to a ref, or resolve conflicts with theirs/ours strategy.",
+          "description": "Restore files to a ref, or resolve conflicts. Alias: paths/path.",
           "inputs": {
             "files": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "description": "File paths",
               "items": {
                 "type": "string",
