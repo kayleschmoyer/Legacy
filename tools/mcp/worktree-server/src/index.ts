@@ -37,7 +37,7 @@ import {
   sep,
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
-import { checkJiraAuth } from './auth-checks';
+import { checkJiraAuth, HOSTED_CONNECTOR_CAVEAT } from './auth-checks';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
 import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
@@ -12508,6 +12508,7 @@ const handleCallTool = async (
             text: JSON.stringify(
               {
                 allAuthenticated,
+                caveat: HOSTED_CONNECTOR_CAVEAT,
                 services: {
                   github: {
                     ok: githubOk,

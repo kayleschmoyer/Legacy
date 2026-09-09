@@ -21,6 +21,39 @@ export interface JiraAuthCheckResult {
   method?: 'env:basic' | 'env:oauth' | 'netrc' | 'hosted:oauth';
 }
 
+/**
+ * `auth_check_all` (and its per-service sub-checks) verify local credential/
+ * config *presence* only — env vars, cache files, netrc entries, or (for AWS)
+ * a live STS call against the credential this process itself holds. None of
+ * that can observe whether the *hosted* github/jira/ci/db/rollbar MCP
+ * connectors are actually reachable this session: those run as separate
+ * OAuth-authenticated connectors registered in claude.ai, and their
+ * connection/session state is owned by the Claude Code client, not by this
+ * (or any) repo-side process — there is no API this server can call to ask
+ * "is the jira connector's OAuth session currently valid?"
+ *
+ * This gap has been proposed as an `auth_check_all` fix three times
+ * (LS-9439, LS-9370, LS-9924) after each recurrence of hosted connectors
+ * reporting healthy here while every real call to them failed with
+ * "Incompatible auth server: does not support dynamic client registration"
+ * or CONNECTION_CLOSED. It has not been actioned because it is not
+ * reachable from this server's process boundary, not because it was
+ * overlooked — do not re-propose it as a code fix without first explaining
+ * what changed about that boundary. Surface the limitation instead so
+ * agents don't trust a green result over a real tool-call error; see
+ * `.agents/skills/mcp-first/references/diagnostics.md` for the recovery
+ * protocol (re-probe ToolSearch by bare tool name; proceed on the
+ * documented CLI/REST fallback; report the outage in the gap audit).
+ */
+export const HOSTED_CONNECTOR_CAVEAT =
+  'Presence-only: confirms local credentials/config exist, not that the hosted ' +
+  'github/jira/ci/db/rollbar connectors are currently reachable this session. ' +
+  'Cannot detect a connector-layer outage (e.g. "Incompatible auth server: does ' +
+  'not support dynamic client registration", CONNECTION_CLOSED) — those have ' +
+  'reported allAuthenticated: true throughout real outages (LS-9439, LS-9370, ' +
+  'LS-9924). Trust an actual tool-call error over this result; see ' +
+  '.agents/skills/mcp-first/references/diagnostics.md for recovery steps.';
+
 export function checkJiraAuth(
   env: NodeJS.ProcessEnv,
   checkNetrc: (machine: string) => boolean,

@@ -377,13 +377,13 @@ Semantic one-shot for CI failure investigation: returns a compact markdown repor
 
 ### `github_pr_diff`
 
-Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber" (preferred) or "number" (alias). Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).
+Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber" (preferred) or "number" (alias). Use maxBytes to cap response size for very large PRs (default: 100 000 bytes).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `prNumber` | number |  | coerced | PR number to fetch the unified diff for |
 | `number` | number |  | coerced | Alias for "prNumber" — use either, not both |
-| `maxBytes` | number |  | coerced, integer, > 0 | Maximum bytes of diff to return (default: 500 000). Increase for large PRs. |
+| `maxBytes` | number |  | coerced, integer, > 0 | Maximum bytes of diff to return (default: 100 000). Increase for large PRs. |
 
 ### `github_pr_enable_auto_merge`
 

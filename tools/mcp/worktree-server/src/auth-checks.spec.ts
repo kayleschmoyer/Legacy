@@ -1,8 +1,21 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { checkJiraAuth } from './auth-checks';
+import { checkJiraAuth, HOSTED_CONNECTOR_CAVEAT } from './auth-checks';
 
 const noNetrc = jest.fn(() => false);
+
+describe('HOSTED_CONNECTOR_CAVEAT', () => {
+  it('names the recurring incidents it exists to prevent re-litigating', () => {
+    expect(HOSTED_CONNECTOR_CAVEAT).toContain('LS-9439');
+    expect(HOSTED_CONNECTOR_CAVEAT).toContain('LS-9370');
+    expect(HOSTED_CONNECTOR_CAVEAT).toContain('LS-9924');
+  });
+
+  it('states the check is presence-only, not a reachability guarantee', () => {
+    expect(HOSTED_CONNECTOR_CAVEAT).toMatch(/presence-only/i);
+    expect(HOSTED_CONNECTOR_CAVEAT).toMatch(/reachable/i);
+  });
+});
 
 describe('checkJiraAuth', () => {
   it('reports unconfigured when no credential shape is present', () => {
