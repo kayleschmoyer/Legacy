@@ -40,6 +40,7 @@ import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth } from './auth-checks';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
+import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
 import {
   getConflictInfo,
   scanStagedForConflictMarkers,
@@ -227,6 +228,23 @@ function detectEphemeralWorktreeCwd(): string | null {
     activeWorktree = cwdWorktree;
     // Erase any persisted state — it belongs to a different session.
     persistActiveWorktree(null);
+  } else {
+    // Direct-branch Claude Code Remote (CCR) session (LS-9819): the repo is
+    // checked out directly at the session root, not a registered
+    // `.claude/worktrees/<name>` tree, so there is no worktree for the
+    // detection above to find. Auto-register the checkout itself as the
+    // active worktree instead of requiring every CCR session to discover and
+    // call `worktree_set(key: "<repo root>")` manually first.
+    const ccrCwd = detectDirectBranchCcrCwd({
+      cwd: process.cwd(),
+      mainRepo: MAIN_REPO,
+      isCcrEnv: process.env['CLAUDE_CODE_REMOTE'] === 'true',
+    });
+    if (ccrCwd) {
+      activeWorktree = ccrCwd;
+      // Erase any persisted state — it belongs to a different session.
+      persistActiveWorktree(null);
+    }
   }
 }
 
