@@ -52,9 +52,16 @@ function isPass(result) {
  * @param {string|undefined} result `needs.<job>.result` for THIS run.
  * @param {Array<{name: string, status: string, conclusion: string|null, completed_at?: string, started_at?: string}>} checkRuns
  *   the head SHA's check runs (already fetched, across all runs).
+ * @param {boolean} [hasAffectedWork] whether this PR mapped to any
+ *   non-@critical affected specs (or ran the full suite). Defaults to `true`
+ *   (existing behaviour) — the @critical safety net always runs regardless of
+ *   affected specs, so a genuine `failure`/`timed_out` result stays a
+ *   hermetic-regression verdict either way. When `false` (LS-9820), an
+ *   unresolved `cancelled` result names that no affected specs matched this
+ *   PR's changes, reinforcing that there is nothing PR-specific to regress.
  * @returns {{ pass: boolean, message: string }}
  */
-function evaluateShard(jobKey, result, checkRuns) {
+function evaluateShard(jobKey, result, checkRuns, hasAffectedWork = true) {
   const label = SHARD_LABEL[jobKey] || `the ${jobKey} job`;
 
   if (isPass(result)) {
@@ -93,12 +100,22 @@ function evaluateShard(jobKey, result, checkRuns) {
     };
   }
 
+  // LS-9820: an unresolved cancellation is a shard whose result is unknown,
+  // not a verdict — never phrase it as an assertion that a regression
+  // occurred. When this PR also had no affected specs (@critical-only), say
+  // so explicitly: there is nothing PR-specific this cancellation could have
+  // regressed.
+  const noAffectedWorkNote = hasAffectedWork
+    ? ''
+    : " No affected specs matched this PR's changes either — there is nothing PR-specific here to regress.";
+
   return {
     pass: false,
     message:
       `e2e-affected gate failed — ${label} was cancelled and never ` +
-      'completed on this SHA (no sibling run succeeded either). This is not ' +
-      'a hermetic regression — re-run the cancelled shard(s).',
+      'completed on this SHA (no sibling run succeeded either). Result ' +
+      'unknown, not a verdict — this is not a hermetic regression — re-run ' +
+      `the cancelled shard(s).${noAffectedWorkNote}`,
   };
 }
 
@@ -119,6 +136,13 @@ function evaluateShard(jobKey, result, checkRuns) {
  * @param {string} params.sha head SHA to check for sibling check-runs.
  * @param {string|undefined} params.e2eResult `needs.e2e.result`.
  * @param {string|undefined} params.e2eMobileResult `needs.e2e-mobile.result`.
+ * @param {boolean} [params.hasAffectedWork] whether this PR mapped to any
+ *   non-@critical affected specs, or ran the full suite (`e2e-affected-run-all`
+ *   / `e2e-affected-specs` from `detect-changes`). Defaults to `true` so a
+ *   caller that omits it keeps the original behaviour. See `evaluateShard`'s
+ *   JSDoc (LS-9820) for how this only softens the *unresolved-cancellation*
+ *   message — a genuine failure/timed_out result is unaffected, since the
+ *   @critical safety net runs regardless of affected specs.
  * @returns {Promise<{ pass: boolean, messages: string[] }>}
  */
 async function evaluateE2eAffectedGate({
@@ -129,6 +153,7 @@ async function evaluateE2eAffectedGate({
   sha,
   e2eResult,
   e2eMobileResult,
+  hasAffectedWork = true,
 }) {
   const needsLookup =
     e2eResult === 'cancelled' || e2eMobileResult === 'cancelled';
@@ -154,8 +179,13 @@ async function evaluateE2eAffectedGate({
     }
   }
 
-  const e2e = evaluateShard('e2e', e2eResult, checkRuns);
-  const mobile = evaluateShard('e2e-mobile', e2eMobileResult, checkRuns);
+  const e2e = evaluateShard('e2e', e2eResult, checkRuns, hasAffectedWork);
+  const mobile = evaluateShard(
+    'e2e-mobile',
+    e2eMobileResult,
+    checkRuns,
+    hasAffectedWork,
+  );
 
   return {
     pass: e2e.pass && mobile.pass,

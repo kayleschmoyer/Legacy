@@ -131,6 +131,33 @@ describe('evaluateShard', () => {
     const result = evaluateShard('e2e', 'cancelled', checkRuns);
     assert.equal(result.pass, true);
   });
+
+  // LS-9820: an unresolved cancellation on a PR with no affected specs (the
+  // PR #7483/LS-9570 shape) should say plainly that there is nothing
+  // PR-specific to regress, on top of the existing "not a verdict" wording.
+  it('cancelled with no sibling and no affected specs names the empty specs list', () => {
+    const result = evaluateShard('e2e', 'cancelled', [], false);
+    assert.equal(result.pass, false);
+    assert.match(result.message, /cancelled and never/);
+    assert.match(result.message, /No affected specs matched/);
+    assert.doesNotMatch(result.message, /hermetic e2e regression/);
+  });
+
+  it('cancelled with no sibling but with affected specs omits the empty-specs note', () => {
+    const result = evaluateShard('e2e', 'cancelled', [], true);
+    assert.doesNotMatch(result.message, /No affected specs matched/);
+  });
+
+  it('hasAffectedWork defaults to true when omitted (back-compat)', () => {
+    const result = evaluateShard('e2e', 'cancelled', []);
+    assert.doesNotMatch(result.message, /No affected specs matched/);
+  });
+
+  it('a genuine failure keeps the hermetic-regression wording even with no affected specs', () => {
+    const result = evaluateShard('e2e', 'failure', [], false);
+    assert.equal(result.pass, false);
+    assert.match(result.message, /hermetic e2e regression/);
+  });
 });
 
 describe('evaluateE2eAffectedGate', () => {
@@ -228,6 +255,21 @@ describe('evaluateE2eAffectedGate', () => {
     });
     assert.equal(pass, false);
     assert.equal(warnings.length, 1);
+  });
+
+  it('threads hasAffectedWork through to both shards (LS-9820)', async () => {
+    const { pass, messages } = await evaluateE2eAffectedGate({
+      github: fakeGithub([]),
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      sha: HEAD_SHA,
+      e2eResult: 'cancelled',
+      e2eMobileResult: 'cancelled',
+      hasAffectedWork: false,
+    });
+    assert.equal(pass, false);
+    assert.match(messages[0], /No affected specs matched/);
+    assert.match(messages[1], /No affected specs matched/);
   });
 
   it('a real failure on one shard fails the gate even if the other is a satisfied cancellation', async () => {

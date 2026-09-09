@@ -1042,16 +1042,30 @@ jobs:
       # sibling success on the same shard context. Logic + tests live in
       # .github/scripts/e2e-affected-gate.js (mirrors ci-gate.js's
       # assertSuccessIsCurrent, LS-9579).
+      #
+      # LS-9820: also pass whether this PR had any affected specs at all
+      # (run-all or a non-empty specs list). An unresolved `cancelled` result
+      # on a PR with zero affected specs has nothing PR-specific it could have
+      # regressed — the gate message says so explicitly instead of leaving
+      # the reader to infer it (observed twice on PR #7483/LS-9570, where the
+      # affected-specs list was empty and the shard was cancelled by a runner
+      # restart, not a code regression).
       - name: "Evaluate e2e result"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           E2E_RESULT: ${{ needs.e2e.result }}
           E2E_MOBILE_RESULT: ${{ needs.e2e-mobile.result }}
           HEAD_SHA: ${{ inputs.head-sha || github.event.pull_request.head.sha || github.sha }}
+          RUN_ALL: ${{ needs.detect-changes.outputs.e2e-affected-run-all }}
+          SPEC_LIST: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
         with:
           script: |
             const { evaluateE2eAffectedGate } = require('./.github/scripts/e2e-affected-gate.js');
             const { owner, repo } = context.repo;
+            const runAll = process.env.RUN_ALL === 'true';
+            const hasAffectedSpecs = (process.env.SPEC_LIST || '')
+              .split('\n')
+              .some((line) => line.trim() !== '');
             const { pass, messages } = await evaluateE2eAffectedGate({
               github,
               core,
@@ -1060,6 +1074,7 @@ jobs:
               sha: process.env.HEAD_SHA,
               e2eResult: process.env.E2E_RESULT,
               e2eMobileResult: process.env.E2E_MOBILE_RESULT,
+              hasAffectedWork: runAll || hasAffectedSpecs,
             });
             for (const message of messages) {
               core.info(message);
