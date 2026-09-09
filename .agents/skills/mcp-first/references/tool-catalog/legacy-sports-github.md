@@ -10,7 +10,7 @@
 
 Pull request and review lifecycle — PR dashboards, review threads, labels, and merge readiness.
 
-Available both locally (stdio) and via the hosted connector. 59 tools.
+Available both locally (stdio) and via the hosted connector. 60 tools.
 
 ---
 
@@ -398,6 +398,15 @@ Enable auto-merge on a PR via the GitHub GraphQL API. The PR will merge automati
 | `number` | number |  | coerced, integer, > 0 | PR number |
 | `prNumber` | number |  | coerced, integer, > 0 | Alias for "number" — use either, not both |
 | `mergeMethod` | enum |  | — | Merge method to use when auto-merging (default: SQUASH) |
+
+### `github_pr_files`
+
+Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: string[] } for format:"names" (default), or with additions/deletions/changeType per file for format:"full". Use instead of a per-PR github_pr_diff fan-out or a shell `gh api .../files` loop.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `prNumbers` | number[] | **required** | min 1, max 50, coerced, integer, > 0 | PR numbers (1-50) |
+| `format` | enum |  | — | "names": file paths only. "full": also additions/deletions/changeType. |
 
 ### `github_pr_scan`
 

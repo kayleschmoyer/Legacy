@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 266,
+  "toolCount": 267,
   "servers": [
     {
       "dir": "worktree-server",
@@ -4070,7 +4070,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 59,
+      "toolCount": 60,
       "tools": [
         {
           "name": "get_job_logs",
@@ -5595,6 +5595,43 @@
               ],
               "default": "SQUASH",
               "description": "Merge method to use when auto-merging (default: SQUASH)"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_pr_files",
+          "description": "Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: string[] } for format:\"names\" (default), or with additions/deletions/changeType per file for format:\"full\". Use instead of a per-PR github_pr_diff fan-out or a shell `gh api .../files` loop.",
+          "inputs": {
+            "prNumbers": {
+              "type": "array",
+              "optional": false,
+              "constraints": [
+                "min 1",
+                "max 50"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced",
+                  "integer",
+                  "> 0"
+                ]
+              },
+              "description": "PR numbers (1-50)"
+            },
+            "format": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "names",
+                "full"
+              ],
+              "default": "names",
+              "description": "\"names\": file paths only. \"full\": also additions/deletions/changeType."
             }
           },
           "transports": [

@@ -49,6 +49,7 @@ import { webhookList, webhookPing, webhookUpdate } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prTimeline } from './tools/pr-timeline.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
+import { prFiles } from './tools/pr-files.js';
 import { prWhyBlocked } from './tools/pr-why-blocked.js';
 import { listPRComments } from './tools/list-pr-comments.js';
 import { getFileContent } from './tools/get-file-content.js';
@@ -1141,6 +1142,26 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => prBatchStatus(params),
+  );
+
+  // --- github_pr_files ---
+  server.tool(
+    'github_pr_files',
+    'Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: string[] } for format:"names" (default), or with additions/deletions/changeType per file for format:"full". Use instead of a per-PR github_pr_diff fan-out or a shell `gh api .../files` loop.',
+    {
+      prNumbers: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(50)
+        .describe('PR numbers (1-50)'),
+      format: z
+        .enum(['names', 'full'])
+        .default('names')
+        .describe(
+          '"names": file paths only. "full": also additions/deletions/changeType.',
+        ),
+    },
+    async (params) => prFiles(params),
   );
 
   // --- github_pr_why_blocked ---
