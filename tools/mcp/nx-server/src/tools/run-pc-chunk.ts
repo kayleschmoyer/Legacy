@@ -1,5 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { registerJobFormatter } from '../job-formatters.js';
+import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot } from '../jobs.js';
 import { getRepoRoot } from '../run-command.js';
 import {
   buildCompactOutput,
@@ -67,6 +70,64 @@ interface RunPcChunkParams {
   parallel?: number;
 }
 
+/** Shape of the job metadata written by runPcChunk for deferred formatting. */
+interface PcChunkJobMeta {
+  chunk?: unknown;
+  verbose?: unknown;
+}
+
+/**
+ * Collapse a pc-chunk logTail (running/orphaned snapshot) the same way a
+ * terminal result's `output` is collapsed, unless the originating call
+ * requested `verbose`. Exported so job-tools.ts's generic non-terminal
+ * rendering can apply the same treatment when polling a pc-chunk job via
+ * nx_job_wait / nx_job_status (LS-9814).
+ */
+export function formatPcChunkLogTail(
+  logTail: string,
+  verbose: boolean | undefined,
+): string {
+  return verbose
+    ? truncateOutput(logTail, MAX_OUTPUT_CHARS)
+    : buildCompactOutput(logTail, MAX_OUTPUT_CHARS);
+}
+
+/**
+ * Build the structured pc-chunk result body from a terminal job snapshot.
+ * Shared between the inline (within sync budget) path and the deferred
+ * nx_job_wait/nx_job_status formatter so callers get the same compacted
+ * output either way (LS-9814 — LS-8423's compaction previously applied only
+ * to the inline path, so pc-format/pc-lint routinely overflowed once they
+ * exceeded the sync budget and were rendered via nx_job_wait instead).
+ */
+function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
+  const meta = (snapshot.meta ?? {}) as PcChunkJobMeta;
+  const chunk = typeof meta.chunk === 'string' ? meta.chunk : undefined;
+  const verbose = meta.verbose === true;
+  const passed = snapshot.status === 'done';
+  const log = snapshot.log ?? '';
+
+  return {
+    body: {
+      ...(chunk ? { chunk } : {}),
+      passed,
+      ...(snapshot.recoveredFromTimeout ? { recoveredFromTimeout: true } : {}),
+      ...(snapshot.error ? { error: snapshot.error } : {}),
+      output: verbose
+        ? truncateOutput(log, MAX_OUTPUT_CHARS)
+        : buildCompactOutput(log, MAX_OUTPUT_CHARS),
+    },
+    isError: !passed,
+  };
+}
+
+// Deferred-completion formatter: a pc-chunk job still running when the sync
+// budget expires, observed later via nx_job_wait / nx_job_status, gets the
+// same compacted result the inline path would have returned (LS-9814).
+registerJobFormatter('pc-chunk', (snapshot) =>
+  Promise.resolve(buildPcChunkResult(snapshot)),
+);
+
 export async function runPcChunk(
   params: RunPcChunkParams,
 ): Promise<ToolResult> {
@@ -122,6 +183,11 @@ export async function runPcChunk(
       // Blind retries (e.g. after a lost transport) join the in-flight run
       // instead of spawning a duplicate make process.
       idempotencyKey: `pc-chunk:${cwd}:${params.chunk}${params.maxWorkers !== undefined ? `:mw${params.maxWorkers}` : ''}${params.parallel !== undefined ? `:par${params.parallel}` : ''}`,
+      meta: {
+        kind: 'pc-chunk',
+        chunk: params.chunk,
+        verbose: params.verbose === true,
+      },
     },
     SYNC_BUDGET_MS,
   );
@@ -136,7 +202,10 @@ export async function runPcChunk(
             status: 'running',
             jobId: snapshot.jobId,
             elapsedSec: snapshot.elapsedSec,
-            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            logTail: formatPcChunkLogTail(
+              snapshot.logTail ?? '',
+              params.verbose,
+            ),
             hint: snapshot.hint,
           }),
         },
@@ -153,7 +222,10 @@ export async function runPcChunk(
             chunk: params.chunk,
             status: 'orphaned',
             jobId: snapshot.jobId,
-            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            logTail: formatPcChunkLogTail(
+              snapshot.logTail ?? '',
+              params.verbose,
+            ),
             hint: snapshot.hint,
           }),
         },
@@ -161,25 +233,9 @@ export async function runPcChunk(
     };
   }
 
-  const passed = snapshot.status === 'done';
-  const log = snapshot.log ?? '';
+  const formatted = buildPcChunkResult(snapshot);
   return {
-    content: [
-      {
-        type: 'text',
-        text: minifiedJson({
-          chunk: params.chunk,
-          passed,
-          ...(snapshot.recoveredFromTimeout
-            ? { recoveredFromTimeout: true }
-            : {}),
-          ...(snapshot.error ? { error: snapshot.error } : {}),
-          output: params.verbose
-            ? truncateOutput(log, MAX_OUTPUT_CHARS)
-            : buildCompactOutput(log, MAX_OUTPUT_CHARS),
-        }),
-      },
-    ],
-    ...(passed ? {} : { isError: true }),
+    content: [{ type: 'text', text: minifiedJson(formatted.body) }],
+    ...(formatted.isError ? { isError: true } : {}),
   };
 }

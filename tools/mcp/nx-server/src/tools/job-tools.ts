@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { formatPcChunkLogTail } from './run-pc-chunk.js';
 import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { formatTerminalSnapshot } from '../job-formatters.js';
 import { listJobs, MAX_WAIT_MS, snapshotJob, waitForJob } from '../jobs.js';
@@ -64,7 +65,14 @@ async function snapshotResult(snapshot: JobSnapshot): Promise<ToolResult> {
     if (snapshot.error) body.error = snapshot.error;
     body.output = truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS);
   } else {
-    body.logTail = truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS);
+    // A pc-chunk job still running/orphaned when polled gets the same
+    // compaction its terminal result would (LS-9814) — other job kinds are
+    // unaffected and keep the raw truncated tail.
+    const meta = snapshot.meta as { kind?: unknown; verbose?: unknown };
+    body.logTail =
+      meta?.kind === 'pc-chunk'
+        ? formatPcChunkLogTail(snapshot.logTail ?? '', meta.verbose === true)
+        : truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS);
     if (snapshot.hint) body.hint = snapshot.hint;
   }
   return {
