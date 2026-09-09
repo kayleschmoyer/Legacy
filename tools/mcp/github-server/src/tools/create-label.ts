@@ -9,6 +9,10 @@ interface CreateLabelParams {
   description?: string;
 }
 
+// GitHub rejects a label description longer than this with a 422. Matches
+// the cap enforced by `.github/scripts/sync-labels.py --check`.
+const MAX_DESCRIPTION_LENGTH = 100;
+
 /**
  * Check whether a 422 error from GitHub is specifically an "already_exists"
  * error by parsing the response JSON embedded in the error message.
@@ -53,6 +57,81 @@ export async function isAlreadyExistsError(
   }
 }
 
+/**
+ * A label with the given name already exists — PATCH it if the caller's
+ * color/description differ from the current definition, otherwise no-op.
+ */
+async function upsertExistingLabel(
+  owner: string,
+  repoName: string,
+  params: CreateLabelParams,
+  color: string | undefined,
+): Promise<ToolResult> {
+  const encodedName = encodeURIComponent(params.name);
+  const current = await githubRest<{
+    name: string;
+    color: string;
+    description: string | null;
+  }>({
+    method: 'GET',
+    path: `/repos/${owner}/${repoName}/labels/${encodedName}`,
+  });
+
+  const desiredColor = color?.toLowerCase();
+  const desiredDescription = params.description;
+  const colorChanged =
+    desiredColor !== undefined && desiredColor !== current.color.toLowerCase();
+  const descriptionChanged =
+    desiredDescription !== undefined &&
+    desiredDescription !== (current.description ?? '');
+
+  if (!colorChanged && !descriptionChanged) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            created: false,
+            updated: false,
+            name: params.name,
+            message:
+              'Label already exists and matches the requested color/description',
+          }),
+        },
+      ],
+    };
+  }
+
+  const patchBody: Record<string, string> = {};
+  if (colorChanged) patchBody.color = desiredColor;
+  if (descriptionChanged) patchBody.description = desiredDescription;
+
+  const result = await githubRest<{
+    name: string;
+    color: string;
+    description: string | null;
+  }>({
+    method: 'PATCH',
+    path: `/repos/${owner}/${repoName}/labels/${encodedName}`,
+    body: patchBody,
+  });
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          created: false,
+          updated: true,
+          name: result.name,
+          color: result.color,
+          description: result.description,
+        }),
+      },
+    ],
+  };
+}
+
 export async function createLabel(
   params: CreateLabelParams,
 ): Promise<ToolResult> {
@@ -71,6 +150,23 @@ export async function createLabel(
           {
             type: 'text',
             text: `Invalid color "${params.color}": must be exactly 6 hex characters (e.g. "ff0000" or "#ff0000")`,
+          },
+        ],
+      };
+    }
+
+    // Validate description length up front — GitHub's API caps it at 100
+    // chars and returns a raw 422 otherwise.
+    if (
+      params.description &&
+      params.description.length > MAX_DESCRIPTION_LENGTH
+    ) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Invalid description for "${params.name}": ${params.description.length} characters exceeds GitHub's ${MAX_DESCRIPTION_LENGTH}-character limit`,
           },
         ],
       };
@@ -109,18 +205,7 @@ export async function createLabel(
       if (
         await isAlreadyExistsError(error, repo.owner, repo.name, params.name)
       ) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: minifiedJson({
-                created: false,
-                name: params.name,
-                message: 'Label already exists',
-              }),
-            },
-          ],
-        };
+        return upsertExistingLabel(repo.owner, repo.name, params, color);
       }
       throw error;
     }

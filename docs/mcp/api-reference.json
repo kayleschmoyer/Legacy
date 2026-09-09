@@ -4495,7 +4495,7 @@
         },
         {
           "name": "github_create_label",
-          "description": "Create a label on the repository. Returns success if label already exists.",
+          "description": "Create a label; upserts if it exists. Description capped at 100 chars.",
           "inputs": {
             "name": {
               "type": "string",

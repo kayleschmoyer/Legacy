@@ -44,7 +44,7 @@ The git-heavy tools (`github_bulk_rebase`, `github_open_pr`'s push phase) run un
 ### Labels
 
 - **github_manage_labels** — Add or remove labels on one or more PRs. Accepts single PR number or array. Use `clearPattern` (glob, e.g. `ci-failure-*`) to remove all matching labels in one call.
-- **github_create_label** — Create a new label
+- **github_create_label** — Create a label, or update its color/description if it already exists (upsert)
 - **github_ensure_sweep_labels** — Ensure sweep labels exist
 - **github_sweep_stale_claims** — Remove stale sweep claims
 

@@ -109,7 +109,7 @@ Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker ex
 
 ### `github_create_label`
 
-Create a label on the repository. Returns success if label already exists.
+Create a label; upserts if it exists. Description capped at 100 chars.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
