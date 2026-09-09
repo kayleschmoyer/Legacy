@@ -5107,6 +5107,11 @@
               "type": "string",
               "optional": true,
               "description": "Glob pattern — labels matching this are removed (e.g. \"ci-failure-*\"). Composes with \"add\" and \"remove\"."
+            },
+            "repo": {
+              "type": "string",
+              "optional": true,
+              "description": "Explicit \"owner/name\" repo override"
             }
           },
           "transports": [

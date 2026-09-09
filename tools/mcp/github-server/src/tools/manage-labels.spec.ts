@@ -1,7 +1,7 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
-import { globToRegex, manageLabels } from './manage-labels';
+import { globToRegex, manageLabels, parseRepoParam } from './manage-labels';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
 
@@ -58,6 +58,66 @@ describe('globToRegex', () => {
     const re = globToRegex('some.label+here');
     expect(re.test('some.label+here')).toBe(true);
     expect(re.test('someXlabelYhere')).toBe(false);
+  });
+});
+
+// ── parseRepoParam ───────────────────────────────────────────────────────────
+
+describe('parseRepoParam', () => {
+  it('parses a well-formed "owner/name" string', () => {
+    expect(parseRepoParam('bkrupa/legacy-sports')).toEqual({
+      owner: 'bkrupa',
+      name: 'legacy-sports',
+    });
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(parseRepoParam('  bkrupa/legacy-sports  ')).toEqual({
+      owner: 'bkrupa',
+      name: 'legacy-sports',
+    });
+  });
+
+  it('throws on malformed input', () => {
+    expect(() => parseRepoParam('not-a-repo')).toThrow(/owner\/name/);
+    expect(() => parseRepoParam('a/b/c')).toThrow(/owner\/name/);
+  });
+});
+
+// ── manageLabels — repo param bypasses auto-detection ─────────────────────────
+
+describe('manageLabels — repo param', () => {
+  it('uses the explicit repo param instead of calling getRepoOwnerName', async () => {
+    mockRest
+      .mockResolvedValueOnce([] as never) // GET current labels for add
+      .mockResolvedValue(undefined); // POST
+
+    const result = await manageLabels({
+      prs: [42],
+      add: ['agent-in-progress'],
+      repo: 'bkrupa/legacy-sports',
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(mockRepo).not.toHaveBeenCalled();
+    const postCall = mockRest.mock.calls.find(
+      ([args]) => args.method === 'POST',
+    );
+    expect(postCall?.[0].path).toBe(
+      '/repos/bkrupa/legacy-sports/issues/42/labels',
+    );
+  });
+
+  it('returns an error for a malformed repo param', async () => {
+    const result = await manageLabels({
+      prs: [1],
+      add: ['agent-in-progress'],
+      repo: 'not-a-repo',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/owner\/name/);
+    expect(mockRest).not.toHaveBeenCalled();
   });
 });
 

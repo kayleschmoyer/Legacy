@@ -925,6 +925,11 @@ export function createServer(): McpServer {
         .describe(
           'Glob pattern — labels matching this are removed (e.g. "ci-failure-*"). Composes with "add" and "remove".',
         ),
+      repo: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Explicit "owner/name" repo override'),
     },
     async (params) => {
       const prs =
@@ -946,6 +951,7 @@ export function createServer(): McpServer {
         add: params.add,
         remove: params.remove,
         clearPattern: params.clearPattern,
+        repo: params.repo,
       });
     },
   );

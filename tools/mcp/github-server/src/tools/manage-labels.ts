@@ -13,6 +13,24 @@ interface ManageLabelsParams {
   remove?: string[];
   /** Glob pattern — labels matching this are removed (e.g. 'ci-failure-*'). Composes with remove[]. */
   clearPattern?: string;
+  /**
+   * Explicit "owner/name" repo, bypassing git-based auto-detection
+   * (getRepoOwnerName). Needed when the caller can supply a worktree path but
+   * the server can't resolve git itself — e.g. `spawn git ENOENT` in a
+   * Lambda-hosted server invoked from a local worktree session (LS-4885).
+   */
+  repo?: string;
+}
+
+/** Parses a "owner/name" repo string. Throws with a caller-facing message on malformed input. */
+export function parseRepoParam(repo: string): { owner: string; name: string } {
+  const match = /^([^/\s]+)\/([^/\s]+)$/.exec(repo.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid "repo" parameter "${repo}" — expected "owner/name" format (e.g. "bkrupa/legacy-sports").`,
+    );
+  }
+  return { owner: match[1], name: match[2] };
 }
 
 /** Convert a simple glob pattern (* = any chars, ? = one char) to a RegExp. */
@@ -71,7 +89,9 @@ export async function manageLabels(
   }> = [];
 
   try {
-    const repo = await getRepoOwnerName();
+    const repo = params.repo
+      ? parseRepoParam(params.repo)
+      : await getRepoOwnerName();
 
     // Process PRs in parallel batches of 10
     const BATCH_SIZE = 10;
