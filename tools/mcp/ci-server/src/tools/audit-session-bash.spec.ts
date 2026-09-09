@@ -245,6 +245,16 @@ describe('auditSessionBash (node-native)', () => {
     expect(resultText(result)).toContain('Must match /^[A-Za-z0-9._-]+$/');
   });
 
+  it('rejects a path-traversal sessionId instead of reading outside the project dir (LS-9755)', () => {
+    const result = auditSessionBash({
+      project: SLUG,
+      sessionId: '../../../../etc/passwd',
+    });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('Invalid session ID');
+    expect(resultText(result)).toContain('Must match /^[A-Za-z0-9._-]+$/');
+  });
+
   it('reports a missing project directory as an error', () => {
     const result = auditSessionBash({ project: 'does-not-exist' });
     expect(result.isError).toBe(true);

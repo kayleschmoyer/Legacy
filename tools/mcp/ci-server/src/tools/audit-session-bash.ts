@@ -3,6 +3,8 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   type BashCall,
+  detectAutoMode,
+  detectAutoModeFromContent,
   extractBashCalls,
   extractBashCallsFromContent,
   extractMcpCalls,
@@ -26,8 +28,20 @@ import type { ToolResult } from '../types.js';
 const SAFE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
 
 function validateProjectSlug(slug: string): string | null {
-  // basename() strips path separators; if the result differs from the input,
-  // the caller smuggled in a directory component (e.g. "../foo", "/abs/path").
+  return validateSafeSlug(slug);
+}
+
+/**
+ * Shared allow-list check for any path segment (project slug, session ID)
+ * that gets interpolated into a filesystem path. basename() strips path
+ * separators; if the result differs from the input, the caller smuggled in
+ * a directory component (e.g. "../foo", "/abs/path") — reject rather than
+ * silently normalise, since a session/subagent ID is untrusted MCP tool
+ * input that otherwise flows straight into `join(projectDir, `${id}.jsonl`)`
+ * and `join(projectDir, id, 'subagents')` (path traversal — bot review
+ * finding on LS-9755).
+ */
+function validateSafeSlug(slug: string): string | null {
   const safe = basename(slug);
   if (
     !safe ||
@@ -97,6 +111,9 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
   let projectSlug: string | null;
   let bashCalls: BashCall[];
   let mcpIssues: McpIssue[];
+  // Only worth detecting when it will actually be consumed (auditMode's
+  // formatAudit); avoid the extra file read/scan on the common paths.
+  let autoModeActive = false;
 
   if (params.transcriptContent !== undefined) {
     bashCalls = extractBashCallsFromContent(params.transcriptContent, 'parent');
@@ -105,6 +122,9 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
       : [];
     sessionId = params.sessionId || bashCalls[0]?.session_id || 'unknown';
     projectSlug = null;
+    if (params.auditMode) {
+      autoModeActive = detectAutoModeFromContent(params.transcriptContent);
+    }
   } else {
     let projectsDir: string;
     try {
@@ -154,12 +174,26 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
         return textError(message);
       }
     }
-    sessionId = resolvedSessionId;
+
+    // Validate before any use in path construction below (parentJsonl,
+    // subagentDir) — resolvedSessionId can come straight from the caller's
+    // `sessionId`/`pid` params, which are untrusted input to this MCP tool.
+    const safeSessionId = validateSafeSlug(resolvedSessionId);
+    if (!safeSessionId) {
+      return textError(
+        `Invalid session ID: ${JSON.stringify(resolvedSessionId)}. ` +
+          'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
+      );
+    }
+    sessionId = safeSessionId;
 
     // Parse parent JSONL
     const parentJsonl = join(projectDir, `${sessionId}.jsonl`);
     bashCalls = extractBashCalls(parentJsonl, 'parent');
     mcpIssues = includeMcp ? extractMcpCalls(parentJsonl, 'parent') : [];
+    if (params.auditMode) {
+      autoModeActive = detectAutoMode(parentJsonl);
+    }
 
     // Parse subagent JSONLs
     const subagentDir = join(projectDir, sessionId, 'subagents');
@@ -173,6 +207,12 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
         bashCalls.push(...extractBashCalls(saPath, sourceName));
         if (includeMcp) {
           mcpIssues.push(...extractMcpCalls(saPath, sourceName));
+        }
+        // Subagents don't inherit the auto-mode system-reminder directly,
+        // but check anyway in case one was quoted/relayed into their
+        // transcript — cheap given the file is already being scanned.
+        if (params.auditMode && !autoModeActive) {
+          autoModeActive = detectAutoMode(saPath);
         }
       }
     }
@@ -196,7 +236,13 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
       content: [
         {
           type: 'text',
-          text: formatAudit(bashCalls, mcpIssues, sessionId, scratchCalls),
+          text: formatAudit(
+            bashCalls,
+            mcpIssues,
+            sessionId,
+            scratchCalls,
+            autoModeActive,
+          ),
         },
       ],
     };

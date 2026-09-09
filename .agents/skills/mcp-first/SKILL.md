@@ -9,6 +9,13 @@ metadata:
 
 > **MCP-first principle**: the shell commands shown in AGENTS.md (Workflow, Commands sections) are **fallbacks** for when MCP servers are unavailable. When MCP tools are available, always prefer them.
 
+> **Auto-mode carve-out (LS-9755)**: the harness's "auto mode" system directive tells agents to bias toward Bash (`cat`/`sed`/`grep`-equivalents) for efficiency, which on its face contradicts AGENTS.md's Tool Usage rule to prefer `Glob`/`Grep`/`Read` over raw shell. The two are reconciled by scope, not by one overriding the other wholesale:
+>
+> - **Plain file read/search operations** (a `cat`, `sed -n`, `grep`, `find`, `tail`, `wc -l` equivalent, with no MCP-domain semantics) — when auto mode is active, deferring to Bash for these is sanctioned. `Glob`/`Grep`/`Read` remain the default; auto mode only widens what's acceptable, it doesn't ban the dedicated tools.
+> - **Everything else is unaffected** — MCP-first stays mandatory regardless of auto mode: `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`, `jira_*`, `github_*`, `worktree_*`, `db_*`, and every other domain operation in this skill. Auto mode's Bash-bias language is about plain file I/O, not a general license to skip MCP tools — read it narrowly.
+>
+> `ci_audit_session_bash`'s `auditMode` report detects the auto-mode directive in the session transcript and excludes the resulting FILE-READ/GREP-class `missing-awareness` findings (`find`/`grep`/`sed -n`/`tail`/`wc -l`) from `action_required`, surfacing them instead under `informational.auto_mode_excluded` — those calls are expected behavior in that mode, not a real awareness gap. Findings for domain-operation gaps (missing `make`/`nx`/`gh`/`jira`/`db` coverage, etc.) are never excluded by this — the carve-out only ever touches the plain-file-read/search class.
+
 ## Sub-skills (references)
 
 | Topic                                                                                             | Load                                                                                                                                                                                                                                                                                                                                                                                                           |

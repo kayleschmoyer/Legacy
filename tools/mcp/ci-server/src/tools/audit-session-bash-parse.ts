@@ -158,6 +158,48 @@ export function extractBashCalls(
 }
 
 /**
+ * Marker text from the harness's "Auto Mode Active" system-reminder (see
+ * AGENTS.md § Tool Usage / .agents/skills/mcp-first/SKILL.md — LS-9755).
+ * When this directive is present in a transcript, the session was told to
+ * bias toward Bash for plain file read/search operations, so `find`/`grep`/
+ * `sed -n`/`tail`/`wc -l` calls are sanctioned behavior for that session,
+ * not a tool-awareness gap. Matched as plain substring — the reminder text
+ * is stable harness boilerplate, not user-authored content that would need
+ * fuzzy matching.
+ */
+const AUTO_MODE_MARKER = 'Auto Mode Active';
+
+/**
+ * Scan already-loaded JSONL text for the auto-mode directive. Checks every
+ * text-bearing content block (system-reminders arrive as ordinary `text`
+ * blocks in the transcript), not just top-level message text, so the
+ * marker is found regardless of which turn introduced it.
+ */
+export function detectAutoModeFromContent(rawContent: string): boolean {
+  for (const { record } of parseJsonlContent(rawContent)) {
+    const blocks = contentBlocks(record);
+    if (!blocks) continue;
+    for (const block of blocks) {
+      if (!isRecord(block)) continue;
+      if (asString(block['text']).includes(AUTO_MODE_MARKER)) return true;
+    }
+  }
+  return false;
+}
+
+/** Detect the auto-mode directive in a JSONL file on disk. */
+export function detectAutoMode(jsonlPath: string): boolean {
+  if (!existsSync(jsonlPath)) return false;
+  let raw: string;
+  try {
+    raw = readFileSync(jsonlPath, 'utf8');
+  } catch {
+    return false;
+  }
+  return detectAutoModeFromContent(raw);
+}
+
+/**
  * Extract non-Bash tool_use calls that resulted in overflows or errors from
  * already-loaded JSONL text. Calls are matched to their tool_result by
  * tool_use_id; only calls whose result overflowed or errored are returned,
@@ -552,18 +594,36 @@ export const RECURRING_INVESTIGATIVE: ReadonlyArray<
   ],
 ];
 
+/** Find the RecurringInfo for a pattern/sample pair, or null if none matches. */
+export function matchRecurringInfo(
+  pattern: string,
+  sample: string,
+): RecurringInfo | null {
+  const stripped = stripCdPrefix(sample.trim());
+  for (const [recPat, info] of RECURRING_INVESTIGATIVE) {
+    if (pattern.startsWith(recPat) || stripped.startsWith(recPat)) {
+      return info;
+    }
+  }
+  return null;
+}
+
 /** Check if a pattern matches any recurring investigative prefix. */
 export function isRecurringInvestigative(
   pattern: string,
   sample: string,
 ): boolean {
-  const stripped = stripCdPrefix(sample.trim());
-  for (const [recPat] of RECURRING_INVESTIGATIVE) {
-    if (pattern.startsWith(recPat) || stripped.startsWith(recPat)) {
-      return true;
-    }
-  }
-  return false;
+  return matchRecurringInfo(pattern, sample) !== null;
+}
+
+/**
+ * Recurring-investigative entries whose gap_type is `missing-awareness` are
+ * exactly the plain file-read/search class (find/grep/sed -n/tail/wc -l)
+ * that AGENTS.md's auto-mode carve-out (LS-9755) sanctions Bash for. Other
+ * missing-awareness gaps outside this curated list are unaffected.
+ */
+function isFileReadGrepClassAwarenessGap(info: RecurringInfo): boolean {
+  return info.gap_type === 'missing-awareness';
 }
 
 /** Gap type to Jira summary prefix mapping. */
@@ -908,6 +968,7 @@ export function formatAudit(
   mcpIssues: McpIssue[],
   sessionId: string,
   scratchCalls: ScratchCall[] | null = null,
+  autoModeActive = false,
 ): string {
   const { counts, samples, classifications } = collectPatternStats(bashCalls);
 
@@ -915,6 +976,7 @@ export function formatAudit(
   const gaps: Array<Record<string, unknown>> = [];
   const covered: Array<Record<string, unknown>> = [];
   const noise: Array<Record<string, unknown>> = [];
+  const autoModeExcluded: Array<Record<string, unknown>> = [];
 
   for (const [pat, count] of mostCommon(counts)) {
     const [status, tool] = classifications.get(pat) ?? ['gap', ''];
@@ -934,7 +996,8 @@ export function formatAudit(
     // Singletons (count==1) are NOT auto-filtered — they become low-confidence
     // gaps so the reviewer can decide. Recurring investigative patterns are
     // always promoted to gaps regardless of count.
-    const isRecurring = isRecurringInvestigative(pat, sample);
+    const recurringInfo = matchRecurringInfo(pat, sample);
+    const isRecurring = recurringInfo !== null;
 
     if (NOISE_PATTERNS.has(pat) && !isRecurring) {
       noise.push({
@@ -942,6 +1005,31 @@ export function formatAudit(
         count,
         sample: sample.slice(0, 120),
         reason: 'known noise pattern',
+      });
+      continue;
+    }
+
+    // The auto-mode directive (LS-9755) sanctions Bash for plain file
+    // read/search operations — the exact class the FILE-READ/GREP recurring
+    // patterns (find/grep/sed -n/tail/wc -l) flag as missing-awareness.
+    // When that directive is active in this transcript, these are expected
+    // behavior, not real gaps: exclude them from action_required so they
+    // don't get filed as docs(skills) tickets, but keep them visible under
+    // informational for auditability. MCP-first for domain operations
+    // (make/nx/jira/github/worktree/db/...) is unaffected — those gap
+    // classes never match RECURRING_INVESTIGATIVE's missing-awareness rows.
+    if (
+      autoModeActive &&
+      recurringInfo !== null &&
+      isFileReadGrepClassAwarenessGap(recurringInfo)
+    ) {
+      autoModeExcluded.push({
+        pattern: pat,
+        count,
+        sample: sample.slice(0, 120),
+        reason:
+          'auto-mode directive active this session: plain file read/search via Bash ' +
+          `(${recurringInfo.reason}) is sanctioned, not a tool-awareness gap — see AGENTS.md Tool Usage`,
       });
       continue;
     }
@@ -1016,11 +1104,14 @@ export function formatAudit(
       covered_patterns: covered.length,
       mcp_overflows: overflowItems.length,
       mcp_failures: failureItems.length,
+      auto_mode_active: autoModeActive,
+      auto_mode_excluded: autoModeExcluded.length,
     },
     action_required: actionRequired,
     informational: {
       noise_filtered: noise,
       covered_commands: covered,
+      auto_mode_excluded: autoModeExcluded,
     },
   };
 
@@ -1034,7 +1125,12 @@ export function formatAudit(
     'verify the gap_type and draft_summary, then approve or skip. ' +
     "For 'gaps_auto_classified' (high confidence): these are pre-approved unless you disagree. " +
     'For overflows/failures: classify the fix_type. ' +
-    'Then create Jira tickets for approved gaps under the current MCP gaps bucket epic.';
+    'Then create Jira tickets for approved gaps under the current MCP gaps bucket epic. ' +
+    (autoModeActive
+      ? "'informational.auto_mode_excluded' lists file-read/search Bash calls held out of " +
+        'action_required because the auto-mode directive was active this session (LS-9755) — ' +
+        'no ticket needed for those.'
+      : '');
 
   return minifiedJson(report);
 }

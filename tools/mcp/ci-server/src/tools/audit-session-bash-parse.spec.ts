@@ -7,6 +7,7 @@ import {
   classifyCommand,
   classifyGapType,
   commandPattern,
+  detectAutoModeFromContent,
   extractBashCalls,
   extractBashCallsFromContent,
   extractMcpCalls,
@@ -638,6 +639,8 @@ describe('audit-session-bash-parse', () => {
         covered_patterns: 1,
         mcp_overflows: 0,
         mcp_failures: 0,
+        auto_mode_active: false,
+        auto_mode_excluded: 0,
       });
       // grep -r is high confidence (auto-classified); gh workflow is medium (to review)
       expect(report.action_required.gaps_auto_classified).toHaveLength(1);
@@ -763,6 +766,103 @@ describe('audit-session-bash-parse', () => {
       expect(report.action_required.gaps_to_review_overflow?.note).toContain(
         'gapsOnly:true',
       );
+    });
+
+    it('excludes FILE-READ/GREP-class missing-awareness gaps when auto-mode is active, but leaves other gap types alone (LS-9755)', () => {
+      const calls = [
+        synthBashCall('grep -r "foo" src/'),
+        synthBashCall("sed -n '10,50p' foo.txt"),
+        synthBashCall('gh workflow list'),
+        synthBashCall('docker ps'),
+      ];
+
+      const report = JSON.parse(
+        formatAudit(calls, [], 'session-1', null, true),
+      ) as {
+        summary: Record<string, number | boolean>;
+        action_required: {
+          gaps_to_review: Array<Record<string, unknown>>;
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+        informational: {
+          auto_mode_excluded: Array<Record<string, unknown>>;
+        };
+        instructions: string;
+      };
+
+      expect(report.summary.auto_mode_active).toBe(true);
+      expect(report.summary.auto_mode_excluded).toBe(2);
+
+      // grep -r and sed -n are excluded (FILE-READ/GREP class).
+      const autoClassifiedPatterns =
+        report.action_required.gaps_auto_classified.map((g) => g['pattern']);
+      expect(autoClassifiedPatterns).not.toContain('grep -r "foo"');
+      expect(autoClassifiedPatterns).not.toContain("sed -n '<range>' <file>");
+      const excludedPatterns = report.informational.auto_mode_excluded.map(
+        (g) => g['pattern'],
+      );
+      expect(excludedPatterns).toContain('grep -r "foo"');
+      expect(excludedPatterns).toContain("sed -n '<range>' <file>");
+
+      // gh workflow list and docker ps (missing-feature/missing-tool, domain/
+      // MCP-server gaps) are untouched by the auto-mode carve-out.
+      expect(
+        report.action_required.gaps_to_review.some(
+          (g) => g['pattern'] === 'gh workflow list',
+        ),
+      ).toBe(true);
+      expect(
+        report.action_required.gaps_to_review.some(
+          (g) => g['pattern'] === 'docker ps',
+        ),
+      ).toBe(true);
+
+      expect(report.instructions).toContain('auto_mode_excluded');
+    });
+
+    it('does not exclude FILE-READ/GREP-class gaps when auto-mode is not active', () => {
+      const calls = [synthBashCall('grep -r "foo" src/')];
+
+      const report = JSON.parse(
+        formatAudit(calls, [], 'session-1', null, false),
+      ) as {
+        summary: Record<string, number | boolean>;
+        action_required: {
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+        informational: { auto_mode_excluded: unknown[] };
+      };
+
+      expect(report.summary.auto_mode_active).toBe(false);
+      expect(report.summary.auto_mode_excluded).toBe(0);
+      expect(report.informational.auto_mode_excluded).toHaveLength(0);
+      expect(report.action_required.gaps_auto_classified).toHaveLength(1);
+    });
+  });
+
+  describe('detectAutoModeFromContent', () => {
+    it('returns true when the auto-mode marker appears in a transcript text block', () => {
+      const raw = toJsonl([
+        {
+          timestamp: '2026-07-26T12:00:00.000Z',
+          sessionId: 'session-1',
+          message: {
+            content: [
+              {
+                type: 'text',
+                text: '<system-reminder>\n## Auto Mode Active\n\nBias toward working without stopping...\n</system-reminder>',
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
+    it('returns false when no transcript block mentions auto mode', () => {
+      const raw = toJsonl([bashUseRecord('ls -la')]);
+      expect(detectAutoModeFromContent(raw)).toBe(false);
     });
   });
 
