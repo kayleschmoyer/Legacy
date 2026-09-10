@@ -9,6 +9,7 @@
  */
 import type { GraphQLSchema } from 'graphql';
 import { inArray, sql } from 'drizzle-orm';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -19,12 +20,23 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Stubs the live-Stripe-lookup path `requireFreshEntitlement` takes
+// (fresh-entitlements.ts `getStripeCustomerId` → `InternalSchema.subscriptions`,
+// then `fetchActiveEntitlements` → Stripe). Grants every catalog entitlement
+// whenever a Stripe customer id is present; a null customer id (no
+// subscription row, i.e. the free-tier default) short-circuits before this is
+// ever called.
+const mockStripeEntitlementsList = jest.fn(function* () {
+  for (const key of Object.values(ENTITLEMENTS)) yield { lookup_key: key };
+});
+
 describe('updateRosterPositions (LS-9099)', () => {
   let schema: GraphQLSchema;
   let mockDb: {
     select: jest.Mock;
     from: jest.Mock;
     where: jest.Mock;
+    orderBy: jest.Mock;
     limit: jest.Mock;
     transaction: jest.Mock;
   };
@@ -67,6 +79,7 @@ describe('updateRosterPositions (LS-9099)', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       transaction: jest.fn(async (cb: (tx: unknown) => unknown) => cb(mockTx)),
     };
@@ -147,6 +160,7 @@ describe('updateRosterPositions (LS-9099)', () => {
             'BN',
             'DP',
             'SFLEX',
+            'KP',
           ],
         },
         InternalSchema: {
@@ -161,7 +175,26 @@ describe('updateRosterPositions (LS-9099)', () => {
           id: 'app_internal.users.id',
           subscriptionTier: 'app_internal.users.subscription_tier',
         },
+        subscriptions: {
+          userId: 'app_internal.subscriptions.user_id',
+          stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
+          createdAt: 'app_internal.subscriptions.created_at',
+          id: 'app_internal.subscriptions.id',
+        },
       },
+    }));
+
+    // The requireFreshEntitlement advanced-gate path (fresh-entitlements.ts)
+    // resolves a live Stripe client to read active entitlements. Tests never
+    // exercise real Stripe — `mockDb.limit`'s queued values decide whether
+    // `getStripeCustomerId` sees a customer at all, and this stub only
+    // matters when it does.
+    jest.doMock('../../server/stripe', () => ({
+      getStripeClient: jest.fn(async () => ({
+        entitlements: {
+          activeEntitlements: { list: mockStripeEntitlementsList },
+        },
+      })),
     }));
 
     const schemaModule = require('../index') as { schema: GraphQLSchema };
@@ -269,6 +302,86 @@ describe('updateRosterPositions (LS-9099)', () => {
       'At least one roster slot with a non-zero count is required.',
     );
     expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks a non-entitled commissioner from adding an SFLEX slot (LS-9277)', async () => {
+    const resolve = getResolver();
+    mockDb.limit
+      .mockResolvedValueOnce([{ id: 1, sport: 'football' }]) // league lookup
+      .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]) // membership
+      .mockResolvedValueOnce([]); // getStripeCustomerId -> no subscription row
+
+    await expect(
+      resolve(
+        {},
+        {
+          input: {
+            leagueId: 1,
+            rosterSlots: [
+              { positionType: 'QB', count: 1 },
+              { positionType: 'SFLEX', count: 1 },
+              { positionType: 'BN', count: 8 },
+            ],
+          },
+        },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Custom roster positions');
+
+    // The gate must fire before any write is attempted.
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+    expect(mockTx.insert).not.toHaveBeenCalled();
+    expect(mockTx.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows an entitled commissioner to update roster positions to include SFLEX/KP (LS-9277)', async () => {
+    const resolve = getResolver();
+    mockDb.limit
+      .mockResolvedValueOnce([{ id: 1, sport: 'football' }]) // league lookup
+      .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]) // membership
+      .mockResolvedValueOnce([{ stripeCustomerId: 'cus_123' }]); // getStripeCustomerId -> entitled
+
+    // Current: QB x1, RB x2, BN x7 (total 10). No one rostered yet.
+    mockTx.orderBy.mockResolvedValueOnce([
+      { id: 1, positionType: 'QB' },
+      { id: 2, positionType: 'RB' },
+      { id: 3, positionType: 'RB' },
+      { id: 4, positionType: 'BN' },
+      { id: 5, positionType: 'BN' },
+      { id: 6, positionType: 'BN' },
+      { id: 7, positionType: 'BN' },
+      { id: 8, positionType: 'BN' },
+      { id: 9, positionType: 'BN' },
+      { id: 10, positionType: 'BN' },
+    ]);
+    mockTx.where
+      .mockReturnValueOnce(mockTx) // currentPositions where -> chain to orderBy
+      .mockResolvedValueOnce([]) // occupiedRows where -> none rostered
+      .mockReturnValueOnce(mockTx); // final league update where -> chain to returning
+
+    mockTx.returning.mockResolvedValueOnce([{ id: 1, maxRosterSize: 14 }]);
+
+    const result = await resolve(
+      {},
+      {
+        input: {
+          leagueId: 1,
+          rosterSlots: [
+            { positionType: 'QB', count: 1 },
+            { positionType: 'RB', count: 2 },
+            { positionType: 'SFLEX', count: 1 },
+            { positionType: 'KP', count: 1 },
+            { positionType: 'BN', count: 9 },
+          ],
+        },
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ id: 1, maxRosterSize: 14 });
   });
 
   it('rejects an invalid position type before opening a transaction', async () => {

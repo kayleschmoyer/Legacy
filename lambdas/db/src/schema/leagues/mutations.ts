@@ -1174,9 +1174,10 @@ const UpdateRosterPositionsInput = builder.inputType(
  * Mutation: updateRosterPositions — commissioner-only reconfiguration of a
  * league's roster position slots after creation (LS-9099). This is the
  * post-creation counterpart to the wizard's rosterSlots input (LS-6145).
- * NOTE: unlike createLeagueAndTeams, this resolver does not gate SFLEX/KP
- * behind `custom_roster_positions` (LS-9107 scoped the entitlement check to
- * league creation only) — tracked as a follow-up gap, not fixed here.
+ * SFLEX/KP are gated behind `custom_roster_positions` here too (LS-9277),
+ * matching the createLeagueAndTeams check from LS-9107 — otherwise a
+ * non-entitled commissioner could create a league without those slots and
+ * add them later through this mutation instead.
  *
  * Shrinking a slot below the number of players any single team already has
  * rostered in that position is rejected — the caller must drop players from
@@ -1244,6 +1245,21 @@ builder.mutationField('updateRosterPositions', (t) =>
       if (validatedRosterSlots.length === 0) {
         throw UserInputError(
           'At least one roster slot with a non-zero count is required.',
+        );
+      }
+
+      // Superflex (SFLEX) and the combined K/P slot (KP) are premium roster
+      // positions (LS-9107) — gate this post-creation path the same way as
+      // createLeagueAndTeams so it can't be used to bypass that check (LS-9277).
+      if (
+        validatedRosterSlots.some((slot) =>
+          PREMIUM_ROSTER_SLOT_TYPES.has(slot.positionType),
+        )
+      ) {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.custom_roster_positions,
+          'Custom roster positions (Superflex, K/P) require a premium subscription. Upgrade to unlock these roster slots.',
         );
       }
 
