@@ -10,7 +10,7 @@
 
 Git worktree lifecycle, branch/commit/push plumbing, and repo-wide git queries for parallel ticket work.
 
-Local stdio process only — not exposed as a hosted connector. 62 tools.
+Local stdio process only — not exposed as a hosted connector. 63 tools.
 
 ---
 
@@ -29,6 +29,17 @@ Attach an existing branch as a new sibling worktree under D:\code\legacy-sports-
 | `branch` | string | **required** | — | Existing branch name (e.g. "LS-2857/fix-ci" or "claude/LS-2857-fix-ci"). The branch must already exist locally or on origin. |
 | `path` | string |  | — | Explicit worktree path. Defaults to D:\code\legacy-sports-worktrees\<slug> where slug is derived from the branch name by replacing "/" with "-". |
 | `setup` | boolean |  | — | If true, run `make wt-setup` after attaching to copy .env, create symlinks, and install git hooks (default: false). Windows-only — ignored on other platforms. |
+
+### `worktree_baseline_setup`
+
+Set up (or tear down) a persistent baseline worktree for an e2e-hold Phase A local comparison against a PR branch: runs `git worktree add`, links node_modules via scripts/modules-pool/link.mjs, and builds the web app (`pnpm exec nx build web`), then returns a ready-to-use worktreePath to pass straight to nx_run_e2e_specs({ worktreePath }). Unlike worktree_run_on_ref (which is one-shot and self-cleaning), the worktree this creates is persistent and keyed by ref — calling it again for the same ref reuses and refreshes it instead of piling up a new checkout. Pass cleanup: true when the comparison is done to remove it.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `ref` | string |  | — | Ref to check out (branch/tag/SHA/remote ref). Default "origin/main". |
+| `cleanup` | boolean |  | — | If true, remove the baseline worktree for this ref instead of setting one up (default false). |
+| `skipModulesLink` | boolean |  | — | Skip linking node_modules (default false). |
+| `skipBuild` | boolean |  | — | Skip the `pnpm exec nx build web` step (default false). |
 
 ### `worktree_branch`
 

@@ -38,6 +38,7 @@ import {
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth, HOSTED_CONNECTOR_CAVEAT } from './auth-checks';
+import { baselineSetup, slugifyRef } from './baseline-setup';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
 import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
@@ -1826,6 +1827,45 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_baseline_setup',
+      description:
+        'Set up (or tear down) a persistent baseline worktree for an e2e-hold ' +
+        'Phase A local comparison against a PR branch: runs `git worktree add`, ' +
+        'links node_modules via scripts/modules-pool/link.mjs, and builds the ' +
+        'web app (`pnpm exec nx build web`), then returns a ready-to-use ' +
+        'worktreePath to pass straight to nx_run_e2e_specs({ worktreePath }). ' +
+        'Unlike worktree_run_on_ref (which is one-shot and self-cleaning), the ' +
+        'worktree this creates is persistent and keyed by ref — calling it ' +
+        'again for the same ref reuses and refreshes it instead of piling up ' +
+        'a new checkout. Pass cleanup: true when the comparison is done to ' +
+        'remove it.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Ref to check out (branch/tag/SHA/remote ref). Default "origin/main".',
+          },
+          cleanup: {
+            type: 'boolean',
+            description:
+              'If true, remove the baseline worktree for this ref instead of ' +
+              'setting one up (default false).',
+          },
+          skipModulesLink: {
+            type: 'boolean',
+            description: 'Skip linking node_modules (default false).',
+          },
+          skipBuild: {
+            type: 'boolean',
+            description:
+              'Skip the `pnpm exec nx build web` step (default false).',
+          },
+        },
       },
     },
     {
@@ -6849,6 +6889,59 @@ const handleCallTool = async (
               tmpdir(),
               `legacy-sports-ref-check-${Date.now()}-${randomUUID().slice(0, 8)}`,
             ),
+          rmSync,
+        },
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_baseline_setup (LS-9744)
+    // -----------------------------------------------------------------------
+    case 'worktree_baseline_setup': {
+      const { ref, cleanup, skipModulesLink, skipBuild } = args as {
+        ref?: string;
+        cleanup?: boolean;
+        skipModulesLink?: boolean;
+        skipBuild?: boolean;
+      };
+
+      return baselineSetup(
+        { ref, cleanup, skipModulesLink, skipBuild },
+        {
+          runGit,
+          exec: (file, execArgs, opts) =>
+            execFileSync(file, execArgs, {
+              cwd: opts.cwd,
+              encoding: 'utf-8',
+              timeout: opts.timeout,
+              maxBuffer: 10 * 1024 * 1024,
+              windowsHide: true,
+            }),
+          ensureSufficientDepth: (cwd) =>
+            ensureSufficientDepth({ runGit }, cwd),
+          linkScriptPath: join(
+            MAIN_REPO,
+            'scripts',
+            'modules-pool',
+            'link.mjs',
+          ),
+          execPath: process.execPath,
+          resolveShell: () => {
+            const shell =
+              process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
+            const isCmdShell =
+              process.platform === 'win32' &&
+              shell.toLowerCase().endsWith('cmd.exe');
+            return {
+              shell,
+              buildArgs: (cmd) =>
+                isCmdShell ? ['/d', '/s', '/c', cmd] : ['-c', cmd],
+            };
+          },
+          mainRepo: MAIN_REPO,
+          baselineWorktreePath: (r) =>
+            join(tmpdir(), 'legacy-sports-baseline', slugifyRef(r)),
+          existsSync,
           rmSync,
         },
       );
