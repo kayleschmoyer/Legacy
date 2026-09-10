@@ -86,18 +86,13 @@ module.exports = {
     // needs (or has) this exclusion.
     '/src/features/elite-draft/PickSplashStatGraphic\\.spec\\.tsx$',
     '/src/features/elite-draft/SpectatorScreen\\.spec\\.tsx$',
-    // Same LS-9180 problem, introduced later by #6862 (LS-9206) without the
-    // exclusion: these generic specs assert web DOM roles/attributes
-    // (`getByRole`) but resolve to the `.native.tsx` fork under this
-    // project's moduleFileExtensions, which renders RN accessibility props
-    // (`accessibilityLabel`/`accessibilityRole`) instead. Unlike the LS-9180
-    // set, these don't yet have a purpose-built `.native.spec.tsx` sibling —
-    // tracked as a real coverage gap in LS-9262, filed while unblocking
-    // LS-5407's CI Gate rather than silently leaving `shared-components:test`
-    // red for every PR that touches this library.
-    '/src/features/elite-draft/DraftPickAnnouncement\\.spec\\.tsx$',
-    '/src/features/elite-draft/DraftClockRing\\.spec\\.tsx$',
-    '/src/features/elite-draft/DraftMiniBoard\\.spec\\.tsx$',
+    // LS-9264: the LS-9262/LS-9180 gap these three exclusions worked around
+    // (generic specs assert DOM `getByRole`/`getByLabelText`, but resolved
+    // against the `.native.tsx` fork's RN `accessibilityRole`/
+    // `accessibilityLabel` props) is now closed at its source — the
+    // `react-native` jest mock in jest-setup-mobile.js maps those props to
+    // `role`/`aria-label` — so the generic specs pass against the native
+    // fork directly and no longer need excluding.
     // Same LS-9180 problem: AnimatedLaunchScreen gained a `.native.tsx` fork
     // (LS-9746, draw -> punch-in -> stamp choreography). This generic spec
     // covers the unchanged web choreography only; its purpose-built
