@@ -71,6 +71,79 @@ const MOCK_BATTING_EDGES = [
   },
 ];
 
+/** Season-stats/career-arc data backing the player-detail modal (LS-5581) —
+ *  needed once a card-feed test actually opens the modal rather than only
+ *  checking the URL param changed. */
+const SEASON_STATS_RESPONSE = {
+  data: {
+    player: {
+      __typename: 'Player',
+      eligiblePositions: ['LF'],
+      firstName: 'Barry',
+      lastName: 'Bonds',
+    },
+    playerSeasonBatting: [
+      {
+        __typename: 'SeasonBatting',
+        season: 2001,
+        team: 'SFG',
+        games: 153,
+        plateAppearances: 664,
+        atBats: 476,
+        runs: 129,
+        hits: 156,
+        doubles: 32,
+        triples: 2,
+        homeRuns: 73,
+        rbi: 137,
+        stolenBases: 13,
+        caughtStealing: 3,
+        baseOnBalls: 177,
+        strikeouts: 93,
+        battingAverage: 0.328,
+        onBasePercentage: 0.515,
+        sluggingPercentage: 0.863,
+      },
+    ],
+  },
+};
+
+const CAREER_ARC_RESPONSE = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Barry',
+      lastName: 'Bonds',
+      eligiblePositions: ['LF'],
+      careerAchievements: {
+        allStarSelections: 14,
+        goldGloves: 8,
+        silverSluggers: 12,
+        mvpAwards: 7,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: false,
+      },
+    },
+    playerSeasonBatting: [
+      {
+        season: 2001,
+        team: 'SFG',
+        games: 153,
+        hits: 156,
+        atBats: 476,
+        homeRuns: 73,
+        rbi: 137,
+        stolenBases: 13,
+        battingAverage: 0.328,
+        onBasePercentage: 0.515,
+        sluggingPercentage: 0.863,
+        onBasePlusSlugging: 1.378,
+      },
+    ],
+  },
+};
+
 async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const operation = extractOperationName(route).toLowerCase();
@@ -107,6 +180,18 @@ async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [] } }),
+      });
+    } else if (operation === 'getallplayerseasonstats') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(SEASON_STATS_RESPONSE),
+      });
+    } else if (operation === 'getplayercareerarc') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(CAREER_ARC_RESPONSE),
       });
     } else {
       await unmockedGraphQLFallback(route);
@@ -152,10 +237,16 @@ test.describe('Player Stats Page — narrow-viewport card feed (LS-9075) @regres
     await playersPage.stats.expectCardFeedVisible('mlb');
   });
 
-  test('preserves the sport param when opening a player from the card feed', async ({
+  test('tapping a card opens the same player-detail modal desktop row-click uses', async ({
     page,
     playersPage,
   }) => {
+    // Card-feed equivalent of `player-stats-row-click-modal.spec.ts` (LS-9732
+    // gap 2): `PlayerFeedCard`'s `onPress` wires to the same
+    // `handleCardPlayerPress` -> `?playerId=` -> `PlayerDetailModal` path the
+    // desktop grid row click uses (PlayerStatsPage.tsx). The URL-param
+    // assertion already existed here; this adds the modal-actually-opened
+    // assertion that was missing.
     await page.setViewportSize(MOBILE_VIEWPORT);
     await mockPlayerStatsGraphQL(page);
     await playersPage.gotoStats();
@@ -163,5 +254,46 @@ test.describe('Player Stats Page — narrow-viewport card feed (LS-9075) @regres
 
     await playersPage.stats.openPlayerByName('Barry Bonds');
     await expect(page).toHaveURL(/[?&]playerId=101/);
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.expectText('Barry Bonds');
+
+    await playersPage.detail.close();
+    await playersPage.detail.expectClosed();
   });
+
+  test('position/search filter state round-trips through the URL at phone width', async ({
+    page,
+    playersPage,
+  }) => {
+    // Card-feed equivalent of `player-stats-url-persistence.spec.ts` (LS-9732
+    // gap 2): the card feed has its own URL-persisted filter state —
+    // `position`/`searchTerm` query params (`useCardFeedUrlState`,
+    // PlayerStatsCardFeed.tsx) — distinct from the desktop table's `view=`
+    // tab param, which the card feed has no concept of (no Hitters/Pitchers/
+    // Combined tabs in the card presentation).
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await mockPlayerStatsGraphQL(page);
+    await playersPage.gotoStats();
+    await playersPage.stats.expectCardFeedVisible('mlb');
+
+    const search = page.getByTestId('players-stats-card-feed-mlb-search');
+    await search.fill('Bonds');
+    await expect(page).toHaveURL(/[?&]searchTerm=Bonds/);
+
+    // A reload with the same URL restores the filter into the input.
+    await page.reload();
+    await playersPage.stats.expectCardFeedVisible('mlb');
+    await expect(
+      page.getByTestId('players-stats-card-feed-mlb-search'),
+    ).toHaveValue('Bonds');
+  });
+
+  // Share (gap 2, third affordance): PlayersCardFeed has no share/export
+  // control by design (PlayerStatsCardFeed.tsx: "the card presentation has
+  // no Export/Share controls... adding bespoke export/share UI to the mobile
+  // card list is new, undesigned surface"). No card-feed equivalent of
+  // `player-stats-share.spec.ts` exists to cover — documented here per
+  // LS-9732 AC2 rather than adding a test for UI that doesn't exist.
 });

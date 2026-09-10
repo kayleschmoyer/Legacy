@@ -17,7 +17,6 @@
 import { test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 import type { FreeAgentsPage, LeaguePage, MatchupPage } from '../pages';
-import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -693,16 +692,18 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 // ── Tests: deep link from draft board ────────────────────────────────────────
 
 /**
- * Waits on `draft-board`, the wide `DraftPlayerBoard` root.
- * `useDraftViewportTier()` swaps in `CompactLiveDraftBoard` on its `phone`
- * tier (below 800px), which renders `DraftPlayersTab` and carries no such
- * hook. Pinned
- * rather than skipped; compact draft-board coverage is tracked as LS-9732
- * (LS-9712).
+ * Runs at both desktop and phone-width projects (LS-9732 removed the
+ * `DESKTOP_VIEWPORT` pin LS-9712 left here). `useDraftViewportTier()` swaps
+ * in `CompactLiveDraftBoard` -> `DraftPlayersTab` on its `phone` tier (below
+ * 800px) in place of the wide `DraftPlayerBoard` (`draft-board` root), so the
+ * "draft mocks are wired and the player pool rendered" gate below branches on
+ * viewport width to wait on the surface that tier actually shows. The deep
+ * link itself (`playersPage.gotoDetail`) is identical either way — neither
+ * board is the thing under test past that gate. Compact board's own
+ * affordances (search/chips/queue/draft-button) get dedicated coverage in
+ * `compact-draft-board.spec.ts`.
  */
 test.describe('Player Detail Deep Link — from Draft Board @regression', () => {
-  test.use({ viewport: DESKTOP_VIEWPORT });
-
   test('player in draft pool can be deep-linked from draft board context', async ({
     page,
     playersPage,
@@ -713,10 +714,19 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
 
-    // Wait for the draft board to render with the player pool
-    await page.waitForSelector('[data-testid="draft-board"]', {
-      timeout: 15000,
-    });
+    // Wait for the draft board to render with the player pool — which board
+    // depends on viewport width (useDraftViewportTier's `phone` tier).
+    const viewportWidth = page.viewportSize()?.width ?? 0;
+    if (viewportWidth < 800) {
+      await page.getByTestId('draft-bottom-nav-players').click();
+      await page.waitForSelector('[data-testid="draft-players-row"]', {
+        timeout: 15000,
+      });
+    } else {
+      await page.waitForSelector('[data-testid="draft-board"]', {
+        timeout: 15000,
+      });
+    }
 
     // Verify the player appears in the pool — confirms draft mocks are wired correctly
     const playerName = `${PLAYER_FIRST} ${PLAYER_LAST}`;

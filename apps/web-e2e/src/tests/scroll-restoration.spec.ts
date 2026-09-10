@@ -12,12 +12,12 @@
  */
 
 import { expect, test } from '../fixtures/pages';
-import { DESKTOP_VIEWPORT } from '../utils/viewport';
+import { DESKTOP_VIEWPORT, MOBILE_VIEWPORT } from '../utils/viewport';
 
 test.describe('Router scroll restoration @regression', () => {
   test.use({ viewport: DESKTOP_VIEWPORT });
 
-  test('PUSH navigation scrolls to top', async ({ page, isMobile }) => {
+  test('PUSH navigation scrolls to top', async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
@@ -73,6 +73,78 @@ test.describe('Router scroll restoration @regression', () => {
     await page.waitForURL('/about');
 
     // POP must restore the saved scroll position (via requestAnimationFrame).
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 })
+      .toBeGreaterThan(100);
+  });
+});
+
+/**
+ * Phone-width equivalent (LS-9732): the header `home-link` the describe
+ * above navigates through doesn't exist below `$gtMd` — at that width
+ * there's a `MobileBottomBar` instead, linking to /players, /players/stats,
+ * /games, /notifications, /profile/settings (never `/`). The restoration
+ * mechanism itself (apps/web/src/app/app.tsx) keys purely off pathname +
+ * sessionStorage, with no dependency on which UI element triggered the
+ * navigation, so a bottom-tab click exercises the identical PUSH/POP code
+ * paths — this is a real, independent-of-desktop assertion of the same
+ * behaviour via the navigation affordance mobile users actually have.
+ */
+test.describe('Router scroll restoration (mobile) @regression', () => {
+  test.use({ viewport: MOBILE_VIEWPORT });
+
+  test('PUSH navigation via the bottom nav bar scrolls to top', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.addStyleTag({
+      content: 'body { min-height: 3000px !important; }',
+    });
+
+    await page.evaluate(() => window.scrollTo(0, 500));
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(100);
+
+    // MobileBottomBar renders below `$gtMd`; tabs are plain <Link>s with no
+    // testid, matched by their accessible label (MobileBottomBar.tsx).
+    await page
+      .getByRole('navigation', { name: 'Bottom navigation' })
+      .getByRole('link', { name: 'Players', exact: true })
+      .click();
+    await page.waitForURL('/players');
+
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 })
+      .toBeLessThan(50);
+  });
+
+  test('POP navigation (browser Back) restores scroll position after bottom-nav navigation', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.addStyleTag({
+      content: 'body { min-height: 3000px !important; }',
+    });
+
+    await page.evaluate(() => window.scrollTo(0, 500));
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(100);
+
+    await page
+      .getByRole('navigation', { name: 'Bottom navigation' })
+      .getByRole('link', { name: 'Players', exact: true })
+      .click();
+    await page.waitForURL('/players');
+
+    await page.goBack();
+    await page.waitForURL('/about');
+
     await expect
       .poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 })
       .toBeGreaterThan(100);
