@@ -31,8 +31,11 @@ import type {
   SeededLeagueInvite,
   SeededLeagueWithMember,
   SeededPlayerPool,
+  SeededScheduledMatchupRoster,
   SeededScoringProfile,
+  SeededSeasonActiveMatchup,
   SeededSeasonRenewal,
+  SeededWaiverQueue,
   TestData,
 } from './test-data';
 import { createLeagueFixture } from '../mocks/graphql/league-fixture.mocks';
@@ -47,6 +50,8 @@ import {
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
 import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
+import { createWaiverQueueFixture } from '../mocks/graphql/waiver-queue.mocks';
+import { createMatchupFixture } from '../mocks/graphql/matchup-fixture.mocks';
 import { GraphQLMockServer } from '../mocks/graphql/server/native-mock-server';
 
 const execFileAsync = promisify(execFile);
@@ -261,6 +266,71 @@ export class NativeMockTestData implements TestData {
       inviteCode: fixture.inviteCode,
       commissionerTeamId: fixture.commissioner.teamId,
       memberTeamId: member.teamId,
+    });
+  }
+
+  /**
+   * Native-mock analogue of `MockTestData.waiverQueue()` (LS-9738). Same
+   * out-of-scope note as `league()` above — single-worker only, no second
+   * native worker to share state with, so there is only ever a "first
+   * caller" (the commissioner, no competing claim pre-seeded).
+   */
+  waiverQueue(): Promise<SeededWaiverQueue> {
+    const league = createLeagueFixture();
+    const queue = createWaiverQueueFixture(league);
+    const role = queue.roleFor(this);
+    for (const [op, handler] of Object.entries(league.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    for (const [op, handler] of Object.entries(
+      queue.handlersFor(role.teamId),
+    )) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    return Promise.resolve({
+      leagueId: league.leagueId,
+      teamId: role.teamId,
+      freeAgent: queue.freeAgent,
+    });
+  }
+
+  /** Native-mock analogue of `MockTestData.seasonActiveMatchup()` (LS-9738). */
+  seasonActiveMatchup(): Promise<SeededSeasonActiveMatchup> {
+    const league = createLeagueFixture();
+    const matchup = createMatchupFixture(league);
+    for (const [op, handler] of Object.entries(league.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    for (const [op, handler] of Object.entries(matchup.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    return Promise.resolve({
+      leagueId: league.leagueId,
+      matchupId: matchup.matchupId,
+      teamId: matchup.team1Id,
+      opponentTeamId: matchup.team2Id,
+    });
+  }
+
+  /** Native-mock analogue of `MockTestData.scheduledMatchupRoster()` (LS-9738). */
+  scheduledMatchupRoster(): Promise<SeededScheduledMatchupRoster> {
+    const league = createLeagueFixture();
+    const matchup = createMatchupFixture(league);
+    for (const [op, handler] of Object.entries(league.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    for (const [op, handler] of Object.entries(matchup.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    return Promise.resolve({
+      leagueId: league.leagueId,
+      matchupId: matchup.matchupId,
+      teamId: matchup.team1Id,
+      opponentTeamId: matchup.team2Id,
+      openSlot: matchup.openSlot,
+      benchPlayer: matchup.benchPlayer,
+      starterToBench: matchup.starterToBench,
+      swapPair: matchup.swapPair,
     });
   }
 }

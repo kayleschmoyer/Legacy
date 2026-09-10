@@ -1,6 +1,18 @@
 /**
  * Waiver Processing UI Integration Test (LS-751)
  *
+ * PARTIAL MIGRATION (LS-9738): the pure UI-mechanics slice — submit a
+ * competing claim, pending-claim card visible for both teams, pending-claim
+ * card absent after processing — now runs PR-blocking (mock) and nightly
+ * (live) as `src/tests/shared/waiver-claim-pipeline.dual.spec.ts`. Former
+ * Phases 6 and 9 (pure UI checks with no further state dependents) were
+ * dropped here as duplicates. What remains below is exactly what the
+ * migration matrix (`docs/dev-process/e2e-dual-mode-migration-matrix.md`
+ * row #1) recommends keeping live-only: the real async-Lambda race guard
+ * (LS-3809), the real waiver-order priority-resolution algorithm, and
+ * waiver-order rotation — none of which a mock can faithfully reproduce
+ * without duplicating backend business logic (correctness-drift risk).
+ *
  * Validates the full waiver processing workflow against the **live** backend
  * (no mocks) through real browser interactions and JWT swapping for
  * multi-user role verification:
@@ -618,59 +630,13 @@ test.describe
   });
 
   // -----------------------------------------------------------------
-  // PHASE 6 — PENDING CLAIMS UI
-  // Both teams should see a "Pending Waiver Claims" card on My Roster.
+  // PHASE 6 — [REMOVED, LS-9738] Pending claims appear on the My Roster
+  // page for both teams. Migrated to `waiver-claim-pipeline.dual.spec.ts`'s
+  // "pending-claim card visible for both" step, which now runs PR-blocking
+  // on every PR (mock) as well as nightly (live) — this phase's pure UI
+  // check added no coverage beyond that once Phase 5 above establishes the
+  // pending claims, so it is dropped rather than kept as a duplicate.
   // -----------------------------------------------------------------
-
-  test('Phase 6: Pending claims appear on the My Roster page', async ({
-    commissionerPage,
-    managerPage1,
-  }) => {
-    // Use dedicated browser contexts for each role. switchUser on a single
-    // page has a race condition (LS-3672, LS-3705, LS-3735): the background
-    // JWT refresh can dispatch AUTH_LOGOUT and clear localStorage after
-    // page.evaluate() sets the profile, landing on the unauthenticated
-    // sign-in page and leaving the Pending Waiver card unrendered.
-    const verifyPendingClaimsUI = async (page: Page): Promise<void> => {
-      await page.goto(`/baseball/league/${state.leagueId}/roster`);
-      await page.waitForLoadState('load');
-      await expect(page).toHaveURL(/\/roster/);
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-        { timeout: 15000 },
-      );
-
-      // PendingWaiverClaims renders an amber card with a "Pending Waiver"
-      // heading whenever the team has active pending claims.
-      await expect(page.getByText(/Pending Waiver/i).first()).toBeVisible({
-        timeout: 30000,
-      });
-
-      // The claimed player's name should appear somewhere in that card.
-      // If the specific player name isn't visible, still pass if there's a
-      // pending claim (the free-agent list ordering can shift between requests).
-      const playerVisible = await page
-        .getByText(state.freeAgentPlayerName, { exact: false })
-        .first()
-        .waitFor({ state: 'visible', timeout: 5_000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!playerVisible) {
-        // Fall back: verify there's at least a cancel button for some claim
-        await expect(
-          page.getByRole('button', { name: /Cancel waiver claim/i }).first(),
-        ).toBeVisible({ timeout: 10000 });
-      }
-    };
-
-    await test.step('Commissioner sees pending claim on My Roster', async () => {
-      await verifyPendingClaimsUI(commissionerPage);
-    });
-
-    await test.step('Manager 1 sees pending claim on My Roster', async () => {
-      await verifyPendingClaimsUI(managerPage1);
-    });
-  });
 
   // -----------------------------------------------------------------
   // PHASE 7 — PROCESS WAIVERS (commissioner panel)
@@ -848,43 +814,12 @@ test.describe
   });
 
   // -----------------------------------------------------------------
-  // PHASE 9 — PENDING CLAIMS ARE GONE (post-processing roster tab)
+  // PHASE 9 — [REMOVED, LS-9738] Pending Waiver Claims card is absent
+  // after processing, on both teams. Migrated to
+  // `waiver-claim-pipeline.dual.spec.ts`'s "pending-claim card absent on
+  // both teams after processing" step (PR-blocking on mock, nightly on
+  // live) — this phase's pure UI check added no coverage beyond that once
+  // Phase 7 above processes the claims, so it is dropped rather than kept
+  // as a duplicate.
   // -----------------------------------------------------------------
-
-  test('Phase 9: Pending Waiver Claims card is absent after processing', async ({
-    commissionerPage,
-    managerPage1,
-  }) => {
-    // Use dedicated browser contexts for each role rather than switchUser on
-    // a single page. switchUser has a race condition (LS-3672, LS-3705,
-    // LS-3735, LS-9486): the background JWT refresh can dispatch AUTH_LOGOUT
-    // and clear localStorage after page.evaluate() sets the profile, landing
-    // on the unauthenticated sign-in page and leaving the Pending Waiver card
-    // unrendered.
-    const verifyNoPendingClaims = async (page: Page): Promise<void> => {
-      await page.goto(`/baseball/league/${state.leagueId}/roster`);
-      await page.waitForLoadState('load');
-      await expect(page).toHaveURL(/\/roster/);
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-        { timeout: 15000 },
-      );
-
-      // The PendingWaiverClaims component hides itself when there are no
-      // pending claims — the inverted `not.toBeVisible({ timeout })` below
-      // already auto-waits for the element to disappear; no separate sleep
-      // is required (LS-4457).
-      await expect(page.getByText(/Pending Waiver/i).first()).not.toBeVisible({
-        timeout: 15_000,
-      });
-    };
-
-    await test.step('No pending claims banner on commissioner roster', async () => {
-      await verifyNoPendingClaims(commissionerPage);
-    });
-
-    await test.step('No pending claims banner on Manager 1 roster', async () => {
-      await verifyNoPendingClaims(managerPage1);
-    });
-  });
 });

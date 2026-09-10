@@ -29,6 +29,14 @@ import {
 } from '../mocks/graphql/player.mocks';
 import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
 import {
+  createWaiverQueueFixture,
+  type WaiverQueueFixture,
+} from '../mocks/graphql/waiver-queue.mocks';
+import {
+  createMatchupFixture,
+  type MatchupFixture,
+} from '../mocks/graphql/matchup-fixture.mocks';
+import {
   LEAGUE_ID as SEASON_RENEWAL_LEAGUE_ID,
   LEAGUE_NAME as SEASON_RENEWAL_LEAGUE_NAME,
   setupSeasonRenewalGraphQL,
@@ -36,6 +44,10 @@ import {
 import { gqlFetch } from '../integration/helpers/gql-fetch';
 import { createLeagueViaUI } from '../integration/helpers/create-league';
 import { joinLeagueAsManager } from '../integration/helpers/wait-for-join-page';
+import {
+  provisionActiveMatchup,
+  type ProvisionedActiveMatchup,
+} from '../integration/helpers/provision-active-matchup';
 import {
   buildIntegrationStorageState,
   getAuthJwt,
@@ -173,6 +185,70 @@ export interface SeededLeagueWithMember extends SeededLeague {
 }
 
 /**
+ * A free-agent-claim queue precondition (LS-9738, seam-extension-list rank
+ * #4). `teamId` is the CALLER's own team — the first `TestData` in a test to
+ * call {@link TestData.waiverQueue} gets the commissioner's team (no claim
+ * submitted yet); a second, distinct caller (`counterpartyTestData`, see
+ * `fixtures/dual.ts`) gets the joined member's team, whose competing claim
+ * for {@link freeAgent} is submitted immediately as a side effect of the
+ * call — mirroring the mutation a spec would otherwise have to drive twice
+ * through the UI for a flow the matrix explicitly scopes to
+ * "claim submitted / claim resolved" state transitions, not real priority
+ * resolution (that stays live-only).
+ */
+export interface SeededWaiverQueue {
+  /** League to navigate to (`/baseball/league/:leagueId/...`). */
+  leagueId: number;
+  /** The caller's own team. */
+  teamId: number;
+  /** The free agent both teams compete for. */
+  freeAgent: { playerId: number; fullName: string };
+}
+
+/**
+ * A season-active, week-1 matchup between the league's commissioner and its
+ * joined member — draft complete, matchup created, win-probability payload
+ * available (LS-9738, matrix row #2 / seam-extension rank #2's deeper rung).
+ * Like {@link SeededWaiverQueue}, the first caller becomes the commissioner
+ * (and does the (live: slow) league/draft/matchup setup); a second, distinct
+ * caller (`counterpartyTestData`) resolves to the ALREADY-joined member's own
+ * team, for the cross-user view a spec drives via the multi-actor fixture.
+ */
+export interface SeededSeasonActiveMatchup {
+  /** League to navigate to. */
+  leagueId: number;
+  /** The matchup to navigate to (`/baseball/league/:leagueId/matchups/:matchupId`). */
+  matchupId: number;
+  /** The caller's own team. */
+  teamId: number;
+  /** The opposing team in the same matchup. */
+  opponentTeamId: number;
+}
+
+/**
+ * A {@link SeededSeasonActiveMatchup} with the caller's own team carrying one
+ * empty starting slot and an eligible bench player — the precondition
+ * `matchup-roster-editor.dual.spec.ts` needs before it can bench/assign/swap
+ * anybody (LS-9738, matrix row #3 / seam-extension rank #6). A direct sibling
+ * of {@link SeededFootballLineup} — same "one open slot, one eligible bench
+ * player" shape, baseball-flavored. Single-caller only (no multi-actor
+ * fixture involved — the matrix does not gap this row on `multiActorPage`).
+ */
+export interface SeededScheduledMatchupRoster extends SeededSeasonActiveMatchup {
+  /** The configured starting slot, empty until the spec fills it. */
+  openSlot: { positionId: number; positionType: string };
+  /** A rostered player on the bench, eligible for {@link openSlot}. */
+  benchPlayer: { matchupPlayerId: string; fullName: string };
+  /** A currently-starting player on the caller's own team, free to bench. */
+  starterToBench: { matchupPlayerId: string; fullName: string };
+  /** Two starters on the caller's own team mutually eligible for each other's slot. */
+  swapPair: [
+    { matchupPlayerId: string; fullName: string },
+    { matchupPlayerId: string; fullName: string },
+  ];
+}
+
+/**
  * Cross-page shared mock state for dual-mode multi-actor specs (LS-9736).
  *
  * `MockTestData` normally owns no state beyond the `page.route()` closures it
@@ -190,11 +266,25 @@ export interface SeededLeagueWithMember extends SeededLeague {
  */
 export class DualMockState {
   #league?: LeagueFixture;
+  #waiverQueue?: WaiverQueueFixture;
+  #matchup?: MatchupFixture;
 
   /** The test's shared league fixture, created on first call. */
   league(): LeagueFixture {
     this.#league ??= createLeagueFixture();
     return this.#league;
+  }
+
+  /** The test's shared waiver-claim-queue fixture (LS-9738), layered on {@link league}. */
+  waiverQueue(): WaiverQueueFixture {
+    this.#waiverQueue ??= createWaiverQueueFixture(this.league());
+    return this.#waiverQueue;
+  }
+
+  /** The test's shared season-active-matchup fixture (LS-9738), layered on {@link league}. */
+  matchup(): MatchupFixture {
+    this.#matchup ??= createMatchupFixture(this.league());
+    return this.#matchup;
   }
 }
 
@@ -317,6 +407,32 @@ export interface TestData {
    * the same tradeoff `footballLineup()`'s sibling verbs already make).
    */
   leagueWithMember(): Promise<SeededLeagueWithMember>;
+
+  /**
+   * Ensure a free-agent-claim queue exists (LS-9738). Mock: installs a
+   * stateful queue fixture shared with any other `TestData` pointed at the
+   * same `DualMockState`, layered on the same {@link league}. Live: creates
+   * the league via the real UI (first caller) or joins it via the real API
+   * as a distinct identity (second caller) — see {@link SeededWaiverQueue}.
+   */
+  waiverQueue(): Promise<SeededWaiverQueue>;
+
+  /**
+   * Ensure a season-active, week-1 matchup exists between the league's
+   * commissioner and its joined member, with a win-probability payload
+   * available (LS-9738). Mock: installs a stateful matchup fixture. Live:
+   * runs a real (API-driven) draft — slow, acceptable for nightly cadence,
+   * the same tradeoff `leagueWithMember()` makes. See
+   * {@link SeededSeasonActiveMatchup}.
+   */
+  seasonActiveMatchup(): Promise<SeededSeasonActiveMatchup>;
+
+  /**
+   * Ensure a {@link seasonActiveMatchup} exists where the caller's own team
+   * has one empty starting slot and an eligible bench player (LS-9738). See
+   * {@link SeededScheduledMatchupRoster}.
+   */
+  scheduledMatchupRoster(): Promise<SeededScheduledMatchupRoster>;
 }
 
 /** Hermetic implementation — preconditions become `route.fulfill()` mocks. */
@@ -718,6 +834,57 @@ export class MockTestData implements TestData {
     };
   }
 
+  async waiverQueue(): Promise<SeededWaiverQueue> {
+    const league = this.#shared.league();
+    const queue = this.#shared.waiverQueue();
+    const role = queue.roleFor(this);
+    await this.#installLeagueRoutes(league);
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const handler = queue.handlersFor(role.teamId)[
+        extractOperationName(route).toLowerCase()
+      ];
+      if (!handler) {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(handler(extractOperationVariables(route))),
+      });
+    });
+    return {
+      leagueId: league.leagueId,
+      teamId: role.teamId,
+      freeAgent: queue.freeAgent,
+    };
+  }
+
+  async seasonActiveMatchup(): Promise<SeededSeasonActiveMatchup> {
+    const league = this.#shared.league();
+    const matchup = this.#shared.matchup();
+    await this.#installLeagueRoutes(league);
+    await this.#installMatchupRoutes(matchup);
+    return {
+      leagueId: league.leagueId,
+      matchupId: matchup.matchupId,
+      teamId: matchup.team1Id,
+      opponentTeamId: matchup.team2Id,
+    };
+  }
+
+  async scheduledMatchupRoster(): Promise<SeededScheduledMatchupRoster> {
+    const base = await this.seasonActiveMatchup();
+    const matchup = this.#shared.matchup();
+    return {
+      ...base,
+      openSlot: matchup.openSlot,
+      benchPlayer: matchup.benchPlayer,
+      starterToBench: matchup.starterToBench,
+      swapPair: matchup.swapPair,
+    };
+  }
+
   /**
    * Point this page's `page.route()` at the shared fixture's handler map —
    * pure transport, same shape as `footballLineup()` above. Idempotent to
@@ -726,6 +893,23 @@ export class MockTestData implements TestData {
    * it freely.
    */
   async #installLeagueRoutes(fixture: LeagueFixture): Promise<void> {
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const handler =
+        fixture.handlers[extractOperationName(route).toLowerCase()];
+      if (!handler) {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(handler(extractOperationVariables(route))),
+      });
+    });
+  }
+
+  /** Same shape as {@link #installLeagueRoutes}, for the matchup fixture (LS-9738). */
+  async #installMatchupRoutes(fixture: MatchupFixture): Promise<void> {
     await this.#page.route(isGraphQLEndpoint, async (route) => {
       const handler =
         fixture.handlers[extractOperationName(route).toLowerCase()];
@@ -801,22 +985,71 @@ export const LEAGUE_WITH_MEMBER_LIVE_REQUIRES_BROWSER_REASON =
   'context for the join (integration/helpers/wait-for-join-page.ts) — this ' +
   'LiveTestData was constructed without one.';
 
+/**
+ * Cross-instance shared LIVE state (LS-9738) — the live-backend analogue of
+ * {@link DualMockState}. Unlike mock mode there is no shared in-process
+ * fixture object on the live backend, so this is just a mutable box: the
+ * FIRST `LiveTestData` in a test to call a verb that needs a second,
+ * distinct identity (`waiverQueue()`, `seasonActiveMatchup()`) stores what it
+ * created here; the SECOND, distinct caller (`counterpartyTestData`, bound to
+ * `fixtures/dual.ts`'s `counterpartyPage`) reads it back to join the SAME
+ * league/matchup rather than creating its own. One instance per test, handed
+ * to both `testData` and `counterpartyTestData`'s `LiveTestData` — mirrors
+ * how `_dualMockState` is threaded through for mock mode.
+ */
+export class DualLiveState {
+  waiverQueue?: {
+    leagueId: number;
+    inviteCode: string;
+    commissionerTeamId: number;
+    freeAgentPlayerId: number;
+    freeAgentPlayerName: string;
+  };
+  seasonActiveMatchup?: ProvisionedActiveMatchup;
+}
+
+/**
+ * Premium seat for the SECOND, distinct identity `waiverQueue()` and
+ * `seasonActiveMatchup()` join in on live mode — deliberately the SAME seat
+ * `fixtures/dual.ts`'s `counterpartyPage` authenticates (`COUNTERPARTY_LIVE_SEAT
+ * = 4`), so that when a spec later navigates `counterpartyPage` to view its
+ * own team's state, it is genuinely the identity that joined/claimed it —
+ * not a third, unrelated identity. Not imported directly from `dual.ts` to
+ * avoid a circular import; kept in sync by convention, the same way
+ * `LEAGUE_WITH_MEMBER_LIVE_SEAT` (3) above coexists with `dual.ts`'s seat 4
+ * without importing it.
+ */
+const DUAL_LIVE_COUNTERPARTY_SEAT = 4;
+
+export const WAIVER_QUEUE_LIVE_REQUIRES_SHARED_STATE_REASON =
+  'TestData.waiverQueue() needs a DualLiveState to coordinate the ' +
+  "commissioner's and the joined member's calls — this LiveTestData was " +
+  'constructed without one.';
+
+export const SEASON_ACTIVE_MATCHUP_LIVE_REQUIRES_SHARED_STATE_REASON =
+  'TestData.seasonActiveMatchup() needs a DualLiveState to coordinate the ' +
+  "commissioner's and the joined member's calls — this LiveTestData was " +
+  'constructed without one.';
+
 export class LiveTestData implements TestData {
   readonly mode = 'live' as const;
   readonly #page?: Page;
   readonly #browser?: Browser;
+  readonly #liveState?: DualLiveState;
 
   /**
    * `page`/`browser` are optional because most existing verbs (the read-only
    * MLB-history ones) need neither. `league()` needs `page` (to drive the
    * real create-league UI as the identity already authenticated on it);
    * `leagueWithMember()` additionally needs `browser` (to open a second,
-   * distinct identity's context for the join) — see
-   * `fixtures/dual.ts` for how both are wired in.
+   * distinct identity's context for the join). `liveState` is needed only by
+   * `waiverQueue()`/`seasonActiveMatchup()` (LS-9738) — see
+   * `fixtures/dual.ts` for how all three are wired in.
    */
-  constructor(page?: Page, browser?: Browser) {
+  constructor(page?: Page, browser?: Browser, liveState?: DualLiveState) {
     this.#page = page;
     this.#browser = browser;
+    this.#liveState = liveState;
   }
 
   /**
@@ -1012,6 +1245,260 @@ export class LiveTestData implements TestData {
     } finally {
       await memberContext.close();
     }
+  }
+
+  async waiverQueue(): Promise<SeededWaiverQueue> {
+    if (!this.#liveState) {
+      throw new Error(WAIVER_QUEUE_LIVE_REQUIRES_SHARED_STATE_REASON);
+    }
+    if (!this.#liveState.waiverQueue) {
+      // First caller (commissioner): create the league and pick the free
+      // agent both teams will compete for.
+      const league = await this.league();
+      const commissionerJwt = await getAuthJwt();
+      const { freeAgents } = await gqlFetch<{
+        freeAgents: Array<{ id: number; firstName: string; lastName: string }>;
+      }>(
+        commissionerJwt,
+        `query GetFreeAgentPlayersForWaiverQueue($leagueId: Int!) {
+           freeAgents(leagueId: $leagueId) { id firstName lastName }
+         }`,
+        { leagueId: league.leagueId },
+      );
+      const picked = freeAgents[0];
+      if (!picked) {
+        throw new Error(
+          `TestData.waiverQueue(): league ${league.leagueId} has no free ` +
+            'agents to seed the precondition.',
+        );
+      }
+      const freeAgentPlayerName =
+        `${picked.firstName} ${picked.lastName}`.trim();
+      this.#liveState.waiverQueue = {
+        leagueId: league.leagueId,
+        inviteCode: league.inviteCode,
+        commissionerTeamId: league.commissionerTeamId,
+        freeAgentPlayerId: picked.id,
+        freeAgentPlayerName,
+      };
+      return {
+        leagueId: league.leagueId,
+        teamId: league.commissionerTeamId,
+        freeAgent: { playerId: picked.id, fullName: freeAgentPlayerName },
+      };
+    }
+
+    // Second, distinct caller (the joined member, bound to `dual.ts`'s
+    // `counterpartyPage`): join the SAME league as that real identity and
+    // submit ITS competing claim via the API — not a second UI drive of the
+    // same free-agents flow the spec already exercises for the commissioner.
+    const shared = this.#liveState.waiverQueue;
+    const memberJwt = await loginAs('premium', DUAL_LIVE_COUNTERPARTY_SEAT);
+    const { joinLeagueByCode } = await gqlFetch<{
+      joinLeagueByCode: { id: number };
+    }>(
+      memberJwt,
+      `mutation JoinLeagueByCodeForWaiverQueue($inviteCode: String!, $teamName: String!) {
+         joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) { id }
+       }`,
+      {
+        inviteCode: shared.inviteCode,
+        teamName: `E2E Waiver Queue ${Date.now()}`,
+      },
+    );
+    const teamId = Number(joinLeagueByCode.id);
+    await gqlFetch(
+      memberJwt,
+      `mutation ClaimFreeAgentForWaiverQueue($leagueId: Int!, $playerId: Int!) {
+         claimFreeAgent(leagueId: $leagueId, playerId: $playerId) { id status }
+       }`,
+      { leagueId: shared.leagueId, playerId: shared.freeAgentPlayerId },
+    );
+    return {
+      leagueId: shared.leagueId,
+      teamId,
+      freeAgent: {
+        playerId: shared.freeAgentPlayerId,
+        fullName: shared.freeAgentPlayerName,
+      },
+    };
+  }
+
+  async seasonActiveMatchup(): Promise<SeededSeasonActiveMatchup> {
+    if (!this.#liveState) {
+      throw new Error(SEASON_ACTIVE_MATCHUP_LIVE_REQUIRES_SHARED_STATE_REASON);
+    }
+    if (!this.#liveState.seasonActiveMatchup) {
+      const commissionerJwt = await getAuthJwt();
+      const memberJwt = await loginAs('premium', DUAL_LIVE_COUNTERPARTY_SEAT);
+      const provisioned = await provisionActiveMatchup({
+        commissionerJwt,
+        memberJwt,
+        leagueName: `E2E Season Active Matchup ${Date.now()}`,
+      });
+      this.#liveState.seasonActiveMatchup = provisioned;
+      return {
+        leagueId: provisioned.leagueId,
+        matchupId: provisioned.matchupId,
+        teamId: provisioned.commissionerTeamId,
+        opponentTeamId: provisioned.memberTeamId,
+      };
+    }
+
+    // Second, distinct caller — the member joined during the first call
+    // already; resolve the SAME identity's own team.
+    const shared = this.#liveState.seasonActiveMatchup;
+    return {
+      leagueId: shared.leagueId,
+      matchupId: shared.matchupId,
+      teamId: shared.memberTeamId,
+      opponentTeamId: shared.commissionerTeamId,
+    };
+  }
+
+  async scheduledMatchupRoster(): Promise<SeededScheduledMatchupRoster> {
+    const base = await this.seasonActiveMatchup();
+    const commissionerJwt = await getAuthJwt();
+
+    const { getMatchupPlayers } = await gqlFetch<{
+      getMatchupPlayers: Array<{
+        id: string;
+        teamId: number;
+        positionId: number | null;
+        player: {
+          firstName: string;
+          lastName: string;
+          eligiblePositions: string[] | null;
+        };
+      }>;
+    }>(
+      commissionerJwt,
+      `query GetMatchupPlayersForRosterVerb($matchupId: Int!) {
+         getMatchupPlayers(matchupId: $matchupId) {
+           id
+           teamId
+           positionId
+           player { firstName lastName eligiblePositions }
+         }
+       }`,
+      { matchupId: base.matchupId },
+    );
+    const starters = getMatchupPlayers.filter(
+      (p) => p.teamId === base.teamId && p.positionId !== null,
+    );
+    const starter = starters[0];
+    if (!starter || starter.positionId == null) {
+      throw new Error(
+        `TestData.scheduledMatchupRoster(): team ${base.teamId} has no ` +
+          `assigned starter to free a slot from (matchup ${base.matchupId}).`,
+      );
+    }
+    const starterToBench = starters[1];
+    if (!starterToBench) {
+      throw new Error(
+        `TestData.scheduledMatchupRoster(): team ${base.teamId} needs at ` +
+          `least 2 starters (1 to free for the open slot, 1 more to bench ` +
+          `during the test) in matchup ${base.matchupId}.`,
+      );
+    }
+
+    const { leaguePositions } = await gqlFetch<{
+      leaguePositions: Array<{ id: number; positionType: string }>;
+    }>(
+      commissionerJwt,
+      `query LeaguePositionsForRosterVerb($leagueId: Int!) {
+         leaguePositions(leagueId: $leagueId) { id positionType }
+       }`,
+      { leagueId: base.leagueId },
+    );
+    const positionTypeById = new Map(
+      leaguePositions.map((p) => [p.id, p.positionType]),
+    );
+    const slotTypeOf = (positionId: number | null): string | null =>
+      positionId != null ? (positionTypeById.get(positionId) ?? null) : null;
+    const eligibleForSlot = (
+      eligible: string[] | null,
+      slotType: string | null,
+    ): boolean => {
+      if (!slotType) return true;
+      if (!eligible || eligible.length === 0) return false;
+      return eligible.some((p) => p.toUpperCase() === slotType.toUpperCase());
+    };
+
+    // Find two starters (excluding `starter`/`starterToBench`, which the
+    // spec's assign/bench steps mutate) mutually eligible for each other's
+    // slot — mirrors the live integration spec's Phase 8 pairing search.
+    const swapCandidates = starters.filter(
+      (p) => p.id !== starter.id && p.id !== starterToBench.id,
+    );
+    let swapPair:
+      | [(typeof swapCandidates)[number], (typeof swapCandidates)[number]]
+      | null = null;
+    for (let i = 0; i < swapCandidates.length && !swapPair; i++) {
+      for (let j = i + 1; j < swapCandidates.length && !swapPair; j++) {
+        const a = swapCandidates[i];
+        const b = swapCandidates[j];
+        const aForB = eligibleForSlot(
+          a.player.eligiblePositions,
+          slotTypeOf(b.positionId),
+        );
+        const bForA = eligibleForSlot(
+          b.player.eligiblePositions,
+          slotTypeOf(a.positionId),
+        );
+        if (aForB && bForA) swapPair = [a, b];
+      }
+    }
+    if (!swapPair) {
+      throw new Error(
+        `TestData.scheduledMatchupRoster(): team ${base.teamId} has no ` +
+          `two starters mutually eligible for each other's slot in matchup ` +
+          `${base.matchupId} (required for the swap step).`,
+      );
+    }
+
+    const positionType = slotTypeOf(starter.positionId) ?? 'UNKNOWN';
+
+    // Bench `starter` to manufacture the "one open slot, one eligible bench
+    // player" precondition — mirrors `footballLineup()`'s scenario, which
+    // the mock verb pre-bakes; the live backend has no equivalent curated
+    // fixture, so free a real slot instead.
+    await gqlFetch(
+      commissionerJwt,
+      `mutation FreeMatchupSlotForRosterVerb($matchupPlayerId: Int!) {
+         updateMatchupPlayerPosition(matchupPlayerId: $matchupPlayerId, positionId: null) {
+           id
+           positionId
+         }
+       }`,
+      { matchupPlayerId: Number(starter.id) },
+    );
+
+    const fullNameOf = (p: (typeof starters)[number]) =>
+      `${p.player.firstName} ${p.player.lastName}`.trim();
+
+    return {
+      ...base,
+      openSlot: { positionId: starter.positionId, positionType },
+      benchPlayer: {
+        matchupPlayerId: starter.id,
+        fullName: fullNameOf(starter),
+      },
+      starterToBench: {
+        matchupPlayerId: starterToBench.id,
+        fullName: fullNameOf(starterToBench),
+      },
+      swapPair: [
+        {
+          matchupPlayerId: swapPair[0].id,
+          fullName: fullNameOf(swapPair[0]),
+        },
+        {
+          matchupPlayerId: swapPair[1].id,
+          fullName: fullNameOf(swapPair[1]),
+        },
+      ],
+    };
   }
 }
 

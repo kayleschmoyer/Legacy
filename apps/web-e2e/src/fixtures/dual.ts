@@ -17,6 +17,7 @@ import {
 } from './native-mock';
 import { useTier } from './shared-mocks';
 import {
+  DualLiveState,
   DualMockState,
   LiveTestData,
   MockTestData,
@@ -158,6 +159,14 @@ export interface DualFixtures {
    * observe the SAME stateful fixtures (e.g. `league()`) within one test.
    */
   _dualMockState: DualMockState;
+  /**
+   * Cross-instance shared LIVE state (LS-9738) — see `test-data.ts`'s
+   * `DualLiveState`. The live-backend analogue of `_dualMockState`, needed by
+   * verbs (`waiverQueue()`, `seasonActiveMatchup()`) whose SECOND caller must
+   * join the SAME league/matchup the first caller created rather than
+   * creating its own.
+   */
+  _dualLiveState: DualLiveState;
 }
 
 /** Worker-scoped fixtures (one per Playwright worker process). */
@@ -354,18 +363,20 @@ export const test = base.extend<
           page,
           browser,
           _dualMockState,
+          _dualLiveState,
         }: {
           backend: BackendMode;
           page: Page;
           browser: Browser;
           _dualMockState: DualMockState;
+          _dualLiveState: DualLiveState;
         },
         use: (testData: TestData) => Promise<void>,
       ) => {
         await use(
           backend === 'mock'
             ? new MockTestData(page, _dualMockState)
-            : new LiveTestData(page, browser),
+            : new LiveTestData(page, browser, _dualLiveState),
         );
       },
 
@@ -377,6 +388,17 @@ export const test = base.extend<
    */
   _dualMockState: async ({}, use: (state: DualMockState) => Promise<void>) => {
     await use(new DualMockState());
+  },
+
+  /**
+   * Cross-instance shared LIVE state (LS-9738) — one instance per test,
+   * handed to both `testData` and `counterpartyTestData`'s `LiveTestData` so
+   * a verb's second caller can join the SAME league/matchup the first caller
+   * created. Cheap to construct unconditionally; mock-mode tests simply
+   * never read from it.
+   */
+  _dualLiveState: async ({}, use: (state: DualLiveState) => Promise<void>) => {
+    await use(new DualLiveState());
   },
 
   /**
@@ -437,18 +459,20 @@ export const test = base.extend<
       counterpartyPage,
       browser,
       _dualMockState,
+      _dualLiveState,
     }: {
       backend: BackendMode;
       counterpartyPage: Page;
       browser: Browser;
       _dualMockState: DualMockState;
+      _dualLiveState: DualLiveState;
     },
     use: (testData: TestData) => Promise<void>,
   ) => {
     await use(
       backend === 'mock'
         ? new MockTestData(counterpartyPage, _dualMockState)
-        : new LiveTestData(counterpartyPage, browser),
+        : new LiveTestData(counterpartyPage, browser, _dualLiveState),
     );
   },
 
