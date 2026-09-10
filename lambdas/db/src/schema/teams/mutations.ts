@@ -1059,7 +1059,7 @@ builder.mutationField('updateTeamBranding', (t) =>
         primaryColor !== undefined &&
         !hexPattern.test(primaryColor)
       ) {
-        throw new Error(
+        throw UserInputError(
           'primaryColor must be a valid hex color (e.g. #FF0000)',
         );
       }
@@ -1068,7 +1068,7 @@ builder.mutationField('updateTeamBranding', (t) =>
         secondaryColor !== undefined &&
         !hexPattern.test(secondaryColor)
       ) {
-        throw new Error(
+        throw UserInputError(
           'secondaryColor must be a valid hex color (e.g. #FF0000)',
         );
       }
@@ -1106,7 +1106,7 @@ builder.mutationField('updateTeamBranding', (t) =>
       );
 
       if (!isCommissioner && !isGM) {
-        throw new Error(
+        throw ForbiddenError(
           'Only the team General Manager can update team branding',
         );
       }
