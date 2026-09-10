@@ -1480,6 +1480,123 @@ describe('ci-gate — a newer run that skipped its pipeline does not supersede (
   });
 });
 
+// ── LS-9811: a not-yet-started pull_request_review candidate does not strand
+// the SHA ──────────────────────────────────────────────────────────────────
+
+describe('ci-gate — a not-yet-started pull_request_review run does not supersede (LS-9811)', () => {
+  it('regression: PR #7499 — posts success when the newer candidate has ZERO jobs and is a pull_request_review run', async () => {
+    // The exact production sequence. Run 33598992411 (the real, fully-green CI
+    // run) reached summarize with run 33599197673 — the pull_request_review
+    // orchestrator run fired by the Reviewer Bot's approval — sitting at
+    // status=pending with ZERO jobs for 20+ minutes (runner saturation).
+    // pipelineJobWasSkipped found no jobs at all to inspect and failed CLOSED,
+    // withholding the real run's verdict in favour of a candidate whose own
+    // check-prior-success step was guaranteed to short-circuit once it ran —
+    // stranding the SHA with no CI Gate status at all.
+    const REAL_RUN = 33598992411;
+    const PENDING_REVIEW_RUN = 33599197673;
+    const saved = process.env.GITHUB_RUN_ID;
+    process.env.GITHUB_RUN_ID = String(REAL_RUN);
+    try {
+      const { github, calls } = makeGithub({
+        runs: [
+          { id: REAL_RUN, name: CI_WORKFLOW, conclusion: 'success' },
+          {
+            id: PENDING_REVIEW_RUN,
+            name: CI_WORKFLOW,
+            event: 'pull_request_review',
+            status: 'pending',
+            conclusion: null,
+          },
+        ],
+        // No jobsByRunId entry for PENDING_REVIEW_RUN — it resolves to `[]`,
+        // reproducing "sat pending with ZERO jobs" exactly.
+      });
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(
+        res.posted,
+        true,
+        'the real, fully-green run must post its verdict rather than being ' +
+          'stranded behind a pull_request_review candidate that will never speak',
+      );
+      assert.strictEqual(calls.statuses[0].state, 'success');
+      assert.deepStrictEqual(
+        calls.listJobs,
+        [PENDING_REVIEW_RUN],
+        'the empty-jobs candidate must still be probed at the job level',
+      );
+    } finally {
+      process.env.GITHUB_RUN_ID = saved;
+    }
+  });
+
+  it('STILL withholds for a not-yet-started candidate that is NOT a pull_request_review run', async () => {
+    // A genuine workflow_dispatch re-run (the manual recovery path) or a fresh
+    // pull_request-triggered run with zero jobs so far may yet run CI and post
+    // its own verdict — the LS-9811 prediction must not apply to it.
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          event: 'workflow_dispatch',
+          status: 'queued',
+          conclusion: null,
+        },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('STILL withholds for a COMPLETED pull_request_review candidate that never created the pipeline job', async () => {
+    // A candidate that has already finished (here with a run-level `failure`,
+    // so the unrelated LS-9579 "completed successfully but never posted"
+    // allowance does not also explain the result) without ever creating '🚀 CI
+    // Pipeline' is not the in-flight stranding scenario the LS-9811 prediction
+    // covers — keep the pre-existing fail-closed default for it.
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          event: 'pull_request_review',
+          status: 'completed',
+          conclusion: 'failure',
+        },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+});
+
 // ── LS-9359: createCommitStatus rate-limit/5xx resilience ─────────────────────
 
 describe('ci-gate — isRetryableStatusError classifies transient errors', () => {

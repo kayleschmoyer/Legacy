@@ -198,16 +198,68 @@ const MAX_SUPERSEDING_RUN_INSPECTIONS = 10;
 
 /**
  * Whether `runId`'s CI Pipeline job was skipped — i.e. that run performed no CI
- * and will therefore never post a `CI Gate` verdict (LS-9565).
+ * and will therefore never post a `CI Gate` verdict (LS-9565) — OR whether the
+ * run can be PREDICTED to end up in that same state before it has even
+ * created that job (LS-9811).
  *
- * Fails CLOSED: on any API error this returns `false` ("assume it will post"),
- * which makes the caller withhold its own success. Withholding is the safe
- * direction — a missing `CI Gate` blocks the merge, whereas wrongly posting
- * green over a newer run's verdict lands a red PR (the LS-9378 invariant).
+ * LS-9811: a `pull_request_review`-triggered candidate that has not yet
+ * created its '🚀 CI Pipeline' job — including one still sitting at ZERO jobs
+ * entirely, e.g. queued behind runner saturation for 20+ minutes — cannot be
+ * distinguished from a run that WILL go on to run CI by inspecting its jobs
+ * alone. Failing closed there (the pre-LS-9811 behaviour) is exactly what
+ * stranded PR #7499: the real, fully-green run withheld its verdict waiting
+ * on this candidate, while the candidate's own `check-prior-success` step
+ * (ci-orchestrator.yml) was guaranteed to short-circuit the moment it ran —
+ * so neither run ever posted `CI Gate` and the merge queue blocked forever.
  *
+ * The prediction is sound because this helper is only ever reached from
+ * `assertSuccessIsCurrent`, whose caller has ALREADY confirmed every
+ * GATE_INPUT_JOBS entry passed in ITS OWN run — i.e. its own orchestrator run
+ * is either still in flight or about to post `CI Gate: success` for this
+ * exact SHA. By the time a not-yet-started `pull_request_review` candidate's
+ * `check-prior-success` step runs, it will find one of:
+ *   (a) `CI Gate` already `success` for this SHA (posted by the caller) →
+ *       its `allPassed` check passes, or
+ *   (b) the caller's own orchestrator run still active with a dispatching
+ *       event (`pull_request` / `workflow_dispatch`) → its `siblingDispatching`
+ *       check (LS-9887) fires.
+ * Either branch sets `ci-already-passed=true`, which skips the candidate's
+ * '🚀 CI Pipeline' job via its `if:` — so the candidate is guaranteed never to
+ * post, exactly like the already-skipped case this helper already handled.
+ * This is why the prediction is scoped tightly to `event ===
+ * 'pull_request_review'`: there cannot be a newer PUSH for the same SHA (the
+ * SHA is fixed), so a genuinely new `pull_request`/`workflow_dispatch`
+ * candidate for it always intends to run CI and must keep failing closed.
+ *
+ * Fails CLOSED in every other case — a candidate whose pipeline job already
+ * exists but has not resolved to `skipped`, a completed run that somehow
+ * never created the job, or any API error — returning `false` ("assume it
+ * will post"), which makes the caller withhold its own success. Withholding
+ * is the safe direction — a missing `CI Gate` blocks the merge, whereas
+ * wrongly posting green over a newer run's verdict lands a red PR (the
+ * LS-9378 invariant, which this prediction does not weaken: it only ever
+ * removes a candidate that is PROVEN to never speak from consideration, the
+ * same guarantee the LS-9565 skipped-job case already relies on).
+ *
+ * @param {object} params
+ * @param {number} params.runId
+ * @param {string} [params.event] the candidate run's trigger event
+ *   (`workflow_runs[].event` from the Actions API), used only for the
+ *   `pull_request_review` prediction above.
+ * @param {string} [params.status] the candidate run's `status`
+ *   (`workflow_runs[].status`) — the prediction only applies while the run
+ *   has not yet reached `'completed'`.
  * @returns {Promise<boolean>}
  */
-async function pipelineJobWasSkipped({ github, core, owner, repo, runId }) {
+async function pipelineJobWasSkipped({
+  github,
+  core,
+  owner,
+  repo,
+  runId,
+  event,
+  status,
+}) {
   try {
     const { data } = await github.rest.actions.listJobsForWorkflowRun({
       owner,
@@ -215,16 +267,37 @@ async function pipelineJobWasSkipped({ github, core, owner, repo, runId }) {
       run_id: runId,
       per_page: 100,
     });
-    const pipelineJob = (data.jobs || []).find(
-      (job) => job.name === CI_PIPELINE_JOB_NAME,
-    );
-    // `status: 'completed'` matters: a job GitHub has created but not yet
-    // resolved carries a null conclusion and is still expected to run.
-    return Boolean(
-      pipelineJob &&
-      pipelineJob.status === 'completed' &&
-      pipelineJob.conclusion === 'skipped',
-    );
+    const jobs = data.jobs || [];
+    const pipelineJob = jobs.find((job) => job.name === CI_PIPELINE_JOB_NAME);
+
+    if (pipelineJob) {
+      // `status: 'completed'` matters: a job GitHub has created but not yet
+      // resolved carries a null conclusion and is still expected to run.
+      return Boolean(
+        pipelineJob.status === 'completed' &&
+        pipelineJob.conclusion === 'skipped',
+      );
+    }
+
+    // No '🚀 CI Pipeline' job exists in this run yet — either it genuinely has
+    // zero jobs so far, or it has some jobs (e.g. "Determine Workflow Scope")
+    // but hasn't reached the point of creating the pipeline job. LS-9811: for
+    // a still-running `pull_request_review` candidate this is predictable
+    // (see the doc comment above) rather than ambiguous; every other trigger,
+    // and a candidate that has already finished without ever creating the
+    // job, keeps the pre-existing fail-closed default below.
+    if (event === 'pull_request_review' && status !== 'completed') {
+      core.info(
+        `CI Gate: run ${runId} is a pull_request_review candidate with no ` +
+          `'${CI_PIPELINE_JOB_NAME}' job yet (status: ${status || 'unknown'}, ` +
+          `${jobs.length} job(s) so far) — its check-prior-success guard is ` +
+          'guaranteed to short-circuit once this run speaks, so it is not ' +
+          'treated as superseding.',
+      );
+      return true;
+    }
+
+    return false;
   } catch (e) {
     core.warning(
       `CI Gate: could not list jobs for run ${runId} (${e.message}) — assuming ` +
@@ -501,6 +574,8 @@ async function assertSuccessIsCurrent({
         owner,
         repo,
         runId: candidate.id,
+        event: candidate.event,
+        status: candidate.status,
       });
       if (skipped) {
         core.info(

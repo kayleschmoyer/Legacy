@@ -132,6 +132,34 @@ its own, so withholding is the safe direction):
   > set — that trigger bypasses the review-gated prior-success guard, so it both
   > runs CI and posts the gate under the highest run id.
 
+  **Nor is "no job yet" always ambiguous (LS-9811).** LS-9565's probe reads
+  the candidate's job list once; when the `🚀 CI Pipeline` job is not there
+  yet — including a candidate sitting at **zero jobs**, e.g. queued behind
+  runner saturation — the probe used to fail closed unconditionally ("assume
+  it will post"). For a `pull_request_review`-triggered candidate that is not
+  yet `completed`, that assumption is provably wrong: this guard is only ever
+  reached after `results` already shows every `GATE_INPUT_JOBS` entry passing
+  in the **posting run's own** run, so that run is either still in flight or
+  about to post `CI Gate: success` for the exact same SHA. By the time the
+  stalled candidate's own `check-prior-success` step runs, it will find
+  either the gate already `success` (`allPassed`) or the posting run still
+  active under a dispatching event (`siblingDispatching`, LS-9887) — both set
+  `ci-already-passed=true` and skip its pipeline job. The candidate is
+  therefore guaranteed to end up in the same non-posting state as the
+  already-`skipped` case above, so guard (A) now predicts it instead of
+  waiting to confirm it. The prediction stays scoped to `event ===
+'pull_request_review'` and an incomplete run — a genuinely new
+  `pull_request`/`workflow_dispatch` candidate for the SHA (there cannot be a
+  newer push for a SHA that has not moved) always intends to run CI and keeps
+  failing closed.
+
+  > Observed on PR #7499: run `33598992411` ran the full pipeline green and
+  > withheld in favour of run `33599197673` — the `pull_request_review`
+  > orchestrator run fired by the Reviewer Bot's approval — which sat
+  > `pending` with zero jobs for 20+ minutes. Its own `check-prior-success`
+  > step would have short-circuited the moment it ran, so neither run ever
+  > posted `CI Gate`, blocking the merge queue for ~25 minutes.
+
 - **(B) newer-failure-posted** — refuse if an existing `CI Gate` failure status on
   the SHA was posted by a newer run (run id parsed from `target_url`). Redundant
   with (A) when the runs listing is complete, but survives pagination and API lag.
