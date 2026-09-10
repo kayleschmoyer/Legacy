@@ -27,6 +27,20 @@ Observed failure mode (LS-8761): ~48 near-identical rejected `jira_transition(ac
 
 **Never use `mcp__github__issue_write({ method: "update", labels: [...] })`** (or any other full-set-replace label call) to add or remove a single label. Its `labels` array **replaces the entire set** — adding one label means reading the current set and writing back the full union, and if a label was stripped by automation (e.g. the "Remove Merge Label on Failure" job removing `merge-when-ready`) in the window between your read and your write, your write silently re-applies it. Per the [Author Agent Contract](../../pr-lifecycle/references/author-agent-contract.md), an agent must never apply `merge-when-ready` or any other maintainer escape-hatch label — replace-semantics turns that into a live race, not just an ergonomics gap. If `github_manage_labels` is ever genuinely unreachable (retry `ToolSearch` once before assuming so), see the [CCR substitution table](#jira-github-hosted-servers-absent-in-ccr-ls-9576) below for the last-resort fallback and its guardrail.
 
+<a id="issue_write-cannot-resolve-pr-numbers-ls-9692"></a>
+
+### `issue_write` Cannot Resolve PR Numbers (LS-9692)
+
+`mcp__github__issue_write({ method: "update", issue_number: <PR#>, ... })` fails **`Failed to find issues: failed to get issue ID: Could not resolve to an Issue with the number of <PR#>`** whenever `issue_number` is a pull request — reproduced applying `bot:ready-for-review` to a real, open PR (#7368), and again on the same number trying to set `state`/`state_reason` to close it. `update_pull_request` on the identical number succeeded immediately after, confirming the PR was real and reachable; only `issue_write`'s resolution step rejects it.
+
+This reads as a repo-fixable resolver bug — GitHub's underlying REST/GraphQL API serves both issues and PRs off the same `issues/{n}` surface for labels and state, so nothing about the platform requires this restriction. It is not, however: `mcp__github__*` is a **hosted, platform-built-in tool surface** (see [Built-in GitHub Tools](service-operations.md#built-in-github-tools-claude-code-on-the-web)) — there is no `tools/mcp/` source in this repo for it, unlike `legacy-sports-github` (`tools/mcp/github-server/`), so the resolver cannot be patched from here. The fix that _is_ reachable from this repo is routing: never call `issue_write` with a PR number, for **any** field, not only `labels`. Concretely:
+
+- Labels on a PR → `github_manage_labels` (additive, safe on PRs — see above; this was already the rule before LS-9692, for the separate reason of replace-semantics).
+- Open/closed state on a PR → `mcp__github__update_pull_request({ owner, repo, pullNumber, state: "open" | "closed" })`. Its schema has no `state_reason` field — closing a PR as `not_planned`/`duplicate`/`completed` with a recorded reason is not currently possible through any available tool; closing via `state: "closed"` alone is the available substitute.
+- No single tool sets both state and labels on a PR in one call — issue two calls (`github_manage_labels` then `update_pull_request`, or vice versa) rather than reaching for `issue_write` to try to do both at once.
+
+If `issue_write` is ever called with a PR number and returns the "Could not resolve to an Issue" error, that is expected behavior for this known platform limitation, not a transient failure worth retrying against the same tool — retry via the routing above instead.
+
 ### Pre-flight Auth Check
 
 <a id="auth_check_all"></a>

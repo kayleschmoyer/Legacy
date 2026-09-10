@@ -56,6 +56,9 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 | `github_request_review({ prs: [number], copilot: true })`         | `mcp__github__request_copilot_review({ owner, repo, pullNumber })`                             |
 | `github_list_prs`                                                 | `mcp__github__list_pull_requests({ owner, repo })`                                             |
 | `github_list_reviews`                                             | `mcp__github__pull_request_read({ method: "get_reviews", owner, repo, pullNumber })`           |
+| _(no custom equivalent needed)_                                   | `mcp__github__update_pull_request({ state: "open" \| "closed" })` — PR open/closed state       |
+
+> **`mcp__github__issue_write` cannot target a PR number (LS-9692)** — `issue_number: <PR#>` fails `Could not resolve to an Issue`, for labels, state, or any other field, even though the number is a real open PR. This is a limitation of the hosted tool itself (no `tools/mcp/` source here to fix it against), not a repo bug. Route labels through `github_manage_labels` and PR state through `update_pull_request` (row above) instead — see [auth-and-routing.md § `issue_write` Cannot Resolve PR Numbers](auth-and-routing.md#issue_write-cannot-resolve-pr-numbers-ls-9692) for the full writeup.
 
 > **Note:** Built-in `mcp__github__*` tools are NOT available on Copilot Coding Agent — use the custom `legacy-sports-github` MCP server there. See [cloud-agent-mode](../../cloud-agent-mode/SKILL.md) for the full cloud review lifecycle workflow.
 
