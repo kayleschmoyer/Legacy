@@ -11,6 +11,8 @@ import {
   fetchRunLogs,
   fetchRunLogsRing,
   JOB_NEVER_STARTED_MESSAGE,
+  LogTooLargeError,
+  MAX_LOG_BLOB_BYTES,
   resolveJobsByName,
   stripAnsiCodes,
 } from './logs.js';
@@ -836,6 +838,130 @@ describe('extractTextFromZip streamed (data-descriptor) entries (LS-9229)', () =
     const result = await fetchRunLogs({ jobId: 1 });
 
     expect(result.text).toContain('setup output');
+  });
+});
+
+describe('LS-9708: streaming bound for large job logs', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  /**
+   * Synthesized equivalent of the LS-9708 repro job (run 32638801454 / job
+   * 97195155320, ~409 KB): an android-emulator-runner job polling adb every
+   * 2s for a 600s boot timeout, producing near-identical lines, ending in
+   * the FATAL out-of-disk error that motivated this fix. Sized well past
+   * AC1's "at least 1 MB" floor (and past the original ~409 KB repro) while
+   * staying comfortably under MAX_LOG_BLOB_BYTES.
+   */
+  function buildLargeLogText(lineCount: number): string {
+    const lines: string[] = [];
+    for (let i = 0; i < lineCount; i++) {
+      lines.push(
+        `2026-08-23T15:0${i % 10}:00.000Z waiting for emulator to boot (attempt ${i})...`,
+      );
+    }
+    lines.push('FATAL: no space left on device');
+    return lines.join('\n');
+  }
+
+  it('ci_get_logs (fetchRunLogsRing) succeeds on a >=1MB job log, honoring maxLines (AC1)', async () => {
+    const text = buildLargeLogText(20_000);
+    expect(Buffer.byteLength(text, 'utf-8')).toBeGreaterThan(1024 * 1024);
+
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(buildStoredZipEntry('1_Boot emulator.txt', text)),
+    );
+
+    const result = await fetchRunLogsRing({ jobId: 97195155320 }, 400);
+
+    expect(result.lines).toHaveLength(400);
+    // The tail is preserved — the FATAL line (the actual repro's root cause)
+    // survives the ring buffer even though it's the very last of 20,001 lines.
+    expect(result.lines[result.lines.length - 1]).toBe(
+      'FATAL: no space left on device',
+    );
+  });
+
+  it('ci_search_logs (fetchRunLogs) succeeds on the same >=1MB job log via jobId (AC3)', async () => {
+    const text = buildLargeLogText(20_000);
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(buildStoredZipEntry('1_Boot emulator.txt', text)),
+    );
+
+    const result = await fetchRunLogs({ jobId: 97195155320 });
+
+    expect(result.text).toContain('FATAL: no space left on device');
+  });
+
+  it('errorSummary step-scoping finds the failing-step marker in a >=1MB log without ever decompressing the large successful step (AC4)', async () => {
+    const bulkSetupText = buildLargeLogText(20_000);
+    mockGithubGet.mockResolvedValue({
+      id: 97195155320,
+      name: 'android-emulator-runner',
+      status: 'completed',
+      conclusion: 'failure',
+      steps: [
+        {
+          name: 'Set up job',
+          status: 'completed',
+          conclusion: 'success',
+          number: 1,
+        },
+        {
+          name: 'Boot emulator',
+          status: 'completed',
+          conclusion: 'failure',
+          number: 2,
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(
+        Buffer.concat([
+          buildStoredZipEntry('1_Set up job.txt', bulkSetupText),
+          buildStoredZipEntry(
+            '2_Boot emulator.txt',
+            'FATAL: no space left on device\n',
+          ),
+        ]),
+      ),
+    );
+
+    const result = await fetchRunLogsRing(
+      { jobId: 97195155320 },
+      400,
+      () => false,
+    );
+
+    expect(result.lines.join('\n')).toContain('FATAL: no space left on device');
+    // Only the failing step (2) was in scope — the large successful setup
+    // step's content never entered the ring buffer.
+    expect(result.lines.join('\n')).not.toContain(
+      'waiting for emulator to boot',
+    );
+  });
+
+  it('fails with an explicit, actionable error naming the ceiling and the get_job_logs fallback instead of risking a bare gateway 502 (AC6)', async () => {
+    const oversized = Buffer.alloc(MAX_LOG_BLOB_BYTES + 1024, 'a');
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(oversized));
+
+    await expect(fetchRunLogsRing({ jobId: 97195155320 }, 400)).rejects.toThrow(
+      LogTooLargeError,
+    );
+    await expect(fetchRunLogsRing({ jobId: 97195155320 }, 400)).rejects.toThrow(
+      /mcp__github__get_job_logs/,
+    );
+  });
+
+  it('ci_search_logs (fetchRunLogs) also fails with the actionable ceiling error rather than an unbounded fetch (AC6)', async () => {
+    const oversized = Buffer.alloc(MAX_LOG_BLOB_BYTES + 1024, 'a');
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(oversized));
+
+    await expect(fetchRunLogs({ jobId: 97195155320 })).rejects.toThrow(
+      LogTooLargeError,
+    );
   });
 });
 
