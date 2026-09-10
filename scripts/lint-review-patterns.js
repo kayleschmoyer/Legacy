@@ -89,6 +89,7 @@ const PATTERNS = [
       /\.(ts|tsx)$/.test(f) &&
       (f.includes('e2e') || f.includes('spec') || f.includes('test')),
     severity: 'error',
+    skipInComments: true,
     description:
       'E2E tests must be hermetic — use route.fulfill() instead of route.continue()',
   },
@@ -279,36 +280,66 @@ function getChangedFiles() {
   }
 }
 
-// --- Get changed lines (added/modified only) for a file ---
-function getChangedLines(filePath) {
-  try {
-    const diff = execFileSync(
-      'git',
-      ['diff', '-U0', `${base}...HEAD`, '--', filePath],
-      { cwd: root, encoding: 'utf8' },
-    );
-    const lines = [];
-    let lineNum = 0;
-    for (const line of diff.split('\n')) {
-      const hunkMatch = line.match(/^@@\s+-\d+(?:,\d+)?\s+\+(\d+)/);
-      if (hunkMatch) {
-        lineNum = parseInt(hunkMatch[1], 10);
-        continue;
-      }
-      if (line.startsWith('+') && !line.startsWith('+++')) {
-        lines.push({ num: lineNum, text: line.slice(1) });
-        lineNum++;
-      } else if (!line.startsWith('-')) {
-        lineNum++;
-      }
+// --- Get the set of new-file line numbers that were added by the diff ---
+// Only line numbers are taken from the diff; the corresponding text is read
+// straight from the working tree (see getChangedLines) so a match can never
+// be produced from a deleted ('-') line's content — the diff is used purely
+// to scope which lines in the *current* file are new/changed.
+function getAddedLineNumbers(filePath) {
+  const diff = execFileSync(
+    'git',
+    ['diff', '-U0', `${base}...HEAD`, '--', filePath],
+    { cwd: root, encoding: 'utf8' },
+  );
+  const lineNumbers = [];
+  let lineNum = 0;
+  let inHunk = false;
+  for (const line of diff.split('\n')) {
+    const hunkMatch = line.match(/^@@\s+-\d+(?:,\d+)?\s+\+(\d+)/);
+    if (hunkMatch) {
+      lineNum = parseInt(hunkMatch[1], 10);
+      inHunk = true;
+      continue;
     }
-    return lines;
-  } catch {
-    // If diff fails, read the whole file as new
-    if (!existsSync(resolve(root, filePath))) return [];
-    const content = readFileSync(resolve(root, filePath), 'utf8');
-    return content.split('\n').map((text, i) => ({ num: i + 1, text }));
+    if (!inHunk) continue; // skip diff --git/index/---/+++ header lines
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      lineNumbers.push(lineNum);
+      lineNum++;
+    } else if (!line.startsWith('-')) {
+      lineNum++;
+    }
   }
+  return lineNumbers;
+}
+
+// --- Get changed lines (added/modified only) for a file, text from disk ---
+function getChangedLines(filePath) {
+  const absPath = resolve(root, filePath);
+  if (!existsSync(absPath)) return []; // file was deleted, nothing to lint
+
+  const fileLines = readFileSync(absPath, 'utf8').split('\n');
+
+  let addedLineNumbers;
+  try {
+    addedLineNumbers = getAddedLineNumbers(filePath);
+  } catch {
+    // If diff fails, treat the whole current file as changed.
+    return fileLines.map((text, i) => ({ num: i + 1, text }));
+  }
+
+  return addedLineNumbers
+    .filter((num) => num >= 1 && num <= fileLines.length)
+    .map((num) => ({ num, text: fileLines[num - 1] }));
+}
+
+// --- Is this line (from the current file) a comment line? ---
+function isCommentLine(text) {
+  const trimmed = text.trim();
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('*')
+  );
 }
 
 // --- Main ---
@@ -342,6 +373,7 @@ function main() {
       if (!pattern.fileFilter(file)) continue;
 
       for (const line of changedLines) {
+        if (pattern.skipInComments && isCommentLine(line.text)) continue;
         if (pattern.regex.test(line.text)) {
           violations.push({
             file,
