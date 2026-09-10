@@ -7,7 +7,7 @@ import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
-import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
+import { binJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -268,8 +268,6 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   // --max-warnings=0 matches the nx lint targetDefault ("eslint . --max-warnings=0",
   // nx.json), so this tool's verdict agrees with pc-lint's.
   const args = [
-    'exec',
-    'eslint',
     '--max-warnings=0',
     ...(mode === 'fix' ? ['--fix'] : []),
     ...files,
@@ -281,7 +279,12 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   // return a jobId to poll via nx_job_wait — never blocking into the ~60s
   // MCP transport timeout (LS-9594). Same job/jobId pattern as nx_run,
   // nx_run_test, and nx_run_pc_chunk.
-  const jobSpec = pnpmJobSpec(args);
+  //
+  // Invoked directly via the local .bin shim, NOT `pnpm exec eslint` — see
+  // binJobSpec's doc comment (LS-10021, LS-10022) for why `pnpm exec` cannot
+  // be trusted to honour `cwd: configDir` for a project directory without
+  // its own package.json.
+  const jobSpec = binJobSpec(cwd, 'eslint', args);
   const snapshot = await runJobWithBudget(
     {
       command: jobSpec.command,

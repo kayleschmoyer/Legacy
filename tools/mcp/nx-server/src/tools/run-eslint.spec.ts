@@ -118,13 +118,13 @@ describe('runESLint', () => {
 
     const result = await runESLint({ files: ['tools/a.ts'] });
 
-    expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
-      '--max-warnings=0',
-      'tools/a.ts',
-    ]);
+    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'tools/a.ts']);
     expect(jobCallOpts().cwd).toBe(ROOT);
+    // LS-10021: invoked as the local .bin shim directly, never via
+    // `pnpm exec` — see localBinJobSpec's doc comment for why.
+    expect(jobCallOpts().command).toBe(
+      resolve(ROOT, 'node_modules', '.bin', 'eslint'),
+    );
     expect(result.isError).toBeUndefined();
     expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
@@ -140,8 +140,6 @@ describe('runESLint', () => {
     await runESLint({ files: ['tools/a.ts', 'tools/b.ts'], mode: 'fix' });
 
     expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
       '--max-warnings=0',
       '--fix',
       'tools/a.ts',
@@ -275,8 +273,6 @@ describe('runESLint', () => {
     expect(result.isError).toBeUndefined();
     expect(jobCallOpts().cwd).toBe(worktree);
     expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
       '--max-warnings=0',
       'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts',
     ]);
@@ -307,12 +303,7 @@ describe('runESLint', () => {
     const result = await runESLint({ files: ['..foo/bar.ts'] });
 
     expect(result.isError).toBeUndefined();
-    expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
-      '--max-warnings=0',
-      '..foo/bar.ts',
-    ]);
+    expect(jobCallArgs()).toEqual(['--max-warnings=0', '..foo/bar.ts']);
   });
 
   it('rejects a path that only becomes hyphen-leading after relativisation', async () => {
@@ -405,7 +396,7 @@ describe('runESLint', () => {
     await runESLint({ files: ['tools/a.ts'] });
 
     expect(jobCallOpts().idempotencyKey).toBe(
-      `eslint:${ROOT}:exec eslint --max-warnings=0 tools/a.ts`,
+      `eslint:${ROOT}:--max-warnings=0 tools/a.ts`,
     );
   });
 
@@ -418,12 +409,7 @@ describe('runESLint', () => {
     const result = await runESLint({ files: ['lambdas/db/src/queries.ts'] });
 
     // cwd is lambdas/db — NOT the repo root — and the file is relativised to it.
-    expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
-      '--max-warnings=0',
-      'src/queries.ts',
-    ]);
+    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'src/queries.ts']);
     expect(jobCallOpts().cwd).toBe(DB);
     expect(JSON.parse(result.content[0].text)).toMatchObject({
       projectRoot: 'lambdas/db',
@@ -436,12 +422,7 @@ describe('runESLint', () => {
 
     await runESLint({ files: ['apps/web/src/App.tsx'] });
 
-    expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
-      '--max-warnings=0',
-      'src/App.tsx',
-    ]);
+    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'src/App.tsx']);
     expect(jobCallOpts().cwd).toBe(WEB);
   });
 
@@ -468,8 +449,6 @@ describe('runESLint', () => {
     await runESLint({ files: ['lambdas/db/src/queries.ts'] });
 
     expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
       '--max-warnings=0',
       'lambdas/db/src/queries.ts',
     ]);
@@ -486,8 +465,6 @@ describe('runESLint', () => {
 
     expect(result.isError).toBeUndefined();
     expect(jobCallArgs()).toEqual([
-      'exec',
-      'eslint',
       '--max-warnings=0',
       'scripts/modules-pool/link.mjs',
     ]);
