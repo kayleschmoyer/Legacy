@@ -5,9 +5,24 @@ import type { ToolResult } from '../types.js';
 interface ViewRunJobsParams {
   runId: number;
   attempt?: number;
-  filter?: 'failure' | 'success' | 'skipped' | 'cancelled' | 'in_progress';
+  filter?:
+    | 'failure'
+    | 'success'
+    | 'skipped'
+    | 'cancelled'
+    | 'in_progress'
+    | 'queued'
+    | 'pending';
   includeSteps?: boolean;
 }
+
+// Job *conclusion* values (failure/success/skipped/cancelled) only exist once
+// a job is done, so they filter on `job.conclusion`. These are job *status*
+// values instead — a job waiting for a runner to pick it up never has a
+// conclusion — so they filter on `job.status` the same way `in_progress`
+// already does (LS-9709: without this, finding the one stuck job in a large
+// job dump meant eyeballing the whole list for `status: "queued"` by hand).
+const STATUS_FILTERS = new Set(['in_progress', 'queued', 'pending']);
 
 interface GitHubJobStep {
   name: string;
@@ -71,7 +86,7 @@ export async function viewRunJobs(
     if (params.filter) {
       const f = params.filter;
       jobs = jobs.filter((j) =>
-        f === 'in_progress' ? j.status === 'in_progress' : j.conclusion === f,
+        STATUS_FILTERS.has(f) ? j.status === f : j.conclusion === f,
       );
     }
 

@@ -10,7 +10,7 @@
 
 GitHub Actions run triage: list/view runs, fetch and search logs, rerun failed jobs, and read Playwright reports.
 
-Available both locally (stdio) and via the hosted connector. 23 tools.
+Available both locally (stdio) and via the hosted connector. 24 tools.
 
 ---
 
@@ -95,6 +95,16 @@ Find Claude Code session JSONL files containing a substring (e.g. a Jira key, br
 | `project` | string |  | — | Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted. |
 | `includeSubagents` | boolean |  | — | Also scan subagent JSONLs under <sessionId>/subagents/ (default: true). |
 | `limit` | number |  | coerced, integer, > 0, max 500 | Maximum number of matches to return (default: 50, max: 500). Older matches are dropped first. |
+
+### `ci_force_cancel_run`
+
+Last resort for a run ci_cancel_run cannot actually evict — e.g. a job queued for a self-hosted runner that has already shut down, so GitHub has no runner left to deliver a graceful cancel signal to (LS-9709). Calls GitHub's POST .../force-cancel endpoint, which GitHub itself documents as a more disruptive last resort, so this refuses to run unless confirmNormalCancelFailed is explicitly true — always try ci_cancel_run({ runId }) first. Unlike a bare API call, this does not trust "request accepted" on its own: it polls the run afterward until it actually reaches a terminal state (or the poll budget runs out) and reports which — { status: "terminated" } only when the run is confirmed completed with conclusion "cancelled", { status: "cancelling", hint } if still not terminal (re-invoke to keep polling), or { status: "already-completed" } / { status: "completed-otherwise" } when there was nothing to force.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `runId` | number | **required** | coerced, integer, > 0 | Run ID to force-cancel. Use the "id" field from ci_list_runs output ("databaseId" is an alias). |
+| `confirmNormalCancelFailed` | boolean |  | — | Must be true to proceed. Set this only after ci_cancel_run({ runId }) has already been called for this run and the run is still not terminating. |
+| `maxWaitSeconds` | number |  | coerced, integer, min 0, max 20 | How long to poll for confirmed termination after force-cancelling (default/cap: 20s, this Lambda's own execution budget). If the run is still not terminal when the budget runs out, re-invoke with the same runId and confirmNormalCancelFailed: true to keep polling. |
 
 ### `ci_get_logs`
 
@@ -245,7 +255,7 @@ Prefer this over `gh run view --json jobs` via shell. List per-job name, status,
 | --- | --- | --- | --- | --- |
 | `runId` | number | **required** | coerced, integer, > 0 | Run ID |
 | `attempt` | number |  | coerced, integer, > 0 | Attempt number |
-| `filter` | enum |  | — | Filter jobs by conclusion (or "in_progress" for currently running jobs). Omit to return all jobs. |
+| `filter` | enum |  | — | Filter jobs by conclusion ("failure"/"success"/"skipped"/"cancelled"), or by status for jobs with no conclusion yet ("in_progress" for currently running jobs, "queued"/"pending" for jobs still waiting on a runner — e.g. finding a wedged job directly instead of eyeballing a full job dump). Omit to return all jobs. |
 | `includeSteps` | boolean |  | — | Include per-step breakdown for each job (default: false) |
 
 ### `ci_wait_run`

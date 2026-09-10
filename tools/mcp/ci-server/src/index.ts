@@ -10,6 +10,7 @@ import { ciViewRun } from './tools/ci-view-run.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { downloadArtifact } from './tools/download-artifact.js';
 import { findSession } from './tools/find-session.js';
+import { forceCancelRun } from './tools/force-cancel-run.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
@@ -314,6 +315,46 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    'ci_force_cancel_run',
+    'Last resort for a run ci_cancel_run cannot actually evict — e.g. a job queued for a self-hosted runner that ' +
+      'has already shut down, so GitHub has no runner left to deliver a graceful cancel signal to (LS-9709). ' +
+      "Calls GitHub's POST .../force-cancel endpoint, which GitHub itself documents as a more disruptive last " +
+      'resort, so this refuses to run unless confirmNormalCancelFailed is explicitly true — always try ' +
+      'ci_cancel_run({ runId }) first. Unlike a bare API call, this does not trust "request accepted" on its ' +
+      'own: it polls the run afterward until it actually reaches a terminal state (or the poll budget runs out) ' +
+      'and reports which — { status: "terminated" } only when the run is confirmed completed with conclusion ' +
+      '"cancelled", { status: "cancelling", hint } if still not terminal (re-invoke to keep polling), or ' +
+      '{ status: "already-completed" } / { status: "completed-otherwise" } when there was nothing to force.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'Run ID to force-cancel. Use the "id" field from ci_list_runs output ("databaseId" is an alias).',
+        ),
+      confirmNormalCancelFailed: coercedBoolean
+        .default(false)
+        .describe(
+          'Must be true to proceed. Set this only after ci_cancel_run({ runId }) has already been called for ' +
+            'this run and the run is still not terminating.',
+        ),
+      maxWaitSeconds: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(20)
+        .optional()
+        .describe(
+          "How long to poll for confirmed termination after force-cancelling (default/cap: 20s, this Lambda's " +
+            'own execution budget). If the run is still not terminal when the budget runs out, re-invoke with the ' +
+            'same runId and confirmNormalCancelFailed: true to keep polling.',
+        ),
+    },
+    async (params) => forceCancelRun(params),
+  );
+
+  server.tool(
     'ci_view_run',
     'Prefer this over `gh run view` via shell. View a CI run summary with jobs and conclusions. Pass runIds (1-50) instead of ' +
       'runId to inspect several runs independently in one call (e.g. checking CI across multiple PRs before merging) — attempt ' +
@@ -520,10 +561,21 @@ export function createServer(): McpServer {
         .optional()
         .describe('Attempt number'),
       filter: z
-        .enum(['failure', 'success', 'skipped', 'cancelled', 'in_progress'])
+        .enum([
+          'failure',
+          'success',
+          'skipped',
+          'cancelled',
+          'in_progress',
+          'queued',
+          'pending',
+        ])
         .optional()
         .describe(
-          'Filter jobs by conclusion (or "in_progress" for currently running jobs). Omit to return all jobs.',
+          'Filter jobs by conclusion ("failure"/"success"/"skipped"/"cancelled"), or by status for jobs with no ' +
+            'conclusion yet ("in_progress" for currently running jobs, "queued"/"pending" for jobs still waiting ' +
+            'on a runner — e.g. finding a wedged job directly instead of eyeballing a full job dump). Omit to ' +
+            'return all jobs.',
         ),
       includeSteps: coercedBoolean
         .default(false)
