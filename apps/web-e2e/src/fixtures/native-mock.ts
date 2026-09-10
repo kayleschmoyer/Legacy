@@ -26,9 +26,12 @@ import type { BackendMode, PlatformMode } from './dual';
 import type {
   SeededDiscoverySearch,
   SeededFootballLineup,
+  SeededLeague,
+  SeededLeagueWithMember,
   SeededPlayerPool,
   TestData,
 } from './test-data';
+import { createLeagueFixture } from '../mocks/graphql/league-fixture.mocks';
 import {
   publicLeaguesEmptyResponse,
   publicLeaguesResponse,
@@ -187,6 +190,39 @@ export class NativeMockTestData implements TestData {
       teamId: fixture.teamId,
       openSlot: fixture.openSlot,
       benchPlayer: fixture.benchPlayer,
+    });
+  }
+
+  /**
+   * Native-mock analogue of `MockTestData.league()`. Out of scope for this
+   * ticket's multi-actor fixture (LS-9736 covers the web dual lane only —
+   * there is no second native worker/server to share state with), but the
+   * `TestData` interface is implemented uniformly, so this seeds a
+   * single-worker league fixture the same way `footballLineup()` does above.
+   */
+  league(): Promise<SeededLeague> {
+    const fixture = createLeagueFixture();
+    for (const [op, handler] of Object.entries(fixture.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      inviteCode: fixture.inviteCode,
+      commissionerTeamId: fixture.commissioner.teamId,
+    });
+  }
+
+  leagueWithMember(): Promise<SeededLeagueWithMember> {
+    const fixture = createLeagueFixture();
+    for (const [op, handler] of Object.entries(fixture.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    const member = fixture.addMember();
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      inviteCode: fixture.inviteCode,
+      commissionerTeamId: fixture.commissioner.teamId,
+      memberTeamId: member.teamId,
     });
   }
 }

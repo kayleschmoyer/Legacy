@@ -1,5 +1,7 @@
 import {
   test as base,
+  type Browser,
+  type BrowserContextOptions,
   expect,
   type Page,
   type TestInfo,
@@ -13,12 +15,18 @@ import {
   NativeMockTestData,
   reverseForwardToDevice,
 } from './native-mock';
-import { LiveTestData, MockTestData, type TestData } from './test-data';
+import {
+  DualMockState,
+  LiveTestData,
+  MockTestData,
+  type TestData,
+} from './test-data';
 import {
   buildIntegrationStorageState,
   getAuthJwt,
   WEB_BASE,
 } from '../integration/fixtures/ui';
+import { loginAs } from '../utils/test-user-auth';
 import { DraftPage, LeaguePage, PlayersPage, RosterPage } from '../pages';
 import { NavHeader } from '../components';
 import {
@@ -80,6 +88,16 @@ export type PlatformMode = 'web' | 'native';
  */
 const IS_NATIVE_WORKER = process.env.E2E_DUAL_PLATFORM === 'native';
 
+/**
+ * Premium seat for `counterpartyPage`'s live identity (LS-9736). Seat 2 is
+ * the commissioner (`integration/fixtures/ui.ts`'s `getAuthJwt`); seats 1 and
+ * 3 are `managerJwt1`/`managerJwt2` there. Seat 4 keeps the counterparty
+ * distinct from both `ui.ts`'s managers and `LiveTestData.leagueWithMember()`'s
+ * own internal seat (3, see `test-data.ts`), so a test using all three
+ * concurrently never collides on one identity.
+ */
+const COUNTERPARTY_LIVE_SEAT = 4;
+
 export interface PlatformOptions {
   /**
    * Which platform driver this spec runs against. Set per project via
@@ -100,6 +118,23 @@ export interface DualFixtures {
   rosterPage: RosterPage;
   navHeader: NavHeader;
   _backendEnv: void;
+  /**
+   * A second authenticated page (LS-9736) — the multi-actor seam. Mock:
+   * another page/context on the hermetic baseline, isolated the same way
+   * `page` is. Live: a distinct premium manager identity, the
+   * `integration/fixtures/ui.ts`-`managerPage1` pattern. Use alongside
+   * `page`/`testData` for flows where a second identity must observe state
+   * the first one wrote (e.g. commissioner posts, manager reads).
+   */
+  counterpartyPage: Page;
+  /** `testData`'s counterpart, bound to {@link DualFixtures.counterpartyPage}. */
+  counterpartyTestData: TestData;
+  /**
+   * Cross-page shared mock state (LS-9736) — see `test-data.ts`'s
+   * `DualMockState`. Test-scoped so `testData` and `counterpartyTestData`
+   * observe the SAME stateful fixtures (e.g. `league()`) within one test.
+   */
+  _dualMockState: DualMockState;
 }
 
 /** Worker-scoped fixtures (one per Playwright worker process). */
@@ -270,13 +305,108 @@ export const test = base.extend<
         await use(new NativeMockTestData(nativeMockServer));
       }
     : async (
-        { backend, page }: { backend: BackendMode; page: Page },
+        {
+          backend,
+          page,
+          browser,
+          _dualMockState,
+        }: {
+          backend: BackendMode;
+          page: Page;
+          browser: Browser;
+          _dualMockState: DualMockState;
+        },
         use: (testData: TestData) => Promise<void>,
       ) => {
         await use(
-          backend === 'mock' ? new MockTestData(page) : new LiveTestData(),
+          backend === 'mock'
+            ? new MockTestData(page, _dualMockState)
+            : new LiveTestData(page, browser),
         );
       },
+
+  /**
+   * Cross-page shared mock state (LS-9736) — one instance per test, handed to
+   * both `testData` and `counterpartyTestData` below so their `MockTestData`s
+   * observe the SAME stateful fixtures. Cheap to construct unconditionally;
+   * live-mode tests simply never read from it.
+   */
+  _dualMockState: async ({}, use: (state: DualMockState) => Promise<void>) => {
+    await use(new DualMockState());
+  },
+
+  /**
+   * A second authenticated page (LS-9736 multi-actor seam). Mock mode gets
+   * its own context on the SAME hermetic baseline `page` uses (so it starts
+   * authenticated identically) with its own independent api-isolation
+   * installation — isolation is a `page.route()` concern, so it must be
+   * installed per-page. Live mode authenticates a distinct premium manager
+   * identity, mirroring `integration/fixtures/ui.ts`'s `managerPage1`.
+   */
+  counterpartyPage: async (
+    {
+      backend,
+      browser,
+      storageState,
+      baseURL,
+    }: {
+      backend: BackendMode;
+      browser: Browser;
+      storageState: BrowserContextOptions['storageState'];
+      baseURL: string | undefined;
+    },
+    use: (page: Page) => Promise<void>,
+    testInfo: TestInfo,
+  ) => {
+    if (backend === 'live') {
+      const jwt = await loginAs('premium', COUNTERPARTY_LIVE_SEAT);
+      const counterpartyContext = await browser.newContext({
+        baseURL: WEB_BASE,
+        storageState: buildIntegrationStorageState(jwt),
+      });
+      try {
+        const counterpartyPage = await counterpartyContext.newPage();
+        await use(counterpartyPage);
+      } finally {
+        await counterpartyContext.close();
+      }
+      return;
+    }
+    const counterpartyContext = await browser.newContext({
+      baseURL,
+      storageState,
+    });
+    try {
+      const counterpartyPage = await counterpartyContext.newPage();
+      await withApiIsolation(counterpartyPage, testInfo, async () => {
+        await use(counterpartyPage);
+      });
+    } finally {
+      await counterpartyContext.close();
+    }
+  },
+
+  /** `testData`'s counterpart, bound to `counterpartyPage` (LS-9736). */
+  counterpartyTestData: async (
+    {
+      backend,
+      counterpartyPage,
+      browser,
+      _dualMockState,
+    }: {
+      backend: BackendMode;
+      counterpartyPage: Page;
+      browser: Browser;
+      _dualMockState: DualMockState;
+    },
+    use: (testData: TestData) => Promise<void>,
+  ) => {
+    await use(
+      backend === 'mock'
+        ? new MockTestData(counterpartyPage, _dualMockState)
+        : new LiveTestData(counterpartyPage, browser),
+    );
+  },
 
   /**
    * Platform driver — a *project* decision (ADR-0016), not a spec decision.

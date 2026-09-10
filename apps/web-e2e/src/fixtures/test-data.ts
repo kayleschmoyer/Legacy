@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 
 import {
   extractOperationName,
@@ -6,6 +6,10 @@ import {
   unmockedGraphQLFallback,
 } from './shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import {
+  createLeagueFixture,
+  type LeagueFixture,
+} from '../mocks/graphql/league-fixture.mocks';
 import {
   publicLeaguesEmptyResponse,
   publicLeaguesResponse,
@@ -17,6 +21,15 @@ import {
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
 import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
+import { gqlFetch } from '../integration/helpers/gql-fetch';
+import { createLeagueViaUI } from '../integration/helpers/create-league';
+import { joinLeagueAsManager } from '../integration/helpers/wait-for-join-page';
+import {
+  buildIntegrationStorageState,
+  getAuthJwt,
+  WEB_BASE,
+} from '../integration/fixtures/ui';
+import { loginAs } from '../utils/test-user-auth';
 
 /**
  * TestData — the backend-agnostic data-precondition seam (ADR-0016).
@@ -76,6 +89,57 @@ export interface SeededFootballLineup {
   };
 }
 
+/**
+ * A league the viewer (commissioner) owns — the base rung of the seeded-league
+ * verb ladder (LS-9736). No members beyond the commissioner, no draft.
+ */
+export interface SeededLeague {
+  /** League to navigate to (`/baseball/league/:leagueId`). */
+  leagueId: number;
+  /** Invite code a second identity can join with. */
+  inviteCode: string;
+  /** The commissioner's own team in the league. */
+  commissionerTeamId: number;
+}
+
+/**
+ * A {@link SeededLeague} with a second identity already joined — the
+ * precondition a multi-actor spec (commissioner + one manager, no draft)
+ * builds on. Deeper ladder rungs (`draftedLeague()`, `seasonActiveMatchup()`,
+ * etc.) are explicitly out of scope for this ticket; each future
+ * spec-migration ticket adds what it specifically needs on top of this base.
+ */
+export interface SeededLeagueWithMember extends SeededLeague {
+  /** The joined member's team in the league. */
+  memberTeamId: number;
+}
+
+/**
+ * Cross-page shared mock state for dual-mode multi-actor specs (LS-9736).
+ *
+ * `MockTestData` normally owns no state beyond the `page.route()` closures it
+ * installs — each instance is scoped to one `Page`. Stateful preconditions
+ * that TWO pages must observe *consistently* (e.g. `league()` /
+ * `leagueWithMember()`, used by both the primary `testData` and the
+ * `counterpartyPage`/`counterpartyTestData` multi-actor fixtures — see
+ * `fixtures/dual.ts`) need a fixture object that outlives any single page's
+ * route closures. This container holds that object: both `MockTestData`
+ * instances are constructed with the SAME `DualMockState` (one per test, via
+ * `fixtures/dual.ts`), so a write made through one page's handlers is visible
+ * to the other's reads — the same shared-handler-map shape
+ * `native-mock.ts`'s `GraphQLMockServer` uses for the native lane, applied
+ * here to two `page.route()` consumers instead of one out-of-process server.
+ */
+export class DualMockState {
+  #league?: LeagueFixture;
+
+  /** The test's shared league fixture, created on first call. */
+  league(): LeagueFixture {
+    this.#league ??= createLeagueFixture();
+    return this.#league;
+  }
+}
+
 export interface TestData {
   readonly mode: 'mock' | 'live';
 
@@ -121,15 +185,46 @@ export interface TestData {
    * (see LS-9655 "Out of Scope").
    */
   footballLineup(): Promise<SeededFootballLineup>;
+
+  /**
+   * Ensure a league exists that the viewer (commissioner) owns, with no
+   * other members and no draft — the base rung of the seeded-league verb
+   * ladder (LS-9736). Mock: installs a stateful league fixture shared with
+   * any other `TestData` pointed at the same `DualMockState` (see
+   * {@link DualMockState}). Live: creates the league via the real UI
+   * (`integration/helpers/create-league.ts`), same identity path as the
+   * `shared-live` project's commissioner.
+   */
+  league(): Promise<SeededLeague>;
+
+  /**
+   * Ensure a {@link league} exists with a second identity already joined —
+   * the precondition nearly every multi-actor integration spec starts from.
+   * Mock: reuses the same stateful league fixture, pre-seeding one joined
+   * member. Live: creates the league, then joins a distinct manager identity
+   * via `integration/helpers/wait-for-join-page.ts`'s
+   * `joinLeagueAsManager` (slow — minutes — acceptable for nightly cadence,
+   * the same tradeoff `footballLineup()`'s sibling verbs already make).
+   */
+  leagueWithMember(): Promise<SeededLeagueWithMember>;
 }
 
 /** Hermetic implementation — preconditions become `route.fulfill()` mocks. */
 export class MockTestData implements TestData {
   readonly mode = 'mock' as const;
   readonly #page: Page;
+  readonly #shared: DualMockState;
 
-  constructor(page: Page) {
+  /**
+   * `shared` defaults to a fresh, single-page-only `DualMockState` so every
+   * existing call site (`new MockTestData(page)`) keeps working unchanged.
+   * Pass the SAME instance across two `MockTestData`s (one per `Page`) to
+   * make `league()`/`leagueWithMember()` observe consistent state — see
+   * {@link DualMockState} and `fixtures/dual.ts`.
+   */
+  constructor(page: Page, shared: DualMockState = new DualMockState()) {
     this.#page = page;
+    this.#shared = shared;
   }
 
   async playerPool(): Promise<SeededPlayerPool> {
@@ -267,6 +362,53 @@ export class MockTestData implements TestData {
       benchPlayer: fixture.benchPlayer,
     };
   }
+
+  async league(): Promise<SeededLeague> {
+    const fixture = this.#shared.league();
+    await this.#installLeagueRoutes(fixture);
+    return {
+      leagueId: fixture.leagueId,
+      inviteCode: fixture.inviteCode,
+      commissionerTeamId: fixture.commissioner.teamId,
+    };
+  }
+
+  async leagueWithMember(): Promise<SeededLeagueWithMember> {
+    const fixture = this.#shared.league();
+    await this.#installLeagueRoutes(fixture);
+    const member =
+      fixture.members().find((m) => m.userId !== fixture.commissioner.userId) ??
+      fixture.addMember();
+    return {
+      leagueId: fixture.leagueId,
+      inviteCode: fixture.inviteCode,
+      commissionerTeamId: fixture.commissioner.teamId,
+      memberTeamId: member.teamId,
+    };
+  }
+
+  /**
+   * Point this page's `page.route()` at the shared fixture's handler map —
+   * pure transport, same shape as `footballLineup()` above. Idempotent to
+   * call more than once per page (Playwright routes match LIFO; the last
+   * registration wins), so `league()` and `leagueWithMember()` can both call
+   * it freely.
+   */
+  async #installLeagueRoutes(fixture: LeagueFixture): Promise<void> {
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const handler =
+        fixture.handlers[extractOperationName(route).toLowerCase()];
+      if (!handler) {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(handler(extractOperationVariables(route))),
+      });
+    });
+  }
 }
 
 /**
@@ -288,8 +430,48 @@ export const FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON =
  * verbs that must create state should issue real GraphQL mutations here (see
  * `integration/helpers/create-league.ts` for the established pattern).
  */
+/**
+ * Surfaced verbatim when `league()`/`leagueWithMember()` are called on a
+ * `LiveTestData` built without the arguments they need — the live analogue of
+ * {@link FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON}, except these verbs ARE
+ * live-capable; the constructor arguments are just missing.
+ */
+export const LEAGUE_LIVE_REQUIRES_PAGE_REASON =
+  'TestData.league() needs a real browser page to drive league creation ' +
+  '(integration/helpers/create-league.ts) — this LiveTestData was ' +
+  'constructed without one.';
+
+/**
+ * Premium seat for `LiveTestData.leagueWithMember()`'s internal member
+ * identity. Seat 2 is the commissioner (`integration/fixtures/ui.ts`'s
+ * `getAuthJwt`); seat 1 is `managerJwt1` there. Seat 3 keeps this verb's
+ * temporary identity distinct from `fixtures/dual.ts`'s `counterpartyPage`
+ * (seat 4), so a test using both concurrently never collides.
+ */
+const LEAGUE_WITH_MEMBER_LIVE_SEAT = 3;
+
+export const LEAGUE_WITH_MEMBER_LIVE_REQUIRES_BROWSER_REASON =
+  "TestData.leagueWithMember() needs a Browser to open a second identity's " +
+  'context for the join (integration/helpers/wait-for-join-page.ts) — this ' +
+  'LiveTestData was constructed without one.';
+
 export class LiveTestData implements TestData {
   readonly mode = 'live' as const;
+  readonly #page?: Page;
+  readonly #browser?: Browser;
+
+  /**
+   * `page`/`browser` are optional because most existing verbs (the read-only
+   * MLB-history ones) need neither. `league()` needs `page` (to drive the
+   * real create-league UI as the identity already authenticated on it);
+   * `leagueWithMember()` additionally needs `browser` (to open a second,
+   * distinct identity's context for the join) — see
+   * `fixtures/dual.ts` for how both are wired in.
+   */
+  constructor(page?: Page, browser?: Browser) {
+    this.#page = page;
+    this.#browser = browser;
+  }
 
   playerPool(): Promise<SeededPlayerPool> {
     // The live MLB history dataset always contains the all-time greats; Barry
@@ -324,4 +506,64 @@ export class LiveTestData implements TestData {
     // review (LS-9655 "Out of Scope").
     throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
   }
+
+  async league(): Promise<SeededLeague> {
+    if (!this.#page) {
+      throw new Error(LEAGUE_LIVE_REQUIRES_PAGE_REASON);
+    }
+    const leagueName = `E2E Dual League ${Date.now()}`;
+    const { leagueId, inviteCode } = await createLeagueViaUI(this.#page, {
+      leagueName,
+    });
+    const commissionerJwt = await getAuthJwt();
+    const commissionerTeamId = await fetchUserTeamId(commissionerJwt, leagueId);
+    return { leagueId, inviteCode, commissionerTeamId };
+  }
+
+  async leagueWithMember(): Promise<SeededLeagueWithMember> {
+    if (!this.#browser) {
+      throw new Error(LEAGUE_WITH_MEMBER_LIVE_REQUIRES_BROWSER_REASON);
+    }
+    const league = await this.league();
+
+    // A distinct premium identity, the same "one dedicated page per
+    // identity" pattern `integration/fixtures/ui.ts`'s `managerPage1`
+    // establishes — but scoped to this verb's own lifetime rather than the
+    // whole test, since the seam only needs this identity long enough to
+    // join and be read back.
+    const memberJwt = await loginAs('premium', LEAGUE_WITH_MEMBER_LIVE_SEAT);
+    const memberContext = await this.#browser.newContext({
+      baseURL: WEB_BASE,
+      storageState: buildIntegrationStorageState(memberJwt),
+    });
+    try {
+      const memberPage = await memberContext.newPage();
+      await joinLeagueAsManager(memberPage, {
+        jwt: memberJwt,
+        inviteCode: league.inviteCode,
+        teamName: `E2E Dual Member ${Date.now()}`,
+      });
+      const memberTeamId = await fetchUserTeamId(memberJwt, league.leagueId);
+      return { ...league, memberTeamId };
+    } finally {
+      await memberContext.close();
+    }
+  }
+}
+
+/** Resolve the calling identity's team in `leagueId` after creating/joining it. */
+async function fetchUserTeamId(jwt: string, leagueId: number): Promise<number> {
+  const { userTeamId } = await gqlFetch<{ userTeamId: number | null }>(
+    jwt,
+    `query GetUserTeamIdForSeededLeague($leagueId: Int!) { userTeamId(leagueId: $leagueId) }`,
+    { leagueId },
+  );
+  if (userTeamId == null) {
+    throw new Error(
+      `userTeamId(leagueId: ${leagueId}) returned null for the seeded-league ` +
+        'fixture — the create/join mutation may not have propagated to the ' +
+        'read path yet.',
+    );
+  }
+  return userTeamId;
 }
