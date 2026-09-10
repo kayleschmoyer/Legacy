@@ -301,7 +301,21 @@ test.describe('Player Statistics Page @regression', () => {
     // GraphQL responds. LS-3785's Combined view renders batting + pitching
     // grids, each with its own loading-indicator testid — scope to the
     // batting grid to avoid a strict-mode collision.
-    await playersPage.stats.expectLoadingIndicator();
+    //
+    // LS-9760: expectLoadingIndicator()'s 5 s default shares its budget with
+    // page mount + the initial GraphQL round-trip, not just the polling
+    // window — on the self-hosted runner's 3-worker shards that budget is
+    // occasionally consumed by render-thread contention from CPU-heavy
+    // neighbors landing in the same shard (shard 3 concentrates
+    // view-game-logs-perf.spec.ts's perf-budget assertions and the
+    // websocket-realtime-updates.spec.ts family alongside this file, purely
+    // as a side effect of Playwright's alphabetical, unweighted --shard
+    // split — see the "E2E: native Playwright --shard" comment in
+    // run-playwright-tests.yml). Matching the 10 s budget already given to
+    // the post-load assertion below removes the false-timeout margin
+    // without masking a genuinely broken render (a locator that never
+    // becomes visible still fails, just after 10 s instead of 5 s).
+    await playersPage.stats.expectLoadingIndicator(10000);
 
     // Verify page content is loaded — the retrying assertion outlasts the 2 s
     // mock delay, so no load-state gate is needed (networkidle is banned,
@@ -334,6 +348,10 @@ test.describe('Player Statistics Page @regression', () => {
     // LS-3785's Combined view renders batting + pitching grids, each with its
     // own error-message testid — scope to the batting grid to avoid a
     // strict-mode collision.
-    await playersPage.stats.expectGridError();
+    //
+    // LS-9760: same shard-3 contention margin as expectLoadingIndicator()
+    // above — bump from the 5 s default to 10 s so page mount + the error
+    // round-trip aren't racing a render-thread-starved worker.
+    await playersPage.stats.expectGridError(10000);
   });
 });
