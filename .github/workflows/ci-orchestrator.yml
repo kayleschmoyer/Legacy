@@ -417,14 +417,26 @@ jobs:
       # LS-4182: Idempotency guard — if every required context is already green
       # for this exact SHA, skip the CI Pipeline re-run. A second approved-review
       # submission for an unchanged SHA (a human approval after the bot's, or a
-      # bot re-approval — the only events that reach this guard, since the
-      # workflow fires on `submitted` + `state == approved`) must not spawn a
-      # duplicate pipeline or let a flaky re-run flip a green CI Gate status.
-      # The required set mixes a check-RUN context (Verify All Migrations
-      # Applied) and commit-STATUS contexts (bot-review, No Merge Conflicts
-      # since LS-9604, CI Gate — marked _commitStatus in ruleset.json), so the
-      # guard evaluates each kind against its own API. Fail-safe direction: on
-      # any read error or doubt, re-run CI.
+      # bot re-approval) must not spawn a duplicate pipeline or let a flaky
+      # re-run flip a green CI Gate status. The required set mixes a check-RUN
+      # context (Verify All Migrations Applied) and commit-STATUS contexts
+      # (bot-review, No Merge Conflicts since LS-9604, CI Gate — marked
+      # _commitStatus in ruleset.json), so the guard evaluates each kind against
+      # its own API. Fail-safe direction: on any read error or doubt, re-run CI.
+      #
+      # LS-9580: this guard used to run only on `pull_request_review`, so the
+      # `ci:run` label handler's `workflow_dispatch` (ci-run-label.yml) had no
+      # idempotency check at all — dispatching it on a PR that a synchronize
+      # push had already queued/started CI for spawned a fully parallel second
+      # pipeline (observed alongside a third from the approval event: three
+      # complete orchestrator runs on one SHA, PR #7235). Running this guard on
+      # `workflow_dispatch` too means `ci-already-passed` (and therefore the
+      # ci-pipeline job's `if`, which already gates on this output regardless
+      # of event) skips the redundant dispatch instead of racing it.
+      # workflow_dispatch carries no `pull_request` payload, so PR number and
+      # head SHA come from the "🔗 Resolve PR Context" step above; a
+      # repo-wide dispatch (no pr_number given) has nothing to de-duplicate
+      # against and always re-runs CI (fail-safe).
       #
       # LS-8682: the `pull_request_review` event payload's `pull_request.head.sha`
       # can be stale relative to the PR's true current head when a push and an
@@ -437,8 +449,11 @@ jobs:
       # head via the API and evaluate against that, not the payload snapshot.
       - name: "🔍 Check for prior CI success"
         id: check-prior-success
-        if: github.event_name == 'pull_request_review'
+        if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RESOLVED_PR_NUMBER: ${{ steps.resolve-pr-context.outputs.pr-number }}
+          RESOLVED_HEAD_SHA: ${{ steps.resolve-pr-context.outputs.head-sha }}
         with:
           script: |
             const fs = require('fs');
@@ -449,17 +464,34 @@ jobs:
             // is the ephemeral test-merge commit (refs/pull/N/merge), NOT the PR head.
             // CI check runs are attached to the PR head, so we must look them up by the
             // head SHA or this guard never finds the prior-success checks and CI re-runs
-            // on every approval (LS-7736). Falls back to context.sha for events with no
-            // pull_request payload, though this step only runs on
-            // pull_request_review.
-            let sha = context.payload.pull_request?.head?.sha ?? context.sha;
+            // on every approval (LS-7736).
+            //
+            // workflow_dispatch (the ci:run label handler) carries no
+            // `pull_request` payload at all — resolve PR number and head SHA
+            // from the "🔗 Resolve PR Context" step's outputs instead. If that
+            // step didn't resolve a PR (repo-wide dispatch with no pr_number),
+            // there is no SHA to de-duplicate against, so fall through to
+            // running CI (fail-safe).
+            let prNumber = context.payload.pull_request?.number;
+            let sha = context.payload.pull_request?.head?.sha;
 
-            // LS-8682: the payload SHA above can be stale — re-fetch the PR's live
-            // head and prefer it. This guarantees the checks/statuses looked up
-            // below (and therefore ci-already-passed) always reflect the PR's
-            // actual current head, never a superseded one from a race between a
-            // push and this approval event.
-            const prNumber = context.payload.pull_request?.number;
+            if (context.eventName === 'workflow_dispatch') {
+              prNumber = process.env.RESOLVED_PR_NUMBER ? Number(process.env.RESOLVED_PR_NUMBER) : undefined;
+              sha = process.env.RESOLVED_HEAD_SHA || undefined;
+              if (!prNumber || !sha) {
+                core.info('check-prior-success: workflow_dispatch has no resolved PR context — nothing to de-duplicate against, running CI.');
+                core.setOutput('ci-already-passed', 'false');
+                return;
+              }
+            }
+
+            sha = sha ?? context.sha;
+
+            // LS-8682: the payload/resolved SHA above can be stale — re-fetch the
+            // PR's live head and prefer it. This guarantees the checks/statuses
+            // looked up below (and therefore ci-already-passed) always reflect
+            // the PR's actual current head, never a superseded one from a race
+            // between a push and this event.
             if (prNumber) {
               try {
                 const { data: livePr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
