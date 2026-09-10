@@ -9,6 +9,12 @@
  *  - Screen reader announcements (aria-live regions present; route change dispatch)
  *  - Mobile menu aria-expanded + Escape close
  *  - Reduced-motion preference respected
+ *
+ * E2E-selection note (LS-9994): this spec only visits /about and /help, but
+ * its assertions target global shell chrome (skip link, nav landmarks,
+ * mobile menu) that the graph-derived surface map already reaches for every
+ * spec via the app-shell eager closure — no RUN_ALL_CORE-style exception is
+ * needed. See e2e-change-safety.md Part 2 for the full rationale.
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';

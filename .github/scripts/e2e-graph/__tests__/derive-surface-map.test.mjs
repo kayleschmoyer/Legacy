@@ -234,6 +234,18 @@ describe('extractRoutes', () => {
     assert.deepEqual(r.unresolved, []);
   });
 
+  it('skips default-value method declarations with no type annotation (LS-9994)', () => {
+    // players.page.ts's own `goto(query = '')` matched the bare-goto call
+    // shape and, lacking a `:` type annotation, fell through the
+    // declaration guard as an unresolved `query` identifier — propagating
+    // a warning to every spec that imports the page object (~100 specs).
+    const r = extractRoutes(
+      "async goto(query = ''): Promise<void> {\n  await this.driver.open(`/players?sport=nfl${query}`);\n}",
+    );
+    assert.deepEqual(r.routes, []);
+    assert.deepEqual(r.unresolved, []);
+  });
+
   it('reports genuinely unresolvable goto arguments', () => {
     const r = extractRoutes('await page.goto(someUrlFromNowhere);');
     assert.deepEqual(r.unresolved, ['someUrlFromNowhere']);
@@ -357,7 +369,19 @@ describe('derive() on the mini fixture repo', () => {
       'apps/web-e2e/src/tests/about.spec.ts',
       'apps/web-e2e/src/tests/draft.spec.ts',
       'apps/web-e2e/src/tests/loop.spec.ts',
+      'apps/web-e2e/src/tests/redirect.spec.ts',
     ]);
+  });
+
+  it('a spec that only visits a pure <Navigate> redirect route reaches the destination page (LS-9994)', () => {
+    // /home renders <Navigate to="/" replace /> and nothing else.
+    // resolveComponentSpecifiers('Navigate', …) always returns [] (it's a
+    // react-router-dom export), so without redirect-following /home's own
+    // route entry would carry zero files and a spec that only ever visits
+    // it would never reach "/"'s real destination (HomeScreen -> AboutTeaser
+    // -> AboutPage) — the faq-page.spec.ts residual finding in real life.
+    const redirect = manifest.specs['apps/web-e2e/src/tests/redirect.spec.ts'];
+    assert.ok(redirect.includes('apps/web/src/pages/about/AboutPage.tsx'));
   });
 
   it('emits the hand-maintained runAllWhenChanged core', () => {

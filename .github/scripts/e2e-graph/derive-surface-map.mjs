@@ -487,8 +487,13 @@ const CONST_STRING_RE = (name) =>
 function normalizeRouteArg(raw) {
   const trimmed = raw.trim();
   if (trimmed === '') return null;
-  // `async goto(leagueId: number)` — a method DECLARATION, not a call.
-  if (/^[\w$]+\s*\??\s*:/.test(trimmed)) return null;
+  // A method DECLARATION, not a call: `async goto(leagueId: number)` (typed
+  // param) or `async goto(query = '')` (default-value param, no type
+  // annotation — LS-9994: players.page.ts's own `goto` method matched this
+  // shape and was misread as an unresolvable call argument named `query`,
+  // propagating an "unresolved goto argument" warning to every spec that
+  // imports the page object, ~100 specs in practice).
+  if (/^[\w$]+\s*\??\s*(?::|=(?!=))/.test(trimmed)) return null;
   const first = trimmed[0];
   if (first === "'" || first === '"') {
     const m = trimmed.match(/^(['"])((?:\\.|(?!\1).)*?)\1/);
@@ -647,7 +652,22 @@ export function parseRouteTable(appSource) {
       : `/${pathMatch[1]}`;
     const idents = new Set();
     for (const t of head.matchAll(/<([A-Z]\w*)/g)) idents.add(t[1]);
-    routes.push({ pattern, components: [...idents] });
+    // A pure `<Navigate to="LITERAL" />` element mounts nothing of its own —
+    // resolveComponentSpecifiers('Navigate', …) always returns [] (it's a
+    // react-router-dom export, not a local module) — so without this the
+    // route's own file set is silently empty and the REAL destination
+    // page's closure (e.g. /faq -> Navigate to="/pricing" -> PricingPage)
+    // never gets attributed to any spec that only ever visits the alias
+    // (LS-9994 residual finding: faq-page.spec.ts). Record the literal
+    // target so derive() can fold the destination route's files in below;
+    // a dynamic `to={...}` target is left unresolved, same conservatism as
+    // an unresolvable goto() argument.
+    const navMatch = head.match(/<Navigate\s+to\s*=\s*["']([^"']+)["']/);
+    routes.push({
+      pattern,
+      components: [...idents],
+      redirectTo: navMatch ? navMatch[1] : null,
+    });
   }
 
   return { routes, componentModules, localBodies };
@@ -763,7 +783,40 @@ export function derive({ repoRoot }) {
         if (rel) files.add(rel);
       }
     }
-    routeEntries.push({ pattern, files: [...files] });
+    routeEntries.push({
+      pattern,
+      files: [...files],
+      redirectTo:
+        table.routes.find((r) => r.pattern === pattern)?.redirectTo ?? null,
+    });
+  }
+
+  // Fold pure-redirect routes' files in from their destination (bounded hop
+  // count guards against a redirect cycle — none exist today, but a future
+  // one should degrade to an empty file set, not hang).
+  for (const entry of routeEntries) {
+    if (entry.files.length > 0 || !entry.redirectTo) continue;
+    const seenPatterns = new Set([entry.pattern]);
+    let target = entry.redirectTo;
+    for (let hop = 0; hop < 5 && target; hop++) {
+      const destEntries = routeEntries.filter(
+        (r) =>
+          r !== entry &&
+          !seenPatterns.has(r.pattern) &&
+          routeMatches(r.pattern, target),
+      );
+      if (destEntries.length === 0) break;
+      const filesFromDest = new Set(entry.files);
+      let nextTarget = null;
+      for (const dest of destEntries) {
+        seenPatterns.add(dest.pattern);
+        for (const f of dest.files) filesFromDest.add(f);
+        if (dest.redirectTo && !nextTarget) nextTarget = dest.redirectTo;
+      }
+      entry.files = [...filesFromDest];
+      if (entry.files.length > 0) break;
+      target = nextTarget;
+    }
   }
   const allPageEntryFiles = [...new Set(routeEntries.flatMap((r) => r.files))];
 
