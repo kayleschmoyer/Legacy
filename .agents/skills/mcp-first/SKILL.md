@@ -16,6 +16,8 @@ metadata:
 >
 > `ci_audit_session_bash`'s `auditMode` report detects the auto-mode directive in the session transcript and excludes the resulting FILE-READ/GREP-class `missing-awareness` findings (`find`/`grep`/`sed -n`/`tail`/`wc -l`) from `action_required`, surfacing them instead under `informational.auto_mode_excluded` — those calls are expected behavior in that mode, not a real awareness gap. Findings for domain-operation gaps (missing `make`/`nx`/`gh`/`jira`/`db` coverage, etc.) are never excluded by this — the carve-out only ever touches the plain-file-read/search class.
 
+> **Label changes on a PR/issue**: use `github_manage_labels` (genuinely additive add/remove, safe no-op, works on PRs) — never `issue_write`'s full-set-replace, which can race-clobber a concurrently-removed `merge-when-ready`. Full guidance: [auth-and-routing.md § Label Change Routing](references/auth-and-routing.md#label-changes--always-additive-never-replace-semantics-ls-9715).
+
 ## Sub-skills (references)
 
 | Topic                                                                                             | Load                                                                                                                                                                                                                                                                                                                                                                                                           |
