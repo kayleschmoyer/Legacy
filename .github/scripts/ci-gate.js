@@ -142,6 +142,25 @@ const CONCLUSIONS_THAT_POST_NO_VERDICT = Object.freeze([
 ]);
 
 /**
+ * Workflow-run `status` values meaning "no job has started yet" (LS-9754).
+ * GitHub's run-status enum is `queued | in_progress | completed | waiting |
+ * requested | pending` — a run blocked on a workflow-level `concurrency:`
+ * group can surface as any of `queued`, `pending`, `waiting`, or `requested`
+ * depending on exactly why it hasn't started (observed as `pending`, not
+ * `queued`, for a run blocked behind the orchestrator's head-SHA-keyed
+ * concurrency slot on PR #7830 itself). `in_progress` is deliberately
+ * excluded — an already-executing sibling has genuinely started and may
+ * finish and post before this run does, so it must still be treated as
+ * superseding.
+ */
+const NOT_YET_STARTED_RUN_STATUSES = new Set([
+  'queued',
+  'pending',
+  'waiting',
+  'requested',
+]);
+
+/**
  * The orchestrator's `ci-pipeline` job name (`name:` in ci-orchestrator.yml) —
  * the caller job for the reusable `.github/workflows/ci-pipeline.yml`, and the
  * only job in a run that can reach the `summarize` post step.
@@ -439,6 +458,43 @@ async function assertSuccessIsCurrent({
           supersededBy: candidate.id,
         };
       }
+      // LS-9754: a candidate sitting in a NOT_YET_STARTED_RUN_STATUS has not
+      // started a single job — the orchestrator's `concurrency:` block is
+      // workflow-level, so a run blocked on it has not even begun evaluating
+      // jobs, let alone run any CI. GitHub surfaces this pre-start state as
+      // `queued`, `pending`, `waiting`, or `requested` depending on exactly
+      // why the run hasn't started (concurrency-group contention observed as
+      // `pending` on PR #7830 itself, not `queued` — see below); `in_progress`
+      // is excluded from this set deliberately; see its own case below. Since
+      // LS-9754 keyed that concurrency group on head SHA, a not-yet-started
+      // sibling for THIS SAME SHA is guaranteed to be blocked behind this
+      // run's own concurrency slot — it cannot be executing concurrently and
+      // will only start once this run finishes. Treating it as superseding
+      // here withholds this run's genuine green verdict for nothing: the
+      // blocked run's own `check-prior-success` guard has no posted `CI Gate`
+      // to see once it finally starts, so it dispatches a full, redundant
+      // sequential re-run of the entire pipeline before it can post anything
+      // itself — replacing the parallel-duplicate waste LS-9754 fixed with a
+      // sequential-duplicate one. Posting now carries no race risk precisely
+      // because the blocked run hasn't started: check-prior-success will see
+      // this posted success once it does.
+      //
+      // Observed in production on this exact PR (#7830): an initial fix here
+      // checked only `status === 'queued'`, but the concurrency-blocked
+      // sibling run's actual API status was `pending` — a distinct value in
+      // GitHub's run-status enum — so it slipped past that check entirely and
+      // reproduced the identical wasteful sequential re-run one run later.
+      // Matching the full not-yet-started set (not just `queued`) closes that
+      // gap.
+      if (NOT_YET_STARTED_RUN_STATUSES.has(candidate.status)) {
+        core.info(
+          `CI Gate: ignoring newer run ${candidate.id} for ${sha} — its ` +
+            `status is '${candidate.status}' (no job has started) and it ` +
+            "cannot be running concurrently under this SHA's concurrency group.",
+        );
+        continue;
+      }
+
       const skipped = await pipelineJobWasSkipped({
         github,
         core,
@@ -521,6 +577,98 @@ async function assertSuccessIsCurrent({
       allowed: false,
       reason: 'newer-failure-posted',
       supersededBy: newerFailure,
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Decide whether THIS run may post a `failure` verdict for `sha` (LS-9754).
+ *
+ * WHY: `assertSuccessIsCurrent` already stops a stale `success` from
+ * overwriting a newer run's already-posted `failure` (part B there). Nothing
+ * previously guarded the reverse: a `failure` post was considered always safe
+ * (LS-9378 — "turning a SHA red is never unsafe"), which holds for a true
+ * re-run of the same logical attempt but not for two full pipelines the
+ * orchestrator accidentally ran in parallel on the identical head SHA
+ * (LS-9754's root cause — fixed separately via a head-SHA-keyed concurrency
+ * group, but this guard is the reconciliation half: it must hold even if a
+ * duplicate slips through). Observed on PR #7374: one duplicate's isolated
+ * E2E flake posted `failure` while its sibling had already posted a clean
+ * `success` for the exact same SHA — and because `failure` posted with no
+ * currency check, GitHub's last-writer-wins-by-created_at commit-status
+ * semantics let that stale failure keep outranking the already-posted green
+ * verdict for 30+ minutes, blocking the merge queue on a result the sibling
+ * run had already superseded.
+ *
+ * This mirrors `get_check_runs`' job-listing behavior, which dedupes by job
+ * name and keeps only the newest run's result — CI Gate is a single commit
+ * status rather than a per-job check run, so it has no such dedup for free
+ * and has to compare run ids explicitly the same way `assertSuccessIsCurrent`
+ * already does for the success direction.
+ *
+ * THE INVARIANT: only an already-POSTED newer `success` withholds a `failure`
+ * — this does NOT do the expensive newer-run-existence lookup
+ * `assertSuccessIsCurrent` performs, so a genuine failure with no newer
+ * verdict posted yet always goes through immediately. That keeps this
+ * narrowly scoped to the reported symptom (a stale failure outliving an
+ * already-green sibling) without reintroducing the deadlock risk a full
+ * "failure must also prove currency" rule would carry — a real failure must
+ * still always eventually become visible.
+ *
+ * Fails OPEN (posts the failure) on a missing run id or a status-lookup
+ * error: a real failure must always be visible, and this guard only ever
+ * withholds when it can positively confirm a newer green already stands.
+ *
+ * @param {object} params
+ * @param {number} params.selfRunId this run's `GITHUB_RUN_ID`.
+ * @returns {Promise<{allowed: boolean, reason?: string, supersededBy?: number}>}
+ */
+async function assertFailureIsCurrent({
+  github,
+  core,
+  owner,
+  repo,
+  sha,
+  selfRunId,
+}) {
+  if (!Number.isSafeInteger(selfRunId)) {
+    return { allowed: true };
+  }
+
+  let existingGateStatuses;
+  try {
+    const { data } = await withStatusRetry(() =>
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    );
+    existingGateStatuses = (data || []).filter(
+      (status) => status.context === CI_GATE_CONTEXT,
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not confirm currency before posting failure for ${sha} ` +
+        `(${e.message}) — posting anyway (a real failure must always be visible).`,
+    );
+    return { allowed: true };
+  }
+
+  const newerSuccess = existingGateStatuses
+    .filter((status) => status.state === 'success')
+    .map((status) => runIdFromTargetUrl(status.target_url))
+    .filter((id) => id !== null && id > selfRunId)
+    .sort((a, b) => b - a)[0];
+
+  if (newerSuccess !== undefined) {
+    return {
+      allowed: false,
+      reason: 'newer-success-posted',
+      supersededBy: newerSuccess,
     };
   }
 
@@ -693,6 +841,34 @@ async function postCiGate({
     conclusion === 'success'
       ? 'All CI checks passed'
       : `Failing: ${failing.join(', ')}`.slice(0, MAX_DESCRIPTION_LENGTH);
+
+  if (state === 'failure') {
+    // LS-9754: a stale failure must not outrank an already-posted newer
+    // success — see assertFailureIsCurrent.
+    const failureCurrency = await assertFailureIsCurrent({
+      github,
+      core,
+      owner,
+      repo,
+      sha: targetSha,
+      selfRunId,
+    });
+    if (!failureCurrency.allowed) {
+      core.info(
+        `CI Gate: withholding 'failure' for ${targetSha} on PR #${pr.number} ` +
+          `(${failureCurrency.reason}, superseded by run ` +
+          `${failureCurrency.supersededBy}) — the newer run's success stands.`,
+      );
+      return {
+        posted: false,
+        reason: failureCurrency.reason,
+        sha: targetSha,
+        supersededBy: failureCurrency.supersededBy,
+        failing,
+        ignored,
+      };
+    }
+  }
 
   if (state === 'success') {
     const currency = await assertSuccessIsCurrent({
@@ -916,6 +1092,7 @@ module.exports = {
   runIdFromTargetUrl,
   cancelledJobHadRealFailure,
   assertSuccessIsCurrent,
+  assertFailureIsCurrent,
   isRetryableStatusError,
   postCiGate,
   seedPendingCiGate,

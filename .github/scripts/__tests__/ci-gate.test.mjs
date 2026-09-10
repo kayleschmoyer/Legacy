@@ -723,6 +723,76 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     );
   });
 
+  it('LS-9754: WITHHOLDS failure when a newer run already posted success — a stale flake must not outrank an already-green sibling', async () => {
+    // Reproduces PR #7374: two full duplicate runs on the same head SHA (the
+    // bug LS-9754's concurrency-group fix prevents at the source). The newer
+    // duplicate (by run id) already posted a clean success; this (older) run's
+    // own isolated E2E flake must not be allowed to post failure over it.
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('success', NEWER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'newer-success-posted');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'a stale failure must not overwrite an already-posted newer success',
+    );
+  });
+
+  it('LS-9754: still posts failure when the newer status is itself a failure (no newer success to defer to)', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('failure', NEWER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
+  it('LS-9754: still posts failure when the only newer success belongs to an OLDER run — must not withhold on a stale/older success', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('success', OLDER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
+  it('LS-9754: fails OPEN and still posts failure when the currency check itself errors — a real failure must always be visible', async () => {
+    const { github, calls } = makeGithub({
+      statusesError: 'API is down',
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
   it('WITHHOLDS success when a newer run already posted a red gate', async () => {
     // The runs listing is incomplete (pagination / API lag) but the newer run's
     // red verdict is visible in the statuses — guard (B) must still catch it.
@@ -830,6 +900,72 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     assert.strictEqual(res.posted, false);
     assert.strictEqual(res.reason, 'superseded-run');
     assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it("LS-9754: a newer run that is still QUEUED (not started) does NOT supersede — it's blocked behind this run's own SHA-keyed concurrency slot", async () => {
+    // Reproduces the interaction between LS-9754's head-SHA-keyed concurrency
+    // group and the pre-existing LS-9378 recency guard: a pull_request_review
+    // event landing while the synchronize-triggered run is still executing now
+    // queues behind it (same SHA => same group) instead of running in
+    // parallel. Withholding this run's green verdict just because that queued
+    // sibling exists forces the sibling's own check-prior-success guard to
+    // find no posted CI Gate and re-run the entire pipeline from scratch —
+    // trading LS-9754's parallel-duplicate waste for a sequential-duplicate
+    // one. A queued run cannot be racing this one, so it must not supersede.
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'queued',
+          conclusion: null,
+        },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(res.state, 'success');
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it("LS-9754 regression: a newer run whose status is PENDING (not 'queued') still does NOT supersede", async () => {
+    // Reproduced live on PR #7830 itself, one run after the 'queued'-only fix
+    // above landed: the concurrency-blocked sibling's actual GitHub Actions
+    // API status was `pending`, a distinct value from `queued` in GitHub's
+    // run-status enum — so the first fix's exact-string check on 'queued'
+    // alone missed it, and the identical wasteful sequential re-run happened
+    // again one run later. `pending`, `waiting`, and `requested` all mean the
+    // same thing as `queued` here: no job has started, so a same-SHA sibling
+    // in any of these states cannot be racing this run.
+    for (const status of ['pending', 'waiting', 'requested']) {
+      const { github, calls } = makeGithub({
+        runs: [
+          { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+          { id: NEWER_RUN_ID, name: CI_WORKFLOW, status, conclusion: null },
+        ],
+      });
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(
+        res.posted,
+        true,
+        `a newer run with status '${status}' must not block the real verdict`,
+      );
+      assert.strictEqual(calls.statuses[0].state, 'success');
+    }
   });
 
   it('LS-9591: never posts success when the runs lookup errors, but registers a visible pending verdict rather than leaving the SHA with no CI Gate context at all', async () => {

@@ -71,27 +71,42 @@ on:
 # observed on PR #7473), a queued run can get displaced by the *next* event
 # before it ever starts a single job, repeatedly, so the shared slot never
 # clears and no run ever posts CI Gate (runs observed sitting `pending` with 0
-# jobs for 13-16+ minutes). Every pull_request_review event — approved or not
-# — now gets its own per-run group so it can never displace, or be displaced
-# out of, the synchronize-triggered run's slot. This no longer depends on the
-# shared group to avoid a duplicate pipeline: check-prior-success's anyActive
-# check below already treats an in-flight "🚀 CI Pipeline /" check run on the
-# same SHA as "already running" and skips re-triggering ci-pipeline (LS-8402).
-# That blind window was originally documented here as "a few seconds" between
-# a push's ci-pipeline job being dispatched and its first check run appearing
-# — a rare, low-cost race. It is not: on self-hosted runners under contention
-# the orchestrator's own determine-scope job can sit queued for many minutes
-# before publishing any check run (16.5 minutes on PR #7585 / LS-9860), and
-# every approval or thread-resolution review event arriving in that window
-# dispatched a full duplicate pipeline. check-prior-success now also treats a
-# queued/in-progress sibling orchestrator run on the same head SHA as evidence
-# that CI is already coming, which closes the window at the run level rather
-# than the check-run level.
+# jobs for 13-16+ minutes). Fixed at the time by giving every
+# pull_request_review event its own per-run group, so it could never displace
+# (or be displaced out of) the synchronize-triggered run's slot for a
+# *different* SHA.
+#
+# LS-9754: that per-run-id group traded cross-SHA displacement for a worse
+# problem — pull_request_review events (and, transitively, anything that
+# re-triggers the orchestrator for a head that is already mid-run, e.g. the
+# "🏷️ Label PR" job's own label churn) got a group that could never dedupe
+# against anything, so a review/relabel event landing while the
+# synchronize-triggered run was still executing spawned a full second parallel
+# pipeline on the IDENTICAL head SHA — observed 5+ times across 3 commits on
+# PR #7374, wasting a full build/lint/test/6-shard-E2E/security run every time.
+#
+# The group key is now the resolved head SHA itself, for every trigger type,
+# not the PR number or a per-run id. This gets both properties LS-9053/LS-9810
+# and LS-9754 each wanted individually:
+#   - A new push always gets a brand-new group (new SHA => new group string),
+#     so it can never be displaced by — or displace — an event for a different,
+#     older SHA. This is what LS-9053/LS-9810 actually needed; keying on PR
+#     number was only ever a proxy for "the commit currently under test."
+#   - A second trigger on the SAME head SHA (an approval landing mid-run, the
+#     Label PR job's own relabel, a redundant ci:run dispatch) now shares that
+#     SHA's group. With cancel-in-progress: false the in-progress run is never
+#     killed, but the redundant trigger is queued behind it instead of running
+#     a parallel duplicate pipeline; if further same-SHA triggers pile up while
+#     the first is still running, only the last one queued survives to run
+#     after it (GitHub retains at most one pending run per group) — and by
+#     then check-prior-success's guard below finds CI already green and skips
+#     it, rather than the fresh parallel run this used to spawn.
+# workflow_dispatch carries no `pull_request` payload (LS-9148), so it falls
+# back to `github.sha` — the checked-out ref's current head at dispatch time —
+# which still dedupes a redundant dispatch against an in-flight run for the
+# same commit.
 concurrency:
-  group: >-
-    ${{ github.event_name == 'pull_request_review' &&
-        format('orchestrator-review-{0}', github.run_id) ||
-        format('orchestrator-{0}', github.event.pull_request.number || github.ref) }}
+  group: "orchestrator-${{ github.event.pull_request.head.sha || github.sha }}"
   cancel-in-progress: false
 
 # IMPORTANT: Orchestrator permissions must include ALL permissions required by called workflows

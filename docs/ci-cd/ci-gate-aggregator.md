@@ -89,6 +89,28 @@ its own, so withholding is the safe direction):
   gate at all. An in-flight run (`conclusion: null`) does supersede; it has not
   finished and is still expected to post.
 
+  **A not-yet-started candidate does NOT supersede (LS-9754).** The
+  orchestrator's `concurrency:` block is workflow-level and, since LS-9754,
+  keyed on head SHA — so a candidate blocked on it for the exact same SHA has
+  not run a single job and is guaranteed to be behind _this_ run's own
+  concurrency slot; it cannot be racing this run. `NOT_YET_STARTED_RUN_STATUSES`
+  (`queued`, `pending`, `waiting`, `requested` — the full set GitHub's run
+  `status` enum uses for "no job has started") all get this exemption;
+  `in_progress` still supersedes as before, since an already-executing
+  sibling has genuinely started and may finish and post before this run does.
+  Treating a not-yet-started candidate as superseding anyway withholds a
+  genuine green verdict for nothing: its own `check-prior-success` guard has
+  no posted `CI Gate` to see once it finally starts, so it dispatches a full,
+  redundant sequential re-run of the entire pipeline before it can post
+  anything itself — trading the parallel-duplicate waste LS-9754's
+  concurrency fix eliminates for a sequential-duplicate one.
+
+  > Observed live on PR #7830 (the LS-9754 PR itself), twice: a first fix
+  > checked only `status === 'queued'`, but the concurrency-blocked sibling's
+  > actual API status was `pending` — a distinct enum value — so it slipped
+  > through and reproduced the identical wasteful re-run one run later.
+  > Matching the full not-yet-started set, not just `queued`, closed the gap.
+
   **The run conclusion alone is not enough (LS-9565).** A
   `pull_request_review: approved` run whose `check-prior-success` guard
   short-circuits the pipeline still concludes **`success` at the run level** —
@@ -117,6 +139,38 @@ its own, so withholding is the safe direction):
 Run **ids** are compared rather than timestamps: a run id is assigned once at
 creation and is immutable and monotonic across re-run attempts, whereas
 re-running a run moves its timestamps and can make an older run look newer.
+
+## A stale failure must not outrank an already-posted success (LS-9754)
+
+The `failure` side of the LS-9378 invariant above — "turning a SHA red is
+never unsafe" — held for a genuine re-run of the same logical attempt, but not
+for two full pipelines the orchestrator accidentally ran **in parallel** on
+the identical head SHA. The concurrency-group fix in `ci-orchestrator.yml`
+(keyed on head SHA — see
+[ci-and-merge-pipeline.md](../../.agents/skills/workflow-overview/references/ci-and-merge-pipeline.md))
+prevents that at the source, but this is the reconciliation half: it must
+still hold if a duplicate slips through.
+
+> Observed on PR #7374: two full duplicate runs executed on the same head
+> SHA. One hit an isolated E2E flake and posted `failure`; its sibling had
+> already posted a clean `success` for the exact same SHA moments earlier.
+> Because `failure` posted with no currency check, GitHub's
+> last-writer-wins-by-`created_at` commit-status semantics let that stale
+> failure keep outranking the already-green verdict for 30+ minutes, blocking
+> the merge queue on a result the sibling run had already superseded — the
+> same failure mode `get_check_runs`' job listing avoids for free by deduping
+> by job name and keeping only the newest run's result per name.
+
+`postCiGate` now runs `assertFailureIsCurrent` before posting a `failure`
+verdict: withhold (**newer-success-posted**) if an existing `CI Gate` success
+status on the SHA was posted by a run with a **higher** run id. This is
+deliberately narrower than the success-side guard — it does **not** do the
+expensive newer-run-existence lookup (A) performs, so a genuine failure with
+no newer verdict posted _yet_ always goes through immediately. It only ever
+withholds on an already-**posted** newer success, preserving the "a real
+failure must always eventually become visible" invariant; it fails **open**
+(posts the failure) on a missing run id or a status-lookup error, for the
+same reason.
 
 ## Consumers must read `CI Gate`, not run conclusions
 
