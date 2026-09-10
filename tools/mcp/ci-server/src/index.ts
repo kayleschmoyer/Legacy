@@ -1,3 +1,4 @@
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { minifiedJson } from '@legacy-sports/mcp-format';
@@ -30,6 +31,19 @@ import {
   getInstallationRateLimit,
   getToken,
 } from './github-api.js';
+
+// Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
+// by default. In cloud sessions the egress proxy is required; set the global dispatcher
+// so all fetch() calls in this process go through the proxy when configured. Mirrors
+// github-server/src/index.ts (LS-9234) — that fix was never mirrored here, so every
+// ci_* tool's own direct fetch() calls (github-api.ts) bypassed the proxy and lost the
+// credentials it injects, even though GH_TOKEN/GITHUB_TOKEN/AGENT_AUTHOR_APP_PRIVATE_KEY
+// were all present in the environment (LS-9288, recurrence of LS-9234).
+const proxyUrl =
+  process.env['HTTPS_PROXY'] || process.env['GLOBAL_AGENT_HTTPS_PROXY'];
+if (proxyUrl) {
+  setGlobalDispatcher(new ProxyAgent(proxyUrl));
+}
 
 /**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
