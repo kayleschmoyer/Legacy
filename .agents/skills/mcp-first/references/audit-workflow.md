@@ -17,6 +17,8 @@ This produces a structured JSON report with:
 
 The tool is Node-native (LS-8316) — it needs no Python interpreter and works in every environment (local Windows, cloud Linux, hosted server). There is no shell fallback; if the `legacy-sports-ci` MCP server is unavailable, fix the server connection instead (see [diagnostics.md](diagnostics.md)).
 
+> **Pass `sessionToolNames` so `gh pr *`/`gh run *` etc. are classified accurately (LS-9749).** The tool's coverage table pre-classifies these Bash commands as `covered` by `github-mcp`/`ci-mcp` on prefix match alone — it has no visibility into whether that server's tools were actually present in your session. If `legacy-sports-github` was absent for this session (see the [absent-hosted-connector cases](auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576)), every `gh pr *` fallback command gets silently filed under `informational.covered_commands` instead of surfacing as the real gap it is. Pass your session's current tool-name list (the deferred-tools listing, or a `ToolSearch` result) as `sessionToolNames` and any command whose "covering" server isn't actually in that list is reclassified as a real gap (`expected_mcp_tool` + a note explaining why), not silently dropped: `ci_audit_session_bash({ auditMode: true, sessionToolNames: [...] })`.
+
 ## Steps
 
 ### 1. Run the audit

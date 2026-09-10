@@ -554,7 +554,18 @@ function describeJsonSchema(schema) {
     if (descriptor.type === 'unknown') descriptor.type = 'enum';
   }
   if (schema.default !== undefined) descriptor.default = schema.default;
-  if (schema.items) descriptor.items = describeJsonSchema(schema.items);
+  if (schema.items) {
+    descriptor.items = describeJsonSchema(schema.items);
+    // Array items have no "optional" concept in JSON Schema the way object
+    // properties do (there's no analogue of a `required` list for items) —
+    // describeJsonSchema's default `optional: true` seed is only meaningful
+    // for object properties, where it's overridden below by the parent's
+    // `required` array. Left unset here, every array's items were
+    // incorrectly reported as optional in the generated reference (LS-9749
+    // bot-review finding on PR #7835 — pre-existing, affects every raw
+    // JSON-Schema array field, not just newly added ones).
+    descriptor.items.optional = false;
+  }
   if (schema.properties) {
     descriptor.properties = {};
     for (const [key, value] of Object.entries(schema.properties)) {

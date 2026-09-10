@@ -29,6 +29,7 @@ Extract Bash tool_use calls (and optionally MCP overflows/failures) from the cur
 | `gapsOnly` | boolean |  | — | Compact output: one line per unique command pattern (<5 KB), gaps separated from covered commands. |
 | `scanScratch` | boolean |  | — | Also scan scratch/*.py for subprocess shell patterns; reported under "scratch_subprocess_calls". |
 | `auditMode` | boolean |  | — | Full audit report: pre-classified gaps with confidence scores, draft ticket summaries, noise filtering, and overflow/failure triage. Implies includeMcp. Review and approve rather than classify from scratch. |
+| `sessionToolNames` | string[] |  | — | Your current tool names — reclassifies `gh pr *`/`gh run *` as a real gap when the covering MCP server is absent from this list, instead of always "covered" (LS-9749). |
 
 ### `ci_auth_status`
 

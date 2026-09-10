@@ -65,6 +65,17 @@ export interface AuditSessionBashParams {
   scanScratch?: boolean;
   auditMode?: boolean;
   transcriptContent?: string;
+  /**
+   * The tool names the calling session can currently see (e.g. from its own
+   * deferred-tools listing or a `ToolSearch` call) — this process has no
+   * other way to know which MCP servers were actually present in the
+   * caller's session. When supplied, `gh pr *`/`gh run *`/etc. commands are
+   * only classified `covered` by their corresponding MCP server if a
+   * matching tool name is present in this list; otherwise they surface as
+   * gaps instead of being silently filtered (LS-9749). Omit to preserve
+   * prior behavior (assume covered, per the static prefix table).
+   */
+  sessionToolNames?: string[];
 }
 
 function textError(text: string): ToolResult {
@@ -241,6 +252,7 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
             mcpIssues,
             sessionId,
             scratchCalls,
+            params.sessionToolNames,
             autoModeActive,
           ),
         },
@@ -254,7 +266,12 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
       content: [
         {
           type: 'text',
-          text: formatGapsOnly(bashCalls, sessionId, scratchCalls).trim(),
+          text: formatGapsOnly(
+            bashCalls,
+            sessionId,
+            scratchCalls,
+            params.sessionToolNames,
+          ).trim(),
         },
       ],
     };

@@ -1,6 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { checkJiraAuth, HOSTED_CONNECTOR_CAVEAT } from './auth-checks';
+import {
+  checkJiraAuth,
+  HOSTED_CONNECTOR_CAVEAT,
+  rosterHasService,
+} from './auth-checks';
 
 const noNetrc = jest.fn(() => false);
 
@@ -83,5 +87,40 @@ describe('checkJiraAuth', () => {
     expect(checkJiraAuth({ MCP_JIRA_BEARER: 'bearer' }, noNetrc)).toEqual({
       ok: false,
     });
+  });
+});
+
+describe('rosterHasService (LS-9749)', () => {
+  it('returns undefined (unknown) when sessionToolNames is omitted — preserves old presence-only behavior', () => {
+    expect(rosterHasService('github', undefined)).toBeUndefined();
+    expect(rosterHasService('jira', undefined)).toBeUndefined();
+    expect(rosterHasService('ci', undefined)).toBeUndefined();
+  });
+
+  it('returns true when a matching hosted-connector tool name is present', () => {
+    expect(
+      rosterHasService('github', ['mcp__legacy-sports-github__github_open_pr']),
+    ).toBe(true);
+    expect(rosterHasService('github', ['github_open_pr'])).toBe(true);
+    expect(
+      rosterHasService('jira', ['mcp__legacy-sports-jira__jira_view']),
+    ).toBe(true);
+    expect(rosterHasService('jira', ['jira_view'])).toBe(true);
+    expect(
+      rosterHasService('ci', ['mcp__legacy-sports-ci-local__ci_list_runs']),
+    ).toBe(true);
+  });
+
+  it('returns false when the roster is non-empty but has no matching tool name — the LS-9749 false-green case', () => {
+    expect(
+      rosterHasService('jira', ['mcp__worktree__worktree_commit', 'make_run']),
+    ).toBe(false);
+    expect(rosterHasService('github', [])).toBe(false);
+  });
+
+  it('does not false-positive on unrelated tools whose names merely contain the service word', () => {
+    // e.g. a jira-adjacent doc tool or a github-flavored variable name should
+    // not be mistaken for the real connector's tools.
+    expect(rosterHasService('github', ['some_github_docs_helper'])).toBe(false);
   });
 });

@@ -52,7 +52,41 @@ export const HOSTED_CONNECTOR_CAVEAT =
   'not support dynamic client registration", CONNECTION_CLOSED) — those have ' +
   'reported allAuthenticated: true throughout real outages (LS-9439, LS-9370, ' +
   'LS-9924). Trust an actual tool-call error over this result; see ' +
-  '.agents/skills/mcp-first/references/diagnostics.md for recovery steps.';
+  '.agents/skills/mcp-first/references/diagnostics.md for recovery steps. ' +
+  'Pass `sessionToolNames` (the tool names visible in your own session) to get ' +
+  'a roster cross-check that catches the stronger case of the connector being ' +
+  'entirely absent from the tool list, not just unreachable (LS-9749) — see ' +
+  '`rosterAbsent` on each service below.';
+
+/**
+ * Tool-name patterns identifying each hosted connector's tools as they'd
+ * appear in a session's tool roster. Used only when the caller supplies
+ * `sessionToolNames` (this server's own process cannot see the caller's tool
+ * roster — that lives in the Claude Code client, not here) to catch the case
+ * where a service's credentials/config look present but its MCP server never
+ * appeared in the session at all (LS-9749) — a stronger, more misleading
+ * false-green than the already-documented "connector present but OAuth
+ * session dead" gap above.
+ */
+export const ROSTER_TOOL_PATTERNS: Readonly<Record<string, RegExp>> = {
+  github: /^(mcp__legacy-sports-github__|github_)/,
+  jira: /^(mcp__legacy-sports-jira__|jira_)/,
+  ci: /^(mcp__legacy-sports-ci-local__|ci_)/,
+};
+
+/**
+ * Returns `undefined` (unknown — caller didn't opt in) when `sessionToolNames`
+ * is omitted, `true` if a matching tool name is present, `false` if the
+ * caller's roster demonstrably has none.
+ */
+export function rosterHasService(
+  service: keyof typeof ROSTER_TOOL_PATTERNS,
+  sessionToolNames: readonly string[] | undefined,
+): boolean | undefined {
+  if (sessionToolNames === undefined) return undefined;
+  const pattern = ROSTER_TOOL_PATTERNS[service];
+  return sessionToolNames.some((name) => pattern.test(name));
+}
 
 export function checkJiraAuth(
   env: NodeJS.ProcessEnv,

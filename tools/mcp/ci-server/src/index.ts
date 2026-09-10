@@ -859,6 +859,13 @@ export function createServer(): McpServer {
             'filtering, and overflow/failure triage. Implies includeMcp. Review and approve rather than ' +
             'classify from scratch.',
         ),
+      sessionToolNames: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Your current tool names — reclassifies `gh pr *`/`gh run *` as a real gap when the ' +
+            'covering MCP server is absent from this list, instead of always "covered" (LS-9749).',
+        ),
     },
     (params) => auditSessionBash(params),
   );

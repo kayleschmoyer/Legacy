@@ -405,6 +405,55 @@ describe('audit-session-bash-parse', () => {
     it('returns gap for uncovered commands', () => {
       expect(classifyCommand('curl https://example.com')).toEqual(['gap', '']);
     });
+
+    describe('sessionToolNames roster cross-check (LS-9749)', () => {
+      it('still classifies as covered when sessionToolNames is omitted (backward compatible)', () => {
+        expect(classifyCommand('gh pr create --draft')).toEqual([
+          'covered',
+          'github-mcp',
+        ]);
+      });
+
+      it('classifies as covered when a matching tool name is present in the roster', () => {
+        expect(
+          classifyCommand('gh pr create --draft', [
+            'mcp__legacy-sports-github__github_open_pr',
+            'mcp__worktree__worktree_commit',
+          ]),
+        ).toEqual(['covered', 'github-mcp']);
+        expect(
+          classifyCommand('gh pr create --draft', ['github_open_pr']),
+        ).toEqual(['covered', 'github-mcp']);
+      });
+
+      it('downgrades to gap (keeping the tool label) when the covering server is absent from the roster', () => {
+        expect(
+          classifyCommand('gh pr create --draft', [
+            'mcp__worktree__worktree_commit',
+            'jira_view',
+          ]),
+        ).toEqual(['gap', 'github-mcp']);
+      });
+
+      it('downgrades to gap when the roster is empty', () => {
+        expect(classifyCommand('gh run view 123', [])).toEqual([
+          'gap',
+          'ci-mcp',
+        ]);
+      });
+
+      it('does not affect classification of prefixes with no roster pattern entry', () => {
+        // "twig " is covered by worktree-mcp which does have a pattern; verify
+        // an unmapped label (hypothetically) would pass through unaffected —
+        // exercised here via a real covered label to confirm mapped patterns
+        // still gate correctly end-to-end.
+        expect(
+          classifyCommand('twig worktree clean', [
+            'mcp__worktree__worktree_clean',
+          ]),
+        ).toEqual(['covered', 'worktree-mcp']);
+      });
+    });
   });
 
   describe('commandPattern', () => {
@@ -667,6 +716,63 @@ describe('audit-session-bash-parse', () => {
       );
     });
 
+    it('surfaces gh pr/gh run commands as gaps (not covered_commands) when sessionToolNames confirms the covering server was absent (LS-9749)', () => {
+      const calls = [
+        synthBashCall('gh pr create --draft --title "x"'),
+        synthBashCall('gh run view 123'),
+      ];
+
+      // Roster with no github-mcp/ci-mcp tool names present — mirrors a
+      // session where legacy-sports-github/legacy-sports-ci-local never
+      // registered.
+      const report = JSON.parse(
+        formatAudit(calls, [], 'session-1', null, [
+          'mcp__worktree__worktree_commit',
+          'jira_view',
+        ]),
+      ) as {
+        summary: Record<string, number>;
+        action_required: {
+          gaps_to_review: Array<Record<string, unknown>>;
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+        informational: {
+          covered_commands: Array<Record<string, unknown>>;
+        };
+      };
+
+      expect(report.informational.covered_commands).toHaveLength(0);
+      expect(report.summary.gaps_found).toBe(2);
+      const allGaps = [
+        ...report.action_required.gaps_to_review,
+        ...report.action_required.gaps_auto_classified,
+      ];
+      const ghPrGap = allGaps.find((g) => g['pattern'] === 'gh pr create');
+      expect(ghPrGap).toMatchObject({
+        expected_mcp_tool: 'github-mcp',
+        note: expect.stringContaining('github-mcp') as unknown as string,
+      });
+      const ghRunGap = allGaps.find((g) => g['pattern'] === 'gh run view');
+      expect(ghRunGap).toMatchObject({ expected_mcp_tool: 'ci-mcp' });
+    });
+
+    it('classifies gh pr/gh run as covered when sessionToolNames confirms the covering server is present (LS-9749)', () => {
+      const calls = [synthBashCall('gh pr create --draft --title "x"')];
+
+      const report = JSON.parse(
+        formatAudit(calls, [], 'session-1', null, [
+          'mcp__legacy-sports-github__github_open_pr',
+        ]),
+      ) as {
+        informational: { covered_commands: Array<Record<string, unknown>> };
+      };
+
+      expect(report.informational.covered_commands).toHaveLength(1);
+      expect(report.informational.covered_commands[0]).toMatchObject({
+        mcp_tool: 'github-mcp',
+      });
+    });
+
     it('summarizes overflow and failure params with truncation', () => {
       const report = JSON.parse(
         formatAudit(
@@ -777,7 +883,7 @@ describe('audit-session-bash-parse', () => {
       ];
 
       const report = JSON.parse(
-        formatAudit(calls, [], 'session-1', null, true),
+        formatAudit(calls, [], 'session-1', null, undefined, true),
       ) as {
         summary: Record<string, number | boolean>;
         action_required: {
@@ -824,7 +930,7 @@ describe('audit-session-bash-parse', () => {
       const calls = [synthBashCall('grep -r "foo" src/')];
 
       const report = JSON.parse(
-        formatAudit(calls, [], 'session-1', null, false),
+        formatAudit(calls, [], 'session-1', null, undefined, false),
       ) as {
         summary: Record<string, number | boolean>;
         action_required: {

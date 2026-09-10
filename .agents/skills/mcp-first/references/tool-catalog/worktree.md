@@ -16,9 +16,11 @@ Local stdio process only — not exposed as a hosted connector. 63 tools.
 
 ### `auth_check_all`
 
-Check workspace auth token presence for all services (GitHub, Jira, AWS, CI). Returns per-service ok/method/hint. Call at the start of any workflow that requires credentials. Never initiates login flows — read-only token presence check only. If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens.
+Check workspace auth token presence for all services (GitHub, Jira, AWS, CI). Returns per-service ok/method/hint. Call at the start of any workflow that requires credentials. Never initiates login flows — read-only token presence check only. If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens. Pass `sessionToolNames` to also flag a connector absent from your tool roster (LS-9749).
 
-_No parameters._
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `sessionToolNames` | string[] |  | — | Your current tool names, to detect a service whose MCP server is absent from your roster. |
 
 ### `worktree_attach`
 

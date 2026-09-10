@@ -395,8 +395,53 @@ export function stripCdPrefix(cmd: string): string {
   return stripped;
 }
 
-/** Return ['covered', tool_name] or ['gap', '']. */
-export function classifyCommand(cmd: string): readonly [string, string] {
+/**
+ * Maps each `MCP_COVERED_PREFIXES` tool label to a pattern matching that
+ * server's actual tool names as they appear in a session's tool roster
+ * (either the hosted-connector form `mcp__<server>__<tool>` or the bare
+ * `<prefix>_...` name most skills call it by). Used to verify a "covered"
+ * classification against the session's real roster (LS-9749) — without this,
+ * `gh pr *` is classified `covered` by `github-mcp` even in a session where
+ * the `legacy-sports-github` MCP server never appeared in the tool list,
+ * silently masking exactly that gap from future audits.
+ */
+const MCP_TOOL_ROSTER_PATTERNS: Readonly<Record<string, RegExp>> = {
+  'worktree-mcp': /^(mcp__worktree__|worktree_)/,
+  'make-mcp': /^(mcp__legacy-sports-make__|make_)/,
+  'nx-mcp': /^(mcp__legacy-sports-nx__|nx_)/,
+  'github-mcp': /^(mcp__legacy-sports-github__|github_)/,
+  'ci-mcp': /^(mcp__legacy-sports-ci-local__|ci_)/,
+  'db-mcp': /^(mcp__legacy-sports-db__|db_)/,
+};
+
+/**
+ * Whether `tool`'s MCP server was actually present in the session's tool
+ * roster. Returns `true` when `sessionToolNames` is not supplied (unknown —
+ * preserves prior "assume covered" behavior for callers that don't pass it)
+ * so this is opt-in, not a breaking change in classification.
+ */
+function toolAvailableInRoster(
+  tool: string,
+  sessionToolNames: readonly string[] | undefined,
+): boolean {
+  if (sessionToolNames === undefined) return true;
+  const pattern = MCP_TOOL_ROSTER_PATTERNS[tool];
+  if (!pattern) return true; // unknown label — nothing to cross-check against
+  return sessionToolNames.some((name) => pattern.test(name));
+}
+
+/**
+ * Return `['covered', tool_name]` or `['gap', '']` — or, when `tool_name`'s
+ * MCP server is confirmed absent from `sessionToolNames`, `['gap',
+ * tool_name]` so the gap is surfaced for review instead of silently
+ * classified away (LS-9749). Passing `sessionToolNames` is optional; omitting
+ * it preserves the pre-LS-9749 behavior of trusting the static prefix table
+ * unconditionally.
+ */
+export function classifyCommand(
+  cmd: string,
+  sessionToolNames?: readonly string[],
+): readonly [string, string] {
   const stripped = stripCdPrefix(cmd.trim());
   const lowered = stripped.toLowerCase();
   for (const [prefix, tool] of MCP_COVERED_PREFIXES) {
@@ -419,6 +464,13 @@ export function classifyCommand(cmd: string): readonly [string, string] {
           after[0] === ' ' ||
           after[0] === '-'
         ) {
+          if (!toolAvailableInRoster(tool, sessionToolNames)) {
+            // The prefix matches, but the tool that's supposed to cover it
+            // was not in this session's roster — this is a real gap, not
+            // noise. Keep `tool` in the tuple so callers can explain *why*
+            // it looked covered.
+            return ['gap', tool];
+          }
           return ['covered', tool];
         }
       }
@@ -891,7 +943,10 @@ interface PatternStats {
 }
 
 /** Group Bash calls by normalised pattern with counts, samples, and classifications. */
-function collectPatternStats(bashCalls: BashCall[]): PatternStats {
+function collectPatternStats(
+  bashCalls: BashCall[],
+  sessionToolNames?: readonly string[],
+): PatternStats {
   const counts = new Map<string, number>();
   const samples = new Map<string, string>();
   const classifications = new Map<string, readonly [string, string]>();
@@ -902,7 +957,7 @@ function collectPatternStats(bashCalls: BashCall[]): PatternStats {
     counts.set(pat, (counts.get(pat) ?? 0) + 1);
     if (!samples.has(pat)) samples.set(pat, cmd);
     if (!classifications.has(pat)) {
-      classifications.set(pat, classifyCommand(cmd));
+      classifications.set(pat, classifyCommand(cmd, sessionToolNames));
     }
   }
 
@@ -968,9 +1023,13 @@ export function formatAudit(
   mcpIssues: McpIssue[],
   sessionId: string,
   scratchCalls: ScratchCall[] | null = null,
+  sessionToolNames?: readonly string[],
   autoModeActive = false,
 ): string {
-  const { counts, samples, classifications } = collectPatternStats(bashCalls);
+  const { counts, samples, classifications } = collectPatternStats(
+    bashCalls,
+    sessionToolNames,
+  );
 
   // Build gap items with full classification
   const gaps: Array<Record<string, unknown>> = [];
@@ -1041,6 +1100,16 @@ export function formatAudit(
       count,
       sample: sample.slice(0, 120),
       ...gapInfo,
+      // Non-empty only when the prefix table would normally call this
+      // "covered", but sessionToolNames confirmed that MCP server's tools
+      // were absent from this session's roster (LS-9749) — flags it as a
+      // real gap instead of silently filtering it out.
+      ...(tool
+        ? {
+            expected_mcp_tool: tool,
+            note: `Would normally be classified 'covered' by ${tool}, but that server's tools were not found in this session's roster — treat as a real gap, not noise.`,
+          }
+        : {}),
     });
   }
 
@@ -1146,8 +1215,12 @@ export function formatGapsOnly(
   bashCalls: BashCall[],
   sessionId: string,
   scratchCalls: ScratchCall[] | null = null,
+  sessionToolNames?: readonly string[],
 ): string {
-  const { counts, samples, classifications } = collectPatternStats(bashCalls);
+  const { counts, samples, classifications } = collectPatternStats(
+    bashCalls,
+    sessionToolNames,
+  );
 
   const gaps: Array<[string, number, string]> = [];
   const covered: Array<[string, number, string]> = [];

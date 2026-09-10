@@ -37,7 +37,11 @@ import {
   sep,
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
-import { checkJiraAuth, HOSTED_CONNECTOR_CAVEAT } from './auth-checks';
+import {
+  checkJiraAuth,
+  HOSTED_CONNECTOR_CAVEAT,
+  rosterHasService,
+} from './auth-checks';
 import { baselineSetup, slugifyRef } from './baseline-setup';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
@@ -3157,10 +3161,18 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'Check workspace auth token presence for all services (GitHub, Jira, AWS, CI). ' +
         'Returns per-service ok/method/hint. Call at the start of any workflow that requires credentials. ' +
         'Never initiates login flows — read-only token presence check only. ' +
-        'If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens.',
+        'If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens. ' +
+        'Pass `sessionToolNames` to also flag a connector absent from your tool roster (LS-9749).',
       inputSchema: {
         type: 'object' as const,
-        properties: {},
+        properties: {
+          sessionToolNames: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Your current tool names, to detect a service whose MCP server is absent from your roster.',
+          },
+        },
         required: [],
       },
     },
@@ -12622,6 +12634,11 @@ const handleCallTool = async (
     }
 
     case 'auth_check_all': {
+      const rawSessionToolNames = args?.sessionToolNames;
+      const sessionToolNames = Array.isArray(rawSessionToolNames)
+        ? rawSessionToolNames.filter((n): n is string => typeof n === 'string')
+        : undefined;
+
       // GitHub / CI: GH_TOKEN, GITHUB_TOKEN, AGENT_AUTHOR_APP_PRIVATE_KEY, cached file, netrc
       const ghEnvToken =
         process.env.GH_TOKEN ||
@@ -12686,7 +12703,28 @@ const handleCallTool = async (
       const ciOk = githubOk;
       const ciMethod = githubMethod;
 
-      const allAuthenticated = githubOk && jiraOk && awsOk && ciOk;
+      // Roster cross-check (LS-9749, opt-in via sessionToolNames): a
+      // credential can look present while the hosted MCP server it belongs
+      // to never appeared in the caller's session at all — a stronger,
+      // more misleading false-green than the connector-reachability gap
+      // HOSTED_CONNECTOR_CAVEAT already documents. `undefined` means the
+      // caller didn't pass sessionToolNames, so nothing is known either way;
+      // `false` means the roster demonstrably has none of that service's tools.
+      const githubRosterPresent = rosterHasService('github', sessionToolNames);
+      const jiraRosterPresent = rosterHasService('jira', sessionToolNames);
+      const ciRosterPresent = rosterHasService('ci', sessionToolNames);
+      const githubReportedOk = githubOk && githubRosterPresent !== false;
+      const jiraReportedOk = jiraOk && jiraRosterPresent !== false;
+      const ciReportedOk = ciOk && ciRosterPresent !== false;
+
+      const allAuthenticated =
+        githubReportedOk && jiraReportedOk && awsOk && ciReportedOk;
+
+      const rosterAbsentHint = (server: string): string =>
+        `Credentials/config for ${server} look present, but no ${server} MCP tool was found in your ` +
+        `session's tool roster — the hosted connector is absent from this session (config/consent gap or ` +
+        `connector-layer outage), not a credential problem. Do not proceed on the MCP-first path for ${server}; ` +
+        'see the degraded-mode fallback in .agents/skills/mcp-first/references/auth-and-routing.md (LS-9749).';
 
       return {
         content: [
@@ -12698,22 +12736,34 @@ const handleCallTool = async (
                 caveat: HOSTED_CONNECTOR_CAVEAT,
                 services: {
                   github: {
-                    ok: githubOk,
+                    ok: githubReportedOk,
                     ...(githubMethod !== undefined
                       ? { method: githubMethod }
                       : {}),
-                    ...(!githubOk
+                    ...(githubRosterPresent === false
+                      ? { rosterAbsent: true }
+                      : {}),
+                    ...(!githubReportedOk
                       ? {
-                          hint: 'Set `GH_TOKEN` in `.mcp.json` env, or run `gh auth login` in your terminal, then restart the session.',
+                          hint:
+                            githubRosterPresent === false
+                              ? rosterAbsentHint('github')
+                              : 'Set `GH_TOKEN` in `.mcp.json` env, or run `gh auth login` in your terminal, then restart the session.',
                         }
                       : {}),
                   },
                   jira: {
-                    ok: jiraOk,
+                    ok: jiraReportedOk,
                     ...(jiraMethod !== undefined ? { method: jiraMethod } : {}),
-                    ...(!jiraOk
+                    ...(jiraRosterPresent === false
+                      ? { rosterAbsent: true }
+                      : {}),
+                    ...(!jiraReportedOk
                       ? {
-                          hint: 'Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in `.mcp.json` env (generate at https://id.atlassian.com/manage-profile/security/api-tokens), then restart the session.',
+                          hint:
+                            jiraRosterPresent === false
+                              ? rosterAbsentHint('jira')
+                              : 'Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in `.mcp.json` env (generate at https://id.atlassian.com/manage-profile/security/api-tokens), then restart the session.',
                         }
                       : {}),
                   },
@@ -12728,11 +12778,17 @@ const handleCallTool = async (
                       : {}),
                   },
                   ci: {
-                    ok: ciOk,
+                    ok: ciReportedOk,
                     ...(ciMethod !== undefined ? { method: ciMethod } : {}),
-                    ...(!ciOk
+                    ...(ciRosterPresent === false
+                      ? { rosterAbsent: true }
+                      : {}),
+                    ...(!ciReportedOk
                       ? {
-                          hint: 'Set `GH_TOKEN` with `repo` and `actions:read` scope in `.mcp.json` env, then restart the session.',
+                          hint:
+                            ciRosterPresent === false
+                              ? rosterAbsentHint('ci')
+                              : 'Set `GH_TOKEN` with `repo` and `actions:read` scope in `.mcp.json` env, then restart the session.',
                         }
                       : {}),
                   },
