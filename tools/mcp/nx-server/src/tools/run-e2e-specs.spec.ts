@@ -600,7 +600,7 @@ describe('runE2ESpecs', () => {
       });
     });
 
-    it('spawns plain pnpm through a shell on Windows (not pnpm.cmd with no shell)', async () => {
+    it('spawns the playwright.cmd binary through a shell on Windows (not pnpm)', async () => {
       Object.defineProperty(process, 'platform', {
         value: 'win32',
         configurable: true,
@@ -611,7 +611,7 @@ describe('runE2ESpecs', () => {
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
       const opts = jobCallOpts();
-      expect(opts.command).toBe('pnpm');
+      expect(opts.command).toMatch(/playwright\.cmd$/);
       expect(opts.shell).toBe(true);
     });
 
@@ -631,7 +631,7 @@ describe('runE2ESpecs', () => {
       expect(jobCallOpts().args).toContain('"--project=Mobile Chrome"');
     });
 
-    it('spawns plain pnpm with shell:false on non-Windows platforms', async () => {
+    it('spawns the playwright binary directly with shell:false on non-Windows platforms', async () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
         configurable: true,
@@ -642,8 +642,26 @@ describe('runE2ESpecs', () => {
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
       const opts = jobCallOpts();
-      expect(opts.command).toBe('pnpm');
+      expect(opts.command).toBe('/repo/node_modules/.bin/playwright');
       expect(opts.shell).toBe(false);
+    });
+
+    it('never invokes playwright through `pnpm exec` (LS-10022): pnpm silently drops cwd for directories with no package.json, breaking every cwd-relative arg', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+
+      const opts = jobCallOpts();
+      expect(opts.command).not.toBe('pnpm');
+      expect(opts.args).not.toContain('exec');
+      expect(opts.args).not.toContain('playwright');
+      expect(opts.args[0]).toBe('test');
+      expect(opts.cwd).toBe('/repo/apps/web-e2e');
     });
   });
 

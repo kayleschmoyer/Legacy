@@ -8,7 +8,7 @@ import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
-import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
+import { binJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -451,8 +451,6 @@ export async function runE2ESpecs(
   }
 
   const args = [
-    'exec',
-    'playwright',
     'test',
     `--config=${configFile}`,
     `--project=${project}`,
@@ -479,13 +477,21 @@ export async function runE2ESpecs(
   // --- Run Playwright as a background job with a bounded sync wait ---
   // Fast spec runs return their parsed report in one call; slower runs return
   // a jobId whose completion (observed via nx_job_wait) is formatted by the
-  // 'e2e-specs' job formatter into the same structured report. Running pnpm
-  // through the platform shell on Windows also fixes the historical EINVAL
-  // from spawning pnpm.cmd without a shell; inputs are pre-validated against
-  // UNSAFE_SPEC_CHARS / UNSAFE_GREP_CHARS above, and shell-relevant args are
-  // quoted (cmd-escape.ts).
+  // 'e2e-specs' job formatter into the same structured report. Invoked via
+  // the playwright binary directly (binJobSpec), not `pnpm exec playwright`
+  // (LS-10022): `pnpm exec` resolves the package scope of the directory it's
+  // spawned from before running anything, and apps/web-e2e has no
+  // package.json of its own — so pnpm silently ran the command from the
+  // *workspace root* instead of e2eAppDir, discarding the cwd option below
+  // entirely and breaking every cwd-relative arg (--config=, resolvedSpecs)
+  // built against e2eAppDir. Direct binary invocation bypasses pnpm's
+  // package-scope resolution so cwd is honored regardless. Same Windows
+  // `.cmd` + shell:true handling as the old pnpm path fixes the historical
+  // EINVAL from spawning a .cmd wrapper without a shell; inputs are
+  // pre-validated against UNSAFE_SPEC_CHARS / UNSAFE_GREP_CHARS above, and
+  // shell-relevant args are quoted (cmd-escape.ts).
   const timeoutMs = integration ? INTEGRATION_TIMEOUT_MS : E2E_TIMEOUT_MS;
-  const jobSpec = pnpmJobSpec(args);
+  const jobSpec = binJobSpec(cwd, 'playwright', args);
   const snapshot = await runJobWithBudget(
     {
       command: jobSpec.command,
