@@ -234,7 +234,15 @@ function mockDraft() {
     draftOrder: `${TEAM_1.id},${TEAM_2.id}`,
     currentPick: 1,
     pickTimeLimitSeconds: 60,
-    currentPickDeadline: null,
+    // A real server always has a deadline synced once a pick is live — `null`
+    // here is indistinguishable from "expired" to useDraftTimer and fires an
+    // unmocked NudgeExpiredDraftPick mutation ~2s after mount (LS-10048,
+    // LS-10049). A future timestamp matches real server behavior and removes
+    // the race entirely instead of racing it. Deliberately wall-clock (not
+    // FIXED_NOW-anchored): the client compares this against its own real
+    // Date.now() to drive the countdown, so it must actually be in the future
+    // relative to the browser's clock, not just relative to the fixed mock epoch.
+    currentPickDeadline: new Date(Date.now() + 60_000).toISOString(),
     draftStartedAt: FIXED_NOW_ISO,
     draftCompletedAt: null,
     scheduledAt: null,
@@ -787,6 +795,14 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
           await json({ leaguePositions: mockPositions() });
         } else if (op === 'getuserteamid') {
           await json({ userTeamId: TEAM_1.id });
+        } else if (op === 'nudgeexpireddraftpick') {
+          // Defensive no-op: currentPickDeadline above is a realistic future
+          // timestamp so this should never fire in practice, but if a slow
+          // test run ever lets the deadline legitimately count down, answer
+          // it instead of failing API isolation (LS-10049).
+          await json({
+            autoProcessDraftPicks: { draftsProcessed: 0, picksAutoMade: 0 },
+          });
         } else {
           await unmockedGraphQLFallback(route);
         }
@@ -806,7 +822,22 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       // plus a fixed 2s sleep — passed just as happily when every GetDraft*
       // query was answered with the wrong payload and the board rendered no
       // draft at all, which is exactly how the shadowed-branch bug survived.
-      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
+      //
+      // Below the `$sm` breakpoint (both mobile Playwright projects run at
+      // 375px) EliteDraftBoardScreen swaps to CompactLiveDraftBoard, whose
+      // DraftHeaderBand has no "Live Draft" text at all in any state — only
+      // "RD {round} · PICK {pick}", which DraftTopBand (desktop) doesn't
+      // render. Same rule as playwright.config.ts's
+      // DESKTOP_DRAFT_TOPBAND_ONLY_SPECS: assert per viewport tier instead of
+      // excluding the phase from mobile outright (LS-10049).
+      const isCompactViewport = (page.viewportSize()?.width ?? 1280) < 800;
+      if (isCompactViewport) {
+        await expect(
+          page.getByText('RD 1', { exact: false }).first(),
+        ).toBeVisible();
+      } else {
+        await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
+      }
       // Sourced from GetAvailableDraftPlayers — the branch that used to be
       // unreachable, and whose query never even fired before the fix because
       // the draft header it depends on resolved empty.

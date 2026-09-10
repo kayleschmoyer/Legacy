@@ -108,7 +108,12 @@ const MOCK_LEAGUE_DRAFT = {
   draftOrder: 'snake',
   currentPick: 1,
   pickTimeLimitSeconds: 30,
-  currentPickDeadline: null,
+  // A real server always has a deadline synced once a pick is live — `null`
+  // is indistinguishable from "expired" to useDraftTimer and fires an
+  // unmocked NudgeExpiredDraftPick mutation ~2s after mount (LS-10049).
+  // Deliberately wall-clock (not FIXED_NOW-anchored): the client compares
+  // this against its own real Date.now() to drive the countdown.
+  currentPickDeadline: new Date(Date.now() + 60_000).toISOString(),
   draftStartedAt: FIXED_NOW_ISO,
 };
 
@@ -385,6 +390,23 @@ async function mockAuctionDraftGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { draftPitchingStats: [] } }),
+      });
+      return;
+    }
+
+    // Defensive no-op: currentPickDeadline above is a realistic future
+    // timestamp so this should never fire in practice, but if a slow test
+    // run ever lets the deadline legitimately count down, answer it instead
+    // of failing API isolation (LS-10049).
+    if (opName === 'nudgeexpireddraftpick') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            autoProcessDraftPicks: { draftsProcessed: 0, picksAutoMade: 0 },
+          },
+        }),
       });
       return;
     }
