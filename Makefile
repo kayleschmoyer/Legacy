@@ -1052,8 +1052,8 @@ pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_plain,Classifying changed files...)
 	@node scripts/classify-changes.js --print-summary --base $(NX_BASE)
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && $(_PC_MIGRATION_CMD),@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD),@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
+	@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD)
+	@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 	$(_PC_FORMAT_RECIPE)
@@ -1074,10 +1074,20 @@ pc: pre-commit ## Alias for pre-commit
 # Each target applies the same change-classification gating as the full pipeline.
 
 pc-db-prep: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-db-prep: ## pc steps 1-3: migration immutability + schema + codegen (db changes only)
+# LS-9276: schema generation + codegen (steps 2-3) always run, regardless of
+# PC_HAS_DB. Staleness in committed schema.graphql/*.generated.ts can be left
+# behind by a PR that touched lambdas/db/src/schema/** without regenerating
+# every codegen target (LS-9106); gating these steps on whether the *current*
+# branch also touches db/schema files means that drift only surfaces later,
+# on some unrelated PR whose own diff happens to flip PC_HAS_DB=1. Both steps
+# are cheap (~20s combined) and side-effect-free when already fresh, so
+# running them unconditionally verifies freshness independent of branch diff.
+# Migration immutability (step 1) stays gated — it is only meaningful when
+# migration files themselves changed.
+pc-db-prep: ## pc steps 1-3: migration immutability (db changes only) + schema + codegen (always)
 	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && $(_PC_MIGRATION_CMD),@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD),@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
-	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
+	@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD)
+	@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD)
 
 pc-typecheck: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-typecheck: ## pc step 4: typecheck affected projects

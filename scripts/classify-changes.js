@@ -12,7 +12,12 @@
  *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_PS1=0 PC_DOCS_ONLY=0
  *
  * Flags:
- *   PC_HAS_DB        — files in lib/db-client/ or lambdas/db/
+ *   PC_HAS_DB        — files in lib/db-client/ or lambdas/db/. Gates only the
+ *                       migration immutability check (pc step 1) — schema
+ *                       generation and codegen (steps 2-3) always run
+ *                       regardless of this flag (LS-9276), so generated-file
+ *                       staleness is caught independent of what the current
+ *                       branch's diff touches.
  *   PC_HAS_WORKFLOWS — files in .github/workflows/
  *   PC_HAS_PS1       — files matching scripts/**\/*.ps1 (LS-8729)
  *   PC_DOCS_ONLY     — ALL changed files are docs (.md, .agents/skills/, docs/)
@@ -159,7 +164,10 @@ function main() {
       }
       if (flags.PC_HAS_DB === '0') {
         skips.push(
-          'no db changes — skipping migration check, schema gen, codegen',
+          // LS-9276: schema gen + codegen always run regardless of PC_HAS_DB
+          // (they verify freshness independent of what the branch touches) —
+          // only the migration immutability check is actually skipped here.
+          'no db changes — skipping migration immutability check',
         );
       }
       if (flags.PC_HAS_WORKFLOWS === '0') {

@@ -20,8 +20,8 @@ The `_PC_*_CMD` variable block in the root `Makefile` (search for the `_PC_` pre
 | #   | Step                            | Command (from `_PC_*_CMD`)                                                                              | Chunk target   | Runs when            |
 | --- | ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- | -------------------- |
 | 1   | Migration immutability          | `node scripts/check-migration-immutability.js --branch`                                                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                                                      | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen`                                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                                                      | `pc-db-prep`   | always               |
+| 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen`                                 | `pc-db-prep`   | always               |
 | 4   | Typecheck                       | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                                                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
 | 5   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                                                         | `pc-format`    | always               |
 | 6   | Lint (scoped fix + check)       | `node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE)` | `pc-lint`      | `PC_DOCS_ONLY=0`     |
@@ -61,9 +61,11 @@ failure mode vendoring removes. See [`scripts/schemas/README.md`](../../../scrip
 
 Each pc invocation runs `node scripts/classify-changes.js --base $(NX_BASE)`, which diffs `NX_BASE...HEAD` and emits three flags:
 
-- `PC_HAS_DB=1` — any changed file under `lib/db-client/` or `lambdas/db/` (enables steps 1–3)
+- `PC_HAS_DB=1` — any changed file under `lib/db-client/` or `lambdas/db/` (enables step 1, migration immutability)
 - `PC_HAS_WORKFLOWS=1` — any changed file under `.github/workflows/` (enables step 7)
 - `PC_DOCS_ONLY=1` — ALL changed files are docs (`*.md`, `docs/`, `.agents/skills/`) (skips steps 4, 6, 8, 9)
+
+**Steps 2–3 (schema generation + codegen) always run, regardless of `PC_HAS_DB`** (LS-9276). They used to be gated the same way as step 1, which let generated-file staleness introduced by one PR (e.g. a schema change that didn't regen every codegen target) go undetected by every later PR whose own diff didn't happen to touch `lib/db-client/`/`lambdas/db/`. Both commands are cheap (~20s combined) and a no-op when already fresh, so running them unconditionally closes that gap for local validation — mirroring what `.github/workflows/check-schema.yml`'s `git diff --exit-code -- '*.generated.ts'` already enforces in CI for PRs that touch schema-relevant paths.
 
 **Fail-safe:** if `git diff` fails (typical cause: shallow clone with no merge-base for `origin/main`) or no changes are detected, every step runs. In cloud, `.claude/cloud-setup.sh` deepens the clone (`git fetch --deepen=200`, fallback `--unshallow`) precisely to avoid this slow run-everything path.
 
