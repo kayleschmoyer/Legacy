@@ -10,7 +10,7 @@
 
 Pull request and review lifecycle — PR dashboards, review threads, labels, and merge readiness.
 
-Available both locally (stdio) and via the hosted connector. 60 tools.
+Available both locally (stdio) and via the hosted connector. 61 tools.
 
 ---
 
@@ -195,6 +195,17 @@ Fetch review threads on a PR via GraphQL. By default returns only UNRESOLVED thr
 | `number` | number |  | coerced | PR number |
 | `prNumber` | number |  | coerced | Alias for "number" — use either, not both |
 | `includeResolved` | boolean |  | — | Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge) |
+
+### `github_issue_comment_write`
+
+Create, update, or delete an issue/PR comment. Works on both issue comments and PR top-level comments — GitHub treats them the same way under the hood via the issues API. Use method "update" to edit an existing comment in place (fix a typo, correct a stale reference, maintain a sticky/marker comment like `<!-- e2e-hold -->`) instead of posting a follow-up correction. method "create" maps to POST /repos/{owner}/{repo}/issues/{number}/comments (equivalent to github_comment_pr); "update" maps to PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}; "delete" maps to DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `method` | enum | **required** | — | "create" posts a new comment (requires number + body); "update" edits an existing comment in place (requires commentId + body); "delete" removes a comment (requires commentId). |
+| `number` | number |  | coerced | Issue or PR number. Required for method "create". |
+| `commentId` | number |  | coerced | Comment ID to update or delete. Required for method "update"/"delete". |
+| `body` | string |  | min 1 | Markdown body of the comment. Required for method "create"/"update". |
 
 ### `github_job_list`
 

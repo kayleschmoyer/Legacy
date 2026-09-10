@@ -28,6 +28,7 @@ import {
   resolveReplyToReviewInput,
 } from './tools/reply-to-review.js';
 import { commentPR } from './tools/comment-pr.js';
+import { issueCommentWrite } from './tools/issue-comment-write.js';
 import { editPR } from './tools/edit-pr.js';
 import { listCommitStatuses } from './tools/list-commit-statuses.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
@@ -697,6 +698,36 @@ export function createServer(): McpServer {
       }
       return commentPR({ number: resolved, body: params.body });
     },
+  );
+
+  // --- github_issue_comment_write ---
+  server.tool(
+    'github_issue_comment_write',
+    'Create, update, or delete an issue/PR comment. Works on both issue comments and PR top-level comments — GitHub treats them the same way under the hood via the issues API. Use method "update" to edit an existing comment in place (fix a typo, correct a stale reference, maintain a sticky/marker comment like `<!-- e2e-hold -->`) instead of posting a follow-up correction. method "create" maps to POST /repos/{owner}/{repo}/issues/{number}/comments (equivalent to github_comment_pr); "update" maps to PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}; "delete" maps to DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}.',
+    {
+      method: z
+        .enum(['create', 'update', 'delete'])
+        .describe(
+          '"create" posts a new comment (requires number + body); "update" edits an existing comment in place (requires commentId + body); "delete" removes a comment (requires commentId).',
+        ),
+      number: prNumberField('number')
+        .optional()
+        .describe('Issue or PR number. Required for method "create".'),
+      commentId: prNumberField('commentId')
+        .optional()
+        .describe(
+          'Comment ID to update or delete. Required for method "update"/"delete".',
+        ),
+      body: z
+        .string()
+        .trim()
+        .min(1, 'Comment body cannot be empty')
+        .optional()
+        .describe(
+          'Markdown body of the comment. Required for method "create"/"update".',
+        ),
+    },
+    async (params) => issueCommentWrite(params),
   );
 
   // --- github_list_pr_comments (consolidated) ---

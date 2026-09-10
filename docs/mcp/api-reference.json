@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 269,
+  "toolCount": 270,
   "servers": [
     {
       "dir": "worktree-server",
@@ -4094,7 +4094,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 60,
+      "toolCount": 61,
       "tools": [
         {
           "name": "get_job_logs",
@@ -4855,6 +4855,49 @@
               "optional": true,
               "default": false,
               "description": "Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge)"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_issue_comment_write",
+          "description": "Create, update, or delete an issue/PR comment. Works on both issue comments and PR top-level comments — GitHub treats them the same way under the hood via the issues API. Use method \"update\" to edit an existing comment in place (fix a typo, correct a stale reference, maintain a sticky/marker comment like `<!-- e2e-hold -->`) instead of posting a follow-up correction. method \"create\" maps to POST /repos/{owner}/{repo}/issues/{number}/comments (equivalent to github_comment_pr); \"update\" maps to PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}; \"delete\" maps to DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}.",
+          "inputs": {
+            "method": {
+              "type": "enum",
+              "optional": false,
+              "enum": [
+                "create",
+                "update",
+                "delete"
+              ],
+              "description": "\"create\" posts a new comment (requires number + body); \"update\" edits an existing comment in place (requires commentId + body); \"delete\" removes a comment (requires commentId)."
+            },
+            "number": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced"
+              ],
+              "description": "Issue or PR number. Required for method \"create\"."
+            },
+            "commentId": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced"
+              ],
+              "description": "Comment ID to update or delete. Required for method \"update\"/\"delete\"."
+            },
+            "body": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Markdown body of the comment. Required for method \"create\"/\"update\"."
             }
           },
           "transports": [
