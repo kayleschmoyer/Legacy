@@ -201,6 +201,55 @@ test('classify() leaves hasPs1 false when no .ps1 files changed', () => {
   }
 });
 
+/**
+ * PC_HAS_GH_SCRIPTS flag (LS-9964): `.github/scripts/` has no nx project.json,
+ * so `nx affected -t test` (make pc-test) is structurally blind to its unit
+ * suites — a change confined there yields "No tasks were run" and exits 0.
+ * classify() must flag those changes so pc-workflows can run the suites
+ * directly via `pnpm run test:github-scripts`.
+ */
+test('classify() sets hasGithubScripts when a .github/scripts file changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, '.github', 'scripts', '__tests__'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(root, '.github', 'scripts', '__tests__', 'thing.test.mjs'),
+      '// test',
+    );
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'add github script test']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasGithubScripts, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() leaves hasGithubScripts false for .github/workflows-only changes', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'name: ci');
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'workflow-only change']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasGithubScripts, false);
+    assert.equal(result.hasWorkflows, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('refreshBaseRef does not throw when the fetch fails (offline fail-safe)', () => {
   const root = mkdtempSync(join(tmpdir(), 'classify-changes-noremote-'));
   const originalCwd = process.cwd();

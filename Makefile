@@ -1021,6 +1021,15 @@ else
 _PC_TEST_PS_CMD = if command -v pwsh >/dev/null 2>&1; then echo "  Running PowerShell script tests (test:scripts:ps)..." && pnpm run test:scripts:ps; else echo "  PowerShell script tests SKIPPED (pwsh not installed -- see .agents/skills/cloud-agent-mode/SKILL.md Quirk 11)"; fi
 endif
 
+# LS-9964: .github/scripts/ has no nx project.json, so `nx affected -t test`
+# structurally cannot reach its unit suites. Run them directly. Unlike
+# _PC_TEST_PS_CMD above this needs no per-shell form: `echo ... && pnpm run`
+# is valid under both cmd.exe and POSIX shells. The cross-platform hazard for
+# this command is the glob, which lives in package.json's test:github-scripts
+# and is double-quoted there so cmd.exe strips the quotes (single quotes would
+# leave node matching nothing and exiting 0).
+_PC_TEST_GH_SCRIPTS_CMD = echo "  Running GitHub script unit tests (test:github-scripts)..." && pnpm run test:github-scripts
+
 # Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
 # Canned recipe so the `pre-commit` pipeline and the standalone `pc-format` target
 # share one implementation.
@@ -1059,6 +1068,7 @@ pre-commit: ## Run all pre-commit validation checks
 	$(_PC_FORMAT_RECIPE)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
+	$(if $(findstring PC_HAS_GH_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_GH_SCRIPTS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && $(_PC_BUILD_CMD),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
@@ -1102,8 +1112,9 @@ pc-lint: ## pc step 6: lint affected projects. Pass PARALLEL=N to cap nx project
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
 
 pc-workflows: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-workflows: ## pc step 7: GitHub workflow validation
+pc-workflows: ## pc step 7: GitHub workflow validation + .github/scripts unit tests
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
+	$(if $(findstring PC_HAS_GH_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_GH_SCRIPTS_CMD),)
 
 pc-test: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-test: ## pc step 8: test affected projects. Pass MAXWORKERS=N to cap Jest worker parallelism (avoids OOM on memory-constrained machines)

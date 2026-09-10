@@ -9,18 +9,19 @@
  * Usage: node scripts/classify-changes.js [--print-summary] [--base <ref>]
  *
  * Output (stdout): space-separated KEY=VALUE pairs, e.g.:
- *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_PS1=0 PC_DOCS_ONLY=0
+ *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_GH_SCRIPTS=0 PC_HAS_PS1=0 PC_DOCS_ONLY=0
  *
  * Flags:
- *   PC_HAS_DB        — files in lib/db-client/ or lambdas/db/. Gates only the
- *                       migration immutability check (pc step 1) — schema
- *                       generation and codegen (steps 2-3) always run
- *                       regardless of this flag (LS-9276), so generated-file
- *                       staleness is caught independent of what the current
- *                       branch's diff touches.
- *   PC_HAS_WORKFLOWS — files in .github/workflows/
- *   PC_HAS_PS1       — files matching scripts/**\/*.ps1 (LS-8729)
- *   PC_DOCS_ONLY     — ALL changed files are docs (.md, .agents/skills/, docs/)
+ *   PC_HAS_DB         — files in lib/db-client/ or lambdas/db/. Gates only the
+ *                        migration immutability check (pc step 1) — schema
+ *                        generation and codegen (steps 2-3) always run
+ *                        regardless of this flag (LS-9276), so generated-file
+ *                        staleness is caught independent of what the current
+ *                        branch's diff touches.
+ *   PC_HAS_WORKFLOWS  — files in .github/workflows/
+ *   PC_HAS_GH_SCRIPTS — files in .github/scripts/ (LS-9964)
+ *   PC_HAS_PS1        — files matching scripts/**\/*.ps1 (LS-8729)
+ *   PC_DOCS_ONLY      — ALL changed files are docs (.md, .agents/skills/, docs/)
  *
  * Fail-safe: if git diff fails or no changes detected, all flags default to
  * "run everything" so nothing is accidentally skipped.
@@ -63,6 +64,7 @@ function classify(baseRef) {
   const FAIL_SAFE = {
     hasDb: true,
     hasWorkflows: true,
+    hasGithubScripts: true,
     hasPs1: true,
     docsOnly: false,
     reason: null,
@@ -92,6 +94,7 @@ function classify(baseRef) {
 
   let hasDb = false;
   let hasWorkflows = false;
+  let hasGithubScripts = false;
   let hasPs1 = false;
   let allDocs = true;
 
@@ -109,6 +112,13 @@ function classify(baseRef) {
     // Workflow changes
     if (normalized.startsWith('.github/workflows/')) {
       hasWorkflows = true;
+    }
+
+    // GitHub automation script changes (LS-9964) — .github/scripts/ has no nx
+    // project.json, so `nx affected -t test` can never reach its unit suites.
+    // Flag it so pc-workflows can run them directly via `node --test`.
+    if (normalized.startsWith('.github/scripts/')) {
+      hasGithubScripts = true;
     }
 
     // PowerShell script changes (LS-8729) — scripts/*.ps1 and scripts/**/*.ps1
@@ -130,7 +140,14 @@ function classify(baseRef) {
   // DB and workflow changes in non-doc files already set allDocs = false
   // via the loop above, so no extra override is needed here.
 
-  return { hasDb, hasWorkflows, hasPs1, docsOnly: allDocs, reason: null };
+  return {
+    hasDb,
+    hasWorkflows,
+    hasGithubScripts,
+    hasPs1,
+    docsOnly: allDocs,
+    reason: null,
+  };
 }
 
 function main() {
@@ -139,6 +156,7 @@ function main() {
   const flags = {
     PC_HAS_DB: result.hasDb ? '1' : '0',
     PC_HAS_WORKFLOWS: result.hasWorkflows ? '1' : '0',
+    PC_HAS_GH_SCRIPTS: result.hasGithubScripts ? '1' : '0',
     PC_HAS_PS1: result.hasPs1 ? '1' : '0',
     PC_DOCS_ONLY: result.docsOnly ? '1' : '0',
   };
@@ -172,6 +190,11 @@ function main() {
       }
       if (flags.PC_HAS_WORKFLOWS === '0') {
         skips.push('no workflow changes — skipping workflow validation');
+      }
+      if (flags.PC_HAS_GH_SCRIPTS === '0') {
+        skips.push(
+          'no .github/scripts changes — skipping GitHub script unit tests',
+        );
       }
       if (flags.PC_HAS_PS1 === '0') {
         skips.push(

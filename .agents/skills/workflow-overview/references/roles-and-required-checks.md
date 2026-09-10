@@ -25,7 +25,9 @@ Three GitHub Apps handle distinct roles to ensure no single identity both author
 - **Config is not live state.** The cutover is staged: a maintainer must run `bash scripts/apply-ruleset.sh` to push the config live; `check-ruleset.yml` reports drift until then (expected). Check the live set with `github_get_branch_protection()` before reasoning about a blocked merge — details in the [config-vs-live section](../../pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
 - Non-required checks (GraphQL Schema & Codegen, Security Scanning, Deploy PR Preview, jira-link-check, Jira Branch Sync, Touch-Map freshness, Update Migration Badge) still post check runs, and the merge queue waits for all checks to complete — so a failing advisory check can delay a queued merge even though it cannot 405 it.
 
-> The CI Pipeline `custom-checks` job also runs the repo-script unit suites — `pnpm test:scripts` (node `--test` over `scripts/__tests__/*.test.mjs`) and `pnpm test:scripts:ps` (the dependency-free PowerShell assertions). `pwsh` is baked into the runner AMI with an install-if-missing fallback in the job (LS-7770).
+> The CI Pipeline `custom-checks` job also runs the repo-script unit suites — `pnpm test:scripts` (node `--test` over `scripts/__tests__/*.test.mjs`), `pnpm test:github-scripts` (node `--test` over `.github/scripts/**/__tests__/*.test.mjs`, LS-9964), and `pnpm test:scripts:ps` (the dependency-free PowerShell assertions). `pwsh` is baked into the runner AMI with an install-if-missing fallback in the job (LS-7770).
+>
+> `test:github-scripts` exists because `.github/scripts/` has no nx `project.json`, so `pc-test` (`nx affected -t test`) is structurally blind to it — a change confined there yields "No tasks were run" and exits 0. Locally the same suites run from `pc-workflows`, gated on `PC_HAS_GH_SCRIPTS`.
 
 ## Secrets Reference
 

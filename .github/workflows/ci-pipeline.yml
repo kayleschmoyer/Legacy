@@ -650,6 +650,16 @@ jobs:
           set -o pipefail
           pnpm run test:scripts 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
+      # LS-9964: .github/scripts/ has no nx project.json, so `nx affected -t test`
+      # (make pc-test) can never reach these suites — a change confined to that
+      # directory yields "No tasks were run" and exits 0. Run them directly here.
+      # Unconditional, like the sibling step above: the suites take ~8s, and
+      # gating on changed paths would miss breakage from a shared dependency.
+      - name: "Script Unit Tests (.github/scripts)"
+        run: |
+          set -o pipefail
+          pnpm run test:github-scripts 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
+
       - name: "Script Unit Tests (PowerShell)"
         run: |
           set -o pipefail
