@@ -196,6 +196,52 @@ Applied` (the 6 granular `🚀 CI Pipeline / {lint,format,build,test,custom-chec
    does not change the live ruleset. Until the apply runs, `check-ruleset.yml`
    (non-required drift check) reports drift — expected.
 
+## Shard-level flake tolerance (LS-9727)
+
+`e2e` (desktop chromium) is a `GATE_INPUT_JOBS` member, so a single red shard
+turns `CI Gate` red regardless of the PR's own diff. LS-9727 documented
+disjoint `expect(locator).toBeVisible()` timeouts across unrelated specs on
+two full-pipeline runs of one byte-identical commit — non-determinism, not a
+regression (a real regression fails the same test every run).
+
+**Root cause**: the same self-hosted-runner CPU oversubscription LS-9695
+root-caused and fixed for the wider "different random `@critical` test fails
+each run" pattern — 4 Playwright workers on a 4 vCPU box left zero headroom
+for the OS/`vite preview`/browser compositor threads, so a transient
+scheduling stall starved whichever assertion happened to be polling at that
+moment, in whichever spec that worker happened to be running. LS-9695's fix
+(`apps/web-e2e/playwright.config.ts`: `workers` 4→3, `expect.timeout` 3s→5s,
+per-test `timeout` 30s→45s) landed after the runs LS-9727 recorded and
+resolved the dominant failure mode fleet-wide (desktop and mobile share the
+same config). Some residual runner-contention flake is not fully eliminable
+on shared infrastructure, which is what the policy below is for.
+
+**Policy decision** (LS-9727, superseding "should a red desktop shard get an
+automatic retry"): a bounded **per-test** retry, not a whole-job/whole-shard
+re-run, and not a change to `playwright.config.ts`'s own `retries: 0`
+default or its "flake is a P1 bug" philosophy for every other caller:
+
+- The desktop chromium `e2e` job (`ci-pipeline.yml`, both the sharded
+  `@critical` run and the narrow-change "affected specs" step) passes
+  `--retries=1` — one retry, so a test fails the shard only after failing
+  **twice**.
+- `e2e-mobile` deliberately keeps `retries: 0`. LS-9712's maintainer ruling
+  found every one of its failures to be a real spec/config gap (desktop-only
+  assertions running at a mobile viewport for the first time), not
+  environment flake — retrying there would mask exactly the class of bug
+  that job exists to catch.
+- A test that needed the retry is reported as **flaky**, never silently
+  dropped: `.github/actions/e2e-testing/action.yml` computes pass/fail off
+  each test's _final_ attempt (so a flaky test isn't double-counted) and
+  separately surfaces every flaky test's title in the job summary. A single
+  flaky occurrence is tolerated; the same test recurring across runs is a
+  real problem and should get its own ticket (the LS-9733-style pattern) —
+  the summary output is what makes that recurrence visible instead of
+  disappearing into a green checkmark.
+- This does not change `GATE_INPUT_JOBS` or `CI Gate`'s pass semantics
+  (`success`/`skipped` pass, `failure`/`timed_out` fail) — a shard failing
+  twice on the same test still fails `e2e` and still turns the gate red.
+
 ## Rollback
 
 If `CI Gate` misbehaves after a stage is applied:

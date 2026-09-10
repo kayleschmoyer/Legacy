@@ -44,6 +44,25 @@ inputs:
     description: "Playwright shard in 'X/Y' format (e.g. '1/3'). Empty string runs all tests on this runner."
     required: false
     default: ""
+  retries:
+    description: >-
+      Playwright --retries value for this invocation only (playwright.config.ts's
+      own `retries: 0` default — and its "flake is a P1 bug" philosophy — is
+      otherwise unchanged for every other caller). LS-9727: even after LS-9695's
+      root-cause fix (workers 4→3, expect/test timeout headroom) for the CPU
+      oversubscription that produced disjoint toBeVisible() timeouts across
+      unrelated specs, some residual runner-contention flake on the self-hosted
+      fleet is not fully eliminable. Policy: the desktop chromium `e2e` PR-gate
+      job alone sets this to "1" (one bounded per-test retry, not a whole-shard
+      re-run) — a test that fails once and passes on retry is reported as
+      "flaky" (see the flaky-test summary below), never silently dropped, so a
+      persistent/repeat offender is still visible for follow-up; a test that
+      fails twice still fails the shard and the gate. `e2e-mobile` deliberately
+      keeps retries at 0 per LS-9712's maintainer ruling (root-cause and fix,
+      don't mask) — its failures there were real spec/config gaps, not
+      environment flake.
+    required: false
+    default: "0"
   e2e-commissioner-email:
     description: "Email for the integration-test commissioner account (managed via GitHub secret E2E_COMMISSIONER_EMAIL)."
     required: false
@@ -90,6 +109,9 @@ outputs:
   failed-tests:
     description: "Number of tests that failed"
     value: ${{ steps.e2e-tests.outputs.failed-tests }}
+  flaky-tests:
+    description: 'Number of tests that failed at least once but passed on retry (LS-9727; always 0 when inputs.retries is "0")'
+    value: ${{ steps.e2e-tests.outputs.flaky-tests }}
   success-rate:
     description: "Test success rate percentage"
     value: ${{ steps.e2e-tests.outputs.success-rate }}
@@ -310,7 +332,14 @@ runs:
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=apps/web-e2e/test-results"
 
         if [ -n "${{ inputs.shard }}" ]; then
-          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --shard=${{ inputs.shard }}"
+          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --shard=\"${{ inputs.shard }}\""
+        fi
+
+        # LS-9727: bounded per-test retry override (see the `retries` input's
+        # description above). "0" is a no-op — matches playwright.config.ts's
+        # own default and every caller that doesn't pass this input.
+        if [ "${{ inputs.retries }}" != "0" ]; then
+          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --retries=\"${{ inputs.retries }}\""
         fi
 
         if [ "${{ inputs.headless }}" != "true" ]; then
@@ -331,6 +360,7 @@ runs:
         TOTAL_TESTS=0
         PASSED_TESTS=0
         FAILED_TESTS=0
+        FLAKY_TESTS=0
         SUCCESS_RATE=100
 
         if [ -f "apps/web-e2e/test-results/results.json" ]; then
@@ -339,25 +369,45 @@ runs:
           TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' \
             "$RESULTS_FILE" 2>/dev/null || echo 0)
           JQ_BASE='.suites | map(.suites[]?.specs[]?.tests[]? // empty)'
-          PASSED_TESTS=$(jq "[$JQ_BASE | map(select(.results[]?.status == \"passed\"))] | length" \
+          # LS-9727: a retried test (see the `retries` input) has multiple
+          # entries in `.results[]` — one per attempt. Counting on "ANY result
+          # status == X" (the old logic) double-counts a flaky test (failed
+          # once, passed on retry) into both PASSED and FAILED. The FINAL
+          # attempt (`.results[-1]`) is the one Playwright's own exit code is
+          # based on, so it's what these counts key off of too.
+          PASSED_TESTS=$(jq "$JQ_BASE | map(select(.results[-1]?.status == \"passed\")) | length" \
             "$RESULTS_FILE" 2>/dev/null || echo 0)
-          FAILED_TESTS=$(jq "[$JQ_BASE | map(select(.results[]?.status == \"failed\"))] | length" \
+          FAILED_TESTS=$(jq "$JQ_BASE | map(select(.results[-1]?.status == \"failed\")) | length" \
             "$RESULTS_FILE" 2>/dev/null || echo 0)
-          
+          # Flaky = needed more than one attempt but ultimately passed. Never
+          # silently dropped: surfaced here even though it doesn't fail the
+          # job, so a repeat offender is visible for follow-up (LS-9727 policy
+          # — a bounded retry must not mask a real, persistent problem).
+          FLAKY_TESTS=$(jq "$JQ_BASE | map(select((.results | length) > 1 and .results[-1]?.status == \"passed\")) | length" \
+            "$RESULTS_FILE" 2>/dev/null || echo 0)
+
           if [ "$TOTAL_TESTS" -gt 0 ]; then
             SUCCESS_RATE=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
           fi
-          
+
           echo "## 🎭 E2E Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Total Tests**: $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
           echo "- **Passed**: $PASSED_TESTS ✅" >> $GITHUB_STEP_SUMMARY
           echo "- **Failed**: $FAILED_TESTS ❌" >> $GITHUB_STEP_SUMMARY
           echo "- **Success Rate**: $SUCCESS_RATE%" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ $E2E_EXIT_CODE -eq 0 ]; then
             echo "- **Status**: All critical user paths working ✅" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: Critical user path failures detected ❌" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${FLAKY_TESTS:-0}" -gt 0 ]; then
+            echo "- **Flaky (passed on retry)**: $FLAKY_TESTS ⚠️" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ LS-9727: the following test(s) failed at least once but passed on retry. This does not fail the shard, but a test appearing here repeatedly across runs is a real problem worth its own ticket — it is not being silently masked:" >> $GITHUB_STEP_SUMMARY
+            jq -r "$JQ_BASE | map(select((.results | length) > 1 and .results[-1]?.status == \"passed\")) | .[].title" \
+              "$RESULTS_FILE" 2>/dev/null | sed 's/^/  - /' >> $GITHUB_STEP_SUMMARY || true
           fi
         fi
 
@@ -369,6 +419,7 @@ runs:
         echo "total-tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
         echo "passed-tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
         echo "failed-tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+        echo "flaky-tests=${FLAKY_TESTS:-0}" >> $GITHUB_OUTPUT
         echo "success-rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
         echo "execution-time=$EXECUTION_TIME" >> $GITHUB_OUTPUT
 

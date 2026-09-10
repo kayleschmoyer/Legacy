@@ -775,6 +775,12 @@ jobs:
           # full suite) when a broad surface changed.
           test-patterns: ${{ needs.detect-changes.outputs.e2e-grep }}
           test-patterns-invert: ${{ needs.detect-changes.outputs.e2e-grep-invert }}
+          # LS-9727: one bounded per-test retry for the desktop chromium gate
+          # only — see the `retries` input's description in
+          # .github/actions/e2e-testing/action.yml for the policy and why
+          # e2e-mobile below does NOT set this. A test that needs the retry is
+          # still surfaced as "flaky" in the job summary, not masked.
+          retries: "1"
           e2e-commissioner-email: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
           e2e-commissioner-password: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
           e2e-manager-1-email: ${{ secrets.E2E_MANAGER_1_EMAIL }}
@@ -819,12 +825,16 @@ jobs:
           # (already run above) or @slow leaves an empty selection after
           # --grep-invert. Playwright treats zero matched tests as a hard error
           # (exit 1) by default; this flag makes that case a no-op pass instead.
+          # --retries=1: same bounded per-test retry policy as the "E2E Testing"
+          # step above (LS-9727) — this step is still the desktop chromium `e2e`
+          # gate, just the narrow-change code path, so it gets the same policy.
           pnpm exec playwright test \
             --config=apps/web-e2e/playwright.config.ts \
             --project=chromium \
             --grep-invert="@critical|@slow" \
             --reporter=line \
             --pass-with-no-tests \
+            --retries=1 \
             --output=apps/web-e2e/test-results-affected \
             "${SPECS[@]}"
 
