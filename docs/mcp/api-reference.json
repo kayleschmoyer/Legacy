@@ -1593,7 +1593,7 @@
             "ref": {
               "type": "string",
               "optional": true,
-              "description": "Git ref to read from. Supports branches (\"origin/main\", \"origin/LS-1234/branch\"), SHAs, relative refs (\"HEAD~1\"), and special refs (\"FETCH_HEAD\", \"ORIG_HEAD\", \"REBASE_HEAD\"). Defaults to \"HEAD\" when omitted."
+              "description": "Git ref: branches, local or fetched remote-tracking (\"origin/main\"; unfetched, use worktree_show_remote), SHAs, relative refs (\"HEAD~1\"), special refs (\"FETCH_HEAD\", \"ORIG_HEAD\", \"REBASE_HEAD\"). Default \"HEAD\"."
             },
             "path": {
               "type": "string",

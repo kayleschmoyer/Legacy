@@ -80,6 +80,7 @@ import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitMessage } from './resolve-commit-message';
 import { resolveCommitish } from './resolve-commitish';
+import { validateRef } from './validate-ref';
 import { resolveMainRepoPath } from './resolve-main-repo';
 import { resolveResetTarget } from './resolve-reset-target';
 import { runOnRef } from './run-on-ref';
@@ -1986,9 +1987,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           ref: {
             type: 'string',
             description:
-              'Git ref to read from. Supports branches ("origin/main", "origin/LS-1234/branch"), ' +
-              'SHAs, relative refs ("HEAD~1"), and special refs ("FETCH_HEAD", "ORIG_HEAD", "REBASE_HEAD"). ' +
-              'Defaults to "HEAD" when omitted.',
+              'Git ref: branches, local or fetched remote-tracking ("origin/main"; unfetched, use worktree_show_remote), ' +
+              'SHAs, relative refs ("HEAD~1"), special refs ("FETCH_HEAD", "ORIG_HEAD", "REBASE_HEAD"). Default "HEAD".',
           },
           path: {
             type: 'string',
@@ -8172,26 +8172,13 @@ const handleCallTool = async (
         }
       }
 
-      // Validate ref (reject option-like values and only safe rev chars)
-      if (ref.startsWith('-')) {
+      // Validate ref (reject option-like values and only safe rev chars).
+      // Shared with worktree_run_on_ref so local branches, SHAs, and
+      // remote-tracking refs (e.g. "origin/main") all resolve the same way.
+      const refCheck = validateRef(ref);
+      if (!refCheck.ok) {
         return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
-            },
-          ],
+          content: [{ type: 'text', text: refCheck.error }],
           isError: true,
         };
       }

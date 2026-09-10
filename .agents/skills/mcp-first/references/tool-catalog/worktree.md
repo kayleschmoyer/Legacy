@@ -552,7 +552,7 @@ Read the contents of a file at a specific git ref (branch, tag, SHA, or special 
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `ref` | string |  | — | Git ref to read from. Supports branches ("origin/main", "origin/LS-1234/branch"), SHAs, relative refs ("HEAD~1"), and special refs ("FETCH_HEAD", "ORIG_HEAD", "REBASE_HEAD"). Defaults to "HEAD" when omitted. |
+| `ref` | string |  | — | Git ref: branches, local or fetched remote-tracking ("origin/main"; unfetched, use worktree_show_remote), SHAs, relative refs ("HEAD~1"), special refs ("FETCH_HEAD", "ORIG_HEAD", "REBASE_HEAD"). Default "HEAD". |
 | `path` | string | **required** | — | File path relative to repo root (e.g. "lib/db-client/src/schema.ts"). |
 | `worktree` | string |  | — | Optional ticket key. Uses active worktree if omitted, falls back to main repo if no active worktree is set. |
 | `startLine` | number |  | integer, min 1 | First line to return (1-based, inclusive). Omit to return the full file. |
