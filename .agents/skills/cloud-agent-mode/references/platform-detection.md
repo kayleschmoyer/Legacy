@@ -2,23 +2,30 @@
 
 ## Step 0: identify your platform
 
-Three configurations hide behind "cloud agent". Identify yours **before** following any workflow — the validation binding differs and picking wrong wastes the session.
+Four configurations hide behind "cloud agent". Identify yours **before** following any workflow — the validation binding differs and picking wrong wastes the session.
+
+**Check for `mcp__Claude_Code_Remote__*` first, not `nx_run_pc_chunk` (LS-9265).** An earlier version of this tree branched on `nx_run_pc_chunk` presence/absence first and treated its presence as proof you were _not_ in CCR. That assumption is false: `legacy-sports-nx` is an ordinary stdio server in `.mcp.json`, and it can connect successfully in a CCR session too (confirmed live during LS-9265 — a single session had both `mcp__Claude_Code_Remote__*` tools and a working `mcp__legacy-sports-nx__nx_run_pc_chunk` at the same time). Whether `nx_run_pc_chunk` happens to be connected tells you nothing about which platform you're on; the `Claude_Code_Remote` server identity (and this session's own system-prompt framing, "Your current remote execution environment") is the reliable signal.
 
 ```
-Is `mcp__legacy-sports-nx__nx_run_pc_chunk` present?
-   (check the deferred-tools <system-reminder>, or run ToolSearch("select:nx_run_pc_chunk"))
+Is `mcp__Claude_Code_Remote__*` present (e.g. `create_trigger`, `list_repos`, `send_later`)?
 │
-├─ YES, and built-in Bash/Read/Edit are present
-│     → CONNECTOR CC WEB (Claude Code on the web with custom remote connectors)
+├─ YES → CLAUDE CODE REMOTE (CCR) — see [claude-code-remote.md](claude-code-remote.md).
+│         `mcp__legacy-sports-nx__nx_run_pc_chunk` may ALSO be connected here — check
+│         with ToolSearch, don't assume it's absent. When connected, use it (same
+│         binding as Connector CC web below). When it fails to connect or drops
+│         mid-session, do not poll indefinitely — see
+│         [ccr-known-failures.md § legacy-sports-nx connects unreliably at CCR session start](ccr-known-failures.md#known-failure-mode-legacy-sports-nx-connects-unreliably-at-ccr-session-start-no-signal-distinguishes-still-connecting-from-never-will-ls-9265).
 │
-├─ YES, and there is no Claude Code shell (worktree_*/make_* tools instead of Bash)
-│     → COPILOT CODING AGENT
-│
-└─ NO
-      ├─ `mcp__Claude_Code_Remote__*` tools present (e.g. `create_trigger`, `list_repos`, `send_later`) alongside hosted `legacy-sports-{jira,github,ci}` connectors
-      │     → CLAUDE CODE REMOTE (CCR) — see [claude-code-remote.md](claude-code-remote.md)
+└─ NO → is `mcp__legacy-sports-nx__nx_run_pc_chunk` present?
+      (check the deferred-tools <system-reminder>, or run ToolSearch("select:nx_run_pc_chunk"))
       │
-      └─ No custom MCP servers of any kind
+      ├─ YES, and built-in Bash/Read/Edit are present
+      │     → CONNECTOR CC WEB (Claude Code on the web with custom remote connectors)
+      │
+      ├─ YES, and there is no Claude Code shell (worktree_*/make_* tools instead of Bash)
+      │     → COPILOT CODING AGENT
+      │
+      └─ NO, no custom MCP servers of any kind
             → DEFAULT (DEGRADED) CC WEB
 ```
 
@@ -30,11 +37,12 @@ The seven `pc-*` chunks in canonical order — `pc-db-prep` → `pc-typecheck` �
 
 **`pc-test` and `scripts/*.ps1` changes (LS-8729)**: `pc-test`'s underlying `_PC_TEST_CMD` (`pnpm exec nx affected -t test --base=$NX_BASE`) never touches root-level `scripts/`, since it is not an Nx project. `classify-changes.js` sets `PC_HAS_PS1=1` whenever a changed file matches `scripts/**/*.ps1`; when that flag is set, `pc-test` additionally runs `pnpm run test:scripts:ps` if `pwsh` is on `PATH`, or prints an explicit `SKIPPED (pwsh not installed)` line otherwise — see [Quirk 11](known-quirks.md#quirk-11-pwsh-is-not-preinstalled-pnpm-run-testscriptsps-fails-outright-ls-8729) for installing `pwsh` in this environment so the step actually runs instead of being skipped.
 
-| Platform             | Binding (owner ruling 2026-07-02)                                                                                                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Copilot Coding Agent | `nx_run_pc_chunk({ chunk: "pc-db-prep" })` → … → `({ chunk: "pc-build" })` — **mandatory** wherever the tool exists (30-min runaway backstop, structured pass/fail)                                                                               |
-| Connector CC web     | Same — `nx_run_pc_chunk` per chunk, **mandatory**                                                                                                                                                                                                 |
-| Default CC web       | `nx_run_pc_chunk` does not exist here. Sanctioned path: Bash `make pc-<chunk>` with **`run_in_background: true`**, one chunk at a time, waiting for each background completion before starting the next. This is the only compliant degraded path |
+| Platform                 | Binding (owner ruling 2026-07-02)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Copilot Coding Agent     | `nx_run_pc_chunk({ chunk: "pc-db-prep" })` → … → `({ chunk: "pc-build" })` — **mandatory** wherever the tool exists (30-min runaway backstop, structured pass/fail)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Connector CC web         | Same — `nx_run_pc_chunk` per chunk, **mandatory**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Claude Code Remote (CCR) | Check `ToolSearch("select:nx_run_pc_chunk")` at the point you need to validate — do not assume absence. **Present** → same binding as Connector CC web, mandatory. **Absent, or drops mid-validation** → two short retries (immediate + 30-60s, the [Repeated Cyclic Flapping](../../mcp-first/references/diagnostics.md#repeated-cyclic-flapping-during-long-running-sessions-ls-9431) protocol), then stop polling and fall back to direct `pnpm exec nx run <project>:<target>` or backgrounded `make pc-<chunk>` (same degraded pattern as Default CC web below) for the rest of the session — see [ccr-known-failures.md § LS-9265](ccr-known-failures.md#known-failure-mode-legacy-sports-nx-connects-unreliably-at-ccr-session-start-no-signal-distinguishes-still-connecting-from-never-will-ls-9265) |
+| Default CC web           | `nx_run_pc_chunk` does not exist here. Sanctioned path: Bash `make pc-<chunk>` with **`run_in_background: true`**, one chunk at a time, waiting for each background completion before starting the next. This is the only compliant degraded path                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 Preconditions that hold on every platform:
 
