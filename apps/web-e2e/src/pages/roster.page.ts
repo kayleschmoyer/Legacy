@@ -51,6 +51,17 @@ export class RosterPage extends BaseScreen {
   }
 
   /**
+   * The occupied slot button for `fullName` assigned at `positionType` —
+   * `"<Player> at <POS>"`. A thin, case-insensitive wrapper over
+   * {@link slotButton} for the dual-mode lineup-assignment assertion
+   * (`football-lineup.dual.spec.ts`), shared by both the "assignment landed"
+   * check and the post-reload persistence check.
+   */
+  assignedSlot(fullName: string, positionType: string): UIElement {
+    return this.slotButton(new RegExp(`${fullName} at ${positionType}`, 'i'));
+  }
+
+  /**
    * The Starting Pitchers section card (`roster-section-pitchers`). Scope
    * position-abbreviation reads to it so an "SP" label never collides with the
    * same text elsewhere on the page.

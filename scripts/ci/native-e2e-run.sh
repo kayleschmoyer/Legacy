@@ -12,20 +12,28 @@
 #
 # It exports the native harness env the shared suite gates on
 # (E2E_NATIVE_APP + Appium coordinates — see apps/web-e2e/src/driver/appium-env.ts),
-# starts an Appium (UiAutomator2) server, and runs the ONE proof flow
-# (login → league list) through the existing native `AppDriver` seam. Appium
-# installs + launches the APK itself via the `appium:app` capability that
-# createAndroidSession() derives from E2E_NATIVE_APP. A non-zero exit reddens
-# the job = the "watched" red check.
+# starts an Appium (UiAutomator2) server, and runs the proof flows (login →
+# league list; football roster bench↔starter lineup assignment — LS-9656)
+# through the existing native `AppDriver` seam. Appium installs + launches
+# the APK itself via the `appium:app` capability that createAndroidSession()
+# derives from E2E_NATIVE_APP. A non-zero exit reddens the job = the
+# "watched" red check.
 set -uo pipefail
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-./artifacts}"
 APPIUM_PORT="${APPIUM_PORT:-4723}"
 APPIUM_LOG="${APPIUM_LOG:-$ARTIFACT_DIR/appium.log}"
 PW_CONFIG="apps/web-e2e/playwright.native.config.ts"
-# The single "login → league list" proof flow (bypass build lands authenticated,
-# then the shared LeaguePage drives the league-discovery / list surface).
-PROOF_SPEC="league-discovery-search.dual.spec.ts"
+# The native proof specs (LS-9656 generalized this from a single hardcoded
+# spec to a list): "login → league list" (bypass build lands authenticated,
+# then the shared LeaguePage drives the league-discovery / list surface) plus
+# the football roster bench↔starter lineup assignment
+# (`lib/shared-components/src/features/roster/**`). Add further specs here as
+# more surfaces get native proof coverage.
+PROOF_SPECS=(
+  "league-discovery-search.dual.spec.ts"
+  "football-lineup.dual.spec.ts"
+)
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -83,10 +91,10 @@ if [ -z "$READY" ]; then
 fi
 echo "✅ Appium ready"
 
-# ── 3. Run the one proof flow through the native project ──────────────
-echo "🧪 Running native E2E: $PW_CONFIG (--project=native-android, $PROOF_SPEC)"
+# ── 3. Run the proof flows through the native project ──────────────────
+echo "🧪 Running native E2E: $PW_CONFIG (--project=native-android, ${PROOF_SPECS[*]})"
 pnpm exec playwright test --config="$PW_CONFIG" \
-  --project=native-android "$PROOF_SPEC"
+  --project=native-android "${PROOF_SPECS[@]}"
 TEST_EXIT=$?
 
 if [ "$TEST_EXIT" -ne 0 ]; then
