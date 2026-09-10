@@ -1528,18 +1528,29 @@ describe('ci-gate — a not-yet-started pull_request_review run does not superse
       assert.strictEqual(calls.statuses[0].state, 'success');
       assert.deepStrictEqual(
         calls.listJobs,
-        [PENDING_REVIEW_RUN],
-        'the empty-jobs candidate must still be probed at the job level',
+        [],
+        'LS-9754 (the NOT_YET_STARTED_RUN_STATUSES check in ' +
+          'assertSuccessIsCurrent) already filters out a `pending` candidate ' +
+          'for this exact SHA before the loop ever reaches pipelineJobWasSkipped ' +
+          "— it is provably blocked behind this run's own SHA-keyed " +
+          'concurrency slot (ci-orchestrator.yml) and cannot be running ' +
+          'concurrently, so no job-level probe is needed at all. The ' +
+          "candidate's job list is therefore never fetched; only the " +
+          'run-level check fires.',
       );
     } finally {
       process.env.GITHUB_RUN_ID = saved;
     }
   });
 
-  it('STILL withholds for a not-yet-started candidate that is NOT a pull_request_review run', async () => {
-    // A genuine workflow_dispatch re-run (the manual recovery path) or a fresh
-    // pull_request-triggered run with zero jobs so far may yet run CI and post
-    // its own verdict — the LS-9811 prediction must not apply to it.
+  it('does not withhold for a not-yet-started candidate that is NOT a pull_request_review run either, because the SHA-keyed concurrency group makes it provably non-racing regardless of event (LS-9754)', async () => {
+    // A genuine workflow_dispatch re-run or a fresh pull_request-triggered run
+    // that has not started a single job for THIS SHA is blocked behind this
+    // run's own concurrency slot (ci-orchestrator.yml's `group:` is keyed
+    // purely on head SHA, independent of triggering event) and its
+    // check-prior-success step applies to every trigger type — so it is safe
+    // to ignore regardless of event, not just for pull_request_review. See
+    // the NOT_YET_STARTED_RUN_STATUSES doc comment.
     const { github, calls } = makeGithub({
       runs: [
         { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
@@ -1559,10 +1570,54 @@ describe('ci-gate — a not-yet-started pull_request_review run does not superse
       results: allPass(),
     });
 
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+    assert.deepStrictEqual(
+      calls.listJobs,
+      [],
+      'filtered out by the run-level NOT_YET_STARTED_RUN_STATUSES check ' +
+        'before any job-level probe',
+    );
+  });
+
+  it('STILL withholds for an IN-PROGRESS candidate that is NOT a pull_request_review run and has not created the pipeline job yet', async () => {
+    // Unlike a not-yet-started candidate, an `in_progress` run has genuinely
+    // begun — it is not blocked by the SHA-keyed concurrency group and may
+    // finish and post before this run does. The LS-9811 prediction in
+    // pipelineJobWasSkipped is scoped tightly to `pull_request_review`
+    // precisely so a genuinely-running, different-event candidate like this
+    // one keeps failing closed.
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          event: 'workflow_dispatch',
+          status: 'in_progress',
+          conclusion: null,
+        },
+      ],
+      // No jobsByRunId entry for NEWER_RUN_ID — it resolves to `[]`, i.e. it
+      // has started but has not yet created the '🚀 CI Pipeline' job.
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
     assert.strictEqual(res.posted, false);
     assert.strictEqual(res.reason, 'superseded-run');
     assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
     assert.strictEqual(calls.statuses.length, 0);
+    assert.deepStrictEqual(
+      calls.listJobs,
+      [NEWER_RUN_ID],
+      'an in_progress candidate is not filtered by the run-level check, so ' +
+        'it must still be probed at the job level',
+    );
   });
 
   it('STILL withholds for a COMPLETED pull_request_review candidate that never created the pipeline job', async () => {

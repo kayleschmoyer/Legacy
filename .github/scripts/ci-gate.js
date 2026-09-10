@@ -202,6 +202,26 @@ const MAX_SUPERSEDING_RUN_INSPECTIONS = 10;
  * run can be PREDICTED to end up in that same state before it has even
  * created that job (LS-9811).
  *
+ * NOTE (LS-10030): this function's caller, `assertSuccessIsCurrent`, already
+ * filters out any candidate whose `status` is in
+ * `NOT_YET_STARTED_RUN_STATUSES` (LS-9754) BEFORE reaching this function, for
+ * every trigger event — that check is event-agnostic and safe because
+ * ci-orchestrator.yml's concurrency `group:` is keyed purely on head SHA, so
+ * a not-yet-started run for the same SHA is provably blocked and cannot race,
+ * and `check-prior-success` applies to every trigger type. As a result the
+ * `pull_request_review` prediction below is only ever actually exercised for
+ * a candidate whose `status` is `in_progress` (excluded from
+ * NOT_YET_STARTED_RUN_STATUSES because an already-executing run has genuinely
+ * started and may finish first) and has not yet created the pipeline job —
+ * NOT for a `queued`/`pending`/`waiting`/`requested` one, even though the
+ * doc comment below is written in those terms (they were accurate when this
+ * function was introduced; NOT_YET_STARTED_RUN_STATUSES already existed by
+ * then but this interaction went unnoticed until it broke this function's
+ * own regression test). Do not "fix" a queued/pending pull_request_review
+ * test fixture here expecting it to reach `listJobsForWorkflowRun` — it
+ * won't; see `ci-gate.test.mjs`'s "a not-yet-started pull_request_review run
+ * does not supersede (LS-9811)" describe block.
+ *
  * LS-9811: a `pull_request_review`-triggered candidate that has not yet
  * created its '🚀 CI Pipeline' job — including one still sitting at ZERO jobs
  * entirely, e.g. queued behind runner saturation for 20+ minutes — cannot be
