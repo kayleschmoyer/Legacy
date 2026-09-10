@@ -4,18 +4,24 @@ name: "Check Migrations Applied"
 # Verifies that every migration file in lib/db-client/migrations/ has been
 # applied to the production database.
 #
-# Runs on PRs targeting main (blocking check). Also declares workflow_dispatch,
-# but that trigger is USABLE ONLY WITH ref: main, not against PR branches: the
-# AWS OIDC role's trust policy authorizes the pull_request-event subject shape
-# (and ref:refs/heads/main), not workflow_dispatch on arbitrary branches.
-# Dispatching against a PR branch fails at AssumeRoleWithWebIdentity ("Not
-# authorized to perform sts:AssumeRoleWithWebIdentity") after ~4 minutes of
-# retries — it is NOT a way to re-trigger this required check on a PR.
-#
-# If this required check gets stuck/cancelled on a PR (e.g. a concurrency-group
-# race with another triggered run), the correct recovery is to push an empty
-# commit to the PR branch to force a fresh `pull_request` synchronize event:
-#   git commit --allow-empty -m "chore: retrigger CI" && git push
+# Runs on PRs targeting main (blocking check). Also declares workflow_dispatch
+# with a pr_number input for MANUAL RECHECK: dispatch this (from main, with a
+# pr_number) to force a fresh check on one PR when the required check gets
+# stuck "not yet registered" (e.g. its orchestrator run was cancelled or never
+# registered — same failure class as LS-9774). Label-cycling does nothing here
+# (this workflow doesn't listen for `labeled`) and the old recovery — manually
+# closing and reopening the PR (done on PR #3396) — was the only fix. LS-9776
+# ports the exact fix `check-conflicts.yml` already applied for its "No Merge
+# Conflicts" check (LS-9604): the "Verify All Migrations Applied" required
+# status is posted as a commit status scoped to the resolved head SHA (via
+# "Resolve PR info" below), not left as this job's own implicit check-run —
+# see that job's `name:` comment for why. This also keeps workflow_dispatch
+# usable under the AWS OIDC role's trust policy, which authorizes the
+# pull_request-event subject shape and workflow_dispatch on ref:refs/heads/main,
+# but NOT workflow_dispatch on arbitrary PR branches: dispatch this workflow
+# from main (not from the PR branch) with the target PR's number — "Resolve PR
+# info" resolves the head SHA via the API and an explicit checkout step pins
+# the workspace to it, so the check still runs against the PR's actual code.
 #
 # How it works:
 #   1. Resolves ci_readonly DB credentials from AWS Secrets Manager.
@@ -36,6 +42,11 @@ on:
   # push-to-main trigger removed: migration status is verified on PRs before
   # merge.  Use workflow_dispatch for ad-hoc checks post-merge.
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to force a fresh migration check on (manual recheck)"
+        required: true
+        type: number
 
 env:
   AWS_REGION: us-east-1
@@ -43,15 +54,18 @@ env:
   # SSM parameter paths (values written by Terraform)
   SSM_CI_CREDS_SECRET_PARAM: /legacy-sports/dev/ci/readonly-db-creds-secret-name
 
-# One check per branch/PR at a time; the latest run wins.
+# One check per branch/PR at a time; the latest run wins. Manual retriggers
+# (workflow_dispatch, no head_ref since they run from main) key off the
+# pr_number input so they don't collide with an unrelated main-ref run.
 concurrency:
-  group: check-migrations-applied-${{ github.head_ref || github.ref }}
+  group: check-migrations-applied-${{ github.event.pull_request.number || inputs.pr_number || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
   id-token: write # Required for OIDC authentication
   contents: read
   pull-requests: write # Required for adding failure labels
+  statuses: write # Required to post the "Verify All Migrations Applied" commit status (LS-9776)
 
 jobs:
   # LS-1652: Restrict self-hosted runners to PR authors with write permission
@@ -82,7 +96,13 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token || github.token }}
 
   check:
-    name: "Verify All Migrations Applied"
+    # Informational check-run name — deliberately NOT "Verify All Migrations
+    # Applied". That name is the required status check (.github/ruleset.json),
+    # posted as a commit status by the "Post required status" step below
+    # (LS-9776, mirrors check-conflicts.yml's LS-9604) — giving this job's own
+    # check-run the same name would recreate the duplicate-required-name
+    # ambiguity that fix avoids.
+    name: "🗄️ Migration Check (job)"
     needs: [check-runner-access]
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 10
@@ -96,8 +116,63 @@ jobs:
           echo "::error::Ensure CI_RUNNER_LABEL is configured and the PR author has write permission."
           exit 1
 
+      # Authenticate the PR-info lookup with the Agent Author app rather than
+      # the default GITHUB_TOKEN — same rationale as check-conflicts.yml
+      # (LS-8277): GITHUB_TOKEN shares a single ~1,000 req/hr installation
+      # rate-limit bucket across every workflow in the repo.
+      - name: "Generate App Token"
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      # LS-9776: separate token for the commit-status post below, following
+      # the LS-9571/LS-9775 pattern — Agent Author does not hold "Commit
+      # statuses: write". Legacy Sports CI does, and minting it here draws
+      # from its own installation budget instead of the one shared across
+      # every concurrently-running workflow in the repo.
+      - name: "Generate CI App Token"
+        id: ci-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+
+      # Resolves prNumber/headSha from either the normal pull_request trigger
+      # or, on a manual workflow_dispatch retrigger, via the API using the
+      # pr_number input — mirrors check-conflicts.yml's "Resolve PR info".
+      - name: "Resolve PR info"
+        id: pr-info
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          script: |
+            let prNumber, headSha;
+            if (context.eventName === 'pull_request') {
+              prNumber = context.payload.pull_request.number;
+              headSha  = context.payload.pull_request.head.sha;
+            } else {
+              prNumber = Number('${{ inputs.pr_number }}');
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              headSha = pr.head.sha;
+            }
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', headSha);
+
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          # Explicit checkout of the resolved head SHA rather than relying on
+          # default checkout behavior — required so a workflow_dispatch
+          # retrigger (which runs from main) actually checks out the PR's code.
+          ref: ${{ steps.pr-info.outputs.head_sha }}
 
       - name: "Setup Workspace"
         uses: ./.github/actions/setup
@@ -190,14 +265,43 @@ jobs:
           set -o pipefail
           node scripts/check-migrations-applied.js 2>&1 | tee "$RUNNER_TEMP/migrations.log"
 
+      - name: 'Post "Verify All Migrations Applied" required status'
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          CHECK_OUTCOME: ${{ steps.migration-check.outcome }}
+        with:
+          # LS-9776: prefer the Legacy Sports CI app token (separate
+          # installation budget, proven Commit statuses: write) over the
+          # default GITHUB_TOKEN. Falls back to GITHUB_TOKEN (this workflow's
+          # own `statuses: write` permission grant covers it) if minting fails.
+          github-token: ${{ steps.ci-app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const passed = process.env.CHECK_OUTCOME === 'success';
+            // The required status check (LS-9776, mirrors LS-9604). Posted as
+            // a commit status scoped to the resolved head SHA, not this job's
+            // own check-run — see the job-name comment above for why.
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: '${{ steps.pr-info.outputs.head_sha }}',
+              state: passed ? 'success' : 'failure',
+              context: 'Verify All Migrations Applied',
+              description: passed
+                ? 'All migrations applied'
+                : 'Migration check failed — see workflow run',
+              target_url: `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            });
+
       - name: "Label PR on Migration Failure"
-        if: always() && github.event.pull_request.number
+        if: always() && steps.pr-info.outputs.pr_number
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.issue.number;
+            const prNumber = Number('${{ steps.pr-info.outputs.pr_number }}');
             if (!prNumber) return;
 
             const checkResult = '${{ steps.migration-check.outcome }}';
@@ -246,7 +350,7 @@ jobs:
             }
 
       - name: "Update CI status comment (migrations section)"
-        if: always() && github.event.pull_request.number
+        if: always() && steps.pr-info.outputs.pr_number
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
@@ -255,6 +359,8 @@ jobs:
           MIGRATION_PENDING: ${{ steps.migration-check.outputs.pending_migrations }}
           MIGRATION_ERROR: ${{ steps.migration-check.outputs.migration_error }}
           MIGRATION_LOG: ${{ runner.temp }}/migrations.log
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.pr-info.outputs.head_sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -263,7 +369,7 @@ jobs:
             const { statusHeading, detailsBlock, fixLine } = require('./.github/scripts/ci-failure-capture/render.js');
             const { distill } = require('./.github/scripts/ci-failure-capture/extract.js');
 
-            const prNumber = context.issue.number;
+            const prNumber = Number(process.env.PR_NUMBER);
             if (!prNumber) return;
 
             const failed = process.env.MIGRATION_OUTCOME === 'failure';
@@ -277,7 +383,7 @@ jobs:
             let log = '';
             try { log = fs.readFileSync(process.env.MIGRATION_LOG, 'utf8'); } catch {}
             const { excerpt } = distill({ tool: 'generic', text: log, runUrl });
-            const headSha = context.payload.pull_request?.head?.sha || context.sha;
+            const headSha = process.env.HEAD_SHA || context.sha;
 
             // LS-9599: only claim "unapplied migrations" when the script actually
             // connected, compared applied-vs-disk state, and found a gap

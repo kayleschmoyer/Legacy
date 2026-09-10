@@ -50,7 +50,8 @@
             "context": "No Merge Conflicts"
           },
           {
-            "_comment": "Verifies all migration files in lib/db-client/migrations/ are applied to the production RDS before merge. Blocks PRs that add a migration file without running it first. Defined in check-migrations-applied.yml; runs on every PR (no paths filter) so this required check always fires. LS-4843.",
+            "_comment": "Verifies all migration files in lib/db-client/migrations/ are applied to the production RDS before merge. Blocks PRs that add a migration file without running it first. Defined in check-migrations-applied.yml; runs on every PR (no paths filter) so this required check always fires. LS-4843. Posted as a commit status (LS-9776, mirrors LS-9604) by that workflow's 'check' job — not a check run, so it cannot accrue the cancelled-duplicate-name pile-up that a concurrency-cancelled check-run can, and so a workflow_dispatch manual retrigger (with a pr_number input) can post it too. Not a check-run: no matching workflow job name.",
+            "_commitStatus": true,
             "context": "Verify All Migrations Applied"
           },
           {
