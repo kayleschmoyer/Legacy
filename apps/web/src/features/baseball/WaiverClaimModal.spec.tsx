@@ -13,6 +13,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { useGetTeamMembersQuery } from '@legacy-sports/graphql';
 import { WaiverClaimModal } from './WaiverClaimModal';
 
 /* ── Mock state (read by factory implementations at render time) ─────────── */
@@ -246,5 +247,82 @@ describe('WaiverClaimModal – error dismissal (LS-4043)', () => {
 
     expect(errorEvent).toBeDefined();
     expect(errorEvent?.detail.message).toContain('player');
+  });
+});
+
+describe('WaiverClaimModal – roster capacity source (LS-9769)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockClaimFn = jest.fn().mockResolvedValue({});
+    capturedOnOpenChange = undefined;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /**
+   * Reproduces the reported contradiction: the roster-service mock (which
+   * stands in for `claimFreeAgent`'s server-side `checkRosterCapacity` check)
+   * counts a real roster at capacity, while the Redux `league.leagueData`
+   * slice mock — the never-populated fallback the v2 free-agents route
+   * leaves in place — still says the cap is 25. Before the fix, the modal
+   * read `maxRosterSize` from that stale Redux slice only, so it rendered
+   * "Roster has space" and let the user submit without picking a player to
+   * drop, exactly the state the reported claim was rejected against.
+   */
+  it('gates on the league-fragment maxRosterSize prop, not the stale Redux fallback, when the roster is actually full', () => {
+    (useGetTeamMembersQuery as jest.Mock).mockReturnValue({
+      data: {
+        teamMembers: [
+          { id: 1, player: { id: 501, firstName: 'A', lastName: 'One' } },
+        ],
+      },
+      loading: false,
+    });
+
+    render(
+      <WaiverClaimModal
+        open
+        player={player}
+        leagueId={leagueId}
+        onClose={jest.fn()}
+        maxRosterSize={1}
+      />,
+    );
+
+    expect(
+      screen.getByText(/Roster full \(1\/1\) — select a player to drop/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Roster has space/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /submit claim/i }),
+    ).toBeDisabled();
+  });
+
+  it('falls back to the Redux league.leagueData cap when no maxRosterSize prop is supplied', () => {
+    (useGetTeamMembersQuery as jest.Mock).mockReturnValue({
+      data: {
+        teamMembers: [
+          { id: 1, player: { id: 501, firstName: 'A', lastName: 'One' } },
+        ],
+      },
+      loading: false,
+    });
+    // Explicitly re-set (rather than relying on the previous test's mock) so
+    // this test's expectations hold regardless of execution order.
+
+    render(
+      <WaiverClaimModal
+        open
+        player={player}
+        leagueId={leagueId}
+        onClose={jest.fn()}
+      />,
+    );
+
+    // The mocked Redux slice reports maxRosterSize: 25, so a 1-player roster
+    // still has space under the legacy fallback path.
+    expect(screen.getByText(/Roster has space \(1\/25\)/i)).toBeInTheDocument();
   });
 });

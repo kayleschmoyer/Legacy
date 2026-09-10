@@ -56,6 +56,19 @@ interface WaiverClaimModalProps {
     eligiblePositions?: string[] | null;
   };
   leagueId: number;
+  /**
+   * This league's roster cap, straight from the just-fetched League GraphQL
+   * fragment. Falls back to the Redux `league.leagueData` slice (then 25)
+   * when a caller doesn't supply it, but that slice is only ever populated by
+   * the legacy v1 league-detail page — the routed v2 page
+   * (`LeagueDetailPageV2` → `FreeAgentsTab`) never dispatches it, so for
+   * every league reached through the current free-agents flow it silently
+   * stayed at the hardcoded 25 default regardless of the league's real
+   * setting. That let this modal render "Roster has space" against the wrong
+   * cap while `claimFreeAgent` validated against the correct one from the DB,
+   * rejecting the claim the UI had just said was fine (LS-9769).
+   */
+  maxRosterSize?: number | null;
 }
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
@@ -65,6 +78,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   onClose,
   player,
   leagueId,
+  maxRosterSize: maxRosterSizeProp,
 }) => {
   const [dropPlayerId, setDropPlayerId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -84,9 +98,14 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
       skip: !open,
     });
   const userTeamId = userTeamData?.userTeamId ?? null;
-  const maxRosterSize = useAppSelector(
+  // Prefer the caller-supplied league fragment value (fresh from this page's
+  // own League query) over the Redux fallback, which the routed v2
+  // league-detail page never populates (see the maxRosterSize prop doc above,
+  // LS-9769).
+  const reduxMaxRosterSize = useAppSelector(
     (s) => s.league.leagueData?.maxRosterSize ?? 25,
   );
+  const maxRosterSize = maxRosterSizeProp ?? reduxMaxRosterSize;
   const waiverType = useAppSelector(
     (s) => s.league.leagueData?.waiverType ?? 'standard',
   );

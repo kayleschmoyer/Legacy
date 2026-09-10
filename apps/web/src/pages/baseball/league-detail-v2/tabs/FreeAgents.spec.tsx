@@ -17,6 +17,10 @@ import { FreeAgentsTab } from './FreeAgents';
 // Capture the props the wrapper passes to the shared tab so we can drive
 // renderClaimAction with a representative player.
 let lastSharedProps: any;
+// Capture the props passed to WaiverClaimModal so we can assert the
+// league-fragment maxRosterSize is threaded through (LS-9769) rather than
+// left for the modal's stale Redux fallback.
+let lastWaiverModalProps: any;
 
 jest.mock('@legacy-sports/shared-components/baseball', () => ({
   buildFreeAgentAriaLabel: (first?: string | null, last?: string | null) =>
@@ -38,9 +42,10 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
 }));
 
 jest.mock('../../../../features/baseball/WaiverClaimModal', () => ({
-  WaiverClaimModal: ({ player }: { player: { id: number } }) => (
-    <div data-testid="waiver-claim-modal">claim {player.id}</div>
-  ),
+  WaiverClaimModal: (props: { player: { id: number } }) => {
+    lastWaiverModalProps = props;
+    return <div data-testid="waiver-claim-modal">claim {props.player.id}</div>;
+  },
 }));
 
 jest.mock('../Icons', () => ({
@@ -52,10 +57,12 @@ const league = {
   name: 'Test League',
   sport: 'baseball',
   waiverEnabled: false,
+  maxRosterSize: 18,
 } as any;
 
 beforeEach(() => {
   lastSharedProps = undefined;
+  lastWaiverModalProps = undefined;
 });
 
 describe('FreeAgentsTab (web wrapper)', () => {
@@ -81,5 +88,11 @@ describe('FreeAgentsTab (web wrapper)', () => {
     expect(screen.getByTestId('waiver-claim-modal')).toHaveTextContent(
       'claim 77',
     );
+  });
+
+  it('forwards the league fragment maxRosterSize to WaiverClaimModal instead of leaving it for the stale Redux fallback (LS-9769)', () => {
+    render(<FreeAgentsTab league={league} isMember myTeamId={42} />);
+    fireEvent.click(screen.getByTestId('claim-free-agent-button'));
+    expect(lastWaiverModalProps.maxRosterSize).toBe(18);
   });
 });

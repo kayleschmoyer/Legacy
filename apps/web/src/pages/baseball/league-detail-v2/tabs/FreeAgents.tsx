@@ -62,6 +62,7 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
           onClose={() => setClaimPlayer(null)}
           player={claimPlayer}
           leagueId={leagueId}
+          maxRosterSize={league.maxRosterSize}
         />
       ) : null}
     </>
