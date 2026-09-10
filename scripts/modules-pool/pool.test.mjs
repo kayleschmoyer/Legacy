@@ -1733,6 +1733,90 @@ test(
   },
 );
 
+test(
+  'leaves no lock directory behind after a successful run (LS-9266)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    const binDir = mkdtempSync(join(tmpdir(), 'mp-test-bin-'));
+    try {
+      const wt = makeWorktree(root, 'lock-cleanup-wt');
+      makeFakePnpm(binDir);
+      runLink(['--worktree=' + wt, '--main-repo=' + root], fakePnpmEnv(binDir));
+      assert.equal(
+        existsSync(join(wt, '.modules-pool.lock')),
+        false,
+        'lock directory must be removed once the run completes',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'reclaims a stale worktree lock instead of waiting out the full timeout (LS-9266)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    const binDir = mkdtempSync(join(tmpdir(), 'mp-test-bin-'));
+    try {
+      const wt = makeWorktree(root, 'stale-lock-wt');
+      makeFakePnpm(binDir);
+      const lockPath = join(wt, '.modules-pool.lock');
+      // Simulate a prior link.mjs process that was killed (e.g. container
+      // reaped mid-install) without releasing its lock: a lock dir whose
+      // mtime is older than the script's own stale-reclaim threshold.
+      mkdirSync(lockPath);
+      const staleTime = new Date(Date.now() - 36 * 60_000); // > 35m LOCK_TIMEOUT_MS
+      utimesSync(lockPath, staleTime, staleTime);
+
+      const out = runLink(
+        ['--worktree=' + wt, '--main-repo=' + root],
+        fakePnpmEnv(binDir),
+      );
+      assert.match(out, /\[lock\] stale lock .* reclaiming/);
+      assert.match(out, /\[ok\]/);
+      assert.equal(
+        existsSync(lockPath),
+        false,
+        'lock directory must be removed once the run completes',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test('a live (fresh) lock held by another process makes a concurrent run wait, not corrupt, node_modules (LS-9266)', () => {
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'held-lock-wt');
+    const lockPath = join(wt, '.modules-pool.lock');
+    mkdirSync(lockPath); // fresh — must NOT be reclaimed as stale
+
+    // The waiting run must poll rather than fail fast or barrel through.
+    const child = spawnSync(
+      'node',
+      [LINK, '--worktree=' + wt, '--main-repo=' + root],
+      { encoding: 'utf-8', timeout: 2000 },
+    );
+    // `timeout` makes node send SIGTERM once elapsed; a run that respected
+    // the lock is still waiting (signal set, no clean exit code yet). A run
+    // that ignored the lock would have raced through materialisation and
+    // exited 0 well within 2s.
+    assert.notEqual(
+      child.status,
+      0,
+      'run must still be waiting on the held lock, not have completed',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 /** Run a node script expecting a possible non-zero exit. */
 function runNodeExpectFail(scriptPath, env) {
   try {

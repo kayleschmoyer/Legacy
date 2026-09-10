@@ -91,6 +91,21 @@
  * dir is renamed out of node_modules (so it can't pollute the pool slot) and the
  * install is retried once, rather than surfacing a raw failure that requires a
  * session restart to clear.
+ *
+ * Concurrent invocations against the SAME worktree are serialized with a
+ * directory-based lock (LS-9266): deciding hit/miss, quarantining an unhealthy
+ * slot, materialising, and (re)symlinking span several non-atomic steps over
+ * tens of seconds. Two overlapping `link.mjs` runs on one worktree — e.g. two
+ * background `make pc-*`/`nx` invocations that each trigger a re-link — could
+ * otherwise unlink/replace node_modules out from under a third process reading
+ * through it mid-build, surfacing as "Cannot find module" for a package that
+ * genuinely exists, or a build output directory disappearing when the build
+ * process itself gets confused reading a moving target. See
+ * `acquireWorktreeLock`/`releaseWorktreeLock` below. This does NOT replace the
+ * existing cross-worktree slot-materialisation race handling (the
+ * atomic-rename "[race]" branches in materialiseSlot) — a lock is scoped to
+ * one worktree, and two different worktrees on the same lockfile hash still
+ * race at the pool-slot level exactly as before, by atomic rename.
  */
 
 import {
@@ -100,6 +115,7 @@ import {
   readdirSync,
   realpathSync,
   readFileSync,
+  writeFileSync,
   mkdirSync,
   renameSync,
   rmSync,
@@ -197,6 +213,12 @@ if (args['print-hash']) {
 const slotDir = join(poolRoot, hash);
 const slotNm = join(slotDir, 'node_modules');
 
+// See the "Worktree lock (LS-9266)" section below for what these guard.
+const LOCK_TIMEOUT_MS = 35 * 60_000; // a little over pnpmInstall's own 30-minute ceiling
+const LOCK_POLL_MS = 500;
+const lockPath = join(worktree, '.modules-pool.lock');
+let lockHeld = false;
+
 console.log('[modules-pool/link]');
 console.log(`  worktree : ${worktree}`);
 console.log(`  main repo: ${mainRepo}`);
@@ -204,9 +226,11 @@ console.log(`  pool     : ${poolRoot}`);
 console.log(`  hash     : ${hash}`);
 console.log('');
 
-const slotState = assessSlot(slotNm);
-
 if (args['check']) {
+  // Read-only diagnostic — no mutation, so no lock needed. A concurrent
+  // materialise could make this report transiently stale, but --check never
+  // acts on what it sees.
+  const slotState = assessSlot(slotNm);
   if (slotState.healthy) {
     console.log('[check] slot is healthy.');
     process.exit(0);
@@ -219,6 +243,13 @@ if (args['check']) {
   );
   process.exit(1);
 }
+
+// Everything from here on mutates this worktree's node_modules (and possibly
+// the pool slot). Serialize against any other link.mjs run targeting the same
+// worktree first — see the file-header comment and acquireWorktreeLock below.
+acquireWorktreeLock();
+
+const slotState = assessSlot(slotNm);
 
 if (slotState.healthy && !args['rebuild']) {
   console.log('[hit] pool slot already built — linking.');
@@ -249,6 +280,8 @@ linkNestedWorkspaceModules(slotDir);
 // resolve DB_CERT_PATH for SSL connections. Failures here are non-fatal: node_modules —
 // the primary mission — is already linked.
 linkSecretEnvFiles();
+
+releaseWorktreeLock();
 
 // ---------------------------------------------------------------------------
 // Materialisation (pool miss)
@@ -521,6 +554,76 @@ function ensureDirSymlink(linkPath, target, label) {
   } else {
     symlinkSync(target, linkPath);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Worktree lock (LS-9266)
+// ---------------------------------------------------------------------------
+// `mkdirSync` without `recursive` is atomic on every platform this script
+// targets (POSIX mkdir(2), Windows CreateDirectory) — exactly one concurrent
+// caller's mkdirSync succeeds, so a lock DIRECTORY (rather than a lock file +
+// separate O_EXCL dance) is a simple, dependency-free mutex. Scoped to the
+// worktree, not the pool slot: the corruption this guards against is a
+// second link.mjs run mutating THIS worktree's node_modules symlink/tree
+// concurrently with a build reading through it — a slot shared with another
+// worktree is already handled separately (atomic rename in materialiseSlot).
+function acquireWorktreeLock() {
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lockPath);
+      try {
+        writeFileSync(join(lockPath, 'pid'), String(process.pid));
+      } catch {
+        /* best-effort — the lock itself is the mkdir, this is just diagnostics */
+      }
+      lockHeld = true;
+      // Release on any exit path (normal completion, fail()'s process.exit,
+      // or an uncaught exception unwinding to the top) — 'exit' fires for
+      // all of those since this script is fully synchronous.
+      process.on('exit', releaseWorktreeLock);
+      return;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+    }
+    let ageMs = 0;
+    try {
+      ageMs = Date.now() - statSync(lockPath).mtimeMs;
+    } catch {
+      continue; // lock vanished between our failed mkdir and this stat — retry now
+    }
+    if (ageMs > LOCK_TIMEOUT_MS) {
+      console.log(
+        `[lock] stale lock at ${lockPath} (older than ${Math.round(LOCK_TIMEOUT_MS / 60_000)}m, ` +
+          'outlives even a full pnpm install — its owner must have died without releasing it) — reclaiming.',
+      );
+      removeDir(lockPath);
+      continue;
+    }
+    if (Date.now() > deadline) {
+      fail(
+        `Timed out after ${Math.round(LOCK_TIMEOUT_MS / 60_000)}m waiting for another ` +
+          `link.mjs run to release the lock on this worktree:\n  ${lockPath}\n` +
+          'If no other link.mjs process is actually running, remove it manually and re-run:\n' +
+          `  rm -rf "${lockPath}"`,
+      );
+    }
+    sleepSync(LOCK_POLL_MS);
+  }
+}
+
+function releaseWorktreeLock() {
+  if (!lockHeld) return;
+  lockHeld = false;
+  removeDir(lockPath);
+}
+
+// Synchronous sleep — this script is deliberately dependency-free and fully
+// synchronous throughout (see file header), so polling for the lock uses the
+// same blocking style rather than introducing async control flow just here.
+function sleepSync(ms) {
+  const sab = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(sab, 0, 0, ms);
 }
 
 // ---------------------------------------------------------------------------
