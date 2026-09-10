@@ -83,6 +83,19 @@ describe('useDraftTimer', () => {
     expect(result.current.timeRemaining).toBe(0);
   });
 
+  it('never nudges when currentPickDeadline has not synced yet, even past the 2s nudge window (LS-10048)', () => {
+    const params = makeParams({
+      pickDeadline: null,
+      leagueDraft: null,
+    });
+    const { result } = renderHook(() => useDraftTimer(params));
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(params.nudgeExpiredDraftPick).not.toHaveBeenCalled();
+    expect(result.current.timeRemaining).toBe(0);
+  });
+
   it('never nudges or ticks the countdown in untimed (offline) mode (LS-9144)', () => {
     const params = makeParams({ untimed: true });
     const { result } = renderHook(() => useDraftTimer(params));

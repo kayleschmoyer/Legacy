@@ -60,6 +60,17 @@ export function useDraftTimer({
 }: UseDraftTimerParams) {
   const [timeRemaining, setTimeRemaining] = useState(0);
 
+  // Tracks whether a real pickDeadline has ever been observed, so the nudge
+  // effect below can tell "clock genuinely hit zero" apart from "we never
+  // received a deadline" — both otherwise present identically as
+  // timeRemaining === 0.
+  const deadlineEverObservedRef = useRef(false);
+  useEffect(() => {
+    if (pickDeadline) {
+      deadlineEverObservedRef.current = true;
+    }
+  }, [pickDeadline]);
+
   // Sync deadline + time-limit from query result
   useEffect(() => {
     if (leagueDraft?.pickTimeLimitSeconds != null) {
@@ -138,6 +149,7 @@ export function useDraftTimer({
   useEffect(() => {
     if (untimed || readOnly || !nudgeExpiredDraftPick) return;
     if (!leagueId || !draftId || draftComplete || draftPaused) return;
+    if (!deadlineEverObservedRef.current) return;
     if (timeRemaining > 0) return;
 
     const pickNumber = currentPickInfo?.overallPick ?? null;
