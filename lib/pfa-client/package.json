@@ -6,7 +6,9 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
+    "drizzle-orm": "^0.44.6",
     "tslib": "*"
   }
 }

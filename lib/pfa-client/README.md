@@ -1,9 +1,37 @@
 # @legacy-sports/pfa-client
 
-HTML parser and rate limiter for Pro Football Archives (PFA), used to ingest
-per-game football stats for 1960-1998 (LS-9948). See LS-9948, LS-9991
-(this package), LS-9993 (crosswalk resolver), and LS-9997 (S3 ingest
-command) for the full slice.
+HTML parser, rate limiter, crawl script, and crosswalk resolver for Pro
+Football Archives (PFA), used to ingest per-game football stats for
+1960-1998 (LS-9948). See LS-9948, LS-9991 (parser + rate limiter), LS-9993
+(this package's crawl script + crosswalk resolver, this section), and
+LS-9997 (S3 ingest command) for the full slice.
+
+## Crawl script + crosswalk resolver (LS-9993)
+
+- `crawlPlayerIndex()` (`src/lib/crawl-player-index.ts`) — crawls all 78 PFA
+  player-index pages (nfl/afl/aafc x a-z) into a source table of
+  `PfaPlayerIndexEntry` rows, recording per-page errors rather than
+  aborting the whole crawl on one bad page.
+- `resolvePfaCrosswalk()` (`src/lib/crosswalk-resolver.ts`) — joins those
+  entries against this repo's `players` table by normalized name, assisted
+  by an era window derived from the PFA `league` value (afl: 1960-1969,
+  aafc: 1946-1949). Every input row produces exactly one output row with a
+  confidence score and match method — never a silent best-guess.
+  `fetchFootballPlayerCandidates()` loads the `players`-side join data (each
+  football player's active-season range, derived from
+  `football_season_*` tables since `players` has no career-year or college
+  column).
+- `buildCoverageReport()` / `renderCoverageReportMarkdown()`
+  (`src/lib/coverage-report.ts`) — decade-stratified coverage measurement
+  following the LS-9817/LS-9908 method, flagging any decade below a 70%
+  match rate explicitly instead of averaging it away.
+
+**⚠️ The live crawl has not been run.** See
+[`COVERAGE-REPORT.md`](./COVERAGE-REPORT.md) for the confirmed network
+blocker (egress to `profootballarchives.com` denied by the sandbox's
+network policy, independently of the fixture-validation gap below) and
+exact instructions to produce a real report once network access is
+available.
 
 ## ⚠️ Fixtures are synthetic, not captured — validate before the live crawl
 
