@@ -387,3 +387,70 @@ test(
     }
   },
 );
+
+// --- git checkout/restore whole-tree overwrite (LS-9275) --------------------
+//
+// `git checkout <ref> -- .` and `git restore --source=<ref> .` silently
+// overwrite the ENTIRE working tree with another ref's contents — exactly as
+// destructive as `git reset --hard`, but until now had no guard at all. This
+// wasn't hypothetical: LS-9106 (PR #6898) ran `git checkout origin/main -- .`
+// mid-drive and silently discarded uncommitted work with zero warning. Scoped
+// single-file checkouts/restores are common and safe, so they must stay
+// unrestricted (negative control below).
+
+test('blocks git checkout <ref> -- . (whole-tree overwrite)', () => {
+  const { code, stderr } = check('git checkout origin/main -- .', MAIN_REPO);
+  assert.equal(code, 2, 'expected a block');
+  assert.match(stderr, /git-checkout-whole-tree/);
+});
+
+test('blocks git checkout -- . (no ref, still whole-tree)', () => {
+  assert.equal(check('git checkout -- .', MAIN_REPO).code, 2);
+});
+
+test('allows scoped, single-file git checkout', () => {
+  const { code, stderr } = check(
+    'git checkout main -- path/to/one-file.ts',
+    MAIN_REPO,
+  );
+  assert.equal(code, 0, `expected no block, got stderr: ${stderr}`);
+});
+
+test('blocks git restore --source=<ref> . (whole-tree overwrite)', () => {
+  const { code, stderr } = check(
+    'git restore --source=origin/main .',
+    MAIN_REPO,
+  );
+  assert.equal(code, 2, 'expected a block');
+  assert.match(stderr, /git-restore-whole-tree/);
+});
+
+test('blocks git restore . (no source, still whole-tree)', () => {
+  assert.equal(check('git restore .', MAIN_REPO).code, 2);
+});
+
+test('allows scoped, single-file git restore', () => {
+  const { code, stderr } = check(
+    'git restore --source=origin/main path/to/one-file.ts',
+    MAIN_REPO,
+  );
+  assert.equal(code, 0, `expected no block, got stderr: ${stderr}`);
+});
+
+test('# risk-ok bypasses git checkout <ref> -- .', () => {
+  assert.equal(
+    check('git checkout origin/main -- . # risk-ok: intentional', MAIN_REPO)
+      .code,
+    0,
+  );
+});
+
+test('# risk-ok bypasses git restore --source=<ref> .', () => {
+  assert.equal(
+    check(
+      'git restore --source=origin/main . # risk-ok: intentional',
+      MAIN_REPO,
+    ).code,
+    0,
+  );
+});

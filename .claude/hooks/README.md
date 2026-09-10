@@ -42,11 +42,11 @@ Node hooks (`*.mjs`) share helpers in [`lib/hook-utils.mjs`](lib/hook-utils.mjs)
 
 ## Risk guard tiers
 
-| Tier         | Response                                                     | Examples                                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CATASTROPHIC | Block, **no bypass**                                         | `rm -rf` on `/`, `~`, `.` or `.git`; `git push --force` (bare); any push to `main`; secret material (AWS/GitHub/Slack/Anthropic/Stripe keys, private key blocks) in tool args |
-| GUARDED      | Block, bypass with `# risk-ok: <reason>` (SQL: `-- risk-ok`) | `git worktree remove`, `nx reset`, npm/yarn usage, `pnpm install` through worktree symlinks, `git clean -dx`, `git reset --hard`, `git stash drop`, SQL `DROP`/`TRUNCATE`     |
-| WARN         | Allow with caution message                                   | other recursive `rm`, `DELETE` without `WHERE`, `chmod -R 777`                                                                                                                |
+| Tier         | Response                                                     | Examples                                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CATASTROPHIC | Block, **no bypass**                                         | `rm -rf` on `/`, `~`, `.` or `.git`; `git push --force` (bare); any push to `main`; secret material (AWS/GitHub/Slack/Anthropic/Stripe keys, private key blocks) in tool args                                                        |
+| GUARDED      | Block, bypass with `# risk-ok: <reason>` (SQL: `-- risk-ok`) | `git worktree remove`, `nx reset`, npm/yarn usage, `pnpm install` through worktree symlinks, `git clean -dx`, `git reset --hard`, `git checkout <ref> -- .`, `git restore --source=<ref> .`, `git stash drop`, SQL `DROP`/`TRUNCATE` |
+| WARN         | Allow with caution message                                   | other recursive `rm`, `DELETE` without `WHERE`, `chmod -R 777`                                                                                                                                                                       |
 
 Command patterns are matched with heredoc bodies and quoted strings stripped, so commit messages that _mention_ dangerous commands don't trip the guard. The secret scan runs on raw text.
 

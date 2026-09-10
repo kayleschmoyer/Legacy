@@ -14,7 +14,9 @@
  *     marker (SQL: `-- risk-ok`) once the agent has verified the action is
  *     intentional. Covers repo Tier-1/2 rules: manual worktree removal,
  *     nx reset, npm/yarn usage, pnpm install through worktree symlinks,
- *     git clean -dx, git reset --hard, DROP/TRUNCATE.
+ *     git clean -dx, git reset --hard, git checkout/restore whole-tree
+ *     overwrites (`git checkout <ref> -- .`, `git restore --source=<ref> .`),
+ *     DROP/TRUNCATE.
  *   WARN — allowed (exit 0) with an in-context caution. Recursive rm on other
  *     paths, DELETE without WHERE, chmod -R 777.
  *
@@ -327,6 +329,16 @@ if (command) {
       /git\s+reset\s+--hard\b/,
       'git-reset-hard',
       '`git reset --hard` irreversibly discards uncommitted work. Confirm the working tree is clean or the loss is intended.',
+    ],
+    [
+      /git\s+(?:-C\s+\S+\s+)*checkout\s+(?:\S+\s+)?--\s+\.\/?(?=\s|$|[;&|])/,
+      'git-checkout-whole-tree',
+      '`git checkout <ref> -- .` silently overwrites the entire working tree with another ref’s contents, discarding uncommitted changes with no warning (LS-9106, PR #6898 near-miss). Confirm the working tree is clean or the loss is intended. Scoped, single-file checkouts (`git checkout <ref> -- path/to/file.ts`) are unaffected.',
+    ],
+    [
+      /git\s+(?:-C\s+\S+\s+)*restore\b(?:(?!;|&|\||\n).)*?\s\.\/?(?=\s|$|[;&|])/,
+      'git-restore-whole-tree',
+      '`git restore [--source=<ref>] .` silently overwrites the entire working tree, discarding uncommitted changes with no warning — same hazard as `git reset --hard` (LS-9106, PR #6898 near-miss). Confirm the working tree is clean or the loss is intended. Scoped, single-file restores (`git restore --source=<ref> path/to/file.ts`) are unaffected.',
     ],
     [
       /git\s+stash\s+(drop|clear)\b/,
