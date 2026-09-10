@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -53,6 +54,7 @@ import type { DraftChatTabRenderer } from './DraftChatTab';
 import type { DraftPickRecord, DraftPlayer } from './types';
 import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
+import { useHasEntitlement } from '../../hooks/useEntitlement';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
@@ -106,6 +108,12 @@ export interface EliteDraftBoardScreenProps {
    * (LS-9446).
    */
   onExitDraft?: () => void;
+  /**
+   * Platform-specific persistence for the "download draft packet" feature
+   * (LS-9750) — web triggers a browser download, mobile opens the native
+   * share sheet. Optional: when omitted the download button is a no-op.
+   */
+  onDownloadDraftPacket?: (contents: string, filename: string) => void;
 }
 
 const POSITION_FILTERS = [
@@ -925,6 +933,7 @@ export function EliteDraftBoardScreen({
   onActiveDraftChange,
   bottomInset = 0,
   onExitDraft,
+  onDownloadDraftPacket,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
@@ -946,6 +955,13 @@ export function EliteDraftBoardScreen({
   const isPremium =
     userSubscriptionData?.user?.accessLevel === 'admin' ||
     userSubscriptionData?.user?.subscriptionTier === 'premium';
+
+  // Capability-based gate (LS-9750) per useEntitlement.ts's own guidance —
+  // new shared-component gates should check the entitlement directly rather
+  // than threading a coarse tier-based `isPremium` down from each platform.
+  const hasDraftPacketEntitlement = useHasEntitlement(
+    ENTITLEMENTS.draft_packet,
+  );
 
   const ui = useDraftUIState();
 
@@ -1385,6 +1401,10 @@ export function EliteDraftBoardScreen({
           leaguePositions={queries.leaguePositions}
           sport={sport}
           maxRosterSize={queries.league?.maxRosterSize ?? null}
+          isPremium={hasDraftPacketEntitlement}
+          teamNameById={queries.teamNameById}
+          leagueName={queries.league?.name}
+          onDownloadPacket={onDownloadDraftPacket}
         />
       );
     }

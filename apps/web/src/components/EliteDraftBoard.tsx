@@ -18,6 +18,7 @@ import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
 import { useLeagueChat } from '../hooks/useLeagueChat';
 import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';
+import { downloadCsvFile } from '../utils/draftPacketDownload';
 
 function renderChat({ leagueId, userId, mentionableTeams }: DraftChatProps) {
   return (
@@ -186,6 +187,9 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
         renderChatTab={renderChatTab}
         onPlayerDrafted={trackPlayerSelected}
         onActiveDraftChange={setIsDraftActive}
+        onDownloadDraftPacket={(contents, filename) =>
+          downloadCsvFile(filename, contents)
+        }
       />
     </div>
   );

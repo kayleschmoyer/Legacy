@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, YStack } from 'tamagui';
 import {
@@ -101,6 +102,27 @@ export default function DraftBoardPage() {
     }
   }, [websocketUrl]);
 
+  // Mobile has no filesystem "download" affordance without a new native
+  // dependency, so the draft packet CSV is handed to the native share sheet
+  // (Save to Files, email, etc.) instead — same pattern as
+  // PlayerStats.tsx's handleShare (LS-9750).
+  const handleDownloadDraftPacket = async (
+    contents: string,
+    filename: string,
+  ) => {
+    try {
+      const result = await Share.share({ message: contents, title: filename });
+      if (result.action === Share.dismissedAction) {
+        LOGGER.debug('Draft packet share dismissed by user');
+      }
+    } catch (error: unknown) {
+      LOGGER.error(
+        'Error while sharing draft packet',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  };
+
   return (
     // Mandatory navigation-landing anchor for the Maestro live-draft-board flow
     // (LS-8446): a stable container present across every draft state so tapping
@@ -120,6 +142,9 @@ export default function DraftBoardPage() {
         renderChatTab={renderChatTab}
         bottomInset={bottomInset}
         onExitDraft={() => closeToHomeTab(router)}
+        onDownloadDraftPacket={(contents, filename) =>
+          void handleDownloadDraftPacket(contents, filename)
+        }
       />
     </YStack>
   );

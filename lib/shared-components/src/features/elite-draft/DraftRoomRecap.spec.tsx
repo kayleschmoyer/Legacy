@@ -100,6 +100,10 @@ describe('DraftRoomRecap', () => {
         leaguePositions={LEAGUE_POSITIONS}
         sport="football"
         maxRosterSize={2}
+        isPremium={false}
+        teamNameById={() => 'Some Team'}
+        leagueName="Test League"
+        onDownloadPacket={jest.fn()}
       />,
     );
 
@@ -118,6 +122,10 @@ describe('DraftRoomRecap', () => {
         leaguePositions={LEAGUE_POSITIONS}
         sport="football"
         maxRosterSize={2}
+        isPremium={false}
+        teamNameById={() => 'Some Team'}
+        leagueName="Test League"
+        onDownloadPacket={jest.fn()}
       />,
     );
 
@@ -136,6 +144,10 @@ describe('DraftRoomRecap', () => {
         leaguePositions={LEAGUE_POSITIONS}
         sport="football"
         maxRosterSize={2}
+        isPremium={false}
+        teamNameById={() => 'Some Team'}
+        leagueName="Test League"
+        onDownloadPacket={jest.fn()}
       />,
     );
 

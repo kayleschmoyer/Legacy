@@ -9,6 +9,7 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { buildDepthChartBuckets } from './DraftPlayerBoard';
+import { DraftPacketSection } from './DraftPacketSection';
 import { DraftRosterSlotRow } from './DraftRosterSlotRow';
 import { useDraftPalette } from './nativeDraftPalette';
 import type { DraftPickRecord, DraftPlayer } from './types';
@@ -25,6 +26,12 @@ export interface DraftRoomRecapProps {
   leaguePositions: ReadonlyArray<{ positionType: string }>;
   sport: SportKind;
   maxRosterSize: number | null;
+  /** Whether the viewer has the `draft_packet` entitlement (LS-9750). */
+  isPremium: boolean;
+  onUpgrade?: () => void;
+  teamNameById: (teamId: number | null | undefined) => string;
+  leagueName?: string | null;
+  onDownloadPacket?: (contents: string, filename: string) => void;
 }
 
 interface PickValue {
@@ -113,6 +120,11 @@ export function DraftRoomRecap({
   leaguePositions,
   sport,
   maxRosterSize,
+  isPremium,
+  onUpgrade,
+  teamNameById,
+  leagueName,
+  onDownloadPacket,
 }: DraftRoomRecapProps): React.JSX.Element {
   const palette = useDraftPalette();
 
@@ -258,7 +270,7 @@ export function DraftRoomRecap({
           </XStack>
         )}
 
-        <YStack paddingHorizontal="$3" paddingBottom="$6">
+        <YStack paddingHorizontal="$3" paddingBottom="$4">
           {slotRows.map((row) => (
             <DraftRosterSlotRow
               key={row.key}
@@ -269,6 +281,15 @@ export function DraftRoomRecap({
             />
           ))}
         </YStack>
+
+        <DraftPacketSection
+          pickHistory={pickHistory}
+          teamNameById={teamNameById}
+          leagueName={leagueName}
+          isPremium={isPremium}
+          onUpgrade={onUpgrade}
+          onDownload={onDownloadPacket}
+        />
       </ScrollView>
     </YStack>
   );

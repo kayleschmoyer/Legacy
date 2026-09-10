@@ -104,6 +104,9 @@ jest.mock('../../features/auth', () => ({
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: jest.fn(() => ({ data: undefined })),
+  // The `draft_packet` entitlement gate (LS-9750) reads this via
+  // useHasEntitlement -> useEntitlements.
+  useMyEntitlementsQuery: jest.fn(() => ({ data: undefined, loading: false })),
   // The screen compares league.sport against the generated Sport enum, so the
   // mocked module has to carry it (its members are the schema's string values).
   Sport: { Baseball: 'baseball', Football: 'football' },

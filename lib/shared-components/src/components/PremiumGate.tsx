@@ -44,6 +44,7 @@ export function PremiumGate({
 
   return (
     <Card
+      testID="premium-feature-gate"
       bordered
       padding="$3"
       backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.04)}
