@@ -18,6 +18,19 @@ const footballLeaguePositions = DEFAULT_FOOTBALL_ROSTER_POSITIONS.map(
 jest.mock('./DraftGrid', () => ({
   DraftGrid: () => <div data-testid="draft-grid" />,
 }));
+// LS-10003: the Draft Board view forks on the viewport tier, so the tier is
+// driven explicitly here rather than left to jsdom's window width. Defaults
+// to `desktop` — the tier every pre-existing case in this file assumed.
+let mockTier: 'phone' | 'tablet' | 'desktop' = 'desktop';
+jest.mock('./hooks/useDraftViewport', () => ({
+  ...jest.requireActual<typeof import('./hooks/useDraftViewport')>(
+    './hooks/useDraftViewport',
+  ),
+  useDraftViewportTier: () => mockTier,
+}));
+beforeEach(() => {
+  mockTier = 'desktop';
+});
 jest.mock('./PlayerCard', () => ({
   PlayerCard: () => <div data-testid="player-card" />,
 }));
@@ -407,5 +420,56 @@ describe('DraftPlayerBoard — My Depth Chart view (LS-8785)', () => {
     );
     expect(getByText('Star QB')).toBeTruthy();
     expect(getAllByText('Open').length).toBeGreaterThan(0);
+  });
+});
+
+// LS-10003: below the `desktop` tier the mock replaces the rounds x teams
+// grid with a round-by-round timeline rather than letting it scroll
+// horizontally. The boundary is the design-token tier, not a `$lg` style
+// prop (the LS-9860 lesson).
+describe('DraftPlayerBoard — Draft Board projection by tier (LS-10003)', () => {
+  const boardProps = () =>
+    makeProps({
+      viewMode: 'board' as const,
+      boardOrderedTeams: [
+        { id: '1', name: 'Bronx Bombers', leagueId: 1 },
+        { id: '2', name: 'Sandlot Swingers', leagueId: 1 },
+      ],
+      currentPickInfo: {
+        draftId: 42,
+        teamId: 1,
+        round: 1,
+        pickNumber: 1,
+        overallPick: 1,
+        isComplete: false,
+      },
+      timeRemaining: 47,
+      pickTimeLimitSeconds: 90,
+    });
+
+  it('renders the grid, and no timeline, at the desktop tier', () => {
+    mockTier = 'desktop';
+    const { queryByTestId } = render(<DraftPlayerBoard {...boardProps()} />);
+
+    expect(queryByTestId('draft-grid')).toBeTruthy();
+    expect(queryByTestId('draft-board-timeline')).toBeNull();
+  });
+
+  it('renders the timeline, and no grid, at the tablet tier', () => {
+    mockTier = 'tablet';
+    const { queryByTestId } = render(<DraftPlayerBoard {...boardProps()} />);
+
+    expect(queryByTestId('draft-board-timeline')).toBeTruthy();
+    expect(queryByTestId('draft-grid')).toBeNull();
+  });
+
+  it('renders neither projection outside the Draft Board view', () => {
+    mockTier = 'tablet';
+    const { queryByTestId } = render(
+      <DraftPlayerBoard {...makeProps({ viewMode: 'table' as const })} />,
+    );
+
+    expect(queryByTestId('draft-board-timeline')).toBeNull();
+    expect(queryByTestId('draft-grid')).toBeNull();
   });
 });

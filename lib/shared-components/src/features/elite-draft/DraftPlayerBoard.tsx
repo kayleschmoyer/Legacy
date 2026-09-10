@@ -13,6 +13,7 @@ import type {
   LeagueTeam,
 } from './types';
 import { DraftGrid } from './DraftGrid';
+import { DraftBoardTimeline } from './DraftBoardTimeline';
 import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
@@ -346,6 +347,17 @@ interface DraftPlayerBoardProps {
   hasMorePlayers: boolean;
   loadingMore: boolean;
   onlineTeamIds: ReadonlySet<string>;
+  /** Seconds left on the current pick. Feeds the Draft Board timeline's clock
+   *  header below the `desktop` tier (LS-10003); the grid has no clock of its
+   *  own, so this is unused at and above that boundary. Already-loaded screen
+   *  state, not a new query. */
+  timeRemaining?: number;
+  /** Seconds the current pick started with — the timeline ring's denominator. */
+  pickTimeLimitSeconds?: number;
+  /** Offline mock draft (LS-9144): the pick clock does not run. */
+  untimed?: boolean;
+  /** Commissioner has paused the draft. */
+  draftPaused?: boolean;
   onSetSearchTerm: (v: string) => void;
   onSetSelectedPosition: (v: string) => void;
   onSetViewMode: (v: ViewMode) => void;
@@ -443,6 +455,10 @@ export function DraftPlayerBoard({
   hasMorePlayers,
   loadingMore,
   onlineTeamIds,
+  timeRemaining = 0,
+  pickTimeLimitSeconds = 0,
+  untimed = false,
+  draftPaused = false,
   onSetSearchTerm,
   onSetSelectedPosition,
   onSetViewMode,
@@ -455,6 +471,14 @@ export function DraftPlayerBoard({
   onPlayerDragEnd,
 }: DraftPlayerBoardProps): React.JSX.Element {
   const depthGridColumns = useDepthGridColumns();
+  // Which Draft Board projection to mount (LS-10003). Structural, so it is
+  // derived from the design-token tier hook — NOT a `$lg`/`$gtLg` style prop,
+  // whose Tamagui media key still resolves against @tamagui/config's stock
+  // widths above `sm` and so fires at the wrong px (the LS-9860 bug LS-9895
+  // had to repair). `desktop` starts at `breakpoints.lg` (980), which is
+  // exactly where the mock's own `@container vp (max-width: 979px)` block
+  // hides `.board-grid` and shows `.board-timeline`.
+  const showBoardTimeline = useDraftViewportTier() !== 'desktop';
 
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
@@ -826,8 +850,23 @@ export function DraftPlayerBoard({
           </ControlsBar>
         )}
 
-        {/* Draft Board view */}
-        {viewMode === 'board' && (
+        {/* Draft Board view — the grid at `desktop`, the round-by-round
+            timeline below it (LS-10003). Same picks, two projections. */}
+        {viewMode === 'board' && showBoardTimeline && (
+          <DraftBoardTimeline
+            teams={boardOrderedTeams}
+            picks={pickHistory}
+            currentPickInfo={currentPickInfo}
+            myTeamId={myTeamId}
+            statsLookup={statsLookup}
+            sport={sport}
+            timeRemaining={timeRemaining}
+            pickTimeLimitSeconds={pickTimeLimitSeconds}
+            untimed={untimed}
+            paused={draftPaused}
+          />
+        )}
+        {viewMode === 'board' && !showBoardTimeline && (
           <DraftGrid
             teams={boardOrderedTeams}
             picks={pickHistory}

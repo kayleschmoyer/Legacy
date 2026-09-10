@@ -1618,6 +1618,10 @@ export function EliteDraftBoardScreen({
           hasMorePlayers={queries.hasMorePlayers}
           loadingMore={queries.loadingMore}
           onlineTeamIds={onlineTeamIds}
+          timeRemaining={timeRemaining}
+          pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+          untimed={untimed}
+          draftPaused={ui.draftPaused}
           myTeam={playerData.myTeam}
           positionCounts={playerData.positionCounts}
           leaguePositions={queries.leaguePositions}

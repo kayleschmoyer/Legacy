@@ -65,3 +65,22 @@ describe('elite-draft responsive breakpoints (LS-9860)', () => {
     expect(mediaQueryWidths.filter((w) => !allowed.has(w))).toEqual([]);
   });
 });
+
+// LS-10003: the Draft Board timeline is mounted by a React fork on
+// `useDraftViewportTier()`, not by a media query. If a later edit tries to
+// gate `.d-tl-view` on a `@media` block instead, the two mechanisms can drift
+// apart the way `$md` and the design-token scale did (LS-9860) — the board
+// would then render both projections, or neither, in the gap between them.
+describe('elite-draft timeline is not media-gated (LS-10003)', () => {
+  it('defines .d-tl-view outside every media query', () => {
+    const withoutMediaBlocks = CSS.replace(/@media[^{]*\{[\s\S]*?\n\}/g, '');
+    expect(withoutMediaBlocks).toContain('.d-tl-view');
+  });
+
+  it('never hides .d-tl-view or .d-draft-grid-view by width', () => {
+    for (const block of CSS.matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)) {
+      expect(block[1]).not.toContain('.d-tl-view');
+      expect(block[1]).not.toContain('.d-draft-grid-view');
+    }
+  });
+});

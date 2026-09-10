@@ -22,6 +22,15 @@ export { useSpectatorDraftData } from './hooks';
 // Sub-components (exported in case consumers need them directly)
 export { CircularTimer } from './CircularTimer';
 export { DraftGrid } from './DraftGrid';
+export { DraftBoardTimeline } from './DraftBoardTimeline';
+export {
+  buildTimelineRounds,
+  defaultOpenRound,
+  timelinePickMeta,
+  type TimelinePick,
+  type TimelinePickState,
+  type TimelineRound,
+} from './draftTimeline';
 export { PickAnnouncement } from './PickAnnouncement';
 export { SkeletonCard as DraftSkeletonCard } from './SkeletonCard';
 

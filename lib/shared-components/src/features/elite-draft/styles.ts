@@ -1349,6 +1349,114 @@ export const CSS = `
   font-size: 10px;
 }
 
+/* ===== Draft Board Timeline (LS-10003) =====
+   Below the 'desktop' tier the Draft Board view swaps the rounds x teams
+   grid for this round-by-round timeline. The swap itself is a React fork in
+   DraftPlayerBoard driven by useDraftViewportTier() (a design-token
+   boundary), NOT a media query here — these rules only dress whichever
+   projection that fork mounted. Ported from the mock's .board-timeline /
+   .tl-* rules in
+   docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/project/
+   styles/adaptive.css. */
+.d-tl-view { padding-bottom: 8px; }
+.d-tl-clock {
+  position: sticky; top: 0; z-index: 3;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 14px;
+  padding: 14px 16px; margin-bottom: 12px;
+  background: linear-gradient(180deg, var(--d-surface) 0%, var(--d-panel) 100%);
+  border: 1px solid var(--d-accent-dim);
+  border-radius: var(--d-radius-md);
+}
+.d-tl-clock-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--d-accent);
+}
+.d-tl-clock-team {
+  font-family: var(--f-display); font-weight: 800;
+  font-size: 24px; line-height: 1.05;
+  color: var(--d-text); margin-top: 3px;
+}
+.d-tl-clock-sub { font-size: 12px; color: var(--d-text-secondary); margin-top: 3px; }
+.d-tl-ring {
+  width: 46px; height: 46px; position: relative;
+  display: grid; place-items: center; flex: none;
+}
+.d-tl-ring svg { position: absolute; inset: 0; }
+.d-tl-ring-time {
+  font-family: var(--f-display); font-weight: 800; font-size: 13px;
+  color: var(--d-accent); font-variant-numeric: tabular-nums;
+}
+.d-tl-round {
+  border: 1px solid var(--d-border);
+  border-radius: var(--d-radius-sm);
+  background: var(--d-panel);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.d-tl-round-head {
+  width: 100%; min-height: 48px;
+  display: grid; grid-template-columns: 1fr auto auto;
+  align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: transparent; border: 0;
+  cursor: pointer; text-align: left;
+  font-family: inherit; color: inherit;
+}
+.d-tl-round-head:hover { background: var(--d-surface-hover); }
+.d-tl-round-label {
+  font-family: var(--f-display); font-weight: 800; font-size: 15px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--d-text);
+}
+.d-tl-round-count { font-size: 12px; color: var(--d-text-secondary); }
+.d-tl-round-chev { color: var(--d-text-muted); font-size: 12px; }
+.d-tl-round.open .d-tl-round-head { border-bottom: 1px solid var(--d-border); }
+.d-tl-picks { display: flex; flex-direction: column; }
+.d-tl-pick {
+  display: grid; grid-template-columns: 42px 34px 1fr auto;
+  gap: 12px; align-items: center;
+  min-height: 56px; padding: 9px 14px;
+  border-bottom: 1px solid var(--d-border);
+  border-left: 3px solid transparent;
+}
+.d-tl-picks .d-tl-pick:last-child { border-bottom: 0; }
+.d-tl-pick-num {
+  font-family: var(--f-display); font-weight: 700; font-size: 12px;
+  color: var(--d-text-muted); font-variant-numeric: tabular-nums;
+}
+.d-tl-pick-team {
+  font-family: var(--f-display); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.08em; color: var(--d-text-secondary);
+}
+.d-tl-pick-body { min-width: 0; }
+.d-tl-pick-name {
+  font-family: var(--f-display); font-weight: 700; font-size: 16px;
+  color: var(--d-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.d-tl-pick-meta {
+  font-size: 11px; color: var(--d-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.d-tl-pick-pos {
+  font-family: var(--f-display); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.08em; color: var(--d-text-secondary);
+}
+/* My team — gold rail + gold monogram, matching the grid cell's .me-team
+   loudest-signal rule. No background wash: the theme-compliance ratchet
+   (LS-8518) admits no new raw rgba, and the only gold wash token,
+   --d-accent-dim, is spent on .now below, which must stay the louder of the
+   two. Declared before .now / .up so an on-the-clock row of mine still reads
+   as on the clock. */
+.d-tl-pick.me-team { border-left-color: var(--d-accent); }
+.d-tl-pick.me-team .d-tl-pick-team { color: var(--d-accent); }
+.d-tl-pick.now {
+  background: var(--d-accent-dim);
+  border-left-color: var(--d-accent);
+}
+.d-tl-pick.now .d-tl-pick-name { color: var(--d-accent); font-style: italic; }
+.d-tl-pick.up .d-tl-pick-name { color: var(--d-text-muted); }
+
 /* ===== Toast Notifications ===== */
 .d-toast {
   position: fixed; bottom: 20px; right: 20px; z-index: 2000;
