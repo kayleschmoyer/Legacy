@@ -76,6 +76,42 @@ describe('runTest', () => {
     });
   });
 
+  it('forwards testNamePattern as --testNamePattern after --testPathPatterns', async () => {
+    await runTest({
+      project: 'app',
+      config: 'mobile',
+      testPathPatterns: 'DraftSquadStrip.native.spec.tsx',
+      testNamePattern: 'DraftSquadStrip',
+    });
+
+    expect(mockRunTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: 'app',
+        target: 'test:mobile',
+        args: [
+          '--testPathPatterns',
+          'DraftSquadStrip.native.spec.tsx',
+          '--testNamePattern',
+          'DraftSquadStrip',
+        ],
+      }),
+    );
+  });
+
+  it('omits --testNamePattern when not given', async () => {
+    await runTest({
+      project: 'shared-components',
+      config: 'web',
+      testPathPatterns: 'LeagueListRow',
+    });
+
+    expect(mockRunTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: ['--testPathPatterns', 'LeagueListRow'],
+      }),
+    );
+  });
+
   it('passes through the runTarget result unchanged for the "single" plan', async () => {
     const expected: ToolResult = {
       content: [{ type: 'text', text: '{"passed":true}' }],
@@ -264,6 +300,45 @@ describe('runTest testPathPatterns validation (ReDoS mitigation)', () => {
     const result = await runTest({
       project: 'app',
       testPathPatterns: '(app)/(tabs)/players.spec',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunTarget).toHaveBeenCalled();
+  });
+
+  it('rejects a testNamePattern value over the length cap without calling runTarget', async () => {
+    const result = await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'LeagueListRow',
+      testNamePattern: 'a'.repeat(301),
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /testNamePattern exceeds 300 characters/,
+    );
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('rejects a nested-quantifier ReDoS shape in testNamePattern', async () => {
+    const result = await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'LeagueListRow',
+      testNamePattern: '(a+)+',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /testNamePattern.*nested-quantifier/,
+    );
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('allows a normal testNamePattern value', async () => {
+    const result = await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'LeagueListRow',
+      testNamePattern: 'renders the league name',
     });
 
     expect(result.isError).toBeUndefined();

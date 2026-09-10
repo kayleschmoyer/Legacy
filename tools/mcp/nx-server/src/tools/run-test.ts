@@ -7,6 +7,7 @@ import type { ToolResult } from '../types.js';
 export interface RunTestParams {
   project: string;
   testPathPatterns: string;
+  testNamePattern?: string;
   config?: string;
   updateSnapshot?: boolean;
   noCache?: boolean;
@@ -17,7 +18,7 @@ export interface RunTestParams {
  * Real spec names/patterns are short; a long value has no legitimate use
  * here and only widens the ReDoS surface of the regex Jest builds from it.
  */
-const MAX_TEST_PATH_PATTERNS_LENGTH = 300;
+const MAX_PATTERN_LENGTH = 300;
 
 /**
  * Rejects the classic catastrophic-backtracking shape: a group ending in a
@@ -27,12 +28,12 @@ const MAX_TEST_PATH_PATTERNS_LENGTH = 300;
  */
 const NESTED_QUANTIFIER_REGEX = /\([^()]*[+*]\)[+*]/;
 
-function validateTestPathPatterns(value: string): string | null {
-  if (value.length > MAX_TEST_PATH_PATTERNS_LENGTH) {
-    return `testPathPatterns exceeds ${MAX_TEST_PATH_PATTERNS_LENGTH} characters — pass a shorter spec name/pattern (or pipe-separated list).`;
+function validatePattern(paramName: string, value: string): string | null {
+  if (value.length > MAX_PATTERN_LENGTH) {
+    return `${paramName} exceeds ${MAX_PATTERN_LENGTH} characters — pass a shorter pattern.`;
   }
   if (NESTED_QUANTIFIER_REGEX.test(value)) {
-    return 'testPathPatterns contains a nested-quantifier shape (e.g. "(a+)+") that risks catastrophic regex backtracking. Use a simpler pattern.';
+    return `${paramName} contains a nested-quantifier shape (e.g. "(a+)+") that risks catastrophic regex backtracking. Use a simpler pattern.`;
   }
   return null;
 }
@@ -41,12 +42,16 @@ function runJestTarget(
   params: RunTestParams,
   target: string,
 ): Promise<ToolResult> {
+  const args = ['--testPathPatterns', params.testPathPatterns];
+  if (params.testNamePattern) {
+    args.push('--testNamePattern', params.testNamePattern);
+  }
   return runTarget({
     project: params.project,
     target,
     noCache: params.noCache,
     updateSnapshot: params.updateSnapshot,
-    args: ['--testPathPatterns', params.testPathPatterns],
+    args,
     worktreePath: params.worktreePath,
   });
 }
@@ -104,7 +109,11 @@ function mergeFanoutResults(
  * and the results are merged, instead of silently running everything.
  */
 export async function runTest(params: RunTestParams): Promise<ToolResult> {
-  const validationError = validateTestPathPatterns(params.testPathPatterns);
+  const validationError =
+    validatePattern('testPathPatterns', params.testPathPatterns) ??
+    (params.testNamePattern != null
+      ? validatePattern('testNamePattern', params.testNamePattern)
+      : null);
   if (validationError != null) {
     return {
       content: [{ type: 'text', text: validationError }],
