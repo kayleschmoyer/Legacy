@@ -77,6 +77,14 @@ module.exports = {
     // integration or `Animated.Image`. Belongs to shared-components:mobile
     // only, which has the full react-native + react-native-svg mocks.
     '/src/components/branding/AnimatedLaunchScreen.native.spec.tsx',
+    // Mobile-only regression test (LS-9263) — renders DraftClockRing.native,
+    // which imports Svg/Circle from the real react-native-svg package (this
+    // web project doesn't mock it, only transforms it). react-native-svg's
+    // real implementation needs pieces of react-native this project doesn't
+    // provide, so `Svg`/`Circle` resolve to unusable objects here ("Element
+    // type is invalid"). Belongs to shared-components:mobile only, which has
+    // a full react-native-svg mock in jest-setup-mobile.js.
+    '/src/features/elite-draft/DraftClockRing.native.spec.tsx',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
