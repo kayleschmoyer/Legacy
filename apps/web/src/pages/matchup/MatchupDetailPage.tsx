@@ -147,7 +147,15 @@ export function MatchupDetailPage() {
     lastTrackedMatchupViewKeyRef.current = key;
   }, [matchup, matchupIdNum, leagueIdNum, currentWeek]);
 
-  if (loading) {
+  // Gate on `loading && !matchup`, not `loading` alone: `useMatchupById`
+  // already falls back to `previousData` so `matchup` stays populated across
+  // a background refetch (e.g. the websocket reconnect/stats-complete
+  // handlers below), but a raw `loading` gate here ignored that and blanked
+  // the whole page back to the skeleton anyway — discarding an
+  // already-rendered scoreboard for the ~1 background round-trip. That
+  // flash was flaky-visible under CPU contention as a genuine
+  // disappear-then-reappear of on-screen content (LS-9733).
+  if (loading && !matchup) {
     return <MatchupDetailSkeleton />;
   }
 
