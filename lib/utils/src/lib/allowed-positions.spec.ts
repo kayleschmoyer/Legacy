@@ -72,6 +72,10 @@ describe('ALLOWED_POSITIONS_BY_SPORT.football', () => {
     expect(football['SFLEX']).toEqual(['QB', 'RB', 'WR', 'TE']);
   });
 
+  it('KP (combined kicker/punter, premium slot) accepts K (LS-9675)', () => {
+    expect(football['KP']).toEqual(['K']);
+  });
+
   it('BENCH accepts all offensive + defensive position values (both formats)', () => {
     expect(football['BENCH']).toEqual([
       'QB',

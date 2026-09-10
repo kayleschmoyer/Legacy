@@ -85,6 +85,13 @@ describe('rosterEligibility', () => {
         false,
       );
     });
+
+    it('KP (premium kicker slot) accepts a kicker but not other positions (LS-9675)', () => {
+      expect(canPlayerPlayPosition(player(['K']), 'KP', 'football')).toBe(true);
+      expect(canPlayerPlayPosition(player(['QB']), 'KP', 'football')).toBe(
+        false,
+      );
+    });
   });
 
   describe('getPositionLabel', () => {

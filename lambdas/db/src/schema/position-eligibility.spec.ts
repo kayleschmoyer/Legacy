@@ -42,6 +42,14 @@ describe('canFillSlot', () => {
     it('accepts a multi-position player when any one position qualifies', () => {
       expect(canFillSlot(['QB', 'WR'], 'FLEX', 'football')).toBe(true);
     });
+
+    it('accepts a kicker into the premium KP slot and rejects a non-kicker (LS-9675)', () => {
+      // KP (combined kicker/punter, LS-9107) now has a real crosswalk entry
+      // rather than relying on the fail-open "unmapped slot" rule below —
+      // that rule let non-kickers into KP too, which is the bug LS-9675 fixed.
+      expect(canFillSlot(['K'], 'KP', 'football')).toBe(true);
+      expect(canFillSlot(['QB'], 'KP', 'football')).toBe(false);
+    });
   });
 
   describe('baseball', () => {
@@ -90,9 +98,9 @@ describe('canFillSlot', () => {
     });
 
     it('treats a slot code absent from the crosswalk as eligible', () => {
-      // 'KP' is a real premium football roster slot with no crosswalk entry.
-      expect(canFillSlot(['K'], 'KP', 'football')).toBe(true);
-      expect(canFillSlot(['QB'], 'KP', 'football')).toBe(true);
+      // 'XFLEX' does not exist as a real slot type; it stands in here for
+      // "any slot code the crosswalk has never heard of."
+      expect(canFillSlot(['QB'], 'XFLEX', 'football')).toBe(true);
     });
 
     it('treats a null or empty slot code as eligible', () => {

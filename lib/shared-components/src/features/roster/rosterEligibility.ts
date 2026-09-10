@@ -79,8 +79,9 @@ export function isDualEligible(player: RosterEligiblePlayer): boolean {
  * `ALLOWED_POSITIONS_BY_SPORT` table this function reads. This function
  * remains an affordance — it greys out moves the server would refuse — and is
  * intentionally stricter in one place: it returns `false` for a slot code
- * absent from the crosswalk (e.g. the premium football `KP` slot), where the
- * server fails open rather than block a write it cannot prove is wrong.
+ * absent from the crosswalk, where the server fails open rather than block a
+ * write it cannot prove is wrong. (The premium football `KP` slot used to be
+ * the example here — it gained a crosswalk entry in LS-9675.)
  *
  * `sport` selects the eligibility crosswalk (defaults to baseball, this
  * function's original behavior — LS-5421 added the football table).

@@ -207,12 +207,10 @@ describe('slot-eligibility gate (LS-6427)', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('fails open for a slot code with no crosswalk entry (premium KP)', async () => {
+    it('accepts a kicker into the premium KP slot (LS-9675)', async () => {
       const { league, team } = await seedLeagueAndTeam('football');
       const kicker = await seedFootballPlayer('K', 'k3');
       await seedMember(league.id, team.id, kicker.id);
-      // `KP` is a real premium roster slot but has no FOOTBALL_ALLOWED_POSITIONS
-      // entry. The gate must not make it unassignable.
       const kpSlot = await seedSlot(league.id, 'KP');
 
       await expect(
@@ -220,6 +218,21 @@ describe('slot-eligibility gate (LS-6427)', () => {
           { playerId: kicker.id, positionId: kpSlot.id },
         ]),
       ).resolves.toBeUndefined();
+    });
+
+    it('rejects a non-kicker from the premium KP slot (LS-9675)', async () => {
+      const { league, team } = await seedLeagueAndTeam('football');
+      const qb = await seedFootballPlayer('QB', 'qb4');
+      await seedMember(league.id, team.id, qb.id);
+      const kpSlot = await seedSlot(league.id, 'KP');
+
+      await expect(
+        assertPositionAssignmentsEligible(db, league.id, [
+          { playerId: qb.id, positionId: kpSlot.id },
+        ]),
+      ).rejects.toMatchObject({
+        extensions: { code: 'POSITION_INELIGIBLE', slotType: 'KP' },
+      });
     });
 
     it('rejects when only the second side of a swap is ineligible (AC2)', async () => {

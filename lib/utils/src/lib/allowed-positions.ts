@@ -19,6 +19,14 @@
 
 export type SportKind = 'baseball' | 'football';
 
+/**
+ * Generic 'P' is intentionally absent as a *slot* key here (LS-9675 audit).
+ * It appears only as an eligible *stat position* folded into SP/RP below —
+ * every pitcher slot the app actually creates is SP or RP, and the
+ * `position_slot` DB enum has no bare 'P' value, so there is no slot for a
+ * 'P' entry to serve. Add one only if a generic pitcher slot type is ever
+ * introduced.
+ */
 const BASEBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
   Object.freeze({
     '1B': ['1B'],
@@ -44,6 +52,12 @@ const FOOTBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     WR: ['WR'],
     TE: ['TE'],
     K: ['K'],
+    /** KP (combined kicker/punter, LS-9107) is a premium slot
+     *  (`PREMIUM_ROSTER_SLOT_TYPES` in `leagues/mutations.ts`). There is no
+     *  separate punter stat position anywhere in the data model — 'K' is the
+     *  only football position code that exists for the kicking game — so any
+     *  player eligible at K is eligible at KP (LS-9675). */
+    KP: ['K'],
     /** DST slot maps to the synthetic DST team-defense player (LS-245). Only
      *  reachable for a 'dst'-format league. */
     DST: ['DST'],

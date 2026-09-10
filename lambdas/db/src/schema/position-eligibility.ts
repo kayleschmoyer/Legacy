@@ -54,12 +54,11 @@ export interface PositionAssignment {
  *    data completeness is a separate concern from enforcing slot eligibility.
  *
  *  - **Slot code absent from the crosswalk → eligible.** The `position_slot`
- *    enum is wider than `ALLOWED_POSITIONS_BY_SPORT`: `KP` is a real premium
- *    football slot (`PREMIUM_ROSTER_SLOT_TYPES` in `leagues/mutations.ts`)
- *    with no entry in the football table. Treating an unmapped slot as a
- *    rejection would make every `KP` slot unassignable. A gate may only
- *    reject what it positively knows to be wrong; an incomplete crosswalk is
- *    a data gap, not a violation.
+ *    enum can be (and has been — see `KP`, closed by LS-9675) wider than
+ *    `ALLOWED_POSITIONS_BY_SPORT`. Treating an unmapped slot as a rejection
+ *    would make every such slot unassignable before its crosswalk entry
+ *    lands. A gate may only reject what it positively knows to be wrong; an
+ *    incomplete crosswalk is a data gap, not a violation.
  *
  * Note this differs on the second rule from the client's
  * `canPlayerPlayPosition`, which returns `false` for an unmapped slot. That
