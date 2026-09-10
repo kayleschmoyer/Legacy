@@ -55,14 +55,17 @@ const HOVER_BORDER = withAlpha(WHITE, 0.1);
 // rules in styles.ts. The mock's tablet tier is where the rail stops being a
 // side column and becomes a collapsible shelf above the player pool.
 //
-// Driven by an explicit `mode` variant rather than the `$md` breakpoint key
-// this used to carry (LS-9860). `$md` resolves to `maxWidth: 1020` under
-// @tamagui/config's default media set, while styles.ts stacks `.d-layout` at
-// the design-token tablet boundary of 979 — so the two disagreed across a
-// whole band, rendering shelf chrome (a "Draft panel" toggle, a 280px
-// max-height) inside a desktop side-rail layout. Folding the viewport tier
-// and the `mobileCollapsed` state into one three-state variant keeps both
-// inputs in a single place and keeps them on the same scale as the CSS.
+// Driven by an explicit `mode` variant rather than a `$md` breakpoint key
+// (LS-9860). Originally that was because `$md` resolved to `maxWidth: 1020`
+// under @tamagui/config's default media set while styles.ts stacked
+// `.d-layout` at the design-token tablet boundary of 979 — the two disagreed
+// across a whole band, rendering shelf chrome (a "Draft panel" toggle, a
+// 280px max-height) inside a desktop side-rail layout. `$md` now derives
+// from the same design-token scale (LS-9896) and agrees with styles.ts, but
+// the variant stays: folding the viewport tier and the `mobileCollapsed`
+// state into one three-state variant still keeps both inputs in a single
+// place, and — per below — the tier still needs to work without a
+// TamaguiProvider.
 //
 // The tier comes from `useDraftViewportTier()`, not Tamagui's `useMedia()`:
 // the latter needs a TamaguiProvider/config that isolated component tests
@@ -146,7 +149,9 @@ const RailContent = tamaguiStyled(YStack, {
   variants: {
     // Only a *shelf* can be collapsed; the desktop rail is always open, so
     // this is passed `isShelf && mobileCollapsed` rather than the raw toggle
-    // state (previously the `$md` key inside the variant did that gating).
+    // state (a `$md` key inside the variant used to do that gating, back
+    // when `$md` still needed the tier hook's help — see the note above
+    // `RailRoot`).
     contentHidden: {
       true: { display: 'none' },
       false: {},

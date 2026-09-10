@@ -122,10 +122,13 @@ const TopBandRoot = tamaguiStyled(XStack, {
   variants: {
     // The mock's tablet tier tightens the band's padding and lets it wrap
     // onto two rows (`.topband { row-gap: 12px }`). Driven by the viewport
-    // tier rather than a `$md` breakpoint key (LS-9860): `$md` resolves to
-    // `maxWidth: 1020` under @tamagui/config's default media set, so it
-    // would have applied these across 980–1020, where styles.ts has already
-    // switched `.d-layout` back to the desktop side-rail form.
+    // tier rather than a `$md` breakpoint key (LS-9860): at the time, `$md`
+    // resolved to `maxWidth: 1020` under @tamagui/config's default media
+    // set, so it would have applied these across 980–1020, where styles.ts
+    // had already switched `.d-layout` back to the desktop side-rail form.
+    // `$md` now derives from the design-token scale and agrees with
+    // styles.ts (LS-9896), but the tier stays the source of truth here so
+    // this keeps working without a TamaguiProvider (see useDraftViewport.ts).
     stacked: {
       true: {
         paddingVertical: 8,

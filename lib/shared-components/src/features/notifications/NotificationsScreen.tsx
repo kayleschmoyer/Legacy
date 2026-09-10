@@ -203,7 +203,7 @@ export function NotificationsScreen({
   // Responsive two-pane layout (AC2): on web the original NotificationsPage was
   // a constrained, centered column rather than a single mobile-first stripe. We
   // keep the mobile-first single column by default and, on wide viewports
-  // (`$gtMd` ≈ ≥1021px), split into a ~1.15fr / 1fr two-pane layout — the
+  // (`$gtMd` ≥980px), split into a ~1.15fr / 1fr two-pane layout — the
   // notification list (main) beside the preferences panel (aside) — mirroring
   // the original web grid that collapsed to one column on narrow screens. The
   // container only widens past the comfortable reading width when there is an

@@ -33,12 +33,12 @@ As of LS-9885 the workspace `media` config is **derived from `@legacy-sports/des
 | `$xxs` | ≤ 659px  | —                  | ✅ aligned                   | Smallest phones. Last-resort tier.   |
 | `$xs`  | ≤ 660px  | `$gtXs` (≥ 661px)  | ⏳ stock — LS-9897 → 799/800 | Phone. The main "compact" tier.      |
 | `$sm`  | ≤ 800px  | `$gtSm` (≥ 801px)  | ⏳ stock — LS-9898 → 859/860 | Large phone / small tablet portrait. |
-| `$md`  | ≤ 1020px | `$gtMd` (≥ 1021px) | ⏳ stock — LS-9896 → 979/980 | Tablet. Multi-column starts above.   |
+| `$md`  | ≤ 979px  | `$gtMd` (≥ 980px)  | ✅ aligned                   | Tablet. Multi-column starts above.   |
 | `$lg`  | ≤ 1119px | `$gtLg` (≥ 1120px) | ✅ aligned                   | Laptop.                              |
 | `$xl`  | ≤ 1279px | `$gtXl` (≥ 1280px) | ✅ aligned                   | Desktop.                             |
 | `$xxl` | ≥ 1280px | —                  | ✅ aligned (new)             | Wide desktop. Top band.              |
 
-Once LS-9896/9897/9898 land, the whole table reads off the design-token scale and the Status column goes away.
+Once LS-9897/9898 land, the whole table reads off the design-token scale and the Status column goes away.
 
 Three things that bite:
 

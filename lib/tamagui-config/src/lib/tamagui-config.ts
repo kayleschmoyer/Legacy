@@ -507,8 +507,8 @@ const designTokenMedia = {
 // visual-regression change, not a config one. So the scale migrates one
 // complementary pair at a time, each with its own call-site audit:
 //
-//   LS-9895 (this change) — xxs, lg, xl, xxl, gtLg, gtXl.  4 existing sites
-//   LS-9896               — md, gtMd  (53 sites) + elite-draft convergence
+//   LS-9895 — xxs, lg, xl, xxl, gtLg, gtXl.  4 existing sites (landed)
+//   LS-9896 (this change) — md, gtMd  (53 sites) + elite-draft convergence
 //   LS-9897               — xs, gtXs  (17 sites)
 //   LS-9898               — sm, gtSm  (184 sites) — the bulk, landed last
 //
@@ -516,7 +516,7 @@ const designTokenMedia = {
 //   1. `$X` and `$gtX` always move together. Moving `$sm` to 859 while `$gtSm`
 //      stayed at 801 would make 801–859 match BOTH keys.
 //   2. Band order stays monotonic — each key's `maxWidth` is below the next's.
-//      Here: xxs 659 < xs 660 < sm 800 < md 1020 < lg 1119 < xl 1279 < xxl.
+//      Here: xxs 659 < xs 660 < sm 800 < md 979 < lg 1119 < xl 1279 < xxl.
 //      (xxs 659 sitting one pixel under the still-stock xs 660 is the visible
 //      seam of the staging; LS-9897 widens xs to 799 and it disappears.)
 //
@@ -527,8 +527,6 @@ const media = {
   gtXs: config.media.gtXs, // → LS-9897
   sm: config.media.sm, // → LS-9898
   gtSm: config.media.gtSm, // → LS-9898
-  md: config.media.md, // → LS-9896
-  gtMd: config.media.gtMd, // → LS-9896
   // Not a design-token band — a viewport-HEIGHT escape hatch (LS-9900).
   // `DateTimePicker`'s popover-to-Sheet adaptation was gated on `sm`
   // (viewport WIDTH), the wrong axis for "does this floating layer fit on

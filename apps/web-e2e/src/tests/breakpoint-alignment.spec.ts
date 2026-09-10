@@ -10,21 +10,27 @@
  * driving a real viewport across the boundary and asserting the layout flips
  * exactly there.
  *
- * Covered here: the `$lg` boundary, which LS-9895 moved from 1280 → 1119.
- * Probe: the Create League two-column layout, whose summary sidebar is
- * `width={340}` with `$lg={{ width: '100%' }}`. Below the boundary the parent
- * stacks and the sidebar fills the row; at or above it the sidebar is its fixed
- * 340px column.
+ * Covered here:
+ *   - the `$lg` boundary, which LS-9895 moved from 1280 → 1119.
+ *     Probe: the Create League two-column layout, whose summary sidebar is
+ *     `width={340}` with `$lg={{ width: '100%' }}`. Below the boundary the
+ *     parent stacks and the sidebar fills the row; at or above it the sidebar
+ *     is its fixed 340px column.
+ *   - the `$md`/`$gtMd` boundary, which LS-9896 moved from 1020/1021 → 979/980.
+ *     Probe: `StandingsTable`'s PF column header, `display: none` with
+ *     `$gtMd={{ display: 'flex' }}` — hidden at 979px, visible at 980px.
  *
- * This is the template for the remaining slices — LS-9896 (`$md`), LS-9897
- * (`$xs`) and LS-9898 (`$sm`) each add their own boundary case here as they
- * land, so the whole scale ends up pinned at real viewport widths.
+ * This is the template for the remaining slices — LS-9897 (`$xs`) and
+ * LS-9898 (`$sm`) each add their own boundary case here as they land, so the
+ * whole scale ends up pinned at real viewport widths.
  *
- * Page-object convention (ADR-0015): locators live on `leaguePage`, so this
- * spec is selector-free. Viewport is the spec's to own.
+ * Page-object convention (ADR-0015): locators live on `leaguePage`/
+ * `standingsPage`, so this spec is selector-free. Viewport is the spec's to
+ * own.
  */
 
 import { expect, leagueTest as test } from '../fixtures/pages';
+import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 /** Design-token `xl` band lower bound — the first width at which `$lg` stops applying. */
 const LG_BOUNDARY = 1120;
@@ -84,5 +90,117 @@ test.describe('Breakpoint alignment — $lg fires on the design-token scale @reg
     await leaguePage.createSummarySidebar.expectVisible();
 
     expect(await sidebarWidth(leaguePage)).toBe(FIXED_SIDEBAR_WIDTH);
+  });
+});
+
+/** Design-token `lg` band lower bound — the first width at which `$gtMd` fires. */
+const MD_BOUNDARY = 980;
+
+async function mockStandingsForBoundary(page: import('@playwright/test').Page) {
+  const league = {
+    __typename: 'League',
+    id: 1,
+    name: 'Breakpoint League',
+    sport: 'football',
+    draftStatus: 'completed',
+  };
+  const teams = [
+    { __typename: 'Team', id: 1, name: 'Home Team', owner: 1, leagueId: 1 },
+  ];
+  const standings = [
+    {
+      __typename: 'TeamStanding',
+      teamId: 1,
+      teamName: 'Home Team',
+      wins: 1,
+      losses: 0,
+      ties: 0,
+      winPercentage: 1,
+      pointsFor: 10,
+      pointsAgainst: 5,
+      divisionId: null,
+      divisionName: null,
+      avatarUrl: null,
+    },
+  ];
+
+  await createGraphQLRouter(page, {
+    getleaguebyid: (route) => fulfillJson(route, { data: { league } }),
+    getleague: (route) => fulfillJson(route, { data: { league } }),
+    getleagueteams: (route) =>
+      fulfillJson(route, { data: { leagueTeams: teams } }),
+    getleaguestandings: (route) =>
+      fulfillJson(route, { data: { getLeagueStandings: standings } }),
+    leaguestandings: (route) =>
+      fulfillJson(route, { data: { getLeagueStandings: standings } }),
+    getcurrentweekforleague: (route) =>
+      fulfillJson(route, { data: { getCurrentWeekForLeague: null } }),
+    getpositionsforleague: (route) =>
+      fulfillJson(route, { data: { leaguePositions: [] } }),
+    getuserteamid: (route) => fulfillJson(route, { data: { userTeamId: 1 } }),
+    getuserleagues: (route) =>
+      fulfillJson(route, { data: { userLeagues: [league] } }),
+    getusers: (route) => fulfillJson(route, { data: { users: [] } }),
+    getteammembers: (route) =>
+      fulfillJson(route, { data: { teamMembers: [] } }),
+    getviewermembership: (route) =>
+      fulfillJson(route, {
+        data: {
+          viewerMembership: {
+            __typename: 'LeagueMember',
+            leagueId: 1,
+            userId: 1,
+            teamId: 1,
+            permissionLevel: 'general_manager',
+            username: 'testuser',
+          },
+        },
+      }),
+  });
+}
+
+test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale @regression', () => {
+  test(`PF column hides one pixel below the boundary (${MD_BOUNDARY - 1}px)`, async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    await page.setViewportSize({ width: MD_BOUNDARY - 1, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    // `$md` (≤979) has this column's `display: none` in effect.
+    await leaguePage.standingsColumnHeader(/^PF$/).expectHidden();
+  });
+
+  test(`PF column shows at the boundary (${MD_BOUNDARY}px)`, async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    await page.setViewportSize({ width: MD_BOUNDARY, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    // `$gtMd` (≥980) has flipped this column to `display: flex`.
+    await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
+  });
+
+  test('the stock Tamagui $gtMd width (1021) is no longer the flip point', async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    // The discriminating case: before this change `$gtMd` resolved to
+    // `minWidth: 1021`, so 1000 still hid the PF column. This assertion
+    // fails against the stock config.
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
   });
 });

@@ -87,7 +87,7 @@ Use theme tokens to create "glowing" or "active" effects without hardcoding hex 
 
 - **Stacks**: Use `XStack` (row) and `YStack` (column) for almost all layout.
 - **Spacing**: Use standard tokens (`$2`, `$4`, `$6`) for `gap`, `padding`, and `margin`.
-- **Responsiveness**: Use media keys (`$xxs` ≤390, `$xs` ≤660, `$sm` ≤800, `$md` ≤1020) for breakpoint overrides. Density rules — how far padding and type step down per tier, the 44px hit-target floor, what to cut at narrow widths — live in [responsive-density.md](responsive-density.md).
+- **Responsiveness**: Use media keys (`$xxs` ≤659, `$xs` ≤660, `$sm` ≤800, `$md` ≤979) for breakpoint overrides. Density rules — how far padding and type step down per tier, the 44px hit-target floor, what to cut at narrow widths — live in [responsive-density.md](responsive-density.md).
 
 ## Component Checklist
 

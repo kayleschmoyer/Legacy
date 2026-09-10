@@ -103,16 +103,14 @@ function positionPillsForSport(
 // .d-main / .d-controls / .d-search-wrap / .d-view-tabs / .d-view-tab /
 // .d-pills / .d-pill on narrow viewports.
 //
-// Caveat worth knowing before adding more of them (LS-9860): the workspace
-// runs @tamagui/config's default media set, where `$md` is `maxWidth: 1020` —
-// NOT the design-token `$md` band (860–979) the mock is annotated against,
-// and there is no `$xxl` at all. These keys are therefore approximate, which
-// is tolerable because every one of them is cosmetic (padding, gap, wrap,
-// overflow). Anything *structural* — which layout applies at which width —
-// must read `useDraftViewportTier()` or a `styles.ts` breakpoint instead,
-// both of which derive from @legacy-sports/design-tokens. Aligning the global
-// Tamagui media config to that scale would move 264 style props across lib/
-// and apps/, so it is tracked as separate work.
+// `$md` here is now the design-token `$md` band (860–979, LS-9896) that the
+// mock is annotated against — it used to run @tamagui/config's stock
+// `maxWidth: 1020` instead (LS-9860), which was tolerable only because every
+// one of these keys is cosmetic (padding, gap, wrap, overflow). Anything
+// *structural* — which layout applies at which width — still reads
+// `useDraftViewportTier()` or a `styles.ts` breakpoint instead, not a `$md`
+// style prop: those need to keep working in consumers without a
+// TamaguiProvider (see useDraftViewport.ts), which a `$md` prop cannot.
 type StyledComponent = React.ComponentType<Record<string, unknown>>;
 
 const MainContainer = tamaguiStyled(YStack, {

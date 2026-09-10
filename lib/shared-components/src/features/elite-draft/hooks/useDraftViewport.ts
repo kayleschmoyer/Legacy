@@ -51,23 +51,22 @@ export function resolveDraftViewportTier(width: number): DraftViewportTier {
  * in `styles.ts`, which are aligned to the same design-token values) — there
  * is deliberately no second boolean alongside it.
  *
- * Built on `useWindowDimensions` rather than Tamagui's `useMedia()` for two
- * reasons. First, `useMedia()` reads a `TamaguiProvider` context that not all
- * of this feature's consumers supply (e.g. `apps/web/src/components/
+ * Built on `useWindowDimensions` rather than Tamagui's `useMedia()` because
+ * `useMedia()` reads a `TamaguiProvider` context that not all of this
+ * feature's consumers supply (e.g. `apps/web/src/components/
  * EliteDraftBoard.a11y.spec.tsx` renders `DraftPlayerBoard` bare), which is
  * why `DraftPlayerBoard` already hand-rolled a `window.matchMedia` listener
- * instead. Second, the workspace's Tamagui media config did not match the
- * design-token scale the mock is annotated against, so `$md` fired at 1020
- * where the mock stacks at 979.
+ * instead.
  *
- * That second reason is being retired. LS-9885 makes the workspace `media`
- * config derive from `@legacy-sports/design-tokens` `breakpoints`; LS-9895 has
- * landed the mechanism (and `$xxl` now genuinely exists, which this comment
- * previously said it did not), but `$md`/`$gtMd` still carry stock values
- * until LS-9896. Once that lands, `$md` IS 979 and this hook and the `$token`
- * props agree — LS-9896 owns collapsing the two mechanisms into one. Until
- * then, anything in this feature that needs a *design-system* band must still
- * read it from here, not from a `$md`/`$gtMd` style prop.
+ * A second reason used to apply: the workspace's Tamagui media config did
+ * not match the design-token scale the mock is annotated against, so `$md`
+ * fired at 1020 where the mock stacks at 979. LS-9885 through LS-9896 closed
+ * that gap — `$md`/`$gtMd` now derive from `@legacy-sports/design-tokens`
+ * `breakpoints` the same way this hook does, so a `$md` style prop and
+ * `resolveDraftViewportTier()`'s tablet boundary finally agree. The
+ * provider-independence reason above is the one keeping this hook alive;
+ * anything that DOES have a `TamaguiProvider` in every consumer it needs to
+ * run in is free to read `$md`/`$gtMd` directly instead.
  *
  * `useWindowDimensions` works unchanged on web (via react-native-web, which
  * tracks `window.innerWidth` and resize) and on native, needs no provider,

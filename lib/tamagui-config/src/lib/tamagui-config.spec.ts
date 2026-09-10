@@ -98,8 +98,10 @@ describe('media config (design-token breakpoint alignment)', () => {
     // `$X` is a maxWidth ending one pixel below the NEXT band's lower bound;
     // `$gtX` is a minWidth at that same lower bound. The two are complements.
     expect(media.xxs).toEqual({ maxWidth: breakpoints.xs - 1 }); // ≤659
+    expect(media.md).toEqual({ maxWidth: breakpoints.lg - 1 }); // ≤979
     expect(media.lg).toEqual({ maxWidth: breakpoints.xl - 1 }); // ≤1119
     expect(media.xl).toEqual({ maxWidth: breakpoints.xxl - 1 }); // ≤1279
+    expect(media.gtMd).toEqual({ minWidth: breakpoints.lg }); // ≥980
     expect(media.gtLg).toEqual({ minWidth: breakpoints.xl }); // ≥1120
     expect(media.gtXl).toEqual({ minWidth: breakpoints.xxl }); // ≥1280
   });
@@ -129,8 +131,6 @@ describe('media config (design-token breakpoint alignment)', () => {
     expect(media.gtXs).toEqual({ minWidth: 661 }); // → LS-9897 → 800
     expect(media.sm).toEqual({ maxWidth: 800 }); // → LS-9898 → 859
     expect(media.gtSm).toEqual({ minWidth: 801 }); // → LS-9898 → 860
-    expect(media.md).toEqual({ maxWidth: 1020 }); // → LS-9896 → 979
-    expect(media.gtMd).toEqual({ minWidth: 1021 }); // → LS-9896 → 980
   });
 
   it('keeps the band order monotonic across the staged rollout', () => {
@@ -147,6 +147,7 @@ describe('media config (design-token breakpoint alignment)', () => {
 
   it('makes $X and $gtX exact complements for every migrated pair', () => {
     for (const [band, gt] of [
+      ['md', 'gtMd'],
       ['lg', 'gtLg'],
       ['xl', 'gtXl'],
     ] as const) {

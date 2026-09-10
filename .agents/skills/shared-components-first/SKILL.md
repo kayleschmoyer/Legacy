@@ -94,20 +94,16 @@ Tamagui media tokens apply inline style overrides at defined breakpoints. Use th
   flexDirection="row"
   $sm={{ flexDirection: 'column' }}   // stacks at ≤800px
   gap="$4"
-  $gtMd={{ gap: '$6' }}               // wider gap at ≥1021px
+  $gtMd={{ gap: '$6' }}               // wider gap at ≥980px
 >
 ```
 
-Tokens as `@tamagui/config` actually compiles them:
+Tokens as the workspace `media` config compiles them today — aligning to `@legacy-sports/design-tokens` is landing in stages (LS-9885):
 
-- `$xxs` — **≤390px** (does not default to active — see the density reference)
-- `$xs` / `$gtXs` — **≤660px** / **≥661px**
-- `$sm` / `$gtSm` — **≤800px** / **≥801px**
-- `$md` / `$gtMd` — **≤1020px** / **≥1021px**
-- `$lg` / `$gtLg` — **≤1280px** / **≥1281px**
-- `$xl` / `$gtXl` — **≤1650px** / **≥1651px**
+- `$xxs` — **≤659px** · `$xs`/`$gtXs` — **≤660px**/**≥661px** (stock) · `$sm`/`$gtSm` — **≤800px**/**≥801px** (stock)
+- `$md`/`$gtMd` — **≤979px**/**≥980px** · `$lg`/`$gtLg` — **≤1119px**/**≥1120px** · `$xl`/`$gtXl` — **≤1279px**/**≥1280px** · `$xxl` — **≥1280px** (no `gt` counterpart)
 
-There is no `$xxl`. `lib/design-tokens/src/lib/breakpoints.ts` defines one, plus `md`/`lg`/`xl` values that do not match the above — it is the source for raw numbers outside Tamagui, not for media props. See [`../ui/references/responsive-density.md`](../ui/references/responsive-density.md#known-drift).
+See the Status column in [`../ui/references/responsive-density.md`](../ui/references/responsive-density.md#tier-table--ground-truth) for which keys are design-token aligned vs. still stock, and for the bracket-direction gotcha.
 
 **Real example** (`MatchupScoreboardView.tsx`):
 
