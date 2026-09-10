@@ -118,6 +118,37 @@ describe('Matchups - DB Integration Tests', () => {
       expect(updated.status).toBe('in_progress');
     });
 
+    it('should persist an optional cancellation reason when cancelling a matchup (LS-9683)', async () => {
+      const { league, team1, team2 } = await seedPrerequisites();
+
+      const [matchup] = await db
+        .insert(matchups)
+        .values({
+          leagueId: league.id,
+          weekNumber: 1,
+          team1Id: team1.id,
+          team2Id: team2.id,
+          status: 'scheduled',
+        })
+        .returning();
+
+      expect(matchup.cancellationReason).toBeNull();
+
+      const [updated] = await db
+        .update(matchups)
+        .set({
+          status: 'cancelled',
+          cancellationReason: 'Not enough rostered players to field a lineup',
+        })
+        .where(eq(matchups.id, matchup.id))
+        .returning();
+
+      expect(updated.status).toBe('cancelled');
+      expect(updated.cancellationReason).toBe(
+        'Not enough rostered players to field a lineup',
+      );
+    });
+
     it('should update matchup scores', async () => {
       const { league, team1, team2 } = await seedPrerequisites();
 

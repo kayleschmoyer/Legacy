@@ -93,6 +93,7 @@ export const Matchup = builder.objectRef<{
   startTime: string | null;
   endTime: string | null;
   recapJson: Record<string, unknown> | null;
+  cancellationReason: string | null;
   updatedAt: Date;
   scoredAt: Date | null;
 }>('Matchup');
@@ -139,6 +140,11 @@ builder.objectType(Matchup, {
     }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
+    cancellationReason: t.exposeString('cancellationReason', {
+      nullable: true,
+      description:
+        'Admin/commissioner-supplied reason this matchup was cancelled. Null unless status is CANCELLED and a reason was given (LS-9683).',
+    }),
     lockTime: t.string({
       nullable: true,
       description:
@@ -485,6 +491,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     startTime: string | null;
     endTime: string | null;
     recapJson: Record<string, unknown> | null;
+    cancellationReason: string | null;
     updatedAt: Date;
     scoredAt: Date | null;
   }>;

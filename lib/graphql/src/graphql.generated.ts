@@ -1716,6 +1716,8 @@ export type LineupPositionInput = {
 /** A head-to-head matchup between two teams in a league */
 export type Matchup = {
   __typename?: 'Matchup';
+  /** Admin/commissioner-supplied reason this matchup was cancelled. Null unless status is CANCELLED and a reason was given (LS-9683). */
+  cancellationReason?: Maybe<Scalars['String']['output']>;
   endTime?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
@@ -2907,6 +2909,7 @@ export type MutationUpdateMatchupScoreArgs = {
 
 export type MutationUpdateMatchupStatusArgs = {
   matchupId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
   status: MatchupStatus;
 };
 
@@ -7304,6 +7307,7 @@ export type GetMatchupByIdQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    cancellationReason?: string | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     pitcherStartsPerMatchup?: number | null;
@@ -7361,6 +7365,7 @@ export type GetMatchupHistoryQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    cancellationReason?: string | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     pitcherStartsPerMatchup?: number | null;
@@ -7578,6 +7583,7 @@ export type GetTeamMatchupHistoryQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    cancellationReason?: string | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     pitcherStartsPerMatchup?: number | null;
@@ -8320,6 +8326,7 @@ export type AppMatchupFragment = {
   team1Score?: number | null;
   team2Score?: number | null;
   status?: MatchupStatus | null;
+  cancellationReason?: string | null;
   statsLoadingStatus?: StatsLoadingStatus | null;
   gamesPerMatchup?: number | null;
   pitcherStartsPerMatchup?: number | null;
@@ -11772,6 +11779,7 @@ export type GetMatchupsByWeekQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    cancellationReason?: string | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     pitcherStartsPerMatchup?: number | null;
@@ -11817,6 +11825,7 @@ export type GetMatchupsForLeagueQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    cancellationReason?: string | null;
     statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     pitcherStartsPerMatchup?: number | null;
@@ -13141,6 +13150,7 @@ export type MatchupFragment = {
   team1Score?: number | null;
   team2Score?: number | null;
   status?: MatchupStatus | null;
+  cancellationReason?: string | null;
   statsLoadingStatus?: StatsLoadingStatus | null;
   gamesPerMatchup?: number | null;
   pitcherStartsPerMatchup?: number | null;
@@ -15757,6 +15767,7 @@ export const AppMatchupFragmentDoc = gql`
     team1Score
     team2Score
     status
+    cancellationReason
     statsLoadingStatus
     gamesPerMatchup
     pitcherStartsPerMatchup
@@ -16559,6 +16570,7 @@ export const MatchupFragmentDoc = gql`
     team1Score
     team2Score
     status
+    cancellationReason
     statsLoadingStatus
     gamesPerMatchup
     pitcherStartsPerMatchup

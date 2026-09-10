@@ -330,6 +330,8 @@ describe('createStaleMatchupGuardLink (LS-6359)', () => {
       winProbability: null,
       // Same hazard as winProbability above, for the LS-6368 lockTime field.
       lockTime: null,
+      // Same hazard as above, for the LS-9683 cancellationReason field.
+      cancellationReason: null,
     };
   }
 

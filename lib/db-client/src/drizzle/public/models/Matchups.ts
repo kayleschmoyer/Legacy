@@ -67,6 +67,12 @@ export const matchups = pgTable(
      */
     recapJson: jsonb('recap_json').$type<Record<string, unknown>>(),
     /**
+     * Optional admin/commissioner-supplied reason for why this matchup was
+     * cancelled (LS-9683). Null for every non-cancelled matchup, and for
+     * cancelled matchups where no reason was given.
+     */
+    cancellationReason: text('cancellation_reason'),
+    /**
      * When team1_score / team2_score were last computed (LS-9665).
      *
      * NULL means the score predates scoring provenance, or was never computed.

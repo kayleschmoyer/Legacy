@@ -470,6 +470,7 @@ export function MatchupScoreboard({
       hasMatchup={!!matchup}
       weekNumber={matchup?.weekNumber}
       status={matchup?.status}
+      cancellationReason={matchup?.cancellationReason}
       gamesPerMatchup={matchup?.gamesPerMatchup}
       gamesRemaining={gamesRemaining}
       team1Id={matchup?.team1Id}

@@ -20,6 +20,7 @@ import {
 } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { randomUUID } from 'crypto';
 
 import {
@@ -31,7 +32,6 @@ import {
   MatchupStatus,
 } from './types';
 import { getFootballPlayerSeasonAverage } from './football-season-projection';
-import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { computeFootballGamePoints } from './matchupScores';
 import { assertPositionAssignmentsEligible } from '../position-eligibility';
 import { builder, Context } from '../builder';
@@ -243,6 +243,10 @@ builder.mutationField('updateMatchupStatus', (t) =>
     args: {
       matchupId: t.arg.int({ required: true }),
       status: t.arg({ type: MatchupStatus, required: true }),
+      // LS-9683: lets an admin/commissioner record why a matchup was
+      // cancelled so it can be surfaced back in the Cancelled-state UI.
+      // Precedent: EditMatchupScoreInput.reason / ForceDropPlayerInput.reason.
+      reason: t.arg.string({ required: false }),
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
@@ -256,9 +260,18 @@ builder.mutationField('updateMatchupStatus', (t) =>
         );
       }
 
+      const updateData: {
+        status: typeof args.status;
+        cancellationReason?: string | null;
+      } = { status: args.status };
+
+      if (args.reason !== null && args.reason !== undefined) {
+        updateData.cancellationReason = args.reason;
+      }
+
       const results = await context.db
         .update(PublicSchema.matchups)
-        .set({ status: args.status })
+        .set(updateData)
         .where(eq(PublicSchema.matchups.id, args.matchupId))
         .returning();
 

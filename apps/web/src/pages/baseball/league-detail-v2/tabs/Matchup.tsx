@@ -472,6 +472,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         weekNumber={week}
         totalMatchups={league.totalMatchups}
         status={matchup?.status ?? null}
+        cancellationReason={matchup?.cancellationReason}
         team1={team1Side}
         team2={team2Side}
         gamesPlayed={gamesPlayed}

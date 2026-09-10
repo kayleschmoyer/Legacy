@@ -111,6 +111,13 @@ export interface MatchupScoreboardViewProps {
    * are the `MatchupStatus` members ('in_progress', 'completed', ...).
    */
   status?: string | null;
+  /**
+   * Admin/commissioner-supplied reason this matchup was cancelled (LS-9683).
+   * When present, extends the cancelled-state banner to
+   * "This matchup was cancelled: <reason>."; ignored for non-cancelled
+   * matchups.
+   */
+  cancellationReason?: string | null;
   gamesPerMatchup?: number | null;
   gamesRemaining?: number;
   team1Id?: number | null;
@@ -152,6 +159,7 @@ export function MatchupScoreboardView({
   hasMatchup,
   weekNumber,
   status,
+  cancellationReason,
   gamesPerMatchup,
   gamesRemaining = 0,
   team1Id,
@@ -278,7 +286,9 @@ export function MatchupScoreboardView({
         >
           <XCircle size={14} color="var(--gray11)" />
           <Text fontSize="$2" fontWeight="600" color="$gray11">
-            This matchup was cancelled.
+            {cancellationReason
+              ? `This matchup was cancelled: ${cancellationReason}.`
+              : 'This matchup was cancelled.'}
           </Text>
         </XStack>
       )}

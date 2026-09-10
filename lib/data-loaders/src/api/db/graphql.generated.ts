@@ -1710,6 +1710,8 @@ export type LineupPositionInput = {
 /** A head-to-head matchup between two teams in a league */
 export type Matchup = {
   __typename?: 'Matchup';
+  /** Admin/commissioner-supplied reason this matchup was cancelled. Null unless status is CANCELLED and a reason was given (LS-9683). */
+  cancellationReason?: Maybe<Scalars['String']['output']>;
   endTime?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
@@ -2901,6 +2903,7 @@ export type MutationUpdateMatchupScoreArgs = {
 
 export type MutationUpdateMatchupStatusArgs = {
   matchupId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
   status: MatchupStatus;
 };
 

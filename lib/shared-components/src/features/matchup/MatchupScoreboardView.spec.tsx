@@ -98,6 +98,23 @@ describe('MatchupScoreboardView', () => {
     expect(screen.getByText('This matchup was cancelled.')).toBeTruthy();
   });
 
+  it('shows the cancellation reason when present (LS-9683)', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({
+          status: MatchupStatus.Cancelled,
+          cancellationReason: 'Not enough rostered players to field a lineup',
+        })}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'This matchup was cancelled: Not enough rostered players to field a lineup.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('This matchup was cancelled.')).toBeNull();
+  });
+
   it('hides projections and the games progress bar for cancelled matchups', () => {
     render(
       <MatchupScoreboardView

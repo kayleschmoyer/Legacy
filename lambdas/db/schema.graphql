@@ -2022,6 +2022,10 @@ input LineupPositionInput {
 A head-to-head matchup between two teams in a league
 """
 type Matchup {
+  """
+  Admin/commissioner-supplied reason this matchup was cancelled. Null unless status is CANCELLED and a reason was given (LS-9683).
+  """
+  cancellationReason: String
   endTime: String
   gamesPerMatchup: Int
   id: ID
@@ -3115,7 +3119,11 @@ type Mutation {
     team1Score: Float
     team2Score: Float
   ): Matchup
-  updateMatchupStatus(matchupId: Int!, status: MatchupStatus!): Matchup
+  updateMatchupStatus(
+    matchupId: Int!
+    reason: String
+    status: MatchupStatus!
+  ): Matchup
   updateNotificationPreferences(
     input: NotificationPreferenceInput!
   ): NotificationPreference
