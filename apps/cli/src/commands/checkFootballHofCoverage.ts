@@ -23,23 +23,47 @@ import { and, eq, ilike, or } from 'drizzle-orm';
  * Simpson) and 1999+ (Manning, Warner) — LS-9968 AC "check the 1999+ range
  * too" found the same defect there (neither is era-bound; the bug is in the
  * shared per-letter discovery path used for every season).
+ *
+ * Each entry pins the exact `pfr_id` where one is known (LS-9765): a
+ * last-name-only check is blind to a specific HOF player still being
+ * missing whenever other, unrelated players share that surname. That is
+ * exactly how Emmitt Smith and Walter Payton slipped past this guard after
+ * LS-9968 landed — "Smith" and "Payton" both already matched plenty of
+ * *other* players in the table, so the last-name check reported them
+ * "present" while the two individual HOF rows this check was meant to
+ * protect stayed absent, and the leaderboard kept surfacing Frank Gore as
+ * the career rushing-yards leader. A `pfrId` match checks the individual;
+ * entries without one (their PFR id wasn't looked up) fall back to the
+ * original last-name check.
  */
-export const KNOWN_FOOTBALL_HOF_LAST_NAMES: readonly string[] = [
-  'Montana',
-  'Marino',
-  'Elway',
-  'Unitas',
-  'Namath',
-  'Staubach',
-  'Tarkenton',
-  'Favre',
-  'Aikman',
-  'Payton',
-  'Rice',
-  'Simpson',
-  'Manning',
-  'Warner',
+export interface KnownFootballHofPlayer {
+  lastName: string;
+  /** Exact PFR id, when known — required to catch LS-9765-style masking by a
+   * shared surname. Omit only when the id hasn't been looked up. */
+  pfrId?: string;
+}
+
+export const KNOWN_FOOTBALL_HOF_PLAYERS: readonly KnownFootballHofPlayer[] = [
+  { lastName: 'Montana' },
+  { lastName: 'Marino' },
+  { lastName: 'Elway' },
+  { lastName: 'Unitas' },
+  { lastName: 'Namath' },
+  { lastName: 'Staubach' },
+  { lastName: 'Tarkenton' },
+  { lastName: 'Favre' },
+  { lastName: 'Aikman' },
+  { lastName: 'Payton', pfrId: 'PaytWa00' }, // Walter Payton (LS-9765)
+  { lastName: 'Rice' },
+  { lastName: 'Simpson' },
+  { lastName: 'Manning' },
+  { lastName: 'Warner' },
+  { lastName: 'Smith', pfrId: 'SmitEm00' }, // Emmitt Smith (LS-9765)
 ];
+
+/** Back-compat: the plain last-name list, derived from the players above. */
+export const KNOWN_FOOTBALL_HOF_LAST_NAMES: readonly string[] =
+  KNOWN_FOOTBALL_HOF_PLAYERS.map((p) => p.lastName);
 
 export interface FootballPlayerRow {
   lastName: string;
@@ -48,21 +72,35 @@ export interface FootballPlayerRow {
 
 /**
  * Pure comparison: given the football players currently in the DB, return
- * the subset of KNOWN_FOOTBALL_HOF_LAST_NAMES with no matching row that
- * carries a pfr_id (a name match with a null pfr_id is not "present" for
- * this purpose — it would not be reachable by the stats loader either).
+ * the display label (`lastName`, or `lastName (pfrId)` when the known entry
+ * pins one) for each known player with no matching row. A name match with a
+ * null pfr_id is not "present" — it would not be reachable by the stats
+ * loader either. When a known entry pins a `pfrId`, presence requires that
+ * exact id — a same-surname row is not enough (LS-9765).
  */
 export function findMissingKnownPlayers(
   dbRows: FootballPlayerRow[],
-  knownLastNames: readonly string[] = KNOWN_FOOTBALL_HOF_LAST_NAMES,
+  knownPlayers: readonly KnownFootballHofPlayer[] = KNOWN_FOOTBALL_HOF_PLAYERS,
 ): string[] {
+  const rowsWithPfrId = dbRows.filter(
+    (r): r is FootballPlayerRow & { pfrId: string } => r.pfrId !== null,
+  );
+  const presentPfrIds = new Set(
+    rowsWithPfrId.map((r) => r.pfrId.toLowerCase()),
+  );
   const presentLastNames = new Set(
-    dbRows.filter((r) => r.pfrId !== null).map((r) => r.lastName.toLowerCase()),
+    rowsWithPfrId.map((r) => r.lastName.toLowerCase()),
   );
 
-  return knownLastNames.filter(
-    (name) => !presentLastNames.has(name.toLowerCase()),
-  );
+  return knownPlayers
+    .filter((known) =>
+      known.pfrId
+        ? !presentPfrIds.has(known.pfrId.toLowerCase())
+        : !presentLastNames.has(known.lastName.toLowerCase()),
+    )
+    .map((known) =>
+      known.pfrId ? `${known.lastName} (${known.pfrId})` : known.lastName,
+    );
 }
 
 async function fetchFootballPlayersByLastName(
@@ -99,12 +137,12 @@ export async function handleCheckFootballHofCoverage(): Promise<void> {
       db,
       KNOWN_FOOTBALL_HOF_LAST_NAMES,
     );
-    return findMissingKnownPlayers(rows);
+    return findMissingKnownPlayers(rows, KNOWN_FOOTBALL_HOF_PLAYERS);
   });
 
   if (missing.length === 0) {
     LOGGER.info(
-      `✅ football HOF coverage check passed: all ${KNOWN_FOOTBALL_HOF_LAST_NAMES.length} known players present.`,
+      `✅ football HOF coverage check passed: all ${KNOWN_FOOTBALL_HOF_PLAYERS.length} known players present.`,
     );
     return;
   }
