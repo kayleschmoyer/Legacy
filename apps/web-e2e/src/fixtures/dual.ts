@@ -15,6 +15,7 @@ import {
   NativeMockTestData,
   reverseForwardToDevice,
 } from './native-mock';
+import { useTier } from './shared-mocks';
 import {
   DualMockState,
   LiveTestData,
@@ -75,6 +76,28 @@ export interface BackendOptions {
  * web or native without change (ADR-0016 §platform seam).
  */
 export type PlatformMode = 'web' | 'native';
+
+/**
+ * Identity tier seam (LS-9737), orthogonal to {@link BackendMode} and
+ * {@link PlatformMode}. Every existing dual spec runs as the premium
+ * commissioner identity (mock: the hermetic baseline user; live: the
+ * `loginAs('premium', 2)` commissioner — see {@link getAuthJwt}). A spec whose
+ * whole point is asserting premium-gating behaviour (e.g. the
+ * player-comparison tool's free-tier upgrade banner) needs the OTHER tier
+ * instead, so it opts in per-file via `test.use({ tier: 'free' })` — mirroring
+ * how `integration/fixtures/ui.ts` reserves `freePage`/`freeJwt` "ONLY for gate
+ * assertions" alongside its premium-by-default fixtures.
+ */
+export type IdentityTier = 'premium' | 'free';
+
+export interface IdentityOptions {
+  /**
+   * Which subscription tier the default identity carries. Defaults to
+   * `'premium'` so every pre-existing dual spec is unaffected. Set to
+   * `'free'` only for specs asserting premium-gate behaviour.
+   */
+  tier: IdentityTier;
+}
 
 /**
  * Set (only) by `playwright.native.config.ts` before any worker spawns
@@ -149,11 +172,12 @@ export interface DualWorkerFixtures {
 }
 
 export const test = base.extend<
-  BackendOptions & PlatformOptions & DualFixtures,
+  BackendOptions & PlatformOptions & IdentityOptions & DualFixtures,
   DualWorkerFixtures
 >({
   backend: ['mock', { option: true }],
   platform: ['web', { option: true }],
+  tier: ['premium', { option: true }],
 
   /**
    * One mock server per worker. Constructed unconditionally (cheap — no socket
@@ -176,12 +200,19 @@ export const test = base.extend<
   ],
 
   /**
-   * Live mode authenticates the default context against the live web app;
-   * mock mode keeps the config-provided hermetic storageState untouched.
+   * Live mode authenticates the default context against the live web app —
+   * as the premium commissioner by default, or (LS-9737) a free-tier seat
+   * when `tier: 'free'` is requested, mirroring `integration/fixtures/ui.ts`'s
+   * `freeJwt` (`loginAs('free', 1)`) rather than the commissioner's
+   * env/CLI-token escape hatches, which are premium-identity-specific. Mock
+   * mode keeps the config-provided hermetic storageState untouched — its tier
+   * is applied later, on the `page` fixture below, via `useTier`.
    */
-  storageState: async ({ backend, storageState }, use) => {
+  storageState: async ({ backend, tier, storageState }, use) => {
     if (backend === 'live') {
-      await use(buildIntegrationStorageState(await getAuthJwt()));
+      const jwt =
+        tier === 'free' ? await loginAs('free', 1) : await getAuthJwt();
+      await use(buildIntegrationStorageState(jwt));
     } else {
       await use(storageState);
     }
@@ -253,8 +284,14 @@ export const test = base.extend<
     {
       backend,
       platform,
+      tier,
       page,
-    }: { backend: BackendMode; platform: PlatformMode; page: Page },
+    }: {
+      backend: BackendMode;
+      platform: PlatformMode;
+      tier: IdentityTier;
+      page: Page;
+    },
     use: (page: Page) => Promise<void>,
     testInfo: TestInfo,
   ) => {
@@ -264,6 +301,13 @@ export const test = base.extend<
     }
     if (backend === 'mock') {
       await withApiIsolation(page, testInfo, async () => {
+        // Registered AFTER api-isolation's baseline (premium) handlers, so its
+        // GetUserById/MyEntitlements routes win the Playwright LIFO race
+        // (LS-9737) — same ordering `useTier` already relies on in
+        // player-comparison.spec.ts / commissioner-scoring-editor.spec.ts.
+        if (tier === 'free') {
+          await useTier(page, 'free');
+        }
         const baseline = await snapshotCoverageBaseline(page);
         await use(page);
         await attributePageCoverage(page, testInfo, baseline);

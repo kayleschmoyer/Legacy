@@ -315,6 +315,26 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('qr-code-svg');
   }
 
+  /** The "Invite Friends" card heading on the detail overview tab. */
+  get inviteFriendsHeading(): UIElement {
+    return this.driver.byText('Invite Friends');
+  }
+
+  /** The "Copy invite link" button in the Invite Friends card. */
+  get copyInviteLinkButton(): UIElement {
+    return this.driver.byRole('button', { name: /copy invite link/i });
+  }
+
+  /** The "Copy invite code" button in the Invite Friends card. */
+  get copyInviteCodeButton(): UIElement {
+    return this.driver.byRole('button', { name: /copy invite code/i });
+  }
+
+  /** The screen-reader `role="status"` confirmation after a copy action. */
+  copyStatus(text: RegExp): UIElement {
+    return this.driver.byRole('status').filterByText(text);
+  }
+
   /** The league-chat message composer input. */
   get chatInput(): UIElement {
     return this.driver.byPlaceholder(/message/i).first();
@@ -328,6 +348,55 @@ export class LeaguePage extends BaseScreen {
   /** A standings table column header by its accessible name. */
   standingsColumnHeader(name: string | RegExp): UIElement {
     return this.driver.byRole('columnheader', { name });
+  }
+
+  /**
+   * The commissioner Scoring Rules accordion toggle (collapsed by default —
+   * `openScoringSection` expands it).
+   */
+  get scoringRulesToggle(): UIElement {
+    return this.driver.byRole('button', { name: 'Scoring Rules', exact: true });
+  }
+
+  /**
+   * A scoring stat's multiplier input, by its stat's display name (e.g.
+   * `scoringMultiplierInput('Home Runs')`) — the accessible name is
+   * `"<displayName> multiplier"` (`LeagueScoringEditor`).
+   */
+  scoringMultiplierInput(statDisplayName: string): UIElement {
+    return this.driver.byRole('textbox', {
+      name: `${statDisplayName} multiplier`,
+    });
+  }
+
+  /** The scoring editor's "Save Changes" button (enabled once a value changes). */
+  get scoringSaveButton(): UIElement {
+    return this.driver.byRole('button', { name: /save.*change/i });
+  }
+
+  /** The scoring editor's "Reset All" button. */
+  get scoringResetAllButton(): UIElement {
+    return this.driver.byRole('button', { name: 'Reset All' });
+  }
+
+  /** The success toast shown after a scoring-profile save completes. */
+  get scoringSavedToast(): UIElement {
+    return this.driver.byTestId('scoring-saved-toast');
+  }
+
+  /** The commissioner "Start New Season" button (season-complete state only). */
+  get startNewSeasonButton(): UIElement {
+    return this.driver.byRole('button', { name: /start new season/i });
+  }
+
+  /**
+   * The season-renewal confirmation dialog (`role="alertdialog"`). Scope
+   * further reads to it via its `UIElement`/`ElementScope` surface (e.g.
+   * `renewalDialog.byText(/keep same rosters/i)`) rather than searching the
+   * whole page — mirrors how {@link premiumGate} is scoped elsewhere here.
+   */
+  get renewalDialog(): UIElement {
+    return this.driver.byRole('alertdialog');
   }
 
   // ── Reads: named discovery getters ───────────────────────────────
@@ -710,6 +779,23 @@ export class LeaguePage extends BaseScreen {
     await this.driver
       .byRole('button', { name: /show qr code to invite/i })
       .tap();
+  }
+
+  /** Hide the invite QR-code dialog once shown (toggle button flips to "Hide"). */
+  async hideQrCode(): Promise<void> {
+    await this.driver.byRole('button', { name: /hide qr code/i }).tap();
+  }
+
+  /**
+   * Expand the commissioner "Scoring Rules" accordion section (collapsed by
+   * default). No-op if already expanded.
+   */
+  async openScoringSection(): Promise<void> {
+    await this.scoringRulesToggle.expectVisible({ timeout: 15000 });
+    if ((await this.scoringRulesToggle.attribute('aria-expanded')) !== 'true') {
+      await this.scoringRulesToggle.tap();
+      await this.scoringRulesToggle.expectAttribute('aria-expanded', 'true');
+    }
   }
 
   /** Confirm the "Rename team?" dialog (clicks its "Rename" button). */

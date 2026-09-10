@@ -24,11 +24,15 @@ import { promisify } from 'node:util';
 import { BASELINE_GRAPHQL_RESPONSES } from './shared-mocks';
 import type { BackendMode, PlatformMode } from './dual';
 import type {
+  InviteJoinResult,
   SeededDiscoverySearch,
   SeededFootballLineup,
   SeededLeague,
+  SeededLeagueInvite,
   SeededLeagueWithMember,
   SeededPlayerPool,
+  SeededScoringProfile,
+  SeededSeasonRenewal,
   TestData,
 } from './test-data';
 import { createLeagueFixture } from '../mocks/graphql/league-fixture.mocks';
@@ -191,6 +195,40 @@ export class NativeMockTestData implements TestData {
       openSlot: fixture.openSlot,
       benchPlayer: fixture.benchPlayer,
     });
+  }
+
+  // ── LS-9737 verbs: no native page objects exist yet for these web-only
+  // flows (league invite card, scoring editor, season-renewal dialog, the
+  // player-comparison premium banner) — deliberately unimplemented rather
+  // than a silent no-op, matching the interface contract. Implement
+  // alongside the first native dual spec that needs one of these surfaces.
+
+  leagueInvite(): Promise<SeededLeagueInvite> {
+    throw new Error(
+      'NativeMockTestData.leagueInvite() is not implemented — no native ' +
+        'page object covers the league invite card yet (LS-9737 is web-only).',
+    );
+  }
+
+  inviteJoin(): Promise<InviteJoinResult> {
+    throw new Error(
+      'NativeMockTestData.inviteJoin() is not implemented — no native page ' +
+        'object covers the league invite card yet (LS-9737 is web-only).',
+    );
+  }
+
+  scoringProfile(): Promise<SeededScoringProfile> {
+    throw new Error(
+      'NativeMockTestData.scoringProfile() is not implemented — no native ' +
+        'page object covers the scoring editor yet (LS-9737 is web-only).',
+    );
+  }
+
+  seasonRenewalDialog(): Promise<SeededSeasonRenewal> {
+    throw new Error(
+      'NativeMockTestData.seasonRenewalDialog() is not implemented — no ' +
+        'native page object covers the renewal dialog yet (LS-9737 is web-only).',
+    );
   }
 
   /**

@@ -7,13 +7,20 @@ import {
 } from './shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 import {
+  leagueByIdResponse,
+  leaguePositionsResponse,
+  leagueTeamsResponse,
+  mockLeague,
+  mockTeam,
+  publicLeaguesEmptyResponse,
+  publicLeaguesResponse,
+  userLeaguesResponse,
+  userTeamIdResponse,
+} from '../mocks/graphql/league.mocks';
+import {
   createLeagueFixture,
   type LeagueFixture,
 } from '../mocks/graphql/league-fixture.mocks';
-import {
-  publicLeaguesEmptyResponse,
-  publicLeaguesResponse,
-} from '../mocks/graphql/league.mocks';
 import {
   careerBattingConnectionResponse,
   careerPitchingLeadersCountResponse,
@@ -21,6 +28,11 @@ import {
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
 import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
+import {
+  LEAGUE_ID as SEASON_RENEWAL_LEAGUE_ID,
+  LEAGUE_NAME as SEASON_RENEWAL_LEAGUE_NAME,
+  setupSeasonRenewalGraphQL,
+} from '../mocks/graphql/season-renewal';
 import { gqlFetch } from '../integration/helpers/gql-fetch';
 import { createLeagueViaUI } from '../integration/helpers/create-league';
 import { joinLeagueAsManager } from '../integration/helpers/wait-for-join-page';
@@ -87,6 +99,52 @@ export interface SeededFootballLineup {
     /** Full display name rendered on the bench row. */
     fullName: string;
   };
+}
+
+/**
+ * A league whose commissioner-facing invite surface (Invite Friends card:
+ * URL, code, QR toggle) is ready to assert against — the precondition for the
+ * league QR-invite flow (LS-9737, converted from
+ * league-qr-invite-ui.integration.spec.ts).
+ */
+export interface SeededLeagueInvite {
+  leagueId: number;
+  leagueName: string;
+  /** 8-character alphanumeric invite code. */
+  inviteCode: string;
+  /** Full join URL for the invite code (`/baseball/league/join/<code>`). */
+  inviteUrl: string;
+}
+
+/** Result of {@link TestData.inviteJoin} — the postcondition to assert on. */
+export interface InviteJoinResult {
+  /** Total league members after the join (commissioner + newly-joined manager). */
+  memberCount: number;
+}
+
+/**
+ * A league whose commissioner Scoring Rules editor is ready to assert
+ * against — the precondition for the league scoring-editor flow (LS-9737,
+ * converted from league-scoring-editor-ui.integration.spec.ts).
+ */
+export interface SeededScoringProfile {
+  leagueId: number;
+  /** Display name of the stat the spec edits (`Home Runs` — matches both fixtures). */
+  statDisplayName: string;
+  /** The stat's multiplier before the spec edits it. */
+  originalMultiplier: number;
+}
+
+/**
+ * A league in the "season complete" state, ready for the commissioner's
+ * renewal dialog (Phase 6 slice only — LS-9737, converted from
+ * season-renewal-migration-ui.integration.spec.ts). Reaching this state on a
+ * real backend requires a full multi-manager season-completion run (create →
+ * join → draft → auto-advance); see {@link SEASON_RENEWAL_LIVE_UNSUPPORTED_REASON}.
+ */
+export interface SeededSeasonRenewal {
+  leagueId: number;
+  leagueName: string;
 }
 
 /**
@@ -185,6 +243,58 @@ export interface TestData {
    * (see LS-9655 "Out of Scope").
    */
   footballLineup(): Promise<SeededFootballLineup>;
+
+  /**
+   * Ensure a league exists whose commissioner-facing overview shows the
+   * Invite Friends card (invite URL, invite code, QR toggle). Mock: installs
+   * a league/team/positions fixture the commissioner owns. Live: creates a
+   * real league via `createLeagueAndTeams` (LS-9737) — nightly-run orphans
+   * are reaped by the existing global-setup/teardown league sweep (Layers 1
+   * &amp; 3, `cleanupLeague.ts`), the same safety net serial integration specs
+   * rely on for their own per-run leagues.
+   */
+  leagueInvite(): Promise<SeededLeagueInvite>;
+
+  /**
+   * Join the league from {@link leagueInvite} as a SECOND identity and return
+   * the resulting member count. Deliberately backend-only (no UI driving): the
+   * dual fixture's single `page`/`driver` is already authenticated as the
+   * league's commissioner, so a second browser context isn't available to
+   * drive the join form the way `league-qr-invite-ui.integration.spec.ts`
+   * Phase 7 does — the join happens directly against the backend in both
+   * modes instead (mock: an in-memory counter; live: a real
+   * `joinLeagueByCode` mutation as a distinct premium identity), and the spec
+   * asserts the same `memberCount` postcondition either way.
+   */
+  inviteJoin(
+    invite: SeededLeagueInvite,
+    teamName: string,
+  ): Promise<InviteJoinResult>;
+
+  /**
+   * Ensure a league exists whose commissioner Scoring Rules editor is ready:
+   * all three stat groups render, and a known stat (Home Runs) carries a
+   * known multiplier the spec can edit and save. Mock: installs a stateful
+   * `UpdateLeagueScoringProfile` handler (edits round-trip). Live: creates a
+   * real league via `createLeagueAndTeams` — a freshly created league carries
+   * the default scoring profile server-side, so no further seeding mutation
+   * is needed before editing it.
+   */
+  scoringProfile(): Promise<SeededScoringProfile>;
+
+  /**
+   * Ensure a league is in the "season complete" state so the commissioner's
+   * renewal dialog (Phase 6 of the source integration spec) can be opened.
+   * Mock: installs the shared `setupSeasonRenewalGraphQL` fixture (already
+   * used by `season-renewal.spec.ts`), whose baseline league is
+   * draft-completed with no active matchup. Live: **throws** — reaching this
+   * state on a real backend means running the full create → 3-manager-join →
+   * automated-draft → auto-advance-to-completion sequence that Phases 1-5 of
+   * `season-renewal-migration-ui.integration.spec.ts` perform, which no
+   * existing live TestData verb seeds (out of scope for LS-9737's Phase-6
+   * slice — see {@link SEASON_RENEWAL_LIVE_UNSUPPORTED_REASON}).
+   */
+  seasonRenewalDialog(): Promise<SeededSeasonRenewal>;
 
   /**
    * Ensure a league exists that the viewer (commissioner) owns, with no
@@ -363,6 +473,227 @@ export class MockTestData implements TestData {
     };
   }
 
+  /** In-memory member count for {@link leagueInvite} / {@link inviteJoin}. */
+  #inviteMemberCount = 1;
+
+  async leagueInvite(): Promise<SeededLeagueInvite> {
+    const leagueId = 1;
+    const leagueName = 'Dual Mode Invite League';
+    const inviteCode = 'DUALINV1';
+    this.#inviteMemberCount = 1;
+    const league = mockLeague({
+      id: leagueId,
+      name: leagueName,
+      owner: 1,
+      inviteCode,
+    });
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'getleaguebyid' || op === 'getleague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leagueByIdResponse(league)),
+        });
+      } else if (op === 'getleagueteams') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            leagueTeamsResponse([
+              mockTeam({ id: 1, name: 'Commish', owner: 1 }),
+            ]),
+          ),
+        });
+      } else if (op === 'getpositionsforleague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leaguePositionsResponse()),
+        });
+      } else if (op === 'getuserteamid') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(userTeamIdResponse(1)),
+        });
+      } else if (op === 'getuserleagues') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(userLeaguesResponse([league])),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    return {
+      leagueId,
+      leagueName,
+      inviteCode,
+      inviteUrl: `/baseball/league/join/${inviteCode}`,
+    };
+  }
+
+  inviteJoin(): Promise<InviteJoinResult> {
+    // Purely in-memory — no route mocking needed since the spec asserts on
+    // the returned count directly rather than re-fetching the roster (see
+    // TestData.inviteJoin doc comment).
+    this.#inviteMemberCount += 1;
+    return Promise.resolve({ memberCount: this.#inviteMemberCount });
+  }
+
+  /** Stateful "current multiplier" for {@link scoringProfile}'s save round trip. */
+  #scoringMultiplier = 1;
+
+  async scoringProfile(): Promise<SeededScoringProfile> {
+    const leagueId = 1;
+    const statDisplayName = 'Home Runs';
+    this.#scoringMultiplier = 1;
+    const league = mockLeague({
+      id: leagueId,
+      name: 'Dual Mode Scoring League',
+      owner: 1,
+      draftStatus: 'not-started',
+    });
+
+    const makeStat = () => ({
+      __typename: 'ScoringRule',
+      multiplier: this.#scoringMultiplier,
+      defaultMultiplier: 1,
+      isOverride: this.#scoringMultiplier !== 1,
+      isEnabled: true,
+      definition: {
+        __typename: 'ScoringStatDefinition',
+        id: 1,
+        statKey: 'hr',
+        statGroup: 'batting',
+        displayName: statDisplayName,
+        description: 'Home run bonus',
+        sourceColumn: 'homeRuns',
+        defaultMultiplier: 1,
+        minMultiplier: 0,
+        maxMultiplier: 10,
+        stepSize: 0.5,
+        isRequired: false,
+        enforcePositive: false,
+        enforceNegative: false,
+      },
+    });
+    // The editor only renders a group's section (and its "Batting"/"Pitching"
+    // heading) when that group has at least one stat — a lone batting stat
+    // would leave "Pitching" permanently absent. Include one pitching stat so
+    // both group headings render, matching what the real backend returns.
+    const makePitchingStat = () => ({
+      __typename: 'ScoringRule',
+      multiplier: 1,
+      defaultMultiplier: 1,
+      isOverride: false,
+      isEnabled: true,
+      definition: {
+        __typename: 'ScoringStatDefinition',
+        id: 2,
+        statKey: 'so',
+        statGroup: 'pitching',
+        displayName: 'Strikeouts',
+        description: 'Strikeout bonus',
+        sourceColumn: 'strikeouts',
+        defaultMultiplier: 1,
+        minMultiplier: 0,
+        maxMultiplier: 10,
+        stepSize: 0.5,
+        isRequired: false,
+        enforcePositive: false,
+        enforceNegative: false,
+      },
+    });
+    const makeProfile = () => ({
+      __typename: 'ScoringConfig',
+      profileId: 1,
+      profileName: 'Standard',
+      stats: [makeStat(), makePitchingStat()],
+      multiplierGroups: [],
+    });
+
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'getleaguebyid' || op === 'getleague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leagueByIdResponse(league)),
+        });
+      } else if (op === 'getleagueteams') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            leagueTeamsResponse([
+              mockTeam({ id: 1, name: 'Commish', owner: 1 }),
+            ]),
+          ),
+        });
+      } else if (op === 'getpositionsforleague') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leaguePositionsResponse([])),
+        });
+      } else if (op === 'getuserteamid') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(userTeamIdResponse(1)),
+        });
+      } else if (op === 'getuserleagues') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(userLeaguesResponse([league])),
+        });
+      } else if (op === 'getleaguescoringprofile') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { leagueScoringProfile: makeProfile() },
+          }),
+        });
+      } else if (op === 'updateleaguescoringprofile') {
+        const { updates } = extractOperationVariables(route);
+        const update = Array.isArray(updates)
+          ? (
+              updates as Array<{
+                statDefinitionId: number;
+                multiplier: number;
+              }>
+            ).find((u) => u.statDefinitionId === 1)
+          : undefined;
+        if (update) this.#scoringMultiplier = update.multiplier;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { updateLeagueScoringProfile: makeProfile() },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    return { leagueId, statDisplayName, originalMultiplier: 1 };
+  }
+
+  async seasonRenewalDialog(): Promise<SeededSeasonRenewal> {
+    await setupSeasonRenewalGraphQL(this.#page);
+    return {
+      leagueId: SEASON_RENEWAL_LEAGUE_ID,
+      leagueName: SEASON_RENEWAL_LEAGUE_NAME,
+    };
+  }
+
   async league(): Promise<SeededLeague> {
     const fixture = this.#shared.league();
     await this.#installLeagueRoutes(fixture);
@@ -425,6 +756,21 @@ export const FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON =
   'Scope" for the follow-up that would make it live-capable.';
 
 /**
+ * Why {@link LiveTestData.seasonRenewalDialog} throws — surfaced verbatim so a
+ * spec that reaches for the verb in live mode fails loudly with the reason,
+ * rather than passing against a precondition that was never established.
+ */
+export const SEASON_RENEWAL_LIVE_UNSUPPORTED_REASON =
+  'TestData.seasonRenewalDialog() has no live implementation: reaching the ' +
+  '"season complete" precondition on a real backend requires the full ' +
+  'create-league → 3-manager-join → automated-draft → auto-advance-to-' +
+  'completion sequence (Phases 1-5 of ' +
+  'season-renewal-migration-ui.integration.spec.ts), which no existing live ' +
+  'TestData verb seeds. LS-9737 ports only the Phase-6 dialog-interaction ' +
+  'slice; this precondition is mock-only — run the spec on a mock backend, ' +
+  'or file a follow-up ticket to build the live seeding sequence.';
+
+/**
  * Live implementation — preconditions are satisfied against the real backend.
  * Read-only preconditions (like the MLB history player pool) need no setup;
  * verbs that must create state should issue real GraphQL mutations here (see
@@ -473,6 +819,49 @@ export class LiveTestData implements TestData {
     this.#browser = browser;
   }
 
+  /**
+   * Create a real league via `createLeagueAndTeams` as the premium
+   * commissioner, mirroring `integration/helpers/create-league.ts`'s
+   * `createLeagueViaUI` but as a direct mutation (LiveTestData verbs carry no
+   * `page`). Orphaned leagues from nightly runs are reaped by the existing
+   * global-setup/teardown sweep (`cleanupLeague.ts` Layers 1 &amp; 3) — the
+   * same safety net the serial integration specs rely on for their own
+   * per-run leagues.
+   */
+  async #createLiveLeague(
+    leagueName: string,
+    numberOfTeams = 4,
+  ): Promise<{ jwt: string; leagueId: number; inviteCode: string }> {
+    const jwt = await getAuthJwt();
+    const data = await gqlFetch<{
+      createLeagueAndTeams: {
+        league: { id: number; inviteCode: string | null };
+      };
+    }>(
+      jwt,
+      `mutation DualModeCreateLeague($input: CreateLeagueAndTeamsInput!) {
+         createLeagueAndTeams(input: $input) {
+           league { id inviteCode }
+         }
+       }`,
+      {
+        input: {
+          leagueName,
+          numberOfTeams,
+          playerPool: 'all',
+          sport: 'baseball',
+        },
+      },
+    );
+    const { league } = data.createLeagueAndTeams;
+    if (!league.inviteCode) {
+      throw new Error(
+        `createLeagueAndTeams returned no inviteCode for league ${league.id}`,
+      );
+    }
+    return { jwt, leagueId: league.id, inviteCode: league.inviteCode };
+  }
+
   playerPool(): Promise<SeededPlayerPool> {
     // The live MLB history dataset always contains the all-time greats; Barry
     // Bonds is the precedent search target (player-search-stats-ui, LS-754).
@@ -505,6 +894,81 @@ export class LiveTestData implements TestData {
     // roster seeding and teardown. That is its own ticket and its own design
     // review (LS-9655 "Out of Scope").
     throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
+  }
+
+  async leagueInvite(): Promise<SeededLeagueInvite> {
+    const leagueName = `Dual QR Invite ${Date.now()}`;
+    const { leagueId, inviteCode } = await this.#createLiveLeague(leagueName);
+    return {
+      leagueId,
+      leagueName,
+      inviteCode,
+      inviteUrl: `${WEB_BASE}/baseball/league/join/${inviteCode}`,
+    };
+  }
+
+  async inviteJoin(
+    invite: SeededLeagueInvite,
+    teamName: string,
+  ): Promise<InviteJoinResult> {
+    // A second, distinct premium identity joins directly against the backend
+    // (see the TestData.inviteJoin doc comment for why this isn't UI-driven).
+    const managerJwt = await loginAs('premium', 1);
+    await gqlFetch<{ joinLeagueByCode: { id: number } | null }>(
+      managerJwt,
+      `mutation DualModeJoinLeague($inviteCode: String!, $teamName: String!) {
+         joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) { id }
+       }`,
+      { inviteCode: invite.inviteCode, teamName },
+    );
+
+    const commissionerJwt = await getAuthJwt();
+    const data = await gqlFetch<{ leagueTeams: Array<{ id: number }> }>(
+      commissionerJwt,
+      `query DualModeLeagueTeams($leagueId: Int!) {
+         leagueTeams(leagueId: $leagueId) { id }
+       }`,
+      { leagueId: invite.leagueId },
+    );
+    return { memberCount: data.leagueTeams.length };
+  }
+
+  async scoringProfile(): Promise<SeededScoringProfile> {
+    const leagueName = `Dual Scoring Editor ${Date.now()}`;
+    const { jwt, leagueId } = await this.#createLiveLeague(leagueName);
+    const statDisplayName = 'Home Runs';
+
+    const data = await gqlFetch<{
+      leagueScoringProfile: {
+        stats: Array<{
+          multiplier: number;
+          definition: { displayName: string };
+        }>;
+      };
+    }>(
+      jwt,
+      `query DualModeScoringProfile($leagueId: Int!) {
+         leagueScoringProfile(leagueId: $leagueId) {
+           stats { multiplier definition { displayName } }
+         }
+       }`,
+      { leagueId },
+    );
+    const hrStat = data.leagueScoringProfile.stats.find(
+      (s) => s.definition.displayName === statDisplayName,
+    );
+    if (!hrStat) {
+      throw new Error(
+        `leagueScoringProfile for league ${leagueId} has no "${statDisplayName}" stat`,
+      );
+    }
+
+    return { leagueId, statDisplayName, originalMultiplier: hrStat.multiplier };
+  }
+
+  seasonRenewalDialog(): Promise<SeededSeasonRenewal> {
+    // Deliberately unimplemented — see SEASON_RENEWAL_LIVE_UNSUPPORTED_REASON.
+    throw new Error(SEASON_RENEWAL_LIVE_UNSUPPORTED_REASON);
   }
 
   async league(): Promise<SeededLeague> {
