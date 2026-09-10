@@ -139,6 +139,10 @@ function makeGithub({
   // fixtures don't accidentally trip the new in-flight-integration merge
   // guard. Defaults to [] (no in-flight integration run).
   integrationWorkflowRuns = [],
+  // LS-9753: existing issue comments served to issues.listComments — used to
+  // seed the staleness-guard's retrigger-history marker (or any other PR
+  // comment state a test wants visible before the run). Defaults to [].
+  issueComments = [],
 } = {}) {
   const calls = {
     merges: [],
@@ -258,12 +262,14 @@ function makeGithub({
         listForRef: async () => ({ data: { check_runs: checkRuns } }),
       },
       issues: {
-        listComments: async () => ({ data: [] }),
+        listComments: async () => ({ data: issueComments }),
         createComment: async (args) => {
           calls.comments.push(args);
           return { data: { id: 1 } };
         },
-        updateComment: async () => {},
+        updateComment: async (args) => {
+          calls.comments.push(args);
+        },
         addLabels: async (args) => {
           calls.labels.push(args);
         },
@@ -3248,6 +3254,208 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
         'dry run must not mutate the branch',
       );
       assert.match(logs, /DRY RUN: Would update branch on PR #1/);
+    }),
+  );
+
+  // ── LS-9753: narrow the overlap heuristic by changed-file proximity ────────
+
+  it(
+    'merges directly when gap and PR files only share a broad spec bucket in unrelated subdirectories',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 2,
+            commits: [gapCommit('gap0007ggg')],
+            // gamma covers two unrelated subdirectories (broad glob) — this
+            // file is nowhere near the PR's own gamma file.
+            files: [gapFile('apps/web/src/pages/gamma/scores/ScoresPage.tsx')],
+          },
+        },
+        prListFiles: [
+          gapFile('apps/web/src/pages/gamma/settings/SettingsPage.tsx'),
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'bucket-only overlap with no file-level proximity must merge (LS-9753 AC1)',
+      );
+      assert.strictEqual(calls.updateBranch.length, 0);
+      assert.match(logs, /verdict=disjoint:no-proximate-overlap/);
+      assert.match(logs, /narrowed by changed-file proximity, LS-9753/);
+    }),
+  );
+
+  it(
+    'still blocks when gap and PR files share a broad bucket AND are path-proximate',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0008hhh')],
+            files: [
+              gapFile('apps/web/src/pages/gamma/settings/SettingsService.ts'),
+            ],
+          },
+        },
+        prListFiles: [
+          gapFile('apps/web/src/pages/gamma/settings/SettingsPage.tsx'),
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        0,
+        'same-directory files sharing a bucket are a real overlap',
+      );
+      assert.strictEqual(calls.updateBranch.length, 1);
+      assert.match(logs, /verdict=overlap(?!:narrowed)/);
+    }),
+  );
+
+  it(
+    'does not narrow a runAllWhenChanged overlap by proximity',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0009iii')],
+            files: [gapFile('lambdas/db/schema.graphql')],
+          },
+        },
+        prListFiles: [
+          gapFile('apps/web/src/pages/gamma/settings/SettingsPage.tsx'),
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(calls.merges.length, 0, 'must not merge');
+      assert.strictEqual(calls.updateBranch.length, 1);
+      assert.doesNotMatch(logs, /narrowed by changed-file proximity/);
+    }),
+  );
+
+  // ── LS-9753: cap retriggers to a maximum per hour ───────────────────────────
+
+  it(
+    'fails open once the hourly retrigger cap is reached instead of retriggering again',
+    withGuardWorkspace(async () => {
+      const recentHistory = Array.from({ length: 4 }, (_, i) =>
+        new Date(Date.now() - (i + 1) * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0010jjj')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(recentHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'cap reached → fail open and merge rather than retrigger again (LS-9753 AC2)',
+      );
+      assert.strictEqual(calls.updateBranch.length, 0);
+      assert.match(logs, /verdict=fail-open:retrigger-cap-reached/);
+    }),
+  );
+
+  it(
+    'ignores retrigger history older than the one-hour window',
+    withGuardWorkspace(async () => {
+      const staleHistory = Array.from({ length: 4 }, (_, i) =>
+        new Date(Date.now() - (2 * 60 + i) * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0011kkk')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(staleHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        1,
+        'history older than the window must not count against the cap',
+      );
+      assert.match(logs, /verdict=overlap/);
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.match(
+        blocker.body,
+        /<!-- LS-9662-RETRIGGERS:\[".*"\] -->/,
+        'a fresh retrigger marker with exactly one (new) timestamp must be persisted',
+      );
+    }),
+  );
+
+  it(
+    'dry run does not advance the retrigger history',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0012lll')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      await runCapturingLogs(github, { isDryRun: true });
+
+      assert.strictEqual(calls.updateBranch.length, 0);
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.match(
+        blocker.body,
+        /<!-- LS-9662-RETRIGGERS:\[\] -->/,
+        'a dry run must not record a real retrigger against the hourly cap',
+      );
     }),
   );
 });

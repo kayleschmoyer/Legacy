@@ -174,6 +174,69 @@ const COMPARE_FILES_CAP = 300;
 // Cap the specs/commits enumerated in the revalidation PR comment.
 const MAX_GUARD_LISTED_ITEMS = 10;
 
+// ── LS-9753: narrow the LS-9662 overlap heuristic + cap retriggers ──────────
+// LS-9662 blocked on shared spec-bucket membership alone: a spec's surface glob
+// (e.g. `apps/web/src/pages/leagues/**`) is broad by design (over-selection is
+// safe for the selector's own job of picking specs to *run*), but that same
+// breadth made two files that only happen to fall under the same broad glob
+// register as "overlapping" even when they sit in unrelated subdirectories
+// with no real interaction risk (PR #7374: a 7-file PR flagged 200+
+// "overlapping" specs purely from main's unrelated churn). Once a spec is
+// flagged as shared, require the actual PR file(s) and gap file(s) that
+// selected it to also be path-proximate (the same file, the same directory,
+// or a parent/child directory) before treating the overlap as real risk
+// rather than bucket coincidence. A spec directly edited by either side is
+// always treated as proximate — someone touched the spec's own surface.
+function fileDirDepth(file) {
+  return file.split('/').length - 1;
+}
+function sharedPathPrefixDepth(a, b) {
+  const as = a.split('/');
+  const bs = b.split('/');
+  let i = 0;
+  while (i < as.length && i < bs.length && as[i] === bs[i]) i++;
+  return i;
+}
+// Proximate = identical file, or one file's directory is a prefix of the
+// other's (same directory, or a parent/child directory relationship).
+function isPathProximate(a, b) {
+  if (a === b) return true;
+  return (
+    sharedPathPrefixDepth(a, b) >= Math.min(fileDirDepth(a), fileDirDepth(b))
+  );
+}
+function specHasProximateOverlap(
+  spec,
+  prFiles,
+  gapFiles,
+  manifest,
+  matchesAny,
+) {
+  if (prFiles.includes(spec) || gapFiles.includes(spec)) return true;
+  const globs = manifest.specs[spec] ?? [];
+  const prMatches = prFiles.filter((f) => matchesAny(f, globs));
+  const gapMatches = gapFiles.filter((f) => matchesAny(f, globs));
+  for (const pf of prMatches) {
+    for (const gf of gapMatches) {
+      if (isPathProximate(pf, gf)) return true;
+    }
+  }
+  return false;
+}
+
+// Backoff: cap how many times the guard will actually trigger a revalidation
+// (update-branch) for the same PR within a rolling window, so a churning
+// main (PR #7374: 12 retriggers in a day) can't keep bouncing an otherwise
+// green PR forever. Once the cap is hit within the window, the guard fails
+// open — merging is preferred over an unbounded retrigger loop, consistent
+// with the guard's fail-open contract elsewhere. History is tracked via a
+// hidden marker in the merge-queue status comment (no new storage), the same
+// approach LS-9209 uses for its self-heal attempt counter.
+const MAX_STALENESS_RETRIGGERS_PER_HOUR = 4;
+const STALENESS_RETRIGGER_WINDOW_MS = 60 * 60 * 1000;
+const STALENESS_RETRIGGER_MARKER_RE =
+  /<!-- LS-9662-RETRIGGERS:(\[[^\]]*\]) -->/;
+
 module.exports = async ({
   github,
   context,
@@ -983,7 +1046,7 @@ module.exports = async ({
       );
 
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      const { selectSpecs } = await import(
+      const { selectSpecs, matchesAny } = await import(
         pathToFileURL(SPEC_SELECTOR_PATH).href
       );
       const prSelection = selectSpecs({ changedFiles: prFiles, manifest });
@@ -1005,14 +1068,71 @@ module.exports = async ({
         verdict = 'overlap:gap-files-truncated';
       }
 
+      // LS-9753: narrow raw spec-bucket overlap to specs whose actual matching
+      // files are path-proximate on both sides. Skipped for the two verdicts
+      // above where "over-select" is the deliberate, correct behavior: a
+      // runAllWhenChanged hit (broad backend/shared-surface risk) and a
+      // truncated gap file list (disjointness unprovable).
+      let proximityNarrowed = false;
+      if (
+        verdict === 'overlap' &&
+        !prSelection.runAll &&
+        !gapSelection.runAll
+      ) {
+        const relatedOverlap = overlap.filter((spec) =>
+          specHasProximateOverlap(
+            spec,
+            prFiles,
+            gapFiles,
+            manifest,
+            matchesAny,
+          ),
+        );
+        if (relatedOverlap.length !== overlap.length) {
+          proximityNarrowed = true;
+          overlap = relatedOverlap;
+        }
+      }
+
       const gapSummary =
         `${totalGapCommits} gap commit(s) since ${validatedBase.sha.slice(0, 7)} ` +
         `(${validatedBase.source}); prSpecs=${prSelection.specs.length} ` +
-        `gapSpecs=${gapSelection.specs.length} overlap=${overlap.length}`;
+        `gapSpecs=${gapSelection.specs.length} overlap=${overlap.length}` +
+        (proximityNarrowed
+          ? ' (narrowed by changed-file proximity, LS-9753)'
+          : '');
 
       if (overlap.length === 0) {
-        logVerdict('disjoint', gapSummary);
-        return { verdict: 'disjoint', block: false };
+        logVerdict(
+          proximityNarrowed ? 'disjoint:no-proximate-overlap' : 'disjoint',
+          gapSummary,
+        );
+        return {
+          verdict: proximityNarrowed
+            ? 'disjoint:no-proximate-overlap'
+            : 'disjoint',
+          block: false,
+        };
+      }
+
+      if (proximityNarrowed) verdict = 'overlap:narrowed';
+
+      // LS-9753: hourly backoff — don't keep retriggering revalidation on the
+      // same PR forever while main churns. Read the current window's history
+      // BEFORE deciding, so a dry run (which never actually retriggers) never
+      // advances the counter.
+      const now = Date.now();
+      const retriggerHistory = (await getStalenessRetriggerHistory(pr)).filter(
+        (ts) => now - new Date(ts).getTime() < STALENESS_RETRIGGER_WINDOW_MS,
+      );
+      if (retriggerHistory.length >= MAX_STALENESS_RETRIGGERS_PER_HOUR) {
+        logVerdict(
+          'fail-open:retrigger-cap-reached',
+          `${retriggerHistory.length} revalidation(s) already triggered on this PR in the last ` +
+            `hour (cap ${MAX_STALENESS_RETRIGGERS_PER_HOUR}) — merging as today rather than ` +
+            `retriggering again (LS-9753)`,
+        );
+        return { verdict: 'fail-open:retrigger-cap-reached', block: false };
       }
 
       logVerdict(verdict, gapSummary);
@@ -1030,7 +1150,7 @@ module.exports = async ({
           `🏃 DRY RUN: Would update branch on PR #${pr.number} to revalidate against current ` +
             `${pr.base.ref} (${overlap.length} overlapping spec(s))`,
         );
-        return blockedResult;
+        return { ...blockedResult, retriggerHistory };
       }
       try {
         await github.rest.pulls.updateBranch({
@@ -1043,7 +1163,10 @@ module.exports = async ({
           `🔁 PR #${pr.number}: branch updated with current ${pr.base.ref} — the synchronize ` +
             `push re-fires CI and the queue re-enters on its workflow_run completion`,
         );
-        return blockedResult;
+        return {
+          ...blockedResult,
+          retriggerHistory: [...retriggerHistory, new Date(now).toISOString()],
+        };
       } catch (updateError) {
         // Never wedge: an overlap we cannot revalidate merges as today (the
         // pre-LS-9662 behavior), loudly.
@@ -1527,6 +1650,36 @@ module.exports = async ({
     }
   }
 
+  // LS-9753: the current staleness-guard retrigger history (ISO timestamps),
+  // read from the hidden marker in the PR's merge-queue status comment. Not a
+  // paginated call — a PR that needs this cap has far fewer than 100 comments
+  // by construction (it's stuck in the merge queue, not accumulating review
+  // history). Returns [] on any read/parse failure — an unreadable history
+  // must never block the guard's fail-open contract.
+  async function getStalenessRetriggerHistory(pr) {
+    try {
+      const comments = await github.rest.issues.listComments({
+        owner,
+        repo,
+        issue_number: pr.number,
+      });
+      const statusComment = comments.data.find(
+        (c) => c.body && c.body.includes('<!-- MERGE-QUEUE-STATUS -->'),
+      );
+      const match = statusComment?.body?.match(STALENESS_RETRIGGER_MARKER_RE);
+      if (!match) return [];
+      const parsed = JSON.parse(match[1]);
+      return Array.isArray(parsed)
+        ? parsed.filter((ts) => typeof ts === 'string')
+        : [];
+    } catch (e) {
+      console.log(
+        `ℹ️ PR #${pr.number}: could not read staleness retrigger history (${e.message}) — treating as empty`,
+      );
+      return [];
+    }
+  }
+
   async function findOrCreateComment(pr, commentBody) {
     const commentMarker = '<!-- MERGE-QUEUE-STATUS -->';
 
@@ -1552,6 +1705,19 @@ module.exports = async ({
       );
       if (pingMarker && !commentBody.includes('<!-- CODEOWNER-PING:')) {
         commentBody += '\n' + pingMarker[0];
+      }
+      // LS-9753: carry the staleness-guard retrigger history forward across
+      // rewrites too — an intermediate cycle blocked on something else (e.g.
+      // "waiting for status checks" while the revalidation CI run is in
+      // flight) must not silently reset the hourly retrigger cap.
+      const retriggerMarker = existingComment.body.match(
+        STALENESS_RETRIGGER_MARKER_RE,
+      );
+      if (
+        retriggerMarker &&
+        !commentBody.includes('<!-- LS-9662-RETRIGGERS:')
+      ) {
+        commentBody += '\n' + retriggerMarker[0];
       }
       console.log(
         `🔄 Updating existing merge queue comment #${existingComment.id}`,
@@ -2135,6 +2301,15 @@ module.exports = async ({
     const pingMarker = `<!-- CODEOWNER-PING:${pr.head.sha} -->`;
     if (isCodeownerBlocked) {
       comment += '\n' + pingMarker;
+    }
+
+    // LS-9753: persist the staleness-guard retrigger history so the hourly
+    // backoff cap survives across queue cycles (see getStalenessRetriggerHistory).
+    if (validation.stalenessGuard?.retriggerHistory) {
+      comment +=
+        '\n<!-- LS-9662-RETRIGGERS:' +
+        JSON.stringify(validation.stalenessGuard.retriggerHistory) +
+        ' -->';
     }
 
     const { previousBody } = await findOrCreateComment(pr, comment);
