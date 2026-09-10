@@ -193,6 +193,46 @@ describe('findClaudeProjectsDir', () => {
     expect(thrown?.message).not.toMatch(/does not exist or is not readable/);
   });
 
+  it('falls back to /root/.claude/projects when $HOME/homedir do not resolve (LS-9268)', () => {
+    // Simulates a CCR container where the launch environment's $HOME is
+    // stale (points nowhere) and the OS user-database homedir() is also
+    // wrong, but the process is actually running as root with a real
+    // /root/.claude/projects — the safety-net scan must still find it.
+    const rootHome = join(tmpDir, 'ls-9268-root');
+    const rootProjects = join(rootHome, '.claude', 'projects');
+    mkdirSync(rootProjects, { recursive: true });
+    (homedir as jest.Mock).mockReturnValueOnce(join(tmpDir, 'no-such-homedir'));
+    process.env['HOME'] = join(tmpDir, 'also-no-such-homedir');
+    try {
+      expect(findClaudeProjectsDir(undefined, { rootHome })).toBe(rootProjects);
+    } finally {
+      rmSync(rootHome, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to scanning /home/*/.claude/projects when nothing else matches (LS-9268)', () => {
+    const homesRoot = mkdtempSync(join(tmpdir(), 'ls-9268-homes-'));
+    const otherUserProjects = join(
+      homesRoot,
+      'someuser',
+      '.claude',
+      'projects',
+    );
+    mkdirSync(otherUserProjects, { recursive: true });
+    (homedir as jest.Mock).mockReturnValueOnce(join(tmpDir, 'no-such-homedir'));
+    process.env['HOME'] = join(tmpDir, 'also-no-such-homedir');
+    try {
+      expect(
+        findClaudeProjectsDir(undefined, {
+          rootHome: join(tmpDir, 'no-such-root'),
+          homesRoot,
+        }),
+      ).toBe(otherUserProjects);
+    } finally {
+      rmSync(homesRoot, { recursive: true, force: true });
+    }
+  });
+
   it('throws with all candidate paths listed when none exist', () => {
     process.env['CLAUDE_PROJECTS_DIR'] = '/nonexistent-override-xyz';
     process.env['APPDATA'] = '/nonexistent-appdata-xyz';

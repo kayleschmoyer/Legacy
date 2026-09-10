@@ -62,8 +62,17 @@ function probeDir(dir: string): ProbeResult {
  *      $HOME explicitly, plus the explicit/env-var overrides above, gives callers
  *      a way around a mismatched value (LS-8867).
  *   4. %APPDATA%\Claude\projects  (native Windows Claude Code install)
+ *   5. Safety-net scan (LS-9268): if none of the above matched, the detected
+ *      home itself may be wrong rather than merely missing ".claude/projects"
+ *      — try /root/.claude/projects (the common CCR root-user case) and every
+ *      /home/*\/.claude/projects, so a stale/mismatched $HOME or homedir()
+ *      doesn't fail the whole lookup outright.
  */
-export function findClaudeProjectsDir(explicit?: string): string {
+export function findClaudeProjectsDir(
+  explicit?: string,
+  /** Test-only override for the safety-net scan roots (LS-9268). */
+  scanRoots: { rootHome?: string; homesRoot?: string } = {},
+): string {
   const candidates: string[] = [];
 
   if (explicit) {
@@ -84,6 +93,24 @@ export function findClaudeProjectsDir(explicit?: string): string {
   const appData = process.env['APPDATA'];
   if (appData) {
     candidates.push(join(appData, 'Claude', 'projects'));
+  }
+
+  // Skip the safety-net scan when the caller supplied an explicit override:
+  // that path is a confirmed-correct value from the caller's side (see the
+  // dedicated error branch below), so silently substituting a scanned
+  // fallback would mask a real "server can't see this path" failure instead
+  // of surfacing it.
+  if (!explicit) {
+    const rootHome = scanRoots.rootHome ?? join(sep, 'root');
+    candidates.push(join(rootHome, '.claude', 'projects'));
+    try {
+      const homesRoot = scanRoots.homesRoot ?? join(sep, 'home');
+      for (const entry of readdirSync(homesRoot)) {
+        candidates.push(join(homesRoot, entry, '.claude', 'projects'));
+      }
+    } catch {
+      // /home (or its override) doesn't exist or isn't listable — nothing to add.
+    }
   }
 
   const probes: ProbeResult[] = [];
