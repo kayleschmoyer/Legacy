@@ -10,7 +10,7 @@
 
 GitHub Actions run triage: list/view runs, fetch and search logs, rerun failed jobs, and read Playwright reports.
 
-Available both locally (stdio) and via the hosted connector. 24 tools.
+Available both locally (stdio) and via the hosted connector. 25 tools.
 
 ---
 
@@ -156,6 +156,15 @@ Read a SINGLE test result from a Playwright report, or list S3 blob artifacts fo
 Report the GitHub App installation token's core rate limit (remaining/limit/reset) — the SAME budget secrets.GITHUB_TOKEN draws from in workflows. Always mints a fresh installation token via AGENT_AUTHOR_APP_PRIVATE_KEY and queries GET /rate_limit directly, bypassing GH_TOKEN/GITHUB_TOKEN env precedence, so it's always the installation bucket — unlike ci_auth_status's rateLimit field. `gh api rate_limit` reports a DIFFERENT bucket (the CLI's own user/PAT token) and does not answer "is CI rate limited?" (LS-9570). Call this when a CI step failed with "API rate limit exceeded for installation", or silently withheld a status/verdict it otherwise computed correctly (a rate-limit signature, not a real verdict). Remedy: wait until resetsAt, then re-run — not an immediate retry.
 
 _No parameters._
+
+### `ci_is_head_sha`
+
+Prefer this over a manual pull_request_read + ci_list_runs/ci_view_run cross-check when a webhook-delivered check-run or CI-comment event needs to be checked for staleness. Answers, in one cheap call, whether the given sha is still the PR's current head — replacing the two-call manual cross-check previously needed to tell whether an event refers to a since-superseded commit (LS-9267).
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `prNumber` | number | **required** | coerced, integer, > 0 | PR number to check the current head SHA of. |
+| `sha` | string | **required** | min 1 | The commit SHA from the webhook event (check-run head_sha, CI comment commit, etc.) to compare against the PR's current head. |
 
 ### `ci_list_runs`
 

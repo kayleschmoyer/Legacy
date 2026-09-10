@@ -15,6 +15,7 @@ import { forceCancelRun } from './tools/force-cancel-run.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
+import { isHeadSha } from './tools/is-head-sha.js';
 import { listRuns } from './tools/list-runs.js';
 import { retryRunnerFlake } from './tools/retry-runner-flake.js';
 import { searchLogs } from './tools/search-logs.js';
@@ -407,6 +408,28 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => ciViewRun(params),
+  );
+
+  server.tool(
+    'ci_is_head_sha',
+    'Prefer this over a manual pull_request_read + ci_list_runs/ci_view_run cross-check when a webhook-delivered ' +
+      'check-run or CI-comment event needs to be checked for staleness. Answers, in one cheap call, whether the ' +
+      "given sha is still the PR's current head — replacing the two-call manual cross-check previously needed to " +
+      'tell whether an event refers to a since-superseded commit (LS-9267).',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('PR number to check the current head SHA of.'),
+      sha: z
+        .string()
+        .min(1)
+        .describe(
+          "The commit SHA from the webhook event (check-run head_sha, CI comment commit, etc.) to compare against the PR's current head.",
+        ),
+    },
+    async (params) => isHeadSha(params),
   );
 
   server.tool(

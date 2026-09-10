@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 272,
+  "toolCount": 273,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2999,7 +2999,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 24,
+      "toolCount": 25,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -3588,6 +3588,33 @@
           "name": "ci_installation_rate_limit",
           "description": "Report the GitHub App installation token's core rate limit (remaining/limit/reset) — the SAME budget secrets.GITHUB_TOKEN draws from in workflows. Always mints a fresh installation token via AGENT_AUTHOR_APP_PRIVATE_KEY and queries GET /rate_limit directly, bypassing GH_TOKEN/GITHUB_TOKEN env precedence, so it's always the installation bucket — unlike ci_auth_status's rateLimit field. `gh api rate_limit` reports a DIFFERENT bucket (the CLI's own user/PAT token) and does not answer \"is CI rate limited?\" (LS-9570). Call this when a CI step failed with \"API rate limit exceeded for installation\", or silently withheld a status/verdict it otherwise computed correctly (a rate-limit signature, not a real verdict). Remedy: wait until resetsAt, then re-run — not an immediate retry.",
           "inputs": {},
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "ci_is_head_sha",
+          "description": "Prefer this over a manual pull_request_read + ci_list_runs/ci_view_run cross-check when a webhook-delivered check-run or CI-comment event needs to be checked for staleness. Answers, in one cheap call, whether the given sha is still the PR's current head — replacing the two-call manual cross-check previously needed to tell whether an event refers to a since-superseded commit (LS-9267).",
+          "inputs": {
+            "prNumber": {
+              "type": "number",
+              "optional": false,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "PR number to check the current head SHA of."
+            },
+            "sha": {
+              "type": "string",
+              "optional": false,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "The commit SHA from the webhook event (check-run head_sha, CI comment commit, etc.) to compare against the PR's current head."
+            }
+          },
           "transports": [
             "stdio"
           ]

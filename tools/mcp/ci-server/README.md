@@ -12,6 +12,7 @@ GitHub Actions workflow run triage and management for Legacy Sports.
 
 - **ci_list_runs** — List recent workflow runs with optional branch, workflow, status, event, and commit filters
 - **ci_view_run** — Inspect a workflow run summary, including jobs and conclusions. Pass `runIds` (array, max 50) instead of `runId` to inspect several runs in one call (partial-failure result shape)
+- **ci_is_head_sha** — Check whether a SHA (from a webhook check-run/CI-comment event) is still a PR's current head, in one call — replaces the manual `pull_request_read` + `ci_list_runs`/`ci_view_run` cross-check for staleness
 - **ci_get_logs** — Retrieve full or failed-only logs for a run or specific job
 - **ci_search_logs** — Search run logs with optional regex and context lines
 - **ci_rerun** — Rerun failed jobs, a specific job, or an entire workflow run (`scope: "failed" | "job" | "all"`); pass `withDiagnostics: true` for the triage-then-rerun one-shot (failure-log snippet + rerun in one call). Pass `runIds` (array, max 50) instead of `runId` to rerun several runs in one call (partial-failure result shape)
