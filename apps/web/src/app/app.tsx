@@ -426,7 +426,7 @@ function Navigation() {
                   aria-label="Legacy Sports home"
                   style={{ textDecoration: 'none', flexShrink: 0 }}
                 >
-                  <XStack alignItems="center" gap="$2" cursor="pointer">
+                  <XStack alignItems="center" gap={0} cursor="pointer">
                     <img
                       src="/logo.png"
                       alt="Legacy Sports"
@@ -438,42 +438,53 @@ function Navigation() {
                         transition: 'height 200ms ease',
                       }}
                     />
-                    {!compact && (
-                      <div
-                        data-testid="brand-text"
+                    {/* Always mounted (rather than conditionally rendered)
+                        and collapsed via width/opacity in the same 200ms
+                        window as the logo's height transition above — a
+                        hard mount/unmount here raced the logo's animation
+                        and produced a brief overlap right at the `compact`
+                        toggle. */}
+                    <div
+                      data-testid="brand-text"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        userSelect: 'none',
+                        lineHeight: 1,
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        marginLeft: compact ? 0 : 8,
+                        maxWidth: compact ? 0 : 140,
+                        opacity: compact ? 0 : 1,
+                        transition:
+                          'max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease',
+                      }}
+                    >
+                      <Text
+                        color="$brandGoldLight"
                         style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          userSelect: 'none',
+                          fontFamily: FONT_DISPLAY,
+                          fontWeight: '800',
+                          fontSize: 14,
+                          letterSpacing: '0.04em',
                           lineHeight: 1,
                         }}
                       >
-                        <Text
-                          color="$brandGoldLight"
-                          style={{
-                            fontFamily: FONT_DISPLAY,
-                            fontWeight: '800',
-                            fontSize: 14,
-                            letterSpacing: '0.04em',
-                            lineHeight: 1,
-                          }}
-                        >
-                          LEGACY
-                        </Text>
-                        <Text
-                          color="$color12"
-                          style={{
-                            fontFamily: FONT_DISPLAY,
-                            fontWeight: '700',
-                            fontSize: 11,
-                            letterSpacing: '0.16em',
-                            lineHeight: 1,
-                          }}
-                        >
-                          SPORTS
-                        </Text>
-                      </div>
-                    )}
+                        LEGACY
+                      </Text>
+                      <Text
+                        color="$color12"
+                        style={{
+                          fontFamily: FONT_DISPLAY,
+                          fontWeight: '700',
+                          fontSize: 11,
+                          letterSpacing: '0.16em',
+                          lineHeight: 1,
+                        }}
+                      >
+                        SPORTS
+                      </Text>
+                    </div>
                   </XStack>
                 </Link>
               }

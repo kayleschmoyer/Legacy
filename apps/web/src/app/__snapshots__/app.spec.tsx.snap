@@ -55,7 +55,7 @@ exports[`App FootballHubPage should match complete football page layout snapshot
                 <div
                   alignitems="center"
                   cursor="pointer"
-                  gap="$2"
+                  gap="0"
                 >
                   <img
                     alt="Legacy Sports"
@@ -65,7 +65,7 @@ exports[`App FootballHubPage should match complete football page layout snapshot
                   />
                   <div
                     data-testid="brand-text"
-                    style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                    style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
                   >
                     <span
                       color="$brandGoldLight"
@@ -334,7 +334,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                 <div
                   alignitems="center"
                   cursor="pointer"
-                  gap="$2"
+                  gap="0"
                 >
                   <img
                     alt="Legacy Sports"
@@ -344,7 +344,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                   />
                   <div
                     data-testid="brand-text"
-                    style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                    style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
                   >
                     <span
                       color="$brandGoldLight"
@@ -592,7 +592,7 @@ exports[`App Navigation should match navigation snapshot 1`] = `
             <div
               alignitems="center"
               cursor="pointer"
-              gap="$2"
+              gap="0"
             >
               <img
                 alt="Legacy Sports"
@@ -602,7 +602,7 @@ exports[`App Navigation should match navigation snapshot 1`] = `
               />
               <div
                 data-testid="brand-text"
-                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
               >
                 <span
                   color="$brandGoldLight"
@@ -831,7 +831,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             <div
               alignitems="center"
               cursor="pointer"
-              gap="$2"
+              gap="0"
             >
               <img
                 alt="Legacy Sports"
@@ -841,7 +841,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
               />
               <div
                 data-testid="brand-text"
-                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1; overflow: hidden; white-space: nowrap; margin-left: 8px; max-width: 140px; opacity: 1; transition: max-width 200ms ease, margin-left 200ms ease, opacity 150ms ease;"
               >
                 <span
                   color="$brandGoldLight"

@@ -77,6 +77,76 @@ test.describe('Router scroll restoration @regression', () => {
       .poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 })
       .toBeGreaterThan(100);
   });
+
+  /**
+   * Regression test for a header brand-lockup bug: the logo `<img>` animates
+   * its height over 200ms on the `compact` scroll toggle (scrollY > 80,
+   * apps/web/src/app/app.tsx), and the "LEGACY / SPORTS" wordmark used to be
+   * conditionally mounted/unmounted instantly instead of transitioning in
+   * step — letting the two race each other and visually collide right at the
+   * threshold. The fix keeps the wordmark always mounted, collapsing it via
+   * width/opacity/margin in the same 200ms window as the logo.
+   */
+  test('compact-nav scroll transition never overlaps the logo and wordmark', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.addStyleTag({
+      content: 'body { min-height: 3000px !important; }',
+    });
+
+    const logo = page.getByTestId('header-logo');
+    const brandText = page.getByTestId('brand-text');
+    await expect(logo).toBeVisible();
+    // The wordmark must stay mounted at every scroll state — a hard
+    // mount/unmount here is the root cause this test guards against.
+    await expect(brandText).toBeAttached();
+
+    const assertNoOverlap = async () => {
+      const [logoBox, textBox] = await Promise.all([
+        logo.boundingBox(),
+        brandText.boundingBox(),
+      ]);
+      if (!logoBox || !textBox) {
+        throw new Error(
+          'Expected both the logo and the wordmark to report a bounding box',
+        );
+      }
+      // The wordmark must never start left of where the logo ends, in any
+      // scroll/animation state — otherwise the crest overlaps the "L".
+      expect(textBox.x).toBeGreaterThanOrEqual(logoBox.x + logoBox.width);
+    };
+
+    // Steady state, not compact.
+    await assertNoOverlap();
+
+    // Cross the compact threshold and sample repeatedly through the 200ms
+    // logo-height / wordmark-collapse transition window, not just after it
+    // settles — the original bug only showed up mid-transition. Each
+    // boundingBox() round-trip already spaces the samples out in time, so no
+    // explicit wait is needed between iterations.
+    await page.evaluate(() => window.scrollTo(0, 200));
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(80);
+    for (let i = 0; i < 5; i++) {
+      await assertNoOverlap();
+      await expect(brandText).toBeAttached();
+    }
+
+    // Scroll back up — compact turns off — and sample through the transition
+    // again.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeLessThan(80);
+    for (let i = 0; i < 5; i++) {
+      await assertNoOverlap();
+      await expect(brandText).toBeAttached();
+    }
+  });
 });
 
 /**
