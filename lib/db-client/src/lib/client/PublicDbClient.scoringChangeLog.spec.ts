@@ -288,7 +288,7 @@ describe('updateLeagueScoringPositionBonuses — change log', () => {
     isEnabled,
   });
 
-  it('writes a change-log row carrying the position in change_reason', async () => {
+  it('writes a change-log row carrying the position in the position column', async () => {
     const { db, changeLogRows } = makeDb([
       [definition(1, '1.000')],
       [bonus(1, '1B', '0.500')],
@@ -310,7 +310,7 @@ describe('updateLeagueScoringPositionBonuses — change log', () => {
       previousMultiplier: '0.5',
       newMultiplier: '1.25',
       changedBy: 42,
-      changeReason: 'position_bonus:1B',
+      position: '1B',
       action: 'updated',
     });
   });
@@ -348,7 +348,7 @@ describe('updateLeagueScoringPositionBonuses — change log', () => {
       action: 'created',
       previousMultiplier: '0',
       newMultiplier: '2',
-      changeReason: 'position_bonus:SS',
+      position: 'SS',
     });
   });
 
@@ -371,9 +371,6 @@ describe('updateLeagueScoringPositionBonuses — change log', () => {
 
     const rows = changeLogRows();
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => String(r.changeReason)).sort()).toEqual([
-      'position_bonus:1B',
-      'position_bonus:SS',
-    ]);
+    expect(rows.map((r) => String(r.position)).sort()).toEqual(['1B', 'SS']);
   });
 });

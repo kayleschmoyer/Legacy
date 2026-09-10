@@ -1501,11 +1501,7 @@ export async function getScoringPositionBonusesForProfile(
  * base multiplier change does, so omitting it would make `Matchup.scoringIsStale`
  * silently answer "not stale" for a league whose scoring inputs just changed.
  *
- * The table has no `position` column, so the position is carried in
- * `change_reason` as `position_bonus:<POSITION>`. That is lossless for the
- * staleness signal (which reads only `changed_at`) and keeps the audit row
- * attributable; a dedicated column would be a schema change beyond this ticket
- * and is tracked separately.
+ * The position is carried in its own `position` column (LS-9721).
  */
 export async function updateLeagueScoringPositionBonuses(
   db: PublicDb,
@@ -1637,7 +1633,7 @@ export async function updateLeagueScoringPositionBonuses(
           previousMultiplier: previousBonus.toString(),
           newMultiplier: newBonus.toString(),
           changedBy: changedBy ?? null,
-          changeReason: `position_bonus:${update.position}`,
+          position: update.position,
           action,
         };
       })

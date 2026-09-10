@@ -238,6 +238,7 @@ export const leagueScoringChangeLog = pgTable(
       .notNull(),
     changeReason: varchar('change_reason', { length: 120 }),
     action: scoringChangeAction('action').notNull(),
+    position: varchar('position', { length: 10 }),
   },
   (table) => {
     return {
