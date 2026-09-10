@@ -76,6 +76,7 @@ import {
   formatBaseBranchCiSection,
 } from './lib/base-branch-ci.mjs';
 import { filterStaleMissingArtifactFindings } from './lib/head-artifacts.mjs';
+import { filterFabricatedFindings } from './lib/finding-verifier.mjs';
 import { reclassifyAffirmationFindings } from './lib/affirmation-guard.mjs';
 
 // Cap on the current-HEAD file context injected into the review prompt (LS-7768).
@@ -1149,15 +1150,25 @@ async function main() {
     );
   }
 
+  // Fabricated-evidence guard (LS-9729): strip findings whose cited
+  // `file:line` doesn't actually contain the code pattern the finding quotes,
+  // or whose cited commit SHA doesn't resolve in git history. Runs
+  // unconditionally on every cycle — unlike the cycle 2/3 validators below,
+  // a fabricated citation isn't specific to a particular review cycle.
+  const fabricationGuard = filterFabricatedFindings(headArtifactFilter.kept);
+  if (fabricationGuard.stripped.length > 0) {
+    process.stdout.write(
+      `::warning::[reviewer] Fabrication guard: stripped ${fabricationGuard.stripped.length} finding(s) with fabricated citations — ${formatStrippedLog(fabricationGuard.stripped)}\n`,
+    );
+  }
+
   // Affirmation/defect polarity guard (LS-8576): reclassify findings whose
   // language is pure praise ("directly addresses…", "excellent refactor")
   // to `observation` severity regardless of the severity the model assigned.
   // Runs before gateFindingsBySeverity on every cycle so a review that is
   // 100% affirmations always gates to zero blocking findings — i.e. always
   // verdicts APPROVED, never "Changes Required".
-  const affirmationGuard = reclassifyAffirmationFindings(
-    headArtifactFilter.kept,
-  );
+  const affirmationGuard = reclassifyAffirmationFindings(fabricationGuard.kept);
   if (affirmationGuard.reclassified.length > 0) {
     process.stdout.write(
       `::warning::[reviewer] Affirmation guard: reclassified ${affirmationGuard.reclassified.length} finding(s) to observation severity — ${formatReclassifiedLog(affirmationGuard.reclassified)}\n`,
@@ -1166,7 +1177,10 @@ async function main() {
 
   // Apply cycle-specific post-LLM validator (T22).
   let filteredFindings = affirmationGuard.kept;
-  let strippedFindings = headArtifactFilter.stripped;
+  let strippedFindings = [
+    ...headArtifactFilter.stripped,
+    ...fabricationGuard.stripped,
+  ];
   if (cycle === 2) {
     const { kept, stripped } = filterFindingsCycle2(
       filteredFindings,
