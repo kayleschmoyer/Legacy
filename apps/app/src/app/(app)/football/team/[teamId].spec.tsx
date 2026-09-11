@@ -679,6 +679,48 @@ describe('FootballTeam route', () => {
     expect(screen.queryByTestId('lineup-scoring-format-badge')).toBeNull();
   });
 
+  it("shows the league's scoring format callout on every tab, not just Lineup", () => {
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: buildScoringProfile(0.5),
+    });
+    render(<FootballTeam />);
+    // Default tab is Roster.
+    expect(screen.getByTestId('team-scoring-format-callout')).toHaveTextContent(
+      /Half-PPR Scoring/,
+    );
+  });
+
+  it('hides the scoring format callout when the profile has no receiving rec stat', () => {
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+    });
+    render(<FootballTeam />);
+    expect(screen.queryByTestId('team-scoring-format-callout')).toBeNull();
+  });
+
+  it('expands the scoring format callout to preview point values by stat category', () => {
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: buildScoringProfile(1),
+    });
+    render(<FootballTeam />);
+    expect(screen.queryByTestId('team-scoring-format-preview')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('team-scoring-format-toggle'));
+
+    expect(screen.getByTestId('team-scoring-format-preview')).toHaveTextContent(
+      /Reception/,
+    );
+    expect(screen.getByTestId('team-scoring-format-preview')).toHaveTextContent(
+      /\+1/,
+    );
+
+    fireEvent.press(screen.getByTestId('team-scoring-format-toggle'));
+    expect(screen.queryByTestId('team-scoring-format-preview')).toBeNull();
+  });
+
   it("forwards the league's football slots to the board", () => {
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));

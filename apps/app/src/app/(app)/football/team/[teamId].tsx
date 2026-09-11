@@ -16,6 +16,7 @@ import {
 } from '@legacy-sports/shared-components/roster';
 import {
   AppTeamMemberFragment,
+  GetLeagueScoringProfileQuery,
   LeaguePositionFragment,
   MatchupFragment,
   MatchupScoresQuery,
@@ -45,6 +46,20 @@ const SCORING_FORMAT_LABELS: Record<FootballScoringFormat, string> = {
   ppr: 'PPR',
   custom: 'Custom',
 };
+
+const SCORING_STAT_GROUP_LABELS: Record<string, string> = {
+  passing: 'Passing',
+  rushing: 'Rushing',
+  receiving: 'Receiving',
+  kicking: 'Kicking',
+  defense: 'Defense',
+  idp: 'IDP',
+};
+
+function formatMultiplier(multiplier: number): string {
+  const rounded = Math.round(multiplier * 100) / 100;
+  return rounded > 0 ? `+${rounded}` : String(rounded);
+}
 
 const ALL_TABS = Object.freeze([
   'Roster',
@@ -209,6 +224,111 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
         uploadError={bannerUpload.uploadError}
         onPick={() => void bannerUpload.pickAndUploadLogo()}
       />
+    </YStack>
+  );
+}
+
+type LeagueScoringProfile = NonNullable<
+  GetLeagueScoringProfileQuery['leagueScoringProfile']
+>;
+
+interface ScoringFormatCalloutProps {
+  scoringFormat: FootballScoringFormat | undefined;
+  profile: LeagueScoringProfile | null | undefined;
+}
+
+/**
+ * LS-6451: badge on the team detail page (visible on every tab) showing the
+ * league's scoring format, expandable to a read-only point-value preview
+ * grouped by stat category. Reuses the scoring profile already fetched by
+ * useGetLeagueScoringProfileQuery for the Lineup-tab badge, so no extra query.
+ */
+function ScoringFormatCallout({
+  scoringFormat,
+  profile,
+}: ScoringFormatCalloutProps): React.JSX.Element | null {
+  const [expanded, setExpanded] = useState(false);
+
+  const groupedStats = useMemo(() => {
+    const groups = new Map<string, { label: string; value: string }[]>();
+    for (const stat of profile?.stats ?? []) {
+      const statGroup = stat?.definition?.statGroup;
+      const displayName = stat?.definition?.displayName;
+      if (
+        !stat ||
+        stat.isEnabled === false ||
+        !statGroup ||
+        !displayName ||
+        typeof stat.multiplier !== 'number' ||
+        !Number.isFinite(stat.multiplier)
+      ) {
+        continue;
+      }
+      const rows = groups.get(statGroup) ?? [];
+      rows.push({
+        label: displayName,
+        value: formatMultiplier(stat.multiplier),
+      });
+      groups.set(statGroup, rows);
+    }
+    return Array.from(groups.entries());
+  }, [profile?.stats]);
+
+  if (!scoringFormat) {
+    return null;
+  }
+
+  return (
+    <YStack
+      testID="team-scoring-format-callout"
+      padding="$3"
+      backgroundColor="$color2"
+      borderRadius="$3"
+      margin="$3"
+      marginBottom="$1"
+      gap="$2"
+    >
+      <Button
+        chromeless
+        justifyContent="space-between"
+        onPress={() => setExpanded((prev) => !prev)}
+        testID="team-scoring-format-toggle"
+      >
+        <Text fontSize="$3" fontWeight="600">
+          {SCORING_FORMAT_LABELS[scoringFormat]} Scoring
+        </Text>
+        <Text fontSize="$2" color="$gray10">
+          {expanded ? 'Hide details ▲' : 'View scoring settings ▼'}
+        </Text>
+      </Button>
+      {expanded && (
+        <YStack testID="team-scoring-format-preview" gap="$3" paddingTop="$1">
+          {groupedStats.length === 0 && (
+            <Text fontSize="$2" color="$gray10">
+              No scoring settings available.
+            </Text>
+          )}
+          {groupedStats.map(([group, rows]) => (
+            <YStack key={group} gap="$1">
+              <Text fontSize="$2" fontWeight="700" color="$gray10">
+                {SCORING_STAT_GROUP_LABELS[group] ?? group}
+              </Text>
+              {rows.map((row) => (
+                <YStack
+                  key={row.label}
+                  flexDirection="row"
+                  justifyContent="space-between"
+                >
+                  <Text fontSize="$2">{row.label}</Text>
+                  <Text fontSize="$2" fontWeight="600">
+                    {row.value}
+                  </Text>
+                </YStack>
+              ))}
+            </YStack>
+          ))}
+        </YStack>
+      )}
     </YStack>
   );
 }
@@ -655,6 +775,11 @@ export default function FootballTeam(): React.JSX.Element {
             ))}
           </Tabs.List>
         </Tabs>
+
+        <ScoringFormatCallout
+          scoringFormat={scoringFormat}
+          profile={scoringProfileData?.leagueScoringProfile}
+        />
 
         <Separator />
         <TabContent
