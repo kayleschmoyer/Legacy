@@ -99,6 +99,47 @@ describe('LeagueListRow (LS-8791)', () => {
     expect(getByText('Rank #1 of 10')).toBeTruthy();
   });
 
+  it('renders the pre-draft state without crashing when the locale date formatter throws (LS-8754)', () => {
+    // Simulates a Hermes release build without full ICU/Intl data, where
+    // `toLocaleDateString`/`toLocaleTimeString` can throw instead of just
+    // being unavailable. `formatDraftDate` (lib/utils/src/lib/format-draft-date.ts)
+    // already catches this internally and falls back to a locale-independent
+    // ISO-ish string — this test locks in that LeagueListRow never crashes
+    // when that fallback path is exercised, rather than just trusting the
+    // formatter's own unit tests.
+    const toLocaleDateSpy = jest
+      .spyOn(Date.prototype, 'toLocaleDateString')
+      .mockImplementation(() => {
+        throw new Error('Intl data unavailable');
+      });
+    const toLocaleTimeSpy = jest
+      .spyOn(Date.prototype, 'toLocaleTimeString')
+      .mockImplementation(() => {
+        throw new Error('Intl data unavailable');
+      });
+
+    try {
+      const summary: HomeLeagueSummary = {
+        leagueId: 6,
+        leagueName: 'Fallback Federation',
+        leaguePhase: 'pre-draft',
+        draftScheduledAt: '2026-04-20T20:00:00.000Z',
+        teamCount: 8,
+      };
+
+      const { getByText } = render(
+        <LeagueListRow summary={summary} onPress={onPress} />,
+      );
+      expect(getByText('Fallback Federation')).toBeTruthy();
+      expect(getByText('Draft scheduled')).toBeTruthy();
+      // Falls back to the locale-independent "YYYY-MM-DD HH:MM" form.
+      expect(getByText('2026-04-20 20:00')).toBeTruthy();
+    } finally {
+      toLocaleDateSpy.mockRestore();
+      toLocaleTimeSpy.mockRestore();
+    }
+  });
+
   it('renders the Mock Draft affordance for pre-draft leagues when onMockDraft is supplied', () => {
     const onMockDraft = jest.fn();
     const summary: HomeLeagueSummary = {
