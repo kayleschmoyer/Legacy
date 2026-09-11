@@ -663,6 +663,17 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
         throw NotFoundError('Matchup player not found');
       }
 
+      // Slot-eligibility gate (LS-6372 / LS-9682) — shared with
+      // swapMatchupPlayerPositions / updateTeamMemberPosition /
+      // swapTeamMemberPositions so the rule is enforced identically
+      // everywhere a position gets assigned.
+      await assertPositionAssignmentsEligible(db, matchup.leagueId, [
+        {
+          playerId: matchupPlayer.playerId,
+          positionId: args.positionId ?? null,
+        },
+      ]);
+
       let updated: {
         id: number;
         matchupId: number;
