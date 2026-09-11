@@ -230,6 +230,27 @@ describe('computeFootballGamePoints — DST branch', () => {
     );
     expect(pts).toBe(0);
   });
+
+  // LS-6397: pointsAllowed is null while a game hasn't started/was postponed,
+  // even though other defense stats may already exist on the row. It must
+  // contribute 0 to the band score, not undefined/NaN, so totalPoints stays
+  // a finite number instead of rendering as NaN.
+  it('returns a finite number, not NaN, when ptsAllowed is null on an otherwise-populated defense row', () => {
+    const pts = computeFootballGamePoints(
+      makeGameStats({
+        defense: makeDefenseRow({
+          sacks: 1,
+          interceptions: 1,
+          ptsAllowed: null,
+        }),
+      }),
+      true,
+      false,
+    );
+    expect(Number.isFinite(pts)).toBe(true);
+    // sacks: 1×1 = 1, int: 1×2 = 2, no band since ptsAllowed is null
+    expect(pts).toBeCloseTo(3);
+  });
 });
 
 // ---------------------------------------------------------------------------

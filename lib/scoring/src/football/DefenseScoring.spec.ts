@@ -102,4 +102,29 @@ describe('computeDefenseScore', () => {
     // flat: 3*1 = 3, no band
     expect(result).toBe(3);
   });
+
+  // LS-6397: a null pts_allowed (game not yet started/postponed) must
+  // contribute 0 to the band score, never NaN/undefined, so it can't
+  // contaminate a running totalPoints sum.
+  it('returns a finite number, not NaN, when pts_allowed is explicitly null', () => {
+    const result = computeDefenseScore(
+      { sacks: 2, int: 1, pts_allowed: null },
+      DEFAULT_DEFENSE_SCORING,
+      DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
+    );
+    expect(Number.isFinite(result)).toBe(true);
+    // flat: 2*1 + 1*2 = 4, no band
+    expect(result).toBe(4);
+  });
+
+  it('still applies the correct band once pts_allowed becomes a real number', () => {
+    const result = computeDefenseScore(
+      { sacks: 2, int: 1, pts_allowed: 6 },
+      DEFAULT_DEFENSE_SCORING,
+      DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
+    );
+    expect(Number.isFinite(result)).toBe(true);
+    // flat: 2*1 + 1*2 = 4, pts_1_6 band = 7 → 11
+    expect(result).toBe(11);
+  });
 });
