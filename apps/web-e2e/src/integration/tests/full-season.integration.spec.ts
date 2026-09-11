@@ -1,3 +1,7 @@
+import {
+  ALLOWED_POSITIONS_BY_SPORT,
+  type SportKind,
+} from '@legacy-sports/utils';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
@@ -52,6 +56,57 @@ const LEAGUE_FIELDS = `
 `;
 
 const TEAM_FIELDS = `id name`;
+
+/**
+ * Mirrors `canFillSlot` in `lambdas/db/src/schema/position-eligibility.ts` —
+ * the server-side gate `updateTeamMemberPosition`/`swapTeamMemberPositions`
+ * enforce since LS-6427. Reads the same `ALLOWED_POSITIONS_BY_SPORT`
+ * crosswalk so a slot pick made here is guaranteed to pass that gate, rather
+ * than blindly picking `members[0]`/`leaguePositions[0]` and hoping they
+ * happen to be compatible (LS-10036).
+ */
+function canFillSlot(
+  eligiblePositions: readonly string[],
+  slotType: string | null | undefined,
+  sport: SportKind,
+): boolean {
+  if (eligiblePositions.length === 0) return true;
+  const allowed = ALLOWED_POSITIONS_BY_SPORT[sport][slotType ?? ''];
+  if (!allowed) return true;
+  return eligiblePositions.some((position) => allowed.includes(position));
+}
+
+interface EligibilityCandidate {
+  member: { id: number; positionId: number | null };
+  eligiblePositions: readonly string[];
+}
+
+interface EligibilitySlot {
+  id: number;
+  positionType: string;
+}
+
+/**
+ * Finds a (member, slot) pair the server will actually accept, by trying
+ * every combination rather than assuming `members[0]` fits `slots[0]`.
+ * Returns `undefined` only if no member is eligible for any slot at all.
+ */
+function findEligibleAssignment(
+  candidates: readonly EligibilityCandidate[],
+  slots: readonly EligibilitySlot[],
+  sport: SportKind,
+):
+  | { member: { id: number; positionId: number | null }; slot: EligibilitySlot }
+  | undefined {
+  for (const candidate of candidates) {
+    for (const slot of slots) {
+      if (canFillSlot(candidate.eligiblePositions, slot.positionType, sport)) {
+        return { member: candidate.member, slot };
+      }
+    }
+  }
+  return undefined;
+}
 
 // Roster size used at league creation. The backend marks a draft `completed`
 // only after every roster is full — `numTeams * MAX_ROSTER_SIZE` picks
@@ -580,6 +635,18 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       return data.teamMembers;
     };
 
+    // Sport gates which slots a player is eligible for (ALLOWED_POSITIONS_BY_SPORT
+    // is keyed by it) — needed to pick genuinely compatible (member, slot) pairs
+    // below rather than blindly indexing into either list (LS-10036).
+    const leagueData = await graphqlOk<{ league: { sport: SportKind } }>(
+      api,
+      `query LeagueSport($leagueId: Int!) {
+         league(id: $leagueId) { sport }
+       }`,
+      { leagueId: state.leagueId },
+    );
+    const leagueSport = leagueData.league.sport;
+
     await test.step('3.1 Set player positions on roster', async () => {
       // Fetch actual league position IDs (they're auto-generated, not 1,2,3).
       const posData = await graphqlOk<{
@@ -592,16 +659,36 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
         { leagueId: state.leagueId },
       );
       expect(posData.leaguePositions.length).toBeGreaterThan(0);
-      const firstPositionId = posData.leaguePositions[0].id;
 
-      const members = await fetchMyTeamMembers('id playerId positionId');
-      expect(members.length).toBeGreaterThan(0);
-
-      const member = members[0] as {
+      const members = (await fetchMyTeamMembers(
+        'id playerId positionId player { eligiblePositions }',
+      )) as Array<{
         id: number;
         playerId: number;
         positionId: number | null;
-      };
+        player: { eligiblePositions: string[] | null } | null;
+      }>;
+      expect(members.length).toBeGreaterThan(0);
+
+      // Resolve a member/slot pair the server will actually accept, instead
+      // of assuming members[0] is eligible for leaguePositions[0] — the
+      // `updateTeamMemberPosition` mutation has enforced
+      // `assertPositionAssignmentsEligible` since LS-6427.
+      const assignment = findEligibleAssignment(
+        members.map((m) => ({
+          member: { id: m.id, positionId: m.positionId },
+          eligiblePositions: m.player?.eligiblePositions ?? [],
+        })),
+        posData.leaguePositions,
+        leagueSport,
+      );
+      if (!assignment) {
+        throw new Error(
+          'Expected at least one roster member eligible for at least one league position',
+        );
+      }
+      const { member, slot } = assignment;
+
       const setData = await graphqlOk<{
         updateTeamMemberPosition: { id: number; positionId: number };
       }>(
@@ -611,51 +698,78 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
              id positionId
            }
          }`,
-        { teamMemberId: member.id, positionId: firstPositionId },
+        { teamMemberId: member.id, positionId: slot.id },
       );
-      expect(setData.updateTeamMemberPosition.positionId).toBe(firstPositionId);
+      expect(setData.updateTeamMemberPosition.positionId).toBe(slot.id);
     });
 
     await test.step('3.2 Swap player positions', async () => {
-      // Get actual league position IDs for the swap fallback
       const posData = await graphqlOk<{
-        leaguePositions: Array<{ id: number }>;
+        leaguePositions: Array<{ id: number; positionType: string }>;
       }>(
         api,
         `query Positions($leagueId: Int!) {
-           leaguePositions(leagueId: $leagueId) { id }
+           leaguePositions(leagueId: $leagueId) { id positionType }
          }`,
         { leagueId: state.leagueId },
       );
-      const posIds = posData.leaguePositions.map((p) => p.id);
 
-      const members = (await fetchMyTeamMembers('id positionId')) as Array<{
+      const members = (await fetchMyTeamMembers(
+        'id positionId player { eligiblePositions }',
+      )) as Array<{
         id: number;
         positionId: number | null;
+        player: { eligiblePositions: string[] | null } | null;
       }>;
-      if (members.length >= 2 && posIds.length >= 2) {
-        const [a, b] = members;
-        const swapData = await graphqlOk<{
-          swapTeamMemberPositions: Array<{ id: number; positionId: number }>;
-        }>(
-          api,
-          `mutation Swap(
-             $teamMemberIdA: Int!, $teamMemberIdB: Int!,
-             $positionIdA: Int, $positionIdB: Int
-           ) {
-             swapTeamMemberPositions(
-               teamMemberIdA: $teamMemberIdA, teamMemberIdB: $teamMemberIdB,
-               positionIdA: $positionIdA, positionIdB: $positionIdB
-             ) { id positionId }
-           }`,
-          {
-            teamMemberIdA: a.id,
-            teamMemberIdB: b.id,
-            positionIdA: b.positionId ?? posIds[1],
-            positionIdB: a.positionId ?? posIds[0],
-          },
-        );
-        expect(swapData.swapTeamMemberPositions).toHaveLength(2);
+
+      if (members.length >= 2 && posData.leaguePositions.length >= 2) {
+        // Greedily pair up two distinct members with two distinct slots they
+        // are each genuinely eligible for, rather than blindly swapping
+        // members[0]/members[1] into posIds[1]/posIds[0] whenever either
+        // member's current slot is unset (LS-10036) — swapTeamMemberPositions
+        // enforces the same eligibility gate as updateTeamMemberPosition.
+        const usedSlotIds = new Set<number>();
+        const assignments: Array<{
+          member: { id: number };
+          slot: { id: number; positionType: string };
+        }> = [];
+        for (const m of members) {
+          const eligiblePositions = m.player?.eligiblePositions ?? [];
+          const slot = posData.leaguePositions.find(
+            (s) =>
+              !usedSlotIds.has(s.id) &&
+              canFillSlot(eligiblePositions, s.positionType, leagueSport),
+          );
+          if (!slot) continue;
+          usedSlotIds.add(slot.id);
+          assignments.push({ member: { id: m.id }, slot });
+          if (assignments.length === 2) break;
+        }
+
+        if (assignments.length === 2) {
+          const [first, second] = assignments;
+          const swapData = await graphqlOk<{
+            swapTeamMemberPositions: Array<{ id: number; positionId: number }>;
+          }>(
+            api,
+            `mutation Swap(
+               $teamMemberIdA: Int!, $teamMemberIdB: Int!,
+               $positionIdA: Int, $positionIdB: Int
+             ) {
+               swapTeamMemberPositions(
+                 teamMemberIdA: $teamMemberIdA, teamMemberIdB: $teamMemberIdB,
+                 positionIdA: $positionIdA, positionIdB: $positionIdB
+               ) { id positionId }
+             }`,
+            {
+              teamMemberIdA: first.member.id,
+              teamMemberIdB: second.member.id,
+              positionIdA: first.slot.id,
+              positionIdB: second.slot.id,
+            },
+          );
+          expect(swapData.swapTeamMemberPositions).toHaveLength(2);
+        }
       }
     });
 
