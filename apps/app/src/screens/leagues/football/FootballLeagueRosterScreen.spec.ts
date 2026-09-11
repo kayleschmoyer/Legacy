@@ -34,6 +34,22 @@ describe('getSlotOrder', () => {
     expect(order).not.toContain('DST');
   });
 
+  it('includes IDP_FLEX in the IDP slot order', () => {
+    const order = getSlotOrder('idp');
+    expect(order).toContain('IDP_FLEX');
+  });
+
+  it('includes ST (special teams) in the IDP slot order', () => {
+    const order = getSlotOrder('idp');
+    expect(order).toContain('ST');
+  });
+
+  it('does not include IDP_FLEX or ST in the DST slot order', () => {
+    const order = getSlotOrder('dst');
+    expect(order).not.toContain('IDP_FLEX');
+    expect(order).not.toContain('ST');
+  });
+
   it('includes common offensive slots in both formats', () => {
     const dst = getSlotOrder('dst');
     const idp = getSlotOrder('idp');

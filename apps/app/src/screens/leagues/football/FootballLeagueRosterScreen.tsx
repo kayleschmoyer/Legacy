@@ -40,6 +40,8 @@ const IDP_SLOT_ORDER = [
   'DL',
   'LB',
   'DB',
+  'IDP_FLEX',
+  'ST',
   'BN',
 ] as const;
 
@@ -54,6 +56,8 @@ const SLOT_LABELS: Record<string, string> = {
   DL: 'Defensive Lineman',
   LB: 'Linebacker',
   DB: 'Defensive Back',
+  IDP_FLEX: 'IDP Flex',
+  ST: 'Special Teams',
   BN: 'Bench',
 };
 
