@@ -103,6 +103,11 @@ export default [
       '**/web-build',
       '**/cache',
       '**/dist',
+      // Tamagui compiler build cache (LS-8793) — same class of gitignored
+      // generated output as apps/web's `.tamagui/`; apps/app also uses
+      // Tamagui and can generate it locally. See apps/web/eslint.config.mjs
+      // for the full explanation.
+      '**/.tamagui/**',
     ],
   },
 ];
