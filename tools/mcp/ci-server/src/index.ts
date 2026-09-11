@@ -207,7 +207,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_list_runs',
-    'Prefer this over `gh run list` via shell. List recent CI runs with optional filters.',
+    'Prefer this over `gh run list` or `mcp__github__actions_list` (can silently drop filters). List recent CI runs, filtered.',
     {
       branch: z.string().optional().describe('Branch name filter'),
       workflow: z

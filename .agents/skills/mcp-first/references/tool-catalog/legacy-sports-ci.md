@@ -168,7 +168,7 @@ Prefer this over a manual pull_request_read + ci_list_runs/ci_view_run cross-che
 
 ### `ci_list_runs`
 
-Prefer this over `gh run list` via shell. List recent CI runs with optional filters.
+Prefer this over `gh run list` or `mcp__github__actions_list` (can silently drop filters). List recent CI runs, filtered.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
