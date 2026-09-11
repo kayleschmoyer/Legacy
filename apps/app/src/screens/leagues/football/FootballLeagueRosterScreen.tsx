@@ -45,6 +45,23 @@ const IDP_SLOT_ORDER = [
   'BN',
 ] as const;
 
+const DEFENSIVE_FORMAT_LABELS: Record<string, string> = {
+  idp: 'IDP League (Individual Defensive Players)',
+  dst: 'DST League (Team Defense / Special Teams)',
+};
+
+/**
+ * Returns the display label for a league's defensive scoring format,
+ * so managers can tell at a glance why their roster shows DST vs.
+ * DL/LB/DB slots (LS-6453). Defaults to the DST label when unset.
+ */
+export function getDefensiveFormatLabel(
+  defensiveFormat: string | null | undefined,
+): string {
+  const label = DEFENSIVE_FORMAT_LABELS[defensiveFormat ?? 'dst'];
+  return label ?? DEFENSIVE_FORMAT_LABELS.dst;
+}
+
 const SLOT_LABELS: Record<string, string> = {
   QB: 'Quarterback',
   RB: 'Running Back',
@@ -280,6 +297,18 @@ export function FootballLeagueRosterScreen(
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <YStack gap="$3" paddingBottom="$8">
+        <XStack
+          testID="roster-defensive-format-badge"
+          alignSelf="flex-start"
+          paddingHorizontal="$2.5"
+          paddingVertical="$1.5"
+          borderRadius="$10"
+          backgroundColor="$surfaceInteractive"
+        >
+          <Text fontSize="$2" fontWeight="600" color="$color12">
+            {getDefensiveFormatLabel(defensiveFormat)}
+          </Text>
+        </XStack>
         {renderSlots.map((slot) => {
           const members = grouped[slot.key] ?? [];
           return (

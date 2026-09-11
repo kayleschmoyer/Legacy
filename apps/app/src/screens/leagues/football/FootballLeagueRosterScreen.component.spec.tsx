@@ -136,6 +136,24 @@ describe('FootballLeagueRosterScreen', () => {
     expect(screen.queryByText('DST')).toBeNull();
   });
 
+  describe('defensive format badge (LS-6453)', () => {
+    it('shows a DST label when the league uses DST scoring', () => {
+      render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+      expect(screen.getByTestId('roster-defensive-format-badge')).toBeTruthy();
+      expect(screen.getByText(/DST League/)).toBeTruthy();
+    });
+
+    it('shows an IDP label when the league uses IDP scoring', () => {
+      render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="idp" />);
+      expect(screen.getByText(/IDP League/)).toBeTruthy();
+    });
+
+    it('defaults to the DST label when defensiveFormat is not provided', () => {
+      render(<FootballLeagueRosterScreen teamId={1} />);
+      expect(screen.getByText(/DST League/)).toBeTruthy();
+    });
+  });
+
   it('renders player name in roster', () => {
     render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
     expect(screen.getByText('Josh Allen')).toBeTruthy();
