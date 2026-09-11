@@ -85,6 +85,19 @@ module.exports = {
     // type is invalid"). Belongs to shared-components:mobile only, which has
     // a full react-native-svg mock in jest-setup-mobile.js.
     '/src/features/elite-draft/DraftClockRing.native.spec.tsx',
+    // Native-only regression test (LS-10066) — covers
+    // useNativePlayerCardDragSource.native.ts's `react-native-gesture-handler`
+    // Pan-gesture wiring. This web project doesn't mock gesture-handler (only
+    // shared-components:mobile does, in jest-setup-mobile.js), so the import
+    // resolves to the real package and throws. PlayerCard.spec.tsx already
+    // covers the web (HTML5 drag) mechanism; this is its native counterpart,
+    // belonging to shared-components:mobile only.
+    '/src/features/elite-draft/useNativePlayerCardDragSource.native.spec.ts',
+    // Native-only regression test (LS-10066) — covers
+    // useNativeQueueReorder.native.ts's gesture-driven queue-reorder
+    // mechanism, for the same gesture-handler-mocking reason as above.
+    // Belongs to shared-components:mobile only.
+    '/src/features/elite-draft/useNativeQueueReorder.native.spec.ts',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],

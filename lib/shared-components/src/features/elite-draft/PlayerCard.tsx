@@ -2,6 +2,7 @@ import React from 'react';
 import { type DraftPlayer } from './types';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
+import { usePlayerCardDragSource } from './usePlayerCardDragSource';
 import type { SportKind } from '../../config/sports';
 
 /**
@@ -89,6 +90,12 @@ export const PlayerCard = React.memo(function PlayerCard({
   // card onto an eligible roster slot in the rail drafts the player; the rail
   // validates eligibility and the active turn before committing the pick.
   const dragEnabled = isMyPick && !isDrafting && !!onDragStartPlayer;
+  const dragSource = usePlayerCardDragSource({
+    player,
+    enabled: dragEnabled,
+    onDragStartPlayer,
+    onDragEndPlayer,
+  });
 
   return (
     <div
@@ -96,19 +103,9 @@ export const PlayerCard = React.memo(function PlayerCard({
       style={{ animationDelay: `${index * 0.04}s` }}
       role="group"
       aria-labelledby={`pn-${player.id}`}
-      draggable={dragEnabled}
-      onDragStart={
-        dragEnabled
-          ? (e: React.DragEvent) => {
-              // text/plain payload makes the native drag valid in all browsers;
-              // the rail reads the dragged player from lifted state, not this.
-              e.dataTransfer.setData('text/plain', String(player.id));
-              e.dataTransfer.effectAllowed = 'move';
-              onDragStartPlayer?.(player);
-            }
-          : undefined
-      }
-      onDragEnd={dragEnabled ? () => onDragEndPlayer?.() : undefined}
+      draggable={dragSource.draggable}
+      onDragStart={dragSource.onDragStart}
+      onDragEnd={dragSource.onDragEnd}
     >
       <div className="d-card-accent" style={{ background: posColor }} />
       <div className="d-card-body">
