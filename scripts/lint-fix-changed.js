@@ -53,22 +53,19 @@ const { execFileSync } = require('child_process');
 const { existsSync } = require('fs');
 const { dirname, extname, join, relative, resolve } = require('path');
 
-// The eslint bin is a `.cmd` shim on Windows. Since Node's CVE-2024-27980
-// fix (backported to 18.19.1/20.11.1/21.6.2+; this repo runs Node 22),
-// spawning a `.cmd`/`.bat` file WITHOUT `shell: true` throws EINVAL
-// regardless of the explicit extension — the extension alone no longer
-// avoids the shell requirement it used to. So `shell: true` is required
-// on Windows here, with args escaped against cmd.exe metacharacters
-// (same pattern as escapeCmdShellArg() / runCommand() in
-// tools/mcp/nx-server/src/{cmd-escape,run-command}.ts) since `shell: true`
-// joins argv into a single string that cmd.exe re-parses.
-const ESLINT_BIN_NAME = process.platform === 'win32' ? 'eslint.cmd' : 'eslint';
-const NEEDS_SHELL = process.platform === 'win32';
-
-/** Escape cmd.exe shell metacharacters in a single argument (Windows-only). */
-function escapeCmdShellArg(arg) {
-  return /[|<>()\s]/.test(arg) ? `"${arg}"` : arg;
-}
+// The `.bin/eslint` shim is a `.cmd` file on Windows. Since Node's
+// CVE-2024-27980 fix (backported to 18.19.1/20.11.1/21.6.2+; this repo runs
+// Node 22), spawning a `.cmd`/`.bat` file WITHOUT `shell: true` throws
+// EINVAL — the explicit extension alone no longer avoids the shell
+// requirement it used to. Rather than take on `shell: true` and the
+// cmd.exe-metacharacter escaping that requires (the pattern
+// escapeCmdShellArg() / runCommand() use in
+// tools/mcp/nx-server/src/{cmd-escape,run-command}.ts for actual `.cmd`
+// wrappers like pnpm/npm/npx/yarn), invoke ESLint's JS entry point directly
+// with the current Node interpreter. `eslint.js` is a plain JS file, not a
+// shell script, so no shell is ever involved and the whole
+// metacharacter-injection question this file used to raise doesn't apply.
+const ESLINT_JS_ENTRY = join('node_modules', 'eslint', 'bin', 'eslint.js');
 
 const LINTABLE_EXTENSIONS = new Set([
   '.js',
@@ -164,7 +161,7 @@ function groupByConfigDir(files, root) {
 
 function main() {
   const root = resolve(__dirname, '..');
-  const eslintBin = resolve(root, 'node_modules', '.bin', ESLINT_BIN_NAME);
+  const eslintEntry = resolve(root, ESLINT_JS_ENTRY);
   const baseRef = parseBaseRef(process.argv);
 
   const files = getChangedFiles(baseRef, root);
@@ -196,15 +193,15 @@ function main() {
     );
     try {
       const args = [
+        eslintEntry,
         '--fix',
         '--fix-type=problem,suggestion,layout',
         ...relFiles,
       ];
-      execFileSync(
-        eslintBin,
-        NEEDS_SHELL ? args.map(escapeCmdShellArg) : args,
-        { cwd: configDir, stdio: 'inherit', shell: NEEDS_SHELL },
-      );
+      execFileSync(process.execPath, args, {
+        cwd: configDir,
+        stdio: 'inherit',
+      });
     } catch (error) {
       // eslint --fix exits 1 when unfixable violations remain — expected.
       // The unscoped `nx affected -t lint` check that follows in the Makefile
