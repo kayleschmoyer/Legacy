@@ -7,10 +7,12 @@ import {
   AuthenticationError,
   ForbiddenError,
   NotFoundError,
+  RateLimitedError,
   UserInputError,
 } from './graphql-errors';
 import { validateGifUrl } from './validate-gif-url';
 import { persistAndBroadcastLeagueMessage } from './league-messages-helper';
+import { checkAndIncrementRateLimit } from './rate-limit';
 import { toUtcIso } from './timestamp-utils';
 import { insertActivityLog } from '../services/activity-log';
 import { detectProfanity } from '../services/profanity-filter';
@@ -988,6 +990,17 @@ builder.mutationField('createTiebreakerRules', (t) =>
   }),
 );
 
+// Rate limit for sendLeagueMessage (LS-6298 / FLD-046): bounds how fast a
+// single user can post to a single league's chat, so a scripted client
+// cannot spam unlimited messages and flood the WebSocket fan-out to every
+// league member. Keyed per-league (not just per-user) via the bucket name —
+// `rate_limit_counters` is unique on (bucket, user_id), so folding the
+// leagueId into the bucket gets per-user-per-league granularity without a
+// schema change.
+const LEAGUE_CHAT_RATE_LIMIT_BUCKET_PREFIX = 'send_league_message';
+const LEAGUE_CHAT_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const LEAGUE_CHAT_RATE_LIMIT_WINDOW_MS = 10 * 1000; // 10 seconds
+
 // Mutation: sendLeagueMessage
 // Persists a league chat message and broadcasts a WebSocket notification to
 // all connected league members.
@@ -1034,6 +1047,19 @@ builder.mutationField('sendLeagueMessage', (t) =>
 
       if (membership.length === 0) {
         throw ForbiddenError('Not a member of this league');
+      }
+
+      // Rate-limit message sends per (user, league) — gated here, after
+      // membership authorization and before any further work, so a single
+      // scripted client cannot spam the WS fan-out (LS-6298 / FLD-046).
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: `${LEAGUE_CHAT_RATE_LIMIT_BUCKET_PREFIX}:${args.leagueId}`,
+        userId: context.user.id,
+        limit: LEAGUE_CHAT_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: LEAGUE_CHAT_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
       }
 
       // Resolve @mentions (LS-9216): derive the mentioned team(s)' managing

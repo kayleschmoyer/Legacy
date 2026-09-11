@@ -4,6 +4,7 @@ describe('Chat and Tiebreakers Resolver', () => {
   let schema: GraphQLSchema;
   let mockDb: any;
   let mockContext: any;
+  let mockCheckAndIncrementRateLimit: jest.Mock;
 
   const makeMessage = (overrides: Record<string, unknown> = {}) => ({
     id: 1,
@@ -104,6 +105,13 @@ describe('Chat and Tiebreakers Resolver', () => {
 
     jest.doMock('../services/activity-log', () => ({
       insertActivityLog: jest.fn().mockResolvedValue(undefined),
+    }));
+
+    mockCheckAndIncrementRateLimit = jest
+      .fn()
+      .mockResolvedValue({ allowed: true });
+    jest.doMock('./rate-limit', () => ({
+      checkAndIncrementRateLimit: mockCheckAndIncrementRateLimit,
     }));
 
     jest.doMock('@legacy-sports/db-client', () => ({
@@ -886,6 +894,66 @@ describe('Chat and Tiebreakers Resolver', () => {
       )) as Record<string, unknown>;
 
       expect(result).toMatchObject({ leagueId: 1, userId: 1 });
+    });
+
+    // ── rate limiting (LS-6298 / FLD-046) ────────────────────────────────
+
+    it('rate-limits per (user, league): checks the limiter after membership, before persisting', async () => {
+      const msg = makeLeagueMsg();
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.returning.mockResolvedValueOnce([msg]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'Hello everyone' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledWith(mockDb, {
+        bucket: 'send_league_message:1',
+        userId: 1,
+        limit: 5,
+        windowMs: 10 * 1000,
+      });
+    });
+
+    it('scopes the rate limit bucket to the target league', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMsg({ leagueId: 42 })]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 42, messageText: 'Hello everyone' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledWith(
+        mockDb,
+        expect.objectContaining({ bucket: 'send_league_message:42' }),
+      );
+    });
+
+    it('throws RATE_LIMITED and does not persist a message once the limit is exceeded', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockCheckAndIncrementRateLimit.mockResolvedValueOnce({ allowed: false });
+
+      const resolver = getMutation('sendLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, messageText: 'spam' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Too many attempts. Please try again later.');
+
+      expect(mockDb.values).not.toHaveBeenCalledWith(
+        expect.objectContaining({ messageText: expect.anything() }),
+      );
     });
 
     // ── gifUrl allowlist (LS-6299 / FLD-047) ────────────────────────────
