@@ -988,6 +988,18 @@ _PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
 # couldn't or didn't touch, so violations are still reported, just never
 # auto-rewritten outside the diff.
 _PC_LINT_CMD = node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE) $(if $(PARALLEL),--parallel=$(PARALLEL),)
+# Skill-content lint (LS-10032): validates .agents/skills/ against the
+# agentskills format + repo-specific rules (frontmatter, SKILL.md size budget
+# from LS-9822, broken links, retired tool mentions). Previously wired only
+# into CI's `custom-checks` job (see ci-pipeline.yml), so a local `pc-lint`
+# pass could go green on a skill-content change that CI would still fail —
+# a full push-and-wait round trip to discover. Runs unconditionally (not
+# gated on PC_DOCS_ONLY) because a skill-only change is exactly the case
+# PC_DOCS_ONLY=1 short-circuits the rest of this step for, and it's the case
+# this check exists to catch. It's also cheap (~10s for the whole corpus,
+# independent of PARALLEL/nx affected scoping — see repo-tooling/SKILL.md),
+# so running it every time doesn't meaningfully slow down pc-lint.
+_PC_LINT_SKILLS_CMD = node scripts/lint-skills.js
 _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 # MAXWORKERS caps Jest worker parallelism (--maxWorkers) across every affected
 # project's test run, forwarded to nx via the trailing `-- --maxWorkers=N`
@@ -1066,7 +1078,8 @@ pre-commit: ## Run all pre-commit validation checks
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 	$(_PC_FORMAT_RECIPE)
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+	@$(call echo_plain,6/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting (affected projects)... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
 	$(if $(findstring PC_HAS_GH_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_GH_SCRIPTS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
@@ -1108,8 +1121,9 @@ pc-format: ## pc step 5: prettier + auto-commit formatter rewrites (new commit, 
 	$(_PC_FORMAT_RECIPE)
 
 pc-lint: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-lint: ## pc step 6: lint affected projects. Pass PARALLEL=N to cap nx project parallelism (avoids OOM on memory-constrained machines)
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+pc-lint: ## pc step 6: lint affected projects + skill content (always). Pass PARALLEL=N to cap nx project parallelism (avoids OOM on memory-constrained machines)
+	@$(call echo_plain,6/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting (affected projects)... SKIPPED (docs-only changes)))
 
 pc-workflows: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-workflows: ## pc step 7: GitHub workflow validation + .github/scripts unit tests
