@@ -502,14 +502,15 @@ Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from
 
 ### `github_retrigger_check`
 
-Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. PR number via "number"/"prNumber".
+Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `number` | number |  | coerced, integer, > 0 | PR number |
 | `prNumber` | number |  | coerced, integer, > 0 | Alias for "number" — use either, not both. |
-| `checkName` | string |  | min 1 | Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching) |
-| `allFailed` | boolean |  | — | When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given. |
+| `checkName` | string |  | min 1 | Check name to re-request (substring match) |
+| `checkNames` | string[] |  | — | Multiple check names |
+| `allFailed` | boolean |  | — | Retrigger checks failing on head SHA. |
 
 ### `github_secret_delete`
 

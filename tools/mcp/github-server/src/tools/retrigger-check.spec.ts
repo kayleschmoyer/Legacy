@@ -322,6 +322,118 @@ describe('retriggerCheck — checkName matching on names containing "&" (LS-9884
   });
 });
 
+describe('retriggerCheck — allFailed scoped to the current head SHA, not superseded attempts (LS-10059)', () => {
+  it('does not retrigger a check whose latest attempt on the head SHA has already succeeded, even though an earlier (e.g. stood-down-as-flaky) attempt for the same name and SHA failed', async () => {
+    // GitHub's check-runs-for-a-ref listing returns every attempt of a check
+    // that has run against this SHA, newest first. A rerequested check keeps
+    // its older check_run objects in the list alongside the new one.
+    mockGithubRest.mockResolvedValueOnce({
+      total_count: 2,
+      check_runs: [
+        makeCheckRun('flaky-test', { id: 2, conclusion: 'success' }),
+        makeCheckRun('flaky-test', { id: 1, conclusion: 'failure' }),
+      ],
+    });
+
+    const result = await retriggerCheck({ number: 5113, allFailed: true });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.message).toBe('No failed check runs to retrigger.');
+    expect(mockGithubRest).toHaveBeenCalledTimes(1);
+  });
+
+  it('retriggers a check whose latest attempt on the head SHA is still failing', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 2,
+        check_runs: [
+          makeCheckRun('flaky-test', { id: 2, conclusion: 'failure' }),
+          makeCheckRun('flaky-test', { id: 1, conclusion: 'success' }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({ number: 5113, allFailed: true });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    const [entry] = body.results as Array<Record<string, unknown>>;
+    expect(entry.id).toBe(2);
+  });
+});
+
+describe('retriggerCheck — checkNames array param (LS-10059)', () => {
+  it('retriggers the union of checks matching any of the given names, regardless of status', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 3,
+        check_runs: [
+          makeCheckRun('bot-review', { id: 1, conclusion: 'success' }),
+          makeCheckRun('lint', { id: 2, conclusion: 'failure' }),
+          makeCheckRun('unrelated-check', { id: 3, conclusion: 'failure' }),
+        ],
+      })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 42,
+      checkNames: ['bot-review', 'lint'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(2);
+    const names = (body.results as Array<Record<string, unknown>>).map(
+      (r) => r.name,
+    );
+    expect(names.sort()).toEqual(['bot-review', 'lint']);
+  });
+
+  it('combines with allFailed to retrigger only the currently-failing checks among the named subset', async () => {
+    mockGithubRest.mockResolvedValueOnce({
+      total_count: 2,
+      check_runs: [
+        makeCheckRun('bot-review', { id: 1, conclusion: 'success' }),
+        makeCheckRun('lint', { id: 2, conclusion: 'failure' }),
+      ],
+    });
+    mockGithubRest.mockResolvedValueOnce(undefined);
+
+    const result = await retriggerCheck({
+      number: 42,
+      checkNames: ['bot-review', 'lint'],
+      allFailed: true,
+    });
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    const [entry] = body.results as Array<Record<string, unknown>>;
+    expect(entry.name).toBe('lint');
+  });
+
+  it('reports available check names when none of checkNames match anything', async () => {
+    mockGithubRest.mockResolvedValueOnce({
+      total_count: 1,
+      check_runs: [makeCheckRun('bot-review', { conclusion: 'failure' })],
+    });
+
+    const result = await retriggerCheck({
+      number: 42,
+      checkNames: ['nonexistent-1', 'nonexistent-2'],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /No check run named "nonexistent-1", "nonexistent-2"/,
+    );
+    expect(result.content[0].text).toMatch(/bot-review/);
+  });
+});
+
 describe('retriggerCheck — checkName substring match on the emoji-prefixed CI Pipeline name (LS-9973)', () => {
   it('matches the short name "lint" against the full "🚀 CI Pipeline / lint & format" check name', async () => {
     mockGithubRest

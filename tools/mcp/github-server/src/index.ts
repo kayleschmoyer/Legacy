@@ -1786,7 +1786,7 @@ export function createServer(): McpServer {
   // --- github_retrigger_check ---
   server.tool(
     'github_retrigger_check',
-    'Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. PR number via "number"/"prNumber".',
+    'Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.',
     {
       number: z.coerce
         .number()
@@ -1805,14 +1805,13 @@ export function createServer(): McpServer {
         .trim()
         .min(1)
         .optional()
-        .describe(
-          'Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching)',
-        ),
+        .describe('Check name to re-request (substring match)'),
+      checkNames: stringList({ min: 1 })
+        .optional()
+        .describe('Multiple check names'),
       allFailed: coercedBoolean
         .default(false)
-        .describe(
-          'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
-        ),
+        .describe('Retrigger checks failing on head SHA.'),
     },
     async (params) => {
       const resolvedNumber = params.number ?? params.prNumber;
@@ -1830,6 +1829,7 @@ export function createServer(): McpServer {
       return retriggerCheck({
         number: resolvedNumber,
         checkName: params.checkName,
+        checkNames: params.checkNames,
         allFailed: params.allFailed,
       });
     },

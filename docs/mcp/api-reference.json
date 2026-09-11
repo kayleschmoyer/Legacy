@@ -6162,7 +6162,7 @@
         },
         {
           "name": "github_retrigger_check",
-          "description": "Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. PR number via \"number\"/\"prNumber\".",
+          "description": "Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.",
           "inputs": {
             "number": {
               "type": "number",
@@ -6190,13 +6190,22 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Specific check name to re-request (case-insensitive substring match against the full display name; retriggers all matching)"
+              "description": "Check name to re-request (substring match)"
+            },
+            "checkNames": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "Multiple check names"
             },
             "allFailed": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given."
+              "description": "Retrigger checks failing on head SHA."
             }
           },
           "transports": [

@@ -9,6 +9,7 @@ import type { ToolResult } from '../types.js';
 interface RetriggerCheckParams {
   number: number;
   checkName?: string;
+  checkNames?: string[];
   allFailed?: boolean;
 }
 
@@ -94,15 +95,43 @@ export async function retriggerCheck(
     };
   }
 
-  if (params.checkName) {
-    const matched = filterRunsByName(allCheckRuns, params.checkName);
+  // GitHub's check-runs-for-a-ref listing includes every attempt of a check
+  // that has ever run against this exact SHA, newest first — a check that
+  // was rerequested keeps its earlier (e.g. failed, later stood-down-as-flaky)
+  // check_run objects in the list alongside the new one. Dedupe to the latest
+  // attempt per check name so "currently failing" reflects only the check's
+  // present state on the head SHA, not a superseded attempt (LS-10059).
+  const latestByName = new Map<string, CheckRun>();
+  for (const run of allCheckRuns) {
+    if (!latestByName.has(run.name)) {
+      latestByName.set(run.name, run);
+    }
+  }
+  allCheckRuns = [...latestByName.values()];
+
+  // Merge the singular `checkName` (backward-compat) with the new `checkNames`
+  // array into one list of names to match — callers can target a precise,
+  // named subset of checks instead of relying on the broad `allFailed` sweep.
+  const namesToMatch = [
+    ...(params.checkName ? [params.checkName] : []),
+    ...(params.checkNames ?? []),
+  ];
+
+  if (namesToMatch.length > 0) {
+    const matchedById = new Map<number, CheckRun>();
+    for (const name of namesToMatch) {
+      for (const run of filterRunsByName(allCheckRuns, name)) {
+        matchedById.set(run.id, run);
+      }
+    }
+    const matched = [...matchedById.values()];
     if (matched.length === 0) {
       return {
         isError: true,
         content: [
           {
             type: 'text',
-            text: `No check run named "${params.checkName}" found on PR #${params.number} (commit ${sha.slice(0, 7)}). Available check names: ${allCheckRuns.map((r) => r.name).join(', ')}`,
+            text: `No check run named ${namesToMatch.map((n) => `"${n}"`).join(', ')} found on PR #${params.number} (commit ${sha.slice(0, 7)}). Available check names: ${allCheckRuns.map((r) => r.name).join(', ')}`,
           },
         ],
       };
@@ -111,14 +140,16 @@ export async function retriggerCheck(
   }
 
   // 3. Filter checks based on params:
-  //    - checkName without allFailed: retrigger all matching (regardless of status)
-  //    - allFailed (with or without checkName): retrigger only failed checks
-  //    - neither: retrigger only failed checks (default behavior)
+  //    - checkName/checkNames without allFailed: retrigger all matching (regardless of status)
+  //    - allFailed (with or without checkName/checkNames): retrigger only checks
+  //      currently failing on the head SHA (i.e. the latest attempt per name)
+  //    - neither: retrigger only currently-failing checks (default behavior)
   let toRetrigger = allCheckRuns;
-  if (params.checkName && !params.allFailed) {
-    // Specific check requested — retrigger all matching runs (any status)
+  if (namesToMatch.length > 0 && !params.allFailed) {
+    // Specific check(s) requested — retrigger all matching runs (any status)
   } else {
-    // Default or allFailed: filter to failed checks only
+    // Default or allFailed: filter to checks currently failing (latest attempt
+    // per name) only.
     toRetrigger = toRetrigger.filter(
       (c) =>
         c.conclusion !== null &&
