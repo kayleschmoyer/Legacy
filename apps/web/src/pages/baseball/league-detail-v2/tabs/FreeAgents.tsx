@@ -63,6 +63,8 @@ export const FreeAgentsTab: React.FC<FreeAgentsTabProps> = ({
           player={claimPlayer}
           leagueId={leagueId}
           maxRosterSize={league.maxRosterSize}
+          waiverType={league.waiverType}
+          faabBudgetDefault={league.faabBudgetDefault}
         />
       ) : null}
     </>

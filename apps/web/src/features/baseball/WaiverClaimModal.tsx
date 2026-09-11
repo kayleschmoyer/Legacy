@@ -69,6 +69,19 @@ interface WaiverClaimModalProps {
    * rejecting the claim the UI had just said was fine (LS-9769).
    */
   maxRosterSize?: number | null;
+  /**
+   * This league's waiver type ('standard' priority-order or 'faab'), straight
+   * from the just-fetched League GraphQL fragment. Falls back to the Redux
+   * `league.leagueData` slice (then 'standard') when a caller doesn't supply
+   * it, for the same reason `maxRosterSize` does above: the v2 free-agents
+   * route never dispatches that slice. Since `waiverType` gates whether the
+   * FAAB bid input renders at all, the stale fallback let a manager submit a
+   * claim missing the FAAB bid the server-side mutation requires, which it
+   * correctly rejects (LS-10009, mirrors LS-9769).
+   */
+  waiverType?: string | null;
+  /** This league's FAAB budget default, sourced the same way as waiverType. */
+  faabBudgetDefault?: number | null;
 }
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
@@ -79,6 +92,8 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
   player,
   leagueId,
   maxRosterSize: maxRosterSizeProp,
+  waiverType: waiverTypeProp,
+  faabBudgetDefault: faabBudgetDefaultProp,
 }) => {
   const [dropPlayerId, setDropPlayerId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -106,12 +121,14 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
     (s) => s.league.leagueData?.maxRosterSize ?? 25,
   );
   const maxRosterSize = maxRosterSizeProp ?? reduxMaxRosterSize;
-  const waiverType = useAppSelector(
+  const reduxWaiverType = useAppSelector(
     (s) => s.league.leagueData?.waiverType ?? 'standard',
   );
-  const faabBudgetDefault = useAppSelector(
+  const reduxFaabBudgetDefault = useAppSelector(
     (s) => s.league.leagueData?.faabBudgetDefault ?? 100,
   );
+  const waiverType = waiverTypeProp ?? reduxWaiverType;
+  const faabBudgetDefault = faabBudgetDefaultProp ?? reduxFaabBudgetDefault;
   const isFaab = waiverType === 'faab';
 
   // While the userTeamId query is still in flight, treat the modal as loading

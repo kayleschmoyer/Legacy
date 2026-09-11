@@ -326,3 +326,71 @@ describe('WaiverClaimModal – roster capacity source (LS-9769)', () => {
     expect(screen.getByText(/Roster has space \(1\/25\)/i)).toBeInTheDocument();
   });
 });
+
+describe('WaiverClaimModal – waiver type source (LS-10009)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockClaimFn = jest.fn().mockResolvedValue({});
+    capturedOnOpenChange = undefined;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /**
+   * Mirrors LS-9769: the Redux `league.leagueData` slice mock (never
+   * populated by the v2 free-agents route) reports 'standard', but the
+   * league-fragment prop says this league is actually FAAB. Before the fix,
+   * the modal read `waiverType` from Redux only, so it would hide the
+   * required FAAB bid input and let the user submit a claim the server-side
+   * mutation rejects for a missing bid.
+   */
+  it('renders the FAAB bid input when the league-fragment waiverType prop is faab, even though Redux says standard', () => {
+    render(
+      <WaiverClaimModal
+        open
+        player={player}
+        leagueId={leagueId}
+        onClose={jest.fn()}
+        waiverType="faab"
+        faabBudgetDefault={250}
+      />,
+    );
+
+    expect(screen.getByText('FAAB Bid Amount')).toBeInTheDocument();
+    expect(
+      screen.getByText(/League budget: \$250 per team/i),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the FAAB bid input when the league-fragment waiverType prop is standard', () => {
+    render(
+      <WaiverClaimModal
+        open
+        player={player}
+        leagueId={leagueId}
+        onClose={jest.fn()}
+        waiverType="standard"
+        faabBudgetDefault={250}
+      />,
+    );
+
+    expect(screen.queryByText('FAAB Bid Amount')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the Redux league.leagueData waiverType when no waiverType prop is supplied', () => {
+    // The mocked Redux slice reports waiverType: 'standard', so the FAAB
+    // input should stay hidden under the legacy fallback path.
+    render(
+      <WaiverClaimModal
+        open
+        player={player}
+        leagueId={leagueId}
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('FAAB Bid Amount')).not.toBeInTheDocument();
+  });
+});

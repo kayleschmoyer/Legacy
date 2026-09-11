@@ -58,6 +58,8 @@ const league = {
   sport: 'baseball',
   waiverEnabled: false,
   maxRosterSize: 18,
+  waiverType: 'faab',
+  faabBudgetDefault: 200,
 } as any;
 
 beforeEach(() => {
@@ -94,5 +96,12 @@ describe('FreeAgentsTab (web wrapper)', () => {
     render(<FreeAgentsTab league={league} isMember myTeamId={42} />);
     fireEvent.click(screen.getByTestId('claim-free-agent-button'));
     expect(lastWaiverModalProps.maxRosterSize).toBe(18);
+  });
+
+  it('forwards the league fragment waiverType and faabBudgetDefault to WaiverClaimModal instead of leaving them for the stale Redux fallback (LS-10009)', () => {
+    render(<FreeAgentsTab league={league} isMember myTeamId={42} />);
+    fireEvent.click(screen.getByTestId('claim-free-agent-button'));
+    expect(lastWaiverModalProps.waiverType).toBe('faab');
+    expect(lastWaiverModalProps.faabBudgetDefault).toBe(200);
   });
 });
