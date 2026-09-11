@@ -53,12 +53,22 @@ const { execFileSync } = require('child_process');
 const { existsSync } = require('fs');
 const { dirname, extname, join, relative, resolve } = require('path');
 
-// The eslint bin is a `.cmd` shim on Windows — execFileSync needs the
-// explicit extension to run it without `shell: true` (which would otherwise
-// re-parse the command through cmd.exe and risk shell metacharacter
-// injection from file paths). Same pattern as resolveCommand() in
-// tools/mcp/nx-server/src/run-command.ts.
+// The eslint bin is a `.cmd` shim on Windows. Since Node's CVE-2024-27980
+// fix (backported to 18.19.1/20.11.1/21.6.2+; this repo runs Node 22),
+// spawning a `.cmd`/`.bat` file WITHOUT `shell: true` throws EINVAL
+// regardless of the explicit extension — the extension alone no longer
+// avoids the shell requirement it used to. So `shell: true` is required
+// on Windows here, with args escaped against cmd.exe metacharacters
+// (same pattern as escapeCmdShellArg() / runCommand() in
+// tools/mcp/nx-server/src/{cmd-escape,run-command}.ts) since `shell: true`
+// joins argv into a single string that cmd.exe re-parses.
 const ESLINT_BIN_NAME = process.platform === 'win32' ? 'eslint.cmd' : 'eslint';
+const NEEDS_SHELL = process.platform === 'win32';
+
+/** Escape cmd.exe shell metacharacters in a single argument (Windows-only). */
+function escapeCmdShellArg(arg) {
+  return /[|<>()\s]/.test(arg) ? `"${arg}"` : arg;
+}
 
 const LINTABLE_EXTENSIONS = new Set([
   '.js',
@@ -185,10 +195,15 @@ function main() {
       `  Fixing ${relFiles.length} file(s) in ${label}...\n`,
     );
     try {
+      const args = [
+        '--fix',
+        '--fix-type=problem,suggestion,layout',
+        ...relFiles,
+      ];
       execFileSync(
         eslintBin,
-        ['--fix', '--fix-type=problem,suggestion,layout', ...relFiles],
-        { cwd: configDir, stdio: 'inherit' },
+        NEEDS_SHELL ? args.map(escapeCmdShellArg) : args,
+        { cwd: configDir, stdio: 'inherit', shell: NEEDS_SHELL },
       );
     } catch (error) {
       // eslint --fix exits 1 when unfixable violations remain — expected.

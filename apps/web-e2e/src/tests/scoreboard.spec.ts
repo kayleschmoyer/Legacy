@@ -468,6 +468,24 @@ test.describe('Scoreboard — sport filter @regression', () => {
     // Track GetScoreboard request count so we can confirm the query is
     // skipped while NFL is active. Apollo's cache-and-network policy fires
     // an initial request on mount; switching to NFL must not fire another.
+    //
+    // Deliberately use a non-live game (status 'Final', not 'Live') here even
+    // though gamePk 1001 mirrors MOCK_LIVE_GAME. `shouldPollScoreboard`
+    // (lib/shared-components/src/features/scoreboard/partition.ts) starts a
+    // 6s Apollo live-poll whenever any game is 'Live', and under CI load a
+    // test can take long enough to reach the NFL click near that poll
+    // boundary — racing the in-flight poll tick against the `skip: true`
+    // re-render and firing a second GetScoreboard just after the switch.
+    // This test is about the sport-filter skip behavior, not live polling,
+    // so keep the fixture non-live to remove that timer entirely rather
+    // than papering over the race with a longer wait.
+    const NON_LIVE_GAME_1001 = {
+      ...MOCK_LIVE_GAME,
+      status: 'Final',
+      inningHalf: null,
+      outs: null,
+    };
+
     let scoreboardRequestCount = 0;
     await page.route(isGraphQLEndpoint, async (route) => {
       const opName = extractOperationName(route).toLowerCase();
@@ -485,7 +503,7 @@ test.describe('Scoreboard — sport filter @regression', () => {
               __typename: 'Scoreboard',
               date: '2026-04-01',
               lastUpdated: FIXED_NOW_ISO,
-              games: [MOCK_LIVE_GAME, MOCK_FINAL_GAME],
+              games: [NON_LIVE_GAME_1001, MOCK_FINAL_GAME],
             },
           },
         }),
@@ -511,7 +529,10 @@ test.describe('Scoreboard — sport filter @regression', () => {
     );
     await expect(page.getByTestId('game-card-1001')).not.toBeVisible();
 
-    // No new GetScoreboard requests should fire while NFL is selected.
+    // No new GetScoreboard requests should fire while NFL is selected. With
+    // no live game in this fixture there's no poll timer racing the switch,
+    // so this wait is no longer proving a negative against an active timer —
+    // it's just settle time for any (unexpected) re-render-driven refetch.
     await page.waitForTimeout(300);
     expect(scoreboardRequestCount).toBe(requestsAfterMount);
 
