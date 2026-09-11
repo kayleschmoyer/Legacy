@@ -126,11 +126,13 @@ function makeMatchupPlayer(
   };
 }
 
-// A single played game with one hit, for one player. The default scoring
-// profile (applied when no league scoring profile is mocked) awards 1pt per
-// hit, so this starter's projected AND actual point values render as real
-// numbers ("1.0") instead of the unplayed-game placeholders ("0.0" proj /
-// "—" actual) every other mocked starter below shows.
+// A single played, non-skipped game slot for one player — this generic
+// per-game tracker (gameNum/statsLoadingStatus/pitcherStartSkipped/
+// noGameDataFound) drives "hasPlayed" for both sports and is independent of
+// scoring. Football's actual point value itself comes from the
+// FootballMatchupPlayer.totalPoints entries in the MatchupScores mock below
+// (LS-9612) — not from battingGame/pitchingGame/fieldingGame, which are
+// baseball-only and stay null/absent for these football players.
 function makePlayedGame(playerId: number) {
   return [
     {
@@ -143,36 +145,59 @@ function makePlayedGame(playerId: number) {
       pitcherStartSkipped: false,
       noGameDataFound: false,
       statsLoadingStatus: 'complete',
-      // computeScoring() throws "Cannot compute non-numeric stat" for any
-      // stat key with a nonzero default weight whose value is `undefined`
-      // (as opposed to `null`, which it treats as 0) — every
-      // DEFAULT_BATTING_SCORING key besides `hits` must be explicitly null.
-      // `playerId`/`season`/`gameNum`/`gameIdentifier` are required by the
-      // fragment (lib/graphql/src/matchupPlayer.fragment.graphql) and by
-      // Apollo's cache normalization for GameBatting — omitting any of them
-      // throws "Missing field '<name>' while writing result" at runtime.
-      battingGame: {
-        __typename: 'GameBatting',
-        playerId,
-        season: 2026,
-        gameNum: 1,
-        gameIdentifier: `game-${playerId}`,
-        hits: 1,
-        caughtStealing: null,
-        doubles: null,
-        hitByPitch: null,
-        homeRuns: null,
-        runs: null,
-        rbi: null,
-        stolenBases: null,
-        strikeouts: null,
-        triples: null,
-      },
+      battingGame: null,
       pitchingGame: null,
       fieldingGame: null,
     },
   ];
 }
+
+// The two QB starters (one per team) are the only players with real
+// FootballMatchupPlayer.totalPoints/projectedPoints in this fixture, so both
+// their Proj and Actual cells render "1.0" — a real numeric point value, not
+// the unplayed-game "0.0" proj / "—" actual placeholder every other mocked
+// starter below shows.
+const QB1_PLAYER_ID = 100;
+const QB2_PLAYER_ID = 200;
+
+const MOCK_MATCHUP_SCORES = [
+  {
+    __typename: 'FootballMatchupStats',
+    teamId: 1,
+    teamName: 'Gridiron Giants',
+    totalPoints: 1,
+    projectedPoints: 1,
+    players: [
+      {
+        __typename: 'FootballMatchupPlayer',
+        playerId: QB1_PLAYER_ID,
+        playerName: 'Alpha QB',
+        position: 'QB',
+        totalPoints: 1,
+        projectedPoints: 1,
+        games: [],
+      },
+    ],
+  },
+  {
+    __typename: 'FootballMatchupStats',
+    teamId: 2,
+    teamName: 'End Zone Eagles',
+    totalPoints: 1,
+    projectedPoints: 1,
+    players: [
+      {
+        __typename: 'FootballMatchupPlayer',
+        playerId: QB2_PLAYER_ID,
+        playerName: 'Bravo QB',
+        position: 'QB',
+        totalPoints: 1,
+        projectedPoints: 1,
+        games: [],
+      },
+    ],
+  },
+];
 
 function makeStarters(teamId: number, firstName: string, playerIdBase: number) {
   return FOOTBALL_POSITIONS.map((position, index) => {
@@ -250,12 +275,13 @@ async function mockFootballRosterComparisonGraphQL(
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
     } else if (op === 'MatchupScores') {
-      // MatchupAdditionalSections (football-only) fires this — not under
-      // test here, so an empty result is enough to satisfy API isolation.
+      // Both MatchupRosterComparison's football scoring path (LS-9612) and
+      // MatchupAdditionalSections fire this — real per-player/team point
+      // values here, matching the two QB starters' games above.
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { matchupScores: [] } }),
+        body: JSON.stringify({ data: { matchupScores: MOCK_MATCHUP_SCORES } }),
       });
     } else if (op === 'GetTeamMatchupHistory') {
       await route.fulfill({

@@ -18,6 +18,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
+  useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
@@ -343,6 +344,59 @@ export function MatchupRosterComparison({
     skip: !leagueId,
   });
 
+  // Football scoring path (LS-9612): the `MatchupPlayer.games[].battingGame/
+  // pitchingGame/fieldingGame` fields fed into `computeScoring` below are
+  // baseball-only — football players have no equivalent per-game stat blocks
+  // there. Real football per-game/actual/projected points already exist via
+  // `matchupScores` (`FootballMatchupPlayer.totalPoints`/`projectedPoints`
+  // and `FootballMatchupStats.totalPoints`/`projectedPoints` for the team),
+  // the same query `MatchupAdditionalSections` already uses successfully —
+  // so reuse it here instead of inventing a second scoring path.
+  const { data: footballScoresData } = useMatchupScoresQuery({
+    variables: { leagueId, weekNum: matchup.weekNumber || 1 },
+    skip: !isFootball || !leagueId || !matchup.weekNumber,
+  });
+
+  const { footballPlayerScores, footballTeamScores } = useMemo(() => {
+    const playerScores = new Map<
+      number,
+      { actual: number; projected: number }
+    >();
+    const teamScores = new Map<number, { actual: number; projected: number }>();
+    footballScoresData?.matchupScores?.forEach((teamStats) => {
+      if (teamStats.__typename !== 'FootballMatchupStats') return;
+      if (teamStats.teamId != null) {
+        teamScores.set(teamStats.teamId, {
+          actual: teamStats.totalPoints ?? 0,
+          projected: teamStats.projectedPoints ?? 0,
+        });
+      }
+      teamStats.players?.forEach((player) => {
+        if (player.playerId != null) {
+          playerScores.set(player.playerId, {
+            actual: player.totalPoints ?? 0,
+            projected: player.projectedPoints ?? 0,
+          });
+        }
+      });
+    });
+    return {
+      footballPlayerScores: playerScores,
+      footballTeamScores: teamScores,
+    };
+  }, [footballScoresData]);
+
+  // Football equivalents of `calculateGameScore`/`calculatePlayerProjection`
+  // below — those two remain baseball-only and unchanged.
+  const getPlayerActualScore = (player: MatchupPlayerFragment): number =>
+    player.playerId != null
+      ? (footballPlayerScores.get(player.playerId)?.actual ?? 0)
+      : 0;
+  const getPlayerProjectedScore = (player: MatchupPlayerFragment): number =>
+    player.playerId != null
+      ? (footballPlayerScores.get(player.playerId)?.projected ?? 0)
+      : 0;
+
   const team1Name = useMemo(() => {
     if (!team1Id || !teamsData?.leagueTeams)
       return userTeamId ? 'Your Team' : 'Team 1';
@@ -594,23 +648,33 @@ export function MatchupRosterComparison({
       isPitcherPositionType(s.slotType),
     );
 
-    // Calculate separate totals for batter and pitcher slots (only assigned players score)
-    const team1BatterTotals = {
-      actual: batterSlotRows.reduce<number>((sum, row) => {
-        const gameSum =
-          row.team1Player?.games?.reduce<number>(
-            (s, g) => s + calculateGameScore(g),
+    // Calculate separate totals for batter and pitcher slots (only assigned players score).
+    // Football sources its totals straight from `FootballMatchupStats.totalPoints`/
+    // `projectedPoints` rather than summing per-player rows, so the displayed team
+    // total always matches the real team score exactly (LS-9612).
+    const team1BatterTotals = isFootball
+      ? {
+          actual: footballTeamScores.get(team1Id ?? -1)?.actual ?? 0,
+          projected: footballTeamScores.get(team1Id ?? -1)?.projected ?? 0,
+        }
+      : {
+          actual: batterSlotRows.reduce<number>((sum, row) => {
+            const gameSum =
+              row.team1Player?.games?.reduce<number>(
+                (s, g) => s + calculateGameScore(g),
+                0,
+              ) ?? 0;
+            return sum + gameSum;
+          }, 0),
+          projected: batterSlotRows.reduce<number>(
+            (sum, row) =>
+              sum +
+              (row.team1Player
+                ? calculatePlayerProjection(row.team1Player)
+                : 0),
             0,
-          ) ?? 0;
-        return sum + gameSum;
-      }, 0),
-      projected: batterSlotRows.reduce<number>(
-        (sum, row) =>
-          sum +
-          (row.team1Player ? calculatePlayerProjection(row.team1Player) : 0),
-        0,
-      ),
-    };
+          ),
+        };
 
     const team1PitcherTotals = {
       actual: pitcherSlotRows.reduce<number>((sum, row) => {
@@ -629,22 +693,29 @@ export function MatchupRosterComparison({
       ),
     };
 
-    const team2BatterTotals = {
-      actual: batterSlotRows.reduce<number>((sum, row) => {
-        const gameSum =
-          row.team2Player?.games?.reduce<number>(
-            (s, g) => s + calculateGameScore(g),
+    const team2BatterTotals = isFootball
+      ? {
+          actual: footballTeamScores.get(team2Id ?? -1)?.actual ?? 0,
+          projected: footballTeamScores.get(team2Id ?? -1)?.projected ?? 0,
+        }
+      : {
+          actual: batterSlotRows.reduce<number>((sum, row) => {
+            const gameSum =
+              row.team2Player?.games?.reduce<number>(
+                (s, g) => s + calculateGameScore(g),
+                0,
+              ) ?? 0;
+            return sum + gameSum;
+          }, 0),
+          projected: batterSlotRows.reduce<number>(
+            (sum, row) =>
+              sum +
+              (row.team2Player
+                ? calculatePlayerProjection(row.team2Player)
+                : 0),
             0,
-          ) ?? 0;
-        return sum + gameSum;
-      }, 0),
-      projected: batterSlotRows.reduce<number>(
-        (sum, row) =>
-          sum +
-          (row.team2Player ? calculatePlayerProjection(row.team2Player) : 0),
-        0,
-      ),
-    };
+          ),
+        };
 
     const team2PitcherTotals = {
       actual: pitcherSlotRows.reduce<number>((sum, row) => {
@@ -689,6 +760,8 @@ export function MatchupRosterComparison({
     seasonStatsMap,
     scoringSettings,
     positionsData,
+    isFootball,
+    footballTeamScores,
   ]);
 
   if (!team1Id || !team2Id) {
@@ -1012,10 +1085,15 @@ export function MatchupRosterComparison({
       );
     }
 
-    const actual =
-      player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??
-      0;
-    const proj = calculatePlayerProjection(player);
+    const actual = isFootball
+      ? getPlayerActualScore(player)
+      : (player.games?.reduce(
+          (sum, game) => sum + calculateGameScore(game),
+          0,
+        ) ?? 0);
+    const proj = isFootball
+      ? getPlayerProjectedScore(player)
+      : calculatePlayerProjection(player);
     const hasPlayed =
       (player.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     const beats = beatsProjection(player, actual, proj);
@@ -1109,12 +1187,22 @@ export function MatchupRosterComparison({
     // position) across both teams — bench/bullpen rows pair arbitrary
     // players by index and rely on each cell's own inline badge instead.
     const group = getPositionGroup(slotType, isFootball);
-    const team1Actual =
-      team1Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
-      0;
-    const team2Actual =
-      team2Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
-      0;
+    const team1Actual = team1Player
+      ? isFootball
+        ? getPlayerActualScore(team1Player)
+        : (team1Player.games?.reduce(
+            (sum, g) => sum + calculateGameScore(g),
+            0,
+          ) ?? 0)
+      : 0;
+    const team2Actual = team2Player
+      ? isFootball
+        ? getPlayerActualScore(team2Player)
+        : (team2Player.games?.reduce(
+            (sum, g) => sum + calculateGameScore(g),
+            0,
+          ) ?? 0)
+      : 0;
     const team1Played =
       (team1Player?.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     const team2Played =

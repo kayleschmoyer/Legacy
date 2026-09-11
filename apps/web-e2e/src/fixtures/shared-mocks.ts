@@ -257,6 +257,13 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   getcurrentmatchup: { data: { currentMatchup: null } },
   getleaguestandings: { data: { getLeagueStandings: [] } },
   getplayoffprojections: { data: { getPlayoffProjections: [] } },
+  // MatchupRosterComparison's football scoring path (LS-9612) fires this on
+  // every football matchup view with a weekNumber (both the standalone
+  // matchup detail page and the league-detail Matchup tab) — MatchupAdditionalSections
+  // already fired it on the former. An empty result renders sensible
+  // defaults (0 actual/projected per player, real team totals of 0) for
+  // specs that don't test football scoring directly.
+  matchupscores: { data: { matchupScores: [] } },
   getleaguescoringprofile: leagueScoringProfileResponse(),
   getleagueactivity: { data: { leagueActivity: [] } },
   getleaguechatmessages: { data: { leagueChatMessages: [] } },

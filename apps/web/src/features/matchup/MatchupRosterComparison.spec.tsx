@@ -15,6 +15,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
+  useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
 import { MatchupRosterComparison } from './MatchupRosterComparison';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -38,6 +39,7 @@ jest.mock('@legacy-sports/graphql', () => {
     useGetMatchupPlayersQuery: jest.fn(),
     useGetPositionsForLeagueQuery: jest.fn(),
     useGetLeagueTeamsQuery: jest.fn(),
+    useMatchupScoresQuery: jest.fn(),
   };
 });
 
@@ -168,6 +170,7 @@ describe('MatchupRosterComparison — bench toggle (LS-5904 / BMD-034)', () => {
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({ data: undefined });
     (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
@@ -250,6 +253,7 @@ describe('MatchupRosterComparison — off-day vs no-data labeling (LS-9122)', ()
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({ data: undefined });
     (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
@@ -407,6 +411,7 @@ describe('MatchupRosterComparison — football (LS-5418)', () => {
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({ data: undefined });
     (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
@@ -522,6 +527,7 @@ describe('MatchupRosterComparison — Matchup Edge grade chip (FMD-028 / LS-6385
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({ data: undefined });
   });
 
   it('shows the grade chip for a premium user with a season FPPG', () => {
@@ -591,5 +597,195 @@ describe('MatchupRosterComparison — Matchup Edge grade chip (FMD-028 / LS-6385
         "Matchup Edge — grades this player's season scoring pace so far, not opponent strength",
       ),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Coverage for LS-9612: football had no scoring path wired into this
+ * component — every football player row showed "—"/0 and team totals never
+ * summed to the real team score, despite real per-game football data
+ * already existing and being used successfully elsewhere on the page via
+ * `matchupScores` / `FootballMatchupPlayer.totalPoints`. This exercises that
+ * same data source now feeding the roster comparison directly.
+ */
+describe('MatchupRosterComparison — football scoring (LS-9612)', () => {
+  function makeFootballStarter(
+    id: string,
+    teamId: number,
+    playerId: number,
+    positionId: number,
+    firstName: string,
+  ): MatchupPlayerFragment {
+    return {
+      __typename: 'MatchupPlayer',
+      id,
+      matchupId: 1234,
+      playerId,
+      teamId,
+      positionId,
+      season: 2026,
+      numberOfGames: 1,
+      player: {
+        __typename: 'Player',
+        firstName,
+        lastName: 'Player',
+        eligiblePositions: ['QB'],
+      },
+      seasonBatting: null,
+      seasonPitching: null,
+      seasonFielding: null,
+      // A single "played" game slot — hasPlayed/games-count display derive
+      // from this generic per-game tracker regardless of sport, separately
+      // from the battingGame/pitchingGame/fieldingGame stat blocks used only
+      // for baseball scoring.
+      games: [
+        {
+          __typename: 'MatchupPlayerGame',
+          id: playerId,
+          matchupPlayerId: playerId,
+          gameNum: 1,
+          gameIdentifier: null,
+          gamePosition: null,
+          statsLoadingStatus: 'completed',
+          pitcherStartSkipped: false,
+          noGameDataFound: false,
+        },
+      ],
+    } as unknown as MatchupPlayerFragment;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue({
+      data: {
+        leaguePositions: [
+          { id: 1, positionType: 'QB' },
+          { id: 2, positionType: 'RB' },
+        ],
+      },
+      loading: false,
+    });
+    (useGetLeagueTeamsQuery as jest.Mock).mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 10, name: 'Team A' },
+          { id: 20, name: 'Team B' },
+        ],
+      },
+    });
+    (useLeagueScoringSettings as jest.Mock).mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+      loading: false,
+    });
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
+  });
+
+  it("renders each football player's real point total and sums the team total from matchupScores, not baseball fields", () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarter('s1', 10, 901, 1, 'Pat'), // QB
+      makeFootballStarter('s2', 10, 903, 2, 'Riley'), // RB
+      makeFootballStarter('s3', 20, 902, 1, 'Chris'), // QB
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({
+      data: {
+        matchupScores: [
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 10,
+            teamName: 'Team A',
+            totalPoints: 34.5,
+            projectedPoints: 30,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 901,
+                playerName: 'Pat Player',
+                position: 'QB',
+                totalPoints: 24.5,
+                projectedPoints: 20,
+                games: [],
+              },
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 903,
+                playerName: 'Riley Player',
+                position: 'RB',
+                totalPoints: 10,
+                projectedPoints: 10,
+                games: [],
+              },
+            ],
+          },
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 20,
+            teamName: 'Team B',
+            totalPoints: 12.25,
+            projectedPoints: 15,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 902,
+                playerName: 'Chris Player',
+                position: 'QB',
+                totalPoints: 12.25,
+                projectedPoints: 15,
+                games: [],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    // Per-player actual points come from FootballMatchupPlayer.totalPoints,
+    // not the baseball battingGame/pitchingGame/fieldingGame path (which
+    // would render "—" for every football player before this fix).
+    expect(screen.getByText('24.5')).toBeInTheDocument();
+    // 12.25 rounds to 1 decimal; Team B has only one player so its player
+    // row and team-total row happen to show the same value.
+    expect(screen.getAllByText('12.3').length).toBeGreaterThan(0);
+
+    // Team A's real total (34.5 = 24.5 + 10) appears as the "Team Total"
+    // row's actual score — sourced from FootballMatchupStats.totalPoints,
+    // so it matches the server's real team score exactly rather than being
+    // recomputed (and silently diverging) from summed player rows.
+    expect(screen.getAllByText('34.5').length).toBeGreaterThan(0);
+    expect(screen.queryByText('0.0')).not.toBeInTheDocument();
+  });
+
+  it('shows 0 (not "—") for a football player with no matchupScores entry yet', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarter('s1', 10, 901, 1, 'Pat'),
+      makeFootballStarter('s2', 20, 902, 1, 'Chris'),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({ data: undefined });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.getAllByText('0.0').length).toBeGreaterThan(0);
   });
 });
