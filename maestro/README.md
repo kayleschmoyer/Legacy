@@ -26,6 +26,67 @@ visual bugs — see [`.agents/skills/mobile-qa/SKILL.md`](../.agents/skills/mobi
    adb install -r apps/app/android/app/build/outputs/apk/debug/app-debug.apk
    ```
 
+## Fast JS-only iteration loop (dev client)
+
+`apps/app` depends on `expo-dev-client` (debug builds only — see
+[`.agents/skills/architecture/FILE-MAP.md`](../.agents/skills/architecture/FILE-MAP.md)
+for where the Android wiring lives). A debug build installed once can reload
+JS-only changes from a running Metro server without a native rebuild — useful
+when iterating in a worktree. This is **not** the same as the Maestro flow
+setup above (which builds/installs a fresh APK per sweep); it's for quick
+manual verification of a JS change.
+
+1. **Start Metro, with an explicit port.** `expo start` is non-interactive
+   under an agent/CI shell and will silently _skip starting the dev server_
+   if port 8081 is already taken — it prints a prompt
+   (`Use port 8082 instead? › Skipping dev server`) that never resolves and
+   exits without an error. Always pass `--port` explicitly (and free the port
+   first if needed) so a stale server doesn't produce a confusing
+   "works when I run it by hand, fails in automation" result:
+
+   ```bash
+   # from apps/app
+   npx expo start --port 8081
+   ```
+
+2. **Forward the device to Metro:**
+
+   ```bash
+   adb reverse tcp:8081 tcp:8081
+   ```
+
+3. **Deep link into the dev client** (the app must already be installed —
+   see step 3 under One-time setup):
+
+   ```bash
+   adb shell am start -a android.intent.action.VIEW \
+     -d "legacysports://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" \
+     com.legacysports.app
+   ```
+
+4. **Confirm it's genuinely running as a dev-client build, not the stale
+   embedded bundle.** The deep link above does **not** error when
+   `expo-dev-client` isn't present in the installed APK — it just launches
+   the app normally and renders whatever JS was embedded at build time. A
+   screenshot at that point can look like a successful verification while
+   actually showing yesterday's build (this exact false positive shipped in
+   LS-8790). Before trusting anything you see after the deep link, check for
+   dev-launcher activity in logcat:
+
+   ```bash
+   adb logcat -d | grep -i "devlauncher\|devmenu"
+   ```
+
+   A dev-client build logs `DevLauncherController`/`DevMenu` activity around
+   startup. If logcat shows nothing from those tags and the app just started
+   `MainActivity` directly, the installed APK does not have `expo-dev-client`
+   wired in (e.g. it's a release build, or was built before this dependency
+   was added) — rebuild the debug variant before trusting the screen.
+
+5. **Make a visible JS-only edit** (e.g. change a string in a screen already
+   on screen) and confirm it appears **without** reinstalling the APK —
+   Metro should show a bundle rebuild and the app should hot-reload.
+
 ## Running flows
 
 From the repo root (screenshot paths are relative to the CWD — always run from root):

@@ -62,6 +62,12 @@
       "expo-router",
       "expo-apple-authentication",
       [
+        "expo-dev-client",
+        {
+          "addGeneratedScheme": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
