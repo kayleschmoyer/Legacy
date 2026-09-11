@@ -442,6 +442,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
 export default function HelpPage() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
+  const [featureRequestOpen, setFeatureRequestOpen] = useState(false);
 
   useEffect(() => {
     ensureKeyframes();
@@ -455,6 +456,11 @@ export default function HelpPage() {
       <BugReportButton
         controlledOpen={bugReportOpen}
         onDialogOpenChange={setBugReportOpen}
+      />
+      <BugReportButton
+        controlledOpen={featureRequestOpen}
+        onDialogOpenChange={setFeatureRequestOpen}
+        kind="feature"
       />
       <PageContainer>
         <PageMeta
@@ -857,8 +863,11 @@ export default function HelpPage() {
                 }}
               >
                 {HELP_CONTACT_ITEMS.map((item) => {
-                  const useAction =
+                  const useBugModal =
                     item.action === 'bug-report' && env.jiraProxyUrl;
+                  const useFeatureModal =
+                    item.action === 'feature-request' && env.jiraProxyUrl;
+                  const useAction = useBugModal || useFeatureModal;
                   return (
                     <ContactOption
                       key={item.title}
@@ -868,7 +877,11 @@ export default function HelpPage() {
                       description={item.description}
                       href={useAction ? undefined : item.url}
                       onPress={
-                        useAction ? () => setBugReportOpen(true) : undefined
+                        useBugModal
+                          ? () => setBugReportOpen(true)
+                          : useFeatureModal
+                            ? () => setFeatureRequestOpen(true)
+                            : undefined
                       }
                     />
                   );

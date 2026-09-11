@@ -344,19 +344,50 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(page.getByText(/describe what happened/i)).toBeVisible();
   });
 
-  // The "Suggest a Feature" / "Community Discussions" contact cards open
-  // external links via `window.open(url, '_blank', 'noopener,noreferrer')`
-  // (HelpPage ContactOption). Asserting these with `page.waitForEvent('popup')`
-  // is the nightly-flake source LS-7859: a real popup (a) escapes the
-  // page-scoped API isolation and loads github.com over the network — a
-  // hermeticity violation — and (b) `window.open` with `noopener` does not
-  // reliably emit Playwright's `popup` event under load, so the wait
-  // intermittently times out. Intercept `window.open` to capture the intended
-  // URL deterministically and hermetically — the same pattern the
-  // "Join our Discord" test below already uses.
-  test('Suggest a Feature option opens GitHub issues in a new tab', async ({
+  // "Suggest a Feature" mirrors the mobile fix (LS-9247): when jiraProxyUrl is
+  // configured it opens the same in-app modal used for bug reports, in
+  // feature mode, instead of navigating to GitHub (LS-9272).
+  test('Suggest a Feature option opens the feature request dialog', async ({
     page,
   }) => {
+    // The BugReportButton requires jiraProxyUrl — inject it and reload
+    await page.addInitScript(() => {
+      window.__e2eJiraProxyUrl = 'http://localhost:4280/__jira-proxy';
+    });
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+
+    await page.getByText('Suggest a Feature').click();
+    await expect(
+      page.getByRole('dialog').getByText('Suggest a Feature'),
+    ).toBeVisible();
+    await expect(page.getByText(/tell us your idea/i)).toBeVisible();
+  });
+
+  // Without jiraProxyUrl configured, the entry falls back to the external
+  // GitHub feature_request template — the safety net LS-9272 preserves.
+  // Asserting this with `page.waitForEvent('popup')` is the nightly-flake
+  // source LS-7859: a real popup (a) escapes the page-scoped API isolation
+  // and loads github.com over the network — a hermeticity violation — and
+  // (b) `window.open` with `noopener` does not reliably emit Playwright's
+  // `popup` event under load, so the wait intermittently times out.
+  // Intercept `window.open` to capture the intended URL deterministically
+  // and hermetically — the same pattern the "Join our Discord" test below
+  // already uses.
+  //
+  // Force jiraProxyUrl to '' explicitly rather than relying on the
+  // suite's ambient default: `env.jiraProxyUrl` also falls back to a
+  // build-time VITE_JIRA_PROXY_URL, which isn't guaranteed empty across
+  // every CI build lane. Without this override the test intermittently
+  // hit the modal-open branch instead of the fallback link — see LS-9272.
+  test('Suggest a Feature falls back to GitHub issues when jiraProxyUrl is not configured', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__e2eJiraProxyUrl = '';
+    });
+    await page.goto('/help');
+    await page.waitForLoadState('load');
     await page.evaluate(() => {
       (window as unknown as Record<string, string>).__openedUrl = '';
       window.open = (url?: string | URL) => {

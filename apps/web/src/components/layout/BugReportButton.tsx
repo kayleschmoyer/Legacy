@@ -71,10 +71,58 @@ const SEARCH_MIN_LENGTH = 10;
 /** Maximum query length sent to the backend search endpoint. */
 const SEARCH_MAX_LENGTH = 200;
 
+/** Which kind of feedback this button collects. */
+export type ReportKind = 'bug' | 'feature';
+
+/**
+ * Per-kind copy and Jira payload shape. Mirrors
+ * apps/app/src/features/bug-report/BugReportModal.tsx's `REPORT_KINDS` — feature
+ * requests file as `Task` so they don't land in the client-bug backlog as
+ * defects to reproduce (LS-9247 / LS-9272).
+ */
+const REPORT_KINDS = {
+  bug: {
+    issueType: 'Bug',
+    title: 'Report a Bug',
+    subtitle: "Describe what happened and we'll file a ticket automatically.",
+    placeholder:
+      'Describe the issue, steps to reproduce, and what you expected to happen...',
+    inputLabel: 'Bug description',
+    submitLabel: 'Submit Report',
+    fallbackSummary: 'Bug report',
+    labels: ['user-reported', 'web'],
+  },
+  feature: {
+    issueType: 'Task',
+    title: 'Suggest a Feature',
+    subtitle: "Tell us your idea and we'll file it for the team to review.",
+    placeholder:
+      'Describe the feature you want, and what it would let you do...',
+    inputLabel: 'Feature request description',
+    submitLabel: 'Submit Suggestion',
+    fallbackSummary: 'Feature request',
+    labels: ['user-reported', 'web', 'feature-request'],
+  },
+} as const satisfies Record<
+  ReportKind,
+  {
+    issueType: string;
+    title: string;
+    subtitle: string;
+    placeholder: string;
+    inputLabel: string;
+    submitLabel: string;
+    fallbackSummary: string;
+    labels: readonly string[];
+  }
+>;
+
 /** Uncontrolled mode — renders its own trigger button. */
 interface BugReportButtonUncontrolledProps {
   controlledOpen?: undefined;
   onDialogOpenChange?: (open: boolean) => void;
+  /** Which flow to render. Defaults to the bug-report flow. */
+  kind?: ReportKind;
 }
 
 /** Controlled mode — dialog open state is managed externally, no trigger
@@ -83,6 +131,8 @@ interface BugReportButtonUncontrolledProps {
 interface BugReportButtonControlledProps {
   controlledOpen: boolean;
   onDialogOpenChange: (open: boolean) => void;
+  /** Which flow to render. Defaults to the bug-report flow. */
+  kind?: ReportKind;
 }
 
 type BugReportButtonProps =
@@ -96,7 +146,9 @@ type BugReportButtonProps =
 export const BugReportButton: React.FC<BugReportButtonProps> = ({
   onDialogOpenChange,
   controlledOpen,
+  kind = 'bug',
 }) => {
+  const copy = REPORT_KINDS[kind];
   const auth = useAuth();
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
@@ -135,6 +187,11 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
   );
 
   const handleSearchSimilar = useCallback(() => {
+    // The search endpoint is JQL-scoped to `type = Bug`, so it can't surface
+    // relevant results for a feature request — skip it entirely rather than
+    // widening the backend query for an unrelated issue type (LS-9272).
+    if (kind === 'feature') return;
+
     const trimmed = description.trim();
     if (trimmed.length < SEARCH_MIN_LENGTH || !env.jiraProxyUrl) {
       return;
@@ -171,7 +228,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
         setSimilarBugs([]);
       })
       .finally(() => setSearchLoading(false));
-  }, [description]);
+  }, [description, kind]);
 
   // Clear stale similar-bug results whenever the description changes
   useEffect(() => {
@@ -292,9 +349,10 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
 
     const recentErrors = getCapturedErrors();
     const payload = {
-      summary: buildSummary(description) || 'Bug report',
+      summary: buildSummary(description) || copy.fallbackSummary,
       description: description.trim(),
-      labels: ['user-reported', 'web'],
+      issueType: copy.issueType,
+      labels: [...copy.labels],
       priority: 'Medium' as const,
       // reporterEmail / reporterUsername are overridden server-side from JWT
       reporterEmail: auth?.user?.email ?? '',
@@ -345,7 +403,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
             : 'Something went wrong. Try again.',
       });
     }
-  }, [description, auth, attachments]);
+  }, [description, auth, attachments, copy]);
 
   const isLoading = submitState.status === 'loading';
   const isSuccess = submitState.status === 'success';
@@ -411,11 +469,10 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                   fontWeight="700"
                   color="$color"
                 >
-                  Report a Bug
+                  {copy.title}
                 </Paragraph>
                 <Paragraph id="bug-report-desc" size="$2" color="$colorPress">
-                  Describe what happened and we&apos;ll file a ticket
-                  automatically.
+                  {copy.subtitle}
                 </Paragraph>
               </YStack>
               <Dialog.Close asChild>
@@ -471,8 +528,8 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                     onChange={(e) => setDescription(e.target.value)}
                     maxLength={MAX_DESCRIPTION_LENGTH}
                     rows={5}
-                    placeholder="Describe the issue, steps to reproduce, and what you expected to happen..."
-                    aria-label="Bug description"
+                    placeholder={copy.placeholder}
+                    aria-label={copy.inputLabel}
                     disabled={isLoading}
                     style={{
                       width: '100%',
@@ -499,21 +556,28 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                   </Paragraph>
                 </YStack>
 
-                {/* Search for similar bugs */}
-                <Button
-                  size="$2"
-                  onPress={handleSearchSimilar}
-                  disabled={
-                    searchLoading ||
-                    description.trim().length < SEARCH_MIN_LENGTH
-                  }
-                  alignSelf="flex-start"
-                >
-                  {searchLoading ? 'Searching…' : 'Search for similar reports'}
-                </Button>
+                {/* Search for similar bugs — skipped in feature mode: the
+                    endpoint's JQL is scoped to `type = Bug`, so it can't
+                    surface relevant results for a feature request (LS-9272). */}
+                {kind === 'bug' && (
+                  <Button
+                    size="$2"
+                    onPress={handleSearchSimilar}
+                    disabled={
+                      searchLoading ||
+                      description.trim().length < SEARCH_MIN_LENGTH
+                    }
+                    alignSelf="flex-start"
+                  >
+                    {searchLoading
+                      ? 'Searching…'
+                      : 'Search for similar reports'}
+                  </Button>
+                )}
 
                 {/* Similar existing bugs */}
-                {similarBugs.length > 0 &&
+                {kind === 'bug' &&
+                  similarBugs.length > 0 &&
                   description.trim().length >= SEARCH_MIN_LENGTH && (
                     <YStack
                       gap="$2"
@@ -763,7 +827,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                     opacity={isLoading || !description.trim() ? 0.6 : 1}
                   >
                     <Paragraph color="white" fontWeight="600">
-                      {isLoading ? 'Submitting...' : 'Submit Report'}
+                      {isLoading ? 'Submitting...' : copy.submitLabel}
                     </Paragraph>
                   </Button>
                 </XStack>
