@@ -30,6 +30,7 @@ import { handleTestRawConnection } from './commands/testRawConnection';
 import { handleDecodeJwt } from './commands/decodeJwt';
 import { handleSetUserType } from './commands/setUserType';
 import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
+import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
 import { handleListUsers } from './commands/listUsers';
 import { handleAddUser } from './commands/addUser';
@@ -214,6 +215,34 @@ export function buildProgram(): Command {
         force?: boolean;
         dryRun?: boolean;
       }) => handleIngestRetrosheet(options),
+    );
+
+  program
+    .command('ingest-nflverse-football')
+    .description(
+      'Stage the nflverse football corpus (1999-2025) in S3, one object per player-season and per team-defense-season (LS-9989)',
+    )
+    .option(
+      '-b, --bucket <name>',
+      'Target S3 bucket (default $FOOTBALL_CORPUS_S3_BUCKET)',
+    )
+    .option(
+      '--prefix <prefix>',
+      'Key prefix (default $FOOTBALL_CORPUS_S3_PREFIX)',
+    )
+    .option('--from <year>', 'First season (default 1999)', parseInt)
+    .option('--to <year>', 'Last season (default 2025)', parseInt)
+    .option('--force', 'Re-upload objects that already exist')
+    .option('--dry-run', 'Parse and report without writing to S3')
+    .action(
+      (options: {
+        bucket?: string;
+        prefix?: string;
+        from?: number;
+        to?: number;
+        force?: boolean;
+        dryRun?: boolean;
+      }) => handleIngestNflverseFootball(options),
     );
 
   program
