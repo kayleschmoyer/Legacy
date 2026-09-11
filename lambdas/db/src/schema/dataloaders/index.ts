@@ -48,6 +48,7 @@ import {
   createMatchupPlayersLoader,
   createMatchupsLoader,
   createPlayoffMatchupsByBracketLoader,
+  createScoringChangeLogLoader,
   createSelectedGamesCountLoader,
 } from './matchup-loaders';
 
@@ -106,6 +107,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   teamPayroll: createTeamPayrollLoader(db),
   lockedTeamMembers: createLockedTeamMembersLoader(db),
   latestScoringChangeAt: createLatestScoringChangeAtLoader(db),
+  scoringChangeLog: createScoringChangeLogLoader(db),
 });
 
 /**

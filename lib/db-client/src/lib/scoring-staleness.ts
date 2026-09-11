@@ -9,7 +9,7 @@
  * same way rather than each re-deriving it.
  */
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import type { PublicDb } from './client/PublicDbClient';
 import * as Schema from '../drizzle/public/schema';
@@ -131,6 +131,90 @@ export async function getLatestScoringChangeAtByLeague(
       row.leagueId,
       changedAt && !Number.isNaN(changedAt.getTime()) ? changedAt : null,
     );
+  }
+
+  return result;
+}
+
+/** One `league_scoring_change_log` row, joined out to display-ready fields. */
+export interface ScoringChangeLogEntry {
+  statDisplayName: string;
+  previousMultiplier: number | null;
+  newMultiplier: number | null;
+  changedAt: Date;
+  changedByUsername: string | null;
+}
+
+/**
+ * Scoring change history per league, for the leagues given (LS-9667).
+ *
+ * One query for all leagues — the UI indicator's "what changed and when"
+ * interaction batches by league rather than issuing a query per matchup.
+ * Rows are for the league's active (default) profile only, newest first.
+ * Leagues with no change-log rows map to an empty array.
+ */
+export async function getScoringChangeLogByLeague(
+  db: PublicDb,
+  leagueIds: number[],
+): Promise<Map<number, ScoringChangeLogEntry[]>> {
+  const uniqueLeagueIds = [...new Set(leagueIds)];
+  const result = new Map<number, ScoringChangeLogEntry[]>(
+    uniqueLeagueIds.map((leagueId) => [leagueId, []]),
+  );
+
+  if (uniqueLeagueIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      leagueId: Schema.leagueScoringProfiles.leagueId,
+      statDisplayName: Schema.scoringStatDefinitions.displayName,
+      previousMultiplier: Schema.leagueScoringChangeLog.previousMultiplier,
+      newMultiplier: Schema.leagueScoringChangeLog.newMultiplier,
+      changedAt: Schema.leagueScoringChangeLog.changedAt,
+      changedByUsername: Schema.users.username,
+    })
+    .from(Schema.leagueScoringChangeLog)
+    .innerJoin(
+      Schema.leagueScoringProfiles,
+      eq(
+        Schema.leagueScoringChangeLog.profileId,
+        Schema.leagueScoringProfiles.id,
+      ),
+    )
+    .innerJoin(
+      Schema.scoringStatDefinitions,
+      eq(
+        Schema.leagueScoringChangeLog.statDefinitionId,
+        Schema.scoringStatDefinitions.id,
+      ),
+    )
+    .leftJoin(
+      Schema.users,
+      eq(Schema.leagueScoringChangeLog.changedBy, Schema.users.id),
+    )
+    .where(
+      and(
+        inArray(Schema.leagueScoringProfiles.leagueId, uniqueLeagueIds),
+        eq(Schema.leagueScoringProfiles.isDefault, true),
+      ),
+    )
+    .orderBy(desc(Schema.leagueScoringChangeLog.changedAt));
+
+  for (const row of rows) {
+    const changedAt = toTime(row.changedAt);
+    if (changedAt === null) continue;
+
+    const entries = result.get(row.leagueId) ?? [];
+    entries.push({
+      statDisplayName: row.statDisplayName,
+      previousMultiplier:
+        row.previousMultiplier !== null ? Number(row.previousMultiplier) : null,
+      newMultiplier:
+        row.newMultiplier !== null ? Number(row.newMultiplier) : null,
+      changedAt: new Date(changedAt),
+      changedByUsername: row.changedByUsername ?? null,
+    });
+    result.set(row.leagueId, entries);
   }
 
   return result;

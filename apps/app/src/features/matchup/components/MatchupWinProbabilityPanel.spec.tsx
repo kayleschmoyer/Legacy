@@ -112,6 +112,9 @@ interface TestMatchup {
   team2Id: number;
   gamesPerMatchup: number;
   status: MatchupStatusType;
+  // Required (non-null) on AppMatchupFragment as of LS-9667, unlike the other
+  // fields here which are all nullable and so optional on the fragment type.
+  scoringChangeLog: [];
 }
 
 function makeMatchup(overrides: Partial<TestMatchup> = {}): TestMatchup {
@@ -122,6 +125,7 @@ function makeMatchup(overrides: Partial<TestMatchup> = {}): TestMatchup {
     team2Id: 102,
     gamesPerMatchup: 1,
     status: SCHEDULED,
+    scoringChangeLog: [],
     ...overrides,
   };
 }

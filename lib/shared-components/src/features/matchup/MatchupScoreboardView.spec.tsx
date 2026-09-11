@@ -8,6 +8,26 @@ import {
 } from './MatchupScoreboardView';
 import { render } from '../../test-utils';
 
+// See StaleScoringIndicator.spec.tsx for why the real Popover isn't
+// rendered under jsdom; this double just respects the controlled `open`
+// state so these tests can assert on the trigger alone.
+jest.mock('../../components/Popover', () => ({
+  Popover: ({
+    trigger,
+    open,
+    children,
+  }: {
+    trigger: React.ReactNode;
+    open?: boolean;
+    children?: React.ReactNode;
+  }) => (
+    <>
+      {trigger}
+      {open ? children : null}
+    </>
+  ),
+}));
+
 const baseProps = (
   overrides: Partial<MatchupScoreboardViewProps> = {},
 ): MatchupScoreboardViewProps => ({
@@ -219,5 +239,56 @@ describe('MatchupScoreboardView', () => {
     render(<MatchupScoreboardView {...baseProps()} />);
     expect(screen.queryByText(/^Kickoff /)).toBeNull();
     expect(screen.queryByText(/^Ends /)).toBeNull();
+  });
+
+  // LS-9667 — stale-scoring indicator wiring.
+  describe('stale scoring indicator', () => {
+    it('renders on a completed matchup with scoringIsStale true', () => {
+      render(
+        <MatchupScoreboardView
+          {...baseProps({
+            status: MatchupStatus.Completed,
+            scoringIsStale: true,
+          })}
+        />,
+      );
+      expect(screen.getByTestId('stale-scoring-indicator')).toBeTruthy();
+    });
+
+    it('is absent when scoringIsStale is false', () => {
+      render(
+        <MatchupScoreboardView
+          {...baseProps({
+            status: MatchupStatus.Completed,
+            scoringIsStale: false,
+          })}
+        />,
+      );
+      expect(screen.queryByTestId('stale-scoring-indicator')).toBeNull();
+    });
+
+    it('is absent when staleness is unknown (null)', () => {
+      render(
+        <MatchupScoreboardView
+          {...baseProps({
+            status: MatchupStatus.Completed,
+            scoringIsStale: null,
+          })}
+        />,
+      );
+      expect(screen.queryByTestId('stale-scoring-indicator')).toBeNull();
+    });
+
+    it('is absent on an in-progress matchup even if scoringIsStale is true', () => {
+      render(
+        <MatchupScoreboardView
+          {...baseProps({
+            status: MatchupStatus.InProgress,
+            scoringIsStale: true,
+          })}
+        />,
+      );
+      expect(screen.queryByTestId('stale-scoring-indicator')).toBeNull();
+    });
   });
 });

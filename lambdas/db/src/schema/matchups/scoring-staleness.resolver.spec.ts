@@ -11,9 +11,9 @@
 
 const isScoringStale = jest.fn();
 
-/** Capture the Matchup object type's field resolvers. */
-async function captureScoringIsStaleResolver(): Promise<
-  (...args: unknown[]) => Promise<unknown>
+/** Capture every field resolver on the Matchup object type. */
+async function captureMatchupResolvers(): Promise<
+  Record<string, (...args: unknown[]) => unknown>
 > {
   jest.resetModules();
   const captured: Record<string, { resolve?: (...a: unknown[]) => unknown }> =
@@ -82,7 +82,18 @@ async function captureScoringIsStaleResolver(): Promise<
   jest.doMock('../entitlements', () => ({ ENTITLEMENTS: {} }));
 
   await import('./types');
-  const resolver = captured.scoringIsStale?.resolve;
+  const resolvers: Record<string, (...args: unknown[]) => unknown> = {};
+  for (const [field, opts] of Object.entries(captured)) {
+    if (opts.resolve) resolvers[field] = opts.resolve;
+  }
+  return resolvers;
+}
+
+async function captureScoringIsStaleResolver(): Promise<
+  (...args: unknown[]) => Promise<unknown>
+> {
+  const resolvers = await captureMatchupResolvers();
+  const resolver = resolvers.scoringIsStale;
   if (!resolver) {
     throw new Error('scoringIsStale field resolver was not captured');
   }
@@ -183,6 +194,80 @@ describe('Matchup.scoringIsStale field', () => {
     expect(isScoringStale).toHaveBeenCalledWith(
       expect.objectContaining({ hasPersistedScore: true }),
     );
+  });
+});
+
+/**
+ * Resolver-level tests for Matchup.scoringChangeLog (LS-9667) — the
+ * stale-scoring indicator's "what changed and when" interaction.
+ */
+describe('Matchup.scoringChangeLog field', () => {
+  const entry = (overrides: Record<string, unknown> = {}) => ({
+    statDisplayName: 'Home Run',
+    previousMultiplier: 2.5,
+    newMultiplier: 4,
+    changedAt: CHANGED_AT,
+    changedByUsername: 'commish_alice',
+    ...overrides,
+  });
+
+  const makeChangeLogContext = (entries: ReturnType<typeof entry>[]) => {
+    const load = jest.fn().mockResolvedValue(entries);
+    return {
+      ctx: { loaders: { scoringChangeLog: { load } } },
+      load,
+    };
+  };
+
+  it('returns an empty array without querying when the matchup has no persisted score', async () => {
+    const resolvers = await captureMatchupResolvers();
+    const { ctx, load } = makeChangeLogContext([entry()]);
+
+    await expect(
+      resolvers.scoringChangeLog(
+        matchup({ team1Score: null, team2Score: null, scoredAt: null }),
+        {},
+        ctx,
+      ),
+    ).resolves.toEqual([]);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('resolves through the league-keyed loader for a scored matchup', async () => {
+    const resolvers = await captureMatchupResolvers();
+    const { ctx, load } = makeChangeLogContext([entry()]);
+
+    await resolvers.scoringChangeLog(matchup(), {}, ctx);
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledWith(5);
+  });
+
+  it('filters out entries that predate scoredAt', async () => {
+    const resolvers = await captureMatchupResolvers();
+    const before = entry({
+      statDisplayName: 'Old change',
+      changedAt: new Date('2026-07-01T00:00:00.000Z'), // before SCORED_AT
+    });
+    const after = entry({
+      statDisplayName: 'Recent change',
+      changedAt: CHANGED_AT, // after SCORED_AT
+    });
+    const { ctx } = makeChangeLogContext([after, before]);
+
+    await expect(
+      resolvers.scoringChangeLog(matchup(), {}, ctx),
+    ).resolves.toEqual([after]);
+  });
+
+  it('returns every entry when scoredAt is null (score predates provenance)', async () => {
+    const resolvers = await captureMatchupResolvers();
+    const entries = [entry(), entry({ statDisplayName: 'Another stat' })];
+    const { ctx } = makeChangeLogContext(entries);
+
+    await expect(
+      resolvers.scoringChangeLog(matchup({ scoredAt: null }), {}, ctx),
+    ).resolves.toEqual(entries);
   });
 });
 

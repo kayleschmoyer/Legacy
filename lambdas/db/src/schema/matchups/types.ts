@@ -108,6 +108,17 @@ export const MatchupRecapType = builder.objectRef<{
   winnerId: number | null;
 }>('MatchupRecap');
 
+// ScoringChangeLogEntry ref (LS-9667) — declared here so Matchup.scoringChangeLog
+// can reference it. builder.objectType(ScoringChangeLogEntryType) is called
+// below after the Matchup fields.
+export const ScoringChangeLogEntryType = builder.objectRef<{
+  statDisplayName: string;
+  previousMultiplier: number | null;
+  newMultiplier: number | null;
+  changedAt: Date;
+  changedByUsername: string | null;
+}>('ScoringChangeLogEntry');
+
 builder.objectType(Matchup, {
   description: 'A head-to-head matchup between two teams in a league',
   fields: (t) => ({
@@ -186,6 +197,33 @@ builder.objectType(Matchup, {
           hasPersistedScore:
             matchup.team1Score !== null || matchup.team2Score !== null,
         });
+      },
+    }),
+    // Scoring change history (LS-9667) — powers the stale-scoring indicator's
+    // "what changed and when" interaction. Empty when the matchup has no
+    // persisted score (nothing to explain); otherwise the league's scoring
+    // changes that postdate this matchup's `scoredAt` (or all of them, for a
+    // score written before `scored_at` existed — there's no point-in-time to
+    // bound by).
+    scoringChangeLog: t.field({
+      type: [ScoringChangeLogEntryType],
+      nullable: false,
+      description:
+        "The league's scoring-settings changes relevant to this matchup's staleness — what changed, by whom, and when. Empty when the matchup has no persisted score.",
+      resolve: async (matchup, _args, context) => {
+        const hasPersistedScore =
+          matchup.team1Score !== null || matchup.team2Score !== null;
+        if (!hasPersistedScore) return [];
+
+        const entries = await context.loaders.scoringChangeLog.load(
+          matchup.leagueId,
+        );
+        if (!matchup.scoredAt) return entries;
+
+        const scoredAtTime = matchup.scoredAt.getTime();
+        return entries.filter(
+          (entry) => entry.changedAt.getTime() > scoredAtTime,
+        );
       },
     }),
     // Relational fields - using Team type imported from leagues.ts
@@ -437,6 +475,39 @@ builder.objectType(MatchupRecapType, {
     winnerId: t.exposeInt('winnerId', {
       nullable: true,
       description: 'ID of the winning team, or null on a tie',
+    }),
+  }),
+});
+
+// ── ScoringChangeLogEntry Type Implementation ─────────────────────────────────
+
+builder.objectType(ScoringChangeLogEntryType, {
+  description:
+    "One league_scoring_change_log row: a single stat's multiplier change (LS-9667).",
+  fields: (t) => ({
+    statDisplayName: t.exposeString('statDisplayName', {
+      nullable: false,
+      description: 'Human-readable name of the stat whose multiplier changed.',
+    }),
+    previousMultiplier: t.exposeFloat('previousMultiplier', {
+      nullable: true,
+      description:
+        'The multiplier before this change, or null if it was newly added.',
+    }),
+    newMultiplier: t.exposeFloat('newMultiplier', {
+      nullable: true,
+      description:
+        'The multiplier after this change, or null if it was disabled.',
+    }),
+    changedAt: t.string({
+      nullable: false,
+      description: 'When the change was made (ISO 8601).',
+      resolve: (entry) => entry.changedAt.toISOString(),
+    }),
+    changedByUsername: t.exposeString('changedByUsername', {
+      nullable: true,
+      description:
+        'Username of the commissioner who made the change, if known.',
     }),
   }),
 });

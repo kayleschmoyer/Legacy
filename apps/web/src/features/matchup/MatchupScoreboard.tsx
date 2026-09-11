@@ -486,6 +486,8 @@ export function MatchupScoreboard({
       hasPlayersError={playersError != null}
       timeInfo={timeInfo}
       onTeamClick={onTeamClick}
+      scoringIsStale={matchup?.scoringIsStale}
+      scoringChangeLog={matchup?.scoringChangeLog}
     />
   );
 }

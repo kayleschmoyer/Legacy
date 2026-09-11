@@ -16,6 +16,18 @@ fragment Matchup on Matchup {
   endTime
   lockTime
   updatedAt
+
+  # Scoring provenance (LS-9665/LS-9667): whether this matchup's persisted
+  # score was computed before the league's current scoring settings, and —
+  # when stale — what changed and when, for the indicator's tooltip.
+  scoringIsStale
+  scoringChangeLog {
+    statDisplayName
+    previousMultiplier
+    newMultiplier
+    changedAt
+    changedByUsername
+  }
   team1 {
     id
     name

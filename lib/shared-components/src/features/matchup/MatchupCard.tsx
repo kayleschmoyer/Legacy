@@ -6,6 +6,7 @@ import { CheckCircle } from '@tamagui/lucide-icons/icons/CheckCircle';
 import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
+import { StaleScoringIndicator } from './StaleScoringIndicator';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -194,6 +195,8 @@ export function MatchupCard({
     team1,
     team2,
     winProbability,
+    scoringIsStale,
+    scoringChangeLog,
   } = matchup;
 
   const isCompleted = status === MatchupStatus.Completed;
@@ -234,24 +237,32 @@ export function MatchupCard({
             Week {weekNumber}
           </Text>
         )}
-        <XStack
-          alignItems="center"
-          gap="$1.5"
-          paddingHorizontal="$2.5"
-          paddingVertical="$1"
-          borderRadius="$10"
-          backgroundColor={statusConfig.bg}
-        >
-          {statusConfig.icon}
-          <Text
-            fontSize="$1"
-            fontWeight="700"
-            color={statusConfig.color}
-            textTransform="uppercase"
-            letterSpacing={0.3}
+        <XStack alignItems="center" gap="$2">
+          {isCompleted && (
+            <StaleScoringIndicator
+              scoringIsStale={scoringIsStale}
+              changeLog={scoringChangeLog}
+            />
+          )}
+          <XStack
+            alignItems="center"
+            gap="$1.5"
+            paddingHorizontal="$2.5"
+            paddingVertical="$1"
+            borderRadius="$10"
+            backgroundColor={statusConfig.bg}
           >
-            {statusConfig.label}
-          </Text>
+            {statusConfig.icon}
+            <Text
+              fontSize="$1"
+              fontWeight="700"
+              color={statusConfig.color}
+              textTransform="uppercase"
+              letterSpacing={0.3}
+            >
+              {statusConfig.label}
+            </Text>
+          </XStack>
         </XStack>
       </XStack>
 

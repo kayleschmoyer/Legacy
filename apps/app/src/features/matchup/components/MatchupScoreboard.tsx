@@ -192,6 +192,8 @@ export function MatchupScoreboard({
         gamesPlayed={gamesPlayed}
         totalGames={totalGames}
         onTeamPress={onTeamPress}
+        scoringIsStale={matchup?.scoringIsStale}
+        scoringChangeLog={matchup?.scoringChangeLog}
       />
     </YStack>
   );

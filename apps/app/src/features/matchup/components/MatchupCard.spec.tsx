@@ -40,6 +40,7 @@ const createMatchup = (
   selectedGamesCount: 5,
   startTime: null,
   endTime: null,
+  scoringChangeLog: [],
   ...overrides,
 });
 

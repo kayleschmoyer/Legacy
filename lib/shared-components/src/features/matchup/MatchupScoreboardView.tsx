@@ -9,6 +9,10 @@ import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import {
+  type StaleScoringChangeLogEntry,
+  StaleScoringIndicator,
+} from './StaleScoringIndicator';
+import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   TEXT_MUTED,
@@ -145,6 +149,13 @@ export interface MatchupScoreboardViewProps {
   timeInfo?: string | null;
   /** When provided, team names become clickable links to view that team's roster */
   onTeamClick?: (teamId: number) => void;
+  /**
+   * `Matchup.scoringIsStale` (LS-9667). Renders the stale-scoring indicator
+   * next to the status chip when true; no-op for false/null/undefined.
+   */
+  scoringIsStale?: boolean | null;
+  /** `Matchup.scoringChangeLog` — shown on interaction with the indicator. */
+  scoringChangeLog?: readonly StaleScoringChangeLogEntry[] | null;
 }
 
 /**
@@ -175,6 +186,8 @@ export function MatchupScoreboardView({
   hasPlayersError = false,
   timeInfo,
   onTeamClick,
+  scoringIsStale,
+  scoringChangeLog,
 }: MatchupScoreboardViewProps) {
   if (!hasMatchup) {
     return (
@@ -317,6 +330,12 @@ export function MatchupScoreboardView({
             <Text fontSize="$2" fontWeight="600" color="$orange10">
               {gamesRemaining} remaining
             </Text>
+          )}
+          {isCompleted && (
+            <StaleScoringIndicator
+              scoringIsStale={scoringIsStale}
+              changeLog={scoringChangeLog}
+            />
           )}
           <StatusChip
             backgroundColor={statusConfig.bg}

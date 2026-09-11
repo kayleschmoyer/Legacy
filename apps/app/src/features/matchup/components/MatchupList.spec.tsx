@@ -97,6 +97,7 @@ const MOCK_MATCHUPS: AppMatchupFragment[] = [
     selectedGamesCount: 7,
     startTime: null,
     endTime: null,
+    scoringChangeLog: [],
   },
   {
     __typename: 'Matchup',
@@ -113,6 +114,7 @@ const MOCK_MATCHUPS: AppMatchupFragment[] = [
     selectedGamesCount: 3,
     startTime: null,
     endTime: null,
+    scoringChangeLog: [],
   },
 ];
 

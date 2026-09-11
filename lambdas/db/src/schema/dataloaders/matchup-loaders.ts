@@ -7,14 +7,16 @@ import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import {
   type GenericDatabase,
   getLatestScoringChangeAtByLeague,
+  getScoringChangeLogByLeague,
   PublicSchema,
+  type ScoringChangeLogEntry,
 } from '@legacy-sports/db-client';
 import {
   type FootballScoringSettings,
   getDefaultFootballScoringSettings,
 } from '@legacy-sports/scoring';
-import { withTransientRetry } from '../leagues/delete-resilience';
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
+import { withTransientRetry } from '../leagues/delete-resilience';
 
 /**
  * DataLoader for locked team members by leagueId (LS-5955).
@@ -499,4 +501,25 @@ export const createLatestScoringChangeAtLoader = (
       leagueIds,
     );
     return keys.map((key) => changeAtByLeague.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for a league's scoring change history (LS-9667).
+ *
+ * Key: leagueId (number)
+ * Returns: the league's `league_scoring_change_log` rows (active profile
+ *   only, newest first), joined out to display-ready fields.
+ *
+ * Backs `Matchup.scoringChangeLog` — the "what changed and when" interaction
+ * on the stale-scoring indicator. Keyed by league, same batching rationale as
+ * `createLatestScoringChangeAtLoader` above; the resolver filters the
+ * league's list down to entries relevant to one matchup's `scoredAt`.
+ */
+export const createScoringChangeLogLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, ScoringChangeLogEntry[]>(async (keys) => {
+    const leagueIds = [...new Set(keys)] as number[];
+    const changeLogByLeague = await getScoringChangeLogByLeague(db, leagueIds);
+    return keys.map((key) => changeLogByLeague.get(key) ?? []);
   });

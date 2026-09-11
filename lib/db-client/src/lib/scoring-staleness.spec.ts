@@ -1,4 +1,8 @@
-import { isScoringStale } from './scoring-staleness';
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- test mocks use any for chained DB interactions */
+import {
+  getScoringChangeLogByLeague,
+  isScoringStale,
+} from './scoring-staleness';
 
 /**
  * LS-9665 AC5 — `scoringIsStale` resolves correctly for: never-scored,
@@ -142,5 +146,97 @@ describe('isScoringStale', () => {
         }),
       ).toBe(true);
     });
+  });
+});
+
+/**
+ * LS-9667 — `getScoringChangeLogByLeague` backs the stale-scoring
+ * indicator's "what changed and when" interaction.
+ */
+describe('getScoringChangeLogByLeague', () => {
+  function createMockDb(rows: any[]): any {
+    const chain: any = {
+      select: jest.fn(),
+      from: jest.fn(),
+      innerJoin: jest.fn(),
+      leftJoin: jest.fn(),
+      where: jest.fn(),
+      orderBy: jest.fn(() => Promise.resolve(rows)),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.from.mockReturnValue(chain);
+    chain.innerJoin.mockReturnValue(chain);
+    chain.leftJoin.mockReturnValue(chain);
+    chain.where.mockReturnValue(chain);
+    return chain;
+  }
+
+  it('returns an empty array for a league with no changes', async () => {
+    const db = createMockDb([]);
+    const result = await getScoringChangeLogByLeague(db, [7]);
+    expect(result.get(7)).toEqual([]);
+  });
+
+  it('returns an empty map for an empty league list without querying', async () => {
+    const db = createMockDb([]);
+    const result = await getScoringChangeLogByLeague(db, []);
+    expect(result.size).toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('maps rows to display-ready entries, grouped by league', async () => {
+    const db = createMockDb([
+      {
+        leagueId: 7,
+        statDisplayName: 'Home Run',
+        previousMultiplier: '2.500',
+        newMultiplier: '4.000',
+        changedAt: new Date('2026-08-02T00:00:00.000Z'),
+        changedByUsername: 'commish_alice',
+      },
+      {
+        leagueId: 7,
+        statDisplayName: 'Strikeout',
+        previousMultiplier: null,
+        newMultiplier: '1.000',
+        changedAt: new Date('2026-08-01T00:00:00.000Z'),
+        changedByUsername: null,
+      },
+    ]);
+
+    const result = await getScoringChangeLogByLeague(db, [7]);
+
+    expect(result.get(7)).toEqual([
+      {
+        statDisplayName: 'Home Run',
+        previousMultiplier: 2.5,
+        newMultiplier: 4,
+        changedAt: new Date('2026-08-02T00:00:00.000Z'),
+        changedByUsername: 'commish_alice',
+      },
+      {
+        statDisplayName: 'Strikeout',
+        previousMultiplier: null,
+        newMultiplier: 1,
+        changedAt: new Date('2026-08-01T00:00:00.000Z'),
+        changedByUsername: null,
+      },
+    ]);
+  });
+
+  it('skips a row with an unparseable changedAt rather than throwing', async () => {
+    const db = createMockDb([
+      {
+        leagueId: 7,
+        statDisplayName: 'Home Run',
+        previousMultiplier: '2.500',
+        newMultiplier: '4.000',
+        changedAt: 'not-a-date',
+        changedByUsername: null,
+      },
+    ]);
+
+    const result = await getScoringChangeLogByLeague(db, [7]);
+    expect(result.get(7)).toEqual([]);
   });
 });

@@ -2043,6 +2043,11 @@ type Matchup {
   recap: MatchupRecap
 
   """
+  The league's scoring-settings changes relevant to this matchup's staleness — what changed, by whom, and when. Empty when the matchup has no persisted score.
+  """
+  scoringChangeLog: [ScoringChangeLogEntry!]!
+
+  """
   Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score.
   """
   scoringIsStale: Boolean
@@ -4506,6 +4511,36 @@ type ScoreboardTeam {
   Full team name
   """
   teamName: String!
+}
+
+"""
+One league_scoring_change_log row: a single stat's multiplier change (LS-9667).
+"""
+type ScoringChangeLogEntry {
+  """
+  When the change was made (ISO 8601).
+  """
+  changedAt: String!
+
+  """
+  Username of the commissioner who made the change, if known.
+  """
+  changedByUsername: String
+
+  """
+  The multiplier after this change, or null if it was disabled.
+  """
+  newMultiplier: Float
+
+  """
+  The multiplier before this change, or null if it was newly added.
+  """
+  previousMultiplier: Float
+
+  """
+  Human-readable name of the stat whose multiplier changed.
+  """
+  statDisplayName: String!
 }
 
 type ScoringConfig {

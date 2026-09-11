@@ -112,6 +112,14 @@ fragment AppMatchup on Matchup {
   selectedGamesCount
   startTime
   endTime
+  scoringIsStale
+  scoringChangeLog {
+    statDisplayName
+    previousMultiplier
+    newMultiplier
+    changedAt
+    changedByUsername
+  }
 }
 
 fragment AppMatchupPlayer on MatchupPlayer {

@@ -5,6 +5,10 @@ import { MatchupStatus } from '@legacy-sports/graphql';
 import { PACE_TINT_THRESHOLDS } from './paceThresholds';
 import { MatchupStatusChip } from './MatchupStatusChip';
 import {
+  type StaleScoringChangeLogEntry,
+  StaleScoringIndicator,
+} from './StaleScoringIndicator';
+import {
   BLACK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -188,6 +192,13 @@ export interface MatchupScoreboardHeroProps {
   timeInfo?: string | null;
   /** When provided, team avatars/names become pressable to view that team. */
   onTeamPress?: (teamId: number) => void;
+  /**
+   * `Matchup.scoringIsStale` (LS-9667). Renders the stale-scoring indicator
+   * next to the status chip when true; no-op for false/null/undefined.
+   */
+  scoringIsStale?: boolean | null;
+  /** `Matchup.scoringChangeLog` — shown on interaction with the indicator. */
+  scoringChangeLog?: readonly StaleScoringChangeLogEntry[] | null;
 }
 
 // ── Team panel ──────────────────────────────────────────────────────────────
@@ -303,12 +314,15 @@ export function MatchupScoreboardHero({
   totalGames,
   timeInfo,
   onTeamPress,
+  scoringIsStale,
+  scoringChangeLog,
 }: MatchupScoreboardHeroProps) {
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
   const isCancelled = status === MatchupStatus.Cancelled;
   const preLock = status === MatchupStatus.Scheduled;
+  const isCompleted = status === MatchupStatus.Completed;
 
   const team1Name = team1.name ?? 'Team 1';
   const team2Name = team2.name ?? 'Team 2';
@@ -358,6 +372,12 @@ export function MatchupScoreboardHero({
             status={status}
             detail={`Week ${weekNumber ?? '—'}`}
           />
+          {isCompleted && (
+            <StaleScoringIndicator
+              scoringIsStale={scoringIsStale}
+              changeLog={scoringChangeLog}
+            />
+          )}
           <Text fontSize="$2" color={TEXT_MUTED}>
             Head-to-Head · Matchup {weekNumber ?? '?'}
             {totalMatchups ? `/${totalMatchups}` : ''}

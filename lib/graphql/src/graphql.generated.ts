@@ -1727,6 +1727,8 @@ export type Matchup = {
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;
+  /** The league's scoring-settings changes relevant to this matchup's staleness — what changed, by whom, and when. Empty when the matchup has no persisted score. */
+  scoringChangeLog: Array<ScoringChangeLogEntry>;
   /** Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score. */
   scoringIsStale?: Maybe<Scalars['Boolean']['output']>;
   /** Number of unique games selected for this matchup */
@@ -4315,6 +4317,21 @@ export type ScoreboardTeam = {
   runs: Scalars['Int']['output'];
   /** Full team name */
   teamName: Scalars['String']['output'];
+};
+
+/** One league_scoring_change_log row: a single stat's multiplier change (LS-9667). */
+export type ScoringChangeLogEntry = {
+  __typename?: 'ScoringChangeLogEntry';
+  /** When the change was made (ISO 8601). */
+  changedAt: Scalars['String']['output'];
+  /** Username of the commissioner who made the change, if known. */
+  changedByUsername?: Maybe<Scalars['String']['output']>;
+  /** The multiplier after this change, or null if it was disabled. */
+  newMultiplier?: Maybe<Scalars['Float']['output']>;
+  /** The multiplier before this change, or null if it was newly added. */
+  previousMultiplier?: Maybe<Scalars['Float']['output']>;
+  /** Human-readable name of the stat whose multiplier changed. */
+  statDisplayName: Scalars['String']['output'];
 };
 
 export type ScoringConfig = {
@@ -7316,6 +7333,15 @@ export type GetMatchupByIdQuery = {
     endTime?: string | null;
     lockTime?: string | null;
     updatedAt?: string | null;
+    scoringIsStale?: boolean | null;
+    scoringChangeLog: Array<{
+      __typename?: 'ScoringChangeLogEntry';
+      statDisplayName: string;
+      previousMultiplier?: number | null;
+      newMultiplier?: number | null;
+      changedAt: string;
+      changedByUsername?: string | null;
+    }>;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -7374,6 +7400,15 @@ export type GetMatchupHistoryQuery = {
     endTime?: string | null;
     lockTime?: string | null;
     updatedAt?: string | null;
+    scoringIsStale?: boolean | null;
+    scoringChangeLog: Array<{
+      __typename?: 'ScoringChangeLogEntry';
+      statDisplayName: string;
+      previousMultiplier?: number | null;
+      newMultiplier?: number | null;
+      changedAt: string;
+      changedByUsername?: string | null;
+    }>;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -7592,6 +7627,15 @@ export type GetTeamMatchupHistoryQuery = {
     endTime?: string | null;
     lockTime?: string | null;
     updatedAt?: string | null;
+    scoringIsStale?: boolean | null;
+    scoringChangeLog: Array<{
+      __typename?: 'ScoringChangeLogEntry';
+      statDisplayName: string;
+      previousMultiplier?: number | null;
+      newMultiplier?: number | null;
+      changedAt: string;
+      changedByUsername?: string | null;
+    }>;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -8333,6 +8377,15 @@ export type AppMatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  scoringIsStale?: boolean | null;
+  scoringChangeLog: Array<{
+    __typename?: 'ScoringChangeLogEntry';
+    statDisplayName: string;
+    previousMultiplier?: number | null;
+    newMultiplier?: number | null;
+    changedAt: string;
+    changedByUsername?: string | null;
+  }>;
 };
 
 export type AppMatchupPlayerFragment = {
@@ -11788,6 +11841,15 @@ export type GetMatchupsByWeekQuery = {
     endTime?: string | null;
     lockTime?: string | null;
     updatedAt?: string | null;
+    scoringIsStale?: boolean | null;
+    scoringChangeLog: Array<{
+      __typename?: 'ScoringChangeLogEntry';
+      statDisplayName: string;
+      previousMultiplier?: number | null;
+      newMultiplier?: number | null;
+      changedAt: string;
+      changedByUsername?: string | null;
+    }>;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -11834,6 +11896,15 @@ export type GetMatchupsForLeagueQuery = {
     endTime?: string | null;
     lockTime?: string | null;
     updatedAt?: string | null;
+    scoringIsStale?: boolean | null;
+    scoringChangeLog: Array<{
+      __typename?: 'ScoringChangeLogEntry';
+      statDisplayName: string;
+      previousMultiplier?: number | null;
+      newMultiplier?: number | null;
+      changedAt: string;
+      changedByUsername?: string | null;
+    }>;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -13159,6 +13230,15 @@ export type MatchupFragment = {
   endTime?: string | null;
   lockTime?: string | null;
   updatedAt?: string | null;
+  scoringIsStale?: boolean | null;
+  scoringChangeLog: Array<{
+    __typename?: 'ScoringChangeLogEntry';
+    statDisplayName: string;
+    previousMultiplier?: number | null;
+    newMultiplier?: number | null;
+    changedAt: string;
+    changedByUsername?: string | null;
+  }>;
   team1?: {
     __typename?: 'Team';
     id?: number | null;
@@ -15774,6 +15854,14 @@ export const AppMatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+    scoringIsStale
+    scoringChangeLog {
+      statDisplayName
+      previousMultiplier
+      newMultiplier
+      changedAt
+      changedByUsername
+    }
   }
 `;
 export const AppMatchupPlayerFragmentDoc = gql`
@@ -16579,6 +16667,14 @@ export const MatchupFragmentDoc = gql`
     endTime
     lockTime
     updatedAt
+    scoringIsStale
+    scoringChangeLog {
+      statDisplayName
+      previousMultiplier
+      newMultiplier
+      changedAt
+      changedByUsername
+    }
     team1 {
       id
       name
