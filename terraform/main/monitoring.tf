@@ -208,6 +208,43 @@ resource "aws_cloudwatch_metric_alarm" "football_pfr_fetch_latency_p99" {
   tags = local.common_tags
 }
 
+# ─── NAT instance system-status alarm ────────────────────────────────────────
+# LS-8906 removed the Secrets Manager / CloudWatch Logs VPC interface endpoints,
+# so all VPC Lambda traffic to those services now routes through this single
+# t3.nano NAT instance. A silent hardware/host failure would take down that
+# traffic path with no alert, so alarm on the System status check and attach
+# the EC2 auto-recovery action alongside the human notification. Recovery
+# preserves the instance ID, private IP, and attached ENI/EIP.
+
+resource "aws_cloudwatch_metric_alarm" "nat_instance_status_check_failed_system" {
+  count = var.use_nat_instance ? 1 : 0
+
+  alarm_name          = "${local.name_prefix}-nat-instance-status-check-failed-system"
+  alarm_description   = "NAT instance failed its System status check — auto-recovery triggered. All VPC Lambda traffic to Secrets Manager/CloudWatch Logs routes through this instance."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 1
+  evaluation_periods  = 2
+  period              = 60
+
+  namespace   = "AWS/EC2"
+  metric_name = "StatusCheckFailed_System"
+  dimensions = {
+    InstanceId = aws_instance.nat_instance[0].id
+  }
+
+  statistic = "Maximum"
+
+  alarm_actions = [
+    "arn:aws:automate:${local.region}:ec2:recover",
+    aws_sns_topic.ops_alerts.arn,
+  ]
+  ok_actions = [aws_sns_topic.ops_alerts.arn]
+
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
 # ─── Lambda error alarms ─────────────────────────────────────────────────────
 # One alarm per Lambda function, based on the Lambda Errors metric (count).
 # When the error count breaches the threshold over the configured evaluation
