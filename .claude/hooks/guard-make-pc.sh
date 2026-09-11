@@ -17,8 +17,14 @@
 # ignored). Exits 2 to actually block the tool call; only stderr is shown to
 # the agent on a blocked PreToolUse call (stdout is discarded), so the
 # message doubles as the block reason.
-# Add `# pc-ok` to a Bash command to bypass when you've confirmed a genuinely
-# non-timeout-prone local run.
+# Add `# pc-ok` to a Bash command to bypass -- reserve this for a run you are
+# watching live in the foreground of a real terminal, never a backgrounded
+# one. LS-8797: a backgrounded monolithic `make pc` in an ordinary local
+# Windows session (never previously flagged timeout-prone) hung 40+ minutes
+# with zero output and no child process under `make.exe` at all -- a
+# Windows/Git-Bash stdout-pipe deadlock hazard, not merely a timeout risk.
+# "Non-timeout-prone" is not a safety property of the monolithic path; only
+# "foreground and human-watched" is.
 
 INPUT=$(cat 2>/dev/null || true)
 if [ -z "$INPUT" ] || ! command -v jq &>/dev/null; then
@@ -75,7 +81,7 @@ case "$TOOL_NAME" in
       if echo "$COMMAND" | grep -qE '(^|[[:space:]])#[[:space:]]*pc-ok'; then
         exit 0
       fi
-      emit_block '`make pc`' 'Confirmed a genuinely non-timeout-prone local run? Add `# pc-ok` to the command to bypass this block.'
+      emit_block '`make pc`' 'Watching this run live in the foreground of a real terminal (never backgrounded -- LS-8797 found the backgrounded monolithic path can silently deadlock even in an ordinary local Windows session)? Add `# pc-ok` to the command to bypass this block.'
       exit 2
     fi
     ;;
