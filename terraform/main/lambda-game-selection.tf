@@ -78,6 +78,15 @@ resource "aws_iam_policy" "game_selection_lambda_secrets" {
       {
         Effect = "Allow"
         Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = [
+          aws_sqs_queue.load_football_stats.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "dynamodb:Query",
           "dynamodb:Scan"
         ]
@@ -207,6 +216,9 @@ resource "aws_lambda_function" "game_selection" {
 
       # SQS queue for loading game stats
       SQS_LOAD_GAME_STATS_URL = aws_sqs_queue.load_game_stats.url
+
+      # SQS queue for loading football game stats (LS-9990)
+      SQS_LOAD_FOOTBALL_STATS_URL = aws_sqs_queue.load_football_stats.url
 
       # WebSocket configuration
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name

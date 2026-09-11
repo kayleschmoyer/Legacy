@@ -32,11 +32,21 @@ import {
   ALLOWED_POSITIONS,
   type EligibleSeasons,
   isNegroLeague,
+  MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
   MIN_SEASON_GAMES_FOR_SELECTION,
   resolveEligibleSeasons,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
-import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
 import { PublicSchema } from './client/PublicDbClient';
@@ -242,6 +252,37 @@ export function selectSeasonsForPlayers(
   });
 
   return { selections, skippedPlayers };
+}
+
+/**
+ * Football analogue of {@link selectSeasonsForPlayers}.
+ *
+ * Football has no batting/pitching/fielding split — instead it has three
+ * distinct per-game producers (offense, DST, IDP) that never overlap for a
+ * given player, so they slot directly into selectSeasonsForPlayers's existing
+ * three-way max-across-categories logic without changing that algorithm:
+ * offensive stats (passing/rushing/receiving/kicking, maxed per player-season)
+ * take the `battingStats` slot, DST the `pitchingStats` slot, and IDP the
+ * `fieldingStats` slot.
+ */
+function selectFootballSeasonsForPlayers(
+  playerIds: number[],
+  offenseStats: PlayerSeasonStats[],
+  dstStats: PlayerSeasonStats[],
+  idpStats: PlayerSeasonStats[],
+  minGames: number,
+  leagueId: number,
+  weekNumber: number,
+): SeasonSelectionResult {
+  return selectSeasonsForPlayers(
+    playerIds,
+    offenseStats,
+    dstStats,
+    idpStats,
+    minGames,
+    leagueId,
+    weekNumber,
+  );
 }
 
 // ── MatchupService ────────────────────────────────────────────────────────────
@@ -625,55 +666,196 @@ export async function populateMatchupPlayersAndSeasons(
 
   if (allPlayerIds.length === 0) return;
 
+  // Sport-aware season sourcing (LS-9990): football has no
+  // batting/pitching/fielding split, so its own per-game producers stand in
+  // for the same three "categories" selectSeasonsForPlayers already maxes
+  // across — see selectFootballSeasonsForPlayers.
+  const [leagueRow] = await db
+    .select({ sport: PublicSchema.leagues.sport })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, leagueId))
+    .limit(1);
+  const sport = leagueRow?.sport ?? 'baseball';
+
   const minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER;
+
   const [allBattingSeasons, allPitchingSeasons, allFieldingSeasons] =
-    await Promise.all([
-      db
-        .select({
-          playerId: PublicSchema.seasonBatting.playerId,
-          season: PublicSchema.seasonBatting.season,
-          g: PublicSchema.seasonBatting.g,
-          lgId: PublicSchema.seasonBatting.lgId,
-        })
-        .from(PublicSchema.seasonBatting)
-        .where(
-          and(
-            inArray(PublicSchema.seasonBatting.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonBatting.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-      db
-        .select({
-          playerId: PublicSchema.seasonPitching.playerId,
-          season: PublicSchema.seasonPitching.season,
-          g: PublicSchema.seasonPitching.g,
-          lgId: PublicSchema.seasonPitching.lgId,
-        })
-        .from(PublicSchema.seasonPitching)
-        .where(
-          and(
-            inArray(PublicSchema.seasonPitching.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonPitching.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-      db
-        .select({
-          playerId: PublicSchema.seasonFielding.playerId,
-          season: PublicSchema.seasonFielding.season,
-          g: PublicSchema.seasonFielding.g,
-          lgId: PublicSchema.seasonFielding.lgId,
-        })
-        .from(PublicSchema.seasonFielding)
-        .where(
-          and(
-            inArray(PublicSchema.seasonFielding.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonFielding.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-    ]);
+    sport === 'football'
+      ? await Promise.all([
+          // "batting" slot: offensive/kicking production, maxed per
+          // player-season across the four PFR-shaped offensive tables.
+          Promise.all([
+            db
+              .select({
+                playerId: PublicSchema.footballSeasonPassing.playerId,
+                season: PublicSchema.footballSeasonPassing.season,
+                g: PublicSchema.footballSeasonPassing.g,
+              })
+              .from(PublicSchema.footballSeasonPassing)
+              .where(
+                and(
+                  inArray(
+                    PublicSchema.footballSeasonPassing.playerId,
+                    allPlayerIds,
+                  ),
+                  isNotNull(PublicSchema.footballSeasonPassing.g),
+                  gte(
+                    PublicSchema.footballSeasonPassing.season,
+                    MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                  ),
+                ),
+              ),
+            db
+              .select({
+                playerId: PublicSchema.footballSeasonRushing.playerId,
+                season: PublicSchema.footballSeasonRushing.season,
+                g: PublicSchema.footballSeasonRushing.g,
+              })
+              .from(PublicSchema.footballSeasonRushing)
+              .where(
+                and(
+                  inArray(
+                    PublicSchema.footballSeasonRushing.playerId,
+                    allPlayerIds,
+                  ),
+                  isNotNull(PublicSchema.footballSeasonRushing.g),
+                  gte(
+                    PublicSchema.footballSeasonRushing.season,
+                    MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                  ),
+                ),
+              ),
+            db
+              .select({
+                playerId: PublicSchema.footballSeasonReceiving.playerId,
+                season: PublicSchema.footballSeasonReceiving.season,
+                g: PublicSchema.footballSeasonReceiving.g,
+              })
+              .from(PublicSchema.footballSeasonReceiving)
+              .where(
+                and(
+                  inArray(
+                    PublicSchema.footballSeasonReceiving.playerId,
+                    allPlayerIds,
+                  ),
+                  isNotNull(PublicSchema.footballSeasonReceiving.g),
+                  gte(
+                    PublicSchema.footballSeasonReceiving.season,
+                    MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                  ),
+                ),
+              ),
+            db
+              .select({
+                playerId: PublicSchema.footballSeasonKicking.playerId,
+                season: PublicSchema.footballSeasonKicking.season,
+                g: PublicSchema.footballSeasonKicking.g,
+              })
+              .from(PublicSchema.footballSeasonKicking)
+              .where(
+                and(
+                  inArray(
+                    PublicSchema.footballSeasonKicking.playerId,
+                    allPlayerIds,
+                  ),
+                  isNotNull(PublicSchema.footballSeasonKicking.g),
+                  gte(
+                    PublicSchema.footballSeasonKicking.season,
+                    MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                  ),
+                ),
+              ),
+          ]).then((rowSets) => rowSets.flat()),
+          // "pitching" slot: DST (team-defense) production.
+          db
+            .select({
+              playerId: PublicSchema.footballSeasonDefense.playerId,
+              season: PublicSchema.footballSeasonDefense.season,
+              g: PublicSchema.footballSeasonDefense.g,
+            })
+            .from(PublicSchema.footballSeasonDefense)
+            .where(
+              and(
+                inArray(
+                  PublicSchema.footballSeasonDefense.playerId,
+                  allPlayerIds,
+                ),
+                isNotNull(PublicSchema.footballSeasonDefense.g),
+                gte(
+                  PublicSchema.footballSeasonDefense.season,
+                  MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                ),
+              ),
+            ),
+          // "fielding" slot: IDP (individual defensive player) production.
+          db
+            .select({
+              playerId: PublicSchema.footballSeasonDefenseIdp.playerId,
+              season: PublicSchema.footballSeasonDefenseIdp.season,
+              g: PublicSchema.footballSeasonDefenseIdp.g,
+            })
+            .from(PublicSchema.footballSeasonDefenseIdp)
+            .where(
+              and(
+                inArray(
+                  PublicSchema.footballSeasonDefenseIdp.playerId,
+                  allPlayerIds,
+                ),
+                isNotNull(PublicSchema.footballSeasonDefenseIdp.g),
+                gte(
+                  PublicSchema.footballSeasonDefenseIdp.season,
+                  MIN_FOOTBALL_SEASON_WITH_GAME_DATA,
+                ),
+              ),
+            ),
+        ])
+      : await Promise.all([
+          db
+            .select({
+              playerId: PublicSchema.seasonBatting.playerId,
+              season: PublicSchema.seasonBatting.season,
+              g: PublicSchema.seasonBatting.g,
+              lgId: PublicSchema.seasonBatting.lgId,
+            })
+            .from(PublicSchema.seasonBatting)
+            .where(
+              and(
+                inArray(PublicSchema.seasonBatting.playerId, allPlayerIds),
+                isNotNull(PublicSchema.seasonBatting.g),
+              ),
+            )
+            .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+          db
+            .select({
+              playerId: PublicSchema.seasonPitching.playerId,
+              season: PublicSchema.seasonPitching.season,
+              g: PublicSchema.seasonPitching.g,
+              lgId: PublicSchema.seasonPitching.lgId,
+            })
+            .from(PublicSchema.seasonPitching)
+            .where(
+              and(
+                inArray(PublicSchema.seasonPitching.playerId, allPlayerIds),
+                isNotNull(PublicSchema.seasonPitching.g),
+              ),
+            )
+            .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+          db
+            .select({
+              playerId: PublicSchema.seasonFielding.playerId,
+              season: PublicSchema.seasonFielding.season,
+              g: PublicSchema.seasonFielding.g,
+              lgId: PublicSchema.seasonFielding.lgId,
+            })
+            .from(PublicSchema.seasonFielding)
+            .where(
+              and(
+                inArray(PublicSchema.seasonFielding.playerId, allPlayerIds),
+                isNotNull(PublicSchema.seasonFielding.g),
+              ),
+            )
+            .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+        ]);
 
   const sortedWeeks = Array.from(matchupsByWeek.keys()).sort((a, b) => a - b);
 
@@ -739,15 +921,26 @@ export async function populateMatchupPlayersAndSeasons(
     const playerIdsForWeek = Array.from(weekPlayerIds);
     if (playerIdsForWeek.length === 0) continue;
 
-    const selectionResult = selectSeasonsForPlayers(
-      playerIdsForWeek,
-      allBattingSeasons,
-      allPitchingSeasons,
-      allFieldingSeasons,
-      minGames,
-      leagueId,
-      weekNumber,
-    );
+    const selectionResult =
+      sport === 'football'
+        ? selectFootballSeasonsForPlayers(
+            playerIdsForWeek,
+            allBattingSeasons,
+            allPitchingSeasons,
+            allFieldingSeasons,
+            minGames,
+            leagueId,
+            weekNumber,
+          )
+        : selectSeasonsForPlayers(
+            playerIdsForWeek,
+            allBattingSeasons,
+            allPitchingSeasons,
+            allFieldingSeasons,
+            minGames,
+            leagueId,
+            weekNumber,
+          );
 
     if (selectionResult.selections.length > 0) {
       await db

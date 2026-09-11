@@ -14,6 +14,10 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
+import {
+  type FootballPlayerNeedingStats,
+  selectGamesForMatchupFootball,
+} from '../services/football-game-selector';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -26,6 +30,7 @@ const sqsClient = new SQSClient({
   region: process.env.AWS_REGION || 'us-east-1',
 });
 const GAME_STATS_QUEUE_URL = process.env.SQS_LOAD_GAME_STATS_URL;
+const FOOTBALL_STATS_QUEUE_URL = process.env.SQS_LOAD_FOOTBALL_STATS_URL;
 
 // Initialize WebSocket notification service for real-time UI updates
 const notificationService = createNotificationService();
@@ -119,6 +124,71 @@ async function queueStatsLoadingForMatchup(
 }
 
 /**
+ * Queue football stats loading for players that don't have cached stats.
+ * Football analogue of queueStatsLoadingForMatchup — dispatches to the
+ * shared load-football-stats FIFO queue with type: 'football-game-stats' so
+ * lambdas/stats-lambda/src/load-football-game.ts (isFootballGameMessage)
+ * routes it correctly.
+ */
+async function queueFootballStatsLoadingForMatchup(
+  matchupId: number,
+  gameNumber: number,
+  playersNeedingLoading: FootballPlayerNeedingStats[],
+): Promise<void> {
+  if (!FOOTBALL_STATS_QUEUE_URL) {
+    LOGGER.warn(
+      'SQS_LOAD_FOOTBALL_STATS_URL not configured, skipping football stats loading',
+    );
+    return;
+  }
+
+  if (playersNeedingLoading.length === 0) {
+    return;
+  }
+
+  const BATCH_SIZE = 8;
+  const batches: (typeof playersNeedingLoading)[] = [];
+  for (let i = 0; i < playersNeedingLoading.length; i += BATCH_SIZE) {
+    batches.push(playersNeedingLoading.slice(i, i + BATCH_SIZE));
+  }
+
+  LOGGER.info(
+    `Queueing ${batches.length} football batches for matchup ${matchupId}, game ${gameNumber} (${playersNeedingLoading.length} uncached players)`,
+  );
+
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex];
+    const message = {
+      type: 'football-game-stats' as const,
+      matchupId,
+      batchIndex,
+      totalBatches: batches.length,
+      players: batch.map((p) => ({
+        matchupPlayerId: p.matchupPlayerId,
+        playerId: p.playerId,
+        pfrId: p.pfrId,
+        season: p.season,
+        isDst: p.isDst,
+        position: p.position,
+        nflTeam: p.nflTeam,
+      })),
+    };
+
+    const command = new SendMessageCommand({
+      QueueUrl: FOOTBALL_STATS_QUEUE_URL,
+      MessageBody: JSON.stringify(message),
+      MessageGroupId: `football-matchup-${matchupId}`,
+      MessageDeduplicationId: `football-${matchupId}-game${gameNumber}-${batchIndex}`,
+    });
+
+    await sqsClient.send(command);
+    LOGGER.info(
+      `Queued football batch ${batchIndex + 1}/${batches.length} for matchup ${matchupId}, game ${gameNumber} with ${batch.length} players`,
+    );
+  }
+}
+
+/**
  * Handler for selecting games for matchups
  * Triggered by SQS messages containing matchupId and game number
  * Uses the matchup's selected_season to determine which season to select games from
@@ -153,6 +223,71 @@ const baseSelectGameHandler = async (
           matchupId: matchup.matchupId,
           gameNumber: matchup.game,
         });
+
+        // Sport-aware routing (LS-9990): the matchup's league determines
+        // whether games are selected from the baseball game_batting/pitching
+        // path or the football game_football_* path.
+        const leagueSportRow = await db
+          .select({ sport: PublicSchema.leagues.sport })
+          .from(PublicSchema.matchups)
+          .innerJoin(
+            PublicSchema.leagues,
+            eq(PublicSchema.leagues.id, PublicSchema.matchups.leagueId),
+          )
+          .where(eq(PublicSchema.matchups.id, matchup.matchupId))
+          .limit(1);
+        const sport = leagueSportRow[0]?.sport ?? 'baseball';
+
+        if (sport === 'football') {
+          const footballResult = await selectGamesForMatchupFootball(
+            db,
+            matchup.matchupId,
+            matchup.game,
+          );
+
+          LOGGER.info('Successfully selected football games for matchup', {
+            matchupId: matchup.matchupId,
+            gameNumber: matchup.game,
+            playersNeedingLoading:
+              footballResult.playersNeedingStatsLoading.length,
+          });
+
+          if (footballResult.playersNeedingStatsLoading.length > 0) {
+            await queueFootballStatsLoadingForMatchup(
+              matchup.matchupId,
+              matchup.game,
+              footballResult.playersNeedingStatsLoading,
+            );
+          } else if (notificationService) {
+            const matchupRow = await db
+              .select({ leagueId: PublicSchema.matchups.leagueId })
+              .from(PublicSchema.matchups)
+              .where(eq(PublicSchema.matchups.id, matchup.matchupId))
+              .limit(1);
+
+            const leagueId = matchupRow[0]?.leagueId;
+            if (leagueId) {
+              const playerCount = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(PublicSchema.matchupPlayers)
+                .where(
+                  eq(PublicSchema.matchupPlayers.matchupId, matchup.matchupId),
+                );
+              const totalPlayers = Number(playerCount[0]?.count || 0);
+
+              await notificationService.notifyMatchupStatsComplete(
+                matchup.matchupId,
+                leagueId,
+                totalPlayers,
+              );
+            }
+          }
+
+          addBreadcrumb(
+            `Processed football matchup ${matchup.matchupId} select-game`,
+          );
+          continue;
+        }
 
         // Use game_identifier-based selection - picks real games from cached stats
         const result = await selectGamesForMatchup(

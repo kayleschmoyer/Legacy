@@ -41,6 +41,7 @@ interface MockSelectChain {
   where: jest.Mock;
   orderBy: jest.Mock;
   inArray: jest.Mock;
+  limit: jest.Mock;
   then: jest.Mock;
 }
 
@@ -94,6 +95,7 @@ function buildMockDb(selectResults: unknown[]): {
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       inArray: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
       // make the chain itself thenable so `await db.select(...).from(...).where(...)` works.
       // Must RETURN resolve(result) — not just call it — so that chained `.then(fn)`
       // calls (e.g. `.then(rows => rows.filter(...))` in Promise.all) receive the
@@ -317,11 +319,12 @@ describe('autoPopulateFirstMatchupLineup', () => {
 
 describe('populateMatchupPlayersAndSeasons', () => {
   /**
-   * Covers the three-query sequence used by populateMatchupPlayersAndSeasons
+   * Covers the query sequence used by populateMatchupPlayersAndSeasons
    * for a single week-1 matchup with two teams and no season data:
    *   1. team_members select (all teams)
-   *   2. seasonBatting, seasonPitching, seasonFielding (parallel — three selects)
-   *   3. insert (captured) — verifies both teams' players appear in the insert values.
+   *   2. leagues select (sport, LS-9990)
+   *   3. seasonBatting, seasonPitching, seasonFielding (parallel — three selects)
+   *   4. insert (captured) — verifies both teams' players appear in the insert values.
    */
   it('inserts matchup_players for both teams from team_members', async () => {
     interface PlayerRow {
@@ -344,6 +347,7 @@ describe('populateMatchupPlayersAndSeasons', () => {
     let selectIndex = 0;
     const selectResults: unknown[] = [
       [...team1Players, ...team2Players], // team_members for the league
+      [{ sport: 'baseball' }], // leagues.sport (LS-9990)
       [], // seasonBatting
       [], // seasonPitching
       [], // seasonFielding
@@ -362,6 +366,7 @@ describe('populateMatchupPlayersAndSeasons', () => {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         inArray: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         // Must RETURN resolve(result) so chained .then(fn) calls in Promise.all
         // (e.g. `.then(rows => rows.filter(...))`) receive the array, not undefined.
         then: jest
@@ -415,5 +420,89 @@ describe('populateMatchupPlayersAndSeasons', () => {
     expect(starterRow10?.positionId).toBe(1);
     const benchRow10 = team1Inserted.find((r) => r.playerId === 1002);
     expect(benchRow10?.positionId).toBeNull();
+  });
+
+  /**
+   * LS-9990: football leagues must route season selection through the
+   * football_season_* tables (passing/rushing/receiving/kicking/defense/
+   * defense_idp) instead of batting/pitching/fielding.
+   */
+  it('routes football leagues through the football season tables', async () => {
+    const insertedValueSets: unknown[][] = [];
+
+    let selectIndex = 0;
+    const selectResults: unknown[] = [
+      [{ teamId: 10, playerId: 3001, positionId: null }], // team_members
+      [{ sport: 'football' }], // leagues.sport
+      [{ playerId: 3001, season: 2005, g: 10 }], // footballSeasonPassing
+      [], // footballSeasonRushing
+      [], // footballSeasonReceiving
+      [], // footballSeasonKicking
+      [], // footballSeasonDefense
+      [], // footballSeasonDefenseIdp
+    ];
+
+    const makeSelectChain = (): MockSelectChain => {
+      if (selectIndex >= selectResults.length) {
+        throw new Error(
+          `Unexpected select() call #${selectIndex + 1}; only ${selectResults.length} mocked result(s) were provided.`,
+        );
+      }
+      const result = selectResults[selectIndex++];
+      const chain: MockSelectChain = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        inArray: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        then: jest
+          .fn()
+          .mockImplementation((resolve: (value: unknown) => unknown) =>
+            resolve(result),
+          ),
+      };
+      return chain;
+    };
+
+    const makeInsertChain = (): MockInsertChain => {
+      const chain: MockInsertChain = {
+        values: jest.fn().mockImplementation((vals: unknown[]) => {
+          insertedValueSets.push(vals);
+          return chain;
+        }),
+        onConflictDoUpdate: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockReturnThis(),
+        then: jest
+          .fn()
+          .mockImplementation((resolve: (value: unknown) => unknown) =>
+            resolve(undefined),
+          ),
+      };
+      return chain;
+    };
+
+    const mockDb = {
+      select: jest.fn().mockImplementation(makeSelectChain),
+      insert: jest.fn().mockImplementation(makeInsertChain),
+    };
+
+    const db = mockDb as unknown as SmokeDb;
+    const matchupRows = [
+      { id: 200, weekNumber: 1, team1Id: 10, team2Id: null },
+    ];
+
+    await populateMatchupPlayersAndSeasons(db, 1, matchupRows, 5);
+
+    const seasonInserts = insertedValueSets.flat() as Array<{
+      playerId: number;
+      season?: number;
+    }>;
+    // Two insert calls happen for this player: matchup_players (no `season`
+    // field) and league_week_player_seasons (has it) — filter to the latter.
+    const playerSeason = seasonInserts.find(
+      (r) => r.playerId === 3001 && typeof r.season === 'number',
+    );
+    expect(playerSeason?.season).toBe(2005);
   });
 });

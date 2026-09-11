@@ -13,6 +13,22 @@
 export const MIN_SEASON_WITH_GAME_DATA = 1901;
 
 /**
+ * Minimum football season year with per-game data available from any of our
+ * sourcing pipelines.
+ *
+ * LS-9908's spike recommended 1999 (nflverse's floor) on the assumption that
+ * pre-1999 would either go unsupported or be approximated via season-prorated
+ * scoring. That assumption did not hold: the product owner instead licensed
+ * Pro Football Archives (PFA) for the pre-1999 tail (LS-9948, "1960-1998"),
+ * pairing with nflverse for 1999-2025 (LS-9989) — see ADR 0022
+ * (docs/decisions/0022-football-per-game-stats-source.md). The combined
+ * producer floor is therefore PFA's, not nflverse's: 1960, matching LS-9948's
+ * scoped range. (PFA can technically reach back to 1920, but 1960-1998 is
+ * what was licensed and scoped for ingest.)
+ */
+export const MIN_FOOTBALL_SEASON_WITH_GAME_DATA = 1960;
+
+/**
  * Number of matchup periods in a full season.
  * Used to calculate the minimum games threshold for player eligibility and
  * fantasy-points-per-game (FPG) computations: minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER.
