@@ -89,20 +89,88 @@ export function isMemberOnBye(
   return byeWeeksByTeam?.[nflTeam] === currentWeek;
 }
 
+/** A single displayed roster card: either a specific configured league position, or a generic placeholder for a position type the league didn't configure at all. */
+export interface RosterRenderSlot {
+  /** Unique key for this card — shared with other same-type slots only when the league has exactly one configured instance of that type. */
+  readonly key: string;
+  /** The position type this card displays (e.g. 'QB', 'FLEX'). */
+  readonly type: string;
+  /** The league's configured slot id for this card, when one exists. Undefined for a type the league didn't configure at all. */
+  readonly slotId?: number;
+}
+
 /**
- * Builds a lookup from a league's roster-slot id to its position type (e.g. 'QB', 'FLEX').
- * Used to resolve a team member's assigned `positionId` to a display slot.
+ * Builds the ordered list of roster cards to render (LS-6449).
+ *
+ * Renders one card per slot the league *actually configured* in `rosterSlots`
+ * (`league_positions`) — so a league with two QB slots gets two independent
+ * QB cards, each with its own empty/filled state, instead of one merged QB
+ * bucket that hides which specific slot is unfilled. A position type with no
+ * configured slots at all still gets a single generic placeholder card so
+ * the roster grid stays complete for that `defensiveFormat`.
  */
-function buildPositionIdToSlot(
+export function buildRenderSlots(
+  slotOrder: readonly string[],
   rosterSlots: readonly (LeaguePositionFragment | null)[],
-): Map<number, string> {
-  const map = new Map<number, string>();
-  for (const slot of rosterSlots) {
-    if (slot?.id != null && slot.positionType) {
-      map.set(slot.id, slot.positionType);
+): RosterRenderSlot[] {
+  const renderSlots: RosterRenderSlot[] = [];
+
+  for (const type of slotOrder) {
+    if (type === 'BN') continue;
+
+    const configured = rosterSlots.filter(
+      (slot): slot is LeaguePositionFragment =>
+        slot?.positionType === type && slot.id != null,
+    );
+
+    if (configured.length === 0) {
+      renderSlots.push({ key: type, type });
+      continue;
+    }
+
+    for (const slot of configured) {
+      renderSlots.push({
+        key: configured.length > 1 ? `${type}-${slot.id}` : type,
+        type,
+        slotId: slot.id ?? undefined,
+      });
     }
   }
-  return map;
+
+  renderSlots.push({ key: 'BN', type: 'BN' });
+  return renderSlots;
+}
+
+/**
+ * Assigns team members to the league's actual configured roster slots (LS-6449).
+ *
+ * Matches strictly by `member.positionId === slot.slotId` — a member whose
+ * positionId doesn't resolve to any currently configured slot (stale id,
+ * null, or a type the league never configured) is benched rather than
+ * guessed at from eligibility, so a genuinely unfilled slot is never
+ * confused with one that's merely mismatched.
+ */
+export function groupMembersBySlot(
+  renderSlots: readonly RosterRenderSlot[],
+  members: readonly TeamMember[],
+): Record<string, TeamMember[]> {
+  const groups: Record<string, TeamMember[]> = {};
+  for (const slot of renderSlots) groups[slot.key] = [];
+
+  for (const member of members) {
+    const target =
+      member.positionId != null
+        ? renderSlots.find((slot) => slot.slotId === member.positionId)
+        : undefined;
+
+    if (target) {
+      groups[target.key]?.push(member);
+    } else {
+      groups['BN']?.push(member);
+    }
+  }
+
+  return groups;
 }
 
 /**
@@ -161,11 +229,6 @@ export function FootballLeagueRosterScreen(
     variables: { teamId },
   });
 
-  const positionIdToSlot = useMemo(
-    () => buildPositionIdToSlot(rosterSlots),
-    [rosterSlots],
-  );
-
   useEffect(() => {
     if (error) {
       LOGGER.error('Failed to load roster', error, { teamId });
@@ -177,26 +240,15 @@ export function FootballLeagueRosterScreen(
     [defensiveFormat],
   );
 
+  const renderSlots = useMemo(
+    () => buildRenderSlots(slotOrder, rosterSlots),
+    [slotOrder, rosterSlots],
+  );
+
   const grouped = useMemo(() => {
     const members = data?.teamMembers ?? [];
-    const groups: Record<string, TeamMember[]> = {};
-    for (const slot of slotOrder) groups[slot] = [];
-
-    for (const member of members) {
-      const assignedSlot =
-        member.positionId != null
-          ? positionIdToSlot.get(member.positionId)
-          : undefined;
-
-      if (assignedSlot && groups[assignedSlot]) {
-        groups[assignedSlot]?.push(member);
-      } else {
-        groups['BN']?.push(member);
-      }
-    }
-
-    return groups;
-  }, [data, slotOrder, positionIdToSlot]);
+    return groupMembersBySlot(renderSlots, members);
+  }, [data, renderSlots]);
 
   if (error) {
     return (
@@ -228,12 +280,12 @@ export function FootballLeagueRosterScreen(
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <YStack gap="$3" paddingBottom="$8">
-        {slotOrder.map((slot) => {
-          const members = grouped[slot] ?? [];
+        {renderSlots.map((slot) => {
+          const members = grouped[slot.key] ?? [];
           return (
             <Card
-              key={slot}
-              testID={`${slot.toLowerCase()}-card`}
+              key={slot.key}
+              testID={`${slot.key.toLowerCase()}-card`}
               bordered
               backgroundColor="$background"
               borderRadius="$4"
@@ -247,10 +299,10 @@ export function FootballLeagueRosterScreen(
                 gap="$2"
               >
                 <Text fontSize="$3" fontWeight="700" color="$color12">
-                  {slot}
+                  {slot.type}
                 </Text>
                 <Text fontSize="$2" color="$gray9" flex={1}>
-                  {SLOT_LABELS[slot] ?? slot}
+                  {SLOT_LABELS[slot.type] ?? slot.type}
                 </Text>
                 <Text fontSize="$2" color="$gray8">
                   {members.length}

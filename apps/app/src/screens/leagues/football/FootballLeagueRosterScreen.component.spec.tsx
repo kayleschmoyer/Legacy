@@ -262,4 +262,79 @@ describe('FootballLeagueRosterScreen', () => {
     const qbCard = screen.getByTestId('qb-card');
     expect(within(qbCard).queryByText('Bench Guy')).toBeNull();
   });
+
+  describe('multi-slot grouping by configured position (LS-6449)', () => {
+    const qbAllen = {
+      id: 301,
+      playerId: 10,
+      positionId: 21,
+      player: {
+        id: 10,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        eligiblePositions: ['QB'],
+      },
+    };
+    const qbMahomes = {
+      id: 302,
+      playerId: 11,
+      positionId: 20,
+      player: {
+        id: 11,
+        firstName: 'Patrick',
+        lastName: 'Mahomes',
+        eligiblePositions: ['QB'],
+      },
+    };
+    const twoQbSlots = [
+      { id: 20, leagueId: 1, positionType: 'QB' },
+      { id: 21, leagueId: 1, positionType: 'QB' },
+    ];
+
+    it('shows both QBs as filled in a 2-QB league even when their positionIds are mismatched to slot array order', () => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [qbAllen, qbMahomes] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          rosterSlots={twoQbSlots}
+        />,
+      );
+
+      const slotForMahomes = screen.getByTestId('qb-20-card');
+      expect(within(slotForMahomes).getByText('Patrick Mahomes')).toBeTruthy();
+      expect(within(slotForMahomes).queryByText('Empty slot')).toBeNull();
+
+      const slotForAllen = screen.getByTestId('qb-21-card');
+      expect(within(slotForAllen).getByText('Josh Allen')).toBeTruthy();
+      expect(within(slotForAllen).queryByText('Empty slot')).toBeNull();
+    });
+
+    it('marks only the genuinely unfilled QB slot as Empty when just one of two QB slots has a member', () => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [qbMahomes] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          rosterSlots={twoQbSlots}
+        />,
+      );
+
+      const filledSlot = screen.getByTestId('qb-20-card');
+      expect(within(filledSlot).getByText('Patrick Mahomes')).toBeTruthy();
+
+      const emptySlot = screen.getByTestId('qb-21-card');
+      expect(within(emptySlot).getByText('Empty slot')).toBeTruthy();
+    });
+  });
 });
