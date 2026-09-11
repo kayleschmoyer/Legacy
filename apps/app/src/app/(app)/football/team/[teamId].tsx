@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Separator, Spinner, Tabs, Text, YStack } from 'tamagui';
 import { Alert, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -38,7 +38,11 @@ import { MatchupCard } from '../../../../features/matchup/components/MatchupCard
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { INTERNAL_JWT_KEY } from '../../../../common/auth/jwtRefresh';
+import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { deriveFootballScoringFormat } from '../../../../common/scoring/footballScoringFormat';
+import { LeagueWebSocketContext } from '../../../../context/LeagueWebSocketContext';
+import { useLeagueWebSocketLifecycle } from '../../../../hooks/useLeagueWebSocketLifecycle';
+import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 
 const SCORING_FORMAT_LABELS: Record<FootballScoringFormat, string> = {
   standard: 'Standard',
@@ -226,6 +230,27 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
       />
     </YStack>
   );
+}
+
+/**
+ * Subscribes to page-level WS events for the team screen (LS-6445). Rendered
+ * as a child of LeagueWebSocketContext.Provider (not the provider component
+ * itself) so it can actually read the context value the provider supplies —
+ * mirrors LeagueWSPageHandler in
+ * apps/app/src/app/(app)/football/league/[leagueId].tsx.
+ */
+function TeamWSPageHandler({
+  onRosterUpdate,
+  onMatchupScoreUpdate,
+}: {
+  onRosterUpdate: () => void;
+  onMatchupScoreUpdate: () => void;
+}) {
+  useLeagueWebSocket({
+    onRosterUpdate,
+    onMatchupScoreUpdated: onMatchupScoreUpdate,
+  });
+  return null;
 }
 
 type LeagueScoringProfile = NonNullable<
@@ -524,7 +549,11 @@ export default function FootballTeam(): React.JSX.Element {
 
   const numTeamId = toIntId(teamId);
 
-  const { loading: loadingTeam, data: team } = useGetTeamByIdQuery({
+  const {
+    loading: loadingTeam,
+    data: team,
+    refetch: refetchTeam,
+  } = useGetTeamByIdQuery({
     skip: numTeamId === null,
     variables: {
       teamId: numTeamId ?? 0,
@@ -564,14 +593,16 @@ export default function FootballTeam(): React.JSX.Element {
     scoringProfileData?.leagueScoringProfile,
   );
 
-  const { loading: loadingMembers, data: membersData } = useGetTeamMembersQuery(
-    {
-      skip: numTeamId === null,
-      variables: {
-        teamId: numTeamId ?? 0,
-      },
+  const {
+    loading: loadingMembers,
+    data: membersData,
+    refetch: refetchMembers,
+  } = useGetTeamMembersQuery({
+    skip: numTeamId === null,
+    variables: {
+      teamId: numTeamId ?? 0,
     },
-  );
+  });
 
   const currentWeekNumber = leagueData?.league?.currentWeekNumber;
 
@@ -589,13 +620,14 @@ export default function FootballTeam(): React.JSX.Element {
     return map;
   }, [nflByeWeekData?.nflTeamSeasonMetadata]);
 
-  const { data: matchupScoresData } = useMatchupScoresQuery({
-    skip: team?.team?.leagueId === undefined || currentWeekNumber == null,
-    variables: {
-      leagueId: team?.team?.leagueId ?? 0,
-      weekNum: currentWeekNumber ?? 0,
-    },
-  });
+  const { data: matchupScoresData, refetch: refetchMatchupScores } =
+    useMatchupScoresQuery({
+      skip: team?.team?.leagueId === undefined || currentWeekNumber == null,
+      variables: {
+        leagueId: team?.team?.leagueId ?? 0,
+        weekNum: currentWeekNumber ?? 0,
+      },
+    });
 
   const actualScores = useMemo(
     () => buildActualScores(matchupScoresData?.matchupScores, numTeamId ?? 0),
@@ -608,12 +640,40 @@ export default function FootballTeam(): React.JSX.Element {
     loading: loadingMatchup,
     data: matchupData,
     error: matchupError,
+    refetch: refetchMatchup,
   } = useGetMatchupByIdQuery({
     skip: currentMatchupId == null,
     variables: {
       id: currentMatchupId ?? 0,
     },
   });
+
+  // Live score updates during a game (LS-6445): the team screen's matchup
+  // score data used to be fetched once on mount, so a user watching their
+  // team through a live game saw stale scores until they navigated away and
+  // back. This reuses the WS ROSTER_UPDATE / MATCHUP_SCORE_UPDATED pattern
+  // already established for the league route
+  // (apps/app/src/app/(app)/football/league/[leagueId].tsx) and the baseball
+  // matchup screen instead of adding a separate polling mechanism.
+  const teamLeagueId = team?.team?.leagueId;
+  const [wsToken, setWsToken] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    void readKeychainValue(Secret.INTERNAL_JWT).then((token: string | null) => {
+      if (active && token) setWsToken(token);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const wsUrl = config.websocketUrl;
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({
+      url: wsUrl ?? undefined,
+      token: wsToken,
+      leagueId: teamLeagueId ?? undefined,
+    });
 
   const isOwner = userTeamData?.userTeamId === numTeamId;
 
@@ -757,61 +817,75 @@ export default function FootballTeam(): React.JSX.Element {
   }
 
   return (
-    <ScrollView data-testid="scrollview">
-      <YStack data-testid="layout">
-        <Tabs
-          value={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
-          onValueChange={(value) => {
-            const index = visibleTabs.indexOf(value as Tab);
-            if (index !== -1) setSelectedTabIdx(index);
-          }}
-          orientation="horizontal"
-        >
-          <Tabs.List>
-            {visibleTabs.map((tab) => (
-              <Tabs.Tab key={tab} value={tab}>
-                <Text>{tab}</Text>
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-        </Tabs>
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <TeamWSPageHandler
+        onRosterUpdate={() => {
+          void refetchMembers();
+          void refetchTeam();
+        }}
+        onMatchupScoreUpdate={() => {
+          void refetchMatchupScores();
+          void refetchMatchup();
+        }}
+      />
+      <ScrollView data-testid="scrollview">
+        <YStack data-testid="layout">
+          <Tabs
+            value={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
+            onValueChange={(value) => {
+              const index = visibleTabs.indexOf(value as Tab);
+              if (index !== -1) setSelectedTabIdx(index);
+            }}
+            orientation="horizontal"
+          >
+            <Tabs.List>
+              {visibleTabs.map((tab) => (
+                <Tabs.Tab key={tab} value={tab}>
+                  <Text>{tab}</Text>
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+          </Tabs>
 
-        <ScoringFormatCallout
-          scoringFormat={scoringFormat}
-          profile={scoringProfileData?.leagueScoringProfile}
-        />
+          <ScoringFormatCallout
+            scoringFormat={scoringFormat}
+            profile={scoringProfileData?.leagueScoringProfile}
+          />
 
-        <Separator />
-        <TabContent
-          onPlayerAssign={(player, position) => {
-            void handlePlayerAssign(player, position);
-          }}
-          onPlayerRemove={(position) => {
-            void handlePlayerRemove(position);
-          }}
-          onPlayerSwap={(incoming, target, displaced) => {
-            void handlePlayerSwap(incoming, target, displaced);
-          }}
-          selectedTab={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
-          rosterSlots={positions?.leaguePositions || []}
-          team={membersData?.teamMembers || []}
-          isOwner={isOwner}
-          teamId={numTeamId ?? 0}
-          leagueId={team.team.leagueId ?? 0}
-          avatarUrl={team.team.avatarUrl}
-          bannerUrl={team.team.bannerUrl}
-          defensiveFormat={leagueData?.league?.defensiveFormat}
-          scoringFormat={scoringFormat}
-          getPlayerStats={getPlayerStats}
-          matchup={matchupData?.getMatchupById}
-          matchupId={currentMatchupId ?? 0}
-          matchupLoading={loadingMatchup}
-          matchupError={matchupError}
-          byeWeeksByTeam={byeWeeksByTeam}
-          currentWeek={currentWeekNumber}
-        />
-      </YStack>
-    </ScrollView>
+          <Separator />
+          <TabContent
+            onPlayerAssign={(player, position) => {
+              void handlePlayerAssign(player, position);
+            }}
+            onPlayerRemove={(position) => {
+              void handlePlayerRemove(position);
+            }}
+            onPlayerSwap={(incoming, target, displaced) => {
+              void handlePlayerSwap(incoming, target, displaced);
+            }}
+            selectedTab={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
+            rosterSlots={positions?.leaguePositions || []}
+            team={membersData?.teamMembers || []}
+            isOwner={isOwner}
+            teamId={numTeamId ?? 0}
+            leagueId={team.team.leagueId ?? 0}
+            avatarUrl={team.team.avatarUrl}
+            bannerUrl={team.team.bannerUrl}
+            defensiveFormat={leagueData?.league?.defensiveFormat}
+            scoringFormat={scoringFormat}
+            getPlayerStats={getPlayerStats}
+            matchup={matchupData?.getMatchupById}
+            matchupId={currentMatchupId ?? 0}
+            matchupLoading={loadingMatchup}
+            matchupError={matchupError}
+            byeWeeksByTeam={byeWeeksByTeam}
+            currentWeek={currentWeekNumber}
+          />
+        </YStack>
+      </ScrollView>
+    </LeagueWebSocketContext.Provider>
   );
 }
 

@@ -65,7 +65,39 @@ jest.mock('@legacy-sports/shared-components', () => {
 });
 
 jest.mock('@legacy-sports/app-config/native', () => ({
-  config: { imageUploadUrl: 'https://upload.example.com' },
+  config: {
+    imageUploadUrl: 'https://upload.example.com',
+    websocketUrl: 'wss://ws.example.com',
+  },
+}));
+
+jest.mock('../../../../common/auth/AuthHooks', () => ({
+  readKeychainValue: jest.fn().mockResolvedValue('mock-jwt'),
+  Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
+}));
+
+jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
+  useLeagueWebSocketLifecycle: jest.fn(() => ({
+    client: null,
+    connected: false,
+  })),
+}));
+
+// Captures the options passed to useLeagueWebSocket by TeamWSPageHandler so
+// tests can invoke onRosterUpdate/onMatchupScoreUpdated directly without a
+// real WS client (LS-6445).
+let mockCapturedWsOptions: {
+  onRosterUpdate?: () => void;
+  onMatchupScoreUpdated?: () => void;
+} | null = null;
+jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
+  useLeagueWebSocket: (options: {
+    onRosterUpdate?: () => void;
+    onMatchupScoreUpdated?: () => void;
+  }) => {
+    mockCapturedWsOptions = options;
+    return { connected: false };
+  },
 }));
 
 // Avoids loading the real @legacy-sports/shared-components/football barrel
@@ -422,9 +454,15 @@ const mockMembers = [
   },
 ];
 
+const mockRefetchTeam = jest.fn(() => Promise.resolve());
+const mockRefetchMembers = jest.fn(() => Promise.resolve());
+const mockRefetchMatchupScores = jest.fn(() => Promise.resolve());
+const mockRefetchMatchup = jest.fn(() => Promise.resolve());
+
 const mockUseGetTeamByIdQuery = jest.fn(() => ({
   loading: false,
   data: { team: mockTeam },
+  refetch: mockRefetchTeam,
 }));
 const mockUseGetUserTeamIdQuery = jest.fn(() => ({
   data: { userTeamId: 42 },
@@ -440,6 +478,7 @@ const mockUseGetPositionsForLeagueQuery = jest.fn(() => ({
 const mockUseGetTeamMembersQuery = jest.fn(() => ({
   loading: false,
   data: { teamMembers: mockMembers },
+  refetch: mockRefetchMembers,
 }));
 const mockUpdateTeamMemberPosition = jest.fn(() => Promise.resolve({}));
 const mockSwapTeamMemberPositions = jest.fn(() => Promise.resolve({}));
@@ -456,6 +495,7 @@ const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
 const mockUseMatchupScoresQuery = jest.fn(() => ({
   loading: false,
   data: undefined,
+  refetch: mockRefetchMatchupScores,
 }));
 const mockMatchup = {
   id: 77,
@@ -471,6 +511,7 @@ const mockMatchup = {
 const mockUseGetMatchupByIdQuery = jest.fn(() => ({
   loading: false,
   data: { getMatchupById: mockMatchup },
+  refetch: mockRefetchMatchup,
 }));
 const mockUseGetNflTeamSeasonMetadataQuery = jest.fn(() => ({
   data: mockNflByeWeekData,
@@ -540,9 +581,11 @@ jest.mock('@legacy-sports/graphql', () => ({
 describe('FootballTeam route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCapturedWsOptions = null;
     mockUseGetTeamByIdQuery.mockReturnValue({
       loading: false,
       data: { team: mockTeam },
+      refetch: mockRefetchTeam,
     });
     mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 42 } });
     mockUseGetLeagueByIdQuery.mockReturnValue({
@@ -556,10 +599,12 @@ describe('FootballTeam route', () => {
     mockUseGetTeamMembersQuery.mockReturnValue({
       loading: false,
       data: { teamMembers: mockMembers },
+      refetch: mockRefetchMembers,
     });
     mockUseGetMatchupByIdQuery.mockReturnValue({
       loading: false,
       data: { getMatchupById: mockMatchup },
+      refetch: mockRefetchMatchup,
     });
     mockUseUpdateTeamMemberPositionMutation.mockReturnValue([
       mockUpdateTeamMemberPosition,
@@ -574,6 +619,7 @@ describe('FootballTeam route', () => {
     mockUseMatchupScoresQuery.mockReturnValue({
       loading: false,
       data: undefined,
+      refetch: mockRefetchMatchupScores,
     });
     mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({
       data: mockNflByeWeekData,
@@ -1003,6 +1049,43 @@ describe('FootballTeam route', () => {
       expect(screen.getByTestId('roster-board-bye-weeks')).toHaveTextContent(
         '{}',
       );
+    });
+  });
+
+  // LS-6445: the team screen previously fetched team/roster/matchup data once
+  // on mount with no live-update mechanism, so a user watching their team
+  // through a live game saw stale scores until they navigated away and back.
+  // These tests simulate the WS notifications a live game would push,
+  // reusing the same ROSTER_UPDATE / MATCHUP_SCORE_UPDATED wiring already
+  // established for the league route.
+  describe('live updates via WebSocket', () => {
+    it('refetches the matchup and matchup scores on a MATCHUP_SCORE_UPDATED push', () => {
+      render(<FootballTeam />);
+
+      mockCapturedWsOptions?.onMatchupScoreUpdated?.();
+
+      expect(mockRefetchMatchupScores).toHaveBeenCalledTimes(1);
+      expect(mockRefetchMatchup).toHaveBeenCalledTimes(1);
+    });
+
+    it('refetches team members and team on a ROSTER_UPDATE push', () => {
+      render(<FootballTeam />);
+
+      mockCapturedWsOptions?.onRosterUpdate?.();
+
+      expect(mockRefetchMembers).toHaveBeenCalledTimes(1);
+      expect(mockRefetchTeam).toHaveBeenCalledTimes(1);
+    });
+
+    it('unmounts cleanly without throwing (WS lifecycle cleanup)', () => {
+      // The actual client subscribe/unsubscribe + socket teardown on unmount
+      // is owned by useLeagueWebSocket / useLeagueWebSocketLifecycle (mocked
+      // here) and is covered by their own specs — this just guards against
+      // the team screen breaking that contract by, e.g., using the hooks
+      // conditionally after an early return.
+      const { unmount } = render(<FootballTeam />);
+      expect(mockCapturedWsOptions).not.toBeNull();
+      expect(() => unmount()).not.toThrow();
     });
   });
 });
