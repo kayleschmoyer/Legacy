@@ -325,6 +325,28 @@ export async function withApiIsolation(
 
   await use();
 
+  // Unregister route handlers before the page/test context is torn down.
+  // The refresh-jwt handler above awaits `page.context().cookies()`; if the
+  // app's background JWT-refresh timer fires in the gap between the test
+  // ending and fixture teardown, that await can throw "Test ended." against
+  // a route call that Playwright can no longer attribute to any test,
+  // failing the whole run instead of the test itself (LS-9742). Unrouting
+  // first ensures any in-flight handler invocation is cleanly discarded.
+  //
+  // On pages that keep generating a high volume of intercepted requests
+  // after the test body finishes (e.g. an unauthenticated landing page's
+  // background polling), `unrouteAll` itself can be slow enough to blow the
+  // whole test timeout — which surfaces as this same teardown throwing
+  // "Test ended.", just one line lower. Race it against a short timeout so
+  // teardown can never exceed the test timeout on its own; on timeout the
+  // routes are simply left registered for the page to tear down normally.
+  await Promise.race([
+    page.unrouteAll({ behavior: 'ignoreErrors' }),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]).catch(() => {
+    // Best-effort cleanup — a rejection here must never fail the test.
+  });
+
   // After the test body: fail if any request slipped through unmocked.
   if (unmockedOps.length > 0) {
     const unique = [...new Set(unmockedOps)];
