@@ -2,10 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import { breakpoints } from '@legacy-sports/design-tokens';
-import {
-  ALLOWED_POSITIONS_BY_SPORT,
-  DEFAULT_ROSTER_SIZE_BY_SPORT,
-} from '@legacy-sports/utils';
 import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
@@ -14,12 +10,13 @@ import type {
 } from './types';
 import { DraftGrid } from './DraftGrid';
 import { DraftBoardTimeline } from './DraftBoardTimeline';
+import { BENCH_SLOT, buildDepthChartBuckets } from './rosterSlots';
 import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
 import { useDraftViewportTier } from './hooks/useDraftViewport';
 import type { SportKind } from '../../config/sports';
-import { getPositionLabel, isPitcherSlot } from '../roster/rosterEligibility';
+import { getPositionLabel } from '../roster/rosterEligibility';
 import { csp } from '../players/crossPlatformStyle';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
 
@@ -190,115 +187,12 @@ const DepthGrid = tamaguiStyled(YStack, {
   },
 }) as StyledComponent;
 
-/** A single depth-chart slot bucket: one or more league-configured roster
- *  positions of the same canonical type (e.g. all SP/RP rows collapse into
- *  a single 'P' bucket), plus whichever of the user's drafted players have
- *  been greedily assigned to fill it. */
-interface DepthChartBucket {
-  positionType: string;
-  total: number;
-  players: DraftPlayer[];
-}
-
-const BENCH_SLOT = 'BENCH';
-
-/** A drafted player's eligible position strings, falling back to their
- *  single canonical `position` when granular eligibility wasn't loaded. */
-const eligiblePositionsOf = (player: DraftPlayer): string[] =>
-  player.eligiblePositions?.length
-    ? player.eligiblePositions
-    : [player.position];
-
-/**
- * Groups `myTeam`'s drafted players into the league's real configured roster
- * slots (`leaguePositions`, the same data RosterBoard renders elsewhere)
- * instead of a hardcoded, baseball-only slot list (LS-8785). Pitcher slot
- * rows (SP/RP/P) collapse into one 'P' bucket, matching `isPitcherSlot`'s
- * existing cross-sport definition of "the same slot" (LS-8069's fix,
- * generalized). Any players beyond the league's starter slots — including
- * true roster overflow — land in a synthetic BENCH bucket so no drafted
- * player is ever silently dropped from view.
- *
- * Eligibility is checked directly against `ALLOWED_POSITIONS_BY_SPORT[sport]`
- * rather than `rosterEligibility.ts`'s `canPlayerPlayPosition`, which reads
- * the legacy baseball-only `ALLOWED_POSITIONS` alias and would silently
- * reject every football slot.
- */
-export function buildDepthChartBuckets(
-  leaguePositions: ReadonlyArray<{ positionType: string }>,
-  myTeam: DraftPlayer[],
-  sport: SportKind,
-  maxRosterSize: number | null,
-): DepthChartBucket[] {
-  const order: string[] = [];
-  const totals = new Map<string, number>();
-  // Union of every real position type (e.g. both 'SP' and 'RP') that
-  // collapsed into a given bucket key, so eligibility checks against the
-  // canonical 'P' bucket still accept SP/RP-eligible players.
-  const allowedByBucket = new Map<string, Set<string>>();
-  const positionEligibility = ALLOWED_POSITIONS_BY_SPORT[sport];
-  for (const { positionType } of leaguePositions) {
-    const key = isPitcherSlot(positionType) ? 'P' : positionType;
-    if (!totals.has(key)) {
-      order.push(key);
-      allowedByBucket.set(key, new Set());
-    }
-    totals.set(key, (totals.get(key) ?? 0) + 1);
-    for (const accepted of positionEligibility[positionType] ?? []) {
-      allowedByBucket.get(key)?.add(accepted);
-    }
-  }
-  const startersTotal = leaguePositions.length;
-  const effectiveRosterSize =
-    maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[sport];
-  order.push(BENCH_SLOT);
-  totals.set(BENCH_SLOT, Math.max(0, effectiveRosterSize - startersTotal));
-
-  const buckets = new Map<string, DepthChartBucket>(
-    order.map((key) => [
-      key,
-      { positionType: key, total: totals.get(key) ?? 0, players: [] },
-    ]),
-  );
-
-  // Fill the most specific (narrowest eligible-position) slots first, so a
-  // player eligible for both a dedicated slot and a broad one (DH/FLEX) fills
-  // the dedicated slot — mirroring the fix in LS-8069.
-  const acceptListSize = (key: string): number =>
-    allowedByBucket.get(key)?.size ?? Infinity;
-  const fillOrder = order
-    .filter((key) => key !== BENCH_SLOT)
-    .sort((a, b) => acceptListSize(a) - acceptListSize(b));
-
-  let unassigned = [...myTeam];
-  for (const key of fillOrder) {
-    const bucket = buckets.get(key);
-    const allowed = allowedByBucket.get(key);
-    if (!bucket || !allowed) continue;
-    const stillUnassigned: DraftPlayer[] = [];
-    for (const player of unassigned) {
-      const eligible = eligiblePositionsOf(player).some((p) => allowed.has(p));
-      if (bucket.players.length < bucket.total && eligible) {
-        bucket.players.push(player);
-      } else {
-        stillUnassigned.push(player);
-      }
-    }
-    unassigned = stillUnassigned;
-  }
-
-  // Whatever's left — including true overflow beyond the configured roster
-  // size — always lands in BENCH, growing it past `total` if needed.
-  const bench = buckets.get(BENCH_SLOT);
-  if (bench) {
-    bench.players.push(...unassigned);
-    bench.total = Math.max(bench.total, bench.players.length);
-  }
-
-  // `buckets` was built from the same `order` array, so this always yields
-  // one entry per key in the original order (Map preserves insertion order).
-  return Array.from(buckets.values());
-}
+// Depth-chart slot derivation moved to `rosterSlots.ts` (LS-10004) so the
+// bottom-pinned slot strip can share it without importing this component
+// module. Re-exported here because existing callers (and their tests) import
+// it from this path.
+export { BENCH_SLOT, buildDepthChartBuckets };
+export type { DepthChartBucket } from './rosterSlots';
 
 type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
 type SortKey = string;

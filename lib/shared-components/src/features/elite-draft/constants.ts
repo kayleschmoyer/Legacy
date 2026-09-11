@@ -24,6 +24,14 @@ export const DEFAULT_PICK_TIME = 120; // matches server default
 
 export const DEFAULT_NUM_TEAMS = 12;
 
+/**
+ * Rendered height of the bottom-pinned positions-drafted slot strip
+ * (LS-10004). Lives here rather than in `DraftSlotStrip.tsx` so `styles.ts`
+ * can shorten `.d-layout` by exactly this much without importing a component:
+ * the strip overlays the board, and the board must not run underneath it.
+ */
+export const DRAFT_SLOT_STRIP_HEIGHT_PX = 64;
+
 export const CONFETTI_COLORS = [
   '#C5A55A',
   '#22C55E',

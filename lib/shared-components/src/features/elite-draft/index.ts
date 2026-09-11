@@ -42,6 +42,25 @@ export {
 } from './DraftRosterSlotRow';
 export { DraftTeamTab, type DraftTeamTabProps } from './DraftTeamTab';
 
+// Positions-drafted slot strip + its chip (LS-10004). The chip is exported
+// standalone because the phone squad strip (LS-10001) renders the same chip at
+// `size="sm"` rather than forking it.
+export {
+  DraftSlotChip,
+  slotAccentColor,
+  slotChipLabel,
+  type DraftSlotChipProps,
+  type DraftSlotChipSize,
+  type DraftSlotChipState,
+} from './DraftSlotChip';
+export { DraftSlotStrip, type DraftSlotStripProps } from './DraftSlotStrip';
+export {
+  buildRosterSlotInstances,
+  nextPrioritySlotKey,
+  rosterSlotFillCounts,
+  type RosterSlotInstance,
+} from './rosterSlots';
+
 // Draft Details settings summary (LS-9857) — rendered in the wide branch's
 // rail and the compact branch's Team tab.
 export {

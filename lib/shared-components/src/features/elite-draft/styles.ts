@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { breakpoints } from '@legacy-sports/design-tokens';
+import { DRAFT_SLOT_STRIP_HEIGHT_PX } from './constants';
 
 const NAV_HEIGHT_PX = 75;
 const NAV_Z_INDEX = 200;
@@ -216,8 +217,23 @@ export const CSS = `
   grid-template-columns: 1fr 320px;
   grid-template-rows: auto 1fr;
   grid-template-areas: "topband topband" "main rail";
-  height: 100%;
+  /* Shortened by exactly the slot strip's height so the bottom-pinned strip
+     overlays nothing (LS-10004): the board's own scroll containers end above
+     it rather than running underneath. */
+  height: calc(100% - ${DRAFT_SLOT_STRIP_HEIGHT_PX}px);
   overflow: hidden;
+}
+
+/* ===== Positions-drafted slot strip (LS-10004) =====
+   Design styles/board.css .slotbar — pinned to the bottom of the board,
+   above the layout grid. The chrome (surface, border, padding) lives in the
+   Tamagui component; this wrapper only positions it. */
+.d-slotbar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 5;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 /* ===== Top Status Band ===== */

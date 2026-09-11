@@ -19,6 +19,7 @@ import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftConnectionBanner } from './DraftConnectionBanner';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
+import { DraftSlotStrip } from './DraftSlotStrip';
 import { DraftPlayersTab } from './DraftPlayersTab';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
@@ -1695,6 +1696,17 @@ export function EliteDraftBoardScreen({
           showCommissionerControls={showCommissionerControls}
           leagueId={leagueId}
           draftStatus={queries.league?.draftStatus ?? null}
+        />
+      </div>
+
+      {/* Positions-drafted slot strip (LS-10004) — pinned below `.d-layout`,
+          which is shortened by exactly its height so it overlays nothing. */}
+      <div className="d-slotbar">
+        <DraftSlotStrip
+          leaguePositions={queries.leaguePositions}
+          players={playerData.myTeam}
+          sport={sport}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
         />
       </div>
 

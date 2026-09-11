@@ -4,16 +4,17 @@
  * roster slots, each rendered via the standalone {@link DraftRosterSlotRow}
  * so the recap child (LS-9402) can reuse the same row.
  *
- * Slot assignment reuses `buildDepthChartBuckets` (DraftPlayerBoard.tsx) —
- * the same narrowest-eligibility-first fill algorithm the spectator depth
- * chart already relies on — expanded from aggregated counts into one row per
- * slot instance, in league-configured order, with a synthetic BENCH row for
- * any drafted players beyond the starter slots.
+ * Slot assignment reuses `buildRosterSlotInstances` (rosterSlots.ts) — the
+ * shared expansion of `buildDepthChartBuckets`'s narrowest-eligibility-first
+ * fill into one entry per slot instance, in league-configured order, with a
+ * synthetic BENCH row for any drafted players beyond the starter slots. The
+ * bottom-pinned slot strip (LS-10004) renders the same entries as chips, so
+ * the two views cannot disagree.
  */
 import React, { useMemo } from 'react';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
-import { buildDepthChartBuckets } from './DraftPlayerBoard';
 import { DraftRosterSlotRow } from './DraftRosterSlotRow';
+import { buildRosterSlotInstances } from './rosterSlots';
 import { initialsOf } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
@@ -86,26 +87,10 @@ export function DraftTeamTab({
     return { players: list, pickByPlayerId: byPlayerId };
   }, [pickHistory, viewedTeamId, statsLookup]);
 
-  const buckets = useMemo(
+  const slots = useMemo(
     () =>
-      buildDepthChartBuckets(leaguePositions, players, sport, maxRosterSize),
+      buildRosterSlotInstances(leaguePositions, players, sport, maxRosterSize),
     [leaguePositions, players, sport, maxRosterSize],
-  );
-
-  const slotRows = useMemo(
-    () =>
-      buckets.flatMap((bucket) =>
-        Array.from({ length: bucket.total }, (_, i) => {
-          const player = bucket.players[i] ?? null;
-          return {
-            key: `${bucket.positionType}-${i}`,
-            positionType: bucket.positionType,
-            player,
-            pick: player ? (pickByPlayerId.get(player.id) ?? null) : null,
-          };
-        }),
-      ),
-    [buckets, pickByPlayerId],
   );
 
   return (
@@ -189,13 +174,17 @@ export function DraftTeamTab({
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <YStack paddingHorizontal="$3" paddingBottom="$4">
-          {slotRows.map((row) => (
+          {slots.map((slot) => (
             <DraftRosterSlotRow
-              key={row.key}
-              slotPositionType={row.positionType}
+              key={slot.key}
+              slotPositionType={slot.positionType}
               sport={sport}
-              player={row.player}
-              pick={row.pick}
+              player={slot.player}
+              pick={
+                slot.player
+                  ? (pickByPlayerId.get(slot.player.id) ?? null)
+                  : null
+              }
             />
           ))}
           {footer}

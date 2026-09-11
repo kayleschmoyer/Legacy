@@ -424,6 +424,10 @@ function makeBaseQueries(
       userMembership: { permissionLevel: 'member', teamId: 1 },
     },
     leagueTeams: [],
+    // The real `useDraftQueries` always returns an array here (it defaults to
+    // `[]`); the double omitted it, which only surfaced once the wide branch
+    // grew a consumer that reads it directly (LS-10004's slot strip).
+    leaguePositions: [],
     leagueDraft: {
       selectionMethod: 'standard',
       draftCompletedAt: null,
@@ -501,7 +505,8 @@ beforeEach(() => {
   mockUseDraftActions.mockReturnValue(makeBaseActions());
   mockUsePlayerData.mockReturnValue({
     enrichedPlayers: [],
-    myTeam: null,
+    // Real `usePlayerData` types this `DraftPlayer[]` and never returns null.
+    myTeam: [],
     myTeamPicks: [],
     statsLookup: new Map(),
   } as unknown as ReturnType<typeof usePlayerData>);
