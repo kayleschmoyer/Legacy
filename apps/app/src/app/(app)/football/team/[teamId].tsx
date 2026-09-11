@@ -7,6 +7,7 @@ import {
   UnifiedLoadingPanel,
   useTeamLogoUpload,
 } from '@legacy-sports/shared-components';
+import { MatchupAdditionalSections } from '@legacy-sports/shared-components/matchup';
 import type { FootballScoringFormat } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/native';
 import {
@@ -254,7 +255,7 @@ function MatchupTab({
   }
 
   return (
-    <YStack padding="$4" testID="matchup-tab-content">
+    <YStack padding="$4" gap="$4" testID="matchup-tab-content">
       <MatchupCard
         matchup={matchup}
         onPress={() =>
@@ -263,6 +264,10 @@ function MatchupTab({
           )
         }
       />
+      {/* LS-6446: same key-players/head-to-head/league-context analytics
+          already shown on the full matchup screen (FootballMatchupScreen),
+          surfaced here too so team detail isn't a stripped-down preview of it. */}
+      <MatchupAdditionalSections matchup={matchup} leagueId={leagueId} />
     </YStack>
   );
 }

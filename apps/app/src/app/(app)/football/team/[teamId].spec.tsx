@@ -271,6 +271,25 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
   };
 });
 
+jest.mock('@legacy-sports/shared-components/matchup', () => {
+  const { View, Text } = jest.requireActual<RNComponents>('react-native');
+  return {
+    MatchupAdditionalSections: ({
+      matchup,
+      leagueId,
+    }: {
+      matchup: { id: number } | null | undefined;
+      leagueId: number;
+    }) => (
+      <View testID="matchup-additional-sections">
+        <Text>
+          Additional sections for matchup {matchup?.id} in league {leagueId}
+        </Text>
+      </View>
+    ),
+  };
+});
+
 jest.mock('../../../../features/matchup/components/MatchupCard', () => {
   const { Pressable, Text } = jest.requireActual<
     RNComponents & { Pressable: typeof import('react-native').Pressable }
@@ -753,6 +772,29 @@ describe('FootballTeam route', () => {
     fireEvent.press(screen.getByTestId('tab-Matchup'));
     expect(screen.getByTestId('matchup-card')).toBeTruthy();
     expect(screen.getByText('Matchup 77')).toBeTruthy();
+  });
+
+  it('shows enhanced matchup analytics (key players, history, league context) on the Matchup tab (LS-6446)', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.getByTestId('matchup-additional-sections')).toBeTruthy();
+    expect(
+      screen.getByText('Additional sections for matchup 77 in league 10'),
+    ).toBeTruthy();
+  });
+
+  it('does not show matchup analytics on the Matchup tab when there is no current matchup', () => {
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { ...mockLeague, currentMatchup: null } },
+    });
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupById: null },
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.queryByTestId('matchup-additional-sections')).toBeNull();
   });
 
   it('navigates to the full matchup screen when the matchup card is pressed', () => {
