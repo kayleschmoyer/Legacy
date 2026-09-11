@@ -33,6 +33,7 @@ const mockExistsSync = existsSync as jest.MockedFunction<typeof existsSync>;
 const ROOT = resolve('/repo');
 const DB = resolve('/repo/lambdas/db');
 const WEB = resolve('/repo/apps/web');
+const WEB_E2E = resolve('/repo/apps/web-e2e');
 
 // Real target files are assumed to exist unless explicitly listed as missing
 // via `setMissingFiles` — only `eslint.config.mjs` presence is governed by
@@ -275,6 +276,56 @@ describe('runESLint', () => {
     expect(jobCallArgs()).toEqual([
       '--max-warnings=0',
       'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts',
+    ]);
+  });
+
+  it('lints a package-less nested-project file (apps/web-e2e) from the repo root cwd via a repo-relative path (LS-10006 repro)', async () => {
+    // apps/web-e2e owns its own flat config but, unlike lambdas/db, has no
+    // package.json of its own — the same package-less shape binJobSpec's
+    // doc comment describes for LS-10021/LS-10022.
+    setConfigRoots([ROOT, WEB_E2E]);
+    setupDoneJob('');
+
+    const result = await runESLint({
+      files: ['apps/web-e2e/src/tests/football-free-agents-waivers.spec.ts'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    // The nearer (project) config governs, not the workspace root one.
+    expect(jobCallOpts().cwd).toBe(WEB_E2E);
+    // Relativised to the project's own config root, not left repo-relative —
+    // the ticket's repro is eslint reporting this exact pattern as
+    // unmatched when cwd/args disagree on which root it's relative to.
+    expect(jobCallArgs()).toEqual([
+      '--max-warnings=0',
+      'src/tests/football-free-agents-waivers.spec.ts',
+    ]);
+    // Resolved from the *repo* root's node_modules/.bin (hoisted), not a
+    // nonexistent apps/web-e2e/node_modules/.bin — this is what binJobSpec
+    // guarantees by taking repoRoot as a separate argument from cwd.
+    expect(jobCallOpts().command).toBe(
+      resolve(ROOT, 'node_modules', '.bin', 'eslint'),
+    );
+  });
+
+  it('lints a package-less nested-project file (apps/web-e2e) via an absolute path (LS-10006 repro)', async () => {
+    setConfigRoots([ROOT, WEB_E2E]);
+    setupDoneJob('');
+
+    const result = await runESLint({
+      files: [
+        resolve(
+          ROOT,
+          'apps/web-e2e/src/tests/football-free-agents-waivers.spec.ts',
+        ),
+      ],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallOpts().cwd).toBe(WEB_E2E);
+    expect(jobCallArgs()).toEqual([
+      '--max-warnings=0',
+      'src/tests/football-free-agents-waivers.spec.ts',
     ]);
   });
 

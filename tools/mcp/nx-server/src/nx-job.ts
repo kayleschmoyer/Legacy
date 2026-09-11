@@ -56,7 +56,10 @@ export function nxJobSpec(nxArgs: string[]): JobSpec {
  * relative to the target directory, etc.) then resolves against the wrong
  * base — this is the root cause LS-10022 (`nx_run_e2e_specs`) and LS-10021
  * (`nx_run_eslint`) both hit, independently, against the same
- * package-less `apps/web-e2e` directory.
+ * package-less `apps/web-e2e` directory. LS-10006 is the same `nx_run_eslint`
+ * symptom against the same directory, reported independently before this fix
+ * landed — not a third, distinct bug; see run-eslint.spec.ts's LS-10006 repro
+ * tests for regression coverage tied to that ticket specifically.
  *
  * Invoking the resolved binary directly sidesteps pnpm's package-scope
  * resolution altogether, so the job's `cwd` option (passed straight to
