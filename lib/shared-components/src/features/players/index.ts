@@ -79,6 +79,7 @@ export {
   type PlayerCareerStats,
   type ScoringStatRecord,
   type PlayerProjectionsResult,
+  type ProjectionMap,
 } from './usePlayerProjections';
 
 // API exports

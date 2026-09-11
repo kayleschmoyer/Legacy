@@ -106,8 +106,20 @@ export function applyMultiplierGroups(
   return result;
 }
 
+export interface UseLeagueScoringSettingsOptions {
+  /**
+   * When set, polls `leagueScoringProfile` at this interval (ms) so a
+   * scoring-format change made elsewhere (e.g. by the commissioner, in a
+   * different session) is detected and the settings this hook returns —
+   * and anything memoized off them, like player projections — refresh
+   * rather than silently staying pinned to the format active at mount.
+   */
+  readonly pollInterval?: number;
+}
+
 export function useLeagueScoringSettings(
   leagueId?: number | null,
+  options?: UseLeagueScoringSettingsOptions,
 ): LeagueScoringState {
   const numericLeagueId = Number.isFinite(leagueId ?? NaN)
     ? Number(leagueId)
@@ -119,6 +131,7 @@ export function useLeagueScoringSettings(
     variables: { leagueId: numericLeagueId || 0 },
     skip: shouldSkip,
     fetchPolicy: 'cache-and-network',
+    pollInterval: options?.pollInterval,
   });
 
   const settings = useMemo(
