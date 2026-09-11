@@ -182,9 +182,24 @@ export async function getPlaywrightReport(params: {
     if (namesToTry.length === 1) {
       const s3Fallback = await tryS3Fallback({ prNumber, runId, reportName });
       if (s3Fallback) return s3Fallback;
+      // The S3 fallback couldn't help (unresolvable SHA, or an empty/failed
+      // listing) — proactively flag the credentials-gap root cause (LS-9846)
+      // instead of surfacing a bare 404, since this is the common single-name
+      // lookup path (prNumber/reportName) that never reaches the multi-name
+      // fallthrough message below.
+      const credentialsGapNote = deploysTokenWasFallback()
+        ? ' This session is using a fallback GitHub token without read access ' +
+          'to the private legacy-sports-deploys repo (PREVIEW_APP_PRIVATE_KEY/' +
+          'PREVIEW_APP_ID are not configured) — that is the likely cause of ' +
+          'this 404, not a missing report. Try ci_get_playwright_test_result ' +
+          'with source: "s3" and the numeric run ID to read raw artifacts from ' +
+          'S3 instead.'
+        : '';
       return {
         isError: true,
-        content: [{ type: 'text', text: report.error }],
+        content: [
+          { type: 'text', text: `${report.error}${credentialsGapNote}` },
+        ],
       };
     }
     lastError = report.error;
@@ -248,12 +263,23 @@ export async function getPlaywrightReport(params: {
   // the broad fallback token (PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID unset),
   // in which case a 404 here does NOT mean the report is missing (LS-8546).
   const triedNames = namesToTry.join(', ');
+  // Proactively call out the credentials-gap root cause (LS-9846) rather than
+  // surfacing a bare 404: this still fires even when tryS3Fallback() above ran
+  // but couldn't help (SHA unresolvable, or the S3 listing came back
+  // empty/failed).
+  const credentialsGapNote = deploysTokenWasFallback()
+    ? ' This session is using a fallback GitHub token without read access to ' +
+      'the private legacy-sports-deploys repo (PREVIEW_APP_PRIVATE_KEY/' +
+      'PREVIEW_APP_ID are not configured) — that is the likely cause of this ' +
+      '404, not a missing report. Try ci_get_playwright_test_result with ' +
+      'source: "s3" and the numeric run ID to read raw artifacts from S3 instead.'
+    : ' If this is an integration nightly run, pass source="s3" to ci_get_playwright_test_result with the numeric run ID to fetch from S3 instead.';
   return {
     isError: true,
     content: [
       {
         type: 'text',
-        text: `Report not found. Tried: ${triedNames}. Last error: ${lastError} If this is an integration nightly run, pass source="s3" to ci_get_playwright_test_result with the numeric run ID to fetch from S3 instead.`,
+        text: `Report not found. Tried: ${triedNames}. Last error: ${lastError}${credentialsGapNote}`,
       },
     ],
   };

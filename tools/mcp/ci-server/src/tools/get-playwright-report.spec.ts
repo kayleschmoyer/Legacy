@@ -513,6 +513,10 @@ describe('getPlaywrightReport — S3 fallback on credentials gap (LS-9236)', () 
     const result = await getPlaywrightReport({ prNumber: 42 });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe('GitHub API 404: credentials gap');
+    expect(result.content[0].text).toContain('GitHub API 404: credentials gap');
+    expect(result.content[0].text).toContain(
+      'fallback GitHub token without read access',
+    );
+    expect(result.content[0].text).toContain('source: "s3"');
   });
 });

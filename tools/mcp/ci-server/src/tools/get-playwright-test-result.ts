@@ -407,14 +407,27 @@ export async function getPlaywrightTestResult(params: {
     const triedNames = namesToTry.join(', ');
     const baseError =
       report && 'error' in report ? report.error : 'Unknown fetch error';
+    // Proactively call out the credentials-gap root cause (LS-9846) rather
+    // than surfacing a bare 404: when the last getDeploysToken() call fell
+    // back to the broad token, this 404 very likely means that token simply
+    // lacks read access to the private legacy-sports-deploys repo, not that
+    // the report doesn't exist. This still fires even when the automatic S3
+    // fallback above ran but couldn't help (SHA unresolvable, or the S3
+    // listing came back empty/failed).
+    const credentialsGapNote = deploysTokenWasFallback()
+      ? '\n\nThis session is using a fallback GitHub token without read access ' +
+        'to the private legacy-sports-deploys repo (PREVIEW_APP_PRIVATE_KEY/' +
+        'PREVIEW_APP_ID are not configured) — that is the likely cause of this ' +
+        '404, not a missing report. Try calling this tool again with ' +
+        'source: "s3" and the numeric GitHub run ID to read raw artifacts from ' +
+        'S3 instead.'
+      : '\n\nIf this is an integration nightly run, pass source="s3" with the numeric run ID to fetch from S3 instead.';
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text:
-            `${baseError}\n\nTried report names: ${triedNames}.\n` +
-            `If this is an integration nightly run, pass source="s3" with the numeric run ID to fetch from S3 instead.`,
+          text: `${baseError}\n\nTried report names: ${triedNames}.${credentialsGapNote}`,
         },
       ],
     };

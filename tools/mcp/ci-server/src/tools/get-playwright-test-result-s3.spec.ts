@@ -410,6 +410,10 @@ describe('getPlaywrightTestResult — automatic S3 fallback on credentials gap (
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('credentials gap');
     expect(result.content[0].text).toContain('Tried report names: pr-7243');
+    expect(result.content[0].text).toContain(
+      'fallback GitHub token without read access',
+    );
+    expect(result.content[0].text).toContain('source: "s3"');
   });
 });
 
