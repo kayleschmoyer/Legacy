@@ -12,6 +12,7 @@ import {
   LeagueActivityFeed,
   LeagueScoringSummary,
   OnThisDayFeed,
+  type OnThisDayPlayerPress,
   PanelCard,
 } from '@legacy-sports/shared-components';
 import {
@@ -116,7 +117,7 @@ interface LeagueOverviewTabProps {
   onJoinDraft: () => void;
   onViewAllStandings: () => void;
   onInviteShare: () => void;
-  onPlayerPress: (playerId: number) => void;
+  onPlayerPress: (params: OnThisDayPlayerPress) => void;
   /**
    * Navigates to a team's Team Detail page (LS-5446). Optional — a caller
    * that doesn't supply it (or a row with no `teamId`) renders the Quick

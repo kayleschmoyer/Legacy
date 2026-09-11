@@ -340,6 +340,14 @@ export interface GameLogsTableProps {
    * leaving the page.
    */
   initialPlayerId?: string;
+  /**
+   * Pre-seed the date-range filter on mount (ISO `YYYY-MM-DD`). Used to
+   * deep-link straight to a specific game — e.g. from the On This Day widget
+   * (LS-9763). Both fields remain editable.
+   */
+  initialStartDate?: string;
+  /** @see initialStartDate */
+  initialEndDate?: string;
   /** Page size hint for the server. */
   pageSize?: number;
 }
@@ -821,14 +829,16 @@ function GameLogsTable({
   sport = 'mlb',
   isPremium = false,
   initialPlayerId = '',
+  initialStartDate = '',
+  initialEndDate = '',
   pageSize = DEFAULT_PAGE_SIZE,
 }: GameLogsTableProps) {
   const [filters, dispatch] = useReducer(filterReducer, {
     ...INITIAL_FILTERS,
     player: initialPlayerId,
   });
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 

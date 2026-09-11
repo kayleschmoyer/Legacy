@@ -128,6 +128,47 @@ type Entry = NonNullable<
 >[number];
 
 /**
+ * Payload passed to {@link OnThisDayFeedProps.onPlayerPress} — widened from a
+ * bare `playerId` (LS-9763) so consumers can deep-link straight to the game
+ * the entry is about, rather than the player's generic profile page.
+ */
+export interface OnThisDayPlayerPress {
+  playerId: number;
+  brefId: string | null | undefined;
+  season: number | string | null | undefined;
+  gameIdentifier: string | null | undefined;
+  /** ISO `YYYY-MM-DD` date parsed from `gameIdentifier`, or `null` if it
+   *  couldn't be parsed. See {@link parseGameIdentifierDate}. */
+  gameDate: string | null;
+}
+
+/**
+ * Parse the ISO game date out of a bref-style `gameIdentifier`
+ * (`TTTYYYYMMDDN` — 3-char team code, 4-digit year, 2-digit month, 2-digit
+ * day, 1-digit doubleheader index; e.g. `NYA192709300` → `1927-09-30`). The
+ * date lives at characters 8-11 (1-indexed), matching the
+ * `SUBSTRING(gameIdentifier, 8, 2)` / `SUBSTRING(gameIdentifier, 10, 2)`
+ * month/day extraction in `StatisticsService.ts`.
+ *
+ * Returns `null` for a missing or malformed identifier rather than throwing,
+ * since callers use this to build an optional deep-link.
+ */
+export function parseGameIdentifierDate(
+  gameIdentifier: string | null | undefined,
+): string | null {
+  if (!gameIdentifier || gameIdentifier.length < 11) return null;
+  const year = gameIdentifier.slice(3, 7);
+  const month = gameIdentifier.slice(7, 9);
+  const day = gameIdentifier.slice(9, 11);
+  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || !/^\d{2}$/.test(day)) {
+    return null;
+  }
+  const iso = `${year}-${month}-${day}`;
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : iso;
+}
+
+/**
  * Build a one-line summary string for a batting entry.
  * e.g.  "3-for-4, 2 HR, 5 RBI"
  */
@@ -223,8 +264,12 @@ function EntryIcon({ type }: EntryIconProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export interface OnThisDayFeedProps {
-  /** Callback when a player entry is tapped. Consumers handle navigation. */
-  onPlayerPress?: (playerId: number) => void;
+  /**
+   * Callback when a player entry is tapped. Consumers handle navigation.
+   * Receives the full entry context (not just `playerId`) so a consumer can
+   * deep-link to the specific game the entry is about (LS-9763).
+   */
+  onPlayerPress?: (params: OnThisDayPlayerPress) => void;
   /**
    * Renders only the single top-ranked entry plus a "More ›" control that
    * expands to the full feed in place. Used by the compact mobile Home layout
@@ -388,10 +433,19 @@ export function OnThisDayFeed({
                 <EntryRow
                   onPress={() => {
                     if (entry.playerId && onPlayerPress) {
-                      onPlayerPress(entry.playerId);
+                      onPlayerPress({
+                        playerId: entry.playerId,
+                        brefId: entry.brefId,
+                        season: entry.season,
+                        gameIdentifier: entry.gameIdentifier,
+                        gameDate: parseGameIdentifierDate(entry.gameIdentifier),
+                      });
                     }
                   }}
-                  accessibilityLabel={`View ${playerName} profile`}
+                  // LS-9763 — the row now deep-links to this specific game
+                  // (where a consumer supports it) rather than the player's
+                  // generic profile, so the label describes that destination.
+                  accessibilityLabel={`View ${playerName} game details`}
                   role="link"
                 >
                   <EntryIcon type={entry.entryType} />

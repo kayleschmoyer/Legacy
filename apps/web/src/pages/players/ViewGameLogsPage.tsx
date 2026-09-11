@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { GameLogsTable } from '@legacy-sports/shared-components/stats';
 import { config } from '@legacy-sports/app-config/web';
 import { PageMeta } from '../../components/PageMeta';
@@ -16,6 +17,18 @@ import { BG_DARK, TEXT_HIGH_CONTRAST } from '../../constants/colors';
  * The stats API base comes from VITE_STATS_API_URL (via app-config), falling
  * back to the local dev stats service. Hardening this fallback for release
  * builds is tracked separately under LS-7691.
+ *
+ * Accepts optional `playerId` / `startDate` / `endDate` query params to
+ * deep-link straight to a specific player + date range — e.g. from the On
+ * This Day widget's game-specific navigation (LS-9763).
+ *
+ * This page is `PremiumGate`d, but the On This Day widget that links here is
+ * shown to free and logged-out users too. Deliberately no special-casing for
+ * that: a free/logged-out user who clicks an entry lands here and sees the
+ * same premium gate as any other visitor hitting this URL directly, rather
+ * than the widget silently no-oping or routing them somewhere else. That
+ * keeps the gate the single source of truth for premium access and avoids
+ * a second, inconsistent gating path in the widget itself.
  */
 const STATS_API_BASE =
   config.statsApiUrl?.replace(/\/+$/, '') ?? 'http://localhost:5000';
@@ -23,6 +36,10 @@ const GAME_LOGS_ENDPOINT = `${STATS_API_BASE}/baseball-game-logs`;
 
 export function ViewGameLogsPage() {
   const isPremium = useIsPremium();
+  const [searchParams] = useSearchParams();
+  const initialPlayerId = searchParams.get('playerId') ?? undefined;
+  const initialStartDate = searchParams.get('startDate') ?? undefined;
+  const initialEndDate = searchParams.get('endDate') ?? undefined;
   return (
     <div
       style={{
@@ -40,6 +57,9 @@ export function ViewGameLogsPage() {
           apiEndpoint={GAME_LOGS_ENDPOINT}
           sport="mlb"
           isPremium={isPremium}
+          initialPlayerId={initialPlayerId}
+          initialStartDate={initialStartDate}
+          initialEndDate={initialEndDate}
         />
       </PremiumGate>
     </div>

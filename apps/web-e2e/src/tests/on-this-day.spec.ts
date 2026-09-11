@@ -287,11 +287,20 @@ test.describe('On This Day Feed — Empty & Error States @regression', () => {
 });
 
 test.describe('On This Day Feed — Player Navigation @regression', () => {
-  test('clicking a batting entry row navigates to the player profile page', async ({
+  test('clicking a batting entry row deep-links to the specific game in Game Logs', async ({
     page,
   }) => {
+    // gameIdentifier 'NYA192709300' encodes 1927-09-30 at chars 8-11
+    // (LS-9763) — the click should land on that exact date range rather than
+    // the player's generic profile page.
     await mockOnThisDay(page, {
-      entries: [battingEntry({ playerId: 101 })],
+      entries: [
+        battingEntry({
+          playerId: 101,
+          brefId: 'ruthba01',
+          gameIdentifier: 'NYA192709300',
+        }),
+      ],
     });
     await page.goto('/');
     await page.waitForLoadState('load');
@@ -307,12 +316,14 @@ test.describe('On This Day Feed — Player Navigation @regression', () => {
 
     // Wait for the entry to be visible
     const entryRow = page.getByRole('link', {
-      name: /view babe ruth profile/i,
+      name: /view babe ruth game details/i,
     });
     await expect(entryRow).toBeVisible();
 
-    // Click the entry and verify navigation to the player profile page.
+    // Click the entry and verify navigation to the game-specific deep-link.
     await entryRow.click();
-    await expect(page).toHaveURL(/\/players\/101/);
+    await expect(page).toHaveURL(
+      /\/players\/view-game-logs\?playerId=ruthba01&startDate=1927-09-30&endDate=1927-09-30/,
+    );
   });
 });

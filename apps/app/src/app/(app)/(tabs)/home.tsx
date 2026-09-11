@@ -16,7 +16,10 @@ import {
   HomeScreen,
   mergeLeagueStandings,
 } from '@legacy-sports/shared-components';
-import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
+import {
+  OnThisDayFeed,
+  type OnThisDayPlayerPress,
+} from '@legacy-sports/shared-components/leagues';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
@@ -240,7 +243,11 @@ export default function HomeTab() {
   const userName = formatDisplayName(userInfo.username || 'Manager');
 
   const handlePlayerPress = useCallback(
-    (id: number) => {
+    // LS-9763 — mobile has no game-logs viewing surface yet (tracked as a
+    // follow-up in LS-10015), so unlike web this always lands on the
+    // player's generic profile page; the extra game context on `params` is
+    // unused here.
+    ({ playerId: id }: OnThisDayPlayerPress) => {
       // Validate the id before navigating (LS-8627) — a blind String(id)
       // coercion let a missing/invalid id reach PlayerDetail, which fails
       // to parse it and always shows "Player Not Found".

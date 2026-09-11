@@ -81,8 +81,9 @@ let capturedOnViewSport: ((sport: 'baseball' | 'football') => void) | null =
   null;
 // Capture topInset so tests can assert it's forwarded from useSafeAreaInsets (LS-8625)
 let capturedTopInset: number | undefined;
-// Capture the OnThisDayFeed onPlayerPress callback (LS-8627)
-let capturedOnPlayerPress: ((playerId: number) => void) | null = null;
+// Capture the OnThisDayFeed onPlayerPress callback (LS-8627, widened LS-9763)
+let capturedOnPlayerPress: ((params: { playerId: number }) => void) | null =
+  null;
 // Capture archived-toggle callbacks and state so tests can drive them (LS-8633)
 let capturedOnShowArchived: (() => void) | null = null;
 let capturedOnHideArchived: (() => void) | null = null;
@@ -198,7 +199,7 @@ jest.mock('@legacy-sports/shared-components/leagues', () => ({
   OnThisDayFeed: ({
     onPlayerPress,
   }: {
-    onPlayerPress?: (playerId: number) => void;
+    onPlayerPress?: (params: { playerId: number }) => void;
   }) => {
     capturedOnPlayerPress = onPlayerPress ?? null;
     return null;
@@ -501,7 +502,7 @@ describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
   it('navigates to PlayerDetail with a validated string playerId for a valid id', () => {
     render(<HomeTab />);
     void act(() => {
-      capturedOnPlayerPress?.(7);
+      capturedOnPlayerPress?.({ playerId: 7 });
     });
 
     expect(mockPush).toHaveBeenCalledWith({
@@ -513,7 +514,7 @@ describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
   it('skips navigation for an invalid id instead of pushing a bad param', () => {
     render(<HomeTab />);
     void act(() => {
-      capturedOnPlayerPress?.(0);
+      capturedOnPlayerPress?.({ playerId: 0 });
     });
 
     expect(mockPush).not.toHaveBeenCalled();

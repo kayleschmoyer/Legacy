@@ -236,7 +236,23 @@ export function HomePage(): React.JSX.Element {
   );
 
   const onThisDay = (
-    <OnThisDayFeed onPlayerPress={(id) => navigate(`/players/${id}`)} />
+    <OnThisDayFeed
+      onPlayerPress={({ playerId, brefId, gameDate }) => {
+        // Deep-link straight to the game this entry is about (LS-9763)
+        // rather than the player's generic profile page — falls back to the
+        // profile page when the identifier can't be resolved to a game date.
+        if (brefId && gameDate) {
+          const params = new URLSearchParams({
+            playerId: brefId,
+            startDate: gameDate,
+            endDate: gameDate,
+          });
+          navigate(`/players/view-game-logs?${params.toString()}`);
+          return;
+        }
+        navigate(`/players/${playerId}`);
+      }}
+    />
   );
 
   return (

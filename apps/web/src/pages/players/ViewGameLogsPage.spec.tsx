@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ViewGameLogsPage } from './ViewGameLogsPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -42,13 +43,54 @@ describe('ViewGameLogsPage — isPremium prop wiring (LS-7463)', () => {
 
   it('passes isPremium=true to GameLogsTable for a premium user', () => {
     mockIsPremium = true;
-    render(<ViewGameLogsPage />);
+    render(
+      <MemoryRouter>
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
     expect(capturedGameLogsTableProps.isPremium).toBe(true);
   });
 
   it('passes isPremium=false to GameLogsTable for a free user', () => {
     mockIsPremium = false;
-    render(<ViewGameLogsPage />);
+    render(
+      <MemoryRouter>
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
     expect(capturedGameLogsTableProps.isPremium).toBe(false);
+  });
+});
+
+describe('ViewGameLogsPage — query param deep-link (LS-9763)', () => {
+  beforeEach(() => {
+    capturedGameLogsTableProps = {};
+    jest.clearAllMocks();
+  });
+
+  it('passes playerId/startDate/endDate query params through as initial* props', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          '/players/view-game-logs?playerId=ruthba01&startDate=1927-09-30&endDate=1927-09-30',
+        ]}
+      >
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
+    expect(capturedGameLogsTableProps.initialPlayerId).toBe('ruthba01');
+    expect(capturedGameLogsTableProps.initialStartDate).toBe('1927-09-30');
+    expect(capturedGameLogsTableProps.initialEndDate).toBe('1927-09-30');
+  });
+
+  it('leaves the initial* props undefined when no query params are present', () => {
+    render(
+      <MemoryRouter>
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
+    expect(capturedGameLogsTableProps.initialPlayerId).toBeUndefined();
+    expect(capturedGameLogsTableProps.initialStartDate).toBeUndefined();
+    expect(capturedGameLogsTableProps.initialEndDate).toBeUndefined();
   });
 });
