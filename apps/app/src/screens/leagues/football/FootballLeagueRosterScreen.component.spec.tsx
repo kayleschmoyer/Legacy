@@ -1,5 +1,10 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import * as graphqlLib from '@legacy-sports/graphql';
@@ -23,6 +28,53 @@ jest.mock('@legacy-sports/graphql', () => ({
     error: undefined,
   })),
 }));
+
+const mockUseHasEntitlement = jest.fn<boolean, [string]>(() => false);
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
+}));
+
+// Pass-through gate: render children for premium users, otherwise an upgrade
+// marker so tests can assert the locked state without the real overlay.
+jest.mock('../../../features/subscription/PremiumGate', () => ({
+  PremiumGate: ({
+    isPremium,
+    children,
+  }: {
+    isPremium: boolean;
+    children: React.ReactNode;
+  }) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    const { Text } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return isPremium
+      ? (children as React.JSX.Element)
+      : ReactActual.createElement(Text, null, 'UPGRADE_TO_PREMIUM');
+  },
+}));
+
+jest.mock('@legacy-sports/shared-components', () => {
+  const { Pressable, Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Chip: ({
+      label,
+      selected,
+      onPress,
+      labelTestID,
+    }: {
+      label: string;
+      selected?: boolean;
+      onPress?: () => void;
+      labelTestID?: string;
+      [key: string]: unknown;
+    }) => (
+      <Pressable testID={labelTestID} onPress={onPress}>
+        <Text>{selected ? `${label} (selected)` : label}</Text>
+      </Pressable>
+    ),
+  };
+});
 
 jest.mock('tamagui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>(
@@ -78,6 +130,7 @@ jest.mock('tamagui', () => {
 describe('FootballLeagueRosterScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseHasEntitlement.mockImplementation(() => false);
     jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
       data: { teamMembers: [mockMember] },
       loading: false,
@@ -353,6 +406,99 @@ describe('FootballLeagueRosterScreen', () => {
 
       const emptySlot = screen.getByTestId('qb-21-card');
       expect(within(emptySlot).getByText('Empty slot')).toBeTruthy();
+    });
+  });
+
+  describe('advanced roster filters (LS-6450)', () => {
+    const byeMember = {
+      id: 102,
+      playerId: 2,
+      player: {
+        id: 2,
+        firstName: 'Pat',
+        lastName: 'Mahomes',
+        eligiblePositions: ['QB'],
+        nflTeam: 'KC',
+      },
+    };
+
+    beforeEach(() => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [mockMember, byeMember] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+    });
+
+    it('omits the filter bar entirely when no currentWeek is passed', () => {
+      mockUseHasEntitlement.mockImplementation(() => true);
+      render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+      expect(screen.queryByTestId('roster-filters')).toBeNull();
+    });
+
+    it('gates the filter bar behind the upgrade prompt for free users', () => {
+      mockUseHasEntitlement.mockImplementation(() => false);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 6 }}
+          currentWeek={6}
+        />,
+      );
+      expect(screen.getByText('UPGRADE_TO_PREMIUM')).toBeTruthy();
+      expect(screen.queryByTestId('hide-bye-week-filter-chip')).toBeNull();
+      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+        'advanced_search_filters',
+      );
+    });
+
+    it('shows the filter bar for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(() => true);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 6 }}
+          currentWeek={6}
+        />,
+      );
+      expect(screen.getByTestId('hide-bye-week-filter-chip')).toBeTruthy();
+    });
+
+    it('hides bye-week players once the filter chip is toggled on for premium users', () => {
+      mockUseHasEntitlement.mockImplementation(() => true);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 6 }}
+          currentWeek={6}
+        />,
+      );
+
+      expect(screen.getByText('Pat Mahomes')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('hide-bye-week-filter-chip'));
+
+      expect(screen.queryByText('Pat Mahomes')).toBeNull();
+      expect(screen.getByText('Josh Allen')).toBeTruthy();
+    });
+
+    it('toggling the filter chip has no effect for free users', () => {
+      mockUseHasEntitlement.mockImplementation(() => false);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 6 }}
+          currentWeek={6}
+        />,
+      );
+
+      // No chip to press for free users — the gate blocks interaction entirely.
+      expect(screen.queryByTestId('hide-bye-week-filter-chip')).toBeNull();
+      expect(screen.getByText('Pat Mahomes')).toBeTruthy();
     });
   });
 });

@@ -7,6 +7,22 @@ import {
   isMemberOnBye,
 } from './FootballLeagueRosterScreen';
 
+jest.mock('@legacy-sports/shared-components', () => ({
+  Chip: () => null,
+}));
+
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: jest.fn(() => false),
+}));
+
+jest.mock('../../../features/subscription/PremiumGate', () => ({
+  PremiumGate: ({ children }: { children: unknown }) => children,
+}));
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: { advanced_search_filters: 'advanced_search_filters' },
+}));
+
 describe('getSlotOrder', () => {
   it('returns DST slot order when defensiveFormat is dst', () => {
     const order = getSlotOrder('dst');

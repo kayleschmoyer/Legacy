@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   ScrollView,
@@ -9,11 +9,15 @@ import {
   YStack,
 } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
+import { Chip } from '@legacy-sports/shared-components';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   type GetTeamMembersQuery,
   type LeaguePositionFragment,
   useGetTeamMembersQuery,
 } from '@legacy-sports/graphql';
+import { PremiumGate } from '../../../features/subscription/PremiumGate';
+import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 type TeamMember = NonNullable<
   NonNullable<GetTeamMembersQuery['teamMembers']>[number]
@@ -246,6 +250,20 @@ export function FootballLeagueRosterScreen(
     variables: { teamId },
   });
 
+  // LS-6450: advanced roster filters (premium). Only "hide players on bye"
+  // ships in this pass — it reuses the bye-week data this screen already
+  // has (LS-6430). Injury-status and NFL-game-start-time filters were also
+  // suggested on the ticket but have no backing field on `FootballPlayer`
+  // yet (no `injuryStatus`, no per-player kickoff time) — confirmed out of
+  // scope entirely per LS-6442's premium-parity investigation ("injury/IR
+  // features do not exist on this historical-data platform"), so they're
+  // left as a follow-up for game-start-time only, rather than faked from
+  // unrelated data.
+  const [hideByeWeekPlayers, setHideByeWeekPlayers] = useState(false);
+  const hasAdvancedFilters = useHasEntitlement(
+    ENTITLEMENTS.advanced_search_filters,
+  );
+
   useEffect(() => {
     if (error) {
       LOGGER.error('Failed to load roster', error, { teamId });
@@ -264,8 +282,21 @@ export function FootballLeagueRosterScreen(
 
   const grouped = useMemo(() => {
     const members = data?.teamMembers ?? [];
-    return groupMembersBySlot(renderSlots, members);
-  }, [data, renderSlots]);
+    const visibleMembers =
+      hasAdvancedFilters && hideByeWeekPlayers
+        ? members.filter(
+            (member) => !isMemberOnBye(member, byeWeeksByTeam, currentWeek),
+          )
+        : members;
+    return groupMembersBySlot(renderSlots, visibleMembers);
+  }, [
+    data,
+    renderSlots,
+    hasAdvancedFilters,
+    hideByeWeekPlayers,
+    byeWeeksByTeam,
+    currentWeek,
+  ]);
 
   if (error) {
     return (
@@ -309,6 +340,31 @@ export function FootballLeagueRosterScreen(
             {getDefensiveFormatLabel(defensiveFormat)}
           </Text>
         </XStack>
+        {currentWeek != null && (
+          <PremiumGate
+            isPremium={hasAdvancedFilters}
+            featureName="Roster Filters"
+            featureDescription="Filter your roster by bye week and other advanced criteria."
+          >
+            <XStack
+              testID="roster-filters"
+              paddingHorizontal="$1"
+              alignItems="center"
+              gap="$2"
+            >
+              <Text fontSize="$2" color="$gray9">
+                Filters:
+              </Text>
+              <Chip
+                label="Hide bye-week players"
+                tone="gold"
+                selected={hideByeWeekPlayers}
+                labelTestID="hide-bye-week-filter-chip"
+                onPress={() => setHideByeWeekPlayers((prev) => !prev)}
+              />
+            </XStack>
+          </PremiumGate>
+        )}
         {renderSlots.map((slot) => {
           const members = grouped[slot.key] ?? [];
           return (
