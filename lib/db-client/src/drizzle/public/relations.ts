@@ -4,6 +4,7 @@ import {
   teams,
   drafts,
   draftPicks,
+  draftParticipants,
   leagueMessages,
   leagueMembers,
   draftTeams,
@@ -51,12 +52,32 @@ export const draftsRelations = relations(drafts, ({ one, many }) => ({
   }),
   draftTeams: many(draftTeams),
   draftPicks: many(draftPicks),
+  participants: many(draftParticipants),
 }));
+
+export const draftParticipantsRelations = relations(
+  draftParticipants,
+  ({ one, many }) => ({
+    draft: one(drafts, {
+      fields: [draftParticipants.draftId],
+      references: [drafts.id],
+    }),
+    team: one(teams, {
+      fields: [draftParticipants.teamId],
+      references: [teams.id],
+    }),
+    picks: many(draftPicks),
+  }),
+);
 
 export const draftPicksRelations = relations(draftPicks, ({ one }) => ({
   draft: one(drafts, {
     fields: [draftPicks.draftId],
     references: [drafts.id],
+  }),
+  participant: one(draftParticipants, {
+    fields: [draftPicks.participantId],
+    references: [draftParticipants.id],
   }),
   team: one(teams, {
     fields: [draftPicks.teamId],

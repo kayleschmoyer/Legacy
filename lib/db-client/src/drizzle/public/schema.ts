@@ -2,6 +2,7 @@ export * from './models/ActivityLog';
 export * from './models/Badges';
 export * from './models/Chat';
 export * from './models/DisclosureGame';
+export * from './models/Drafts';
 export * from './models/Dues';
 export * from './models/Enums';
 export * from './models/FootballStatistics';

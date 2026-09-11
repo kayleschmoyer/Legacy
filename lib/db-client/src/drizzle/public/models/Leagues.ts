@@ -39,6 +39,9 @@ import {
   tradeOfferVoteChoice,
   draftSlotTradeStatus,
   sportKind,
+  draftKind,
+  mockDraftMode,
+  draftParticipantController,
 } from './Enums';
 
 /**
@@ -287,7 +290,42 @@ export const drafts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** Nullable in the database since LS-10073 — CHECK drafts_kind_league_ck
+     *  allows NULL only for kind = 'mock'. Typed non-null until a writer can
+     *  create a league-less draft (draft-first slices, epic LS-9252). */
     leagueId: integer('league_id').notNull(),
+    /** 'league' drafts belong to leagueId; 'mock' drafts stand alone (LS-10073). */
+    kind: draftKind('kind').notNull().default('league'),
+    /** Draft lifecycle status (LS-10073). Mirrors leagues.draft_status for
+     *  league drafts. Optional on insert: the drafts_fill_from_league trigger
+     *  copies it from the league when omitted. */
+    status: draftStatus('status')
+      .notNull()
+      .$defaultFn(() => sql`default`),
+    /** Mock-draft host, or the league owner for league drafts (LS-10073).
+     *  Filled from leagues.owner by trigger when omitted. */
+    createdBy: integer('created_by')
+      .notNull()
+      .$defaultFn(() => sql`default`),
+    /** Copy of the league's sport for league drafts (LS-10073). Filled from
+     *  leagues.sport by trigger when omitted. */
+    sport: sportKind('sport')
+      .notNull()
+      .$defaultFn(() => sql`default`),
+    /** Set only for kind = 'mock' (CHECK drafts_mock_mode_ck). */
+    mockMode: mockDraftMode('mock_mode'),
+    /** Only allowed with mockMode = 'offline' (CHECK drafts_control_all_teams_ck). */
+    controlAllTeams: boolean('control_all_teams').notNull().default(false),
+    /** Only allowed for online mock drafts (CHECK drafts_is_public_ck). League
+     *  drafts take their visibility from leagues.is_public. */
+    isPublic: boolean('is_public').notNull().default(false),
+    /** Mock drafts only (CHECK drafts_invite_code_mock_ck); league drafts use
+     *  leagues.invite_code. */
+    inviteCode: varchar('invite_code', { length: 8 }).unique(
+      'drafts_uk_invite_code',
+    ),
+    /** Online mock lobbies expire if nobody starts them. */
+    lobbyExpiresAt: timestamp('lobby_expires_at', { withTimezone: true }),
     draftMode: draftMode('draft_mode').notNull().default('live'),
     selectionMethod: selectionMethod('selection_method')
       .notNull()
@@ -318,7 +356,87 @@ export const drafts = pgTable(
         foreignColumns: [leagues.id],
         name: 'drafts_leagues_id_fk',
       }).onDelete('cascade'),
+      draftsCreatedByFk: foreignKey({
+        columns: [table.createdBy],
+        foreignColumns: [users.id],
+        name: 'drafts_created_by_fk',
+      }),
       leagueIdIdx: index('drafts_league_id_idx').on(table.leagueId),
+      // Weekly mock-draft quota: WHERE created_by = $1 AND created_at >= $2.
+      mockCreatedByCreatedAtIdx: index('drafts_mock_created_by_created_at_idx')
+        .on(table.createdBy, table.createdAt)
+        .where(sql`kind = 'mock'`),
+      // Public lobby browse list.
+      publicMockLobbyIdx: index('drafts_public_mock_lobby_idx')
+        .on(table.sport, table.createdAt)
+        .where(sql`kind = 'mock' AND is_public AND status = 'not-started'`),
+    };
+  },
+);
+
+/**
+ * Draft seat (LS-10073) — one row per draft slot, for both draft kinds.
+ *
+ * A league seat points at a team (teamId + leagueId, composite FK to teams);
+ * its owner is whoever holds league_members.team_id. A mock seat points at a
+ * user, or at nobody when it is open or AI-controlled. CHECKs keep teamId and
+ * leagueId both-null-or-both-set and forbid a seat with both a team and a user.
+ *
+ * Until the draft writers move over (LS-10074), a deferred trigger on
+ * draft_teams keeps league seats in step with draft_teams.
+ */
+export const draftParticipants = pgTable(
+  'draft_participants',
+  {
+    id: serial('id').primaryKey().notNull(),
+    draftId: integer('draft_id').notNull(),
+    /** 1-based draft position. Unique per draft (deferrable, so a single
+     *  statement may permute slots). */
+    slot: integer('slot').notNull(),
+    teamId: integer('team_id'),
+    leagueId: integer('league_id'),
+    userId: integer('user_id'),
+    controller: draftParticipantController('controller').notNull(),
+    seatName: varchar('seat_name', { length: 40 }).notNull(),
+    /** Same meaning as draft_teams.auto_pick. */
+    autoPick: boolean('auto_pick').notNull().default(false),
+    joinedAt: timestamp('joined_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      draftParticipantsDraftsIdFk: foreignKey({
+        columns: [table.draftId],
+        foreignColumns: [drafts.id],
+        name: 'draft_participants_drafts_id_fk',
+      }).onDelete('cascade'),
+      draftParticipantsTeamsIdLeagueIdFk: foreignKey({
+        columns: [table.teamId, table.leagueId],
+        foreignColumns: [teams.id, teams.leagueId],
+        name: 'draft_participants_teams_id_league_id_fk',
+      }).onDelete('cascade'),
+      draftParticipantsUserIdFk: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+        name: 'draft_participants_user_id_fk',
+      }).onDelete('set null'),
+      draftParticipantsUkDraftSlot: unique(
+        'draft_participants_uk_draft_slot',
+      ).on(table.draftId, table.slot),
+      draftParticipantsUkDraftTeam: unique(
+        'draft_participants_uk_draft_team',
+      ).on(table.draftId, table.teamId),
+      userIdIdx: index('draft_participants_user_id_idx')
+        .on(table.userId)
+        .where(sql`user_id IS NOT NULL`),
+      teamIdLeagueIdIdx: index('draft_participants_team_id_league_id_idx')
+        .on(table.teamId, table.leagueId)
+        .where(sql`team_id IS NOT NULL`),
     };
   },
 );
@@ -486,7 +604,15 @@ export const draftPicks = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
+    /** Nullable in the database since LS-10073 (mock-draft picks will have a
+     *  seat but no team). Typed non-null until a writer can omit it. */
     teamId: integer('team_id').notNull(),
+    /** The seat that made the pick (LS-10073). Optional on insert: the
+     *  draft_picks_fill_participant_id trigger resolves it from
+     *  (draft_id, team_id) when omitted. */
+    participantId: integer('participant_id')
+      .notNull()
+      .$defaultFn(() => sql`default`),
     playerId: integer('player_id').notNull(),
     round: integer('round').notNull(),
     pickNumber: integer('pick_number').notNull(),
@@ -515,6 +641,14 @@ export const draftPicks = pgTable(
         foreignColumns: [teams.id],
         name: 'draft_picks_teams_id_fk',
       }).onDelete('cascade'),
+      draftPicksParticipantIdFk: foreignKey({
+        columns: [table.participantId],
+        foreignColumns: [draftParticipants.id],
+        name: 'draft_picks_participant_id_fk',
+      }).onDelete('cascade'),
+      participantIdIdx: index('draft_picks_participant_id_idx').on(
+        table.participantId,
+      ),
       draftPicksPlayersIdFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
@@ -551,6 +685,9 @@ export const draftQueue = pgTable(
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
     teamId: integer('team_id').notNull(),
+    /** The queue owner's seat (LS-10073). Filled from (draft_id, team_id) by
+     *  trigger when omitted. */
+    participantId: integer('participant_id'),
     playerId: integer('player_id').notNull(),
     priority: integer('priority').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -572,6 +709,14 @@ export const draftQueue = pgTable(
         foreignColumns: [players.id],
         name: 'draft_queue_players_id_fk',
       }).onDelete('cascade'),
+      draftQueueParticipantIdFk: foreignKey({
+        columns: [table.participantId],
+        foreignColumns: [draftParticipants.id],
+        name: 'draft_queue_participant_id_fk',
+      }).onDelete('cascade'),
+      participantIdIdx: index('draft_queue_participant_id_idx').on(
+        table.participantId,
+      ),
       draftQueueUkDraftTeamPlayer: unique(
         'draft_queue_uk_draft_team_player',
       ).on(table.draftId, table.teamId, table.playerId),

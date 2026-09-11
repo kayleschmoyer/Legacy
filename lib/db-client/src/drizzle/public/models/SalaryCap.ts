@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { leagues } from './Leagues';
 import { players } from './Players';
-import { drafts, teams } from './Leagues';
+import { draftParticipants, drafts, teams } from './Leagues';
 
 /**
  * player_salaries — authoritative salary for every player in a salary-cap league.
@@ -83,6 +83,10 @@ export const auctionState = pgTable(
     nominatedPlayerId: integer('nominated_player_id'),
     currentBid: integer('current_bid'),
     currentBidderTeamId: integer('current_bidder_team_id'),
+    /** Seat ids for the nominator / current bidder (LS-10073). Filled from the
+     *  matching *_team_id columns by trigger when omitted. */
+    nominatorParticipantId: integer('nominator_participant_id'),
+    currentBidderParticipantId: integer('current_bidder_participant_id'),
     nominationDeadline: timestamp('nomination_deadline', {
       withTimezone: true,
     }),
@@ -97,6 +101,16 @@ export const auctionState = pgTable(
         name: 'auction_state_draft_fk',
       }).onDelete('cascade'),
       auctionStateDraftUk: unique('auction_state_uk_draft').on(table.draftId),
+      auctionStateNominatorParticipantIdFk: foreignKey({
+        columns: [table.nominatorParticipantId],
+        foreignColumns: [draftParticipants.id],
+        name: 'auction_state_nominator_participant_id_fk',
+      }).onDelete('set null'),
+      auctionStateCurrentBidderParticipantIdFk: foreignKey({
+        columns: [table.currentBidderParticipantId],
+        foreignColumns: [draftParticipants.id],
+        name: 'auction_state_current_bidder_participant_id_fk',
+      }).onDelete('set null'),
     };
   },
 );
@@ -114,6 +128,9 @@ export const auctionBudgets = pgTable(
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
     teamId: integer('team_id').notNull(),
+    /** The budget owner's seat (LS-10073). Filled from (draft_id, team_id) by
+     *  trigger when omitted. */
+    participantId: integer('participant_id'),
     remainingBudget: integer('remaining_budget').notNull(),
     playersWon: integer('players_won').notNull().default(0),
   },
@@ -134,6 +151,14 @@ export const auctionBudgets = pgTable(
         table.teamId,
       ),
       teamIdIdx: index('auction_budgets_team_id_idx').on(table.teamId),
+      auctionBudgetsParticipantIdFk: foreignKey({
+        columns: [table.participantId],
+        foreignColumns: [draftParticipants.id],
+        name: 'auction_budgets_participant_id_fk',
+      }).onDelete('cascade'),
+      participantIdIdx: index('auction_budgets_participant_id_idx').on(
+        table.participantId,
+      ),
     };
   },
 );

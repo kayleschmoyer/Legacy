@@ -70,6 +70,27 @@ export const draftStatus = pgEnum('draft_status', [
   'paused',
   'completed',
 ]);
+
+/** Draft-first model (LS-10073): a draft is owned by a league or is a standalone mock draft. */
+export const draftKind = pgEnum('draft_kind', ['league', 'mock']);
+
+/** Mock drafts only: solo against AI ('offline') or a multiplayer lobby ('online'). */
+export const mockDraftMode = pgEnum('mock_draft_mode', ['offline', 'online']);
+
+/** Who drives a draft seat. 'open' is an unclaimed lobby seat; it becomes 'ai' at start. */
+export const draftParticipantController = pgEnum(
+  'draft_participant_controller',
+  ['user', 'ai', 'open'],
+);
+
+export const invitationStatus = pgEnum('invitation_status', [
+  'pending',
+  'accepted',
+  'declined',
+  'revoked',
+  'expired',
+]);
+
 export const leaguePermissionLevel = pgEnum('league_permission_level', [
   'general_manager',
   'assistant_manager',
