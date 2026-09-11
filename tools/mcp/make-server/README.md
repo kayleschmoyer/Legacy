@@ -21,6 +21,7 @@ Exposes Makefile targets as structured MCP tools for AI agents. Prevents agents 
 **Types:** typecheck
 **Codegen:** codegen
 **Install:** install, install-force, install-node, install-python, setup, setup-force, setup-hooks
+**Dependency management:** lockfile
 **Database:** db-migrate, db-check-connections
 **Clean:** clean-safe, clean-cache, reset
 **Troubleshooting:** kill-stale, diagnose

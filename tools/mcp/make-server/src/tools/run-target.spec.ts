@@ -45,6 +45,11 @@ describe('runTarget — allowlist gate', () => {
     expect(result.content[0].text).toContain('sync-skill-index');
     expect(result.content[0].text).toContain('sync-agent-prompts');
   });
+
+  it('allows the lockfile target (LS-10028)', async () => {
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    expect(result.content[0].text).toContain('lockfile');
+  });
 });
 
 describe('runTarget — variable injection guard', () => {
@@ -206,6 +211,18 @@ describe('runTarget — runInBackground: true', () => {
     const body = payload(result);
     expect(body.status).toBe('running');
     expect(body.timeoutMs).toBe(600_000);
+  });
+
+  it('uses the default 300000ms timeout for lockfile (LS-10028)', async () => {
+    const result = await runTarget({
+      target: 'lockfile',
+      worktreePath: workDir,
+      runInBackground: true,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = payload(result);
+    expect(body.status).toBe('running');
+    expect(body.timeoutMs).toBe(300_000);
   });
 
   it.each(['build-all', 'test-all', 'install', 'install-force'])(

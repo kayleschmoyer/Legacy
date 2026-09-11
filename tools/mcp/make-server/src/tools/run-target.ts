@@ -124,6 +124,10 @@ const ALLOWED_TARGETS = new Set([
   'setup-force',
   'setup-hooks',
 
+  // Dependency management (LS-10028) — regenerates pnpm-lock.yaml in
+  // isolation, safe to run from within a worktree (LS-9837).
+  'lockfile',
+
   // Database
   'db-migrate',
   'db-check-connections',
