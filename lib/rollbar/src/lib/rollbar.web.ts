@@ -14,6 +14,7 @@ import {
 } from './types';
 import { RollbarOutputDestination } from './RollbarOutputDestination';
 import { sanitizeContext } from './sanitize-context';
+import { DEFAULT_DEDUPE_WINDOW_MS, RollbarDeduper } from './dedupe';
 
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
@@ -46,9 +47,20 @@ class WebRollbarImplementation implements RollbarInterface {
   private rollbarDestination: RollbarOutputDestination | null = null;
   /** Errors already reported to Rollbar — used by withRollbar to skip double-reporting. */
   private reportedErrors = new WeakSet<Error>();
+  /**
+   * Collapses bursts of identical items, keyed by `severity + ' ' + message`,
+   * so one repeating client-side error (a websocket give-up loop, a GraphQL
+   * error burst) can't exhaust the `maxItems` / `itemsPerMinute` budget and
+   * trip Rollbar's own "ignoring errors until reset" notices, masking
+   * whatever real errors follow in the same session (LS-8764). Mirrors the
+   * Node implementation's de-duplication (LS-8343), which this platform
+   * never had.
+   */
+  private deduper = new RollbarDeduper();
 
   init(config: RollbarConfig): void {
     try {
+      this.deduper.configure(config.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS);
       // Clamp captureRate into [0, 1]. undefined means "send everything".
       const rawRate = config.captureRate;
       const captureRate =
@@ -201,6 +213,15 @@ class WebRollbarImplementation implements RollbarInterface {
         });
         return;
       }
+      const { report, suppressed } = this.deduper.apply(
+        `${severity} ${error.message}`,
+        Date.now(),
+      );
+      if (!report) {
+        // Collapsed into an already-reported item this window; drop silently
+        // so it doesn't count against Rollbar's maxItems/itemsPerMinute budget.
+        return;
+      }
       const safeContext = context ? sanitizeContext(context) : undefined;
       const breadcrumbContext =
         this.breadcrumbs.length > 0
@@ -210,6 +231,7 @@ class WebRollbarImplementation implements RollbarInterface {
       const payload = {
         ...breadcrumbContext,
         ...(safeContext ?? {}),
+        ...(suppressed > 0 ? { suppressedSinceLastReport: suppressed } : {}),
       };
       switch (severity) {
         case 'warning':
