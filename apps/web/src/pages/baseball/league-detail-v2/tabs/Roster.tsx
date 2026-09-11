@@ -25,7 +25,8 @@ import {
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { Button, Text, useMedia, YStack } from 'tamagui';
+import { CombinedGraphQLErrors } from '@apollo/client';
+import { Button, Text, useMedia, XStack, YStack } from 'tamagui';
 import { PendingWaiverClaims } from '../../../../features/roster';
 import {
   computeMatchupPlayerStats,
@@ -55,6 +56,23 @@ function formatPeriodDate(iso: string): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+const PLAYER_LOCKED_MESSAGE =
+  'This player is locked — the matchup for the current week has already started.';
+
+/**
+ * Distinguishes the expected, intentional "player locked" validation
+ * (`extensions.code === 'MATCHUP_LOCKED'`, thrown by `checkPlayersNotLocked`
+ * in `lambdas/db/src/schema/authorization.ts`) from genuinely unexpected
+ * mutation failures, via the GraphQL error code rather than message text
+ * (LS-9798).
+ */
+function isMatchupLockedError(err: unknown): boolean {
+  return (
+    CombinedGraphQLErrors.is(err) &&
+    err.errors.some((e) => e.extensions?.['code'] === 'MATCHUP_LOCKED')
+  );
 }
 
 export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
@@ -88,6 +106,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const [inFlightPositionIds, setInFlightPositionIds] = useState<
     ReadonlySet<number>
   >(new Set());
+  const [lockedPlayerNotice, setLockedPlayerNotice] = useState<string | null>(
+    null,
+  );
 
   const addInFlight = useCallback((ids: number[]) => {
     setInFlightPositionIds((prev) => new Set([...prev, ...ids]));
@@ -109,17 +130,24 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       try {
         await updatePosition({
           variables: { teamMemberId: player.id, positionId: position.id },
+          // Handled locally below (locked-player banner, or LOGGER.error for
+          // anything else) — skip the global Apollo error toast/Rollbar link.
+          context: { suppressGlobalError: true },
         });
         await refetch();
       } catch (err) {
-        LOGGER.error(
-          'Failed to assign player to position',
-          err instanceof Error ? err : undefined,
-          {
-            playerId: player.id,
-            positionId: position.id,
-          },
-        );
+        if (isMatchupLockedError(err)) {
+          setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
+        } else {
+          LOGGER.error(
+            'Failed to assign player to position',
+            err instanceof Error ? err : undefined,
+            {
+              playerId: player.id,
+              positionId: position.id,
+            },
+          );
+        }
       } finally {
         removeInFlight([position.id]);
       }
@@ -137,17 +165,24 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       try {
         await updatePosition({
           variables: { teamMemberId: occupant.id, positionId: null },
+          // Handled locally below (locked-player banner, or LOGGER.error for
+          // anything else) — skip the global Apollo error toast/Rollbar link.
+          context: { suppressGlobalError: true },
         });
         await refetch();
       } catch (err) {
-        LOGGER.error(
-          'Failed to remove player from position',
-          err instanceof Error ? err : undefined,
-          {
-            playerId: occupant.id,
-            positionId: position.id,
-          },
-        );
+        if (isMatchupLockedError(err)) {
+          setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
+        } else {
+          LOGGER.error(
+            'Failed to remove player from position',
+            err instanceof Error ? err : undefined,
+            {
+              playerId: occupant.id,
+              positionId: position.id,
+            },
+          );
+        }
       } finally {
         removeInFlight([position.id]);
       }
@@ -182,18 +217,25 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
             teamMemberIdB: displaced.id,
             positionIdB: incoming.positionId ?? undefined,
           },
+          // Handled locally below (locked-player banner, or LOGGER.error for
+          // anything else) — skip the global Apollo error toast/Rollbar link.
+          context: { suppressGlobalError: true },
         });
         await refetch();
       } catch (err) {
-        LOGGER.error(
-          'Failed to swap player positions',
-          err instanceof Error ? err : undefined,
-          {
-            incomingId: incoming.id,
-            displacedId: displaced.id,
-            positionId: target.id,
-          },
-        );
+        if (isMatchupLockedError(err)) {
+          setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
+        } else {
+          LOGGER.error(
+            'Failed to swap player positions',
+            err instanceof Error ? err : undefined,
+            {
+              incomingId: incoming.id,
+              displacedId: displaced.id,
+              positionId: target.id,
+            },
+          );
+        }
       } finally {
         removeInFlight(affectedIds);
       }
@@ -411,6 +453,33 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       />
 
       <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+
+      {lockedPlayerNotice && (
+        <XStack
+          role="alert"
+          aria-live="assertive"
+          borderRadius="$4"
+          borderWidth={1}
+          backgroundColor="$orange3"
+          borderColor="$orange7"
+          padding="$3"
+          gap="$2"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Text fontSize="$3" color="$orange11" flex={1}>
+            {lockedPlayerNotice}
+          </Text>
+          <Button
+            size="$2"
+            chromeless
+            aria-label="Dismiss"
+            onPress={() => setLockedPlayerNotice(null)}
+          >
+            <I.X size={14} />
+          </Button>
+        </XStack>
+      )}
 
       {isCurrent && league.id != null && (
         <PendingTradeOfferBanner

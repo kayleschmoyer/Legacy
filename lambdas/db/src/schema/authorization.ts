@@ -45,8 +45,8 @@ import {
   AuthenticationError,
   EntitlementsStaleError,
   ForbiddenError,
+  MatchupLockedError,
   PremiumRequiredError,
-  UserInputError,
 } from './graphql-errors';
 import {
   ENTITLEMENT_LABELS,
@@ -777,6 +777,7 @@ export async function checkPlayersNotLocked(
     .select({
       team1Id: PublicSchema.matchups.team1Id,
       team2Id: PublicSchema.matchups.team2Id,
+      status: PublicSchema.matchups.status,
     })
     .from(PublicSchema.matchups)
     .where(
@@ -793,14 +794,22 @@ export async function checkPlayersNotLocked(
 
   if (startedMatchups.length === 0) return;
 
-  const lockedTeamIds = new Set<number>();
+  const lockedTeamStatus = new Map<number, string>();
   for (const m of startedMatchups) {
-    if (m.team1Id != null) lockedTeamIds.add(m.team1Id);
-    if (m.team2Id != null) lockedTeamIds.add(m.team2Id);
+    if (m.team1Id != null) lockedTeamStatus.set(m.team1Id, m.status);
+    if (m.team2Id != null) lockedTeamStatus.set(m.team2Id, m.status);
   }
 
-  if (membersWithTeam.some((m) => lockedTeamIds.has(m.teamId))) {
-    throw UserInputError(
+  const lockedMember = membersWithTeam.find((m) =>
+    lockedTeamStatus.has(m.teamId),
+  );
+  if (lockedMember) {
+    // Same condition/message as before (LS-9798) — only the wire error code
+    // changed, from generic BAD_USER_INPUT to MATCHUP_LOCKED, so the client
+    // can distinguish this expected, intentional validation from other
+    // input errors via `extensions.code` instead of message-string matching.
+    throw MatchupLockedError(
+      lockedTeamStatus.get(lockedMember.teamId) ?? 'in_progress',
       'Player is locked — the matchup for the current week has already started',
     );
   }
