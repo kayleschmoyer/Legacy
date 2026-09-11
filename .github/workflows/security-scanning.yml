@@ -892,6 +892,43 @@ jobs:
               throw lastError;
             }
 
+            // Proactive headroom check (LS-9231): the retry helper above only
+            // reacts once a call has already 403'd. Where the limit is close
+            // to exhausted, that's foreseeable ahead of time via the
+            // x-ratelimit-remaining header GitHub returns on every REST
+            // response — check it before the call and, if headroom is thin,
+            // wait for the window to reset (capped, since this job only has a
+            // few minutes) instead of spending an attempt on a call we can
+            // predict will fail.
+            const RATE_LIMIT_MIN_REMAINING = 5;
+            const RATE_LIMIT_MAX_WAIT_MS = 60_000;
+            async function ensureRateLimitHeadroom(label) {
+              let rateLimit;
+              try {
+                const response = await github.rest.rateLimit.get();
+                rateLimit = response.data.resources.core;
+              } catch (e) {
+                // Best-effort only - if we can't even check the rate limit,
+                // fall through and let the retry helper handle the real call.
+                core.warning(`${label}: failed to check rate limit headroom (${e.message}); proceeding anyway`);
+                return;
+              }
+
+              if (rateLimit.remaining > RATE_LIMIT_MIN_REMAINING) {
+                return;
+              }
+
+              const resetMs = rateLimit.reset * 1000 - Date.now();
+              const waitMs = Math.max(0, Math.min(resetMs, RATE_LIMIT_MAX_WAIT_MS));
+              core.warning(
+                `${label}: only ${rateLimit.remaining} API calls remaining (resets at ${new Date(rateLimit.reset * 1000).toISOString()}); ` +
+                  `waiting ${waitMs}ms before proceeding to avoid a foreseeable 403`
+              );
+              if (waitMs > 0) {
+                await new Promise(resolve => setTimeout(resolve, waitMs));
+              }
+            }
+
             // Prefer the PR head SHA over context.sha (which may be the
             // synthetic merge commit for PR runs).
             const sha = context.payload?.pull_request?.head?.sha || context.sha;
@@ -955,6 +992,7 @@ jobs:
             } else {
               for (const prNumber of uniquePrNumbers) {
                 try {
+                  await ensureRateLimitHeadroom(`pulls.get #${prNumber}`);
                   const { data: pr } = await withRateLimitRetry(
                     () => github.rest.pulls.get({ owner, repo, pull_number: prNumber }),
                     { label: `pulls.get #${prNumber}` }
@@ -1033,6 +1071,7 @@ jobs:
             // so a plain job rerun is enough to clear it once the window rolls
             // over — no re-push required.
             try {
+              await ensureRateLimitHeadroom('createCommitStatus');
               await withRateLimitRetry(
                 () => github.rest.repos.createCommitStatus({
                   owner,
