@@ -1,7 +1,5 @@
 import { AbsoluteFill, Sequence } from 'remotion';
-import { loadFont as loadBigShoulders } from '@remotion/google-fonts/BigShoulders';
-import { loadFont as loadLiterata } from '@remotion/google-fonts/Literata';
-import { loadFont as loadRobotoMono } from '@remotion/google-fonts/RobotoMono';
+import { loadLocalFonts } from './fonts';
 import { BG_DARK, SCENES } from './theme';
 
 import { TitleScene } from './scenes/TitleScene';
@@ -13,9 +11,7 @@ import { MatchupScene } from './scenes/MatchupScene';
 import { CTAScene } from './scenes/CTAScene';
 
 // Load fonts at module level so Remotion handles delayRender/continueRender
-loadBigShoulders('normal', { weights: ['400', '600', '700', '800'] });
-loadLiterata('normal', { weights: ['400', '600', '700'] });
-loadRobotoMono('normal', { weights: ['400', '500'] });
+loadLocalFonts();
 
 export const TutorialVideo = () => {
   return (

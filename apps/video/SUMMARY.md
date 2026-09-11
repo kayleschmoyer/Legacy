@@ -139,12 +139,13 @@ Defined in [`src/theme.ts`](src/theme.ts) and consistent with the repo-wide desi
 
 The app is self-contained — it does **not** import from any `lib/` packages.
 
-| Package                  | Purpose                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `remotion`               | Core Remotion primitives (`<AbsoluteFill>`, `<Sequence>`, `interpolate`, `spring`, etc.) |
-| `@remotion/cli`          | Studio dev server and render CLI                                                         |
-| `@remotion/google-fonts` | Font loading (`loadFont`)                                                                |
-| React / React-DOM        | Component runtime                                                                        |
+| Package           | Purpose                                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `remotion`        | Core Remotion primitives (`<AbsoluteFill>`, `<Sequence>`, `interpolate`, `spring`, etc.) |
+| `@remotion/cli`   | Studio dev server and render CLI                                                         |
+| React / React-DOM | Component runtime                                                                        |
+
+Fonts are vendored locally under [`public/fonts/`](public/fonts/) and loaded via [`src/fonts.ts`](src/fonts.ts) (`FontFace` + `delayRender`/`continueRender`) rather than fetched live from `fonts.gstatic.com` at build time — see LS-8751.
 
 ---
 
