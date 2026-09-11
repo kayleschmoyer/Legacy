@@ -660,6 +660,30 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         return;
       }
 
+      // Lock the league row for the rest of this transaction. Without this, a
+      // concurrent deleteLeague/deleteAllLeagues (DELETE FROM leagues, which
+      // cascade-deletes teams via teams_leagues_id_fk) can commit between the
+      // team lookup below and the team_members batch insert further down —
+      // buildPlayerPool alone issues several sequential queries, leaving a wide
+      // window. That interleaving surfaced as an opaque
+      // team_members_teams_id_fk violation deep inside the insert instead of a
+      // clean error (LS-10017). SELECT ... FOR UPDATE blocks the DELETE until
+      // this transaction finishes; if the league was already deleted before we
+      // got here, the lock read returns nothing and we fail fast, before ever
+      // reading (now-stale) teams.
+      const [lockedLeague] = await tx
+        .select({ id: PublicSchema.leagues.id })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1)
+        .for('update');
+
+      if (!lockedLeague) {
+        throw new Error(
+          `League ${leagueId} not found — it may have been deleted while the draft was queued`,
+        );
+      }
+
       // Step 1: Batch fetch all required data in parallel (including league config)
       const [teams, leaguePositions, leagueConfig] = await Promise.all([
         tx
@@ -1008,7 +1032,13 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
-          .limit(1),
+          .limit(1)
+          // Locks the league row for the rest of this transaction so a concurrent
+          // deleteLeague/deleteAllLeagues (which cascade-deletes teams via
+          // teams_leagues_id_fk) can't commit between this lookup and the
+          // team_members batch insert further down — see the matching comment
+          // in randomlyAssignPlayers (LS-10017).
+          .for('update'),
         tx
           .select({ id: PublicSchema.drafts.id })
           .from(PublicSchema.drafts)

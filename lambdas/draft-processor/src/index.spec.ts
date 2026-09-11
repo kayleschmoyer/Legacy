@@ -431,6 +431,75 @@ describe('draft-processor handler', () => {
       expect(result.batchItemFailures).toHaveLength(1);
     });
   });
+
+  // ── League deleted mid-draft (LS-10017) ─────────────────────────────────
+  //
+  // Regression coverage for the team_members_teams_id_fk violation reported
+  // in Rollbar item #249: randomlyAssignPlayers fetched `teams` early in its
+  // transaction, then ran several more (slow) queries via buildPlayerPool
+  // before the team_members batch insert. If the league was deleted (cascade
+  // -deleting its teams) in that window, the insert crashed with an opaque
+  // Postgres foreign-key error instead of a clean, expected failure. The fix
+  // locks the league row (SELECT ... FOR UPDATE) before doing any of that
+  // work, so a mid-transaction deletion is either blocked until this
+  // transaction finishes, or — if the league was already gone — surfaces as
+  // a clear "not found" error before any team/player data is touched.
+  describe('random draft — league deleted mid-transaction (LS-10017)', () => {
+    // Chainable query-builder mock: every method returns the same chain, and
+    // the chain is thenable — awaiting it (with or without a preceding
+    // .limit()/.for()) resolves to the next queued response. This mirrors
+    // exactly the two query shapes randomlyAssignPlayers issues before it
+    // would reach the team_members insert:
+    //   await tx.select(...).from(...).where(...)                (no .limit)
+    //   await tx.select(...).from(...).where(...).limit(1).for('update')
+    function makeChainableTx(responses: unknown[][]) {
+      let callIdx = 0;
+      const chain: Record<string, unknown> = {
+        from: jest.fn(() => chain),
+        where: jest.fn(() => chain),
+        limit: jest.fn(() => chain),
+        for: jest.fn(() => chain),
+        orderBy: jest.fn(() => chain),
+        then: (
+          resolve: (v: unknown) => unknown,
+          reject?: (e: unknown) => unknown,
+        ) => Promise.resolve(responses[callIdx++] ?? []).then(resolve, reject),
+        catch: (reject: (e: unknown) => unknown) =>
+          Promise.resolve(responses[callIdx++] ?? []).catch(reject),
+      };
+      const tx = { select: jest.fn(() => chain) };
+
+      return {
+        select: jest.fn(() => chain),
+        transaction: (cb: (tx: unknown) => Promise<unknown>) => cb(tx),
+      };
+    }
+
+    it('fails cleanly instead of surfacing a team_members_teams_id_fk violation when the league is gone', async () => {
+      // Response 1: existingMembersCheck (idempotency guard) — no team
+      // members yet. Response 2: the league lock (SELECT ... FOR UPDATE) —
+      // empty, simulating a league deleted after the draft was queued.
+      const db = makeChainableTx([[{ count: 0 }], []]);
+      mockRunWithPublicClient.mockImplementation(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(db),
+      );
+
+      const msg = makeValidStartDraftMessage({ leagueId: 1 });
+      const record = makeSqsRecord(msg);
+      const result = await handler(makeSqsEvent([record]));
+
+      // Draft processing failed for this message, but the failure is the
+      // clean "league not found" error, not an unhandled FK violation.
+      expect(result.batchItemFailures).toHaveLength(1);
+      expect(mockUpdateLeagueDraftStatus).toHaveBeenCalledWith(
+        1,
+        'not-started',
+        expect.stringContaining(
+          'League 1 not found — it may have been deleted while the draft was queued',
+        ),
+      );
+    });
+  });
 });
 
 // ── Bench assignment tests ────────────────────────────────────────────────
