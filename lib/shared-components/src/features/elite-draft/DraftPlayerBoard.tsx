@@ -1113,6 +1113,7 @@ export function DraftPlayerBoard({
           <>
             <YStack
               data-testid="player-pool"
+              minHeight={filteredPlayers.length === 0 ? 200 : undefined}
               style={csp({
                 display: 'grid',
                 gridTemplateColumns: gridCols,

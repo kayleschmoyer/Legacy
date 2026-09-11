@@ -297,6 +297,7 @@ export function useDraftQueries({
 
   const {
     data: availablePlayersData,
+    previousData: previousAvailablePlayersData,
     loading: availablePlayersLoading,
     error: availablePlayersError,
     refetch: refetchAvailablePlayers,
@@ -323,10 +324,14 @@ export function useDraftQueries({
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    const items = availablePlayersData?.getAvailableDraftPlayers ?? [];
+    // While a filter/search-driven refetch is in flight, Apollo clears `data`
+    // to undefined. Fall back to `previousData` so the board keeps rendering
+    // the prior player list instead of collapsing to an empty grid.
+    const source = availablePlayersData ?? previousAvailablePlayersData;
+    const items = source?.getAvailableDraftPlayers ?? [];
     setAllRawPlayers(items);
     setHasMorePlayers(items.length === PLAYER_PAGE_SIZE);
-  }, [availablePlayersData]);
+  }, [availablePlayersData, previousAvailablePlayersData]);
 
   const availablePlayers: AvailableDraftPlayer[] = useMemo(
     () =>
