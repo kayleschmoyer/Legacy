@@ -698,3 +698,108 @@ describe('PS_WRAPPER_SCRIPT (LS-9321 regression)', () => {
     },
   );
 });
+
+/**
+ * `wrapForExitSidecar` hardcodes `powershell.exe` (Windows PowerShell 5.1,
+ * "Desktop" edition) as the actual production trampoline on Windows — not
+ * `pwsh` (PowerShell 7+, "Core" edition), which the suite above uses as a
+ * cross-platform stand-in so this file gets *some* coverage on Linux CI
+ * (there is no Windows CI runner for this package). That substitution is not
+ * behavior-equivalent (LS-10064): `@($json | ConvertFrom-Json)` — wrapping
+ * the ConvertFrom-Json *pipeline expression itself* in `@()` — double-wraps
+ * its single emitted pipeline object (the already-deserialized array) on
+ * Desktop edition once the array has 2+ elements, but not on Core edition.
+ * The result: `$commandAndArgs.Count` comes back 1 instead of 2, and
+ * `$command` ends up holding the *entire original array* rather than just
+ * the command name — which PowerShell then silently stringifies
+ * (space-joined) when resolving it as a command, producing a
+ * CommandNotFoundException for a command name like "make pc-typecheck" that
+ * was never supposed to exist. Every existing case above (`pwsh`-only) either
+ * used zero args or otherwise didn't trip this, so none of them caught it;
+ * this block exists specifically to close that gap on developer machines,
+ * even though — per the same CI/runner constraint noted on `findPwsh` above —
+ * it cannot run in this repo's Linux-only CI and is local-Windows-only
+ * enforcement.
+ */
+describe('PS_WRAPPER_SCRIPT on Windows PowerShell 5.1 / Desktop edition (LS-10064 regression)', () => {
+  function findWindowsPowerShell(): string | null {
+    if (process.platform !== 'win32') return null;
+    // Unlike `pwsh`, `powershell.exe` has no bare `-Version` flag that exits
+    // 0 (it errors "Missing argument for parameter 'version'"), so probe
+    // with a trivial -Command instead.
+    const probe = spawnSync(
+      'powershell.exe',
+      ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', 'exit 0'],
+      { encoding: 'utf-8' },
+    );
+    return !probe.error && probe.status === 0 ? 'powershell.exe' : null;
+  }
+
+  const winPwsh = findWindowsPowerShell();
+  const maybeIt = winPwsh ? it : it.skip;
+  let scriptDir: string;
+  let scriptPath: string;
+
+  beforeAll(() => {
+    scriptDir = mkdtempSync(join(tmpdir(), 'mcp-jobs-ps-wrapper-winps-'));
+    scriptPath = join(scriptDir, 'run-with-exit-sidecar.ps1');
+    writeFileSync(scriptPath, PS_WRAPPER_SCRIPT);
+  });
+
+  afterAll(() => {
+    rmSync(scriptDir, { recursive: true, force: true });
+  });
+
+  function runWrapper(
+    exitPath: string,
+    command: string,
+    args: string[],
+  ): ReturnType<typeof spawnSync> {
+    return spawnSync(
+      winPwsh as string,
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-File',
+        scriptPath,
+        exitPath,
+        encodeCommandAndArgs(command, args),
+      ],
+      { encoding: 'utf-8' },
+    );
+  }
+
+  // The exact repro shape that broke every nx_run_pc_chunk call on Windows:
+  // a command with two total tokens (command + one arg), reproduced here
+  // with `cmd.exe /c echo` instead of `make <chunk>` for a hermetic assertion
+  // on stdout content and exit code.
+  maybeIt(
+    'invokes a two-token command correctly instead of stringifying the whole array into an unresolvable command name',
+    () => {
+      const exitPath = join(scriptDir, 'test-two-token.exit');
+      const result = runWrapper(exitPath, 'cmd.exe', [
+        '/c',
+        'echo',
+        'two-token-ok',
+      ]);
+
+      expect(result.stdout).not.toContain(SIDECAR_INVOKE_FAILURE_MARKER);
+      expect(result.stdout).not.toContain('CommandNotFoundException');
+      expect(result.stdout).toContain('two-token-ok');
+      expect(result.status).toBe(0);
+      expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+    },
+  );
+
+  // A single-element command array (no args) must keep working post-fix —
+  // this is the case ConvertFrom-Json unwraps to a scalar rather than a
+  // 1-element array, which is why the fix's extra `@()` wrap is still needed.
+  maybeIt('still runs a plain command with no args', () => {
+    const exitPath = join(scriptDir, 'test-plain-winps.exit');
+    const result = runWrapper(exitPath, 'cmd.exe', ['/c', 'exit 0']);
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+  });
+});

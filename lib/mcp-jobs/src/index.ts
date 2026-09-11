@@ -139,7 +139,17 @@ export const PS_WRAPPER_SCRIPT = `param(
 )
 
 $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($EncodedCommandAndArgs))
-$commandAndArgs = @($json | ConvertFrom-Json)
+# ConvertFrom-Json emits its whole parsed result as ONE pipeline object (here,
+# the already-deserialized array). Wrapping the PIPE ITSELF in @() — as
+# opposed to wrapping an already-materialized value — makes @() collect that
+# single pipeline object into an outer array, double-wrapping it: for a
+# multi-element JSON array, $commandAndArgs.Count is 1 and $commandAndArgs[0]
+# holds the *entire original array*, which PowerShell silently stringifies
+# (space-joined) when later used as a command name. Splitting the pipeline
+# result into its own variable first avoids this: @() then sees an
+# already-materialized array and passes it through unchanged (LS-10064).
+$parsedCommandAndArgs = $json | ConvertFrom-Json
+$commandAndArgs = @($parsedCommandAndArgs)
 $command = $commandAndArgs[0]
 $commandArgs = @()
 if ($commandAndArgs.Count -gt 1) {
