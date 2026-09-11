@@ -324,11 +324,45 @@ test.describe('Football Matchup Scoring Breakdown – structure @regression', ()
     await matchupPage.text('Starting Lineup — Pitchers').expectHidden();
   });
 
-  test('shows the football "Team Total" totals row label, not "Hitters Total"', async ({
+  test('the "Team Total" value equals the sum of the starters\' points, not just the label', async ({
+    page,
     matchupPage,
   }) => {
     await matchupPage.text('Team Total').expectVisible({ timeout: 10_000 });
     await matchupPage.text('Hitters Total').expectHidden();
+
+    // MatchupRosterComparison derives each team's "Team Total" (mrc-totals
+    // row with the "Team Total" label) by summing every starter's per-game
+    // score. Every mock player here has `games: []` (see file header — a
+    // football player's per-game score is always 0 in production today), so
+    // an empty-array sum makes the expected total 0 regardless of how many
+    // starters are on the team — deriving it from the fixture, rather than
+    // hardcoding 0, still catches a real regression: a bug that fabricated a
+    // non-zero contribution (or otherwise miscomputed the aggregation) would
+    // render a total other than the one summed here.
+    const startersActualSum = (teamId: number): number =>
+      MOCK_MATCHUP_PLAYERS.filter((mp) => mp.teamId === teamId).reduce(
+        (teamSum, mp) =>
+          teamSum + mp.games.reduce((gameSum: number) => gameSum, 0),
+        0,
+      );
+
+    const teamTotalRow = page
+      .locator('.mrc-totals')
+      .filter({ has: page.locator('.mrc-tot-lab', { hasText: 'Team Total' }) });
+    const team1ActualText = await teamTotalRow
+      .locator('.mrc-tot-cell.mrc-t1 .mrc-sc.mrc-actual .mrc-num')
+      .innerText();
+    const team2ActualText = await teamTotalRow
+      .locator('.mrc-tot-cell.mrc-t2 .mrc-sc.mrc-actual .mrc-num')
+      .innerText();
+
+    expect(Number.parseFloat(team1ActualText)).toBe(
+      startersActualSum(TEAM1_ID),
+    );
+    expect(Number.parseFloat(team2ActualText)).toBe(
+      startersActualSum(TEAM2_ID),
+    );
   });
 
   test('shows each starting player row for both teams', async ({
