@@ -101,8 +101,20 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
   // ─── Future draft date ──────────────────────────────────────────────────
 
   test('past dates are disabled in the draft date picker; today is selectable', async ({
+    page,
     leaguePage,
   }) => {
+    // Hermetic clock (LS-8874): this test used to derive "today" from the
+    // real wall clock, so it only ever exercised the draft-date picker's
+    // day-of-month-overflow path (LS-8869/LS-8873 — `navigateMonth`
+    // silently bouncing back to the current month when the adjacent month
+    // has fewer days than today's day-of-month) on the ~3 days a month
+    // where "today" happens to land on day 29-31. Every other day it was a
+    // no-op check that happened to pass. Pinning to a fixed day-31 "today"
+    // makes the test both deterministic (no wall-clock dependence, per this
+    // suite's hermeticity rule — see `mocks/time.ts`) and a permanent
+    // regression guard for that overflow class, instead of a 1-in-~30 shot.
+    await page.clock.install({ time: new Date(2026, 4, 31, 12, 0, 0) });
     await leaguePage.gotoCreate();
     await leaguePage.expandSection('draft');
 
@@ -110,7 +122,7 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
     // midnight) rendered via `.toISOString()`. Using `new Date()` (the
     // current instant, not midnight) here would drift a UTC day near
     // midnight depending on the runner's timezone.
-    const now = new Date();
+    const now = new Date(2026, 4, 31, 12, 0, 0);
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayKey = today.toISOString().slice(0, 10);
 
