@@ -41,6 +41,13 @@ jest.mock('../../components/PageMeta', () => ({
   ),
 }));
 
+// TeamBrandingSettings' own upload/validation/color/clear-confirmation
+// behavior is covered by TeamBrandingSettings.spec.tsx (LS-9670) — stub it
+// here so this file only exercises the page's gating around it.
+jest.mock('../../features/teams/TeamBrandingSettings', () => ({
+  TeamBrandingSettings: () => <div data-testid="team-branding-settings" />,
+}));
+
 /**
  * Surfaces the props the ACs care about as data attributes: `sport` (AC2),
  * `readOnly` (AC3), and the resolved slot order (AC4). The handler buttons let
@@ -171,6 +178,7 @@ jest.mock('tamagui', () => ({
     </button>
   ),
   H3: ({ children }: any) => <h3>{children}</h3>,
+  Separator: () => <hr />,
   Spinner: () => <span data-testid="spinner" />,
   Text: ({ children }: any) => <span>{children}</span>,
   XStack: ({ children }: any) => <div>{children}</div>,
@@ -358,6 +366,59 @@ describe('edit permission gate (AC3)', () => {
 
     expect(
       screen.queryByText(/viewing this team as a visitor/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ── Team Branding section gating (LS-9670) ──────────────────────────────────
+
+describe('Team Settings / branding gating (LS-9670)', () => {
+  it('renders the Team Branding section for the team GM', () => {
+    render(<FootballTeamDetailPage />);
+
+    expect(screen.getByText('Team Settings')).toBeInTheDocument();
+    expect(screen.getByTestId('team-branding-settings')).toBeInTheDocument();
+  });
+
+  it('renders the Team Branding section for a commissioner who does not own this team', () => {
+    mockViewerMembershipResult = {
+      data: {
+        viewerMembership: { teamId: 2, permissionLevel: 'commissioner' },
+      },
+      loading: false,
+      error: undefined,
+    };
+    render(<FootballTeamDetailPage />);
+
+    expect(screen.getByTestId('team-branding-settings')).toBeInTheDocument();
+  });
+
+  it('renders nothing for a visitor (not GM, not commissioner)', () => {
+    mockViewerMembershipResult = {
+      data: {
+        viewerMembership: { teamId: 2, permissionLevel: 'general_manager' },
+      },
+      loading: false,
+      error: undefined,
+    };
+    render(<FootballTeamDetailPage />);
+
+    expect(screen.queryByText('Team Settings')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('team-branding-settings'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders nothing while permission data is still loading', () => {
+    mockViewerMembershipResult = {
+      data: undefined,
+      loading: true,
+      error: undefined,
+    };
+    render(<FootballTeamDetailPage />);
+
+    expect(
+      screen.queryByTestId('team-branding-settings'),
     ).not.toBeInTheDocument();
   });
 });

@@ -1,20 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import type { ErrorLike } from '@apollo/client';
-import {
-  Button,
-  Dialog,
-  H3,
-  Input,
-  Paragraph,
-  Separator,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
-import type { TamaguiElement } from 'tamagui';
+import { Button, H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Skeleton } from '@legacy-sports/shared-components/ui';
 import {
   LeaguePositionFragment,
@@ -25,140 +13,22 @@ import {
   useGetTeamMembersQuery,
   useGetViewerMembershipQuery,
   useSwapTeamMemberPositionsMutation,
-  useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
-import {
-  normalizeTeamColor,
-  RosterBoard,
-  TEAM_BRANDING_PRESET_COLORS,
-} from '@legacy-sports/shared-components/roster';
+import { RosterBoard } from '@legacy-sports/shared-components/roster';
 import { LOGGER } from '@legacy-sports/logging';
-import { validateBrandingUrl } from './validate-branding-url';
 import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
+import { TeamBrandingSettings } from '../../features/teams/TeamBrandingSettings';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
-  BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
-import { getCsrfToken } from '../../lib/csrf';
 import { trackTeamViewed } from '../../utils/analytics';
-import { env } from '../../config/environment';
 import { useIsPremium } from '../../hooks/useIsPremium';
-
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
-const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
-
-interface ColorInputGroupProps {
-  label: string;
-  value: string;
-  presetColors: readonly string[];
-  onChange: (color: string) => void;
-}
-
-/**
- * LS-6046: swatch presets + hex/native color input, mirroring the pattern
- * already shipped on the league-detail-v2 Team tab (Team.tsx:20-98). Kept
- * local to this page rather than extracted/shared — see ticket Out of Scope.
- */
-const ColorInputGroup: React.FC<ColorInputGroupProps> = ({
-  label,
-  value,
-  presetColors,
-  onChange,
-}) => {
-  const [hexInput, setHexInput] = useState(value);
-
-  useEffect(() => {
-    setHexInput(value);
-  }, [value]);
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.startsWith('#')
-      ? e.target.value
-      : `#${e.target.value}`;
-    setHexInput(v);
-    if (HEX_COLOR_RE.test(v)) onChange(v);
-  };
-
-  return (
-    <YStack gap="$2">
-      <Text fontSize="$3" fontWeight="500">
-        {label}
-      </Text>
-      <XStack gap="$2" flexWrap="wrap">
-        {presetColors.map((c) => (
-          <button
-            key={c}
-            type="button"
-            aria-label={`Pick ${label.toLowerCase()} ${c}`}
-            aria-pressed={value === c}
-            onClick={() => onChange(c)}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              background: c,
-              border:
-                value === c
-                  ? `2px solid ${BRAND_GOLD_LIGHT}`
-                  : `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.35)}`,
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          />
-        ))}
-      </XStack>
-      <XStack gap="$2" alignItems="center">
-        <input
-          type="color"
-          aria-label={`${label} color picker`}
-          value={HEX_COLOR_RE.test(value) ? value : BRAND_NAVY_LIGHT}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setHexInput(e.target.value);
-          }}
-          style={{
-            width: 32,
-            height: 32,
-            padding: 0,
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-            background: 'none',
-          }}
-        />
-        <input
-          type="text"
-          aria-label={`${label} hex`}
-          value={hexInput}
-          onChange={handleTextChange}
-          placeholder="#RRGGBB"
-          maxLength={7}
-          style={{
-            width: 100,
-            fontFamily: 'monospace',
-            fontSize: 13,
-            padding: '4px 8px',
-            borderRadius: 4,
-            border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.35)}`,
-          }}
-        />
-      </XStack>
-      {hexInput && !HEX_COLOR_RE.test(hexInput) && (
-        <Text fontSize="$2" style={{ color: BRAND_SEAM_RED }}>
-          Enter a valid 6-digit hex color (e.g. #RRGGBB).
-        </Text>
-      )}
-    </YStack>
-  );
-};
 
 /**
  * TeamDetailPage - Display team roster and allow editing for General Managers.
@@ -174,40 +44,10 @@ export function TeamDetailPage() {
   const isValidTeamId = /^\d+$/.test(teamId ?? '');
   const teamIdNum = isValidTeamId ? parseInt(teamId ?? '', 10) : 0;
 
-  // Local state for branding form
-  const [avatarInput, setAvatarInput] = useState('');
-  const [bannerInput, setBannerInput] = useState('');
-  const [brandingError, setBrandingError] = useState<string | null>(null);
-  const [brandingSuccess, setBrandingSuccess] = useState(false);
+  // Local state for the identity header's image rendering only — the
+  // branding form itself lives in TeamBrandingSettings.
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [bannerImgError, setBannerImgError] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [bannerUploading, setBannerUploading] = useState(false);
-  const [pendingClear, setPendingClear] = useState<'logo' | 'banner' | null>(
-    null,
-  );
-
-  // LS-6046: team color state, seeded from the team once loaded (see effect below)
-  const [primaryColor, setPrimaryColor] = useState<string>(
-    TEAM_BRANDING_PRESET_COLORS[0],
-  );
-  const [secondaryColor, setSecondaryColor] = useState<string>(
-    TEAM_BRANDING_PRESET_COLORS[5],
-  );
-
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const bannerFileInputRef = useRef<HTMLInputElement>(null);
-  // LS-6049: restore focus to the trigger button when the clear-branding
-  // dialog closes (relying on document.activeElement at open time is
-  // unreliable — e.g. Safari does not focus <button> on mouse click).
-  const avatarClearButtonRef = useRef<TamaguiElement>(null);
-  const bannerClearButtonRef = useRef<TamaguiElement>(null);
-
-  const focusClearTrigger = (target: 'logo' | 'banner') => {
-    const ref =
-      target === 'banner' ? bannerClearButtonRef : avatarClearButtonRef;
-    ref.current?.focus();
-  };
 
   // Get team members (which includes leagueId)
   const {
@@ -278,21 +118,6 @@ export function TeamDetailPage() {
   );
 
   const team = teamByIdData?.team;
-  const seedTeamId = team?.id;
-  const teamPrimaryColor = team?.primaryColor;
-  const teamSecondaryColor = team?.secondaryColor;
-
-  // LS-6046: (re-)seed color pickers whenever the underlying team's saved
-  // colors change, mirroring useTeamBranding's re-seed effect.
-  useEffect(() => {
-    if (seedTeamId == null) return;
-    setPrimaryColor(
-      normalizeTeamColor(teamPrimaryColor, TEAM_BRANDING_PRESET_COLORS[0]),
-    );
-    setSecondaryColor(
-      normalizeTeamColor(teamSecondaryColor, TEAM_BRANDING_PRESET_COLORS[5]),
-    );
-  }, [seedTeamId, teamPrimaryColor, teamSecondaryColor]);
 
   useEffect(() => {
     if (teamIdNum && leagueId) {
@@ -300,8 +125,6 @@ export function TeamDetailPage() {
     }
   }, [teamIdNum, leagueId]);
 
-  const [updateTeamBranding, { loading: brandingLoading }] =
-    useUpdateTeamBrandingMutation();
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
@@ -393,7 +216,15 @@ export function TeamDetailPage() {
   const isPremium = useIsPremium();
 
   // Gates team identity + roster — the data those sections need to render.
-  const identityLoading = membersLoading || teamByIdLoading || positionsLoading;
+  // teamByIdLoading is excluded once `team` has already loaded once (LS-9670):
+  // TeamBrandingSettings' onBrandingUpdated callback calls refetchTeamById()
+  // after every save/clear, and Apollo briefly flips teamByIdLoading to true
+  // for that refetch. Without this guard, the whole page (identity, roster,
+  // and the branding section itself) would unmount to this full-page spinner
+  // and remount on every branding save — discarding TeamBrandingSettings'
+  // in-flight "Branding saved!" success state along with it.
+  const identityLoading =
+    membersLoading || (teamByIdLoading && !team) || positionsLoading;
 
   // Gates only the GM/Commissioner settings section. Identity and roster
   // render as soon as their own data is available instead of waiting on
@@ -472,236 +303,10 @@ export function TeamDetailPage() {
   const currentAvatarUrl = team?.avatarUrl ?? null;
   const currentBannerUrl = team?.bannerUrl ?? null;
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
-  const handleSaveBranding = async () => {
-    if (!leagueId) return;
-    setBrandingError(null);
-    setBrandingSuccess(false);
-
-    // Validate: if either field is non-empty it must be HTTPS
-    const trimmedAvatar = avatarInput.trim();
-    const trimmedBanner = bannerInput.trim();
-
-    if (trimmedAvatar) {
-      const avatarError = validateBrandingUrl(trimmedAvatar, 'Avatar');
-      if (avatarError) {
-        setBrandingError(avatarError);
-        return;
-      }
-    }
-    if (trimmedBanner) {
-      const bannerError = validateBrandingUrl(trimmedBanner, 'Banner');
-      if (bannerError) {
-        setBrandingError(bannerError);
-        return;
-      }
-    }
-
-    // If both are empty, nothing to save
-    if (!trimmedAvatar && !trimmedBanner) {
-      setBrandingError('Enter at least one URL to save.');
-      return;
-    }
-
-    try {
-      await updateTeamBranding({
-        variables: {
-          teamId: teamIdNum,
-          leagueId,
-          // Only send a field if the input is non-empty
-          ...(trimmedAvatar ? { avatarUrl: trimmedAvatar } : {}),
-          ...(trimmedBanner ? { bannerUrl: trimmedBanner } : {}),
-        },
-      });
-      await refetchTeamById();
-      setAvatarInput('');
-      setBannerInput('');
-      setAvatarImgError(false);
-      setBannerImgError(false);
-      setBrandingSuccess(true);
-      setTimeout(() => setBrandingSuccess(false), 3000);
-    } catch (err: unknown) {
-      setBrandingError(
-        err instanceof Error ? err.message : 'Failed to save branding',
-      );
-    }
-  };
-
-  // LS-6046: colors persist independently of the avatar/banner form above —
-  // the pickers always reflect the current (or default) team colors, dirty
-  // tracked against the last-saved values.
-  const savedPrimaryColor = normalizeTeamColor(
-    team?.primaryColor,
-    TEAM_BRANDING_PRESET_COLORS[0],
-  );
-  const savedSecondaryColor = normalizeTeamColor(
-    team?.secondaryColor,
-    TEAM_BRANDING_PRESET_COLORS[5],
-  );
-  const colorsDirty =
-    primaryColor !== savedPrimaryColor ||
-    secondaryColor !== savedSecondaryColor;
-
-  const handleSaveColors = async () => {
-    if (!leagueId || !colorsDirty) return;
-    setBrandingError(null);
-    setBrandingSuccess(false);
-    try {
-      await updateTeamBranding({
-        variables: {
-          teamId: teamIdNum,
-          leagueId,
-          primaryColor,
-          secondaryColor,
-        },
-      });
-      await refetchTeamById();
-      setBrandingSuccess(true);
-      setTimeout(() => setBrandingSuccess(false), 3000);
-    } catch (err: unknown) {
-      setBrandingError(
-        err instanceof Error ? err.message : 'Failed to save colors',
-      );
-    }
-  };
-
-  const handleDiscardColors = () => {
-    setPrimaryColor(savedPrimaryColor);
-    setSecondaryColor(savedSecondaryColor);
-  };
-
-  const handleClearAvatar = async () => {
-    if (!leagueId) return;
-    setBrandingError(null);
-    setBrandingSuccess(false);
-    try {
-      await updateTeamBranding({
-        variables: {
-          teamId: teamIdNum,
-          leagueId,
-          avatarUrl: '',
-        },
-      });
-      await refetchTeamById();
-      setAvatarImgError(false);
-      setBrandingSuccess(true);
-      setTimeout(() => setBrandingSuccess(false), 3000);
-    } catch (err: unknown) {
-      setBrandingError(
-        err instanceof Error ? err.message : 'Failed to clear avatar',
-      );
-    }
-  };
-
-  const handleClearBanner = async () => {
-    if (!leagueId) return;
-    setBrandingError(null);
-    setBrandingSuccess(false);
-    try {
-      await updateTeamBranding({
-        variables: {
-          teamId: teamIdNum,
-          leagueId,
-          bannerUrl: '',
-        },
-      });
-      await refetchTeamById();
-      setBannerImgError(false);
-      setBrandingSuccess(true);
-      setTimeout(() => setBrandingSuccess(false), 3000);
-    } catch (err: unknown) {
-      setBrandingError(
-        err instanceof Error ? err.message : 'Failed to clear banner',
-      );
-    }
-  };
-
-  // ── Upload handler ─────────────────────────────────────────────────────────
-
-  const handleFileUpload = async (
-    file: File,
-    imageType: 'avatar' | 'banner',
-  ) => {
-    if (!leagueId) return;
-
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      setBrandingError(
-        `Unsupported file type: ${file.type}. Please upload a PNG, JPEG, or WebP image.`,
-      );
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_BYTES) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setBrandingError(
-        `Image is too large (${sizeMb} MB). Maximum allowed size is 2 MB.`,
-      );
-      return;
-    }
-
-    setBrandingError(null);
-    setBrandingSuccess(false);
-
-    if (imageType === 'avatar') setAvatarUploading(true);
-    else setBannerUploading(true);
-
-    try {
-      if (!env.imageUploadUrl) {
-        throw new Error(
-          'Image uploads are not configured. Please set VITE_IMAGE_UPLOAD_URL.',
-        );
-      }
-      const uploadUrl = `${env.imageUploadUrl}/images/upload?teamId=${teamIdNum}&imageType=${imageType}`;
-      const csrfToken = getCsrfToken();
-      if (!csrfToken) {
-        throw new Error(
-          'Unable to verify your session. Please refresh the page and try again.',
-        );
-      }
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': file.type,
-          'X-CSRF-Token': csrfToken,
-        },
-        body: file,
-        credentials: 'include',
-      });
-
-      const json = (await response.json()) as { url?: string; error?: string };
-
-      if (!response.ok) {
-        throw new Error(json.error ?? `Upload failed (${response.status})`);
-      }
-
-      if (!json.url) {
-        throw new Error('Upload succeeded but no URL was returned');
-      }
-
-      await updateTeamBranding({
-        variables: {
-          teamId: teamIdNum,
-          leagueId,
-          ...(imageType === 'avatar'
-            ? { avatarUrl: json.url }
-            : { bannerUrl: json.url }),
-        },
-      });
-
-      await refetchTeamById();
-      if (imageType === 'avatar') setAvatarImgError(false);
-      else setBannerImgError(false);
-      setBrandingSuccess(true);
-      setTimeout(() => setBrandingSuccess(false), 3000);
-    } catch (err: unknown) {
-      setBrandingError(
-        err instanceof Error ? err.message : 'Upload failed. Please try again.',
-      );
-    } finally {
-      if (imageType === 'avatar') setAvatarUploading(false);
-      else setBannerUploading(false);
-    }
+  const handleBrandingUpdated = async () => {
+    await refetchTeamById();
+    setAvatarImgError(false);
+    setBannerImgError(false);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -881,273 +486,15 @@ export function TeamDetailPage() {
           <YStack gap="$4">
             <H3>Team Settings</H3>
 
-            {/* Team Branding */}
-            <YStack
-              gap="$3"
-              padding="$4"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
-              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.06)}
-            >
-              <Text
-                fontSize="$5"
-                fontWeight="600"
-                style={{ color: BRAND_GOLD_LIGHT }}
-              >
-                Team Branding
-              </Text>
-              <Text fontSize="$3" color="$gray11">
-                Personalise your team with a logo and banner. Upload an image
-                (PNG, JPEG, or WebP, max 2 MB) or paste a public HTTPS URL.
-                Uploaded images are screened for inappropriate content.
-              </Text>
-
-              {/* Hidden file inputs */}
-              <input
-                ref={avatarFileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFileUpload(file, 'avatar');
-                  e.target.value = '';
-                }}
-              />
-              <input
-                ref={bannerFileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFileUpload(file, 'banner');
-                  e.target.value = '';
-                }}
-              />
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (brandingLoading || (!avatarInput && !bannerInput)) return;
-                  void handleSaveBranding();
-                }}
-                style={{ display: 'contents' }}
-              >
-                {/* Avatar */}
-                <YStack gap="$2">
-                  <Text fontSize="$3" fontWeight="500">
-                    Avatar{' '}
-                    <Text fontSize="$2" color="$gray11">
-                      (team logo / icon)
-                    </Text>
-                  </Text>
-                  {currentAvatarUrl && (
-                    <XStack gap="$2" alignItems="center">
-                      <Text
-                        fontSize="$2"
-                        color="$gray11"
-                        flex={1}
-                        numberOfLines={1}
-                        style={{ wordBreak: 'break-all' }}
-                      >
-                        Current: {currentAvatarUrl}
-                      </Text>
-                      <Button
-                        ref={avatarClearButtonRef}
-                        size="$2"
-                        chromeless
-                        onPress={() => setPendingClear('logo')}
-                        disabled={brandingLoading || avatarUploading}
-                        style={{ color: BRAND_SEAM_RED }}
-                      >
-                        Clear
-                      </Button>
-                    </XStack>
-                  )}
-                  <XStack gap="$2" alignItems="center">
-                    <Input
-                      value={avatarInput}
-                      onChangeText={setAvatarInput}
-                      placeholder="https://example.com/my-logo.png"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      flex={1}
-                    />
-                    <Button
-                      size="$3"
-                      onPress={() => avatarFileInputRef.current?.click()}
-                      disabled={
-                        avatarUploading || bannerUploading || brandingLoading
-                      }
-                      style={{
-                        backgroundColor: BRAND_NAVY_LIGHT,
-                        color: 'white',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {avatarUploading ? 'Uploading…' : 'Upload'}
-                    </Button>
-                  </XStack>
-                </YStack>
-
-                {/* Banner */}
-                <YStack gap="$2">
-                  <Text fontSize="$3" fontWeight="500">
-                    Banner{' '}
-                    <Text fontSize="$2" color="$gray11">
-                      (header image)
-                    </Text>
-                  </Text>
-                  {currentBannerUrl && (
-                    <XStack gap="$2" alignItems="center">
-                      <Text
-                        fontSize="$2"
-                        color="$gray11"
-                        flex={1}
-                        numberOfLines={1}
-                        style={{ wordBreak: 'break-all' }}
-                      >
-                        Current: {currentBannerUrl}
-                      </Text>
-                      <Button
-                        ref={bannerClearButtonRef}
-                        size="$2"
-                        chromeless
-                        onPress={() => setPendingClear('banner')}
-                        disabled={brandingLoading || bannerUploading}
-                        style={{ color: BRAND_SEAM_RED }}
-                      >
-                        Clear
-                      </Button>
-                    </XStack>
-                  )}
-                  <XStack gap="$2" alignItems="center">
-                    <Input
-                      value={bannerInput}
-                      onChangeText={setBannerInput}
-                      placeholder="https://example.com/my-banner.jpg"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      flex={1}
-                    />
-                    <Button
-                      size="$3"
-                      onPress={() => bannerFileInputRef.current?.click()}
-                      disabled={
-                        avatarUploading || bannerUploading || brandingLoading
-                      }
-                      style={{
-                        backgroundColor: BRAND_NAVY_LIGHT,
-                        color: 'white',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {bannerUploading ? 'Uploading…' : 'Upload'}
-                    </Button>
-                  </XStack>
-                </YStack>
-
-                {/* Feedback */}
-                {brandingError && (
-                  <Text
-                    fontSize="$3"
-                    style={{ color: BRAND_SEAM_RED }}
-                    role="alert"
-                  >
-                    {brandingError}
-                  </Text>
-                )}
-                {brandingSuccess && (
-                  <Text
-                    fontSize="$3"
-                    color="$green9"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    Branding saved!
-                  </Text>
-                )}
-
-                <Button
-                  onPress={handleSaveBranding}
-                  disabled={brandingLoading || (!avatarInput && !bannerInput)}
-                  style={{
-                    backgroundColor:
-                      brandingLoading || (!avatarInput && !bannerInput)
-                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                        : BRAND_NAVY_LIGHT,
-                    color: 'white',
-                  }}
-                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
-                  alignSelf="flex-start"
-                >
-                  {brandingLoading ? 'Saving…' : 'Save Branding'}
-                </Button>
-              </form>
-            </YStack>
-
-            {/* Team Colors (LS-6046) — free capability, not premium-gated */}
-            <YStack
-              gap="$3"
-              padding="$4"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
-              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.06)}
-            >
-              <Text
-                fontSize="$5"
-                fontWeight="600"
-                style={{ color: BRAND_GOLD_LIGHT }}
-              >
-                Team Colors
-              </Text>
-              <Text fontSize="$3" color="$gray11">
-                Pick your team&apos;s primary and secondary colors. Choose a
-                preset swatch or enter a custom hex value.
-              </Text>
-
-              <ColorInputGroup
-                label="Primary Color"
-                value={primaryColor}
-                presetColors={TEAM_BRANDING_PRESET_COLORS}
-                onChange={setPrimaryColor}
-              />
-              <ColorInputGroup
-                label="Secondary Color"
-                value={secondaryColor}
-                presetColors={TEAM_BRANDING_PRESET_COLORS}
-                onChange={setSecondaryColor}
-              />
-
-              <XStack gap="$2" alignItems="center">
-                <Button
-                  onPress={() => {
-                    void handleSaveColors();
-                  }}
-                  disabled={brandingLoading || !colorsDirty}
-                  style={{
-                    backgroundColor:
-                      brandingLoading || !colorsDirty
-                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                        : BRAND_NAVY_LIGHT,
-                    color: 'white',
-                  }}
-                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
-                >
-                  {brandingLoading ? 'Saving…' : 'Save Colors'}
-                </Button>
-                {colorsDirty && !brandingLoading && (
-                  <Button size="$3" chromeless onPress={handleDiscardColors}>
-                    Discard changes
-                  </Button>
-                )}
-              </XStack>
-            </YStack>
+            <TeamBrandingSettings
+              teamId={teamIdNum}
+              leagueId={leagueId}
+              avatarUrl={currentAvatarUrl}
+              bannerUrl={currentBannerUrl}
+              primaryColor={team?.primaryColor}
+              secondaryColor={team?.secondaryColor}
+              onBrandingUpdated={handleBrandingUpdated}
+            />
 
             {/* Assistant Manager Settings — GM/commissioner only; the backend
                 restricts invite/remove to those roles (BTD-001 / LS-6024) */}
@@ -1160,85 +507,6 @@ export function TeamDetailPage() {
           </YStack>
         </>
       )}
-
-      {/* Confirmation dialog for clearing logo / banner (LS-4017) */}
-      <Dialog
-        modal
-        open={pendingClear !== null}
-        onOpenChange={(open) => {
-          if (!open && pendingClear) {
-            const target = pendingClear;
-            setPendingClear(null);
-            focusClearTrigger(target);
-          }
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay
-            key="overlay"
-            animation="quick"
-            opacity={0.5}
-            enterStyle={{ opacity: 0 }}
-            exitStyle={{ opacity: 0 }}
-          />
-          <Dialog.Content
-            bordered
-            elevate
-            key="content"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="clear-branding-title"
-            aria-describedby="clear-branding-description"
-            animateOnly={['transform', 'opacity']}
-            animation={['quick', { opacity: { overshootClamping: true } }]}
-            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
-            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
-            gap="$4"
-            padding="$4"
-            width={500}
-          >
-            <Dialog.Title id="clear-branding-title" color="$red11">
-              {pendingClear === 'banner'
-                ? 'Clear team banner?'
-                : 'Clear team logo?'}
-            </Dialog.Title>
-            <Dialog.Description id="clear-branding-description">
-              <Paragraph>
-                {pendingClear === 'banner'
-                  ? 'The current banner image will be removed from your team.'
-                  : 'The current logo will be removed from your team.'}{' '}
-                You can upload a new one at any time.
-              </Paragraph>
-            </Dialog.Description>
-            <XStack gap="$3" justifyContent="flex-end">
-              <Button
-                onPress={() => {
-                  const target = pendingClear;
-                  setPendingClear(null);
-                  if (target) focusClearTrigger(target);
-                }}
-                disabled={brandingLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                theme="red"
-                onPress={() => {
-                  const target = pendingClear;
-                  setPendingClear(null);
-                  if (target) focusClearTrigger(target);
-                  if (target === 'banner') void handleClearBanner();
-                  else if (target === 'logo') void handleClearAvatar();
-                }}
-                disabled={brandingLoading}
-                icon={brandingLoading ? <Spinner /> : undefined}
-              >
-                {pendingClear === 'banner' ? 'Clear banner' : 'Clear logo'}
-              </Button>
-            </XStack>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog>
     </YStack>
   );
 }

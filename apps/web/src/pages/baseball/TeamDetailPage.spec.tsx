@@ -254,192 +254,41 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
     mockIsPremium = false;
   });
 
-  // ── Logo ──────────────────────────────────────────────────────────────────
-
-  describe('Clear logo', () => {
-    it('opens a confirmation dialog without calling the mutation', () => {
-      render(<TeamDetailPage />);
-
-      // Both "Clear" buttons exist (logo + banner); the logo one comes first
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[0]);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText(/clear team logo/i)).toBeInTheDocument();
-      expect(mockUpdateBranding).not.toHaveBeenCalled();
-    });
-
-    it('closes the dialog without calling the mutation when Cancel is clicked', () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[0]);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(mockUpdateBranding).not.toHaveBeenCalled();
-    });
-
-    it('calls updateTeamBranding with avatarUrl empty string when confirmed', async () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[0]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^clear logo$/i }));
-
-      await waitFor(() => {
-        expect(mockUpdateBranding).toHaveBeenCalledWith({
-          variables: { teamId: 1, leagueId: 100, avatarUrl: '' },
-        });
-      });
-    });
-
-    // LS-6049: focus must return to the trigger button, not stay trapped in
-    // the (now-unmounted) dialog or fall back to the document body.
-    it('returns focus to the Clear button when Cancel is clicked', () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[0]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-      expect(clearButtons[0]).toHaveFocus();
-    });
-
-    it('returns focus to the Clear button when the clear is confirmed', async () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[0]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^clear logo$/i }));
-
-      await waitFor(() => {
-        expect(mockUpdateBranding).toHaveBeenCalled();
-      });
-      expect(clearButtons[0]).toHaveFocus();
-    });
-  });
-
-  // ── Banner ────────────────────────────────────────────────────────────────
-
-  describe('Clear banner', () => {
-    it('opens a confirmation dialog without calling the mutation', () => {
-      render(<TeamDetailPage />);
-
-      // Banner "Clear" button is second
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[1]);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText(/clear team banner/i)).toBeInTheDocument();
-      expect(mockUpdateBranding).not.toHaveBeenCalled();
-    });
-
-    it('closes the dialog without calling the mutation when Cancel is clicked', () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[1]);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(mockUpdateBranding).not.toHaveBeenCalled();
-    });
-
-    it('calls updateTeamBranding with bannerUrl empty string when confirmed', async () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[1]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^clear banner$/i }));
-
-      await waitFor(() => {
-        expect(mockUpdateBranding).toHaveBeenCalledWith({
-          variables: { teamId: 1, leagueId: 100, bannerUrl: '' },
-        });
-      });
-    });
-
-    // LS-6049: same focus-restoration guarantee for the banner trigger.
-    it('returns focus to the Clear button when Cancel is clicked', () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[1]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-      expect(clearButtons[1]).toHaveFocus();
-    });
-
-    it('returns focus to the Clear button when the clear is confirmed', async () => {
-      render(<TeamDetailPage />);
-
-      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
-      fireEvent.click(clearButtons[1]);
-
-      fireEvent.click(screen.getByRole('button', { name: /^clear banner$/i }));
-
-      await waitFor(() => {
-        expect(mockUpdateBranding).toHaveBeenCalled();
-      });
-      expect(clearButtons[1]).toHaveFocus();
-    });
-  });
-});
-
-// ── Branding save toast accessibility (LS-6045) ────────────────────────────
-
-describe('TeamDetailPage – branding save toast accessibility (LS-6045)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeamById.mockResolvedValue({});
-  });
-
-  it('announces a successful save via a role="status" aria-live="polite" region', async () => {
+  // Detailed coverage of the confirmation flow itself (dialog copy, mutation
+  // payload, focus restoration) lives in TeamBrandingSettings.spec.tsx
+  // (LS-9670) — this integration-level test just confirms TeamDetailPage
+  // wires the shared component into the page correctly.
+  it('opens a confirmation dialog without calling the mutation', () => {
     render(<TeamDetailPage />);
 
-    fireEvent.change(
-      screen.getByPlaceholderText('https://example.com/my-logo.png'),
-      { target: { value: 'https://example.com/new-logo.png' } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
+    const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+    fireEvent.click(clearButtons[0]);
 
-    const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent('Branding saved!');
-    expect(status).toHaveAttribute('aria-live', 'polite');
-  });
-
-  it('announces a validation error via a role="alert" region', () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.change(
-      screen.getByPlaceholderText('https://example.com/my-logo.png'),
-      { target: { value: 'not-a-url' } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
-
-    // LS-6043: client validation now mirrors server semantics (new URL()
-    // parse) instead of a loose regex, so a malformed (non-parseable) URL
-    // gets a "must be a valid URL" reason rather than the old generic text.
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Avatar URL must be a valid URL');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/clear team logo/i)).toBeInTheDocument();
     expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+
+  it('calls updateTeamBranding with avatarUrl empty string when confirmed', async () => {
+    render(<TeamDetailPage />);
+
+    const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+    fireEvent.click(clearButtons[0]);
+    fireEvent.click(screen.getByRole('button', { name: /^clear logo$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        variables: { teamId: 1, leagueId: 100, avatarUrl: '' },
+      });
+    });
   });
 });
 
 // ── Team Colors (LS-6046) ───────────────────────────────────────────────────
+//
+// Full coverage of color validation/persistence lives in
+// TeamBrandingSettings.spec.tsx (LS-9670) — this just confirms the page
+// passes the team's saved colors through to the shared component.
 
 describe('TeamDetailPage – team colors (LS-6046)', () => {
   beforeEach(() => {
@@ -448,217 +297,20 @@ describe('TeamDetailPage – team colors (LS-6046)', () => {
     mockRefetchTeamById.mockResolvedValue({});
   });
 
-  it('AC1: renders primary/secondary color pickers seeded from the team', () => {
+  it('renders primary/secondary color pickers seeded from the team', () => {
     render(<TeamDetailPage />);
 
     expect(screen.getByText('Team Colors')).toBeInTheDocument();
     expect(screen.getByLabelText('Primary Color hex')).toHaveValue('#123ABC');
     expect(screen.getByLabelText('Secondary Color hex')).toHaveValue('#ABC123');
-    expect(
-      screen.getByLabelText('Primary Color color picker'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText('Secondary Color color picker'),
-    ).toBeInTheDocument();
   });
 
-  it('AC1: seeds from the shared preset defaults when the team has no saved colors', () => {
-    const graphql = jest.requireMock<{ useGetTeamByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetTeamByIdQuery.mockReturnValueOnce({
-      data: {
-        team: {
-          id: 1,
-          leagueId: 100,
-          name: 'Test Team',
-          avatarUrl: 'https://example.com/logo.png',
-          bannerUrl: 'https://example.com/banner.jpg',
-          primaryColor: null,
-          secondaryColor: null,
-        },
-      },
-      loading: false,
-      refetch: mockRefetchTeamById,
-    });
-
+  it('the color pickers render for a GM with no premium gating', () => {
     render(<TeamDetailPage />);
 
-    expect(screen.getByLabelText('Primary Color hex')).toHaveValue('#1B3A5C');
-    expect(screen.getByLabelText('Secondary Color hex')).toHaveValue('#C5A55A');
-  });
-
-  it('AC2: selecting a preset swatch and saving calls updateTeamBranding with the new color', async () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.click(screen.getByLabelText('Pick primary color #C41E3A'));
-    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
-
-    await waitFor(() => {
-      expect(mockUpdateBranding).toHaveBeenCalledWith({
-        variables: {
-          teamId: 1,
-          leagueId: 100,
-          primaryColor: '#C41E3A',
-          secondaryColor: '#ABC123',
-        },
-      });
-    });
-  });
-
-  it('AC2: typing a valid 6-digit hex and saving persists it', async () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.change(screen.getByLabelText('Secondary Color hex'), {
-      target: { value: '#00FF00' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
-
-    await waitFor(() => {
-      expect(mockUpdateBranding).toHaveBeenCalledWith({
-        variables: {
-          teamId: 1,
-          leagueId: 100,
-          primaryColor: '#123ABC',
-          secondaryColor: '#00FF00',
-        },
-      });
-    });
-  });
-
-  it('AC3: an invalid/incomplete hex value is not saved and shows a validation message', () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.change(screen.getByLabelText('Primary Color hex'), {
-      target: { value: '#12' },
-    });
-
-    expect(
-      screen.getByText(/enter a valid 6-digit hex color/i),
-    ).toBeInTheDocument();
-    // The underlying color state never updated, so Save stays disabled.
-    expect(
-      screen.getByRole('button', { name: /^save colors$/i }),
-    ).toBeDisabled();
-
-    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
-    expect(mockUpdateBranding).not.toHaveBeenCalled();
-  });
-
-  it('AC4: the color pickers render for a GM with no premium gating', () => {
-    render(<TeamDetailPage />);
-
-    const colorsSection = screen.getByText('Team Colors').closest('div');
-    expect(colorsSection).not.toBeNull();
     expect(screen.queryByText(/premium/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Primary Color hex')).toBeInTheDocument();
     expect(screen.getByLabelText('Secondary Color hex')).toBeInTheDocument();
-  });
-});
-
-// ── Image upload CSRF token (LS-6040) ───────────────────────────────────────
-
-describe('TeamDetailPage – image upload CSRF token (LS-6040)', () => {
-  const { getCsrfToken } = jest.requireMock<{ getCsrfToken: jest.Mock }>(
-    '../../lib/csrf',
-  );
-
-  const uploadFile = (container: HTMLElement) => {
-    const fileInput = container.querySelector('input[type="file"]');
-    if (!fileInput) throw new Error('avatar file input not found');
-    const file = new File(['fake-image-bytes'], 'logo.png', {
-      type: 'image/png',
-    });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeamById.mockResolvedValue({});
-    getCsrfToken.mockReturnValue('test-token');
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ url: 'https://cdn.example.com/logo.png' }),
-    });
-  });
-
-  it('always sends the X-CSRF-Token header when a token is available', async () => {
-    const { container } = render(<TeamDetailPage />);
-
-    uploadFile(container);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/images/upload'),
-        expect.objectContaining({
-          headers: expect.objectContaining({ 'X-CSRF-Token': 'test-token' }),
-        }),
-      );
-    });
-  });
-
-  it('throws and never fires the upload request when no CSRF token is available', async () => {
-    getCsrfToken.mockReturnValue('');
-    const { container } = render(<TeamDetailPage />);
-
-    uploadFile(container);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/unable to verify your session/i),
-      ).toBeInTheDocument();
-    });
-    expect(global.fetch).not.toHaveBeenCalled();
-    expect(mockUpdateBranding).not.toHaveBeenCalled();
-  });
-});
-
-// ── Save branding validation (LS-6043) ──────────────────────────────────────
-
-describe('TeamDetailPage – save branding URL validation (LS-6043)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeamById.mockResolvedValue({});
-  });
-
-  it('blocks a URL with embedded credentials before calling the mutation, showing the specific reason', async () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.change(
-      screen.getByPlaceholderText('https://example.com/my-logo.png'),
-      { target: { value: 'https://attacker.com:80@evil.com/path' } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('Avatar URL must not contain credentials'),
-      ).toBeInTheDocument();
-    });
-    expect(mockUpdateBranding).not.toHaveBeenCalled();
-  });
-
-  it('saves successfully for a valid HTTPS URL', async () => {
-    render(<TeamDetailPage />);
-
-    fireEvent.change(
-      screen.getByPlaceholderText('https://example.com/my-logo.png'),
-      { target: { value: 'https://example.com/my-logo.png' } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
-
-    await waitFor(() => {
-      expect(mockUpdateBranding).toHaveBeenCalledWith({
-        variables: {
-          teamId: 1,
-          leagueId: 100,
-          avatarUrl: 'https://example.com/my-logo.png',
-        },
-      });
-    });
   });
 });
 

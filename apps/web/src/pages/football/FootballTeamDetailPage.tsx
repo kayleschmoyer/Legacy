@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import { Button, H3, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, H3, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type LeaguePositionFragment,
   Sport,
@@ -18,6 +18,7 @@ import { RosterBoard } from '@legacy-sports/shared-components/roster';
 import { LOGGER } from '@legacy-sports/logging';
 import { orderFootballPositions } from './footballRosterSlots';
 import { PageMeta } from '../../components/PageMeta';
+import { TeamBrandingSettings } from '../../features/teams/TeamBrandingSettings';
 import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
@@ -36,11 +37,12 @@ import { trackTeamViewed } from '../../utils/analytics';
  * `pages/baseball/`, so parameterising it would deepen the "baseball/ serves
  * both sports" confusion the ticket calls out rather than resolving it.
  *
- * Team branding is deliberately NOT on this page in its first iteration —
- * deferred to LS-9670 so it can be routed through web's validated upload path
- * (LS-1810) rather than the native Settings tab's arbitrary-URL input (the
- * LS-6434 defect). LS-6438's AC5 permits either; deferring keeps the five
- * tickets blocked on this page from waiting on a separable capability.
+ * Team branding (logo, banner, colors — LS-9670) is rendered via the shared
+ * `TeamBrandingSettings`, extracted from `TeamDetailPage.tsx`'s original
+ * inline block so both sports validate uploaded URLs through the same
+ * `validate-branding-url.ts` (LS-1810) rather than maintaining two copies of
+ * a security-adjacent rule. LS-6438 shipped this page without branding so the
+ * five tickets blocked on it didn't wait on this separable capability.
  */
 export function FootballTeamDetailPage(): React.JSX.Element {
   const { teamId } = useParams<{ teamId: string }>();
@@ -48,6 +50,11 @@ export function FootballTeamDetailPage(): React.JSX.Element {
 
   const teamIdNum = Number(teamId);
   const isValidTeamId = Number.isInteger(teamIdNum) && teamIdNum > 0;
+
+  // Local state for the identity header's image rendering only — the
+  // branding form itself lives in TeamBrandingSettings.
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const [bannerImgError, setBannerImgError] = useState(false);
 
   const {
     data: membersData,
@@ -63,6 +70,7 @@ export function FootballTeamDetailPage(): React.JSX.Element {
     data: teamByIdData,
     loading: teamByIdLoading,
     error: teamByIdError,
+    refetch: refetchTeamById,
   } = useGetTeamByIdQuery({
     variables: { teamId: teamIdNum },
     skip: !isValidTeamId,
@@ -209,8 +217,19 @@ export function FootballTeamDetailPage(): React.JSX.Element {
   // then re-sort them. It costs nothing to wait — `leagueId` is already known
   // by the time the members/team queries have settled, so this query is
   // in-flight (usually already cached) rather than not yet started.
+  //
+  // teamByIdLoading is excluded once the team has already loaded once
+  // (LS-9670): TeamBrandingSettings' onBrandingUpdated callback calls
+  // refetchTeamById() after every save/clear, and Apollo briefly flips
+  // teamByIdLoading to true for that refetch. Without this guard, the whole
+  // page would unmount to this full-page spinner and remount on every
+  // branding save — discarding TeamBrandingSettings' in-flight "Branding
+  // saved!" success state along with it.
   const identityLoading =
-    membersLoading || teamByIdLoading || positionsLoading || leagueLoading;
+    membersLoading ||
+    (teamByIdLoading && !teamByIdData?.team) ||
+    positionsLoading ||
+    leagueLoading;
   const permissionLoading = viewerMembershipLoading;
 
   if (!isValidTeamId) {
@@ -303,6 +322,14 @@ export function FootballTeamDetailPage(): React.JSX.Element {
     (m): m is TeamMemberFragment => m != null,
   );
   const teamName = team?.name ?? 'Team';
+  const currentAvatarUrl = team?.avatarUrl ?? null;
+  const currentBannerUrl = team?.bannerUrl ?? null;
+
+  const handleBrandingUpdated = async () => {
+    await refetchTeamById();
+    setAvatarImgError(false);
+    setBannerImgError(false);
+  };
 
   return (
     <YStack
@@ -317,10 +344,28 @@ export function FootballTeamDetailPage(): React.JSX.Element {
         description={`View ${teamName}'s football roster and set its lineup.`}
       />
 
-      {/* ── Team identity ──
-           Initials only: rendering a team's saved avatar belongs with the
-           branding work deferred to LS-9670, so the two land together rather
-           than shipping a display with no way to change what it displays. */}
+      {/* ── Banner (LS-9670) ── */}
+      {currentBannerUrl && !bannerImgError && (
+        <YStack
+          borderRadius="$4"
+          overflow="hidden"
+          height={160}
+          $sm={{ height: 100 }}
+          style={{ position: 'relative' }}
+        >
+          <img
+            src={currentBannerUrl}
+            alt={`${teamName} banner`}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={() => setBannerImgError(true)}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+          />
+        </YStack>
+      )}
+
+      {/* ── Team identity ── */}
       <XStack gap="$4" alignItems="center" flexWrap="wrap">
         <YStack
           width={72}
@@ -333,9 +378,21 @@ export function FootballTeamDetailPage(): React.JSX.Element {
             background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
           }}
         >
-          <Text fontSize="$8" fontWeight="bold" color="white">
-            {teamName.charAt(0).toUpperCase()}
-          </Text>
+          {currentAvatarUrl && !avatarImgError ? (
+            <img
+              src={currentAvatarUrl}
+              alt={`${teamName} avatar`}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={() => setAvatarImgError(true)}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <Text fontSize="$8" fontWeight="bold" color="white">
+              {teamName.charAt(0).toUpperCase()}
+            </Text>
+          )}
         </YStack>
 
         <YStack gap="$1" flex={1}>
@@ -406,6 +463,29 @@ export function FootballTeamDetailPage(): React.JSX.Element {
           error={positionsError ?? null}
         />
       </YStack>
+
+      {/* ── Team Settings (LS-9670) — mirrors TeamDetailPage.tsx's gate:
+           rendered for users who pass the page's edit gate, nothing for
+           other visitors. Assistant-manager management stays out of scope
+           for this page. ── */}
+      {!permissionLoading && (isGM || isCommissioner) && leagueId != null && (
+        <>
+          <Separator />
+          <YStack gap="$4">
+            <H3>Team Settings</H3>
+
+            <TeamBrandingSettings
+              teamId={teamIdNum}
+              leagueId={leagueId}
+              avatarUrl={currentAvatarUrl}
+              bannerUrl={currentBannerUrl}
+              primaryColor={team?.primaryColor}
+              secondaryColor={team?.secondaryColor}
+              onBrandingUpdated={handleBrandingUpdated}
+            />
+          </YStack>
+        </>
+      )}
     </YStack>
   );
 }

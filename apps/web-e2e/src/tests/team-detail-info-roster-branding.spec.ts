@@ -488,17 +488,26 @@ test.describe('Team Detail – roster with positions @regression', () => {
 // ── Tests: Branding Display & Form ───────────────────────────────────────────
 
 test.describe('Team Detail – branding form (GM) @regression', () => {
-  test('GM sees Avatar URL and Banner URL input fields', async ({ page }) => {
+  // LS-9670: the avatar/banner form is upload-only — no arbitrary-URL text
+  // input (that pattern is the LS-6434 defect on native's Settings tab, and
+  // must not appear in the web flow). GM sees Upload buttons instead.
+  test('GM sees Upload Avatar and Upload Banner buttons', async ({ page }) => {
     await setupGraphQL(page, { userTeamId: 1 });
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByPlaceholder('https://example.com/my-logo.png'),
+      page.getByRole('button', { name: /upload avatar/i }),
     ).toBeVisible();
     await expect(
-      page.getByPlaceholder('https://example.com/my-banner.jpg'),
+      page.getByRole('button', { name: /upload banner/i }),
     ).toBeVisible();
+    await expect(
+      page.getByPlaceholder('https://example.com/my-logo.png'),
+    ).not.toBeVisible();
+    await expect(
+      page.getByPlaceholder('https://example.com/my-banner.jpg'),
+    ).not.toBeVisible();
   });
 
   test('GM sees personalisation instructions text', async ({ page }) => {
@@ -509,18 +518,6 @@ test.describe('Team Detail – branding form (GM) @regression', () => {
     await expect(
       page.getByText(/personalise your team with a logo and banner/i),
     ).toBeVisible();
-  });
-
-  test('Save Branding button is disabled when inputs are empty', async ({
-    page,
-  }) => {
-    await setupGraphQL(page, { userTeamId: 1 });
-    await page.goto(TEAM_URL);
-    await page.waitForLoadState('load');
-
-    const saveButton = page.getByRole('button', { name: /save branding/i });
-    await expect(saveButton).toBeVisible();
-    await expect(saveButton).toBeDisabled();
   });
 
   test('shows current avatar URL when team has one', async ({ page }) => {
@@ -577,48 +574,62 @@ test.describe('Team Detail – branding form (GM) @regression', () => {
 // and only works inside a page.route() handler; it takes a Route, not the
 // Request object page.waitForRequest's predicate receives here.
 test.describe('Team Detail – branding actions (GM) @regression', () => {
-  test('saves an avatar URL and shows success feedback', async ({ page }) => {
+  // LS-9670/LS-1810: the uploaded URL itself is re-validated client-side via
+  // validate-branding-url.ts before the branding mutation ever fires — the
+  // upload endpoint is untrusted the same way a pasted URL would be.
+  test('rejects an uploaded avatar URL that fails validate-branding-url without saving', async ({
+    page,
+  }) => {
     await setupGraphQL(page, { userTeamId: 1 });
-    await page.goto(TEAM_URL);
-    await page.waitForLoadState('load');
 
-    const avatarUrlInput = page.getByPlaceholder(
-      'https://example.com/my-logo.png',
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              'Access-Control-Allow-Origin':
+                (await route.request().allHeaders())['origin'] ?? '*',
+              'Access-Control-Allow-Credentials': 'true',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: {
+            'Access-Control-Allow-Origin':
+              (await route.request().allHeaders())['origin'] ?? '*',
+            'Access-Control-Allow-Credentials': 'true',
+          },
+          body: JSON.stringify({
+            url: 'http://insecure.example.com/logo.png',
+          }),
+        });
+      },
     );
-    await avatarUrlInput.fill('https://cdn.example.com/new-logo.png');
 
-    const [request] = await Promise.all([
-      page.waitForRequest((req) =>
-        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
-      ),
-      page.getByRole('button', { name: /save branding/i }).click(),
-    ]);
-
-    const body = request.postDataJSON() as {
-      variables?: Record<string, unknown>;
-    };
-    expect(body.variables?.avatarUrl).toBe(
-      'https://cdn.example.com/new-logo.png',
-    );
-
-    await expect(page.getByText('Branding saved!')).toBeVisible();
-    await expect(avatarUrlInput).toHaveValue('');
-  });
-
-  test('rejects a non-HTTPS avatar URL without saving', async ({ page }) => {
-    await setupGraphQL(page, { userTeamId: 1 });
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
     await page
-      .getByPlaceholder('https://example.com/my-logo.png')
-      .fill('http://insecure.example.com/logo.png');
-    await page.getByRole('button', { name: /save branding/i }).click();
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'logo.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      });
 
-    // LS-6043: client validation now mirrors the server's stricter rules
-    // (new URL() + protocol check) instead of a loose regex, so the
-    // rejection message is now specific rather than the old generic
-    // "must start with https://" string.
+    // LS-6043: client validation mirrors the server's stricter rules (new
+    // URL() + protocol check), so the rejection message is specific.
     await expect(page.getByText('Avatar URL must use HTTPS')).toBeVisible();
     await expect(page.getByText('Branding saved!')).not.toBeVisible();
   });
@@ -828,34 +839,6 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
     expect(uploadCalled).toBe(false);
   });
 
-  test('saves a banner URL and shows success feedback', async ({ page }) => {
-    await setupGraphQL(page, { userTeamId: 1 });
-    await page.goto(TEAM_URL);
-    await page.waitForLoadState('load');
-
-    const bannerUrlInput = page.getByPlaceholder(
-      'https://example.com/my-banner.jpg',
-    );
-    await bannerUrlInput.fill('https://cdn.example.com/new-banner.jpg');
-
-    const [request] = await Promise.all([
-      page.waitForRequest((req) =>
-        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
-      ),
-      page.getByRole('button', { name: /save branding/i }).click(),
-    ]);
-
-    const body = request.postDataJSON() as {
-      variables?: Record<string, unknown>;
-    };
-    expect(body.variables?.bannerUrl).toBe(
-      'https://cdn.example.com/new-banner.jpg',
-    );
-
-    await expect(page.getByText('Branding saved!')).toBeVisible();
-    await expect(bannerUrlInput).toHaveValue('');
-  });
-
   test('clears the banner after confirming the dialog', async ({ page }) => {
     await mockExternalImages(page);
     await setupGraphQL(page, {
@@ -963,13 +946,52 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
     page,
   }) => {
     await setupGraphQL(page, { userTeamId: 1, errorBranding: true });
+
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              'Access-Control-Allow-Origin':
+                (await route.request().allHeaders())['origin'] ?? '*',
+              'Access-Control-Allow-Credentials': 'true',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: {
+            'Access-Control-Allow-Origin':
+              (await route.request().allHeaders())['origin'] ?? '*',
+            'Access-Control-Allow-Credentials': 'true',
+          },
+          body: JSON.stringify({
+            url: 'https://cdn.example.com/new-logo.png',
+          }),
+        });
+      },
+    );
+
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
     await page
-      .getByPlaceholder('https://example.com/my-logo.png')
-      .fill('https://cdn.example.com/new-logo.png');
-    await page.getByRole('button', { name: /save branding/i }).click();
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'logo.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      });
 
     // .first() — the error surfaces both inline and via an aria-live
     // region wrapping the same text, so the plain text query matches twice.
