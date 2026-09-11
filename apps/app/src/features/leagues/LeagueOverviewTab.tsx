@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   Alert,
   Pressable,
   type RefreshControlProps,
   ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
@@ -245,7 +246,30 @@ export function LeagueOverviewTab({
   refreshControl,
 }: LeagueOverviewTabProps): React.JSX.Element {
   const { bottom: bottomInset } = useSafeAreaInsets();
+  const router = useRouter();
   const isFootball = league.sport === Sport.Football;
+
+  // LS-10015 — deep-link straight to the game an On This Day entry is about
+  // (matching web's HomePage, LS-9763), rather than the player's generic
+  // profile page. Falls back to the caller's `onPlayerPress` (generic profile
+  // navigation) when the identifier can't be resolved to a game date.
+  const handleOnThisDayPress = useCallback(
+    (params: OnThisDayPlayerPress) => {
+      if (params.brefId && params.gameDate) {
+        router.push({
+          pathname: '/ViewGameLogs',
+          params: {
+            playerId: params.brefId,
+            startDate: params.gameDate,
+            endDate: params.gameDate,
+          },
+        });
+        return;
+      }
+      onPlayerPress(params);
+    },
+    [router, onPlayerPress],
+  );
   const configChips = buildLeagueConfigChips(league);
   // IDP is a paid-tier draft setting (see the "IDP" Premium Configuration
   // chip below) that directly changes the player pool at draft time, so a
@@ -519,7 +543,7 @@ export function LeagueOverviewTab({
             baseball player id (LS-6326). Already renders its own bordered
             surface + header, so it is not re-wrapped in an OverviewSection
             here. */}
-        {!isFootball && <OnThisDayFeed onPlayerPress={onPlayerPress} />}
+        {!isFootball && <OnThisDayFeed onPlayerPress={handleOnThisDayPress} />}
 
         {/* Premium Configuration — chip summary of active paid features so a
             premium league has a visible anchor for its "what I'm paying for"

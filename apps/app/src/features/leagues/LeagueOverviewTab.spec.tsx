@@ -17,13 +17,40 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
 }));
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
+// Capture the OnThisDayFeed onPlayerPress callback so tests can drive the
+// deep-link decision (LS-10015) without depending on the real feed's data
+// fetching / random sampling.
+let capturedOnPlayerPress:
+  | ((params: {
+      playerId: number;
+      brefId?: string | null;
+      gameDate?: string | null;
+    }) => void)
+  | null = null;
+
 jest.mock('@legacy-sports/shared-components', () => {
   const { View, Text } = jest.requireActual<RNComponents>('react-native');
   return {
     Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     LeagueActivityFeed: () => <View testID="league-activity-feed" />,
     LeagueScoringSummary: () => <View testID="league-scoring-summary" />,
-    OnThisDayFeed: () => <View testID="on-this-day-feed" />,
+    OnThisDayFeed: ({
+      onPlayerPress,
+    }: {
+      onPlayerPress?: (params: {
+        playerId: number;
+        brefId?: string | null;
+        gameDate?: string | null;
+      }) => void;
+    }) => {
+      capturedOnPlayerPress = onPlayerPress ?? null;
+      return <View testID="on-this-day-feed" />;
+    },
     PanelCard: ({ children }: { children?: React.ReactNode }) => (
       <View>{children}</View>
     ),
@@ -107,6 +134,12 @@ const STANDINGS = Array.from({ length: 8 }, (_, i) => ({
 }));
 
 describe('LeagueOverviewTab', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    capturedOnPlayerPress = null;
+    BASE_PROPS.onPlayerPress.mockClear();
+  });
+
   it('always renders the activity and dues panels', () => {
     render(<LeagueOverviewTab {...BASE_PROPS} />);
     expect(screen.getByText('Recent Activity')).toBeTruthy();
@@ -127,6 +160,36 @@ describe('LeagueOverviewTab', () => {
       />,
     );
     expect(screen.queryByTestId('on-this-day-feed')).toBeNull();
+  });
+
+  // LS-10015 — deep-links straight to the game's stat log when the entry
+  // resolves to a brefId + gameDate, matching web's HomePage (LS-9763).
+  it('navigates to ViewGameLogs when the On This Day entry resolves to a brefId + gameDate', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} />);
+    capturedOnPlayerPress?.({
+      playerId: 7,
+      brefId: 'ramirjo01',
+      gameDate: '2024-05-01',
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/ViewGameLogs',
+      params: {
+        playerId: 'ramirjo01',
+        startDate: '2024-05-01',
+        endDate: '2024-05-01',
+      },
+    });
+    expect(BASE_PROPS.onPlayerPress).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the caller-supplied onPlayerPress when gameDate is unresolvable', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} />);
+    const params = { playerId: 7, brefId: 'ramirjo01', gameDate: null };
+    capturedOnPlayerPress?.(params);
+
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(BASE_PROPS.onPlayerPress).toHaveBeenCalledWith(params);
   });
 
   it('does not render the dues payment panel for non-member spectators (LS-6325)', () => {

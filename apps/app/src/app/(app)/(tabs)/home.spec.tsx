@@ -82,8 +82,13 @@ let capturedOnViewSport: ((sport: 'baseball' | 'football') => void) | null =
 // Capture topInset so tests can assert it's forwarded from useSafeAreaInsets (LS-8625)
 let capturedTopInset: number | undefined;
 // Capture the OnThisDayFeed onPlayerPress callback (LS-8627, widened LS-9763)
-let capturedOnPlayerPress: ((params: { playerId: number }) => void) | null =
-  null;
+let capturedOnPlayerPress:
+  | ((params: {
+      playerId: number;
+      brefId?: string | null;
+      gameDate?: string | null;
+    }) => void)
+  | null = null;
 // Capture archived-toggle callbacks and state so tests can drive them (LS-8633)
 let capturedOnShowArchived: (() => void) | null = null;
 let capturedOnHideArchived: (() => void) | null = null;
@@ -199,7 +204,11 @@ jest.mock('@legacy-sports/shared-components/leagues', () => ({
   OnThisDayFeed: ({
     onPlayerPress,
   }: {
-    onPlayerPress?: (params: { playerId: number }) => void;
+    onPlayerPress?: (params: {
+      playerId: number;
+      brefId?: string | null;
+      gameDate?: string | null;
+    }) => void;
   }) => {
     capturedOnPlayerPress = onPlayerPress ?? null;
     return null;
@@ -518,6 +527,44 @@ describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
     });
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // LS-10015 — deep-links to the specific game's stat log when the entry
+  // resolves to a brefId + gameDate, matching web's HomePage (LS-9763).
+  it('navigates to ViewGameLogs when brefId and gameDate are present', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnPlayerPress?.({
+        playerId: 7,
+        brefId: 'ramirjo01',
+        gameDate: '2024-05-01',
+      });
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/ViewGameLogs',
+      params: {
+        playerId: 'ramirjo01',
+        startDate: '2024-05-01',
+        endDate: '2024-05-01',
+      },
+    });
+  });
+
+  it('falls back to PlayerDetail when brefId is present but gameDate is not', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnPlayerPress?.({
+        playerId: 7,
+        brefId: 'ramirjo01',
+        gameDate: null,
+      });
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/PlayerDetail',
+      params: { playerId: '7', playerName: '' },
+    });
   });
 });
 

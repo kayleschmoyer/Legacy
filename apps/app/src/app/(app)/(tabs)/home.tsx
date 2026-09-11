@@ -243,11 +243,19 @@ export default function HomeTab() {
   const userName = formatDisplayName(userInfo.username || 'Manager');
 
   const handlePlayerPress = useCallback(
-    // LS-9763 — mobile has no game-logs viewing surface yet (tracked as a
-    // follow-up in LS-10015), so unlike web this always lands on the
-    // player's generic profile page; the extra game context on `params` is
-    // unused here.
-    ({ playerId: id }: OnThisDayPlayerPress) => {
+    // LS-10015 — deep-link straight to the game this entry is about, matching
+    // web's HomePage behavior (LS-9763), rather than the player's generic
+    // profile page. Falls back to the profile page when the identifier can't
+    // be resolved to a game date.
+    ({ playerId: id, brefId, gameDate }: OnThisDayPlayerPress) => {
+      if (brefId && gameDate) {
+        router.push({
+          pathname: '/ViewGameLogs',
+          params: { playerId: brefId, startDate: gameDate, endDate: gameDate },
+        });
+        return;
+      }
+
       // Validate the id before navigating (LS-8627) — a blind String(id)
       // coercion let a missing/invalid id reach PlayerDetail, which fails
       // to parse it and always shows "Player Not Found".
