@@ -2,14 +2,7 @@ import React from 'react';
 import { Text, XStack } from 'tamagui';
 import type { BrandIconName } from './icons/BrandIcon';
 import { BrandIcon } from './icons/BrandIcon';
-
-const handleKeyActivate =
-  (fn: (() => void) | undefined) => (e: React.KeyboardEvent<HTMLElement>) => {
-    if (fn != null && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      e.currentTarget.click();
-    }
-  };
+import { handleKeyActivate } from '../utils/keyboardActivation';
 
 export type { BrandIconName };
 

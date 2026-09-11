@@ -3,6 +3,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import type { LeagueTeam } from './types';
 import { GradientSurface } from '../home/GradientSurface';
 import { useThemeTokens } from '../../hooks/useThemeTokens';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 
 export interface DraftChatProps {
   leagueId: number;
@@ -21,14 +22,6 @@ interface DraftChatOverlayProps {
 }
 
 const OVERLAY_WIDTH = 320;
-
-const handleKeyActivate =
-  (fn: (() => void) | undefined) => (e: React.KeyboardEvent<HTMLElement>) => {
-    if (fn != null && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      e.currentTarget.click();
-    }
-  };
 
 export function DraftChatOverlay({
   leagueId,

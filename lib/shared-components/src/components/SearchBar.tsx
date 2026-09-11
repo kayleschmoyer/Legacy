@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input, Text, XStack, YStack } from 'tamagui';
 import { BrandIcon } from './icons/BrandIcon';
+import { handleKeyActivate } from '../utils/keyboardActivation';
 
 // Dark-theme textMuted hex — used for the search icon color which requires
 // a raw string (BrandIcon doesn't accept Tamagui token references).
@@ -39,14 +40,6 @@ export interface SearchBarProps {
   seeAllLabel?: string;
   onSeeAll?: () => void;
 }
-
-const handleKeyActivate =
-  (fn: (() => void) | undefined) => (e: React.KeyboardEvent<HTMLElement>) => {
-    if (fn != null && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      e.currentTarget.click();
-    }
-  };
 
 function FilterChip({
   label,

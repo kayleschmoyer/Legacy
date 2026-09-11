@@ -1,5 +1,4 @@
 import {
-  abbreviatedPlayerName,
   buildBoardCells,
   computeMyUpcomingPicks,
   describeBoardCell,
@@ -8,7 +7,6 @@ import {
   initialsOf,
   MIN_BOARD_ROUNDS,
   resolveBoardRounds,
-  shortPlayerName,
   snakePickInRound,
   statLineFor,
 } from './nativeDraftBoard';
@@ -269,21 +267,6 @@ describe('describeBoardCell', () => {
   });
 });
 
-describe('shortPlayerName', () => {
-  it('returns the surname', () => {
-    expect(shortPlayerName('Aaron Judge')).toBe('Judge');
-  });
-
-  it('skips generational suffixes', () => {
-    expect(shortPlayerName('Bobby Witt Jr.')).toBe('Witt');
-    expect(shortPlayerName('Ken Griffey III')).toBe('Griffey');
-  });
-
-  it('passes a single-word name through', () => {
-    expect(shortPlayerName('Ichiro')).toBe('Ichiro');
-  });
-});
-
 describe('statLineFor', () => {
   it('shows rate stats for hitters, with the leading zero dropped', () => {
     expect(statLineFor(makePlayer())).toBe('AVG .332 · HR 32 · RBI 96');
@@ -407,20 +390,6 @@ describe('computeMyUpcomingPicks', () => {
         myTeamIndex: -1,
       }),
     ).toEqual([]);
-  });
-});
-
-describe('abbreviatedPlayerName', () => {
-  it('abbreviates the first name to an initial', () => {
-    expect(abbreviatedPlayerName('Mike Trout')).toBe('M. Trout');
-  });
-
-  it('drops generational suffixes before abbreviating', () => {
-    expect(abbreviatedPlayerName('Bobby Witt Jr.')).toBe('B. Witt');
-  });
-
-  it('returns a single-word name unchanged', () => {
-    expect(abbreviatedPlayerName('Ohtani')).toBe('Ohtani');
   });
 });
 

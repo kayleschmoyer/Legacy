@@ -14,7 +14,7 @@ import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
 import { DraftDetailsPanel } from './DraftDetailsPanel';
 import type { DraftDetailsSettings } from './draftDetails';
-import { DraftBoardGrid } from './DraftBoardGrid';
+import { DraftRoundBoard } from './DraftRoundBoard';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftConnectionBanner } from './DraftConnectionBanner';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
@@ -637,7 +637,7 @@ function CompactLiveDraftBoard({
       ) : null}
       {ui.activeTab === 'board' && (
         <>
-          <DraftBoardGrid
+          <DraftRoundBoard
             teams={boardTeams}
             picks={queries.pickHistory}
             currentPickInfo={queries.currentPickInfo}

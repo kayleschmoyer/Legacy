@@ -57,7 +57,7 @@ interface UseDraftQueriesParams {
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
   /** True on the compact/native draft board, which always renders the Board
-   * tab grid (DraftBoardGrid, LS-9398; formerly DraftMiniBoard) regardless of
+   * tab (DraftRoundBoard, LS-10000; previously DraftBoardGrid) regardless of
    * `viewMode` and therefore always needs the real slot order (LS-9245). */
   isCompact?: boolean;
 }

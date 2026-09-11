@@ -157,23 +157,6 @@ export function describeBoardCell(
   return `R${cell.round} · ${teamName} — ${cell.playerName ?? 'Unknown'}${position}`;
 }
 
-const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
-
-/**
- * Surname for the board grid, where a cell is barely wider than the position
- * label. Generational suffixes are dropped so "Bobby Witt Jr." reads as "Witt"
- * rather than "Jr.".
- */
-export function shortPlayerName(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return name;
-  for (let i = words.length - 1; i >= 0; i--) {
-    const bare = words[i].replace(/\./g, '').toLowerCase();
-    if (!NAME_SUFFIXES.has(bare)) return words[i];
-  }
-  return words[words.length - 1];
-}
-
 /** Batting-average display style: three decimals with no leading zero (`.332`). */
 function formatAvg(avg: number): string {
   const fixed = avg.toFixed(3);
@@ -252,17 +235,6 @@ export function computeMyUpcomingPicks({
     }
   }
   return results;
-}
-
-/**
- * "F. Lastname" abbreviation for the Board tab grid cell (README "Board tab",
- * LS-9398) — reuses {@link shortPlayerName}'s suffix-stripping so "Bobby Witt
- * Jr." reads as "B. Witt" rather than "B. Jr.".
- */
-export function abbreviatedPlayerName(fullName: string): string {
-  const words = fullName.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return fullName.trim();
-  return `${words[0].charAt(0)}. ${shortPlayerName(fullName)}`;
 }
 
 /**

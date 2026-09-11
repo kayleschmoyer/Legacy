@@ -238,8 +238,8 @@ jest.mock('./DraftBottomNav', () => ({
     />
   ),
 }));
-jest.mock('./DraftBoardGrid', () => ({
-  DraftBoardGrid: ({
+jest.mock('./DraftRoundBoard', () => ({
+  DraftRoundBoard: ({
     rounds,
     sport,
     onMakePick,
@@ -249,7 +249,7 @@ jest.mock('./DraftBoardGrid', () => ({
     onMakePick: () => void;
   }) => (
     <button
-      data-testid="draft-board-grid"
+      data-testid="draft-round-board"
       data-rounds={rounds}
       data-sport={sport}
       onClick={onMakePick}
@@ -1454,23 +1454,23 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(header.getAttribute('data-draft-paused')).toBe('true');
   });
 
-  it('passes the resolved board rounds and sport to DraftBoardGrid', () => {
+  it('passes the resolved board rounds and sport to DraftRoundBoard', () => {
     setupCompactLiveDraft({ picks: [makePickRecord()] });
 
     render(<EliteDraftBoardScreen {...defaultProps} sport="football" />);
 
-    const grid = screen.getByTestId('draft-board-grid');
+    const grid = screen.getByTestId('draft-round-board');
     expect(grid).toBeTruthy();
     expect(grid.getAttribute('data-sport')).toBe('football');
   });
 
-  it('navigates to the Players tab when DraftBoardGrid fires onMakePick', () => {
+  it('navigates to the Players tab when DraftRoundBoard fires onMakePick', () => {
     const setActiveTab = jest.fn();
     setupCompactLiveDraft({ ui: { setActiveTab } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    fireEvent.click(screen.getByTestId('draft-board-grid'));
+    fireEvent.click(screen.getByTestId('draft-round-board'));
 
     expect(setActiveTab).toHaveBeenCalledWith('players');
   });
@@ -1612,7 +1612,7 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(screen.queryByLabelText(/Open roster/i)).toBeNull();
     // The board tab still renders, so the assertions above are about the
     // drawer's absence rather than an empty screen.
-    expect(screen.getByTestId('draft-board-grid')).toBeTruthy();
+    expect(screen.getByTestId('draft-round-board')).toBeTruthy();
   });
 
   it('exposes commissioner pause and comm-pick controls to the commissioner', () => {
@@ -1714,7 +1714,7 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.getByTestId('draft-board-grid')).toBeTruthy();
+    expect(screen.getByTestId('draft-round-board')).toBeTruthy();
     expect(screen.getByTestId('flatlist')).toBeTruthy();
     expect(screen.queryByText('Chat tab is coming soon.')).toBeNull();
     expect(screen.queryByTestId('draft-players-tab')).toBeNull();
