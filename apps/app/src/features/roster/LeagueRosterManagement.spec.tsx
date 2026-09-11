@@ -128,14 +128,15 @@ describe('LeagueRosterManagement', () => {
     expect(screen.queryByText('week-nav')).toBeNull();
   });
 
-  it('makes the board read-only and shows the future banner on future weeks', () => {
+  it('keeps the board editable and shows the upcoming-week banner on future weeks (LS-9768)', () => {
     render(
       <LeagueRosterManagement {...baseProps} currentWeek={3} totalWeeks={10} />,
     );
     // Advance from current week (3 → 4): a future week.
     fireEvent.press(screen.getByText('go-next'));
     expect(screen.getByText('banner-future')).toBeTruthy();
-    expect(screen.getByText('board-readonly-true')).toBeTruthy();
+    // Future weeks are editable — only a finalized past week is read-only.
+    expect(screen.getByText('board-readonly-false')).toBeTruthy();
     // Pending banners and the action bar only show on the current week.
     expect(screen.queryByText('pending-trades')).toBeNull();
     expect(screen.queryByText('action-bar')).toBeNull();

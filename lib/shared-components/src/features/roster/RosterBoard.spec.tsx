@@ -209,6 +209,63 @@ describe('RosterBoard', () => {
     expect(onPlayerSwap).not.toHaveBeenCalled();
   });
 
+  // ── Blocked-placement reason (LS-9768) ─────────────────────────────────────
+
+  it('shows a reason banner when the selected player is not eligible for the tapped slot', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    // Nolan Ryan (SP-only) can't play the empty 1B slot.
+    fireEvent.click(screen.getByRole('button', { name: /Nolan Ryan — bench/ }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /1st Base.*open slot/i }),
+    );
+    expect(
+      screen.getByText(
+        "Nolan Ryan is only eligible for SP — can't be placed at 1st Base.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it('does not fire onPlayerAssign for a position-mismatched placement', () => {
+    const onPlayerAssign = jest.fn();
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={onPlayerAssign}
+        onPlayerRemove={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Nolan Ryan — bench/ }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /1st Base.*open slot/i }),
+    );
+    expect(onPlayerAssign).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the blocked-reason banner', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Nolan Ryan — bench/ }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /1st Base.*open slot/i }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText(/Nolan Ryan is only eligible for SP/)).toBeNull();
+  });
+
   // ── mlbTeam / jerseyNumber badge (LS-8597) ─────────────────────────────────
 
   it('renders a team + jersey number badge for a starter when present', () => {

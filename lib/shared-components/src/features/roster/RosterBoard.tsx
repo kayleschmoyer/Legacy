@@ -17,6 +17,7 @@ import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { contrastRatio } from '@legacy-sports/design-tokens';
 import {
   canPlayerPlayPosition,
+  getEligiblePositions,
   getPositionLabel,
   isPitcherSlot,
   playerHasBatting,
@@ -409,6 +410,25 @@ const SELECTED_BG = withAlpha(BRAND_GOLD, 0.1);
 const ELIGIBLE_GLOW = isWeb
   ? { boxShadow: `0 0 18px ${withAlpha(BRAND_GOLD, 0.18)}` }
   : undefined;
+
+/**
+ * Human-readable reason a selected player can't be placed in a given slot
+ * (LS-9768) — surfaced as a dismissible banner instead of the tap silently
+ * doing nothing. `null` when the placement is actually allowed.
+ */
+function describeBlockedPlacement(
+  playerName: string,
+  targetLabel: string,
+  eligible: readonly string[],
+  isTargetLocked: boolean,
+): string {
+  if (isTargetLocked) {
+    return `${targetLabel} is locked — that matchup has already started, so this slot can't be changed.`;
+  }
+  return eligible.length > 0
+    ? `${playerName} is only eligible for ${eligible.join(', ')} — can't be placed at ${targetLabel}.`
+    : `${playerName} can't be placed at ${targetLabel}.`;
+}
 
 function subLineFromStats(stats: RosterPlayerStats): string | null {
   const parts: string[] = [];
@@ -899,6 +919,12 @@ export function RosterBoard<
   currentWeek,
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
   const [selected, setSelected] = useState<P | null>(null);
+  /**
+   * Reason the last placement attempt was blocked (position mismatch, or the
+   * target slot's occupant is locked) — cleared on the next successful
+   * action, new selection, or dismissal (LS-9768).
+   */
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
   /** Position id whose quick-swap menu is open. */
   const [quickSwapPositionId, setQuickSwapPositionId] = useState<number | null>(
     null,
@@ -988,12 +1014,15 @@ export function RosterBoard<
       if (position.id != null && disabledPositionIds?.has(position.id)) return;
       closeMenus();
       const assigned = teamPlayers.find((p) => p.positionId === position.id);
+      const posLabel = getPositionLabel(position.positionType);
       if (!selected) {
+        setBlockedReason(null);
         if (assigned && !assigned.isLocked) setSelected(assigned);
         return;
       }
       // Clicking the already-selected player's own slot → deselect.
       if (assigned && assigned.id === selected.id) {
+        setBlockedReason(null);
         setSelected(null);
         return;
       }
@@ -1005,10 +1034,16 @@ export function RosterBoard<
       if (assigned && canAccept) {
         if (assigned.isLocked) {
           // Can't swap into a locked player's slot; re-select them instead.
+          // (Unreachable from the row's own tap today — SlotRow disables
+          // onPress whenever its occupant is locked — but this guard stays
+          // as a defensive fallback for any other caller of this handler.
+          // The locked occupant's own row already explains why via its
+          // "Locked — game in progress" subtext and lock icon, LS-9768.)
           setSelected(assigned);
           return;
         }
         // Swap when the data layer supports it; otherwise re-select occupant.
+        setBlockedReason(null);
         if (onPlayerSwap) {
           onPlayerSwap(selected, position, assigned);
           setSelected(null);
@@ -1018,11 +1053,21 @@ export function RosterBoard<
         return;
       }
       if (!assigned && canAccept) {
+        setBlockedReason(null);
         onPlayerAssign(selected, position);
         setSelected(null);
         return;
       }
-      // Selected player can't play here — switch to the occupant or deselect.
+      // Selected player can't play here (position mismatch, LS-9768) —
+      // explain why, then switch to the occupant or deselect as before.
+      setBlockedReason(
+        describeBlockedPlacement(
+          getPlayerName(selected),
+          posLabel,
+          getEligiblePositions(selected),
+          false,
+        ),
+      );
       if (assigned) setSelected(assigned);
       else setSelected(null);
     },
@@ -1043,6 +1088,7 @@ export function RosterBoard<
       if (readOnly) return;
       if (player.isLocked) return;
       closeMenus();
+      setBlockedReason(null);
       // Tapping the bench while a lineup player is selected → bench that player.
       if (selected && selected.positionId != null) {
         const pos = positions.find((p) => p.id === selected.positionId);
@@ -1318,9 +1364,46 @@ export function RosterBoard<
           fontWeight="600"
           color="$brandGoldLight"
           hoverStyle={{ color: '$brandGold' }}
-          onPress={() => setSelected(null)}
+          onPress={() => {
+            setSelected(null);
+            setBlockedReason(null);
+          }}
         >
           Cancel
+        </Text>
+      </XStack>
+    </Card>
+  );
+
+  const blockedReasonBanner = blockedReason && !readOnly && (
+    <Card
+      testID="roster-blocked-reason"
+      role="alert"
+      aria-live="assertive"
+      borderRadius="$4"
+      borderWidth={1}
+      borderColor="$orange7"
+      backgroundColor="$orange3"
+      paddingHorizontal="$4"
+      paddingVertical="$2.5"
+    >
+      <XStack alignItems="center" gap="$2">
+        <YStack flex={1} minWidth={0}>
+          <Text fontSize="$2" color="$orange11">
+            {blockedReason}
+          </Text>
+        </YStack>
+        <Text
+          testID="roster-dismiss-blocked-reason"
+          role="button"
+          aria-label="Dismiss"
+          tabIndex={0}
+          fontSize="$2"
+          fontWeight="600"
+          color="$orange11"
+          onPress={() => setBlockedReason(null)}
+        >
+          Dismiss
         </Text>
       </XStack>
     </Card>
@@ -1452,6 +1535,7 @@ export function RosterBoard<
                 if (pos) {
                   onPlayerRemove(pos);
                   setSelected(null);
+                  setBlockedReason(null);
                 }
               }}
             >
@@ -1469,6 +1553,7 @@ export function RosterBoard<
     return (
       <YStack gap="$4">
         {selectionBanner}
+        {blockedReasonBanner}
         <XStack gap="$4" alignItems="flex-start">
           <YStack flex={2} minWidth={0} gap="$4">
             {startersCard}
@@ -1485,6 +1570,7 @@ export function RosterBoard<
   return (
     <YStack gap="$4">
       {selectionBanner}
+      {blockedReasonBanner}
       {startersCard}
       {pitchersCard}
       {benchCard}

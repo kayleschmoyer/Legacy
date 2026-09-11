@@ -6,7 +6,11 @@ import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 export interface RosterStatusBannersProps {
   /** Viewing a finalized past week — lineup is read-only. */
   isPast: boolean;
-  /** Viewing a future week — changes are provisional. */
+  /**
+   * Viewing an upcoming week — lineup is editable (LS-9768). Changes apply to
+   * the player's persistent roster slot and carry forward to this and later
+   * weeks until edited again.
+   */
   isFuture: boolean;
 }
 
@@ -81,10 +85,10 @@ export function RosterStatusBanners({
   if (isFuture) {
     return (
       <Banner
-        kind="warning"
-        icon={<Info size={18} color="var(--orange11)" />}
-        title="Future Week — Read Only"
-        sub="Lineup changes are not available for future weeks. Return to the current week to update your lineup."
+        kind="info"
+        icon={<Info size={18} color="var(--brandGold)" />}
+        title="Upcoming Week"
+        sub="You're setting a lineup ahead of time — changes carry forward to this and later weeks until you edit them again."
       />
     );
   }

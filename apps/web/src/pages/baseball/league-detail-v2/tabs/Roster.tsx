@@ -249,7 +249,12 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const isPast = week < currentWeek;
   const isFuture = week > currentWeek;
   const isCurrent = week === currentWeek;
-  const readOnly = isPast || isFuture;
+  // Only a finalized past week is locked — future weeks are editable so
+  // managers can set lineups ahead of time (LS-9768). The server's own
+  // `checkPlayersNotLocked` guard (lambdas/db/src/schema/authorization.ts)
+  // only ever locks the league's *current* week, so a future-week edit here
+  // can never collide with that check.
+  const readOnly = isPast;
   const isFootball = league.sport === Sport.Football;
 
   // Bye-week warning data (LS-6334) — football only. IR-slot enforcement was

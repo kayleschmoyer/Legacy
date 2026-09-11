@@ -217,7 +217,9 @@ export function LeagueRosterManagement({
             onPlayerSwap={onPlayerSwap}
             onPlayerPress={onPlayerPress}
             loading={loading}
-            readOnly={isViewingOther || isPast || isFuture}
+            // Only a finalized past week is locked — future weeks are
+            // editable so managers can set lineups ahead of time (LS-9768).
+            readOnly={isViewingOther || isPast}
             salaryCapEnabled={!!salaryCapEnabled}
             sport={sport}
             currentWeek={sport === 'football' ? activeWeek : undefined}
