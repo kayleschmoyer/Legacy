@@ -178,4 +178,60 @@ describe('useDraftUIState — Draft Room v2 shell additions (LS-9397)', () => {
 
     expect(result.current.pickSplashQueue).toEqual([]);
   });
+
+  it('caps the pick toast queue during a flood of rapid auto-picks', () => {
+    const { result } = renderHook(() => useDraftUIState());
+
+    // 8 rapid-fire auto-picks (e.g. a commissioner auto-drafting the rest of
+    // the league) must not queue every toast — that would re-trigger the
+    // popup every ~1.9s long after the picks happened (stuttery back-to-back
+    // popups).
+    act(() => {
+      for (let i = 1; i <= 8; i += 1) {
+        result.current.enqueuePickToast({
+          id: `toast-${i}`,
+          player,
+          pickNumber: i,
+          round: 1,
+          roundPickNumber: i,
+          teamName: `Team ${i}`,
+          isAuto: true,
+        });
+      }
+    });
+
+    // 8 enqueues against TOAST_FLOOD_QUEUE_LENGTH=5 / TOAST_FLOOD_KEEP_NEWEST=2
+    // trims deterministically to 4: the flood trim fires once length crosses
+    // 5 (at enqueue #6, trimming to the newest 2), then #7 and #8 land
+    // without re-crossing the threshold.
+    expect(result.current.pickToastQueue.map((t) => t.id)).toEqual([
+      'toast-5',
+      'toast-6',
+      'toast-7',
+      'toast-8',
+    ]);
+  });
+
+  it('caps the pick splash queue during a flood of rapid auto-picks', () => {
+    const { result } = renderHook(() => useDraftUIState());
+
+    act(() => {
+      for (let i = 1; i <= 8; i += 1) {
+        result.current.enqueuePickSplash({
+          id: `splash-${i}`,
+          player,
+          pickNumber: i,
+          round: 1,
+          roundPickNumber: i,
+        });
+      }
+    });
+
+    expect(result.current.pickSplashQueue.map((s) => s.id)).toEqual([
+      'splash-5',
+      'splash-6',
+      'splash-7',
+      'splash-8',
+    ]);
+  });
 });

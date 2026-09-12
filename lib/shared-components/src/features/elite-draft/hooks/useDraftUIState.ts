@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AvailableDraftPlayer, DraftPlayer } from '../types';
 import { DEFAULT_PICK_TIME } from '../constants';
 
+// A flood of rapid auto-picks (e.g. the commissioner auto-drafting the rest
+// of the league) would otherwise queue every pick and re-trigger the toast
+// every ~1.9s long after those picks actually happened — stuttery,
+// back-to-back popups. Cap the backlog and keep only the newest entries,
+// same flood-control shape as the spectator SplashQueue (LS-8942).
+const TOAST_FLOOD_QUEUE_LENGTH = 5;
+const TOAST_FLOOD_KEEP_NEWEST = 2;
+
 export interface AnnouncementData {
   player: DraftPlayer | AvailableDraftPlayer;
   pickNumber: number;
@@ -196,7 +204,12 @@ export function useDraftUIState() {
     [],
   );
   const enqueuePickToast = useCallback((item: PickToastQueueItem) => {
-    setPickToastQueue((queue) => [...queue, item]);
+    setPickToastQueue((queue) => {
+      const next = [...queue, item];
+      return next.length > TOAST_FLOOD_QUEUE_LENGTH
+        ? next.slice(-TOAST_FLOOD_KEEP_NEWEST)
+        : next;
+    });
   }, []);
   const dequeuePickToast = useCallback(() => {
     setPickToastQueue((queue) => queue.slice(1));
@@ -206,7 +219,12 @@ export function useDraftUIState() {
     [],
   );
   const enqueuePickSplash = useCallback((item: PickSplashQueueItem) => {
-    setPickSplashQueue((queue) => [...queue, item]);
+    setPickSplashQueue((queue) => {
+      const next = [...queue, item];
+      return next.length > TOAST_FLOOD_QUEUE_LENGTH
+        ? next.slice(-TOAST_FLOOD_KEEP_NEWEST)
+        : next;
+    });
   }, []);
   const dequeuePickSplash = useCallback(() => {
     setPickSplashQueue((queue) => queue.slice(1));
