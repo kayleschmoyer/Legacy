@@ -15,6 +15,7 @@ import { EllipsisVertical } from '@tamagui/lucide-icons/icons/EllipsisVertical';
 import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { contrastRatio } from '@legacy-sports/design-tokens';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   canPlayerPlayPosition,
   getEligiblePositions,
@@ -174,6 +175,13 @@ export interface RosterBoardProps<
    * determine bye-week starters (LS-6334).
    */
   currentWeek?: number | null;
+  /**
+   * The roster's owning team, for diagnostic context only (LS-6439) — logged
+   * alongside a duplicate-`positionId` warning so the underlying data issue
+   * can be traced back to a specific team. Purely optional; omitting it just
+   * drops that field from the log line.
+   */
+  teamId?: number | string | null;
 }
 
 // ── Position accents ────────────────────────────────────────────────────────
@@ -917,6 +925,7 @@ export function RosterBoard<
   salaryCapEnabled = false,
   byeWeeksByTeam,
   currentWeek,
+  teamId,
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
   const [selected, setSelected] = useState<P | null>(null);
   /**
@@ -953,6 +962,34 @@ export function RosterBoard<
     () => teamPlayers.filter((p) => p.positionId == null),
     [teamPlayers],
   );
+
+  /**
+   * Resolves the one starter occupying each slot. `team_members.positionId`
+   * is expected to be unique among starters, but if data corruption, a race
+   * condition, or a migration bug ever produces two rows sharing the same
+   * positionId, a plain `Map.set` would silently let the later row overwrite
+   * the earlier one — the earlier player would vanish from the lineup with no
+   * trace of what happened (LS-6439). Still resolves to one entry per
+   * positionId (last write wins, unchanged from before), but now logs the
+   * collision so the underlying data issue is discoverable.
+   */
+  const teamMemberByPositionId = useMemo(() => {
+    const map = new Map<number, P>();
+    for (const p of teamPlayers) {
+      if (p.positionId == null) continue;
+      const existing = map.get(p.positionId);
+      if (existing) {
+        LOGGER.warn('Duplicate positionId in team roster', {
+          teamId,
+          positionId: p.positionId,
+          overwrittenPlayerId: existing.id,
+          newPlayerId: p.id,
+        });
+      }
+      map.set(p.positionId, p);
+    }
+    return map;
+  }, [teamPlayers, teamId]);
 
   const { benchHitters, benchPitchers } = useMemo(() => {
     if (isFootball)
@@ -1013,7 +1050,10 @@ export function RosterBoard<
       if (readOnly) return;
       if (position.id != null && disabledPositionIds?.has(position.id)) return;
       closeMenus();
-      const assigned = teamPlayers.find((p) => p.positionId === position.id);
+      const assigned =
+        position.id != null
+          ? teamMemberByPositionId.get(position.id)
+          : undefined;
       const posLabel = getPositionLabel(position.positionType);
       if (!selected) {
         setBlockedReason(null);
@@ -1074,7 +1114,7 @@ export function RosterBoard<
     [
       readOnly,
       selected,
-      teamPlayers,
+      teamMemberByPositionId,
       onPlayerAssign,
       onPlayerSwap,
       disabledPositionIds,
@@ -1145,7 +1185,8 @@ export function RosterBoard<
   const moveToBenchEnabled = !readOnly && selected?.positionId != null;
 
   const renderSlot = (position: Pos) => {
-    const assigned = teamPlayers.find((p) => p.positionId === position.id);
+    const assigned =
+      position.id != null ? teamMemberByPositionId.get(position.id) : undefined;
     let state: SlotState = 'idle';
     if (selected) {
       const canAccept = canPlayerPlayPosition(

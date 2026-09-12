@@ -1,4 +1,5 @@
 import React from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   RosterBoard,
   type RosterBoardPlayer,
@@ -640,6 +641,74 @@ describe('RosterBoard', () => {
       expect(
         container.querySelector('[data-testid="roster-move-to-bench"]'),
       ).not.toBeNull();
+    });
+  });
+
+  describe('duplicate positionId defensive logging (LS-6439)', () => {
+    it('logs both player IDs, the shared positionId, and the team when two team_members rows share a positionId', () => {
+      const warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation();
+      const duplicatePlayers: RosterBoardPlayer[] = [
+        mk(101, 'Mike', 'Johnson', ['C'], 1),
+        mk(999, 'Ghost', 'Player', ['C'], 1), // corrupt seed: same positionId as 101
+      ];
+
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={duplicatePlayers}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          teamId={42}
+        />,
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Duplicate positionId in team roster',
+        expect.objectContaining({
+          teamId: 42,
+          positionId: 1,
+          overwrittenPlayerId: 101,
+          newPlayerId: 999,
+        }),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('still resolves the slot to exactly one entry (the later row) despite the collision', () => {
+      const warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation();
+      const duplicatePlayers: RosterBoardPlayer[] = [
+        mk(101, 'Mike', 'Johnson', ['C'], 1),
+        mk(999, 'Ghost', 'Player', ['C'], 1),
+      ];
+
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={duplicatePlayers}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+
+      expect(screen.getByText('Ghost Player')).toBeTruthy();
+      expect(screen.queryByText('Mike Johnson')).toBeNull();
+      warnSpy.mockRestore();
+    });
+
+    it('does not log when no positionId collision exists', () => {
+      const warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation();
+
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 });
