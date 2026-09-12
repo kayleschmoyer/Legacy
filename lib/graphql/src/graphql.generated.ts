@@ -1017,6 +1017,17 @@ export type FootballMatchupPlayer = {
   totalPoints: Scalars['Float']['output'];
 };
 
+/** Premium advanced per-player metrics for a football matchup player (LS-6398): snap count %, target share %, and air yards. Every field is currently always null — the underlying ingest (snap counts, target share, air yards) does not exist yet in the data pipeline. This type exists so the field is wired end-to-end (schema + premium gate + UI) ahead of that ingest work landing. */
+export type FootballMatchupPlayerAdvancedStats = {
+  __typename?: 'FootballMatchupPlayerAdvancedStats';
+  /** Total air yards on targeted passes. */
+  airYards?: Maybe<Scalars['Int']['output']>;
+  /** Percentage of offensive/defensive snaps played (0-100). */
+  snapCountPercentage?: Maybe<Scalars['Float']['output']>;
+  /** Player's share of their team's passing targets (0-100). */
+  targetSharePercentage?: Maybe<Scalars['Float']['output']>;
+};
+
 /** A single NFL game played by a football matchup player */
 export type FootballMatchupPlayerGame = {
   __typename?: 'FootballMatchupPlayerGame';
@@ -1860,6 +1871,8 @@ export enum MatchupMessageType {
 /** A player selected for a specific matchup */
 export type MatchupPlayer = {
   __typename?: 'MatchupPlayer';
+  /** Premium advanced per-player metrics (snap count %, target share, air yards) for football matchup players (LS-6398). Null for non-premium users and for baseball players. Currently resolves with every metric null for everyone else too — the underlying ingest does not exist yet; see the type description. */
+  advancedStats?: Maybe<FootballMatchupPlayerAdvancedStats>;
   /** Average fantasy points per game for a football player's assigned matchup season, used to grade whether it's been a strong or weak season for them so far (the "Matchup Edge" chip). Not an opponent-specific matchup comparison — no defense-vs-position data source exists yet. Premium-gated (ENTITLEMENTS.football_projections); null for non-premium users, baseball players, or players with no assigned season. */
   footballSeasonFppg?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Array<MatchupPlayerGame>>;
@@ -7447,6 +7460,12 @@ export type GetMatchupRosterQuery = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7693,6 +7712,12 @@ export type UpdateMatchupPlayerPositionMutation = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7866,6 +7891,12 @@ export type SwapMatchupPlayerPositionsMutation = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -8036,6 +8067,12 @@ export type UndoMatchupPlayerSwapMutation = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -8207,6 +8244,12 @@ export type SetOptimalLineupMutation = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -11615,6 +11658,12 @@ export type GetMatchupPlayersQuery = {
     swapId?: string | null;
     numberOfGames?: number | null;
     footballSeasonFppg?: number | null;
+    advancedStats?: {
+      __typename?: 'FootballMatchupPlayerAdvancedStats';
+      snapCountPercentage?: number | null;
+      targetSharePercentage?: number | null;
+      airYards?: number | null;
+    } | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -13269,6 +13318,12 @@ export type MatchupPlayerFragment = {
   swapId?: string | null;
   numberOfGames?: number | null;
   footballSeasonFppg?: number | null;
+  advancedStats?: {
+    __typename?: 'FootballMatchupPlayerAdvancedStats';
+    snapCountPercentage?: number | null;
+    targetSharePercentage?: number | null;
+    airYards?: number | null;
+  } | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -16702,6 +16757,11 @@ export const MatchupPlayerFragmentDoc = gql`
     swapId
     numberOfGames
     footballSeasonFppg
+    advancedStats {
+      snapCountPercentage
+      targetSharePercentage
+      airYards
+    }
     player {
       id
       firstName

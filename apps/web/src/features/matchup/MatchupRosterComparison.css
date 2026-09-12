@@ -598,6 +598,58 @@
   word-break: break-word;
 }
 
+/* advanced stats expandable section (LS-6398) */
+.mrc-advstats-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-fg, var(--fg3));
+  cursor: pointer;
+}
+.mrc-advstats-toggle:hover {
+  text-decoration: underline;
+}
+.mrc-advstats-panel {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-4, 6px);
+}
+.mrc-advstats-locked,
+.mrc-advstats-empty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--fg3);
+}
+.mrc-advstats-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mrc-advstats-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.mrc-advstats-row dt {
+  color: var(--fg3);
+}
+.mrc-advstats-row dd {
+  margin: 0;
+  color: var(--fg2);
+  font-weight: 600;
+}
+
 /* score block */
 .mrc-pscore {
   display: flex;

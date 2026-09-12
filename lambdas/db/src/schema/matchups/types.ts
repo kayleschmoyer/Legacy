@@ -33,6 +33,48 @@ import {
 /** Football IDP position types (LS-6385), mirrors the isIdp derivation in matchupScores.ts. */
 const IDP_POSITION_TYPES = new Set(['DL', 'LB', 'DB', 'DP']);
 
+// ── Advanced per-player football metrics (LS-6398) ──────────────────────────
+//
+// Premium-gated schema/UI plumbing for snap count %, target share, and air
+// yards. None of these are ingested anywhere in the data pipeline yet — there
+// is no snap-count, target-share, or air-yards source table or field (checked
+// lib/data-loaders and the game_football_passing/rushing/receiving/kicking/
+// defense/defense_idp tables in lambdas/db/src/schema/football.ts; only raw
+// target *count* (`tgt`) exists, not a share). Building that ingest pipeline
+// is out of scope here (tracked as a follow-up, see LS-6398 description) —
+// this field resolves every metric to `null` until that data exists, so the
+// UI can render its "coming soon" state today and light up automatically
+// once ingest lands, with no further schema change.
+export const FootballMatchupPlayerAdvancedStatsRef = builder.objectRef<{
+  snapCountPercentage: number | null;
+  targetSharePercentage: number | null;
+  airYards: number | null;
+}>('FootballMatchupPlayerAdvancedStats');
+
+FootballMatchupPlayerAdvancedStatsRef.implement({
+  description:
+    'Premium advanced per-player metrics for a football matchup player ' +
+    '(LS-6398): snap count %, target share %, and air yards. Every field ' +
+    'is currently always null — the underlying ingest (snap counts, target ' +
+    'share, air yards) does not exist yet in the data pipeline. This type ' +
+    'exists so the field is wired end-to-end (schema + premium gate + UI) ' +
+    'ahead of that ingest work landing.',
+  fields: (t) => ({
+    snapCountPercentage: t.exposeFloat('snapCountPercentage', {
+      nullable: true,
+      description: 'Percentage of offensive/defensive snaps played (0-100).',
+    }),
+    targetSharePercentage: t.exposeFloat('targetSharePercentage', {
+      nullable: true,
+      description: "Player's share of their team's passing targets (0-100).",
+    }),
+    airYards: t.exposeInt('airYards', {
+      nullable: true,
+      description: 'Total air yards on targeted passes.',
+    }),
+  }),
+});
+
 // Mirrors @legacy-sports/narrative's MatchupNarrativeResult shape. Used to
 // validate matchups.recap_json (an untyped jsonb column) when read back from
 // the DB, so a malformed or future-incompatible stored value falls back to
@@ -996,6 +1038,51 @@ builder.objectType(MatchupPlayer, {
               matchupPlayerId: matchupPlayer.id,
               playerId: matchupPlayer.playerId,
               season: matchupPlayer.season,
+            },
+          );
+          return null;
+        }
+      },
+    }),
+
+    // Premium-gated advanced per-player metrics (LS-6398): snap count %,
+    // target share %, air yards. See FootballMatchupPlayerAdvancedStatsRef
+    // above for why every value is currently null.
+    advancedStats: t.field({
+      type: FootballMatchupPlayerAdvancedStatsRef,
+      nullable: true,
+      description:
+        'Premium advanced per-player metrics (snap count %, target share, ' +
+        'air yards) for football matchup players (LS-6398). Null for ' +
+        'non-premium users and for baseball players. Currently resolves ' +
+        'with every metric null for everyone else too — the underlying ' +
+        'ingest does not exist yet; see the type description.',
+      resolve: async (matchupPlayer, _args, context) => {
+        if (!context.user) return null;
+        try {
+          const player = await context.loaders.players.load(
+            matchupPlayer.playerId,
+          );
+          if (!player || player.sport !== 'football') return null;
+          // Mirrors the footballSeasonFppg gate above: defense-in-depth
+          // behind the UI PremiumGate.
+          if (
+            !(await hasEntitlement(context, ENTITLEMENTS.football_projections))
+          ) {
+            return null;
+          }
+          return {
+            snapCountPercentage: null,
+            targetSharePercentage: null,
+            airYards: null,
+          };
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve advancedStats',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
             },
           );
           return null;

@@ -290,6 +290,25 @@ export function MatchupRosterComparison({
   // Bench toggle state
   const [showBench, setShowBench] = useState(false);
 
+  // Advanced stats expand/collapse state, keyed by playerId (LS-6398).
+  const [expandedAdvancedStats, setExpandedAdvancedStats] = useState<
+    Set<number>
+  >(new Set());
+  const toggleAdvancedStats = (playerId: number) => {
+    setExpandedAdvancedStats((prev) => {
+      const next = new Set(prev);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return next;
+    });
+  };
+  const canSeeAdvancedStats = useHasEntitlement(
+    ENTITLEMENTS.football_projections,
+  );
+
   // Modal state for season stats
   const [seasonStatsModalOpen, setSeasonStatsModalOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<{
@@ -1152,6 +1171,58 @@ export function MatchupRosterComparison({
             )}
           </div>
           {statLine && <div className="mrc-pstat">{statLine}</div>}
+          {isFootball && player.playerId != null && (
+            <>
+              <button
+                type="button"
+                className="mrc-advstats-toggle"
+                aria-expanded={expandedAdvancedStats.has(player.playerId)}
+                onClick={() => toggleAdvancedStats(player.playerId as number)}
+              >
+                {expandedAdvancedStats.has(player.playerId)
+                  ? 'Hide advanced stats'
+                  : 'Advanced stats'}
+              </button>
+              {expandedAdvancedStats.has(player.playerId) && (
+                <div className="mrc-advstats-panel">
+                  {!canSeeAdvancedStats ? (
+                    <p className="mrc-advstats-locked">
+                      Snap %, target share, and air yards are a Premium feature.
+                    </p>
+                  ) : player.advancedStats?.snapCountPercentage == null &&
+                    player.advancedStats?.targetSharePercentage == null &&
+                    player.advancedStats?.airYards == null ? (
+                    <p className="mrc-advstats-empty">
+                      Advanced stats are coming soon for this player.
+                    </p>
+                  ) : (
+                    <dl className="mrc-advstats-list">
+                      <div className="mrc-advstats-row">
+                        <dt>Snap %</dt>
+                        <dd>
+                          {player.advancedStats.snapCountPercentage != null
+                            ? `${player.advancedStats.snapCountPercentage.toFixed(0)}%`
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div className="mrc-advstats-row">
+                        <dt>Target share</dt>
+                        <dd>
+                          {player.advancedStats.targetSharePercentage != null
+                            ? `${player.advancedStats.targetSharePercentage.toFixed(0)}%`
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div className="mrc-advstats-row">
+                        <dt>Air yards</dt>
+                        <dd>{player.advancedStats.airYards ?? '—'}</dd>
+                      </div>
+                    </dl>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div className="mrc-pscore">
           <div className="mrc-sc mrc-proj">

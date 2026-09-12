@@ -8,6 +8,11 @@ fragment MatchupPlayer on MatchupPlayer {
   swapId
   numberOfGames
   footballSeasonFppg
+  advancedStats {
+    snapCountPercentage
+    targetSharePercentage
+    airYards
+  }
   player {
     id
     firstName
