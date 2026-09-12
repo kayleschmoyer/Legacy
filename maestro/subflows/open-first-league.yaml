@@ -1,5 +1,10 @@
 # Subflow: from any tab, open the Leagues tab and enter the first league.
 # Assumes the test account has at least one league (dynamic testID league-row-<id>).
+# appId below is only to satisfy this Maestro CLI version's config-section
+# validation, which (LS-9696) now applies even to runFlow:-included
+# fragments that are never run standalone — see launch-authenticated.yaml.
+appId: com.legacysports.app
+---
 - tapOn: "Leagues"
 - extendedWaitUntil:
     visible:

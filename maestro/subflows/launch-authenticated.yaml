@@ -1,5 +1,12 @@
 # Subflow: cold-launch the app and wait for the authenticated home screen.
 # Requires a dev build with EXPO_PUBLIC_BYPASS_AUTH=true (see maestro/README.md).
+# appId below is only to satisfy this Maestro CLI version's config-section
+# validation, which (LS-9696) now applies even to runFlow:-included
+# fragments that are never run standalone — it is not otherwise meaningful
+# here, since this file is always reached via runFlow from a flow that
+# already declares its own appId.
+appId: com.legacysports.app
+---
 - launchApp:
     clearState: true
 - extendedWaitUntil:

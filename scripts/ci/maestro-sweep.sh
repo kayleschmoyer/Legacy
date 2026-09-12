@@ -58,8 +58,33 @@ echo "🔎 Maestro: $(maestro --version 2>/dev/null || echo 'version unknown')"
 echo "🎬 Running Maestro sweep — --include-tags=${TAGS} (app: ${PKG})"
 
 # `maestro test` runs every flow whose tags match --include-tags. Screenshots
-# land under maestro/artifacts/<page>/ (CWD-relative). No AI judging here — that
-# is the downstream /mobile-qa step that consumes these artifacts.
-maestro test --include-tags="$TAGS" maestro/
+# land under maestro/artifacts/<page>/ (CWD-relative), so this MUST keep
+# running from the repo root — do not `cd maestro` to dodge the issue below.
+# No AI judging here — that is the downstream /mobile-qa step that consumes
+# these artifacts.
+#
+# Neither `maestro test maestro/` nor `maestro test maestro/flows/` works on
+# the Maestro CLI version this workflow installs (unpinned via
+# vars.MAESTRO_VERSION, so always latest — 2.10.0 as of LS-9696):
+#   - `maestro/` recursively scans the whole tree, including
+#     maestro/subflows/ (runFlow:-only fragments with no top-level config:
+#     section). maestro/config.yaml's `flows: - "flows/**"` is documented
+#     (maestro/README.md) to scope the scan away from subflows/, but this
+#     CLI version does not honor that glob for an explicit directory
+#     argument, so it fails with "Config Section Required at
+#     .../subflows/<file>.yaml:3:1".
+#   - `maestro/flows/` avoids subflows/ but breaks the OTHER way: flow
+#     files are nested one level deeper per page
+#     (maestro/flows/<page>/*.yaml), and without the workspace config this
+#     CLI version won't recurse into them either, failing with "Top-level
+#     directories do not contain any Flows".
+# Sidestep both failure modes: pass the actual flow files explicitly so
+# Maestro never has to glob-discover (or accidentally include) anything.
+mapfile -t flow_files < <(find maestro/flows -type f -name '*.yaml' | sort)
+if [ "${#flow_files[@]}" -eq 0 ]; then
+  echo "❌ No flow files found under maestro/flows/" >&2
+  exit 1
+fi
+maestro test --include-tags="$TAGS" "${flow_files[@]}"
 
 echo "✅ Maestro sweep completed for tags: ${TAGS}"

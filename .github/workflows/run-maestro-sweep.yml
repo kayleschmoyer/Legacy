@@ -158,7 +158,13 @@ jobs:
     name: "Maestro Sweep (${{ matrix.variant }})"
     needs: [prepare]
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # LS-9696: 50 was sized around the old (fatal) disk-exhaustion failure,
+    # which killed the build well before it could run long. With that fixed,
+    # a cold-cache run compiling both ABIs (see the "Build dev APK" step
+    # below) can legitimately take close to its own 48min budget, so the job
+    # needs enough headroom on top for setup/SDK install/emulator boot/Maestro
+    # flows too — bumped alongside the build step's timeout below.
+    timeout-minutes: 65
     strategy:
       fail-fast: false
       matrix:
@@ -186,6 +192,52 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # LS-9696: this job runs on GH-hosted ubuntu-latest (KVM requirement, see
+      # the job comment above), which ships ~30GB of preinstalled toolchains
+      # this build never touches (dotnet, swift, ghcup/ghc, powershell, boost)
+      # on top of a disk already trimmed by Docker images. The debug build here
+      # compiles BOTH arm64-v8a and x86_64 native ABIs (the second is only
+      # added so the APK can boot on the CI emulator — see the ABI override on
+      # the "Build dev APK" step below), so CMake/NDK object output, the
+      # Android SDK+NDK install, and the Gradle dependency/build caches
+      # together reliably exhaust what's left, failing partway through
+      # `app:buildCMakeDebug[x86_64]` with the runner down to ~49MB free
+      # (reproduced twice on PR #7319, unrelated to that PR's diff). Reclaim
+      # BEFORE any of those installs/caches land, mirroring the equivalent
+      # step in e2e-native-android.yml (LS-9652) which hit the same
+      # GH-hosted-runner disk ceiling for its native Android build. Deliberately
+      # NOT removed: /opt/hostedtoolcache (holds the Node "Setup Workspace"
+      # resolves) and /usr/local/lib/android (the SDK this job installs into).
+      - name: Free disk space for the native Android build
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "Free space before:"
+          df -h / | tail -1
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /usr/local/.ghcup \
+            /opt/ghc \
+            /usr/local/share/powershell \
+            /usr/local/share/boost \
+            /usr/share/miniconda \
+            /opt/az \
+            /usr/local/share/chromium \
+            /usr/local/lib/google-cloud-sdk || true
+          # The runner image preinstalls several NDK versions under the same
+          # SDK root this job installs its own NDK into (deliberately not
+          # wiped wholesale above). None of them are the pinned NDK_VERSION
+          # this build needs, so clear them now — "Setup Android SDK" below
+          # installs ours fresh regardless. Verification runs were landing
+          # only ~530MB short of the AVD's userdata-partition requirement at
+          # emulator-boot time (LS-9696) after the build; each preinstalled
+          # NDK is 1-2GB, so this alone comfortably closes that gap.
+          sudo rm -rf /usr/local/lib/android/sdk/ndk/* || true
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          echo "Free space after:"
+          df -h / | tail -1
 
       - name: Setup Workspace
         uses: ./.github/actions/setup
@@ -225,7 +277,14 @@ jobs:
           # honors the last -P value for a given property.
           build-type: debug
           extra-gradle-flags: "-PreactNativeArchitectures=arm64-v8a,x86_64"
-        timeout-minutes: 40
+        # LS-9696: the x86_64 ABI here isn't covered by any other workflow's
+        # Gradle/native cache key (build-android-app.yml only ever builds
+        # arm64-v8a debug), so a cold cache means compiling x86_64 native code
+        # from scratch — observed taking the full previous 40min budget while
+        # still actively compiling (not stalled). 48 gives that first cold run
+        # room to finish; later runs land well under this via the composite
+        # action's Gradle/native-build-output caches (see build-android/action.yml).
+        timeout-minutes: 48
 
       - name: Resolve APK path + tag for the emulator script
         shell: bash
@@ -258,7 +317,13 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-api34-x86_64-google_apis
+          # LS-9696: the key MUST vary with disk-size (and any other AVD
+          # creation parameter) — android-emulator-runner's
+          # force-avd-creation: false means an AVD restored from cache is
+          # reused as-is, so an unversioned key can silently keep serving an
+          # AVD built under a since-changed config. Bump this suffix any time
+          # the emulator config below changes.
+          key: avd-api34-x86_64-google_apis-disk6g
 
       - name: Boot emulator and run Maestro sweep
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
@@ -268,6 +333,17 @@ jobs:
           target: google_apis
           profile: pixel_6
           ram-size: 4096M
+          # LS-9696: the emulator reserves disk-size x 1.2 up front, so 6G
+          # demands 7372.80 MB at boot time. Lowering this to 4G (tried and
+          # reverted) had NO effect — this API level's google_apis x86_64
+          # system image has an intrinsic userdata-partition floor around
+          # 6GB, so a smaller disk-size request is simply ignored rather
+          # than shrinking the reservation (unlike e2e-native-android.yml's
+          # api-level 35 image, where 4G genuinely is enough — LS-9652).
+          # After the build, verification runs were landing only ~530MB
+          # short of 7372.80 MB; the extra NDK/toolchain reclaim in "Free
+          # disk space for the native Android build" above closes that gap
+          # instead.
           disk-size: 6G
           force-avd-creation: false
           emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on

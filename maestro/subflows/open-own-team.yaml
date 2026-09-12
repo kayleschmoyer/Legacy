@@ -9,6 +9,12 @@
 # and no-ops for a standings-less test account instead of hard-failing on an
 # environment/fixture gap (callers should follow with a `when: visible: "Roster"`
 # guard before relying on Team Detail content being on screen).
+#
+# appId below is only to satisfy this Maestro CLI version's config-section
+# validation, which (LS-9696) now applies even to runFlow:-included
+# fragments that are never run standalone — see launch-authenticated.yaml.
+appId: com.legacysports.app
+---
 - runFlow:
     when:
       visible:
