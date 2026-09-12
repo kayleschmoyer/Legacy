@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { stripAnsiCodes } from '../ansi.js';
 import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import type { JobSnapshot } from '../jobs.js';
@@ -13,6 +14,7 @@ import {
   labelBenignEslintPreFixCrash,
   MAX_OUTPUT_CHARS,
   truncateOutput,
+  truncateOutputPreferTail,
 } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
@@ -92,7 +94,9 @@ export function formatPcChunkLogTail(
   logTail: string,
   verbose: boolean | undefined,
 ): string {
-  const labeled = labelBenignEslintPreFixCrash(logTail);
+  // ANSI stripped first so labelBenignEslintPreFixCrash's banner match isn't
+  // broken by colour codes sitting inside it (LS-10092).
+  const labeled = labelBenignEslintPreFixCrash(stripAnsiCodes(logTail));
   return verbose
     ? truncateOutput(labeled, MAX_OUTPUT_CHARS)
     : buildCompactOutput(labeled, MAX_OUTPUT_CHARS);
@@ -111,7 +115,13 @@ function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
   const chunk = typeof meta.chunk === 'string' ? meta.chunk : undefined;
   const verbose = meta.verbose === true;
   const passed = snapshot.status === 'done';
-  const log = labelBenignEslintPreFixCrash(snapshot.log ?? '');
+  const log = labelBenignEslintPreFixCrash(stripAnsiCodes(snapshot.log ?? ''));
+  // A FAILED chunk is truncated from the top instead of the bottom
+  // (LS-10092): eslint and jest both print per-project progress first and the
+  // actual error list last, so head-truncation drops precisely the lines the
+  // caller is reading the result for. A passing chunk keeps the existing
+  // balanced shape — there is no failure tail to protect.
+  const preferTail = !passed;
 
   return {
     body: {
@@ -120,8 +130,10 @@ function buildPcChunkResult(snapshot: JobSnapshot): FormattedJobResult {
       ...(snapshot.recoveredFromTimeout ? { recoveredFromTimeout: true } : {}),
       ...(snapshot.error ? { error: snapshot.error } : {}),
       output: verbose
-        ? truncateOutput(log, MAX_OUTPUT_CHARS)
-        : buildCompactOutput(log, MAX_OUTPUT_CHARS),
+        ? preferTail
+          ? truncateOutputPreferTail(log, MAX_OUTPUT_CHARS)
+          : truncateOutput(log, MAX_OUTPUT_CHARS)
+        : buildCompactOutput(log, MAX_OUTPUT_CHARS, preferTail),
     },
     isError: !passed,
   };

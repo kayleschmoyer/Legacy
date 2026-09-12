@@ -1,17 +1,49 @@
 export const MAX_OUTPUT_CHARS = 30_000;
 
-export function truncateOutput(
+/** Head share of the budget for the default (balanced) truncation. */
+const DEFAULT_HEAD_RATIO = 0.3;
+/**
+ * Head share of the budget for tail-biased truncation (LS-10092). Small but
+ * non-zero: the head still carries the nx/make invocation banner that says
+ * what ran, while the failure summary — always written last — keeps 90% of
+ * the budget instead of 70%.
+ */
+const TAIL_BIASED_HEAD_RATIO = 0.1;
+
+function truncateWithRatio(
   output: string,
-  maxChars: number = MAX_OUTPUT_CHARS,
+  maxChars: number,
+  headRatio: number,
 ): string {
   if (output.length <= maxChars) return output;
-  const headSize = Math.floor(maxChars * 0.3);
-  const tailSize = Math.floor(maxChars * 0.7);
+  const headSize = Math.floor(maxChars * headRatio);
+  const tailSize = Math.floor(maxChars * (1 - headRatio));
   const head = output.slice(0, headSize);
   const tail = output.slice(-tailSize);
   const omitted = output.length - headSize - tailSize;
   const result = `${head}\n\n... [${omitted.toLocaleString()} characters omitted] ...\n\n${tail}`;
   return result.length > maxChars ? result.slice(0, maxChars) : result;
+}
+
+export function truncateOutput(
+  output: string,
+  maxChars: number = MAX_OUTPUT_CHARS,
+): string {
+  return truncateWithRatio(output, maxChars, DEFAULT_HEAD_RATIO);
+}
+
+/**
+ * Truncate while preferring the tail (LS-10092, the LS-8822 lesson for
+ * make_run). Jest and nx print the failure summary — the part an agent is
+ * reading the output for — at the very end, after the per-suite progress
+ * chatter. Use this for output whose value is concentrated at the end;
+ * `truncateOutput` stays the default everywhere else.
+ */
+export function truncateOutputPreferTail(
+  output: string,
+  maxChars: number = MAX_OUTPUT_CHARS,
+): string {
+  return truncateWithRatio(output, maxChars, TAIL_BIASED_HEAD_RATIO);
 }
 
 /**
@@ -76,8 +108,16 @@ const MAX_STEP_BODY_LINES = 20;
  * full output]" when truncated. Content-agnostic — this is what caps a
  * pc-lint chunk's eslint per-file dump, since compressFormatterOutput only
  * recognizes prettier's specific line shape.
+ *
+ * `preferTail` keeps the LAST MAX_STEP_BODY_LINES of each over-long body
+ * instead of the first (LS-10092). Callers pass it for a FAILED chunk: both
+ * eslint and jest print per-project/per-file progress first and the actual
+ * error list last, so head-truncating a failed chunk reliably drops exactly
+ * the lines the caller needs — the reported symptom was a pc-lint result
+ * ending in "[390 more lines — run step directly for full output]" with all
+ * 51 eslint errors inside the elided region.
  */
-export function truncateStepErrors(output: string): string {
+export function truncateStepErrors(output: string, preferTail = false): string {
   const headers: Array<{ index: number; length: number }> = [];
   STEP_HEADER_GLOBAL_RE.lastIndex = 0;
   let m;
@@ -107,10 +147,19 @@ export function truncateStepErrors(output: string): string {
     const contentLineCount = trimmed.length - 1; // subtract leading ''
     if (contentLineCount > MAX_STEP_BODY_LINES) {
       const remaining = contentLineCount - MAX_STEP_BODY_LINES;
-      parts.push(trimmed.slice(0, MAX_STEP_BODY_LINES + 1).join('\n'));
-      parts.push(
-        `\n[${remaining} more lines — run step directly for full output]`,
-      );
+      if (preferTail) {
+        // The step header was pushed without its trailing newline, so the
+        // note needs its own leading '\n' to land on the line below it.
+        parts.push(
+          `\n[${remaining} earlier lines omitted — run step directly for full output]`,
+        );
+        parts.push(`\n${trimmed.slice(-MAX_STEP_BODY_LINES).join('\n')}`);
+      } else {
+        parts.push(trimmed.slice(0, MAX_STEP_BODY_LINES + 1).join('\n'));
+        parts.push(
+          `\n[${remaining} more lines — run step directly for full output]`,
+        );
+      }
     } else {
       parts.push(body);
     }
@@ -123,12 +172,23 @@ export function truncateStepErrors(output: string): string {
  * Build a compact output string suitable for MCP responses (default mode).
  * Suppresses prettier per-file listings and truncates per-step bodies to 20 lines.
  * For the full raw output, callers should use truncateOutput directly.
+ *
+ * `preferTail` (LS-10092) flips both truncation stages to keep the end of the
+ * output — the per-step bodies and the overall budget — for callers rendering
+ * a failed run, where the error list is always last.
  */
-export function buildCompactOutput(output: string, maxChars: number): string {
-  return truncateOutput(
-    truncateStepErrors(compressFormatterOutput(output)),
-    maxChars,
+export function buildCompactOutput(
+  output: string,
+  maxChars: number,
+  preferTail = false,
+): string {
+  const compacted = truncateStepErrors(
+    compressFormatterOutput(output),
+    preferTail,
   );
+  return preferTail
+    ? truncateOutputPreferTail(compacted, maxChars)
+    : truncateOutput(compacted, maxChars);
 }
 
 /**

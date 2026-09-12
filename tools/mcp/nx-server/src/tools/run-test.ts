@@ -1,6 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { newJestReportFile } from './jest-report-result.js';
+import type { JestReportMode } from './jest-report-result.js';
 import { resolveTestTargetPlan } from './resolve-test-target.js';
 import { runTarget } from './run-target.js';
+import { MAX_FAILURES } from '../jest-report.js';
 import { getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -12,6 +15,12 @@ export interface RunTestParams {
   updateSnapshot?: boolean;
   noCache?: boolean;
   worktreePath?: string;
+  /**
+   * Structured failure reporting (LS-10092). Omitted, the response shape is
+   * unchanged. "summary" returns only the parsed counts and failure list;
+   * "json" returns those plus the ANSI-stripped raw output.
+   */
+  report?: JestReportMode;
 }
 
 /**
@@ -53,7 +62,66 @@ function runJestTarget(
     updateSnapshot: params.updateSnapshot,
     args,
     worktreePath: params.worktreePath,
+    // One report file per target: a fanned-out run executes several Jest
+    // targets concurrently, and a shared path would have them overwrite each
+    // other's report.
+    ...(params.report
+      ? { jestReport: { mode: params.report, outputFile: newJestReportFile() } }
+      : {}),
   });
+}
+
+/** The report fields `mergeFanoutResults` rolls up across fanned-out targets. */
+interface PerTargetReportFields {
+  numTotalTests?: unknown;
+  numPassedTests?: unknown;
+  numFailedTests?: unknown;
+  numFailedTestSuites?: unknown;
+  failures?: unknown;
+}
+
+function sumField(
+  parsedResults: unknown[],
+  field: keyof PerTargetReportFields,
+): number {
+  return parsedResults.reduce<number>((total, parsed) => {
+    const value = (parsed as PerTargetReportFields | null)?.[field];
+    return total + (typeof value === 'number' ? value : 0);
+  }, 0);
+}
+
+/**
+ * Roll the per-target structured reports up into one top-level failure list
+ * (LS-10092). Without this, a fanned-out run in report mode would make the
+ * caller walk N nested per-target objects to assemble the very list the mode
+ * exists to hand them. Returns null when no target produced a parsed report
+ * (e.g. every one was an Nx cache replay), so the caller omits the fields
+ * rather than reporting a fabricated zero-failure roll-up.
+ */
+function aggregateFanoutReport(
+  parsedResults: unknown[],
+): Record<string, unknown> | null {
+  const withReport = parsedResults.filter(
+    (parsed) =>
+      parsed != null &&
+      typeof parsed === 'object' &&
+      Array.isArray((parsed as PerTargetReportFields).failures),
+  );
+  if (withReport.length === 0) return null;
+
+  const failures = withReport.flatMap(
+    (parsed) => (parsed as { failures: unknown[] }).failures,
+  );
+  const omitted = Math.max(0, failures.length - MAX_FAILURES);
+
+  return {
+    numTotalTests: sumField(withReport, 'numTotalTests'),
+    numPassedTests: sumField(withReport, 'numPassedTests'),
+    numFailedTests: sumField(withReport, 'numFailedTests'),
+    numFailedTestSuites: sumField(withReport, 'numFailedTestSuites'),
+    failures: failures.slice(0, MAX_FAILURES),
+    ...(omitted > 0 ? { omittedFailures: omitted } : {}),
+  };
 }
 
 /** Merges one `runTarget` result per fanned-out jest target into one ToolResult. */
@@ -61,8 +129,10 @@ function mergeFanoutResults(
   project: string,
   perTarget: Array<{ target: string; result: ToolResult }>,
   skipped: string[],
+  report: JestReportMode | undefined,
 ): ToolResult {
   const results: Record<string, unknown> = {};
+  const parsedResults: unknown[] = [];
   let passed = true;
   for (const { target, result } of perTarget) {
     const text = result.content[0]?.text ?? '';
@@ -73,7 +143,23 @@ function mergeFanoutResults(
       // Not JSON (e.g. a plain error string) — keep the raw text.
     }
     results[target] = parsed;
+    parsedResults.push(parsed);
     if (result.isError) passed = false;
+  }
+
+  const aggregate = report ? aggregateFanoutReport(parsedResults) : null;
+  if (aggregate) {
+    // The failure lists are rolled up top-level and every failure names its
+    // own suite, so leaving the per-target copies in place would bill the
+    // same content twice.
+    for (const [target, parsed] of Object.entries(results)) {
+      if (parsed != null && typeof parsed === 'object') {
+        const { failures: _rolledUp, ...rest } = parsed as {
+          failures?: unknown;
+        };
+        results[target] = rest;
+      }
+    }
   }
 
   return {
@@ -86,6 +172,7 @@ function mergeFanoutResults(
           targets: perTarget.map((r) => r.target),
           ...(skipped.length ? { skippedNonJestTargets: skipped } : {}),
           passed,
+          ...(aggregate ?? {}),
           results,
         }),
       },
@@ -146,5 +233,10 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
     })),
   );
 
-  return mergeFanoutResults(params.project, perTarget, plan.skipped);
+  return mergeFanoutResults(
+    params.project,
+    perTarget,
+    plan.skipped,
+    params.report,
+  );
 }

@@ -169,7 +169,9 @@ server.tool(
     'shell when narrowing to one spec/test. Wrapper over nx_run: resolves `config` to the ' +
     'matching jest target (e.g. "mobile" -> "test:mobile") and forwards testPathPatterns/' +
     'testNamePattern. Omit `config` for a single "test" target (fans out for aggregate targets, ' +
-    'e.g. shared-components). Same job semantics as nx_run — call nx_job_wait if slow.',
+    'e.g. shared-components). Same job semantics as nx_run — call nx_job_wait if slow. ' +
+    'On a failing run pass report: "summary" for the full failing-test list; the raw log is ' +
+    'truncated and cuts through the middle of it.',
   {
     project: z.string().describe('Project name'),
     testPathPatterns: z
@@ -198,6 +200,15 @@ server.tool(
       .default(false)
       .describe('Update Jest snapshots (appends --updateSnapshot).'),
     noCache: z.boolean().default(false).describe('Bypass Nx cache'),
+    report: z
+      .enum(['summary', 'json'])
+      .optional()
+      .describe(
+        'Structured failures parsed from jest --json. "summary": counts plus ' +
+          'failures: [{ suite, fullName, message }], ANSI-stripped, each message clipped to ' +
+          '~10 lines, no raw log. "json": adds the raw output. Omit for the default shape. ' +
+          'Pair with noCache: true — an Nx cache replay writes no report.',
+      ),
     worktreePath: z
       .string()
       .optional()

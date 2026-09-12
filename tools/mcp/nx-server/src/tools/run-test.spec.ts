@@ -345,3 +345,148 @@ describe('runTest testPathPatterns validation (ReDoS mitigation)', () => {
     expect(mockRunTarget).toHaveBeenCalled();
   });
 });
+
+describe('runTest report mode (LS-10092)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRunTarget.mockResolvedValue(stubResult());
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'single',
+      target: 'test',
+    });
+  });
+
+  it('does not pass jestReport when report is omitted', async () => {
+    await runTest({ project: 'web', testPathPatterns: 'Foo' });
+
+    expect(mockRunTarget).toHaveBeenCalledWith(
+      expect.not.objectContaining({ jestReport: expect.anything() }),
+    );
+  });
+
+  it('forwards the requested mode with a unique per-target output file', async () => {
+    await runTest({
+      project: 'web',
+      testPathPatterns: 'Foo',
+      report: 'summary',
+    });
+
+    const call = mockRunTarget.mock.calls[0][0] as {
+      jestReport?: { mode: string; outputFile: string };
+    };
+    expect(call.jestReport?.mode).toBe('summary');
+    expect(call.jestReport?.outputFile).toMatch(/nx-mcp-jest-report-.*\.json$/);
+  });
+
+  it('gives each fanned-out target its own report file', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'fanout',
+      targets: ['test:web', 'test:mobile'],
+      skipped: [],
+    });
+
+    await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'Foo',
+      report: 'json',
+    });
+
+    const files = mockRunTarget.mock.calls.map(
+      (call) =>
+        (call[0] as { jestReport?: { outputFile: string } }).jestReport
+          ?.outputFile,
+    );
+    expect(files).toHaveLength(2);
+    expect(files[0]).not.toBe(files[1]);
+  });
+
+  it('rolls per-target failure lists up to the top level', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'fanout',
+      targets: ['test:web', 'test:mobile'],
+      skipped: [],
+    });
+    mockRunTarget
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              passed: false,
+              numTotalTests: 5,
+              numPassedTests: 4,
+              numFailedTests: 1,
+              numFailedTestSuites: 1,
+              failures: [
+                { suite: 'a.spec.ts', fullName: 'a fails', message: 'x' },
+              ],
+            }),
+          },
+        ],
+        isError: true,
+      })
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              passed: true,
+              numTotalTests: 3,
+              numPassedTests: 3,
+              numFailedTests: 0,
+              numFailedTestSuites: 0,
+              failures: [],
+            }),
+          },
+        ],
+      });
+
+    const result = await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'Foo',
+      report: 'summary',
+    });
+
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.passed).toBe(false);
+    expect(body.numTotalTests).toBe(8);
+    expect(body.numPassedTests).toBe(7);
+    expect(body.numFailedTests).toBe(1);
+    expect(body.failures).toEqual([
+      { suite: 'a.spec.ts', fullName: 'a fails', message: 'x' },
+    ]);
+    // Rolled up once, not billed again inside each per-target result.
+    const perTarget = body.results as Record<string, Record<string, unknown>>;
+    expect(perTarget['test:web'].failures).toBeUndefined();
+    expect(perTarget['test:web'].numFailedTests).toBe(1);
+  });
+
+  it('omits the roll-up when no target produced a parsed report', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'fanout',
+      targets: ['test:web'],
+      skipped: [],
+    });
+    mockRunTarget.mockResolvedValue({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            passed: true,
+            reportUnavailable: 'cache replay',
+          }),
+        },
+      ],
+    });
+
+    const result = await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'Foo',
+      report: 'summary',
+    });
+
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.failures).toBeUndefined();
+    expect(body.numFailedTests).toBeUndefined();
+  });
+});

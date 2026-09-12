@@ -149,7 +149,7 @@ Prefer this over raw `pnpm exec prettier --check/--write <files>` via shell, and
 
 ### `nx_run_test`
 
-Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern> -t <name>` via shell when narrowing to one spec/test. Wrapper over nx_run: resolves `config` to the matching jest target (e.g. "mobile" -> "test:mobile") and forwards testPathPatterns/testNamePattern. Omit `config` for a single "test" target (fans out for aggregate targets, e.g. shared-components). Same job semantics as nx_run — call nx_job_wait if slow.
+Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern> -t <name>` via shell when narrowing to one spec/test. Wrapper over nx_run: resolves `config` to the matching jest target (e.g. "mobile" -> "test:mobile") and forwards testPathPatterns/testNamePattern. Omit `config` for a single "test" target (fans out for aggregate targets, e.g. shared-components). Same job semantics as nx_run — call nx_job_wait if slow. On a failing run pass report: "summary" for the full failing-test list; the raw log is truncated and cuts through the middle of it.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -159,6 +159,7 @@ Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern> -t <
 | `config` | string |  | — | Jest config variant, mapped to the "test:<config>" target (e.g. "mobile", "web", "stories"). Omit for projects with a single "test" target. |
 | `updateSnapshot` | boolean |  | — | Update Jest snapshots (appends --updateSnapshot). |
 | `noCache` | boolean |  | — | Bypass Nx cache |
+| `report` | enum |  | — | Structured failures parsed from jest --json. "summary": counts plus failures: [{ suite, fullName, message }], ANSI-stripped, each message clipped to ~10 lines, no raw log. "json": adds the raw output. Omit for the default shape. Pair with noCache: true — an Nx cache replay writes no report. |
 | `worktreePath` | string |  | — | Worktree path (default: repo root) |
 
 ### `nx_show_project`

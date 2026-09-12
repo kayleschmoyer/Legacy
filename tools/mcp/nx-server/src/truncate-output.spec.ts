@@ -5,6 +5,7 @@ import {
   compressFormatterOutput,
   labelBenignEslintPreFixCrash,
   truncateOutput,
+  truncateOutputPreferTail,
   truncateStepErrors,
 } from './truncate-output.js';
 
@@ -158,5 +159,74 @@ describe('buildCompactOutput', () => {
     const result = buildCompactOutput(output, 30_000);
     expect(result.length).toBeLessThan(output.length);
     expect(result).toContain('more lines — run step directly for full output');
+  });
+});
+
+describe('truncateOutputPreferTail (LS-10092)', () => {
+  it('returns input unchanged when under the limit', () => {
+    expect(truncateOutputPreferTail('short', 100)).toBe('short');
+  });
+
+  it('keeps more of the tail than the default balanced truncation', () => {
+    const input = 'A'.repeat(5_000) + 'B'.repeat(5_000);
+    const tailBiased = truncateOutputPreferTail(input, 1_000);
+    const balanced = truncateOutput(input, 1_000);
+
+    const countB = (s: string) => s.split('').filter((c) => c === 'B').length;
+    expect(countB(tailBiased)).toBeGreaterThan(countB(balanced));
+    expect(tailBiased.startsWith('A')).toBe(true);
+    expect(tailBiased.endsWith('B')).toBe(true);
+    expect(tailBiased).toContain('characters omitted');
+  });
+
+  it('stays within the character budget', () => {
+    const result = truncateOutputPreferTail('X'.repeat(10_000), 500);
+    expect(result.length).toBeLessThanOrEqual(500);
+  });
+});
+
+describe('truncateStepErrors with preferTail (LS-10092)', () => {
+  const failingStep = [
+    '6/9 Linting...',
+    ...Array.from({ length: 30 }, (_, i) => `progress line ${i}`),
+    ...Array.from({ length: 5 }, (_, i) => `error: real violation ${i}`),
+  ].join('\n');
+
+  it('keeps the end of an over-long step body instead of the start', () => {
+    const result = truncateStepErrors(failingStep, true);
+    expect(result).toContain('error: real violation 4');
+    expect(result).toContain('earlier lines omitted');
+    expect(result).not.toContain('progress line 0');
+    // The header keeps its own line — the note must not be appended to it.
+    expect(result.split('\n')[0]).toBe('6/9 Linting...');
+  });
+
+  it('keeps the start of the body by default (unchanged behaviour)', () => {
+    const result = truncateStepErrors(failingStep);
+    expect(result).toContain('progress line 0');
+    expect(result).not.toContain('error: real violation 4');
+    expect(result).toContain('more lines — run step directly for full output');
+  });
+
+  it('leaves a short step body alone in either mode', () => {
+    const short = ['1/9 Checking...', 'all good'].join('\n');
+    expect(truncateStepErrors(short, true)).toBe(short);
+    expect(truncateStepErrors(short)).toBe(short);
+  });
+});
+
+describe('buildCompactOutput with preferTail (LS-10092)', () => {
+  it('surfaces the trailing error list a head-truncated chunk would drop', () => {
+    const output = [
+      '6/9 Linting...',
+      ...Array.from({ length: 400 }, (_, i) => `checked project ${i}`),
+      '/repo/lib/a.ts:12:1  error  Unexpected any  @typescript-eslint/no-explicit-any',
+    ].join('\n');
+
+    const tailBiased = buildCompactOutput(output, 30_000, true);
+    expect(tailBiased).toContain('@typescript-eslint/no-explicit-any');
+    expect(buildCompactOutput(output, 30_000)).not.toContain(
+      '@typescript-eslint/no-explicit-any',
+    );
   });
 });

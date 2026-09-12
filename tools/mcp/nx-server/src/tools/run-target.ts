@@ -1,4 +1,10 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  buildJestReportResult,
+  JEST_REPORT_JOB_KIND,
+} from './jest-report-result.js';
+import type { JestReportRequest } from './jest-report-result.js';
+import { stripAnsiCodes } from '../ansi.js';
 import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { nxJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import {
@@ -75,6 +81,13 @@ interface RunTargetParams {
   args?: string | string[];
   env?: Record<string, string>;
   worktreePath?: string;
+  /**
+   * Structured Jest failure reporting (LS-10092). Set by nx_run_test's
+   * `report` param: appends `--json --outputFile=<temp>` and returns the
+   * server-parsed failure list instead of the raw log. Ignored for non-test
+   * targets, where the shape would be meaningless.
+   */
+  jestReport?: JestReportRequest;
 }
 
 /**
@@ -200,6 +213,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     const isTestTarget =
       params.target === 'test' || params.target.startsWith('test:');
 
+    // The structured report is a Jest-specific output shape — meaningless for
+    // build/lint/codegen, so it is dropped rather than honoured on those.
+    const jestReport = isTestTarget ? params.jestReport : undefined;
+
     // run-many fans the target out across every project that declares it
     // (equivalent to `nx run-many -t <target>`) instead of targeting one
     // project:target pair — the -t/--configuration flag shapes differ from
@@ -259,14 +276,21 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       }
 
       nxArgs.push('--', ...translated);
-    } else if (params.updateSnapshot && isTestTarget) {
-      // No extra args provided — still need the -- separator for --updateSnapshot.
+    } else if ((params.updateSnapshot && isTestTarget) || jestReport) {
+      // No extra args provided — still need the -- separator for the Jest
+      // flags appended below.
       nxArgs.push('--');
     }
 
     // Append --updateSnapshot after all other Jest flags when requested.
     if (params.updateSnapshot && isTestTarget) {
       nxArgs.push('--updateSnapshot');
+    }
+
+    // Jest writes the machine-readable report to a temp file rather than
+    // stdout so nx's own wrapper lines can't corrupt the JSON (LS-10092).
+    if (jestReport) {
+      nxArgs.push('--json', `--outputFile=${jestReport.outputFile}`);
     }
 
     // Run as a background job with a bounded sync wait: fast targets return
@@ -286,9 +310,27 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           : `nx run ${runSpec}`,
         timeoutMs: NX_RUN_TIMEOUT_MS,
         // Blind retries (e.g. after a lost transport) join the in-flight run
-        // instead of spawning a duplicate nx process.
+        // instead of spawning a duplicate nx process. In report mode the key
+        // includes the run's unique --outputFile, so two concurrent report
+        // calls deliberately do NOT join: each needs its own report file, and
+        // sharing one would have the second run overwrite the first's results
+        // mid-read.
         idempotencyKey: `nx-run:${cwd}:${nxArgs.join(' ')}`,
         env: params.env,
+        // Only report-mode runs get a meta.kind: without one, job-tools.ts
+        // renders the generic passed/output snapshot exactly as before.
+        ...(jestReport
+          ? {
+              meta: {
+                kind: JEST_REPORT_JOB_KIND,
+                mode: jestReport.mode,
+                outputFile: jestReport.outputFile,
+                project: params.project ?? 'all',
+                target: params.target,
+                cwd,
+              },
+            }
+          : {}),
       },
       SYNC_BUDGET_MS,
     );
@@ -305,7 +347,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
               jobId: snapshot.jobId,
               elapsedSec: snapshot.elapsedSec,
               ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
-              logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+              logTail: truncateOutput(
+                stripAnsiCodes(snapshot.logTail ?? ''),
+                MAX_OUTPUT_CHARS,
+              ),
               hint: snapshot.hint,
             }),
           },
@@ -314,7 +359,27 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       };
     }
 
-    const rawOutput = snapshot.log ?? '';
+    if (jestReport) {
+      const formatted = await buildJestReportResult(snapshot);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: minifiedJson({
+              ...formatted.body,
+              ...(pluginWorkerRetried ? { pluginWorkerRetried: true } : {}),
+            }),
+          },
+        ],
+        ...(formatted.isError ? { isError: true } : {}),
+      };
+    }
+
+    // ANSI escapes inflate the character budget by 40-80% and sit between
+    // semantically adjacent characters, breaking the pattern matching the
+    // daemon / plugin-worker / project-not-found checks below do on this same
+    // text (LS-10092 — the same root cause LS-9557 fixed for ci_get_logs).
+    const rawOutput = stripAnsiCodes(snapshot.log ?? '');
     // A daemon that fails to compute the project graph still exits 0 (LS-8819)
     // — deriving `passed` from status alone reports a false green on zero
     // tasks run. Only checked on an otherwise-"done" status; an exit-code

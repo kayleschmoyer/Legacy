@@ -8,6 +8,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 - **nx_show_project** — Inspect a single project's configuration (targets, tags, deps)
 - **nx_affected** — Show which projects are affected by current changes
 - **nx_run** — Run an Nx target on a specific project
+- **nx_run_test** — Run one spec/test by pattern; `report: "summary" | "json"` returns Jest's parsed failure list instead of the raw log (see [Structured test failures](#structured-test-failures))
 - **nx_run_affected** — Run a target on all affected projects
 - **nx_run_prettier** — Run `prettier --check`/`--write` against an explicit, small file list (capped at 50 files) without the whole-repo side effects of `nx_run_pc_chunk({ chunk: 'pc-format' })`
 - **nx_run_eslint** — Run `eslint --max-warnings=0` (optionally `--fix`) against an explicit, small file list (capped at 50 files) instead of linting a whole project or the whole repo. See [Scoped lint and typecheck](#scoped-lint-and-typecheck)
@@ -49,6 +50,16 @@ So the tool walks up from each file to the nearest directory owning an `eslint.c
 3. **Workspace root** — always installs with `-w` flag (all deps are hoisted to the root)
 4. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication
 5. **Types detection** — reports whether the package bundles types or needs an `@types/` companion
+
+### Structured test failures
+
+`nx_run_test`'s `report` param (LS-10092) makes Jest itself the source of the failure list instead of the console log. It appends `--json --outputFile=<temp>` to the run, parses that file server-side, deletes it, and returns `{ passed, numTotalTests, numPassedTests, numFailedTests, numFailedTestSuites, failures: [{ suite, fullName, message }] }` — every failing test named, each message ANSI-stripped and clipped to 10 lines, the list capped at 50 with an `omittedFailures` count. `"summary"` drops the raw log; `"json"` keeps it. Omitting `report` leaves the response shape exactly as it was.
+
+It exists because the raw log cannot carry this reliably: a 16-failure run overflowed `MAX_OUTPUT_CHARS` and was truncated through the middle of the failure list, surfacing 2 of the 16 names. Jest writes to a temp file rather than stdout so nx's own wrapper lines can't corrupt the JSON, and a run that outlives the sync budget is formatted identically when polled via `nx_job_wait` (a `jest-report` job formatter, the LS-9814 lesson).
+
+An Nx cache replay never re-runs Jest and so writes no report: the response then carries `reportUnavailable` plus the raw output rather than a fabricated zero-failure result. Pair `report` with `noCache: true` when that's a risk.
+
+Two related truncation rules apply everywhere in this server: command output is ANSI-stripped before it is matched or truncated (escape codes inflate the budget by 40-80% and break the daemon/plugin-worker/project-not-found pattern matching), and a **failed** `nx_run_pc_chunk` truncates from the top rather than the bottom — eslint and jest print per-project progress first and the real error list last, so head-truncation drops precisely the lines the caller needs.
 
 ## Response format
 
