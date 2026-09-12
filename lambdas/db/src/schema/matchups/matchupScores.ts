@@ -300,9 +300,12 @@ export async function resolveFootballMatchupScores(
 
   const teamNameMap = new Map(teamRows.map((t) => [t.id, t.name]));
 
-  // League scoring settings (LS-9041) — falls back to defaults when the
-  // league has no custom profile, so unconfigured leagues score identically
-  // to before this change.
+  // League scoring settings (LS-9041). Applies per-stat defaults for any
+  // entry a league's profile hasn't customized, but throws
+  // MissingScoringProfileError if the league has no profile row at all
+  // instead of silently scoring the whole league from platform defaults
+  // (LS-6395) — that used to look legitimate but was wrong for any league on
+  // Half-PPR or custom scoring.
   const scoringSettings = await getFootballScoringSettingsForLeague(
     db,
     leagueId,

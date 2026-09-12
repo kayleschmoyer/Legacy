@@ -12,10 +12,7 @@ import {
   type ScoringChangeLogEntry,
   withPoolTimeoutRetry,
 } from '@legacy-sports/db-client';
-import {
-  type FootballScoringSettings,
-  getDefaultFootballScoringSettings,
-} from '@legacy-sports/scoring';
+import { type FootballScoringSettings } from '@legacy-sports/scoring';
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { withTransientRetry } from '../leagues/delete-resilience';
 
@@ -419,31 +416,40 @@ export const createMatchupMessagesLoader = (
  * DataLoader for a league's football scoring settings (LS-6385).
  * Key: leagueId (number)
  * Returns: FootballScoringSettings, merged from the league's active scoring
- *   profile (falling back to defaults) via getFootballScoringSettingsForLeague.
+ *   profile via getFootballScoringSettingsForLeague.
  *
  * Every player row in a given matchup roster shares the same leagueId, so
  * batching collapses what would otherwise be one profile lookup per player
  * into a single settings resolution per league.
+ *
+ * A league missing its scoring profile (LS-6395) throws
+ * `MissingScoringProfileError` rather than silently defaulting — caught here
+ * per-key so one bad league in a batch fails only its own `.load(leagueId)`
+ * callers instead of poisoning every other league resolved in the same tick.
  */
 export const createFootballScoringSettingsLoader = (
   db: GenericDatabase<typeof PublicSchema>,
 ) =>
   new DataLoader<number, FootballScoringSettings>(async (keys) => {
     const leagueIds = [...new Set(keys)] as number[];
-    const settingsByLeagueId = new Map(
+    const settingsByLeagueId = new Map<number, FootballScoringSettings | Error>(
       await Promise.all(
-        leagueIds.map(
-          async (leagueId) =>
-            [
+        leagueIds.map(async (leagueId) => {
+          try {
+            return [
               leagueId,
               await getFootballScoringSettingsForLeague(db, leagueId),
-            ] as const,
-        ),
+            ] as const;
+          } catch (err) {
+            return [leagueId, err as Error] as const;
+          }
+        }),
       ),
     );
     return keys.map(
       (key) =>
-        settingsByLeagueId.get(key) ?? getDefaultFootballScoringSettings(),
+        settingsByLeagueId.get(key) ??
+        new Error(`No scoring settings resolved for league ${key}`),
     );
   });
 

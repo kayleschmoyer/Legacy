@@ -1938,6 +1938,9 @@ importers:
       '@legacy-sports/db-client':
         specifier: workspace:*
         version: link:../db-client
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../utils

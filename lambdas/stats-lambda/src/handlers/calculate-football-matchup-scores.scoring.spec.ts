@@ -24,6 +24,7 @@ import {
   DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
   DEFAULT_PASSING_SCORING,
 } from '@legacy-sports/scoring';
+import { MissingScoringProfileError } from '@legacy-sports/scoring/server';
 
 const mockGetMatchupFootballPlayerGameStats = jest.fn();
 const mockUpdateMatchupScore = jest.fn();
@@ -38,6 +39,7 @@ jest.mock('@legacy-sports/logging', () => ({
     debug: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
+    fatal: jest.fn(),
   },
 }));
 
@@ -207,9 +209,28 @@ const DEFENSE_SHUTOUT_BAND_DEFINITION = {
   defaultMultiplier: String(DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS.pts_0),
 };
 
-/** No scoring profile → the league falls back to platform defaults. */
+/**
+ * No scoring profile → getFootballScoringSettingsForLeague throws
+ * MissingScoringProfileError (LS-6395). Only used to test that failure path;
+ * never as a "defaults" baseline (see withDefaultProfile below).
+ */
 function withoutProfile(): void {
   mockGetActiveScoringProfileForLeague.mockResolvedValue(null);
+}
+
+/**
+ * An active profile with no stat definitions or entries — every stat
+ * resolves to its platform default multiplier, same numeric outcome the old
+ * "no profile" fallback produced, but through the profile-exists path so it
+ * doesn't also exercise the missing-profile failure.
+ */
+function withDefaultProfile(): void {
+  mockGetActiveScoringProfileForLeague.mockResolvedValue({
+    id: 900,
+    leagueId: LEAGUE_ID,
+  });
+  mockGetScoringStatDefinitions.mockResolvedValue([]);
+  mockGetScoringProfileEntriesForProfile.mockResolvedValue([]);
 }
 
 /** An active profile whose `entries` override the given definitions. */
@@ -249,29 +270,30 @@ describe('calculateAndUpdateFootballMatchupScores — league scoring settings', 
     withoutProfile();
     mockGetMatchupFootballPlayerGameStats.mockResolvedValue([]);
 
-    await scoreMatchup(makeDb([]));
-
-    // The defect was that this call never happened: the lambda scored every
-    // league from the hardcoded DEFAULT_* constants.
+    // The original defect was that this call never happened: the lambda
+    // scored every league from the hardcoded DEFAULT_* constants. Now that a
+    // missing profile is a hard failure (LS-6395), proving the call happened
+    // and proving the failure surfaces are the same assertion.
+    await expect(scoreMatchup(makeDb([]))).rejects.toThrow(
+      MissingScoringProfileError,
+    );
     expect(mockGetActiveScoringProfileForLeague).toHaveBeenCalledWith(
       expect.anything(),
       LEAGUE_ID,
     );
   });
 
-  it('scores from the platform defaults when the league has no profile (AC4)', async () => {
+  it('throws MissingScoringProfileError instead of scoring from platform defaults when the league has no profile (AC4, LS-6395)', async () => {
     withoutProfile();
     mockGetMatchupFootballPlayerGameStats.mockResolvedValue([
       quarterbackGame(10),
     ]);
 
-    const result = await scoreMatchup(
-      makeDb([{ matchupPlayerId: 10, teamId: TEAM_1, positionType: 'QB' }]),
-    );
-
-    // 300 * 0.04 + 2 * 4 + 1 * -2 = 18
-    expect(result.team1Score).toBeCloseTo(18, 5);
-    expect(result.team2Score).toBe(0);
+    await expect(
+      scoreMatchup(
+        makeDb([{ matchupPlayerId: 10, teamId: TEAM_1, positionType: 'QB' }]),
+      ),
+    ).rejects.toThrow(MissingScoringProfileError);
   });
 
   it('a league with an override scores differently from one without (AC2)', async () => {
@@ -282,7 +304,10 @@ describe('calculateAndUpdateFootballMatchupScores — league scoring settings', 
       { matchupPlayerId: 10, teamId: TEAM_1, positionType: 'QB' },
     ];
 
-    withoutProfile();
+    // Baseline: an active profile with no overrides, so every stat resolves
+    // to its platform default multiplier (not a missing profile — that's a
+    // separate failure path, tested above).
+    withDefaultProfile();
     const unconfigured = await scoreMatchup(makeDb(players));
 
     // Same league, same stat line — only the passing-yards multiplier moves,
@@ -304,7 +329,7 @@ describe('calculateAndUpdateFootballMatchupScores — league scoring settings', 
       { matchupPlayerId: 20, teamId: TEAM_2, positionType: 'DST' },
     ];
 
-    withoutProfile();
+    withDefaultProfile();
     const unconfigured = await scoreMatchup(makeDb(players));
 
     // 3 sacks * 1 + 1 int * 2 + shutout band 10 = 15
@@ -348,7 +373,7 @@ describe('calculateAndUpdateFootballMatchupScores — league scoring settings', 
   });
 
   it('splits scores across the two teams', async () => {
-    withoutProfile();
+    withDefaultProfile();
     mockGetMatchupFootballPlayerGameStats.mockResolvedValue([
       quarterbackGame(10),
       dstGame(20),

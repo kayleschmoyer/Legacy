@@ -359,6 +359,28 @@ describe('resolveFootballMatchupScores', () => {
     expect(mockGetFootballScoringSettings).toHaveBeenCalledWith(db, 1);
   });
 
+  it('propagates a missing-scoring-profile rejection instead of scoring the matchup (LS-6395)', async () => {
+    // getFootballScoringSettingsForLeague throws MissingScoringProfileError
+    // rather than resolving to defaults when the league has no scoring
+    // profile row — the resolver must let that failure surface, not swallow
+    // it and silently score with defaults.
+    mockGetFootballScoringSettings.mockRejectedValueOnce(
+      new Error('League 1 has no active scoring profile configured'),
+    );
+
+    const db = buildMockDb([
+      [{ id: 100, team1Id: 10, team2Id: 20 }],
+      [
+        { id: 10, name: 'Eagles' },
+        { id: 20, name: 'Bears' },
+      ],
+    ]);
+
+    await expect(
+      resolveFootballMatchupScores(db as never, 1, 1),
+    ).rejects.toThrow('League 1 has no active scoring profile configured');
+  });
+
   it('scores DST player using computeDefenseScore (sack + shutout = 11 pts)', async () => {
     const db = buildMockDb([
       [{ id: 100, team1Id: 10, team2Id: 20 }],

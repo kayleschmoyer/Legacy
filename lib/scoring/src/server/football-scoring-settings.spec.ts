@@ -1,9 +1,10 @@
 /**
- * Unit tests for getFootballScoringSettingsForLeague (LS-9041).
+ * Unit tests for getFootballScoringSettingsForLeague (LS-9041, LS-6395).
  *
  * Covers:
- *   - No active profile → default settings (byte-identical to the pre-change
- *     hardcoded DEFAULT_*_SCORING constants)
+ *   - No active profile → throws MissingScoringProfileError and logs a
+ *     CRITICAL alert, rather than silently defaulting to PPR-style scoring
+ *     (LS-6395)
  *   - Active profile with an override → the override wins for that stat,
  *     everything else still falls back to default
  *   - Disabled entry → the stat contributes nothing (excluded, not defaulted)
@@ -12,8 +13,34 @@
  */
 
 import type { PublicDb } from '@legacy-sports/db-client';
-import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { LOGGER as REAL_LOGGER } from '@legacy-sports/logging';
+import {
+  getFootballScoringSettingsForLeague,
+  MissingScoringProfileError,
+} from './football-scoring-settings';
 import { getDefaultFootballScoringSettings } from '../football/DefaultScoring';
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    info: jest.fn(),
+    debug: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+  },
+}));
+
+// Cast through `unknown` to a plain function-valued-property type: the real
+// `ILogger` declares its methods with shorthand syntax, which trips
+// @typescript-eslint/unbound-method when a method is referenced (not called)
+// as in `expect(LOGGER.fatal)` below.
+const LOGGER = REAL_LOGGER as unknown as {
+  info: jest.Mock;
+  debug: jest.Mock;
+  warn: jest.Mock;
+  error: jest.Mock;
+  fatal: jest.Mock;
+};
 
 type QueryRow = Record<string, unknown>;
 
@@ -95,12 +122,25 @@ function entry(overrides: Record<string, unknown>) {
 }
 
 describe('getFootballScoringSettingsForLeague', () => {
-  it('falls back to defaults when the league has no active profile (AC3)', async () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws MissingScoringProfileError and logs CRITICAL when the league has no active profile (LS-6395)', async () => {
     const db = makeDb([[]]); // getActiveScoringProfileForLeague → no rows
 
-    const settings = await getFootballScoringSettingsForLeague(db, 42);
+    await expect(getFootballScoringSettingsForLeague(db, 42)).rejects.toThrow(
+      MissingScoringProfileError,
+    );
+    await expect(getFootballScoringSettingsForLeague(db, 42)).rejects.toThrow(
+      /League 42 has no active scoring profile/,
+    );
 
-    expect(settings).toEqual(getDefaultFootballScoringSettings());
+    expect(LOGGER.fatal).toHaveBeenCalledWith(
+      expect.stringContaining('CRITICAL'),
+      expect.any(MissingScoringProfileError),
+      { leagueId: 42 },
+    );
   });
 
   it('applies a custom multiplier override on top of the defaults (AC4)', async () => {

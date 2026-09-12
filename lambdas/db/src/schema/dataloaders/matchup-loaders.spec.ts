@@ -8,6 +8,10 @@
  *  4. roster members of the locked teams from step 3
  */
 
+jest.mock('@legacy-sports/scoring/server', () => ({
+  getFootballScoringSettingsForLeague: jest.fn(),
+}));
+
 jest.mock('@legacy-sports/db-client', () => ({
   PublicSchema: {
     leagues: {
@@ -61,11 +65,16 @@ jest.mock('@legacy-sports/db-client', () => ({
   },
 }));
 
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import {
+  createFootballScoringSettingsLoader,
   createLockedTeamMembersLoader,
   createMatchupPlayerGamesLoader,
   createSelectedGamesCountLoader,
 } from './matchup-loaders';
+
+const mockGetFootballScoringSettingsForLeague =
+  getFootballScoringSettingsForLeague as jest.Mock;
 
 type QueryResult = Record<string, unknown>[];
 
@@ -256,6 +265,64 @@ describe('createMatchupPlayerGamesLoader (LS-8477)', () => {
 
     expect(where).toHaveBeenCalledTimes(2);
     expect(result).toEqual(games);
+  });
+});
+
+describe('createFootballScoringSettingsLoader (LS-6385, LS-6395)', () => {
+  const fakeDb = {} as Parameters<
+    typeof createFootballScoringSettingsLoader
+  >[0];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('resolves settings independently per leagueId in the same batch tick', async () => {
+    const leagueOneSettings = { passing: { yds: 0.04 } };
+    const leagueTwoSettings = { passing: { yds: 0.05 } };
+    mockGetFootballScoringSettingsForLeague.mockImplementation(
+      (_db: unknown, leagueId: number) =>
+        Promise.resolve(leagueId === 1 ? leagueOneSettings : leagueTwoSettings),
+    );
+
+    const loader = createFootballScoringSettingsLoader(fakeDb);
+    const [settingsOne, settingsTwo] = await Promise.all([
+      loader.load(1),
+      loader.load(2),
+    ]);
+
+    expect(settingsOne).toBe(leagueOneSettings);
+    expect(settingsTwo).toBe(leagueTwoSettings);
+  });
+
+  it('rejects only the league missing its scoring profile, not sibling leagues in the same batch (LS-6395)', async () => {
+    const leagueTwoSettings = { passing: { yds: 0.05 } };
+    mockGetFootballScoringSettingsForLeague.mockImplementation(
+      (_db: unknown, leagueId: number) => {
+        if (leagueId === 1) {
+          return Promise.reject(
+            new Error('League 1 has no active scoring profile configured'),
+          );
+        }
+        return Promise.resolve(leagueTwoSettings);
+      },
+    );
+
+    const loader = createFootballScoringSettingsLoader(fakeDb);
+    const [resultOne, resultTwo] = await Promise.allSettled([
+      loader.load(1),
+      loader.load(2),
+    ]);
+
+    expect(resultOne.status).toBe('rejected');
+    const reason = (resultOne as PromiseRejectedResult).reason as Error;
+    expect(reason.message).toContain(
+      'League 1 has no active scoring profile configured',
+    );
+    expect(resultTwo).toEqual({
+      status: 'fulfilled',
+      value: leagueTwoSettings,
+    });
   });
 });
 
