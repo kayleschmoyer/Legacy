@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "start": "expo start",
     "prebuild": "expo prebuild --clean --no-install",
-    "prebuild:android": "expo prebuild --clean --platform android --no-install"
+    "prebuild:android": "expo prebuild --clean --platform android --no-install",
+    "prebuild:ios": "expo prebuild --clean --platform ios --no-install"
   },
   "dependencies": {
     "@expo/dom-webview": "~56.0.5",

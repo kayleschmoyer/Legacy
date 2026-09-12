@@ -121,9 +121,9 @@ jobs:
       - name: Update Build Number in Info.plist
         run: |
           # Update CFBundleVersion with our build number
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.version.outputs.build_number }}" apps/app/ios/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.version.outputs.build_number }}" apps/app/ios/LegacySports/Info.plist
           # Update CFBundleShortVersionString with version
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" apps/app/ios/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" apps/app/ios/LegacySports/Info.plist
 
       - name: Build iOS App for Simulator
         if: steps.version.outputs.build_config == 'Debug'
@@ -133,8 +133,8 @@ jobs:
         run: |
           cd apps/app/ios
           xcodebuild \
-            -workspace App.xcworkspace \
-            -scheme App \
+            -workspace LegacySports.xcworkspace \
+            -scheme LegacySports \
             -configuration ${{ steps.version.outputs.build_config }} \
             -sdk iphonesimulator \
             -arch x86_64 \
@@ -151,11 +151,11 @@ jobs:
 
           # Create archive
           xcodebuild \
-            -workspace App.xcworkspace \
-            -scheme App \
+            -workspace LegacySports.xcworkspace \
+            -scheme LegacySports \
             -configuration ${{ steps.version.outputs.build_config }} \
             -sdk iphoneos \
-            -archivePath ./build/App.xcarchive \
+            -archivePath ./build/LegacySports.xcarchive \
             archive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -189,7 +189,7 @@ jobs:
           # Export IPA
           xcodebuild \
             -exportArchive \
-            -archivePath ./build/App.xcarchive \
+            -archivePath ./build/LegacySports.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath ./build/export \
             -allowProvisioningUpdates
@@ -201,7 +201,7 @@ jobs:
 
           if [ "${{ steps.version.outputs.build_config }}" == "Release" ]; then
             # For Release builds, we have an IPA
-            mv build/export/App.ipa build/export/${{ steps.version.outputs.artifact_name }}.ipa
+            mv build/export/LegacySports.ipa build/export/${{ steps.version.outputs.artifact_name }}.ipa
             
             # Create a latest symlink
             ln -s ${{ steps.version.outputs.artifact_name }}.ipa build/export/legacy-sports-ios-latest.ipa
@@ -211,7 +211,7 @@ jobs:
           else
             # For Debug builds, create a zip of the .app bundle
             cd build/Build/Products/Debug-iphonesimulator
-            zip -r "${{ steps.version.outputs.artifact_name }}.app.zip" App.app
+            zip -r "${{ steps.version.outputs.artifact_name }}.app.zip" LegacySports.app
             mv "${{ steps.version.outputs.artifact_name }}.app.zip" ../../../../
             
             echo "app_zip_path=apps/app/ios/${{ steps.version.outputs.artifact_name }}.app.zip" >> $GITHUB_OUTPUT
