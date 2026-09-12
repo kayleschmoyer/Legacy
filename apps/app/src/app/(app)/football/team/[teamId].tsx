@@ -73,6 +73,26 @@ const ALL_TABS = Object.freeze([
 ] as const);
 type Tab = (typeof ALL_TABS)[number];
 
+function isTab(value: unknown): value is Tab {
+  return (ALL_TABS as readonly string[]).includes(value as string);
+}
+
+/**
+ * Resolve the `initialTab` deep-link param to a starting tab index, mirroring
+ * the league route's `initialTab` handling
+ * (`apps/app/src/app/(app)/football/league/[leagueId].tsx`). Unrecognised or
+ * absent values fall back to the first tab.
+ *
+ * Indices are read against {@link ALL_TABS} rather than the viewer-filtered
+ * `visibleTabs`: the only filtered-out tab is `Settings`, which is last, so
+ * every other tab keeps its index either way.
+ */
+function initialTabIndex(value: unknown): number {
+  if (!isTab(value)) return 0;
+  const index = ALL_TABS.indexOf(value);
+  return index === -1 ? 0 : index;
+}
+
 type MatchupScoreEntry = MatchupScoresQuery['matchupScores'][number];
 type FootballMatchupScoreEntry = Extract<
   MatchupScoreEntry,
@@ -684,7 +704,9 @@ export default function FootballTeam(): React.JSX.Element {
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
-  const [selectedTabIdx, setSelectedTabIdx] = useState(0);
+  const [selectedTabIdx, setSelectedTabIdx] = useState(() =>
+    initialTabIndex(params.initialTab),
+  );
 
   const teamMembers = membersData?.teamMembers;
 

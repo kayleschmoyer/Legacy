@@ -23,6 +23,7 @@ import {
   type MockTeam,
   mockTeam,
   userTeamIdResponse,
+  viewerMembershipResponse,
 } from './league.mocks';
 
 // ── Roster player + team member ─────────────────────────────────────
@@ -229,6 +230,41 @@ export function mockRosterTeam(
   };
 }
 
+/**
+ * {@link MockRosterTeam} plus the remaining `Team` fragment fields and the
+ * `managerId` that `GetTeamById` selects on top of it. Team Detail (web
+ * `pages/football/FootballTeamDetailPage.tsx`, native
+ * `app/(app)/football/team/[teamId].tsx`) is driven by that query rather than
+ * by `GetLeagueTeams`, and native treats a null `team` as a hard "Could not
+ * load team" — so the fixture has to answer it with a real row.
+ */
+export interface MockTeamById extends MockRosterTeam {
+  bannerUrl: string | null;
+  totalPayroll: number | null;
+  capSpace: number | null;
+  managerId: number | null;
+}
+
+export function mockTeamById(
+  overrides: Partial<MockTeamById> = {},
+): MockTeamById {
+  const base = mockRosterTeam(overrides);
+  return {
+    ...base,
+    bannerUrl: null,
+    totalPayroll: null,
+    capSpace: null,
+    // The team's manager is its owner unless a scenario says otherwise.
+    managerId: base.owner,
+    ...overrides,
+  };
+}
+
+/** Mock response for the `GetTeamById` query (aliased `team: teamById`). */
+export function teamByIdResponse(team?: Partial<MockTeamById>) {
+  return { data: { team: mockTeamById(team) } };
+}
+
 // ── Lineup mutation response factories ──────────────────────────────
 
 /** Mock response for the `UpdateTeamMemberPosition` mutation. */
@@ -278,6 +314,26 @@ export interface FootballLineupFixtureOptions {
    * the pre-LS-6441 fixture never had a team on bye.
    */
   byeWeeksByTeam?: Readonly<Record<string, number>>;
+  /**
+   * The team the VIEWER owns in this league, served as both `userTeamId` and
+   * `viewerMembership.teamId` (LS-9657 Team Detail scenario). Defaults to
+   * {@link FootballLineupFixtureOptions.teamId} — i.e. the viewer owns the
+   * team under test, which is what every League-Roster-tab scenario wants,
+   * since that tab only ever renders the viewer's own team.
+   *
+   * Point it at a DIFFERENT team id to build the Team Detail visitor
+   * precondition: both platforms' edit gates compare the viewer's own team
+   * against the team being viewed (web `FootballTeamDetailPage`'s
+   * `isOwner`/`isGM`, native `[teamId].tsx`'s `isOwner`), so a mismatch is
+   * exactly what renders `RosterBoard` read-only.
+   */
+  viewerTeamId?: number;
+  /**
+   * The viewer's `viewerMembership.permissionLevel`. Defaults to
+   * `'general_manager'` — the level web's Team Detail edit gate requires
+   * (`'owner'` is NOT one of them; see `FootballTeamDetailPage`'s `isGM`).
+   */
+  viewerPermissionLevel?: string;
 }
 
 export interface FootballLineupFixture {
@@ -377,6 +433,11 @@ export function createFootballLineupFixture(
       owner: 1,
     }),
   ];
+  // The viewer's own team in this league — the same id the team under test
+  // carries unless a scenario deliberately separates them (the visitor case).
+  const viewerTeamId = options.viewerTeamId ?? teamId;
+  const viewerPermissionLevel =
+    options.viewerPermissionLevel ?? 'general_manager';
 
   let members = options.members ?? [
     mockTeamMember({ teamId, leagueId, positionId: null }),
@@ -426,7 +487,28 @@ export function createFootballLineupFixture(
     getpositionsforleague: () => footballPositionsResponse(positions),
     getteammembers: () => teamMembersResponse(members),
     getleagueteams: () => ({ data: { leagueTeams: teams } }),
-    getuserteamid: () => userTeamIdResponse(teamId),
+    // Team Detail (LS-9657) is addressed by team, not by league, so it reads
+    // the team row through `GetTeamById` rather than `GetLeagueTeams` — and
+    // native hard-stops on a null `team`, so answer it from the same row.
+    getteambyid: (variables) => {
+      const requested = toId(variables['teamId'], 'teamId');
+      return teamByIdResponse({
+        id: requested,
+        leagueId,
+        name: options.teamName ?? 'Steel City Blitz',
+        owner: 1,
+      });
+    },
+    getuserteamid: () => userTeamIdResponse(viewerTeamId),
+    // Web's Team Detail edit gate reads the viewer's membership row directly
+    // (native derives the same thing from `GetUserTeamId` above), so both
+    // have to agree about which team the viewer owns.
+    getviewermembership: () =>
+      viewerMembershipResponse({
+        leagueId,
+        teamId: viewerTeamId,
+        permissionLevel: viewerPermissionLevel,
+      }),
     // The Roster tab's matchup scoreline pipeline degrades gracefully on empty
     // data; pin both so neither backend falls through to the baseline.
     getmatchupplayers: () => ({ data: { getMatchupPlayers: [] } }),
@@ -473,4 +555,47 @@ export function createFootballLineupFixture(
     members: () => members,
     handlers,
   };
+}
+
+// ── The Team Detail visitor scenario (LS-9657) ──────────────────────
+
+/** The team id the viewer owns in {@link createFootballTeamDetailVisitorScenario}. */
+export const VISITOR_VIEWER_TEAM_ID = 2;
+
+/** The starter already in the viewed team's QB slot, for the same scenario. */
+export const VISITOR_STARTER = Object.freeze({
+  fullName: 'Josh Allen',
+  positionType: 'QB',
+});
+
+/**
+ * Build the Team Detail read-only precondition: a football team the viewer
+ * does NOT own, with one player already in its only starting slot.
+ *
+ * Lives here (rather than inline in each `TestData` implementation) so the web
+ * `page.route()` verb and the native mock-server verb construct the SAME
+ * scenario from one definition — the duplication the football-lineup sibling
+ * scenarios carry is a standing cost (ADR-0017 AC2), not a pattern to extend.
+ */
+export function createFootballTeamDetailVisitorScenario(): FootballLineupFixture {
+  return createFootballLineupFixture({
+    positionTypes: [VISITOR_STARTER.positionType],
+    members: [
+      mockTeamMember({
+        id: 501,
+        // The fixture's first configured slot — `mockFootballPositions` ids
+        // are 1-based in receipt order.
+        positionId: 1,
+        player: mockRosterPlayer({
+          id: 930,
+          firstName: 'Josh',
+          lastName: 'Allen',
+          eligiblePositions: [VISITOR_STARTER.positionType],
+          nflTeam: 'BUF',
+        }),
+      }),
+    ],
+    // The whole point: the viewer's own team is NOT the team being viewed.
+    viewerTeamId: VISITOR_VIEWER_TEAM_ID,
+  });
 }

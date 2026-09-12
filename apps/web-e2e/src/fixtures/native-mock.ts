@@ -29,6 +29,7 @@ import type {
   SeededFootballLineup,
   SeededFootballLineupByeWeek,
   SeededFootballLineupLocked,
+  SeededFootballTeamDetailVisitor,
   SeededLeague,
   SeededLeagueInvite,
   SeededLeagueWithMember,
@@ -53,9 +54,12 @@ import {
 } from '../mocks/graphql/player.mocks';
 import {
   createFootballLineupFixture,
+  createFootballTeamDetailVisitorScenario,
   type FootballLineupFixture,
   mockRosterPlayer,
   mockTeamMember,
+  VISITOR_STARTER,
+  VISITOR_VIEWER_TEAM_ID,
 } from '../mocks/graphql/roster.mocks';
 import { createWaiverQueueFixture } from '../mocks/graphql/waiver-queue.mocks';
 import { createMatchupFixture } from '../mocks/graphql/matchup-fixture.mocks';
@@ -284,6 +288,17 @@ export class NativeMockTestData implements TestData {
       leagueId: fixture.leagueId,
       teamId: fixture.teamId,
       byeStarter: { fullName: 'Josh Allen', positionType: 'QB' },
+    });
+  }
+
+  footballTeamDetailVisitor(): Promise<SeededFootballTeamDetailVisitor> {
+    const fixture = createFootballTeamDetailVisitorScenario();
+    this.#installFootballLineupRoutes(fixture);
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      viewerTeamId: VISITOR_VIEWER_TEAM_ID,
+      starter: { ...VISITOR_STARTER },
     });
   }
 

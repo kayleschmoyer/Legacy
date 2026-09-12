@@ -13,6 +13,11 @@
  * sport-scoped (`/football/leagues`), native is one sport-agnostic screen
  * (`apps/app/src/app/(app)/league-discovery.tsx`).
  *
+ * Team Detail (LS-9657) adds a third shape: web addresses it as
+ * `/:sport/teams/:teamId` (plural) while native's expo-router file is
+ * `team/[teamId].tsx` (singular), and football's native screen renders the
+ * lineup board on a `Lineup` tab rather than as the screen itself.
+ *
  * `/draft` and `/draft/watch` share the same broken URL shape — they were the
  * worked example in this ticket's own technical approach — but resolve to
  * dedicated top-level native screens (`DraftBoardPage`, `DraftWatchPage`),
@@ -76,6 +81,7 @@ const VALID_LEAGUE_TABS: Readonly<Record<Sport, ReadonlySet<string>>> = {
 };
 
 const LEAGUE_TAB_PATH = /^\/(baseball|football)\/league\/(\d+)\/([a-z-]+)$/;
+const TEAM_DETAIL_PATH = /^\/(baseball|football)\/teams\/(\d+)$/;
 const LEAGUE_DISCOVERY_PATH = /^\/(baseball|football)\/leagues$/;
 const LEAGUE_DRAFT_PATH = /^\/(baseball|football)\/league\/(\d+)\/draft$/;
 const LEAGUE_DRAFT_WATCH_PATH =
@@ -132,6 +138,21 @@ export function resolveNativeRoute(path: string): string {
   if (draftMatch) {
     const [, , leagueId] = draftMatch;
     return `/DraftBoardPage?leagueId=${leagueId}`;
+  }
+
+  const teamDetailMatch = normalized.match(TEAM_DETAIL_PATH);
+  if (teamDetailMatch) {
+    const [, sportSegment, teamId] = teamDetailMatch;
+    // Two mismatches at once. The segment is PLURAL on web
+    // (`apps/web/src/app/app.tsx`'s `/football/teams/:teamId`) and SINGULAR on
+    // native (`apps/app/src/app/(app)/football/team/[teamId].tsx`), and the
+    // football screen puts its `RosterBoard` lineup editor on a non-default
+    // `Lineup` tab while web renders the board as the page itself. Baseball's
+    // native team screen already opens on `Lineup` (its first tab), so only
+    // football needs the tab named.
+    return sportSegment === 'football'
+      ? `/football/team/${teamId}?initialTab=Lineup`
+      : `/baseball/team/${teamId}`;
   }
 
   const tabMatch = normalized.match(LEAGUE_TAB_PATH);

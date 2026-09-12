@@ -31,13 +31,18 @@ PW_CONFIG="apps/web-e2e/playwright.native.config.ts"
 # (`lib/shared-components/src/features/roster/**`), plus (LS-6441) the
 # lock-window and bye-week conditional-state specs — same shared
 # `RosterBoard`/`TestData.footballLineup*()` machinery, so they are as
-# native-capable as the bench↔starter spec above. Add further specs here as
-# more surfaces get native proof coverage.
+# native-capable as the bench↔starter spec above. LS-9657 adds the Team Detail
+# lineup journey, which drives the SAME `RosterBoard` on the football team
+# screen's Lineup tab (`apps/app/src/app/(app)/football/team/[teamId].tsx`) —
+# reached through the driver route map's `initialTab=Lineup` rewrite — and adds
+# the read-only visitor case the League Roster tab cannot exercise. Add further
+# specs here as more surfaces get native proof coverage.
 PROOF_SPECS=(
   "league-discovery-search.dual.spec.ts"
   "football-lineup.dual.spec.ts"
   "football-lineup-lock-window.dual.spec.ts"
   "football-lineup-bye-week.dual.spec.ts"
+  "football-team-detail-lineup.dual.spec.ts"
 )
 
 mkdir -p "$ARTIFACT_DIR"

@@ -30,6 +30,23 @@ export class RosterPage extends BaseScreen {
     await this.open(`/${sport}/league/${leagueId}/roster`);
   }
 
+  /**
+   * Navigate straight to a TEAM's detail page — the other surface that renders
+   * the same `RosterBoard` lineup editor (LS-9657). Unlike {@link goto} this is
+   * addressed by TEAM, so it can render a team the viewer does not own; the
+   * board comes up read-only when it does.
+   *
+   * Native's Team Detail puts the board on a non-default tab, which the driver
+   * route-parity seam resolves (`driver/native-route-map.ts`) — callers pass
+   * the web-shaped path either way.
+   */
+  async gotoTeamDetail(
+    teamId: number,
+    sport: Sport = 'baseball',
+  ): Promise<void> {
+    await this.open(`/${sport}/teams/${teamId}`);
+  }
+
   // ── Reads: parameterised getters ─────────────────────────────────
 
   /** A section/card heading by its accessible name (e.g. "Starting Hitters", "Bench"). */
@@ -93,6 +110,46 @@ export class RosterPage extends BaseScreen {
     return this.slotButton(
       new RegExp(`${fullName} at ${positionType} — on bye week`, 'i'),
     );
+  }
+
+  /**
+   * The BENCH row for `fullName` — `"<Player> — bench"`. The start of every
+   * bench→slot assignment: tapping it is what puts the board into a selection
+   * (`RosterBoard`'s `BenchRow`).
+   */
+  benchRow(fullName: string): UIElement {
+    return this.slotButton(new RegExp(`${fullName} — bench`, 'i'));
+  }
+
+  /**
+   * The open slot's action label once `fullName` is selected — `"Assign
+   * <Player> to <POS>"`. An empty slot renames itself to this only while an
+   * eligible player is selected, so its presence is also the proof that the
+   * selection landed.
+   */
+  assignAction(fullName: string, positionType: string): UIElement {
+    return this.slotButton(
+      new RegExp(`assign ${fullName} to ${positionType}`, 'i'),
+    );
+  }
+
+  /**
+   * The "Move <Player> to bench" action offered for a SELECTED starter — the
+   * starter→bench half of the lineup journey. Absent whenever the board is
+   * read-only, since nothing can be selected there.
+   */
+  moveToBenchAction(fullName: string): UIElement {
+    return this.slotButton(new RegExp(`move ${fullName} to bench`, 'i'));
+  }
+
+  /**
+   * An EMPTY slot by its position type — `"<Position label> — open slot"`,
+   * e.g. `"Quarterback — open slot"` (label from `rosterEligibility.ts`'s
+   * `getPositionLabel`). The post-condition of moving a starter back to the
+   * bench.
+   */
+  openSlot(positionLabel: string): UIElement {
+    return this.slotButton(new RegExp(`${positionLabel} — open slot`, 'i'));
   }
 
   /**

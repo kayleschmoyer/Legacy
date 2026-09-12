@@ -90,6 +90,28 @@ void test('resolveNativeRoute: sport-scoped discovery collapses to the one nativ
 });
 
 // ---------------------------------------------------------------------------
+// Team Detail (LS-9657) — plural→singular segment, plus football's Lineup tab
+// ---------------------------------------------------------------------------
+
+void test('resolveNativeRoute: football Team Detail maps to the singular segment and the Lineup tab', () => {
+  assert.equal(
+    resolveNativeRoute('/football/teams/7'),
+    '/football/team/7?initialTab=Lineup',
+  );
+});
+
+void test('resolveNativeRoute: baseball Team Detail maps the segment only — Lineup is already its first tab', () => {
+  assert.equal(resolveNativeRoute('/baseball/teams/7'), '/baseball/team/7');
+});
+
+void test('resolveNativeRoute: a non-numeric team segment is not treated as Team Detail', () => {
+  assert.equal(
+    resolveNativeRoute('/football/teams/mine'),
+    '/football/teams/mine',
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Passthrough — most routes are already URL-shaped on both platforms
 // ---------------------------------------------------------------------------
 

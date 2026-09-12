@@ -29,9 +29,12 @@ import {
 } from '../mocks/graphql/player.mocks';
 import {
   createFootballLineupFixture,
+  createFootballTeamDetailVisitorScenario,
   type FootballLineupFixture,
   mockRosterPlayer,
   mockTeamMember,
+  VISITOR_STARTER,
+  VISITOR_VIEWER_TEAM_ID,
 } from '../mocks/graphql/roster.mocks';
 import {
   createWaiverQueueFixture,
@@ -141,6 +144,24 @@ export interface SeededFootballLineupLocked {
   lockedBenchPlayer: SeededFootballLineupPlayer;
   /** The open (unoccupied, unlocked) slot's position type, e.g. `WR`. */
   openSlotPositionType: string;
+}
+
+/**
+ * A football Team Detail page (`/football/teams/:teamId`) the viewer does NOT
+ * own — the read-only precondition for LS-9657. Team Detail is addressed by
+ * team rather than by league, so unlike the League Roster tab it can render
+ * somebody else's team; this is the scenario that proves it renders read-only
+ * when it does.
+ */
+export interface SeededFootballTeamDetailVisitor {
+  /** League the team belongs to. */
+  leagueId: number;
+  /** The team being VIEWED — navigate to `/football/teams/:teamId`. */
+  teamId: number;
+  /** The viewer's own (different) team in the same league. */
+  viewerTeamId: number;
+  /** A player already starting on the viewed team's lineup. */
+  starter: SeededFootballLineupPlayer;
 }
 
 export interface SeededFootballLineupByeWeek {
@@ -393,6 +414,16 @@ export interface TestData {
    * reasoning as {@link footballLineup}.
    */
   footballLineupByeWeek(): Promise<SeededFootballLineupByeWeek>;
+
+  /**
+   * Ensure a football league has a team the viewer does NOT own, with one
+   * player already in a starting slot — the Team Detail read-only precondition
+   * (LS-9657). Mock: the same football-lineup fixture with its `viewerTeamId`
+   * pointed at a different team, which is what both platforms' edit gates
+   * compare against. Live: **throws**, same reasoning as
+   * {@link footballLineup} — see {@link FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON}.
+   */
+  footballTeamDetailVisitor(): Promise<SeededFootballTeamDetailVisitor>;
 
   /**
    * Ensure a league exists whose commissioner-facing overview shows the
@@ -739,6 +770,18 @@ export class MockTestData implements TestData {
       leagueId: fixture.leagueId,
       teamId: fixture.teamId,
       byeStarter: { fullName: 'Josh Allen', positionType: 'QB' },
+    };
+  }
+
+  async footballTeamDetailVisitor(): Promise<SeededFootballTeamDetailVisitor> {
+    const fixture = createFootballTeamDetailVisitorScenario();
+    await this.#installFootballLineupRoutes(fixture);
+
+    return {
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      viewerTeamId: VISITOR_VIEWER_TEAM_ID,
+      starter: { ...VISITOR_STARTER },
     };
   }
 
@@ -1286,6 +1329,13 @@ export class LiveTestData implements TestData {
     // Same reasoning as `footballLineup` above — a locked-player precondition
     // needs the same real league/team/roster seeding, plus waiting for (or
     // faking) a real NFL game start, which no live verb does.
+    throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
+  }
+
+  footballTeamDetailVisitor(): Promise<SeededFootballTeamDetailVisitor> {
+    // Same reasoning as `footballLineup` above, plus this precondition needs a
+    // SECOND real team in the league whose roster the test identity does not
+    // own — further still from anything an existing live verb seeds.
     throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
   }
 
