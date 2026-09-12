@@ -8,6 +8,7 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  type FootballGameStatsDataQuality,
   type FootballMatchupPlayerGameStats,
   getMatchupFootballPlayerGameStats,
   type PublicDb,
@@ -67,11 +68,18 @@ type FootballMatchupPlayerShape = {
   games: FootballMatchupPlayerGameShape[];
   totalPoints: number;
   projectedPoints: number;
+  /**
+   * Worst data-quality state across this player's scheduled games (LS-6394).
+   * Anything other than `ok` means `totalPoints` may under-count.
+   */
+  dataQuality: FootballGameStatsDataQuality;
 };
 
 type FootballMatchupPlayerGameShape = {
   gameNum: number;
   gameIdentifier: string;
+  /** Why this game has no stats, when it has none (LS-6394). */
+  dataQuality: FootballGameStatsDataQuality;
   opponent: string | null;
   gameDate: string | null;
   passing: GamePassingShape | null;
@@ -245,6 +253,58 @@ export function computeFootballGamePoints(
   });
 }
 
+// ─── Missing-stats detection (LS-6394) ───────────────────────────────────────
+
+/**
+ * Severity order for `FootballGameStatsDataQuality`. A player's reported
+ * quality is the worst across their scheduled games, so one missing game is
+ * never masked by another game that loaded fine.
+ */
+const DATA_QUALITY_SEVERITY: Record<FootballGameStatsDataQuality, number> = {
+  ok: 0,
+  stats_pending: 1,
+  stats_failed: 2,
+  stats_missing: 3,
+};
+
+/** Return whichever of the two states is more severe. */
+export function worseDataQuality(
+  a: FootballGameStatsDataQuality,
+  b: FootballGameStatsDataQuality,
+): FootballGameStatsDataQuality {
+  return DATA_QUALITY_SEVERITY[b] > DATA_QUALITY_SEVERITY[a] ? b : a;
+}
+
+/**
+ * Log a WARN and emit a `missing_stats` metric line for a scheduled game that
+ * produced no stat rows (LS-6394).
+ *
+ * The repo has no metrics client, so the metric is emitted as a structured
+ * log field (`metric: 'missing_stats'`) that a CloudWatch metric filter can
+ * key on. Keep the field names stable — they are the metric's contract.
+ */
+function warnMissingGameStats(
+  leagueId: number,
+  weekNum: number,
+  matchupId: number,
+  playerId: number,
+  game: FootballMatchupPlayerGameStats,
+): void {
+  LOGGER.warn(
+    `matchupScores: no stats for player ${playerId} in game ${game.gameIdentifier} (${game.dataQuality}) — scoring 0`,
+    {
+      metric: 'missing_stats',
+      dataQuality: game.dataQuality,
+      playerId,
+      leagueId,
+      weekNum,
+      matchupId,
+      gameNum: game.gameNum,
+      gameIdentifier: game.gameIdentifier,
+    },
+  );
+}
+
 // ─── Football resolver ───────────────────────────────────────────────────────
 
 /**
@@ -408,7 +468,11 @@ export async function resolveFootballMatchupScores(
   // matchupPlayerId, from the already-played games for the week.
   const gamesByMatchupPlayerId = new Map<
     number,
-    { games: FootballMatchupPlayerGameShape[]; totalPoints: number }
+    {
+      games: FootballMatchupPlayerGameShape[];
+      totalPoints: number;
+      dataQuality: FootballGameStatsDataQuality;
+    }
   >();
 
   for (const [matchupId, playerGameStats] of playerGameStatsMap.entries()) {
@@ -443,9 +507,23 @@ export async function resolveFootballMatchupScores(
         posType,
       );
 
+      // LS-6394: a scheduled game with no stat rows still scores 0. Warn (and
+      // emit the missing_stats metric) so a delayed or failed ingest is
+      // visible instead of silently under-counting the team total.
+      if (gameStats.dataQuality !== 'ok') {
+        warnMissingGameStats(
+          leagueId,
+          weekNum,
+          matchupId,
+          mpInfo.playerId,
+          gameStats,
+        );
+      }
+
       const gameShape: FootballMatchupPlayerGameShape = {
         gameNum: gameStats.gameNum,
         gameIdentifier: gameStats.gameIdentifier,
+        dataQuality: gameStats.dataQuality,
         opponent: null,
         gameDate: null,
         passing: gameStats.offense
@@ -467,11 +545,15 @@ export async function resolveFootballMatchupScores(
 
       let entry = gamesByMatchupPlayerId.get(gameStats.matchupPlayerId);
       if (!entry) {
-        entry = { games: [], totalPoints: 0 };
+        entry = { games: [], totalPoints: 0, dataQuality: 'ok' };
         gamesByMatchupPlayerId.set(gameStats.matchupPlayerId, entry);
       }
       entry.games.push(gameShape);
       entry.totalPoints += fantasyPoints;
+      entry.dataQuality = worseDataQuality(
+        entry.dataQuality,
+        gameStats.dataQuality,
+      );
     }
   }
 
@@ -559,6 +641,9 @@ export async function resolveFootballMatchupScores(
         games: played?.games ?? [],
         totalPoints: actual,
         projectedPoints: projected,
+        // LS-6394: a starter with no scheduled games at all is genuinely
+        // unplayed (and already gets a projection), not a data gap.
+        dataQuality: played?.dataQuality ?? 'ok',
       });
       agg.totalPoints += actual;
       agg.projectedPoints += projected;

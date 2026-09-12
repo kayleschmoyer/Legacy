@@ -526,6 +526,236 @@ describe('resolveFootballMatchupScores', () => {
 // resolveBaseballMatchupScores
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Missing per-game stats (LS-6394 / FMD-030)
+// ---------------------------------------------------------------------------
+
+describe('resolveFootballMatchupScores — missing per-game stats (LS-6394)', () => {
+  // Reach the warn spy through the mocked module rather than the imported
+  // `LOGGER` binding: `expect(LOGGER.warn)` passes the method unbound, which
+  // trips @typescript-eslint/unbound-method.
+  const loggerMock = jest.requireMock<{ LOGGER: { warn: jest.Mock } }>(
+    '@legacy-sports/logging',
+  );
+
+  /** The single rostered player on team 10, or a hard failure if absent. */
+  function onlyPlayerOfTeam10(
+    result: Awaited<ReturnType<typeof resolveFootballMatchupScores>>,
+  ) {
+    const team = result.find((r) => r.teamId === 10);
+    if (!team) throw new Error('expected a result entry for team 10');
+    if (team.players.length !== 1) {
+      throw new Error(
+        `expected exactly 1 player on team 10, got ${team.players.length}`,
+      );
+    }
+    return team.players[0];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetFootballScoringSettings.mockResolvedValue(
+      getDefaultFootballScoringSettings(),
+    );
+  });
+
+  /**
+   * The reported bug: a starter has a row in `matchup_player_games` (the game
+   * was scheduled and the ingest reported success) but no stat row exists, so
+   * every stat block comes back null. The player scores 0 and — because they
+   * *do* have a game entry — they are also excluded from the unplayed-starter
+   * projection fallback. Before this fix that 0 was completely silent.
+   */
+  function buildMissingStatsDb() {
+    return buildMockDb([
+      [{ id: 100, team1Id: 10, team2Id: 20 }], // matchupRows
+      [
+        { id: 10, name: 'Eagles' },
+        { id: 20, name: 'Bears' },
+      ], // teamRows
+      [
+        {
+          matchupPlayerId: 1,
+          matchupId: 100,
+          teamId: 10,
+          playerId: 5,
+          positionType: 'QB',
+        },
+      ], // matchupPlayerRows
+      [
+        {
+          id: 5,
+          firstName: 'Patrick',
+          lastName: 'Mahomes',
+          isDst: false,
+          nflTeam: 'KC',
+        },
+      ], // playerRows
+    ]);
+  }
+
+  function missingStatsGame(
+    dataQuality: 'stats_missing' | 'stats_pending' | 'stats_failed' | 'ok',
+  ) {
+    return {
+      playerId: 5,
+      matchupPlayerId: 1,
+      gameNum: 1,
+      gameIdentifier: '20240901_KC_BAL',
+      offense: null,
+      defense: null,
+      idpDefense: null,
+      dataQuality,
+    };
+  }
+
+  it('still scores 0 but now reports dataQuality stats_missing instead of a silent zero', async () => {
+    mockGetFootballStats.mockResolvedValueOnce([
+      missingStatsGame('stats_missing'),
+    ]);
+
+    const result = await resolveFootballMatchupScores(
+      buildMissingStatsDb() as never,
+      1,
+      1,
+    );
+
+    const player = onlyPlayerOfTeam10(result);
+    // The under-count itself is unchanged — this ticket is about making it
+    // visible, not about inventing points we do not have.
+    expect(player.totalPoints).toBe(0);
+    expect(player.dataQuality).toBe('stats_missing');
+    expect(player.games[0].dataQuality).toBe('stats_missing');
+  });
+
+  it('logs a WARN carrying the missing_stats metric and the player id', async () => {
+    mockGetFootballStats.mockResolvedValueOnce([
+      missingStatsGame('stats_missing'),
+    ]);
+
+    await resolveFootballMatchupScores(buildMissingStatsDb() as never, 1, 1);
+
+    expect(loggerMock.LOGGER.warn).toHaveBeenCalledTimes(1);
+    const [message, fields] = loggerMock.LOGGER.warn.mock.calls[0];
+    expect(message).toContain('player 5');
+    expect(fields).toMatchObject({
+      metric: 'missing_stats',
+      dataQuality: 'stats_missing',
+      playerId: 5,
+      leagueId: 1,
+      weekNum: 1,
+      matchupId: 100,
+      gameIdentifier: '20240901_KC_BAL',
+    });
+  });
+
+  it.each(['stats_pending', 'stats_failed'] as const)(
+    'also warns and reports %s',
+    async (quality) => {
+      mockGetFootballStats.mockResolvedValueOnce([missingStatsGame(quality)]);
+
+      const result = await resolveFootballMatchupScores(
+        buildMissingStatsDb() as never,
+        1,
+        1,
+      );
+
+      expect(onlyPlayerOfTeam10(result).dataQuality).toBe(quality);
+      expect(loggerMock.LOGGER.warn).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('stays silent and reports ok for a game whose stats loaded normally', async () => {
+    mockGetFootballStats.mockResolvedValueOnce([
+      {
+        ...missingStatsGame('ok'),
+        offense: {
+          passYds: 300,
+          passTd: 2,
+          interceptions: 0,
+          sacked: 0,
+          passCmp: 22,
+          passAtt: 30,
+          rushYds: 0,
+          rushTd: 0,
+          rushFumbles: 0,
+          rec: 0,
+          recYds: 0,
+          recTd: 0,
+          recFumbles: 0,
+          fgm: 0,
+          fg50m: 0,
+          xpm: 0,
+        },
+      },
+    ]);
+
+    const result = await resolveFootballMatchupScores(
+      buildMissingStatsDb() as never,
+      1,
+      1,
+    );
+
+    const player = onlyPlayerOfTeam10(result);
+    expect(player.totalPoints).toBeCloseTo(20);
+    expect(player.dataQuality).toBe('ok');
+    expect(loggerMock.LOGGER.warn).not.toHaveBeenCalled();
+  });
+
+  it('reports the worst quality across a player’s games, so a good game cannot mask a missing one', async () => {
+    mockGetFootballStats.mockResolvedValueOnce([
+      {
+        ...missingStatsGame('ok'),
+        gameNum: 1,
+        offense: {
+          passYds: 300,
+          passTd: 2,
+          interceptions: 0,
+          sacked: 0,
+          passCmp: 22,
+          passAtt: 30,
+          rushYds: 0,
+          rushTd: 0,
+          rushFumbles: 0,
+          rec: 0,
+          recYds: 0,
+          recTd: 0,
+          recFumbles: 0,
+          fgm: 0,
+          fg50m: 0,
+          xpm: 0,
+        },
+      },
+      { ...missingStatsGame('stats_missing'), gameNum: 2 },
+    ]);
+
+    const result = await resolveFootballMatchupScores(
+      buildMissingStatsDb() as never,
+      1,
+      1,
+    );
+
+    const player = onlyPlayerOfTeam10(result);
+    expect(player.games).toHaveLength(2);
+    expect(player.dataQuality).toBe('stats_missing');
+  });
+
+  it('reports ok for a starter with no scheduled games at all — they are projected, not missing', async () => {
+    mockGetFootballStats.mockResolvedValueOnce([]);
+
+    const result = await resolveFootballMatchupScores(
+      buildMissingStatsDb() as never,
+      1,
+      1,
+    );
+
+    const player = onlyPlayerOfTeam10(result);
+    expect(player.games).toHaveLength(0);
+    expect(player.dataQuality).toBe('ok');
+    expect(loggerMock.LOGGER.warn).not.toHaveBeenCalled();
+  });
+});
+
 describe('resolveBaseballMatchupScores', () => {
   beforeEach(() => {
     jest.clearAllMocks();

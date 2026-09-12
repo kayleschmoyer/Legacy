@@ -11,6 +11,9 @@ query MatchupScores($leagueId: Int!, $weekNum: Int!) {
         position
         totalPoints
         projectedPoints
+        # LS-6394: non-`ok` means a scheduled game produced no stat rows, so
+        # totalPoints may under-count — the UI badges the row as stats pending.
+        dataQuality
         games {
           gameNum
           opponent

@@ -1012,6 +1012,8 @@ export type FootballGameRushingStats = {
 /** A player on a football fantasy team in a matchup */
 export type FootballMatchupPlayer = {
   __typename?: 'FootballMatchupPlayer';
+  /** Worst data-quality state across this player’s scheduled games (LS-6394). Anything other than `ok` means `totalPoints` may under-count because a scheduled game produced no stat rows. */
+  dataQuality: FootballStatsDataQuality;
   games: Array<FootballMatchupPlayerGame>;
   isDst: Scalars['Boolean']['output'];
   nflTeam?: Maybe<Scalars['String']['output']>;
@@ -1264,6 +1266,18 @@ export type FootballSeasonRushing = {
   yds?: Maybe<Scalars['Int']['output']>;
   ydsPerAtt?: Maybe<Scalars['Float']['output']>;
 };
+
+/** Data-quality state for a football matchup player’s per-game stats (LS-6394). Anything other than `ok` means a scheduled game produced no stat rows and the points may under-count. */
+export enum FootballStatsDataQuality {
+  /** Stats present, or a verified no-data game. */
+  Ok = 'ok',
+  /** Stat ingest ran and failed; the 0 is not trustworthy. */
+  StatsFailed = 'stats_failed',
+  /** Stat ingest reported success without flagging the game as having no data, yet no stat row exists. */
+  StatsMissing = 'stats_missing',
+  /** Stat ingest has not completed for this game yet. */
+  StatsPending = 'stats_pending',
+}
 
 /** Result of a football stats refresh job triggered by EventBridge */
 export type FootballStatsRefreshResult = {
@@ -13541,6 +13555,7 @@ export type MatchupScoresQuery = {
           position: string;
           totalPoints: number;
           projectedPoints: number;
+          dataQuality: FootballStatsDataQuality;
           games: Array<{
             __typename?: 'FootballMatchupPlayerGame';
             gameNum: number;
@@ -33659,6 +33674,7 @@ export const MatchupScores = gql`
           position
           totalPoints
           projectedPoints
+          dataQuality
           games {
             gameNum
             opponent

@@ -11,7 +11,10 @@
  * Career stat tables (LS-250): career_football_passing/rushing/receiving/kicking/defense.
  * Matchup game-level stat types (LS-4765): used by LS-4151 matchup resolver.
  */
-import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  type FootballGameStatsDataQuality,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import {
   computeFootballDefenseFantasyPoints,
   computeFootballIdpFantasyPoints,
@@ -2788,6 +2791,38 @@ FootballMatchupPlayerGameRef.implement({
 
 // ── Matchup player type ───────────────────────────────────────────────────────
 
+/**
+ * Whether a football matchup player's points can be trusted (LS-6394).
+ * Anything other than `ok` means a scheduled game produced no stat rows, so
+ * `totalPoints` may under-count.
+ */
+export const FootballStatsDataQualityEnum = builder.enumType(
+  'FootballStatsDataQuality',
+  {
+    description:
+      'Data-quality state for a football matchup player\u2019s per-game stats (LS-6394). Anything other than `ok` means a scheduled game produced no stat rows and the points may under-count.',
+    values: {
+      ok: {
+        value: 'ok',
+        description: 'Stats present, or a verified no-data game.',
+      },
+      stats_pending: {
+        value: 'stats_pending',
+        description: 'Stat ingest has not completed for this game yet.',
+      },
+      stats_failed: {
+        value: 'stats_failed',
+        description: 'Stat ingest ran and failed; the 0 is not trustworthy.',
+      },
+      stats_missing: {
+        value: 'stats_missing',
+        description:
+          'Stat ingest reported success without flagging the game as having no data, yet no stat row exists.',
+      },
+    },
+  },
+);
+
 export interface FootballMatchupPlayerShape {
   playerId: number;
   playerName: string;
@@ -2796,6 +2831,8 @@ export interface FootballMatchupPlayerShape {
   isDst: boolean;
   games: FootballMatchupPlayerGameShape[];
   totalPoints: number;
+  /** Worst data-quality state across this player's scheduled games (LS-6394). */
+  dataQuality: FootballGameStatsDataQuality;
   /**
    * Actual points if this week's game has been played, otherwise the
    * player's average fantasy points per game for their assigned matchup
@@ -2825,6 +2862,13 @@ FootballMatchupPlayerRef.implement({
       nullable: false,
       description:
         'Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364).',
+    }),
+    dataQuality: t.field({
+      type: FootballStatsDataQualityEnum,
+      nullable: false,
+      description:
+        'Worst data-quality state across this player’s scheduled games (LS-6394). Anything other than `ok` means `totalPoints` may under-count because a scheduled game produced no stat rows.',
+      resolve: (parent) => parent.dataQuality,
     }),
   }),
 });

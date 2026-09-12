@@ -767,6 +767,93 @@ describe('MatchupRosterComparison — football scoring (LS-9612)', () => {
     expect(screen.queryByText('0.0')).not.toBeInTheDocument();
   });
 
+  // LS-6394 (FMD-030): a starter whose scheduled game produced no stat rows
+  // scores 0. Without a badge that 0 is indistinguishable from a real zero,
+  // so the row is marked "stats pending".
+  it('badges a football player whose per-game stats are missing, and leaves clean rows unbadged', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarter('s1', 10, 901, 1, 'Pat'),
+      makeFootballStarter('s2', 10, 903, 2, 'Riley'),
+      makeFootballStarter('s3', 20, 902, 1, 'Chris'),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+    (useMatchupScoresQuery as jest.Mock).mockReturnValue({
+      data: {
+        matchupScores: [
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 10,
+            teamName: 'Team A',
+            totalPoints: 24.5,
+            projectedPoints: 20,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 901,
+                playerName: 'Pat Player',
+                position: 'QB',
+                totalPoints: 24.5,
+                projectedPoints: 20,
+                dataQuality: 'ok',
+                games: [],
+              },
+              {
+                // Scheduled game, ingest reported success, no stat row.
+                __typename: 'FootballMatchupPlayer',
+                playerId: 903,
+                playerName: 'Riley Player',
+                position: 'RB',
+                totalPoints: 0,
+                projectedPoints: 0,
+                dataQuality: 'stats_missing',
+                games: [],
+              },
+            ],
+          },
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 20,
+            teamName: 'Team B',
+            totalPoints: 12.25,
+            projectedPoints: 15,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 902,
+                playerName: 'Chris Player',
+                position: 'QB',
+                totalPoints: 12.25,
+                projectedPoints: 15,
+                dataQuality: 'stats_pending',
+                games: [],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.getByTestId('stats-pending-badge-903')).toHaveTextContent(
+      'stats pending',
+    );
+    expect(screen.getByTestId('stats-pending-badge-902')).toHaveTextContent(
+      'stats pending',
+    );
+    // The player whose stats loaded normally is not badged.
+    expect(screen.queryByTestId('stats-pending-badge-901')).toBeNull();
+  });
+
   it('shows 0 (not "—") for a football player with no matchupScores entry yet', () => {
     const players: MatchupPlayerFragment[] = [
       makeFootballStarter('s1', 10, 901, 1, 'Pat'),

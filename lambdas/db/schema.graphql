@@ -1195,6 +1195,10 @@ type FootballGameRushingStats {
 A player on a football fantasy team in a matchup
 """
 type FootballMatchupPlayer {
+  """
+  Worst data-quality state across this player’s scheduled games (LS-6394). Anything other than `ok` means `totalPoints` may under-count because a scheduled game produced no stat rows.
+  """
+  dataQuality: FootballStatsDataQuality!
   games: [FootballMatchupPlayerGame!]!
   isDst: Boolean!
   nflTeam: String
@@ -1478,6 +1482,31 @@ type FootballSeasonRushing {
   team: String
   yds: Int
   ydsPerAtt: Float
+}
+
+"""
+Data-quality state for a football matchup player’s per-game stats (LS-6394). Anything other than `ok` means a scheduled game produced no stat rows and the points may under-count.
+"""
+enum FootballStatsDataQuality {
+  """
+  Stats present, or a verified no-data game.
+  """
+  ok
+
+  """
+  Stat ingest ran and failed; the 0 is not trustworthy.
+  """
+  stats_failed
+
+  """
+  Stat ingest reported success without flagging the game as having no data, yet no stat row exists.
+  """
+  stats_missing
+
+  """
+  Stat ingest has not completed for this game yet.
+  """
+  stats_pending
 }
 
 """

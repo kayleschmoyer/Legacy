@@ -1858,6 +1858,29 @@ export type {
 } from './matchup-history';
 
 /**
+ * Why a scheduled game has no stat rows (LS-6394).
+ *
+ * `getMatchupFootballPlayerGameStats` emits one entry per row in
+ * `matchup_player_games` — i.e. per *scheduled* game — and leaves
+ * `offense`/`defense`/`idpDefense` null when no matching stat row exists.
+ * A null stat row scores 0, so without this discriminator a player whose
+ * stats were never ingested is indistinguishable from one who genuinely
+ * scored nothing, and the team total silently under-counts.
+ *
+ * - `ok` — stats are present, or the ingest ran and correctly found no game
+ *   data for this player (a real DNP zero).
+ * - `stats_pending` — ingest has not completed for this game yet.
+ * - `stats_failed` — ingest ran and failed; the 0 is not trustworthy.
+ * - `stats_missing` — ingest reported success and did *not* flag the game as
+ *   having no data, yet no stat row exists. This is the silent-swallow case.
+ */
+export type FootballGameStatsDataQuality =
+  | 'ok'
+  | 'stats_pending'
+  | 'stats_failed'
+  | 'stats_missing';
+
+/**
  * @internal Used only by getMatchupFootballPlayerGameStats. No callers exist outside
  * lib/db-client. The `offense` field consolidates the former separate passing/rushing/
  * receiving/kicking fields via the game_football_player_offense_stats view (LS-4758).
@@ -1870,6 +1893,33 @@ export interface FootballMatchupPlayerGameStats {
   offense: typeof Schema.gameFootballPlayerOffenseStats.$inferSelect | null;
   defense: typeof Schema.gameFootballDefense.$inferSelect | null;
   idpDefense: typeof Schema.gameFootballDefenseIdp.$inferSelect | null;
+  /** Why this game has no stat rows, when it has none (LS-6394). */
+  dataQuality: FootballGameStatsDataQuality;
+}
+
+/**
+ * Classify a scheduled game that produced no stat rows (LS-6394).
+ *
+ * `statsLoadingStatus` / `noGameDataFound` come from `matchup_player_games`,
+ * written by the stats ingest lambda. They are the only signal available for
+ * "the game is done but we have nothing" — there is no NFL game-status table
+ * in this schema.
+ */
+export function deriveFootballGameStatsDataQuality(
+  statsLoadingStatus: string | null,
+  noGameDataFound: boolean,
+  hasAnyStats: boolean,
+): FootballGameStatsDataQuality {
+  if (hasAnyStats) return 'ok';
+  if (statsLoadingStatus === 'failed') return 'stats_failed';
+  if (statsLoadingStatus === 'pending') return 'stats_pending';
+  // The ingest explicitly recorded that this player had no game data, so a
+  // zero here is correct rather than missing.
+  if (noGameDataFound) return 'ok';
+  if (statsLoadingStatus === 'completed') return 'stats_missing';
+  // No status recorded at all — treat as not-yet-ingested rather than
+  // asserting the zero is real.
+  return 'stats_pending';
 }
 
 export async function getMatchupFootballPlayerGameStats(
@@ -1956,6 +2006,8 @@ export async function getMatchupFootballPlayerGameStats(
     gameNum: number;
     matchupPlayerId: number;
     gameIdentifier: string;
+    statsLoadingStatus: string | null;
+    noGameDataFound: boolean;
   };
 
   const dstGames: GameEntry[] = [];
@@ -1971,6 +2023,8 @@ export async function getMatchupFootballPlayerGameStats(
       gameNum: game.gameNum,
       matchupPlayerId: game.matchupPlayerId,
       gameIdentifier: game.gameIdentifier,
+      statsLoadingStatus: game.statsLoadingStatus ?? null,
+      noGameDataFound: game.noGameDataFound ?? false,
     };
     if (mpInfo.isDst) dstGames.push(entry);
     else if (mpInfo.isIdp) idpGames.push(entry);
@@ -2049,14 +2103,25 @@ export async function getMatchupFootballPlayerGameStats(
   const results: FootballMatchupPlayerGameStats[] = [];
   for (const game of [...dstGames, ...idpGames, ...offGames]) {
     const key = statKey(game.playerId, game.season, game.gameNum);
+    const offense = offenseMap.get(key) ?? null;
+    const defense = defenseMap.get(key) ?? null;
+    const idpDefense = idpDefenseMap.get(key) ?? null;
     results.push({
       playerId: game.playerId,
       matchupPlayerId: game.matchupPlayerId,
       gameNum: game.gameNum,
       gameIdentifier: game.gameIdentifier,
-      offense: offenseMap.get(key) ?? null,
-      defense: defenseMap.get(key) ?? null,
-      idpDefense: idpDefenseMap.get(key) ?? null,
+      offense,
+      defense,
+      idpDefense,
+      // LS-6394: a scheduled game with no stat row scores 0. Record *why* so
+      // callers can tell a real zero from an ingest gap instead of silently
+      // under-counting the team total.
+      dataQuality: deriveFootballGameStatsDataQuality(
+        game.statsLoadingStatus,
+        game.noGameDataFound,
+        offense !== null || defense !== null || idpDefense !== null,
+      ),
     });
   }
 

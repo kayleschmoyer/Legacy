@@ -12,6 +12,7 @@ import {
   POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components/roster';
 import {
+  FootballStatsDataQuality,
   type MatchupFragment,
   type MatchupPlayerFragment,
   Sport,
@@ -33,6 +34,32 @@ import {
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { outsToBaseballIP } from '../../lib/scoring/ipUtils';
 import './MatchupRosterComparison.css';
+
+/**
+ * Row badge for a football player whose points may under-count because a
+ * scheduled game produced no stat rows (LS-6394). `ok` gets no badge.
+ */
+const STATS_QUALITY_BADGES: Record<
+  FootballStatsDataQuality,
+  { label: string; title: string } | null
+> = {
+  [FootballStatsDataQuality.Ok]: null,
+  [FootballStatsDataQuality.StatsPending]: {
+    label: 'stats pending',
+    title:
+      'This player’s game stats have not been loaded yet — their points may be incomplete.',
+  },
+  [FootballStatsDataQuality.StatsFailed]: {
+    label: 'stats pending',
+    title:
+      'Loading this player’s game stats failed — their points may be incomplete.',
+  },
+  [FootballStatsDataQuality.StatsMissing]: {
+    label: 'stats pending',
+    title:
+      'This player’s game finished but no stats were found — their points may be incomplete.',
+  },
+};
 
 // ── Game-slot helpers ────────────────────────────────────────────────────
 //
@@ -379,7 +406,11 @@ export function MatchupRosterComparison({
   const { footballPlayerScores, footballTeamScores } = useMemo(() => {
     const playerScores = new Map<
       number,
-      { actual: number; projected: number }
+      {
+        actual: number;
+        projected: number;
+        dataQuality: FootballStatsDataQuality;
+      }
     >();
     const teamScores = new Map<number, { actual: number; projected: number }>();
     footballScoresData?.matchupScores?.forEach((teamStats) => {
@@ -395,6 +426,7 @@ export function MatchupRosterComparison({
           playerScores.set(player.playerId, {
             actual: player.totalPoints ?? 0,
             projected: player.projectedPoints ?? 0,
+            dataQuality: player.dataQuality ?? FootballStatsDataQuality.Ok,
           });
         }
       });
@@ -415,6 +447,15 @@ export function MatchupRosterComparison({
     player.playerId != null
       ? (footballPlayerScores.get(player.playerId)?.projected ?? 0)
       : 0;
+  // LS-6394: a scheduled game with no stat rows scores 0. Surface that as a
+  // badge so an ingest gap reads as "pending", not as a real zero.
+  const getPlayerDataQuality = (
+    player: MatchupPlayerFragment,
+  ): FootballStatsDataQuality =>
+    player.playerId != null
+      ? (footballPlayerScores.get(player.playerId)?.dataQuality ??
+        FootballStatsDataQuality.Ok)
+      : FootballStatsDataQuality.Ok;
 
   const team1Name = useMemo(() => {
     if (!team1Id || !teamsData?.leagueTeams)
@@ -1130,6 +1171,11 @@ export function MatchupRosterComparison({
       isFootball && canSeeMatchupGrade && player.footballSeasonFppg != null
         ? getMatchupGrade(player.footballSeasonFppg, group)
         : null;
+    // LS-6394: badge rows whose points may under-count because a scheduled
+    // game produced no stat rows.
+    const statsBadge = isFootball
+      ? STATS_QUALITY_BADGES[getPlayerDataQuality(player)]
+      : null;
 
     return (
       <div className={`mrc-cell ${cls}${mine}${lead}`}>
@@ -1157,6 +1203,15 @@ export function MatchupRosterComparison({
                 title="Matchup Edge — grades this player's season scoring pace so far, not opponent strength"
               >
                 {matchupGrade.grade}
+              </span>
+            )}
+            {statsBadge && (
+              <span
+                className="mrc-stats-pending-chip"
+                title={statsBadge.title}
+                data-testid={`stats-pending-badge-${player.playerId}`}
+              >
+                {statsBadge.label}
               </span>
             )}
           </div>

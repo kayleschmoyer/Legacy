@@ -62,7 +62,7 @@ jest.mock('@legacy-sports/db-client', () => ({
   getMatchupFootballPlayerGameStats: jest.fn(),
 }));
 
-import { computeFootballGamePoints } from './matchupScores';
+import { computeFootballGamePoints, worseDataQuality } from './matchupScores';
 
 // ---------------------------------------------------------------------------
 // Minimal stat shapes — only fields that matter to the scoring logic
@@ -179,6 +179,7 @@ function makeGameStats(
     offense: null,
     defense: null,
     idpDefense: null,
+    dataQuality: 'ok' as const,
     ...overrides,
   };
 }
@@ -387,5 +388,40 @@ describe('computeFootballGamePoints — offense/kicking branch', () => {
   it('returns 0 when offense row is null', () => {
     const pts = computeFootballGamePoints(makeGameStats(), false, false);
     expect(pts).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Missing-stats severity aggregation (LS-6394 / FMD-030)
+// ---------------------------------------------------------------------------
+
+describe('worseDataQuality', () => {
+  it('keeps ok only when both games are ok', () => {
+    expect(worseDataQuality('ok', 'ok')).toBe('ok');
+  });
+
+  // A player's reported quality is the worst across their scheduled games, so
+  // one missing game is never masked by another that loaded fine.
+  it('lets a problem game win over an ok game in either argument order', () => {
+    expect(worseDataQuality('ok', 'stats_missing')).toBe('stats_missing');
+    expect(worseDataQuality('stats_missing', 'ok')).toBe('stats_missing');
+  });
+
+  it('ranks stats_missing above stats_failed above stats_pending', () => {
+    expect(worseDataQuality('stats_pending', 'stats_failed')).toBe(
+      'stats_failed',
+    );
+    expect(worseDataQuality('stats_failed', 'stats_missing')).toBe(
+      'stats_missing',
+    );
+    expect(worseDataQuality('stats_pending', 'stats_missing')).toBe(
+      'stats_missing',
+    );
+  });
+
+  it('is stable when both arguments are equal', () => {
+    expect(worseDataQuality('stats_pending', 'stats_pending')).toBe(
+      'stats_pending',
+    );
   });
 });
