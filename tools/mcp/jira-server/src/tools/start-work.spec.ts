@@ -21,6 +21,20 @@ const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
   getJiraCredentials: jest.Mock;
 }>('../netrc');
 
+type JiraCall = [
+  { method: string; path: string; body?: Record<string, unknown> },
+];
+
+const transitionPostCalls = () =>
+  (mockJiraRequest.mock.calls as JiraCall[]).filter(
+    ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+  );
+
+const assigneePutCalls = () =>
+  (mockJiraRequest.mock.calls as JiraCall[]).filter(
+    ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+  );
+
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
   return JSON.parse(block.text) as Record<string, unknown>;
@@ -363,7 +377,7 @@ describe('startWork', () => {
     });
   });
 
-  it('proceeds with a warning when /myself 401s (LS-7891 scope error)', async () => {
+  it('refuses to start work (isError, no transition) when /myself 401s (LS-7891 scope error)', async () => {
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {
         if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
@@ -384,18 +398,20 @@ describe('startWork', () => {
     );
 
     const result = await startWork({ key: 'LS-1' });
-    const data = parse(result);
 
-    expect(result.isError).not.toBe(true);
-    expect(data['status']).toBe('In Progress');
-
-    const warnings = data['warnings'] as string[];
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('Assignee update failed');
-    expect(warnings[0]).toContain('scope does not match');
+    // Refusal is plain text, not the JSON success payload.
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toMatch(
+      /^Refusing to start work on LS-1 without an assignee: /,
+    );
+    expect(text).toContain('scope does not match');
+    expect(text).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
   });
 
-  it('LS-8773: skips the doomed /myself round trip under OAuth (hosted Lambda) and warns with an actionable remedy instead', async () => {
+  it('LS-8773/LS-10069: skips the doomed /myself round trip under OAuth and refuses to start work instead of leaving the ticket unassigned', async () => {
     mockGetJiraCredentials.mockResolvedValue({
       type: 'oauth',
       clientId: 'id',
@@ -405,20 +421,71 @@ describe('startWork', () => {
     });
 
     const result = await startWork({ key: 'LS-1' });
-    const data = parse(result);
 
-    expect(result.isError).not.toBe(true);
-    expect(data['status']).toBe('In Progress');
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toMatch(
+      /^Refusing to start work on LS-1 without an assignee: /,
+    );
+    expect(text).toContain('assigneeAccountId');
+    expect(text).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(text).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
 
     const myselfCalls = (
       mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
     ).filter(([opts]) => opts.path === '/rest/api/3/myself');
     expect(myselfCalls).toHaveLength(0);
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
+  });
 
+  it('LS-10069: refuses a machine caller with no explicit assignee, ignoring the shared env var, without transitioning', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'shared-env-account';
+
+    const result = await startWork({
+      key: 'LS-1',
+      caller: { kind: 'machine', token: 'machine-token', sub: 'client-123' },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toMatch(
+      /^Refusing to start work on LS-1 without an assignee: /,
+    );
+    expect(text).toContain('machine');
+    expect(text).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
+  });
+
+  it('LS-10069: surfaces a failed assignee PUT as a warning after transitioning', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'acct-1';
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'PUT' && opts.path.includes('/assignee')) {
+          return Promise.reject(new Error('403 Forbidden'));
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(data['status']).toBe('In Progress');
+    expect(data['assignee']).toBeNull();
+    expect(transitionPostCalls()).toHaveLength(1);
     const warnings = data['warnings'] as string[];
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
+    expect(warnings[0]).toContain('Assignee update failed');
+    expect(warnings[0]).toContain('403 Forbidden');
   });
 
   it('returns an error when no In Progress transition is available', async () => {

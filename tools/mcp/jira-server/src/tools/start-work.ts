@@ -2,18 +2,25 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { matchesStatus } from '../locale.js';
-import { resolveAndAssign } from '../assignee.js';
+import {
+  type AssigneeCaller,
+  putAssignee,
+  resolveAndAssign,
+  resolveAssignee,
+} from '../assignee.js';
 
 interface StartWorkParams {
   key: string;
   /**
-   * See `resolveAndAssign` in `../assignee.ts` for the full precedence order.
+   * See `resolveAssignee` in `../assignee.ts` for the full precedence order.
    * `assigneeAccountId` is still the cheapest path (no lookup at all), but an
    * email now resolves on the hosted Lambda too, via a JQL fallback that
    * works under `read:jira-work` where `/user/search` 401s (LS-9513).
    */
   assignee?: string;
   assigneeAccountId?: string;
+  /** The hosted request's authenticated caller — see `resolveAssignee`. */
+  caller?: AssigneeCaller;
 }
 
 interface JiraTransition {
@@ -40,7 +47,7 @@ interface JiraIssueResponse {
 export async function startWork(
   params: StartWorkParams,
 ): Promise<CallToolResult> {
-  const { key, assignee, assigneeAccountId } = params;
+  const { key, assignee, assigneeAccountId, caller } = params;
 
   try {
     const [issue, transitionsResponse] = await Promise.all([
@@ -73,6 +80,7 @@ export async function startWork(
           key,
           explicitAssignee: assignee,
           explicitAssigneeAccountId: assigneeAccountId,
+          caller,
           toolName: 'jira_start_work',
         });
         return successResult({
@@ -110,26 +118,40 @@ export async function startWork(
       );
     }
 
+    // Resolve the owner first so an unowned claim is refused before the
+    // ticket moves, rather than left In Progress with nobody assigned.
+    const owner = await resolveAssignee({
+      key,
+      explicitAssignee: assignee,
+      explicitAssigneeAccountId: assigneeAccountId,
+      caller,
+      toolName: 'jira_start_work',
+    });
+    if (!owner.ok) {
+      return errorResult(
+        `Refusing to start work on ${key} without an assignee: ${owner.error}`,
+      );
+    }
+
     await jiraRequest({
       method: 'POST',
       path: `/rest/api/3/issue/${key}/transitions`,
       body: { transition: { id: inProgressTransition.id } },
     });
 
-    const { accountId, displayName, warnings } = await resolveAndAssign({
+    const putWarning = await putAssignee(
       key,
-      explicitAssignee: assignee,
-      explicitAssigneeAccountId: assigneeAccountId,
-      toolName: 'jira_start_work',
-    });
+      owner.accountId,
+      'jira_start_work',
+    );
 
     return successResult({
       key,
       status: 'In Progress',
       previousStatus,
-      assignee: displayName ?? accountId ?? null,
+      assignee: putWarning ? null : (owner.displayName ?? owner.accountId),
       idempotent: false,
-      warnings,
+      warnings: putWarning ? [putWarning] : [],
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

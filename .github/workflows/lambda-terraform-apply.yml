@@ -259,10 +259,6 @@ jobs:
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
-          # Default assignee for jira MCP claims that omit an explicit param.
-          # Without it the Lambda's JIRA_ASSIGNEE_EMAIL is an empty string and
-          # every claim falls through to /myself, which 401s (LS-9513).
-          TF_VAR_jira_assignee_email: ${{ vars.JIRA_ASSIGNEE_EMAIL }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
@@ -317,10 +313,6 @@ jobs:
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
-          # Default assignee for jira MCP claims that omit an explicit param.
-          # Without it the Lambda's JIRA_ASSIGNEE_EMAIL is an empty string and
-          # every claim falls through to /myself, which 401s (LS-9513).
-          TF_VAR_jira_assignee_email: ${{ vars.JIRA_ASSIGNEE_EMAIL }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
@@ -431,10 +423,6 @@ jobs:
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
-          # Default assignee for jira MCP claims that omit an explicit param.
-          # Without it the Lambda's JIRA_ASSIGNEE_EMAIL is an empty string and
-          # every claim falls through to /myself, which 401s (LS-9513).
-          TF_VAR_jira_assignee_email: ${{ vars.JIRA_ASSIGNEE_EMAIL }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
@@ -567,10 +555,6 @@ jobs:
           TF_VAR_discord_client_secret: ${{ secrets.DISCORD_CLIENT_SECRET }}
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
-          # Default assignee for jira MCP claims that omit an explicit param.
-          # Without it the Lambda's JIRA_ASSIGNEE_EMAIL is an empty string and
-          # every claim falls through to /myself, which 401s (LS-9513).
-          TF_VAR_jira_assignee_email: ${{ vars.JIRA_ASSIGNEE_EMAIL }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).

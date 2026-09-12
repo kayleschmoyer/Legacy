@@ -36,16 +36,6 @@ github_username  = "bkrupa"  # Your GitHub username/organization
 # Monitoring & Alerting
 alert_email = "" # Set to an ops e-mail to receive CloudWatch DLQ alarm notifications
 
-# Jira auto-assign: when set, jira_claim_ticket will assign claimed tickets to this
-# Jira account email. Leave empty to disable. Set via infra.auto.tfvars (non-secret).
-jira_assignee_email = ""  # e.g., "you@example.com"
-
-# Jira auto-assign fallback: pre-resolved Jira accountId assigned directly when
-# no email is configured. Required on the hosted Lambda — its service-account
-# token lacks the read:jira-user scope, so /myself and /user/search 401 there.
-# Find it in the Jira profile URL: https://<site>.atlassian.net/jira/people/<accountId>
-jira_assignee_account_id = ""  # e.g., "712020:abcd1234-..."
-
 # Stripe Price IDs (non-sensitive — safe to check in via infra.auto.tfvars)
 # Obtain from Stripe Dashboard → Products → [your product] → Pricing → Price ID
 stripe_monthly_price_id = "price_xxxxxxxxxxxxxxxxxxxxxxxx"

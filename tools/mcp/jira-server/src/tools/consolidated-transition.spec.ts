@@ -40,6 +40,16 @@ function parse(result: { content: Array<{ type: string }> }) {
   return JSON.parse(block.text) as Record<string, unknown>;
 }
 
+/** Transition POSTs and assignee PUTs — the writes a claim performs. */
+const claimMutations = () =>
+  (
+    mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+  ).filter(
+    ([opts]) =>
+      (opts.method === 'POST' && opts.path.endsWith('/transitions')) ||
+      (opts.method === 'PUT' && opts.path.endsWith('/assignee')),
+  );
+
 const makeIssue = (key: string, statusName = 'To Do') => ({
   key,
   fields: {
@@ -298,7 +308,7 @@ describe('consolidatedTransition — claim action', () => {
     expect(putCalls).toHaveLength(1);
   });
 
-  it('LS-8773: skips /myself under OAuth (hosted Lambda) and warns with an actionable remedy', async () => {
+  it('LS-8773/LS-10069: skips /myself under OAuth and stops the claim per key with an actionable remedy', async () => {
     mockGetJiraCredentials.mockResolvedValue({
       type: 'oauth',
       clientId: 'id',
@@ -330,17 +340,112 @@ describe('consolidatedTransition — claim action', () => {
     const data = parse(result);
     expect(data['success']).toBe(true);
     const results = data['results'] as Record<string, PerKey>;
-    expect(results['LS-1']?.['action']).toBe('PROCEED');
-    expect(results['LS-1']?.status).toBe('In Progress');
+    expect(results['LS-1']?.['action']).toBe('STOP');
+    expect(results['LS-1']?.['claimed']).toBe(false);
+    // Not claimed, so the reported status is the ticket's unchanged one.
+    expect(results['LS-1']?.status).toBe('To Do');
+    const reason = results['LS-1']?.['reason'] as string;
+    expect(reason).toMatch(/^Cannot claim LS-1 without an assignee: /);
+    expect(reason).toContain('assigneeAccountId');
+    expect(reason).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(reason).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
 
     const myselfCalls = (
       mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
     ).filter(([opts]) => opts.path === '/rest/api/3/myself');
     expect(myselfCalls).toHaveLength(0);
+    expect(claimMutations()).toHaveLength(0);
+  });
 
-    const warnings = results['LS-1']?.['warnings'] as string[] | undefined;
-    expect(warnings?.join(' ')).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings?.join(' ')).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
+  it('LS-10069: forwards caller into the claim — a machine caller stops per key, ignoring the env default', async () => {
+    // Basic auth + an env account would both resolve an owner if consulted;
+    // the caller must short-circuit them.
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'shared-env-account';
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '21', name: 'Start', to: { name: 'In Progress' } },
+            ],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/LS-')) {
+          const key = opts.path.split('/issue/')[1]?.split('/')[0] ?? 'LS-1';
+          return Promise.resolve(makeIssue(key));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: ['LS-1', 'LS-2'],
+      status: 'In Progress',
+      action: 'claim',
+      caller: { kind: 'machine', token: 'machine-token', sub: 'client-1' },
+    });
+    const data = parse(result);
+    const results = data['results'] as Record<string, PerKey>;
+    for (const key of ['LS-1', 'LS-2']) {
+      expect(results[key]?.['action']).toBe('STOP');
+      expect(results[key]?.['claimed']).toBe(false);
+      expect(results[key]?.['reason']).toContain('machine');
+    }
+    expect(claimMutations()).toHaveLength(0);
+  });
+
+  it('LS-10069: forwards a user caller into the claim, assigning to the caller', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          return Promise.resolve([
+            { accountId: `id-for-${opts.query?.['query']}` },
+          ]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '21', name: 'Start', to: { name: 'In Progress' } },
+            ],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/LS-1')) {
+          return Promise.resolve(makeIssue('LS-1'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: 'In Progress',
+      action: 'claim',
+      caller: {
+        kind: 'user',
+        token: 'user-token',
+        sub: 'sub-1',
+        email: 'caller@example.com',
+      },
+    });
+    const data = parse(result);
+    const results = data['results'] as Record<string, PerKey>;
+    expect(results['LS-1']?.['action']).toBe('PROCEED');
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.endsWith('/assignee'),
+    );
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({
+      accountId: 'id-for-caller@example.com',
+    });
   });
 
   it('passes assigneeAccountId through to claimTicket, skipping any lookup', async () => {

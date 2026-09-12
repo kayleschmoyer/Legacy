@@ -206,6 +206,68 @@ export async function verifyBearerToken(
   config: AuthConfig,
   jwks: JWTVerifyGetKey,
 ): Promise<AuthFailure | null> {
+  const result = await verifyBearerTokenIdentity(headers, config, jwks);
+  return 'code' in result ? result : null;
+}
+
+/**
+ * Who a verified bearer belongs to. `user` tokens come from an interactive
+ * Cognito sign-in (the claude.ai connector's authorization-code access token,
+ * or a legacy ID token); `machine` tokens come from the `client_credentials`
+ * grant and carry no person at all (Cognito sets `sub` to the client id).
+ */
+export interface McpCallerIdentity {
+  kind: 'user' | 'machine';
+  /** The raw bearer, for calls made on the caller's behalf (e.g. `/oauth2/userInfo`). */
+  token: string;
+  sub?: string;
+  username?: string;
+  /** Present on legacy ID tokens only — Cognito access tokens never carry it. */
+  email?: string;
+  clientId?: string;
+  tokenUse?: string;
+  scopes: string[];
+  expiresAt?: number;
+}
+
+function stringClaim(payload: JWTPayload, name: string): string | undefined {
+  const value = payload[name];
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+function callerIdentity(payload: JWTPayload, token: string): McpCallerIdentity {
+  const tokenUse = stringClaim(payload, 'token_use');
+  const clientId = stringClaim(payload, 'client_id');
+  const username =
+    stringClaim(payload, 'username') ??
+    stringClaim(payload, 'cognito:username');
+  const isUser =
+    tokenUse === 'id' ||
+    (username !== undefined &&
+      payload.sub !== undefined &&
+      payload.sub !== clientId);
+  return {
+    kind: isUser ? 'user' : 'machine',
+    token,
+    sub: payload.sub,
+    username,
+    email: stringClaim(payload, 'email'),
+    clientId,
+    tokenUse,
+    scopes: tokenScopes(payload),
+    expiresAt: payload.exp,
+  };
+}
+
+/**
+ * Same verification as {@link verifyBearerToken}, but returns the caller's
+ * identity on success instead of `null`.
+ */
+export async function verifyBearerTokenIdentity(
+  headers: Record<string, string | undefined> | undefined,
+  config: AuthConfig,
+  jwks: JWTVerifyGetKey,
+): Promise<AuthFailure | McpCallerIdentity> {
   const parsed = readBearer(headers);
   if ('code' in parsed) return parsed;
 
@@ -224,14 +286,14 @@ export async function verifyBearerToken(
   const acceptLegacy = config.mode === 'legacy' || config.mode === 'dual';
 
   if (acceptMachine && tokenScopes(payload).includes(config.requiredScope)) {
-    return null;
+    return callerIdentity(payload, parsed.token);
   }
   if (
     acceptLegacy &&
     config.legacyAudience !== undefined &&
     audienceMatches(payload, config.legacyAudience)
   ) {
-    return null;
+    return callerIdentity(payload, parsed.token);
   }
 
   return failure(notAuthorizedReason(config));
@@ -367,6 +429,22 @@ export async function authenticateMcpRequest(
   event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'headers'>,
   options: AuthenticateOptions,
 ): Promise<APIGatewayProxyResultV2 | null> {
+  const result = await authenticateMcpRequestWithIdentity(event, options);
+  return result.ok ? null : result.response;
+}
+
+export type McpAuthResult =
+  | { ok: true; identity: McpCallerIdentity }
+  | { ok: false; response: APIGatewayProxyResultV2 };
+
+/**
+ * {@link authenticateMcpRequest}, but on success also returns who the caller
+ * is, so a server can attribute actions to the person behind the token.
+ */
+export async function authenticateMcpRequestWithIdentity(
+  event: Pick<APIGatewayProxyEventV2, 'requestContext' | 'headers'>,
+  options: AuthenticateOptions,
+): Promise<McpAuthResult> {
   const config = readConfigFromEnv(options.requiredScope);
   if ('code' in config) {
     // Missing/invalid MCP_COGNITO_* / MCP_AUTH_MODE config — surface as a
@@ -374,24 +452,28 @@ export async function authenticateMcpRequest(
     // as a bad token, rather than the Lambda runtime turning a thrown
     // Error into an opaque 5xx the MCP transport can't parse.
     logAuthEvent('rejected', options.requiredScope, config.message, null);
-    return buildAuthErrorResponse(config);
+    return { ok: false, response: buildAuthErrorResponse(config) };
   }
   const jwks = getRemoteJwks(config.issuer);
-  const result = await verifyBearerToken(event.headers, config, jwks);
+  const result = await verifyBearerTokenIdentity(event.headers, config, jwks);
+  const rejected = 'code' in result;
   logAuthEvent(
-    result ? 'rejected' : 'accepted',
+    rejected ? 'rejected' : 'accepted',
     options.requiredScope,
-    result?.message ?? null,
+    rejected ? result.message : null,
     tokenLogClaims(event.headers),
   );
-  if (!result) return null;
+  if (!rejected) return { ok: true, identity: result };
   // Missing/invalid token → spec-compliant 401 challenge so an OAuth client
   // (Claude Code web) can discover the Cognito authorization server. The
   // challenge body remains a well-formed JSON-RPC error envelope.
   const resourceMetadataUrl = `${resourceIdentifier(
     event.requestContext?.domainName,
   )}${OAUTH_PROTECTED_RESOURCE_PATH}`;
-  return buildAuthChallengeResponse(result, resourceMetadataUrl);
+  return {
+    ok: false,
+    response: buildAuthChallengeResponse(result, resourceMetadataUrl),
+  };
 }
 
 // ── OAuth 2.0 Authorization (MCP Authorization spec, Track B) ────────────────

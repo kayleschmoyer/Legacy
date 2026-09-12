@@ -626,16 +626,14 @@ server.tool(
       .email()
       .optional()
       .describe(
-        "action='claim' only. Assignee email — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is " +
-          'attributed to the caller, not the shared server default. Overridden by `assigneeAccountId`. ' +
-          'Resolution caveats: .agents/skills/work-ticket/references/leaf-mode.md.',
+        "action='claim' only. Assignee email; defaults to the signed-in caller. Machine-token sessions " +
+          'must pass it (or `assigneeAccountId`) or the claim STOPs. See work-ticket leaf-mode.md.',
       ),
     assigneeAccountId: z
       .string()
       .optional()
       .describe(
-        "action='claim' only. Assignee accountId — assigned directly with no lookup, so it is the most " +
-          'reliable path. Takes precedence over `assignee` and the JIRA_ASSIGNEE_* env vars.',
+        "action='claim' only. Jira accountId, assigned with no lookup. Takes precedence over `assignee`.",
       ),
     cascade: z
       .boolean()
@@ -680,11 +678,8 @@ server.tool(
     'and sets the assignee in a single call. Idempotent on already-In-Progress tickets ' +
     '(no-op success). Refuses Done tickets with an error. ' +
     'Returns { key, status, previousStatus, assignee, idempotent, warnings }. ' +
-    'Assignee precedence: explicit `assigneeAccountId` > explicit `assignee` (email) > ' +
-    'JIRA_ASSIGNEE_ACCOUNT_ID env var > JIRA_ASSIGNEE_EMAIL env var > authenticated ' +
-    'service account. accountId-based paths are checked first because they need no ' +
-    'lookup at all; email resolution falls back from /user/search to a JQL lookup ' +
-    'that works under the hosted Lambda scopes (LS-9513). ' +
+    'Assignee: `assigneeAccountId` > `assignee` > the signed-in caller (hosted) or ' +
+    'JIRA_ASSIGNEE_* env / current user (local); refused before the transition if none resolves. ' +
     "Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → " +
     'jira_transition → assignee PUT) for the standard "start work" flow. Use ' +
     "jira_transition({ action: 'claim' }) when you also need blocker checks, child summaries, or branch " +
@@ -702,7 +697,7 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Assignee email. Overridden by `assigneeAccountId`, which needs no lookup — prefer it when known.',
+        'Assignee email; defaults to the signed-in caller. Overridden by `assigneeAccountId`.',
       ),
     assigneeAccountId: z
       .string()

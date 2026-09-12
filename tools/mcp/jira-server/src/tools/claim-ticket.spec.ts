@@ -33,6 +33,31 @@ const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
   getJiraCredentials: jest.Mock;
 }>('../netrc');
 
+/** Model the hosted Lambda's client-credentials OAuth token (LS-8773). */
+function useOAuth() {
+  mockGetJiraCredentials.mockResolvedValue({
+    type: 'oauth',
+    clientId: 'id',
+    clientSecret: 'secret',
+    cloudId: 'cloud-1',
+    siteUrl: 'https://example.atlassian.net',
+  });
+}
+
+type JiraCall = [
+  { method: string; path: string; body?: Record<string, unknown> },
+];
+
+const transitionPostCalls = () =>
+  (mockJiraRequest.mock.calls as JiraCall[]).filter(
+    ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+  );
+
+const assigneePutCalls = () =>
+  (mockJiraRequest.mock.calls as JiraCall[]).filter(
+    ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+  );
+
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
   return JSON.parse(block.text) as Record<string, unknown>;
@@ -70,15 +95,15 @@ beforeEach(() => {
   _resetAssigneeCache();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
-  // These tests model the hosted Lambda (client-credentials OAuth token) —
-  // the production environment claimTicket actually runs in. Override per
-  // test for basic-auth (local session) scenarios.
+  // Default: a local basic-auth session with no caller, so an owner always
+  // resolves via GET /myself (mocked below as 'service-account'). A claim
+  // with no resolvable owner now refuses (LS-10069), so the guard tests that
+  // are not about assignment need this default to reach PROCEED. Tests that
+  // model the hosted Lambda's client-credentials token call useOAuth().
   mockGetJiraCredentials.mockResolvedValue({
-    type: 'oauth',
-    clientId: 'id',
-    clientSecret: 'secret',
-    cloudId: 'cloud-1',
-    siteUrl: 'https://example.atlassian.net',
+    type: 'basic',
+    login: 'a',
+    password: 'b',
   });
 
   // Default happy-path mock sequence:
@@ -138,34 +163,31 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect((data['warnings'] as string[]).length).toBe(0);
   });
 
-  it('LS-8773: skips the doomed /myself round trip under OAuth (hosted Lambda) and warns with an actionable remedy instead', async () => {
+  it('LS-8773/LS-10069: skips the doomed /myself round trip under OAuth and refuses the claim (STOP) instead of leaving it unassigned', async () => {
     // No email or accountId configured, and credentials are OAuth (the
     // hosted Lambda's client-credentials token, which always 401s on
-    // GET /rest/api/3/myself — LS-7891/LS-8773). The fix skips the call
-    // entirely rather than attempting and failing it.
+    // GET /rest/api/3/myself — LS-7891/LS-8773). The call is skipped, and
+    // with no resolvable owner the claim now stops before touching the
+    // ticket (LS-10069) rather than transitioning it unassigned.
+    useOAuth();
     const result = await claimTicket({ key: 'LS-1' });
     const data = parse(result);
 
-    expect(data['action']).toBe('PROCEED');
-    expect(data['claimed']).toBe(true);
+    expect(data['action']).toBe('STOP');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toMatch(/^Cannot claim LS-1 without an assignee: /);
+    expect(data['reason']).toContain('assigneeAccountId');
+    expect(data['reason']).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(data['reason']).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
 
     const myselfCalls = (
       mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
     ).filter(([opts]) => opts.path === '/rest/api/3/myself');
     expect(myselfCalls).toHaveLength(0);
 
-    const putCalls = (
-      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
-    ).filter(
-      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
-    );
-    expect(putCalls).toHaveLength(0);
-
-    const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
-    expect(warnings[0]).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
+    expect(data['warnings']).toEqual([]);
   });
 
   it('assigns to the explicit assignee param, overriding the env var', async () => {
@@ -253,16 +275,12 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0].body).toEqual({ accountId: 'abc123' });
 
-    // Falling back to the server-side env var (rather than an explicit
-    // `assignee` param) is now flagged — the Lambda is shared across every
-    // caller, so this default silently misattributes without the warning.
-    const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings[0]).toContain('shared across all callers');
+    // The env fallback is now stdio-only (no caller), where there is exactly
+    // one user — so it is silent rather than flagged as shared (LS-10069).
+    expect(data['warnings']).toEqual([]);
   });
 
-  it('adds a warning (and does not assign) when JIRA_ASSIGNEE_EMAIL is set but no user is found', async () => {
+  it('refuses the claim (STOP, no transition) when JIRA_ASSIGNEE_EMAIL is set but no user is found', async () => {
     process.env['JIRA_ASSIGNEE_EMAIL'] = 'nobody@example.com';
 
     mockJiraRequest.mockImplementation(
@@ -283,21 +301,15 @@ describe('claimTicket — auto-assign behaviour', () => {
     const result = await claimTicket({ key: 'LS-1' });
     const data = parse(result);
 
-    expect(data['action']).toBe('PROCEED');
-    expect(data['claimed']).toBe(true);
-
-    const putCalls = (
-      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
-    ).filter(
-      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
-    );
-    expect(putCalls).toHaveLength(0);
-
-    const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(2);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings[0]).toContain('shared across all callers');
-    expect(warnings[1]).toContain('no Jira user found');
+    expect(data['action']).toBe('STOP');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toMatch(/^Cannot claim LS-1 without an assignee: /);
+    expect(data['reason']).toContain('no Jira user found');
+    expect(data['reason']).toContain('nobody@example.com');
+    expect(data['reason']).toContain('at least one issue assigned');
+    expect(data['reason']).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
   });
 
   it('assigns directly from JIRA_ASSIGNEE_ACCOUNT_ID without any user-lookup API call', async () => {
@@ -329,11 +341,7 @@ describe('claimTicket — auto-assign behaviour', () => {
     );
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0].body).toEqual({ accountId: '712020:abcd-1234' });
-
-    const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
-    expect(warnings[0]).toContain('shared across all callers');
+    expect(data['warnings']).toEqual([]);
   });
 
   it('prefers JIRA_ASSIGNEE_ACCOUNT_ID over JIRA_ASSIGNEE_EMAIL', async () => {
@@ -418,15 +426,10 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect((data['warnings'] as string[]).length).toBe(0);
   });
 
-  it('adds a warning and proceeds when /myself fails under basic auth (e.g. an expired local token)', async () => {
-    // No email or accountId configured, basic-auth creds — falls through to
-    // /myself (the OAuth/hosted-Lambda case is covered by the LS-8773 test
-    // above, which never attempts this call).
-    mockGetJiraCredentials.mockResolvedValue({
-      type: 'basic',
-      login: 'a',
-      password: 'b',
-    });
+  it('refuses the claim (STOP, no transition) when /myself fails under basic auth (e.g. an expired local token)', async () => {
+    // No email or accountId configured, basic-auth creds (the default) —
+    // falls through to /myself (the OAuth/hosted-Lambda case is covered by
+    // the LS-8773 test above, which never attempts this call).
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {
         if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
@@ -449,20 +452,13 @@ describe('claimTicket — auto-assign behaviour', () => {
     const result = await claimTicket({ key: 'LS-1' });
     const data = parse(result);
 
-    expect(data['action']).toBe('PROCEED');
-    expect(data['claimed']).toBe(true);
-
-    const putCalls = (
-      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
-    ).filter(
-      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
-    );
-    expect(putCalls).toHaveLength(0);
-
-    const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('Assignee update failed');
-    expect(warnings[0]).toContain('scope does not match');
+    expect(data['action']).toBe('STOP');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toMatch(/^Cannot claim LS-1 without an assignee: /);
+    expect(data['reason']).toContain('scope does not match');
+    expect(data['reason']).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
   });
 
   it('adds a warning and proceeds when the assignee PUT call throws', async () => {
@@ -492,12 +488,106 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(data['action']).toBe('PROCEED');
     expect(data['claimed']).toBe(true);
 
+    // The transition already happened, so a failed PUT is non-fatal: the
+    // claim still proceeds, with a single warning naming the PUT failure.
+    expect(transitionPostCalls()).toHaveLength(1);
     const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(2);
-    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
-    expect(warnings[0]).toContain('shared across all callers');
-    expect(warnings[1]).toContain('Assignee update failed');
-    expect(warnings[1]).toContain('403 Forbidden');
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('Assignee update failed');
+    expect(warnings[0]).toContain('403 Forbidden');
+    expect(warnings[0]).toContain('verify the accountId');
+    // The ticket card must not report an owner the PUT never set.
+    expect((data['ticket'] as { assignee: string }).assignee).toBe('');
+  });
+});
+
+describe('claimTicket — hosted caller identity (LS-10069)', () => {
+  const USER_CALLER = {
+    kind: 'user' as const,
+    token: 'user-access-token',
+    sub: 'sub-owner',
+    email: 'owner@example.com',
+  };
+  const MACHINE_CALLER = {
+    kind: 'machine' as const,
+    token: 'machine-token',
+    sub: 'client-123',
+  };
+
+  beforeEach(() => {
+    // The hosted Lambda runs under OAuth. The env var set here is the
+    // shared, Lambda-wide default that must be ignored whenever a caller is
+    // present.
+    useOAuth();
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'shared-env-account';
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          const q = opts.query?.['query'];
+          return Promise.resolve([
+            { accountId: `id-for-${q}`, displayName: 'Owner Person' },
+          ]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+  });
+
+  it("assigns a user caller's claim to the caller's own resolved account, ignoring the shared env var", async () => {
+    const result = await claimTicket({ key: 'LS-1', caller: USER_CALLER });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+    expect(transitionPostCalls()).toHaveLength(1);
+    expect(assigneePutCalls()).toHaveLength(1);
+    expect(assigneePutCalls()[0][0].body).toEqual({
+      accountId: 'id-for-owner@example.com',
+    });
+    expect((data['ticket'] as { assignee: string }).assignee).toBe(
+      'Owner Person',
+    );
+    expect(data['warnings']).toEqual([]);
+  });
+
+  it('refuses a machine caller with no explicit assignee (STOP) without transitioning or assigning', async () => {
+    const result = await claimTicket({ key: 'LS-1', caller: MACHINE_CALLER });
+    const data = parse(result);
+
+    expect(data['action']).toBe('STOP');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toMatch(/^Cannot claim LS-1 without an assignee: /);
+    expect(data['reason']).toContain('machine');
+    expect(data['reason']).toContain('assigneeAccountId');
+    expect(transitionPostCalls()).toHaveLength(0);
+    expect(assigneePutCalls()).toHaveLength(0);
+  });
+
+  it('lets a machine caller claim when it passes an explicit assignee', async () => {
+    const result = await claimTicket({
+      key: 'LS-1',
+      caller: MACHINE_CALLER,
+      assignee: 'someone@example.com',
+    });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+    expect(transitionPostCalls()).toHaveLength(1);
+    expect(assigneePutCalls()).toHaveLength(1);
+    expect(assigneePutCalls()[0][0].body).toEqual({
+      accountId: 'id-for-someone@example.com',
+    });
   });
 });
 

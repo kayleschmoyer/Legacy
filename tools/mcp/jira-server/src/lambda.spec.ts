@@ -1,6 +1,60 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createMcpServer } from './lambda';
+import type { McpCallerIdentity } from '@legacy-sports/mcp-bearer-auth';
+import { callerFrom, createMcpServer, toAuthInfo } from './lambda';
+
+describe('lambda caller identity plumbing (LS-10069)', () => {
+  const identity: McpCallerIdentity = {
+    kind: 'user',
+    token: 'raw-bearer-token',
+    sub: 'sub-123',
+    username: 'google_12345',
+    email: 'person@example.com',
+    clientId: 'connector-client',
+    tokenUse: 'access',
+    scopes: ['openid', 'mcp/access'],
+    expiresAt: 1_900_000_000,
+  };
+
+  it('round-trips kind/token/sub/email through AuthInfo', () => {
+    const authInfo = toAuthInfo(identity);
+
+    expect(authInfo.token).toBe('raw-bearer-token');
+    expect(authInfo.clientId).toBe('connector-client');
+    expect(authInfo.scopes).toEqual(['openid', 'mcp/access']);
+    expect(authInfo.expiresAt).toBe(1_900_000_000);
+    expect(callerFrom({ authInfo })).toEqual({
+      kind: 'user',
+      token: 'raw-bearer-token',
+      sub: 'sub-123',
+      email: 'person@example.com',
+    });
+  });
+
+  it('carries a machine identity through as a machine caller', () => {
+    const authInfo = toAuthInfo({
+      ...identity,
+      kind: 'machine',
+      sub: 'connector-client',
+      username: undefined,
+      email: undefined,
+    });
+
+    expect(callerFrom({ authInfo })).toEqual(
+      expect.objectContaining({ kind: 'machine', sub: 'connector-client' }),
+    );
+  });
+
+  it('returns undefined when the request carried no authInfo (e.g. stdio)', () => {
+    expect(callerFrom({})).toBeUndefined();
+  });
+
+  it('returns undefined when authInfo has no caller attached', () => {
+    expect(
+      callerFrom({ authInfo: { token: 't', clientId: 'c', scopes: [] } }),
+    ).toBeUndefined();
+  });
+});
 
 /**
  * Registration coverage for the hosted Lambda entry point. The stdio entry

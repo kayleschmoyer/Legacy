@@ -145,10 +145,11 @@ jobs:
             echo "MCP_ROLLBAR_URL=${MCP_ROLLBAR_URL}"
           } >> "$GITHUB_ENV"
 
-      # JIRA_ASSIGNEE_EMAIL: when set, jira_claim_ticket auto-assigns claimed
-      # tickets to this Jira account. Set it in the 'copilot' environment as a
-      # plain (non-secret) variable. For hosted Lambda (production) sessions the
-      # same var is configured via the jira_assignee_email Terraform variable.
+      # JIRA_ASSIGNEE_EMAIL: the Jira account email the agent passes as the
+      # `assignee` param when claiming. Copilot reaches the hosted Jira server
+      # with a machine token that identifies no person, so claims are refused
+      # without it (LS-10069). Set it in the 'copilot' environment as a plain
+      # (non-secret) variable.
       - name: Export Jira assignee email
         env:
           JIRA_ASSIGNEE_EMAIL: ${{ vars.JIRA_ASSIGNEE_EMAIL }}

@@ -199,12 +199,12 @@ Set or change the parent epic of a ticket via REST API.
 
 ### `jira_start_work`
 
-Semantic one-shot for Step 3 of the ticket spine ("Jira → In Progress"). Verifies state, resolves the In Progress transition id, transitions the ticket, and sets the assignee in a single call. Idempotent on already-In-Progress tickets (no-op success). Refuses Done tickets with an error. Returns { key, status, previousStatus, assignee, idempotent, warnings }. Assignee precedence: explicit `assigneeAccountId` > explicit `assignee` (email) > JIRA_ASSIGNEE_ACCOUNT_ID env var > JIRA_ASSIGNEE_EMAIL env var > authenticated service account. accountId-based paths are checked first because they need no lookup at all; email resolution falls back from /user/search to a JQL lookup that works under the hosted Lambda scopes (LS-9513). Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → jira_transition → assignee PUT) for the standard "start work" flow. Use jira_transition({ action: 'claim' }) when you also need blocker checks, child summaries, or branch recommendations.
+Semantic one-shot for Step 3 of the ticket spine ("Jira → In Progress"). Verifies state, resolves the In Progress transition id, transitions the ticket, and sets the assignee in a single call. Idempotent on already-In-Progress tickets (no-op success). Refuses Done tickets with an error. Returns { key, status, previousStatus, assignee, idempotent, warnings }. Assignee: `assigneeAccountId` > `assignee` > the signed-in caller (hosted) or JIRA_ASSIGNEE_* env / current user (local); refused before the transition if none resolves. Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → jira_transition → assignee PUT) for the standard "start work" flow. Use jira_transition({ action: 'claim' }) when you also need blocker checks, child summaries, or branch recommendations.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `key` | string | **required** | — | Ticket key to start work on |
-| `assignee` | string |  | email | Assignee email. Overridden by `assigneeAccountId`, which needs no lookup — prefer it when known. |
+| `assignee` | string |  | email | Assignee email; defaults to the signed-in caller. Overridden by `assigneeAccountId`. |
 | `assigneeAccountId` | string |  | — | Assignee Jira accountId — assigned directly with no lookup. Takes precedence over `assignee`. |
 
 ### `jira_transition`
@@ -218,8 +218,8 @@ Transition one or more tickets to a new status. Accepts a single key or an array
 | `openPrs` | object[] |  | — | action='claim' only. Open PRs the caller already found for this key (this server has no GitHub credentials and cannot look them up). When non-empty, claim returns 'PR_EXISTS' instead of 'PROCEED'. See .agents/skills/work-ticket/references/leaf-mode.md. |
 | `status` | string | **required** | min 1 | Target status, resolved dynamically against the issue's available workflow transitions (common: Backlog, To Do, In Progress, In Review, Done, Won't Do) |
 | `action` | enum |  | — | 'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress. |
-| `assignee` | string |  | email | action='claim' only. Assignee email — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is attributed to the caller, not the shared server default. Overridden by `assigneeAccountId`. Resolution caveats: .agents/skills/work-ticket/references/leaf-mode.md. |
-| `assigneeAccountId` | string |  | — | action='claim' only. Assignee accountId — assigned directly with no lookup, so it is the most reliable path. Takes precedence over `assignee` and the JIRA_ASSIGNEE_* env vars. |
+| `assignee` | string |  | email | action='claim' only. Assignee email; defaults to the signed-in caller. Machine-token sessions must pass it (or `assigneeAccountId`) or the claim STOPs. See work-ticket leaf-mode.md. |
+| `assigneeAccountId` | string |  | — | action='claim' only. Jira accountId, assigned with no lookup. Takes precedence over `assignee`. |
 | `cascade` | boolean |  | — | Auto-transition open subtasks to Done (default: false). Only applies to single-key transitions. |
 
 ### `jira_view`

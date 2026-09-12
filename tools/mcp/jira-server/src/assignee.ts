@@ -2,15 +2,27 @@ import { LOGGER } from '@legacy-sports/logging/server';
 import { jiraRequest } from './jira-api.js';
 import { getJiraCredentials } from './netrc.js';
 import { searchJql } from './jql-search.js';
+import { type AssigneeCaller, resolveCallerEmail } from './caller-email.js';
 
-export interface ResolveAndAssignParams {
+export type { AssigneeCaller } from './caller-email.js';
+
+export interface ResolveAssigneeParams {
   key: string;
   /** Explicit email param passed by the caller (e.g. the tool's `assignee` arg). */
   explicitAssignee?: string;
   /** Explicit accountId param passed by the caller (e.g. the tool's `assigneeAccountId` arg). */
   explicitAssigneeAccountId?: string;
+  /**
+   * Who sent the hosted MCP request (from its bearer token). Present only on
+   * the shared Lambda; when present, the single-user env/`/myself` fallbacks
+   * are never used, because they cannot tell callers apart.
+   */
+  caller?: AssigneeCaller;
   /** Tool name used to prefix log lines (e.g. 'jira_transition'). */
   toolName: string;
+}
+
+export interface ResolveAndAssignParams extends ResolveAssigneeParams {
   /**
    * Clear the ticket's assignee instead of resolving/assigning a user. Skips
    * every resolution path (no email/env lookups) and PUTs `accountId: null`.
@@ -24,28 +36,14 @@ export interface ResolveAndAssignResult {
   warnings: string[];
 }
 
-/**
- * The Lambda serving this tool is shared across every caller's session — an
- * env-var-based assignee default has no way to distinguish which user's
- * session is claiming a given ticket, so it silently misattributes every
- * claim that omits an explicit `assignee`/`assigneeAccountId` param to the
- * same fixed account. Surface that loudly (log + returned warning) so it
- * isn't mistaken for correct per-user attribution.
- */
-function warnEnvFallback(
-  toolName: string,
-  key: string,
-  envVar: 'JIRA_ASSIGNEE_ACCOUNT_ID' | 'JIRA_ASSIGNEE_EMAIL',
-  warnings: string[],
-): void {
-  const msg =
-    `${toolName}: no explicit assignee param was passed for ${key}; falling back to the ` +
-    `server-side ${envVar} env var. This Lambda is shared across all callers, so every ` +
-    'session that omits an explicit assignee gets attributed to this same fixed account — ' +
-    'pass `assignee`/`assigneeAccountId` explicitly to attribute the claim to the caller.';
-  LOGGER.warn(msg, { key, toolName, envVar });
-  warnings.push(msg);
-}
+export type AssigneeResolution =
+  | { ok: true; accountId: string; displayName?: string }
+  | { ok: false; error: string };
+
+const MACHINE_CALLER_ERROR =
+  'this request was authenticated with a machine (client_credentials) token, ' +
+  'which identifies no person, so there is nobody to assign. Pass `assignee` ' +
+  '(your Jira email) or `assigneeAccountId` explicitly.';
 
 interface ResolvedUser {
   accountId: string;
@@ -208,30 +206,192 @@ export async function applyAssigneeChange({
     : resolveAndAssign({ key, toolName, unassign: true });
 }
 
+async function resolveEmailOrFail(
+  email: string,
+  source: string,
+  toolName: string,
+  key: string,
+): Promise<AssigneeResolution> {
+  const resolved = await resolveEmailToAccountId(email, toolName);
+  if (resolved) {
+    return {
+      ok: true,
+      accountId: resolved.accountId,
+      displayName: resolved.displayName ?? email,
+    };
+  }
+  LOGGER.warn(`${toolName}: no Jira user found for assignee`, {
+    assigneeEmail: email,
+    key,
+  });
+  return {
+    ok: false,
+    error:
+      `no Jira user found for email "${email}" (${source}). Email resolution ` +
+      'falls back to a JQL lookup, which only finds users who already have at ' +
+      'least one issue assigned to them. Remedy: pass `assigneeAccountId` ' +
+      'explicitly to skip email resolution entirely.',
+  };
+}
+
 /**
- * Resolve an assignee accountId and PUT it onto the ticket.
+ * Decide who a ticket should be assigned to, without writing anything.
  *
- * Precedence: explicit `assigneeAccountId` param (direct, no lookup) >
- * explicit `assignee` email param > `JIRA_ASSIGNEE_ACCOUNT_ID` env var
- * (direct, no lookup) > `JIRA_ASSIGNEE_EMAIL` env var > the authenticated
- * service account (via `GET /rest/api/3/myself`).
+ * Precedence: explicit `assigneeAccountId` (no lookup) > explicit `assignee`
+ * email > the hosted caller's own email (from their bearer token). On the
+ * hosted Lambda (`caller` present) that is the end of the list — a machine
+ * token or an unresolvable caller is an error, never a fixed fallback
+ * account, because the Lambda is shared by every user.
  *
- * accountId-based paths are checked before their email counterparts because
- * they need no lookup at all. Email resolution itself is two-stage — see
- * {@link resolveEmailToAccountId}: `/rest/api/3/user/search` where the
- * `read:jira-user` scope is available, otherwise a JQL search that works
- * under `read:jira-work` (LS-9513). The `/myself` last resort always 401s on
- * the hosted Lambda's OAuth token (LS-7891), so it is skipped entirely there
- * in favor of an actionable warning (LS-8773) — it remains a local-session
- * (basic auth) only path.
+ * Without a caller (the local stdio server, which has exactly one user) the
+ * single-user fallbacks follow: `JIRA_ASSIGNEE_ACCOUNT_ID` >
+ * `JIRA_ASSIGNEE_EMAIL` > `GET /rest/api/3/myself`. `/myself` needs
+ * `read:jira-user`, which OAuth client-credentials tokens cannot carry
+ * (LS-7891), so it only runs under basic auth.
+ *
+ * Email resolution is two-stage — see {@link resolveEmailToAccountId}.
  */
-export async function resolveAndAssign({
+export async function resolveAssignee({
   key,
   explicitAssignee,
   explicitAssigneeAccountId,
+  caller,
   toolName,
+}: ResolveAssigneeParams): Promise<AssigneeResolution> {
+  if (explicitAssigneeAccountId) {
+    return { ok: true, accountId: explicitAssigneeAccountId };
+  }
+  if (explicitAssignee) {
+    return resolveEmailOrFail(
+      explicitAssignee,
+      'from the `assignee` param',
+      toolName,
+      key,
+    );
+  }
+
+  if (caller) {
+    if (caller.kind === 'machine') {
+      return { ok: false, error: MACHINE_CALLER_ERROR };
+    }
+    const email = await resolveCallerEmail(caller);
+    if (!email) {
+      return {
+        ok: false,
+        error:
+          "could not determine the signed-in caller's email from their token " +
+          '(Cognito userInfo lookup failed or returned no email). Pass ' +
+          '`assignee` (your Jira email) or `assigneeAccountId` explicitly.',
+      };
+    }
+    return resolveEmailOrFail(
+      email,
+      "the signed-in caller's email",
+      toolName,
+      key,
+    );
+  }
+
+  const envAccountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+  if (envAccountId) return { ok: true, accountId: envAccountId };
+  const envEmail = process.env['JIRA_ASSIGNEE_EMAIL'];
+  if (envEmail) {
+    return resolveEmailOrFail(
+      envEmail,
+      'from JIRA_ASSIGNEE_EMAIL',
+      toolName,
+      key,
+    );
+  }
+
+  try {
+    const creds = await getJiraCredentials();
+    if (creds.type === 'oauth') {
+      return {
+        ok: false,
+        error:
+          'no assignee param and no JIRA_ASSIGNEE_EMAIL/JIRA_ASSIGNEE_ACCOUNT_ID ' +
+          "env var were set, and this server's OAuth token cannot resolve the " +
+          'current user (GET /rest/api/3/myself always 401s under a ' +
+          'client-credentials token — a permanent scope gap, not a transient ' +
+          'failure). Remedy: pass `assignee` (email) or `assigneeAccountId` ' +
+          'explicitly, or set JIRA_ASSIGNEE_EMAIL / JIRA_ASSIGNEE_ACCOUNT_ID ' +
+          'in the environment.',
+      };
+    }
+    const self = await jiraRequest<{ accountId: string; displayName?: string }>(
+      { method: 'GET', path: '/rest/api/3/myself' },
+    );
+    if (self?.accountId) {
+      return {
+        ok: true,
+        accountId: self.accountId,
+        displayName: self.displayName,
+      };
+    }
+    return {
+      ok: false,
+      error:
+        'the current-user lookup returned no accountId. Remedy: pass ' +
+        '`assignee` (email) or `assigneeAccountId` explicitly, or set ' +
+        'JIRA_ASSIGNEE_EMAIL / JIRA_ASSIGNEE_ACCOUNT_ID in the environment.',
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    LOGGER.error(
+      `${toolName}: assignee resolution failed`,
+      err instanceof Error ? err : new Error(msg),
+      { key },
+    );
+    return {
+      ok: false,
+      error:
+        `${msg} Remedy: pass \`assignee\` (email) or \`assigneeAccountId\` ` +
+        'explicitly, or set JIRA_ASSIGNEE_EMAIL / JIRA_ASSIGNEE_ACCOUNT_ID in ' +
+        'the environment, instead of relying on the current-user lookup.',
+    };
+  }
+}
+
+/** PUT a resolved accountId onto the ticket; returns a warning on failure. */
+export async function putAssignee(
+  key: string,
+  accountId: string,
+  toolName: string,
+): Promise<string | undefined> {
+  try {
+    await jiraRequest({
+      method: 'PUT',
+      path: `/rest/api/3/issue/${key}/assignee`,
+      body: { accountId },
+    });
+    return undefined;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    LOGGER.error(
+      `${toolName}: assignee update failed (non-fatal)`,
+      err instanceof Error ? err : new Error(msg),
+      { key },
+    );
+    return (
+      `Assignee update failed (non-fatal): ${msg} Remedy: the PUT to ` +
+      '/issue/{key}/assignee itself failed — verify the accountId is valid and ' +
+      'the token has write:jira-work, or set the assignee manually in Jira.'
+    );
+  }
+}
+
+/**
+ * Resolve an assignee and PUT it onto the ticket, never throwing: an
+ * unresolvable assignee or a failed PUT comes back as a warning. Callers that
+ * must not proceed without an owner (claims) use {@link resolveAssignee}
+ * first instead.
+ */
+export async function resolveAndAssign({
   unassign,
+  ...params
 }: ResolveAndAssignParams): Promise<ResolveAndAssignResult> {
+  const { key, toolName } = params;
   const warnings: string[] = [];
 
   if (unassign) {
@@ -256,138 +416,20 @@ export async function resolveAndAssign({
     return { accountId: undefined, displayName: undefined, warnings };
   }
 
-  let accountId: string | undefined;
-  let emailToLookUp: string | undefined;
-
-  if (explicitAssigneeAccountId) {
-    accountId = explicitAssigneeAccountId;
-  } else if (explicitAssignee) {
-    emailToLookUp = explicitAssignee;
-  } else if (process.env['JIRA_ASSIGNEE_ACCOUNT_ID']) {
-    accountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
-    warnEnvFallback(toolName, key, 'JIRA_ASSIGNEE_ACCOUNT_ID', warnings);
-  } else if (process.env['JIRA_ASSIGNEE_EMAIL']) {
-    emailToLookUp = process.env['JIRA_ASSIGNEE_EMAIL'];
-    warnEnvFallback(toolName, key, 'JIRA_ASSIGNEE_EMAIL', warnings);
-  }
-
-  // Nothing explicit or env-configured — the only remaining path is the
-  // "current user" fallback (`GET /rest/api/3/myself`). That endpoint
-  // requires `read:jira-user`, which the hosted Lambda's OAuth
-  // client-credentials token does not carry and cannot be granted (the
-  // token endpoint rejects the scope as `invalid_scope` — see
-  // resolveEmailViaJql's doc comment) — it 401s there on *every* call, not
-  // just intermittently (LS-7891, recurring as LS-8773). Skip the doomed
-  // round trip under OAuth and surface the actionable remedy directly,
-  // instead of a generic "non-fatal" 401 warning that reads like a fixable
-  // transient error.
-  if (accountId === undefined && !emailToLookUp) {
-    // getJiraCredentials() itself can throw (e.g. no ~/.netrc and no env
-    // vars configured at all) — treat that the same as any other
-    // assignee-resolution failure below: non-fatal, surfaced as a warning,
-    // not an uncaught rejection out of this function.
-    try {
-      const creds = await getJiraCredentials();
-      if (creds.type === 'oauth') {
-        const msg =
-          `${toolName}: no assignee param and no JIRA_ASSIGNEE_EMAIL/` +
-          `JIRA_ASSIGNEE_ACCOUNT_ID env var were set for ${key}, and this ` +
-          "server's OAuth token cannot resolve the current user (GET " +
-          '/rest/api/3/myself always 401s under the hosted client-credentials ' +
-          'token — a known, permanent scope gap, not a transient failure). ' +
-          'Ticket left unassigned. Remedy: pass `assignee` (email) or ' +
-          '`assigneeAccountId` explicitly, or set JIRA_ASSIGNEE_EMAIL / ' +
-          'JIRA_ASSIGNEE_ACCOUNT_ID in the environment.';
-        LOGGER.warn(msg, { key, toolName });
-        warnings.push(msg);
-        return { accountId: undefined, displayName: undefined, warnings };
-      }
-    } catch (credsErr) {
-      const msg =
-        credsErr instanceof Error ? credsErr.message : String(credsErr);
-      LOGGER.error(
-        `${toolName}: assignee update failed (non-fatal)`,
-        credsErr instanceof Error ? credsErr : new Error(msg),
-        { key },
-      );
-      warnings.push(
-        `Assignee update failed (non-fatal): ${msg} Remedy: set ` +
-          'JIRA_CLIENT_ID/JIRA_CLIENT_SECRET/JIRA_CLOUD_ID or ' +
-          'JIRA_EMAIL/JIRA_API_TOKEN, or set the assignee manually in Jira.',
-      );
-      return { accountId: undefined, displayName: undefined, warnings };
-    }
-  }
-
-  let usedMyselfFallback = false;
-
-  try {
-    let displayName: string | undefined;
-
-    if (accountId === undefined && emailToLookUp) {
-      const resolved = await resolveEmailToAccountId(emailToLookUp, toolName);
-      accountId = resolved?.accountId;
-      displayName = resolved?.displayName ?? emailToLookUp;
-      if (!accountId) {
-        LOGGER.warn(
-          `${toolName}: no Jira user found for assignee; skipping assignee`,
-          { assigneeEmail: emailToLookUp, key },
-        );
-        warnings.push(
-          `Could not assign ticket: no Jira user found for email "${emailToLookUp}". ` +
-            'Email resolution falls back to a JQL lookup, which only finds users who ' +
-            'already have at least one issue assigned to them. Remedy: pass ' +
-            '`assigneeAccountId` explicitly instead of `assignee` to skip email ' +
-            'resolution entirely.',
-        );
-      }
-    } else if (accountId === undefined) {
-      // No explicit/env accountId or email configured — default to the
-      // authenticated user. Only reached under basic auth (the OAuth path
-      // returned earlier without attempting this call — see above).
-      usedMyselfFallback = true;
-      const self = await jiraRequest<{
-        accountId: string;
-        displayName?: string;
-      }>({
-        method: 'GET',
-        path: '/rest/api/3/myself',
-      });
-      accountId = self?.accountId;
-      displayName = self?.displayName;
-    }
-
-    if (accountId) {
-      await jiraRequest({
-        method: 'PUT',
-        path: `/rest/api/3/issue/${key}/assignee`,
-        body: { accountId },
-      });
-    }
-
-    return { accountId, displayName, warnings };
-  } catch (assignErr) {
-    const msg =
-      assignErr instanceof Error ? assignErr.message : String(assignErr);
-    LOGGER.error(
-      `${toolName}: assignee update failed (non-fatal)`,
-      assignErr instanceof Error ? assignErr : new Error(msg),
-      { key },
-    );
-    const remedy =
-      accountId === undefined && usedMyselfFallback
-        ? 'pass `assignee` (email) or `assigneeAccountId` explicitly, or set ' +
-          'JIRA_ASSIGNEE_EMAIL / JIRA_ASSIGNEE_ACCOUNT_ID in the environment, ' +
-          'instead of relying on the current-user lookup'
-        : accountId === undefined
-          ? 'pass `assigneeAccountId` explicitly instead of `assignee` to bypass ' +
-            'email lookup entirely'
-          : 'the PUT to /issue/{key}/assignee itself failed — verify the ' +
-            'accountId is valid and the token has write:jira-work';
-    warnings.push(
-      `Assignee update failed (non-fatal): ${msg} Remedy: ${remedy}, or set ` +
-        'the assignee manually in Jira.',
-    );
+  const resolution = await resolveAssignee(params);
+  if (!resolution.ok) {
+    warnings.push(`Could not assign ${key}: ${resolution.error}`);
     return { accountId: undefined, displayName: undefined, warnings };
   }
+
+  const putWarning = await putAssignee(key, resolution.accountId, toolName);
+  if (putWarning) {
+    warnings.push(putWarning);
+    return { accountId: undefined, displayName: undefined, warnings };
+  }
+  return {
+    accountId: resolution.accountId,
+    displayName: resolution.displayName,
+    warnings,
+  };
 }

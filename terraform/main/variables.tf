@@ -26,18 +26,6 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "jira_assignee_email" {
-  description = "Jira account email to auto-assign tickets to when jira_claim_ticket is called. Leave empty to disable auto-assign."
-  type        = string
-  default     = ""
-}
-
-variable "jira_assignee_account_id" {
-  description = "Jira accountId to auto-assign tickets to when jira_claim_ticket is called and no assignee email is configured. Used as a direct fallback because the service account's client-credentials token lacks the read:jira-user scope needed for /myself and /user/search. Leave empty to fall back to GET /rest/api/3/myself."
-  type        = string
-  default     = ""
-}
-
 variable "availability_zones" {
   description = "Availability zones"
   type        = list(string)

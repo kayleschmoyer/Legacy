@@ -7,11 +7,13 @@ import {
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import {
-  authenticateMcpRequest,
+  authenticateMcpRequestWithIdentity,
   handleOAuthMetadataRequest,
   MCP_SCOPE,
+  type McpCallerIdentity,
   runMcpTransport,
 } from '@legacy-sports/mcp-bearer-auth';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { handleMcpDocsRequest } from '@legacy-sports/mcp-docs';
 import {
   CSP as DOCS_CSP,
@@ -20,6 +22,7 @@ import {
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import type { AssigneeCaller } from './assignee.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { createTicket } from './tools/create-ticket.js';
 import { editTicket } from './tools/edit-ticket.js';
@@ -94,6 +97,32 @@ const ticketSchema = z.object({
     .regex(/^(?:current|\d+)$/)
     .optional(),
 });
+
+const CALLER_KEY = 'caller';
+
+/** Exported for tests. */
+export function toAuthInfo(identity: McpCallerIdentity): AuthInfo {
+  const caller: AssigneeCaller = {
+    kind: identity.kind,
+    token: identity.token,
+    sub: identity.sub,
+    email: identity.email,
+  };
+  return {
+    token: identity.token,
+    clientId: identity.clientId ?? '',
+    scopes: identity.scopes,
+    expiresAt: identity.expiresAt,
+    extra: { [CALLER_KEY]: caller },
+  };
+}
+
+/** Exported for tests. */
+export function callerFrom(extra: {
+  authInfo?: AuthInfo;
+}): AssigneeCaller | undefined {
+  return extra.authInfo?.extra?.[CALLER_KEY] as AssigneeCaller | undefined;
+}
 
 /** Exported for the registration spec (lambda.spec.ts). */
 export function createMcpServer(): McpServer {
@@ -240,7 +269,8 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_transition',
-    "Transition ticket(s) to a new status. Accepts a single key or an array (1-50). When action='claim', performs the assignee-set + transition atomically.",
+    "Transition ticket(s) to a new status. Accepts a single key or an array (1-50). When action='claim', performs the assignee-set + transition atomically; " +
+      'the assignee defaults to the signed-in caller (machine tokens must pass one).',
     {
       keys: jiraKeysSchema.optional(),
       key: jiraKeysSchema.optional(),
@@ -256,7 +286,7 @@ export function createMcpServer(): McpServer {
       cascade: z.boolean().default(false),
       openPrs: openPrsSchema,
     },
-    async (params) => {
+    async (params, extra) => {
       const keys = params.keys ?? params.key;
       if (keys === undefined) {
         return {
@@ -279,6 +309,7 @@ export function createMcpServer(): McpServer {
         cascade: params.cascade,
         assignee: params.assignee,
         assigneeAccountId: params.assigneeAccountId,
+        caller: callerFrom(extra),
         openPrs: params.openPrs,
       });
     },
@@ -438,14 +469,14 @@ export function createMcpServer(): McpServer {
     'jira_start_work',
     'Semantic one-shot for "Jira → In Progress": verifies state, resolves the transition, transitions the ticket, ' +
       'and sets the assignee in one call. Idempotent on already-In-Progress tickets; refuses Done tickets. ' +
-      'Prefer `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). ' +
+      'The assignee defaults to the signed-in caller (machine tokens must pass one). ' +
       'Use jira_transition({ action: "claim" }) when you also need blocker checks or the open-PR guard.',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       assignee: z.string().email().optional(),
       assigneeAccountId: z.string().optional(),
     },
-    async (p) => startWork(p),
+    async (p, extra) => startWork({ ...p, caller: callerFrom(extra) }),
   );
   server.tool(
     'jira_rollover_sync',
@@ -473,10 +504,10 @@ export const handler = async (
   });
   if (metadataResponse) return metadataResponse;
 
-  const authError = await authenticateMcpRequest(event, {
+  const auth = await authenticateMcpRequestWithIdentity(event, {
     requiredScope: MCP_SCOPE.jira,
   });
-  if (authError) return authError;
+  if (!auth.ok) return auth.response;
 
   // Human-readable tool reference for this server, served to a browser at
   // GET /docs. Placed after the auth check on purpose: tool descriptions
@@ -512,7 +543,9 @@ export const handler = async (
   return runMcpTransport(
     async () => {
       await server.connect(transport);
-      return transport.handleRequest(request);
+      return transport.handleRequest(request, {
+        authInfo: toAuthInfo(auth.identity),
+      });
     },
     () => server.close(),
   );

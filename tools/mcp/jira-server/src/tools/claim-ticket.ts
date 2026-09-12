@@ -5,7 +5,12 @@ import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
-import { resolveAndAssign } from '../assignee.js';
+import {
+  type AssigneeCaller,
+  putAssignee,
+  resolveAndAssign,
+  resolveAssignee,
+} from '../assignee.js';
 import {
   findSimilarTickets,
   type SimilarTicketCandidate,
@@ -22,6 +27,8 @@ interface ClaimTicketParams {
    */
   assignee?: string;
   assigneeAccountId?: string;
+  /** The hosted request's authenticated caller — see `resolveAssignee`. */
+  caller?: AssigneeCaller;
   /**
    * Open PRs the caller has already found to reference this ticket's key
    * (e.g. via `github_pr_dashboard(state: 'open')` filtered by key). The
@@ -72,7 +79,7 @@ interface JiraIssueResponse {
 export async function claimTicket(
   params: ClaimTicketParams,
 ): Promise<CallToolResult> {
-  const { key, assignee, assigneeAccountId, openPrs } = params;
+  const { key, assignee, assigneeAccountId, caller, openPrs } = params;
 
   try {
     // Fetch ticket details, child status counts, and available transitions concurrently
@@ -133,6 +140,7 @@ export async function claimTicket(
           key,
           explicitAssignee: assignee,
           explicitAssigneeAccountId: assigneeAccountId,
+          caller,
           toolName: 'jira_transition',
         });
         warnings.push(...repair.warnings);
@@ -292,20 +300,45 @@ export async function claimTicket(
       });
     }
 
+    // --- Resolve the owner before touching the ticket (LS-10069) ---
+    // A claim with no resolvable owner used to transition anyway and leave
+    // the ticket In Progress with nobody assigned. Refuse up front instead,
+    // so the ticket stays untouched and the caller gets a concrete remedy.
+    const owner = await resolveAssignee({
+      key,
+      explicitAssignee: assignee,
+      explicitAssigneeAccountId: assigneeAccountId,
+      caller,
+      toolName: 'jira_transition',
+    });
+    if (!owner.ok) {
+      return makeResult({
+        action: 'STOP',
+        reason: `Cannot claim ${key} without an assignee: ${owner.error}`,
+        claimed: false,
+        ticket: buildTicket(issue, childResult),
+        warnings,
+      });
+    }
+
     await jiraRequest({
       method: 'POST',
       path: `/rest/api/3/issue/${key}/transitions`,
       body: { transition: { id: inProgressTransition.id } },
     });
 
-    // --- Assign the ticket ---
-    const assignResult = await resolveAndAssign({
+    const putWarning = await putAssignee(
       key,
-      explicitAssignee: assignee,
-      explicitAssigneeAccountId: assigneeAccountId,
-      toolName: 'jira_transition',
-    });
-    warnings.push(...assignResult.warnings);
+      owner.accountId,
+      'jira_transition',
+    );
+    if (putWarning) {
+      warnings.push(putWarning);
+    } else {
+      issue.fields.assignee = {
+        displayName: owner.displayName ?? owner.accountId,
+      };
+    }
 
     return makeResult({
       action: 'PROCEED',

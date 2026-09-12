@@ -4,6 +4,7 @@ type SigningKey = Awaited<ReturnType<typeof generateKeyPair>>['privateKey'];
 import {
   type AuthConfig,
   authenticateMcpRequest,
+  authenticateMcpRequestWithIdentity,
   buildAuthErrorResponse,
   buildProtectedResourceMetadata,
   createLocalJWKSet,
@@ -17,6 +18,7 @@ import {
   sanitizeTransportErrorMessage,
   tokenLogClaims,
   verifyBearerToken,
+  verifyBearerTokenIdentity,
 } from './index';
 
 const API_GW_DOMAIN = 'abc123.execute-api.us-east-1.amazonaws.com';
@@ -220,6 +222,184 @@ describe('verifyBearerToken — user authorization-code access token (claude.ai 
       createLocalJWKSet(jwks),
     );
     expect(result).toBeNull();
+  });
+});
+
+describe('verifyBearerTokenIdentity — caller identity (LS-10069)', () => {
+  const CONNECTOR_CLIENT_ID = 'connector-client-id';
+
+  async function identify(
+    config: AuthConfig,
+    overrides: Parameters<typeof signToken>[1],
+  ) {
+    const { privateKey, jwks } = await buildKeySet();
+    const token = await signToken(privateKey, overrides);
+    const result = await verifyBearerTokenIdentity(
+      { authorization: `Bearer ${token}` },
+      config,
+      createLocalJWKSet(jwks),
+    );
+    return { token, result };
+  }
+
+  it('classifies a claude.ai connector access token as a user, with its claims', async () => {
+    const { token, result } = await identify(DUAL_CONFIG, {
+      scope: `openid ${SCOPE}`,
+      extraClaims: {
+        token_use: 'access',
+        username: 'google_1234567890',
+        sub: 'user-sub-1',
+        client_id: CONNECTOR_CLIENT_ID,
+      },
+    });
+
+    expect(result).toEqual({
+      kind: 'user',
+      token,
+      sub: 'user-sub-1',
+      username: 'google_1234567890',
+      email: undefined,
+      clientId: CONNECTOR_CLIENT_ID,
+      tokenUse: 'access',
+      scopes: ['openid', SCOPE],
+      expiresAt: expect.any(Number) as number,
+    });
+  });
+
+  it('accepts the cognito:username claim as a user marker too', async () => {
+    const { result } = await identify(MACHINE_CONFIG, {
+      scope: SCOPE,
+      extraClaims: {
+        token_use: 'access',
+        'cognito:username': 'someone',
+        sub: 'user-sub-2',
+        client_id: CONNECTOR_CLIENT_ID,
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ kind: 'user', username: 'someone' }),
+    );
+  });
+
+  it('classifies a client_credentials token (sub === client_id, no username) as a machine', async () => {
+    const { token, result } = await identify(MACHINE_CONFIG, {
+      scope: SCOPE,
+      extraClaims: {
+        token_use: 'access',
+        sub: 'machine-client-id',
+        client_id: 'machine-client-id',
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        kind: 'machine',
+        token,
+        sub: 'machine-client-id',
+        clientId: 'machine-client-id',
+        username: undefined,
+      }),
+    );
+  });
+
+  it('does not treat a username equal to the client as a person when sub === client_id', async () => {
+    const { result } = await identify(MACHINE_CONFIG, {
+      scope: SCOPE,
+      extraClaims: {
+        token_use: 'access',
+        username: 'machine-client-id',
+        sub: 'machine-client-id',
+        client_id: 'machine-client-id',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({ kind: 'machine' }));
+  });
+
+  it('classifies a legacy ID token as a user and surfaces its email claim', async () => {
+    const { token, result } = await identify(LEGACY_CONFIG, {
+      audience: AUDIENCE,
+      extraClaims: {
+        token_use: 'id',
+        sub: 'user-sub-3',
+        email: 'person@example.com',
+        'cognito:username': 'person',
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        kind: 'user',
+        token,
+        sub: 'user-sub-3',
+        email: 'person@example.com',
+        tokenUse: 'id',
+        scopes: [],
+      }),
+    );
+  });
+
+  it('still returns an AuthFailure for a wrong-scope token', async () => {
+    const { result } = await identify(MACHINE_CONFIG, {
+      scope: OTHER_SCOPE,
+      extraClaims: { username: 'someone', sub: 'user-sub-1' },
+    });
+
+    expect(result).toEqual({
+      code: MCP_AUTH_ERROR_CODE,
+      message: expect.stringMatching(
+        /not authorized for this server/,
+      ) as string,
+    });
+  });
+
+  it('still returns an AuthFailure for an expired token', async () => {
+    const { result } = await identify(MACHINE_CONFIG, {
+      scope: SCOPE,
+      expSecondsFromNow: -60,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        code: MCP_AUTH_ERROR_CODE,
+        message: expect.stringMatching(/token expired/) as string,
+      }),
+    );
+  });
+
+  it('still returns an AuthFailure for a missing Authorization header', async () => {
+    const { jwks } = await buildKeySet();
+    const result = await verifyBearerTokenIdentity(
+      {},
+      MACHINE_CONFIG,
+      createLocalJWKSet(jwks),
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        code: MCP_AUTH_ERROR_CODE,
+        message: expect.stringMatching(
+          /Authorization header missing/,
+        ) as string,
+      }),
+    );
+  });
+
+  it('keeps verifyBearerToken returning null (not the identity) on success', async () => {
+    const { privateKey, jwks } = await buildKeySet();
+    const token = await signToken(privateKey, {
+      scope: SCOPE,
+      extraClaims: { username: 'someone', sub: 'user-sub-1' },
+    });
+
+    await expect(
+      verifyBearerToken(
+        { authorization: `Bearer ${token}` },
+        MACHINE_CONFIG,
+        createLocalJWKSet(jwks),
+      ),
+    ).resolves.toBeNull();
   });
 });
 
@@ -509,6 +689,47 @@ describe('authenticateMcpRequest', () => {
     const parsed = parseBody(result.body);
     expect(parsed.error.code).toBe(MCP_AUTH_ERROR_CODE);
     expect(parsed.error.message).toMatch(/Authorization header missing/);
+  });
+
+  it('authenticateMcpRequestWithIdentity returns { ok: false, response } matching authenticateMcpRequest on rejection (LS-10069)', async () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const stderrSpy = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+    try {
+      const withIdentity = await authenticateMcpRequestWithIdentity(
+        gatewayEvent() as never,
+        OPTIONS,
+      );
+      const legacy = await authenticateMcpRequest(
+        gatewayEvent() as never,
+        OPTIONS,
+      );
+
+      expect(withIdentity.ok).toBe(false);
+      if (withIdentity.ok) throw new Error('expected a rejection');
+      expect(withIdentity.response).toEqual(legacy);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it('authenticateMcpRequestWithIdentity returns the misconfiguration envelope when MCP_COGNITO_ISSUER is missing (LS-10069)', async () => {
+    delete process.env['MCP_COGNITO_ISSUER'];
+    const result = await authenticateMcpRequestWithIdentity(
+      gatewayEvent() as never,
+      OPTIONS,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok || typeof result.response === 'string') {
+      throw new Error('expected structured auth error response');
+    }
+    expect(result.response.statusCode).toBe(200);
+    expect(parseBody(result.response.body).error.message).toMatch(
+      /MCP_COGNITO_ISSUER/,
+    );
   });
 });
 

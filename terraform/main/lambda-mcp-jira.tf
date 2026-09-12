@@ -119,15 +119,11 @@ resource "aws_lambda_function" "mcp_jira" {
       # scope check. Without this it defaults to `openid` only and the token
       # would lack the scope (LS-5151).
       MCP_OAUTH_SCOPES = "openid mcp/jira"
-      # When set, jira_claim_ticket will auto-assign the claimed ticket to this
-      # Jira user. Value is the Jira account email; leave empty to disable.
-      JIRA_ASSIGNEE_EMAIL = var.jira_assignee_email
-      # Fallback assignee when no email is configured: a pre-resolved Jira
-      # accountId assigned directly, with no user-lookup API call. Needed
-      # because the service account's client-credentials token only carries
-      # read:jira-work/write:jira-work — /rest/api/3/myself and
-      # /rest/api/3/user/search both require read:jira-user (LS-7891).
-      JIRA_ASSIGNEE_ACCOUNT_ID = var.jira_assignee_account_id
+      # Cognito hosted-UI origin, for resolving a connector caller's email via
+      # /oauth2/userInfo so claims are assigned to whoever made them. There is
+      # deliberately no Lambda-wide default assignee: this server is shared
+      # by every user, so a fixed fallback would misattribute claims (LS-10069).
+      MCP_COGNITO_DOMAIN = local.mcp_cognito_hosted_ui
     }
   }
 

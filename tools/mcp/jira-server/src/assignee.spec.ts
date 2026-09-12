@@ -1,7 +1,16 @@
-import { _resetAssigneeCache, resolveAndAssign } from './assignee';
+import {
+  _resetAssigneeCache,
+  putAssignee,
+  resolveAndAssign,
+  resolveAssignee,
+} from './assignee';
 
 jest.mock('@legacy-sports/logging/server', () => ({
   LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
+jest.mock('./caller-email', () => ({
+  resolveCallerEmail: jest.fn(),
 }));
 
 jest.mock('./jira-api', () => ({
@@ -28,6 +37,10 @@ const { getJiraCredentials: mockGetJiraCredentials } = jest.requireMock<{
   getJiraCredentials: jest.Mock;
 }>('./netrc');
 
+const { resolveCallerEmail: mockResolveCallerEmail } = jest.requireMock<{
+  resolveCallerEmail: jest.Mock;
+}>('./caller-email');
+
 /** The 401 the hosted Lambda's client-credentials token gets on user lookups. */
 const scopeError = new Error(
   'Jira API GET /rest/api/3/user/search failed (401): {"code":401,"message":"Unauthorized; scope does not match"}',
@@ -53,6 +66,278 @@ beforeEach(() => {
     type: 'basic',
     login: 'a',
     password: 'b',
+  });
+  mockResolveCallerEmail.mockResolvedValue(undefined);
+});
+
+describe('resolveAssignee — hosted caller identity (LS-10069)', () => {
+  const USER_CALLER = {
+    kind: 'user' as const,
+    token: 'user-token',
+    sub: 'sub-1',
+  };
+  const MACHINE_CALLER = {
+    kind: 'machine' as const,
+    token: 'machine-token',
+    sub: 'client-1',
+  };
+
+  /** /user/search echoes a distinct accountId per queried email. */
+  function mockUserSearchEcho() {
+    mockJiraRequest.mockImplementation(
+      (opts: { path: string; query?: Record<string, string> }) =>
+        opts.path === '/rest/api/3/user/search'
+          ? Promise.resolve([
+              {
+                accountId: `id-for-${opts.query?.['query']}`,
+                displayName: 'Caller Person',
+              },
+            ])
+          : Promise.resolve(undefined),
+    );
+  }
+
+  const lookupCalls = () =>
+    (mockJiraRequest.mock.calls as Array<[{ path: string }]>).filter(
+      ([opts]) =>
+        opts.path === '/rest/api/3/myself' ||
+        opts.path.startsWith('/rest/api/3/user'),
+    );
+
+  it("resolves a user caller to the account behind the caller's own email", async () => {
+    mockResolveCallerEmail.mockResolvedValue('caller@example.com');
+    mockUserSearchEcho();
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      caller: USER_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      accountId: 'id-for-caller@example.com',
+      displayName: 'Caller Person',
+    });
+    expect(mockResolveCallerEmail).toHaveBeenCalledWith(USER_CALLER);
+    // resolveAssignee never writes.
+    expect(putAssigneeCalls()).toHaveLength(0);
+  });
+
+  it('refuses a machine caller with an error naming the explicit-assignee remedy', async () => {
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      caller: MACHINE_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result.ok).toBe(false);
+    const error = (result as { error: string }).error;
+    expect(error).toContain('machine');
+    expect(error).toContain('`assignee`');
+    expect(error).toContain('assigneeAccountId');
+    expect(lookupCalls()).toHaveLength(0);
+  });
+
+  it.each([
+    ['JIRA_ASSIGNEE_ACCOUNT_ID', 'shared-env-account'],
+    ['JIRA_ASSIGNEE_EMAIL', 'shared-env@example.com'],
+  ])('never consults %s when a caller is present', async (envVar, envValue) => {
+    process.env[envVar] = envValue;
+
+    const machine = await resolveAssignee({
+      key: 'LS-1',
+      caller: MACHINE_CALLER,
+      toolName: 'jira_transition',
+    });
+    expect(machine.ok).toBe(false);
+
+    mockResolveCallerEmail.mockResolvedValue('caller@example.com');
+    mockUserSearchEcho();
+    const user = await resolveAssignee({
+      key: 'LS-1',
+      caller: USER_CALLER,
+      toolName: 'jira_transition',
+    });
+    expect(user).toEqual(
+      expect.objectContaining({
+        ok: true,
+        accountId: 'id-for-caller@example.com',
+      }),
+    );
+  });
+
+  it('refuses a user caller whose email cannot be determined, without falling back to env or /myself', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'shared-env-account';
+    mockResolveCallerEmail.mockResolvedValue(undefined);
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      caller: USER_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result.ok).toBe(false);
+    const error = (result as { error: string }).error;
+    expect(error).toContain('email');
+    expect(error).toContain('assigneeAccountId');
+    expect(lookupCalls()).toHaveLength(0);
+    expect(mockGetJiraCredentials).not.toHaveBeenCalled();
+  });
+
+  it('refuses a user caller whose email maps to no Jira user', async () => {
+    mockResolveCallerEmail.mockResolvedValue('ghost@example.com');
+    mockJiraRequest.mockImplementation((opts: { path: string }) =>
+      opts.path === '/rest/api/3/user/search'
+        ? Promise.resolve([])
+        : Promise.resolve(undefined),
+    );
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      caller: USER_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result.ok).toBe(false);
+    const error = (result as { error: string }).error;
+    expect(error).toContain('no Jira user found');
+    expect(error).toContain('ghost@example.com');
+    expect(error).toContain('at least one issue assigned');
+    expect(error).toContain('assigneeAccountId');
+  });
+
+  it('lets an explicit assigneeAccountId beat the caller (no email lookup at all)', async () => {
+    mockResolveCallerEmail.mockResolvedValue('caller@example.com');
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      explicitAssigneeAccountId: 'explicit-acct',
+      caller: MACHINE_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result).toEqual({ ok: true, accountId: 'explicit-acct' });
+    expect(mockResolveCallerEmail).not.toHaveBeenCalled();
+    expect(lookupCalls()).toHaveLength(0);
+  });
+
+  it('lets an explicit assignee email beat the caller', async () => {
+    mockResolveCallerEmail.mockResolvedValue('caller@example.com');
+    mockUserSearchEcho();
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      explicitAssignee: 'explicit@example.com',
+      caller: USER_CALLER,
+      toolName: 'jira_transition',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        accountId: 'id-for-explicit@example.com',
+      }),
+    );
+    expect(mockResolveCallerEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveAssignee — local stdio fallbacks (no caller)', () => {
+  it('refuses under OAuth creds without calling /myself', async () => {
+    mockGetJiraCredentials.mockResolvedValue({
+      type: 'oauth',
+      clientId: 'id',
+      clientSecret: 'secret',
+      cloudId: 'cloud-1',
+      siteUrl: 'https://example.atlassian.net',
+    });
+
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as { error: string }).error).toContain('assigneeAccountId');
+    expect(mockJiraRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses an explicit email that resolves to no Jira user', async () => {
+    const result = await resolveAssignee({
+      key: 'LS-1',
+      explicitAssignee: 'nobody@example.com',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.ok).toBe(false);
+    const error = (result as { error: string }).error;
+    expect(error).toContain('no Jira user found');
+    expect(error).toContain('at least one issue assigned');
+    expect(error).toContain('assigneeAccountId');
+  });
+});
+
+describe('putAssignee (LS-10069)', () => {
+  it('returns undefined after a successful PUT of the accountId', async () => {
+    await expect(
+      putAssignee('LS-1', 'acct-1', 'jira_transition'),
+    ).resolves.toBeUndefined();
+    expect(putAssigneeCalls()).toHaveLength(1);
+    expect(putAssigneeCalls()[0][0].path).toBe(
+      '/rest/api/3/issue/LS-1/assignee',
+    );
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: 'acct-1' });
+  });
+
+  it('returns a remedy-bearing warning (never throws) when the PUT fails', async () => {
+    mockJiraRequest.mockRejectedValue(new Error('Jira API PUT failed (403)'));
+
+    const warning = await putAssignee('LS-1', 'acct-1', 'jira_transition');
+
+    expect(warning).toContain('Assignee update failed');
+    expect(warning).toContain('Jira API PUT failed (403)');
+    expect(warning).toContain('verify the accountId');
+  });
+});
+
+describe('resolveAndAssign — with a hosted caller (LS-10069)', () => {
+  it("assigns to the user caller's resolved account", async () => {
+    mockResolveCallerEmail.mockResolvedValue('caller@example.com');
+    mockJiraRequest.mockImplementation((opts: { path: string }) =>
+      opts.path === '/rest/api/3/user/search'
+        ? Promise.resolve([{ accountId: 'acct-caller', displayName: 'Caller' }])
+        : Promise.resolve(undefined),
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      caller: { kind: 'user', token: 't', sub: 'sub-1' },
+      toolName: 'jira_transition',
+    });
+
+    expect(result).toEqual({
+      accountId: 'acct-caller',
+      displayName: 'Caller',
+      warnings: [],
+    });
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: 'acct-caller' });
+  });
+
+  it('warns (never assigns the shared env account) for a machine caller', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'shared-env-account';
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      caller: { kind: 'machine', token: 't', sub: 'client-1' },
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(putAssigneeCalls()).toHaveLength(0);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toMatch(/^Could not assign LS-1: /);
+    expect(result.warnings[0]).toContain('machine');
   });
 });
 
@@ -222,7 +507,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     expect(putAssigneeCalls()).toHaveLength(2);
   });
 
-  it('resolves JIRA_ASSIGNEE_EMAIL through the same fallback, with the shared-Lambda warning', async () => {
+  it('resolves JIRA_ASSIGNEE_EMAIL through the same fallback, silently (env fallback is stdio-only now)', async () => {
     process.env['JIRA_ASSIGNEE_EMAIL'] = 'env@example.com';
     mockJiraRequest.mockImplementation((opts: { path: string }) => {
       if (opts.path === '/rest/api/3/user/search')
@@ -241,7 +526,10 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     });
 
     expect(result.accountId).toBe('acct-env');
-    expect(result.warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: 'acct-env' });
+    // No caller means the local single-user stdio server, so the env default
+    // is no longer flagged as shared across callers (LS-10069).
+    expect(result.warnings).toEqual([]);
   });
 
   it('names a concrete remedy when the assignee PUT itself fails (LS-9428)', async () => {
@@ -321,8 +609,12 @@ describe('resolveAndAssign — current-user fallback (LS-8773)', () => {
 
     expect(result.accountId).toBeUndefined();
     expect(putAssigneeCalls()).toHaveLength(0);
-    expect(result.warnings.join(' ')).toContain('Assignee update failed');
-    expect(result.warnings.join(' ')).toContain('No Jira credentials found');
+    // A resolution failure (not a failed PUT) is reported as such.
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toMatch(/^Could not assign LS-1: /);
+    expect(result.warnings[0]).toContain('No Jira credentials found');
+    expect(result.warnings[0]).toContain('current-user lookup');
+    expect(result.warnings[0]).not.toContain('Assignee update failed');
   });
 
   it('still attempts GET /rest/api/3/myself under basic auth (local sessions)', async () => {

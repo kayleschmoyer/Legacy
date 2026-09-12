@@ -5,6 +5,7 @@ import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
 import type { OpenPrRef } from '../schemas.js';
+import type { AssigneeCaller } from '../assignee.js';
 
 /**
  * Statuses commonly exposed by the LS workflow, listed in tool descriptions as
@@ -36,6 +37,8 @@ interface ConsolidatedParams {
   cascade?: boolean;
   assignee?: string;
   assigneeAccountId?: string;
+  /** Only used when action='claim'. The hosted request's authenticated caller. */
+  caller?: AssigneeCaller;
   /**
    * Only used when action='claim'. Open PRs the caller has already found to
    * reference the ticket's key — see `claimTicket`'s `openPrs` doc (LS-9289).
@@ -270,6 +273,7 @@ export async function consolidatedTransition(
           key,
           assignee: params.assignee,
           assigneeAccountId: params.assigneeAccountId,
+          caller: params.caller,
           openPrs: params.openPrs,
         });
         const text = (claim.content[0] as { text: string }).text;
