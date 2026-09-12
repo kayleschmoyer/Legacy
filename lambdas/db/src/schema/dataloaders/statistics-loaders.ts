@@ -4,7 +4,11 @@
 
 import DataLoader from 'dataloader';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
-import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  type GenericDatabase,
+  PublicSchema,
+  withPoolTimeoutRetry,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 
 function chunk<T>(arr: readonly T[], size: number): T[][] {
@@ -296,21 +300,26 @@ export const createSeasonBattingLoader = (
 
       // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
       // Each chunk generates: WHERE (pid=A AND season=B) OR (pid=C AND season=D) OR ...
+      // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): this loader fires
+      // on the same Matchup.winProbability per-player fan-out as
+      // createSeasonPitchingLoader below. See LS-10037.
       const allStats: (typeof PublicSchema.seasonBatting.$inferSelect)[] = [];
       for (const batch of chunk(lookups, 50)) {
-        const rows = await db
-          .select()
-          .from(PublicSchema.seasonBatting)
-          .where(
-            or(
-              ...batch.map(({ playerId, season }) =>
-                and(
-                  eq(PublicSchema.seasonBatting.playerId, playerId),
-                  eq(PublicSchema.seasonBatting.season, season),
+        const rows = await withPoolTimeoutRetry(() =>
+          db
+            .select()
+            .from(PublicSchema.seasonBatting)
+            .where(
+              or(
+                ...batch.map(({ playerId, season }) =>
+                  and(
+                    eq(PublicSchema.seasonBatting.playerId, playerId),
+                    eq(PublicSchema.seasonBatting.season, season),
+                  ),
                 ),
               ),
             ),
-          );
+        );
         allStats.push(...rows);
       }
 
@@ -347,21 +356,26 @@ export const createSeasonPitchingLoader = (
     });
 
     // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
+    // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): this is the exact
+    // call site in the LS-10037 Rollbar trace (item 250) — a burst of
+    // concurrent Matchup.winProbability fan-out exhausting the shared pool.
     const allStats: (typeof PublicSchema.seasonPitching.$inferSelect)[] = [];
     for (const batch of chunk(lookups, 50)) {
-      const rows = await db
-        .select()
-        .from(PublicSchema.seasonPitching)
-        .where(
-          or(
-            ...batch.map(({ playerId, season }) =>
-              and(
-                eq(PublicSchema.seasonPitching.playerId, playerId),
-                eq(PublicSchema.seasonPitching.season, season),
+      const rows = await withPoolTimeoutRetry(() =>
+        db
+          .select()
+          .from(PublicSchema.seasonPitching)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.seasonPitching.playerId, playerId),
+                  eq(PublicSchema.seasonPitching.season, season),
+                ),
               ),
             ),
           ),
-        );
+      );
       allStats.push(...rows);
     }
 
@@ -397,21 +411,25 @@ export const createSeasonFieldingLoader = (
     });
 
     // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
+    // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): same fan-out
+    // exposure as createSeasonBattingLoader/createSeasonPitchingLoader above.
     const allStats: (typeof PublicSchema.seasonFielding.$inferSelect)[] = [];
     for (const batch of chunk(lookups, 50)) {
-      const rows = await db
-        .select()
-        .from(PublicSchema.seasonFielding)
-        .where(
-          or(
-            ...batch.map(({ playerId, season }) =>
-              and(
-                eq(PublicSchema.seasonFielding.playerId, playerId),
-                eq(PublicSchema.seasonFielding.season, season),
+      const rows = await withPoolTimeoutRetry(() =>
+        db
+          .select()
+          .from(PublicSchema.seasonFielding)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.seasonFielding.playerId, playerId),
+                  eq(PublicSchema.seasonFielding.season, season),
+                ),
               ),
             ),
           ),
-        );
+      );
       allStats.push(...rows);
     }
 

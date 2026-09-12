@@ -49,6 +49,9 @@ jest.mock('@legacy-sports/db-client', () => ({
       id: 'players.id',
       nflTeam: 'players.nflTeam',
     },
+    teams: {
+      id: 'teams.id',
+    },
   },
   // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
   // up to 2x on the pool's connection-timeout message) so the loader-level
@@ -83,6 +86,7 @@ import {
   createLeaguePositionByIdLoader,
   createPlayerClubLoader,
   createTeamPayrollLoader,
+  createTeamsLoader,
 } from './entity-loaders';
 
 type ChainResolver = (chain: {
@@ -235,6 +239,41 @@ describe('createTeamPayrollLoader (LS-2506)', () => {
     ]);
 
     expect(calls).toHaveLength(2);
+  });
+});
+
+// LS-10041: unlike createLeaguePositionByIdLoader, the teams batch query was
+// not wrapped in withPoolTimeoutRetry, so a pool connection timeout under
+// concurrent load propagated straight to the resolver. Now wrapped to match
+// the LS-8478 pattern.
+describe('createTeamsLoader (LS-10041)', () => {
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    let call = 0;
+    const rows = [{ id: 5, name: 'The Foo' }];
+    const { db, calls } = makeMockDb(() => {
+      call += 1;
+      if (call === 1) {
+        throw new Error('timeout exceeded when trying to connect');
+      }
+      return rows;
+    });
+    const loader = createTeamsLoader(db);
+
+    await expect(loader.load(5)).resolves.toEqual(rows[0]);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not retry and rejects on a non-pool-timeout error', async () => {
+    const dbErr = new Error('syntax error at or near "SELECT"');
+    const { db, calls } = makeMockDb(() => {
+      throw dbErr;
+    });
+    const loader = createTeamsLoader(db);
+
+    await expect(loader.load(5)).rejects.toThrow(
+      'syntax error at or near "SELECT"',
+    );
+    expect(calls).toHaveLength(1);
   });
 });
 
@@ -420,5 +459,42 @@ describe('createPlayerClubLoader (LS-9832)', () => {
     ).resolves.toEqual(['STL', 'PIT']);
     // Three relations consulted, one query each — not one per player.
     expect(calls).toHaveLength(3);
+  });
+});
+
+// LS-10039: unlike createLeaguePositionByIdLoader, this loader's three-way
+// batch query was not wrapped in withPoolTimeoutRetry, so a pool connection
+// timeout during a concurrent draft-picks page (one of the DataLoader batch
+// loaders in the LS-10037 cluster) propagated straight to the resolver
+// instead of retrying. Now wrapped to match the LS-8478 pattern.
+describe('createPlayerClubLoader — pool timeout retry (LS-10039)', () => {
+  beforeEach(() => clearPlayerClubCache());
+
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    let call = 0;
+    const { db, calls } = makeMockDb((state) => {
+      call += 1;
+      if (call === 1) {
+        throw new Error('timeout exceeded when trying to connect');
+      }
+      return (state.table as { playerId?: string })?.playerId?.startsWith('sb')
+        ? [{ playerId: 6, team: 'CHC', games: 10, lastSeason: 1970 }]
+        : [];
+    });
+
+    await expect(createPlayerClubLoader(db).load(6)).resolves.toBe('CHC');
+    expect(calls).toHaveLength(4); // 1 failed attempt + 3 relations on retry
+  });
+
+  it('does not retry and rejects on a non-pool-timeout error', async () => {
+    const dbErr = new Error('syntax error at or near "SELECT"');
+    const { db, calls } = makeMockDb(() => {
+      throw dbErr;
+    });
+
+    await expect(createPlayerClubLoader(db).load(7)).rejects.toThrow(
+      'syntax error at or near "SELECT"',
+    );
+    expect(calls).toHaveLength(1);
   });
 });

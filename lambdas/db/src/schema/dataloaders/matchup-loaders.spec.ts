@@ -35,13 +35,36 @@ jest.mock('@legacy-sports/db-client', () => ({
     },
     matchupPlayerGames: {
       matchupPlayerId: 'matchupPlayerGames.matchupPlayerId',
+      gameNum: 'matchupPlayerGames.gameNum',
     },
+  },
+  // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
+  // up to 2x on the pool's connection-timeout message), so the LS-10043
+  // regression test below exercises the same retry contract without pulling
+  // in the real Helpers module (and its pg/drizzle dependencies).
+  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+    const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      try {
+        return await queryFn();
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message === POOL_TIMEOUT_MESSAGE &&
+          attempt < 2
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
   },
 }));
 
 import {
   createLockedTeamMembersLoader,
   createMatchupPlayerGamesLoader,
+  createSelectedGamesCountLoader,
 } from './matchup-loaders';
 
 type QueryResult = Record<string, unknown>[];
@@ -233,5 +256,58 @@ describe('createMatchupPlayerGamesLoader (LS-8477)', () => {
 
     expect(where).toHaveBeenCalledTimes(2);
     expect(result).toEqual(games);
+  });
+});
+
+// LS-10043: this loader's query was not wrapped in withPoolTimeoutRetry, so a
+// pool connection timeout during a concurrent Matchup.winProbability fan-out
+// propagated straight to the resolver. Now wrapped to match the LS-8478
+// pattern (see createLeaguePositionByIdLoader in entity-loaders.spec.ts).
+describe('createSelectedGamesCountLoader (LS-10043)', () => {
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    let attempt = 0;
+    const rows = [{ matchupId: 1, count: 3 }];
+    const groupBy = jest.fn(() => {
+      attempt += 1;
+      if (attempt === 1) {
+        return Promise.reject(
+          new Error('timeout exceeded when trying to connect'),
+        );
+      }
+      return Promise.resolve(rows);
+    });
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({ groupBy }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof createSelectedGamesCountLoader>[0];
+
+    const loader = createSelectedGamesCountLoader(db);
+    const result = await loader.load(1);
+
+    expect(groupBy).toHaveBeenCalledTimes(2);
+    expect(result).toBe(3);
+  });
+
+  it('does not retry and rejects on a non-pool-timeout error', async () => {
+    const dbErr = new Error('syntax error at or near "SELECT"');
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({ groupBy: () => Promise.reject(dbErr) }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof createSelectedGamesCountLoader>[0];
+
+    const loader = createSelectedGamesCountLoader(db);
+    await expect(loader.load(1)).rejects.toThrow(
+      'syntax error at or near "SELECT"',
+    );
   });
 });

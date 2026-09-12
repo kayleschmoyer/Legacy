@@ -82,10 +82,15 @@ export const createTeamsLoader = (db: GenericDatabase<typeof PublicSchema>) =>
   new DataLoader<number, typeof PublicSchema.teams.$inferSelect | null>(
     async (keys) => {
       const ids = [...new Set(keys)] as number[];
-      const allTeams = await db
-        .select()
-        .from(PublicSchema.teams)
-        .where(inArray(PublicSchema.teams.id, ids));
+      // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): a heavily-batched
+      // hot-path loader is as exposed to pool exhaustion under concurrent
+      // load as any other. See LS-10041.
+      const allTeams = await withPoolTimeoutRetry(() =>
+        db
+          .select()
+          .from(PublicSchema.teams)
+          .where(inArray(PublicSchema.teams.id, ids)),
+      );
 
       const teamsMap = new Map<
         number,
@@ -430,41 +435,49 @@ export const createPlayerClubLoader = (
     if (missing.length > 0) {
       const ids = [...new Set(missing)];
 
-      const [battingRows, pitchingRows, footballRows] = await Promise.all([
-        db
-          .select({
-            playerId: PublicSchema.seasonBatting.playerId,
-            team: PublicSchema.seasonBatting.team,
-            games: sum(PublicSchema.seasonBatting.g).mapWith(Number),
-            lastSeason: sql<number>`MAX(${PublicSchema.seasonBatting.season})`,
-          })
-          .from(PublicSchema.seasonBatting)
-          .where(inArray(PublicSchema.seasonBatting.playerId, ids))
-          .groupBy(
-            PublicSchema.seasonBatting.playerId,
-            PublicSchema.seasonBatting.team,
-          ),
-        db
-          .select({
-            playerId: PublicSchema.seasonPitching.playerId,
-            team: PublicSchema.seasonPitching.team,
-            games: sum(PublicSchema.seasonPitching.g).mapWith(Number),
-            lastSeason: sql<number>`MAX(${PublicSchema.seasonPitching.season})`,
-          })
-          .from(PublicSchema.seasonPitching)
-          .where(inArray(PublicSchema.seasonPitching.playerId, ids))
-          .groupBy(
-            PublicSchema.seasonPitching.playerId,
-            PublicSchema.seasonPitching.team,
-          ),
-        db
-          .select({
-            id: PublicSchema.players.id,
-            nflTeam: PublicSchema.players.nflTeam,
-          })
-          .from(PublicSchema.players)
-          .where(inArray(PublicSchema.players.id, ids)),
-      ]);
+      // Wrapped in withPoolTimeoutRetry (LS-8478 pattern, see
+      // createLeaguePositionByIdLoader above): three queries firing together
+      // per batch, from a DataLoader that itself batches across a whole
+      // draft-picks page, makes this loader a heavy consumer of the shared
+      // per-Lambda pool under concurrent draft load. See LS-10039.
+      const [battingRows, pitchingRows, footballRows] =
+        await withPoolTimeoutRetry(() =>
+          Promise.all([
+            db
+              .select({
+                playerId: PublicSchema.seasonBatting.playerId,
+                team: PublicSchema.seasonBatting.team,
+                games: sum(PublicSchema.seasonBatting.g).mapWith(Number),
+                lastSeason: sql<number>`MAX(${PublicSchema.seasonBatting.season})`,
+              })
+              .from(PublicSchema.seasonBatting)
+              .where(inArray(PublicSchema.seasonBatting.playerId, ids))
+              .groupBy(
+                PublicSchema.seasonBatting.playerId,
+                PublicSchema.seasonBatting.team,
+              ),
+            db
+              .select({
+                playerId: PublicSchema.seasonPitching.playerId,
+                team: PublicSchema.seasonPitching.team,
+                games: sum(PublicSchema.seasonPitching.g).mapWith(Number),
+                lastSeason: sql<number>`MAX(${PublicSchema.seasonPitching.season})`,
+              })
+              .from(PublicSchema.seasonPitching)
+              .where(inArray(PublicSchema.seasonPitching.playerId, ids))
+              .groupBy(
+                PublicSchema.seasonPitching.playerId,
+                PublicSchema.seasonPitching.team,
+              ),
+            db
+              .select({
+                id: PublicSchema.players.id,
+                nflTeam: PublicSchema.players.nflTeam,
+              })
+              .from(PublicSchema.players)
+              .where(inArray(PublicSchema.players.id, ids)),
+          ]),
+        );
 
       // Sum games per (player, club) across both baseball tables so a pitcher
       // who also batted is counted once per club rather than twice.

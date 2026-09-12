@@ -1,5 +1,5 @@
 import { DbOptions } from '@legacy-sports/utils/node';
-import { runWithPublicClient } from '../client/Helpers';
+import { runWithPublicClient, withPoolTimeoutRetry } from '../client/Helpers';
 import {
   getActiveScoringProfileForLeague,
   getScoringMultipliersForLeague,
@@ -74,30 +74,43 @@ export class ScoringService {
   async getActiveProfileDetails(
     leagueId: number,
   ): Promise<LeagueScoringProfileDetails> {
-    return runWithPublicClient(this.options, async (db) => {
-      const profile = await getActiveScoringProfileForLeague(db, leagueId);
-      const definitions = await getScoringStatDefinitions(db);
+    // Wrapped in withPoolTimeoutRetry (LS-8478): this is on the hot path for
+    // Matchup.winProbability, which every concurrent request in a league
+    // (dozens of matchups fanning out per scoring refresh) resolves through
+    // the same per-Lambda pool. A burst of concurrent requests can exhaust
+    // the pool's connectionTimeoutMillis budget here — including during the
+    // runWithClient `select 1 + 1` health check, before the query below even
+    // runs — surfacing as a spurious "timeout exceeded when trying to
+    // connect" rather than a real query failure. See LS-10037.
+    return withPoolTimeoutRetry(() =>
+      runWithPublicClient(this.options, async (db) => {
+        const profile = await getActiveScoringProfileForLeague(db, leagueId);
+        const definitions = await getScoringStatDefinitions(db);
 
-      if (!profile) {
+        if (!profile) {
+          return {
+            profileId: null,
+            leagueId,
+            profileName: null,
+            entries: [],
+            definitions,
+          };
+        }
+
+        const entries = await getScoringProfileEntriesForProfile(
+          db,
+          profile.id,
+        );
+
         return {
-          profileId: null,
-          leagueId,
-          profileName: null,
-          entries: [],
+          profileId: profile.id,
+          leagueId: profile.leagueId,
+          profileName: profile.profileName,
+          entries,
           definitions,
         };
-      }
-
-      const entries = await getScoringProfileEntriesForProfile(db, profile.id);
-
-      return {
-        profileId: profile.id,
-        leagueId: profile.leagueId,
-        profileName: profile.profileName,
-        entries,
-        definitions,
-      };
-    });
+      }),
+    );
   }
 
   async updateActiveProfile(

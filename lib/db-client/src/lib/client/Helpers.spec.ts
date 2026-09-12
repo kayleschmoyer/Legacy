@@ -216,6 +216,42 @@ describe('runWithClient', () => {
       );
       expect(callback).toHaveBeenCalledTimes(1);
     });
+
+    // LS-10037 (Rollbar items 253/259): the health check competes for the same
+    // pool as every other concurrent query, so it can fail with the pool's
+    // own connection-timeout message (no SQLSTATE code) rather than one of
+    // the Aurora transient codes above. Previously this wasn't classified as
+    // recoverable and propagated straight to the caller.
+    it('retries when the health-check query fails with the pool connection-timeout message', async () => {
+      const poolTimeoutErr = new Error(
+        'timeout exceeded when trying to connect',
+      );
+      mockExecute.mockRejectedValueOnce(poolTimeoutErr).mockResolvedValue([]);
+      const callback = jest.fn().mockResolvedValue('ok');
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'ok',
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a pool connection-timeout error wrapped in a DrizzleQueryError-style cause chain', async () => {
+      const poolTimeoutErr = new Error(
+        'timeout exceeded when trying to connect',
+      );
+      const drizzleErr = Object.assign(
+        new Error('Failed query: select 1 + 1'),
+        { cause: poolTimeoutErr },
+      );
+      mockExecute.mockRejectedValueOnce(drizzleErr).mockResolvedValue([]);
+      const callback = jest.fn().mockResolvedValue('ok');
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'ok',
+      );
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+    });
   });
 });
 

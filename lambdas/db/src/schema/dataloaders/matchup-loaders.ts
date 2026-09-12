@@ -10,6 +10,7 @@ import {
   getScoringChangeLogByLeague,
   PublicSchema,
   type ScoringChangeLogEntry,
+  withPoolTimeoutRetry,
 } from '@legacy-sports/db-client';
 import {
   type FootballScoringSettings,
@@ -352,21 +353,26 @@ export const createSelectedGamesCountLoader = (
 ) =>
   new DataLoader<number, number>(async (keys) => {
     const ids = [...new Set(keys)] as number[];
-    const rows = await db
-      .select({
-        matchupId: PublicSchema.matchupPlayers.matchupId,
-        count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
-      })
-      .from(PublicSchema.matchupPlayerGames)
-      .innerJoin(
-        PublicSchema.matchupPlayers,
-        eq(
-          PublicSchema.matchupPlayerGames.matchupPlayerId,
-          PublicSchema.matchupPlayers.id,
-        ),
-      )
-      .where(inArray(PublicSchema.matchupPlayers.matchupId, ids))
-      .groupBy(PublicSchema.matchupPlayers.matchupId);
+    // Wrapped in withPoolTimeoutRetry (LS-8478 pattern): this loader is on
+    // the same Matchup.winProbability fan-out path as the other loaders hit
+    // by the LS-10037 cluster. See LS-10043.
+    const rows = await withPoolTimeoutRetry(() =>
+      db
+        .select({
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+        })
+        .from(PublicSchema.matchupPlayerGames)
+        .innerJoin(
+          PublicSchema.matchupPlayers,
+          eq(
+            PublicSchema.matchupPlayerGames.matchupPlayerId,
+            PublicSchema.matchupPlayers.id,
+          ),
+        )
+        .where(inArray(PublicSchema.matchupPlayers.matchupId, ids))
+        .groupBy(PublicSchema.matchupPlayers.matchupId),
+    );
 
     const countMap = new Map<number, number>();
     for (const row of rows) countMap.set(row.matchupId, row.count);

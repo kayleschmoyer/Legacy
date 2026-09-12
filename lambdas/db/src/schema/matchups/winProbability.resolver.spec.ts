@@ -49,8 +49,35 @@ jest.mock('../scoring', () => ({
     loadLeagueScoringConfig(...args),
 }));
 
+// Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
+// up to 2x on the pool's connection-timeout message), so the LS-10038
+// regression test below exercises the same retry contract without pulling in
+// the real Helpers module (and its pg/drizzle dependencies).
+const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+async function mockWithPoolTimeoutRetry<T>(
+  queryFn: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    try {
+      return await queryFn();
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message === POOL_TIMEOUT_MESSAGE &&
+        attempt < 2
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('unreachable');
+}
+
 jest.mock('@legacy-sports/db-client', () => ({
   PublicSchema: { matchupPlayers: { matchupId: 'matchupId' } },
+  withPoolTimeoutRetry: (queryFn: () => Promise<unknown>) =>
+    mockWithPoolTimeoutRetry(queryFn),
 }));
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn() }));
@@ -93,6 +120,7 @@ function makeContext(
     teamId: number;
     positionId: number | null;
   }> = [],
+  selectImpl?: () => Promise<typeof matchupPlayers>,
 ) {
   const positionLoad = jest.fn().mockResolvedValue({ positionType: 'OF' });
   const gamesLoad = jest.fn().mockResolvedValue([]);
@@ -112,7 +140,9 @@ function makeContext(
     },
     db: {
       select: () => ({
-        from: () => ({ where: () => Promise.resolve(matchupPlayers) }),
+        from: () => ({
+          where: selectImpl ?? (() => Promise.resolve(matchupPlayers)),
+        }),
       }),
     },
   };
@@ -189,5 +219,49 @@ describe('resolveMatchupWinProbability — entitlement gate', () => {
       team2ProjectedScore: 10,
       simulationCount: 5000,
     });
+  });
+});
+
+// LS-10038: the matchupPlayers select fired directly against context.db.
+// Under concurrent load (many matchups resolving win probability at once
+// against a shared per-Lambda pool) it could fail with the pool's
+// "timeout exceeded when trying to connect" error before ever reaching a
+// real query fault. The resolver now retries that specific transient
+// condition via withPoolTimeoutRetry (LS-8478 pattern) instead of letting it
+// propagate and swallow the whole field behind the resolver's catch/null.
+describe('resolveMatchupWinProbability — pool timeout retry (LS-10038)', () => {
+  beforeEach(() => {
+    hasEntitlement.mockReset();
+    hasEntitlement.mockResolvedValue(true);
+    loadLeagueScoringConfig.mockReset();
+    loadLeagueScoringConfig.mockResolvedValue({ multiplierGroups: [] });
+  });
+
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    let call = 0;
+    const players = [{ id: 1, playerId: 11, teamId: 101, positionId: null }];
+    const ctx = makeContext({ id: 7 }, players, () => {
+      call += 1;
+      if (call === 1) {
+        return Promise.reject(
+          new Error('timeout exceeded when trying to connect'),
+        );
+      }
+      return Promise.resolve(players);
+    });
+
+    // No rostered non-benched players means team totals stay 0/0 → null, but
+    // reaching that (rather than the catch-block null from a thrown error)
+    // proves the select was retried rather than failing the field outright.
+    await expect(resolve(SCHEDULED, ctx)).resolves.toBeNull();
+    expect(call).toBe(2);
+  });
+
+  it('does not retry and returns null via the catch block on a non-pool-timeout error', async () => {
+    const ctx = makeContext({ id: 7 }, [], () =>
+      Promise.reject(new Error('syntax error at or near "SELECT"')),
+    );
+
+    await expect(resolve(SCHEDULED, ctx)).resolves.toBeNull();
   });
 });

@@ -227,6 +227,30 @@ function isTransientConnectionError(err: unknown): boolean {
   );
 }
 
+// node-postgres's pool throws this plain Error (no SQLSTATE code) when
+// `connectionTimeoutMillis` elapses waiting for a free client — i.e. the pool
+// is exhausted by concurrent queries within a single request (e.g. several
+// DataLoader batches resolving in parallel). Drizzle wraps it in a
+// DrizzleQueryError with the original error preserved on `.cause`. See LS-8478.
+//
+// This can happen during runWithClient's own `select 1 + 1` health check —
+// acquiring a client for the health check competes for the same pool as
+// every other concurrent query — so runWithClient's retry loop below treats
+// it as recoverable too, not just withPoolTimeoutRetry's post-connect
+// query-level retries. See LS-10037 (items 253/259: the health check itself
+// failing with this exact message under concurrent load).
+const POOL_CONNECTION_TIMEOUT_MESSAGE =
+  'timeout exceeded when trying to connect';
+
+/** True when the pool's own connectionTimeoutMillis elapsed waiting for a client. */
+function isPoolTimeoutError(err: unknown): boolean {
+  return (
+    findInCauseChain(err, (error) =>
+      error.message === POOL_CONNECTION_TIMEOUT_MESSAGE ? true : undefined,
+    ) ?? false
+  );
+}
+
 /** True when Postgres rejected the credentials we connected with. */
 function isAuthFailure(err: unknown): boolean {
   return (
@@ -243,9 +267,13 @@ function isAuthFailure(err: unknown): boolean {
  * Open a database connection, run `callback`, and close the connection.
  *
  * Retries up to MAX_QUERY_RETRIES times on transient Aurora connection errors
- * (SQLSTATE 08xxx / 57Pxx). These codes signal that the TCP connection was
- * severed *before* any write reached the server, so the server-side transaction
- * was never opened and a retry is unconditionally safe.
+ * (SQLSTATE 08xxx / 57Pxx), a severed socket (ECONNRESET etc., LS-9530), or
+ * the pg pool's own connection-timeout message when a burst of concurrent
+ * requests exhausts the pool while this call is still acquiring its client
+ * for the `select 1 + 1` health check below (LS-10037). All three signal
+ * that the TCP connection was severed or never established *before* any
+ * write reached the server, so the server-side transaction was never opened
+ * and a retry is unconditionally safe.
  *
  * **Idempotency contract:** because the callback may execute more than once,
  * callers must ensure it is idempotent (e.g. upserts rather than blind
@@ -296,7 +324,10 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
       const pgCode = extractTransientPgCode(err);
       const authFailure = isAuthFailure(err);
       recoverableError =
-        pgCode !== undefined || isTransientConnectionError(err) || authFailure;
+        pgCode !== undefined ||
+        isTransientConnectionError(err) ||
+        isPoolTimeoutError(err) ||
+        authFailure;
 
       if (authFailure) {
         // Almost certainly a credential rotation that happened inside the
@@ -357,34 +388,30 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
   );
 }
 
-// node-postgres's pool throws this plain Error (no SQLSTATE code) when
-// `connectionTimeoutMillis` elapses waiting for a free client — i.e. the pool
-// is exhausted by concurrent queries within a single request (e.g. several
-// DataLoader batches resolving in parallel). Drizzle wraps it in a
-// DrizzleQueryError with the original error preserved on `.cause`. See LS-8478.
-const POOL_CONNECTION_TIMEOUT_MESSAGE =
-  'timeout exceeded when trying to connect';
-
 const MAX_POOL_TIMEOUT_RETRIES = 2;
 const POOL_TIMEOUT_RETRY_DELAY_BASE_MS = 150;
 
-// Walk err → err.cause → … looking for the pool's connection-timeout message.
-function isPoolTimeoutError(err: unknown): boolean {
-  let current: unknown = err;
-  const seen = new Set<unknown>();
-  while (current instanceof Error && !seen.has(current)) {
-    seen.add(current);
-    if (current.message === POOL_CONNECTION_TIMEOUT_MESSAGE) return true;
-    current = (current as Error & { cause?: unknown }).cause;
-  }
-  return false;
+// True for a burst-of-concurrent-load failure worth retrying: either the
+// pool's own connectionTimeoutMillis message, or a severed-socket error
+// (ECONNRESET etc. — see isTransientConnectionError/LS-9530) on a query that
+// runs against an already-initialized, reused connection later in the same
+// request. Those don't go through runWithClient's own retry loop again —
+// that loop only wraps the initial connect + health check for a given
+// runWithClient call — so a query fired directly against context.db (or
+// inside a DataLoader batch sharing it) needs its own retry here. See
+// LS-10058, where a burst of concurrent DataLoader batches produced
+// "read ECONNRESET" rather than the pool-timeout message on the exact same
+// call site the pool-timeout message hits under lighter contention.
+function isRetryableConcurrencyError(err: unknown): boolean {
+  return isPoolTimeoutError(err) || isTransientConnectionError(err);
 }
 
 /**
- * Run `queryFn`, retrying with backoff if it fails solely because the pool's
- * `connectionTimeoutMillis` elapsed before a client became free. This is a
- * transient condition caused by a burst of concurrent queries sharing a
- * small per-request connection pool — a short delay gives in-flight queries
+ * Run `queryFn`, retrying with backoff if it fails because of a transient
+ * condition caused by a burst of concurrent queries sharing a small
+ * per-request connection pool — either the pool's `connectionTimeoutMillis`
+ * elapsing before a client became free, or the underlying socket being
+ * severed under that same contention. A short delay gives in-flight queries
  * time to release their connection, after which a retry typically succeeds.
  *
  * Any other error (including real Postgres failures) is rethrown immediately.
@@ -396,10 +423,16 @@ export async function withPoolTimeoutRetry<T>(
     try {
       return await queryFn();
     } catch (err) {
-      if (isPoolTimeoutError(err) && attempt < MAX_POOL_TIMEOUT_RETRIES) {
+      if (
+        isRetryableConcurrencyError(err) &&
+        attempt < MAX_POOL_TIMEOUT_RETRIES
+      ) {
         const delayMs = POOL_TIMEOUT_RETRY_DELAY_BASE_MS * (attempt + 1);
+        const reason = isPoolTimeoutError(err)
+          ? 'pool exhausted'
+          : 'severed connection under load';
         LOGGER.warn(
-          `DB pool connection timeout (pool exhausted), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_POOL_TIMEOUT_RETRIES})`,
+          `DB concurrency-related connection error (${reason}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_POOL_TIMEOUT_RETRIES})`,
           err instanceof Error ? err : new Error(String(err)),
         );
         await new Promise<void>((resolve) => setTimeout(resolve, delayMs));

@@ -9,6 +9,10 @@ import type {
 
 jest.mock('../client/Helpers', () => ({
   runWithPublicClient: jest.fn(),
+  // Pass-through by default; individual tests below override this to
+  // exercise the LS-10037 retry contract without pulling in the real
+  // Helpers module (and its pg/drizzle dependencies).
+  withPoolTimeoutRetry: jest.fn((queryFn: () => unknown) => queryFn()),
 }));
 
 jest.mock('../client/PublicDbClient', () => ({
@@ -171,6 +175,72 @@ describe('ScoringService', () => {
 
       expect(getDetailsSpy).toHaveBeenCalledWith(leagueId);
       expect(result).toBe(expected);
+    });
+  });
+
+  // LS-10037: getActiveProfileDetails is on the hot path for
+  // Matchup.winProbability, resolved once per unresolved matchup — a burst
+  // of concurrent requests can exhaust the shared per-Lambda pool while
+  // waiting for a free connection (including during runWithClient's
+  // internal health check, before any query here even runs), surfacing as
+  // "timeout exceeded when trying to connect". getActiveProfileDetails now
+  // routes through withPoolTimeoutRetry so that specific transient
+  // condition is retried instead of failing the field outright.
+  describe('getActiveProfileDetails — pool timeout retry (LS-10037)', () => {
+    it('delegates through withPoolTimeoutRetry', async () => {
+      publicClientMocks.getActiveScoringProfileForLeague.mockResolvedValue(
+        null,
+      );
+      publicClientMocks.getScoringStatDefinitions.mockResolvedValue([]);
+
+      await service.getActiveProfileDetails(42);
+
+      expect(mockedHelpers.withPoolTimeoutRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries and succeeds after a pool connection-timeout error', async () => {
+      let attempt = 0;
+      mockedHelpers.withPoolTimeoutRetry.mockImplementationOnce(
+        async (queryFn: () => unknown) => {
+          for (;;) {
+            attempt += 1;
+            try {
+              return await queryFn();
+            } catch (err) {
+              if (
+                attempt >= 2 ||
+                !(err instanceof Error) ||
+                err.message !== 'timeout exceeded when trying to connect'
+              ) {
+                throw err;
+              }
+            }
+          }
+        },
+      );
+      mockedHelpers.runWithPublicClient.mockImplementationOnce(
+        (_opts, handler) => {
+          if (attempt === 1) {
+            return Promise.reject(
+              new Error('timeout exceeded when trying to connect'),
+            );
+          }
+          return handler({} as never);
+        },
+      );
+      publicClientMocks.getActiveScoringProfileForLeague.mockResolvedValue(
+        null,
+      );
+      publicClientMocks.getScoringStatDefinitions.mockResolvedValue([]);
+
+      await expect(service.getActiveProfileDetails(42)).resolves.toEqual({
+        profileId: null,
+        leagueId: 42,
+        profileName: null,
+        entries: [],
+        definitions: [],
+      });
+      expect(attempt).toBe(2);
     });
   });
 });

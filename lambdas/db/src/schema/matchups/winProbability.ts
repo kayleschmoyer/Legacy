@@ -12,7 +12,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { PublicSchema } from '@legacy-sports/db-client';
+import { PublicSchema, withPoolTimeoutRetry } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   applyMultiplierGroups,
@@ -94,10 +94,17 @@ export async function resolveMatchupWinProbability(
   }
 
   try {
-    const matchupPlayers = await context.db
-      .select()
-      .from(PublicSchema.matchupPlayers)
-      .where(eq(PublicSchema.matchupPlayers.matchupId, matchup.id));
+    // LS-10038: this resolver fans out heavily (see the Promise.all fan-out
+    // below), and it's hit once per unresolved matchup in a league — a
+    // scoring refresh can trigger many of these concurrently against the
+    // same small per-Lambda connection pool. Retry a pool-exhaustion timeout
+    // here rather than surfacing it as a resolver failure (LS-8478 pattern).
+    const matchupPlayers = await withPoolTimeoutRetry(() =>
+      context.db
+        .select()
+        .from(PublicSchema.matchupPlayers)
+        .where(eq(PublicSchema.matchupPlayers.matchupId, matchup.id)),
+    );
 
     if (matchupPlayers.length === 0) return null;
 
