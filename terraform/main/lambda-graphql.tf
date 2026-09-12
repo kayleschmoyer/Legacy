@@ -325,22 +325,19 @@ resource "aws_lambda_function" "graphql" {
       # other GraphQL) requests from the browser are not blocked by the Lambda's
       # origin-reflection guard in handler.ts.
       # Falls back to the handler's built-in default when domain_name is empty.
-      # In dev, also allow localhost dev-server origins: web app on :4200,
-      # storybook on :4280 (plus its 127.0.0.1 form — Playwright's webServer
-      # health check hits the E2E static server via 127.0.0.1:4280, not
-      # localhost:4280), and :4300 (the `vite preview` port used by both
-      # apps/web and apps/graphql-explorer) so developers can hit the dev
-      # backend from a local frontend without tripping the origin-reflection
-      # guard (LS-4546, LS-9160).
-      CORS_ALLOWED_ORIGINS = join(",", concat(
-        [var.domain_name != "" ? "https://${var.domain_name}" : "https://legacy-fantasy.com"],
-        var.environment == "dev" ? [
-          "http://localhost:4200",
-          "http://localhost:4280",
-          "http://127.0.0.1:4280",
-          "http://localhost:4300",
-        ] : []
-      ))
+      CORS_ALLOWED_ORIGINS = var.domain_name != "" ? "https://${var.domain_name}" : "https://legacy-fantasy.com"
+
+      # In dev, local frontend tooling (vite, `vite preview`, storybook, a
+      # worktree's own dev server, Playwright's webServer health check via
+      # 127.0.0.1, ...) each pick their own port, so an exact-match port list
+      # in CORS_ALLOWED_ORIGINS goes stale every time a new one shows up —
+      # this has been re-filed and re-"fixed" by adding one more port three
+      # times now (LS-4546: :4200/:4280, LS-9160: :4300/127.0.0.1:4280,
+      # LS-10065: yet another new port). Instead of another exact entry, allow
+      # any localhost/127.0.0.1 origin on any port in dev; handler.ts's
+      # isOriginAllowed() only honors this when var.environment == "dev", so
+      # staging/prod stay exact-match only.
+      CORS_ALLOW_ANY_LOCALHOST_PORT = var.environment == "dev" ? "true" : "false"
 
       # MLB data provider configuration
       MLB_DATA_PROVIDER            = var.mlb_data_provider

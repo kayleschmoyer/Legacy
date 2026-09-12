@@ -26,6 +26,32 @@ function getAllowedOrigins(): Set<string> {
   );
 }
 
+// Matches http(s)://localhost or http(s)://127.0.0.1 on any port (or no
+// port). Local dev/preview tooling (vite, vite preview, storybook, a
+// worktree's own dev server, Playwright's webServer health check, ...) picks
+// an arbitrary port per app/session, so a growing exact-match list of ports
+// in CORS_ALLOWED_ORIGINS goes stale every time a new one shows up — see
+// LS-4546, LS-9160, LS-8342, LS-10065, all filed for exactly this reason.
+const LOCALHOST_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+/**
+ * True if `origin` should be treated as allowed: either an exact match in
+ * `allowed`, or — only when CORS_ALLOW_ANY_LOCALHOST_PORT is enabled, which
+ * is wired to "true" for the dev environment only (see
+ * terraform/main/lambda-graphql.tf) — any localhost/127.0.0.1 origin
+ * regardless of port. Production/staging never set that env var, so origin
+ * matching there stays exact-match only.
+ */
+function isOriginAllowed(origin: string, allowed: Set<string>): boolean {
+  if (allowed.has(origin)) {
+    return true;
+  }
+  return (
+    process.env.CORS_ALLOW_ANY_LOCALHOST_PORT === 'true' &&
+    LOCALHOST_ORIGIN_PATTERN.test(origin)
+  );
+}
+
 /**
  * Build CORS + security headers for a request, reflecting the validated origin.
  * If the request origin is not in the allowlist, Access-Control-Allow-Origin is
@@ -49,7 +75,7 @@ export function getCorsHeaders(
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Content-Security-Policy': "default-src 'none'",
   };
-  if (origin && allowed.has(origin)) {
+  if (origin && isOriginAllowed(origin, allowed)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Vary'] = 'Origin';
   } else if (origin) {
