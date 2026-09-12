@@ -282,7 +282,9 @@ jobs:
     # triggers uniformly. Skipped only when `resolve` itself didn't complete
     # (so we have no PR number to operate on) or when the workflow was
     # dispatched manually (no label to remove).
-    if: always() && needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run:integration')
+    if: >-
+      always() && needs.resolve.result != 'skipped' && needs.resolve.result != 'cancelled' &&
+      github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run:integration')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

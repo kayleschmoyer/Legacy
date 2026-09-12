@@ -405,7 +405,8 @@ runs:
           if [ "${FLAKY_TESTS:-0}" -gt 0 ]; then
             echo "- **Flaky (passed on retry)**: $FLAKY_TESTS ⚠️" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ LS-9727: the following test(s) failed at least once but passed on retry. This does not fail the shard, but a test appearing here repeatedly across runs is a real problem worth its own ticket — it is not being silently masked:" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ LS-9727: the following test(s) failed at least once but passed on retry. This does not fail the shard,"\
+              "but a test appearing here repeatedly across runs is a real problem worth its own ticket — it is not being silently masked:" >> $GITHUB_STEP_SUMMARY
             jq -r "$JQ_BASE | map(select((.results | length) > 1 and .results[-1]?.status == \"passed\")) | .[].title" \
               "$RESULTS_FILE" 2>/dev/null | sed 's/^/  - /' >> $GITHUB_STEP_SUMMARY || true
           fi

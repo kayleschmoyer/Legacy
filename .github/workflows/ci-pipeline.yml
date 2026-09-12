@@ -563,7 +563,16 @@ jobs:
           set -o pipefail
           node scripts/check-migration-immutability.js --branch 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"
 
-      - name: "Workflow working-directory existence (LS-4910)"
+      # validate-workflows.js runs yamllint and FAILS in CI if it is missing
+      # (LS-10104). Before this step existed the runner had no yamllint, so the
+      # lint silently skipped here while reporting green. Pinned to the
+      # version .yamllint.yml was verified against.
+      - name: "Install yamllint"
+        run: |
+          uv tool install yamllint==1.38.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+
+      - name: "Workflow validation: schema, working-directory, yamllint"
         run: |
           set -o pipefail
           node scripts/validate-workflows.js 2>&1 | tee -a "$RUNNER_TEMP/ci-custom-checks.log"

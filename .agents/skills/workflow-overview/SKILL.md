@@ -91,7 +91,7 @@ The full pre-commit validation pipeline backed by the `pre-commit` Makefile targ
 4. `nx affected -t typecheck` -- TypeScript type checking on affected projects
 5. `nx format:write` -- auto-formats code; if the working tree was clean, it formats and commits the rewrites as a new commit (never amends the tip — LS-8367), otherwise you must commit the formatted files and re-run
 6. `scripts/lint-fix-changed.js` auto-fixes only files changed vs the merge-base, then `nx affected -t lint` (no `--fix`) checks every affected project -- scoping autofix to the diff prevents ESLint from rewriting files the agent never touched (LS-8777)
-7. Workflow validation (`scripts/validate-workflows.js`)
+7. Workflow validation (`scripts/validate-workflows.js`) -- JSON schema, working-directory paths, and yamllint over every workflow/action file. Without yamllint installed locally it prints a `yamllint DID NOT RUN` banner and continues; under `CI` or `REQUIRE_YAMLLINT=1` that is a failure (LS-10104)
 8. `nx affected -t test` -- Jest unit/integration tests on affected projects
 9. `nx affected -t build` -- build validation on affected projects
 

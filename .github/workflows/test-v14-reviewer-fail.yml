@@ -68,7 +68,10 @@ jobs:
           echo "[test-v14] Running reviewer with REVIEWER_FORCE_FAIL=true against PR #${{ inputs.pr_number }}"
           node .github/scripts/reviewer/index.mjs
       - name: Verify force-fail completed
-        run: echo '[test-v14] Reviewer force-fail run complete — verify COMMENT review and review-bot-degraded label on PR #${{ inputs.pr_number }}'
+        # Block scalar: in a plain scalar, " #" starts a YAML comment, which
+        # silently truncated this command at "PR" (LS-10104).
+        run: |
+          echo '[test-v14] Reviewer force-fail run complete — verify COMMENT review and review-bot-degraded label on PR #${{ inputs.pr_number }}'
       - name: Verify review-bot-degraded label applied (AC3)
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}

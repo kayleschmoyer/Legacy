@@ -70,7 +70,7 @@ When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job,
 - `lint` — `nx affected -t lint`, then a Prettier format check over the PR's changed files as a second step (LS-8901: the former standalone `format` job was merged into `lint` to save a runner spin-up + `pnpm install` per PR push; the job exposes separate `lint-failure-excerpt` / `format-failure-excerpt` outputs so failure reporting/labels still distinguish the two)
 - `test` — `nx affected -t typecheck test` (with `NODE_OPTIONS=--max_old_space_size=2048` — lower than the 4096 MB global default to prevent OOM when a lockfile change marks all projects affected)
 - `build` — web/mobile/lambda builds + terraform validate as flagged by detect-changes; uploads the web artifact for e2e
-- `custom-checks` — agent-skill lint, migration immutability, workflow validation, touch-map freshness (advisory), repo-script unit suites (`scripts/` and `.github/scripts/`)
+- `custom-checks` — agent-skill lint, migration immutability, workflow validation (schema + working-directory + yamllint; the job installs a pinned yamllint via uv, and a missing yamllint fails the check under `CI` rather than silently skipping — LS-10104), touch-map freshness (advisory), repo-script unit suites (`scripts/` and `.github/scripts/`)
 - `lockfile-check` — `pnpm-lock.yaml` drift
 
 Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci` label — a footgun once `CI Gate` is required; see [the skip-ci footgun](../../pr-lifecycle/references/ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected).

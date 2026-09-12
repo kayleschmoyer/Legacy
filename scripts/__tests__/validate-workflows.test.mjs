@@ -31,6 +31,7 @@ const {
   loadSchema,
   WORKFLOW_SCHEMA_PATH,
   ACTION_SCHEMA_PATH,
+  isYamllintRequired,
 } = require(resolve(__dirname, '..', 'validate-workflows.js'));
 
 const Ajv = require('ajv');
@@ -293,33 +294,84 @@ test('checkWorkingDirectoryPaths flags paths that exist but are files, not direc
 // `python -m yamllint`, which is stricter (e.g. the repo's 200-char
 // line-length rule). That let `make pc` / `pc-workflows` report green on a
 // diff the pre-commit hook would still block. These tests cover both the
-// happy path and the graceful-degrade path when python/yamllint is missing.
+// happy path and the missing-yamllint path.
+//
+// LS-10104: the missing-yamllint path used to return success everywhere,
+// which made the check a silent no-op on CI runners (no yamllint installed).
+// It now FAILS when required (CI / REQUIRE_YAMLLINT) and only stays non-fatal,
+// with a loud banner, on a local dev box.
 // ---------------------------------------------------------------------------
 
-test('isYamllintAvailable returns null when no candidate binary exists', () => {
-  assert.equal(isYamllintAvailable(['no-such-python-binary-ls-9911']), null);
-});
+const MISSING = [['no-such-yamllint-binary-ls-10104']];
 
-test('runYamllintCheck degrades gracefully (returns true, does not throw) when yamllint is unavailable', () => {
-  const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+function withMissingYamllint(env) {
+  const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-10104-'));
   try {
     const filePath = join(tmpRepo, 'workflow.yml');
     writeFileSync(filePath, `${'x'.repeat(500)}\n`);
-
-    const ok = runYamllintCheck({
+    return runYamllintCheck({
       workflowFiles: [filePath],
       actionFiles: [],
       repoRoot: tmpRepo,
-      pythonCandidates: ['no-such-python-binary-ls-9911'],
+      candidates: MISSING,
+      env,
     });
-
-    // Missing tooling must never hard-crash the validator, and must not
-    // silently report success either (visible warning is asserted via a
-    // captured console.log below rather than duplicated here).
-    assert.equal(ok, true);
   } finally {
     rmSync(tmpRepo, { recursive: true, force: true });
   }
+}
+
+test('isYamllintAvailable returns null when no candidate binary exists', () => {
+  assert.equal(isYamllintAvailable(MISSING), null);
+});
+
+// LS-10104 regression: the npm `yaml-lint` devDependency ships a
+// node_modules/.bin/yamllint that exits 0 on `--version` (printing a bare
+// `1.7.0`) but only checks YAML parses. Under `pnpm run` it shadowed the real
+// linter and the line-length test passed vacuously in CI. Simulated with
+// `node -e` so the test needs no stub files and runs on every platform. The
+// trailing `--` matters: isYamllintAvailable appends `--version`, which node
+// would otherwise consume as its own flag and print node's version instead.
+const fakeVersion = (text) => [
+  process.execPath,
+  '-e',
+  `console.log(${JSON.stringify(text)})`,
+  '--',
+];
+
+test('isYamllintAvailable rejects a runnable binary that is not Python yamllint', () => {
+  assert.equal(isYamllintAvailable([fakeVersion('1.7.0')]), null);
+});
+
+test('isYamllintAvailable accepts a binary that identifies as Python yamllint', () => {
+  const candidate = fakeVersion('yamllint 1.38.0');
+  assert.deepEqual(isYamllintAvailable([candidate]), candidate);
+});
+
+test('isYamllintAvailable skips an impostor and falls through to the real yamllint', () => {
+  const real = fakeVersion('yamllint 1.38.0');
+  assert.deepEqual(isYamllintAvailable([fakeVersion('1.7.0'), real]), real);
+});
+
+test('isYamllintRequired: CI or REQUIRE_YAMLLINT, ignoring falsy spellings', () => {
+  assert.equal(isYamllintRequired({}), false);
+  assert.equal(isYamllintRequired({ CI: 'true' }), true);
+  assert.equal(isYamllintRequired({ CI: '1' }), true);
+  assert.equal(isYamllintRequired({ CI: 'false' }), false);
+  assert.equal(isYamllintRequired({ CI: '0' }), false);
+  assert.equal(isYamllintRequired({ REQUIRE_YAMLLINT: '1' }), true);
+});
+
+test('runYamllintCheck FAILS when yamllint is missing in CI (no silent skip)', () => {
+  assert.equal(withMissingYamllint({ CI: 'true' }), false);
+});
+
+test('runYamllintCheck FAILS when yamllint is missing and REQUIRE_YAMLLINT=1', () => {
+  assert.equal(withMissingYamllint({ REQUIRE_YAMLLINT: '1' }), false);
+});
+
+test('runYamllintCheck is non-fatal when yamllint is missing on a local dev box', () => {
+  assert.equal(withMissingYamllint({}), true);
 });
 
 test('runYamllintCheck returns true when there are no workflow/action files', () => {
@@ -327,21 +379,35 @@ test('runYamllintCheck returns true when there are no workflow/action files', ()
     workflowFiles: [],
     actionFiles: [],
     repoRoot: process.cwd(),
-    pythonCandidates: ['no-such-python-binary-ls-9911'],
+    candidates: MISSING,
+    env: { CI: 'true' },
   });
   assert.equal(ok, true);
 });
 
 // The remaining tests require an actual yamllint installation and are
-// skipped (not failed) when one isn't present, matching the check's own
-// graceful-degrade behavior rather than making CI environment-dependent.
+// skipped when one isn't present locally. CI installs yamllint before
+// custom-checks, so they do run there.
 const yamllintBinary = isYamllintAvailable();
+
+// Each temp repo gets its own .yamllint.yml. Without one, yamllint walks up
+// from the temp dir, finds no project config, and falls back to the ambient
+// user config (~/.config/yamllint/config, XDG_CONFIG_HOME,
+// YAMLLINT_CONFIG_FILE). If that config relaxed line-length, the violation
+// test would pass vacuously. A project config outranks all of those.
+function writeHermeticYamllintConfig(dir) {
+  writeFileSync(
+    join(dir, '.yamllint.yml'),
+    'extends: default\nrules:\n  line-length:\n    max: 80\n',
+  );
+}
 
 test(
   'runYamllintCheck passes on a clean file (requires yamllint)',
   { skip: !yamllintBinary },
   () => {
     const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+    writeHermeticYamllintConfig(tmpRepo);
     try {
       const filePath = join(tmpRepo, 'workflow.yml');
       writeFileSync(filePath, 'on:\n  push:\n');
@@ -363,6 +429,7 @@ test(
   { skip: !yamllintBinary },
   () => {
     const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9911-'));
+    writeHermeticYamllintConfig(tmpRepo);
     try {
       const filePath = join(tmpRepo, 'workflow.yml');
       writeFileSync(

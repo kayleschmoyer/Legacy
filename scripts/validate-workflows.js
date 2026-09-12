@@ -224,39 +224,91 @@ function runWorkingDirectoryCheck({ workflowFiles, actionFiles, repoRoot }) {
 // still block — a validation-gate inconsistency the two checks should not
 // have.
 //
-// Degrades gracefully (a warning, not a failure) when python/yamllint isn't
-// on PATH, since that's an environment gap rather than a workflow-file
-// problem — mirrors the fail-open posture used elsewhere in this file only
-// for genuinely external dependencies, not for the repo's own vendored state.
-function isYamllintAvailable(pythonCandidates = ['python3', 'python']) {
-  for (const python of pythonCandidates) {
-    const result = spawnSync(python, ['-m', 'yamllint', '--version']);
-    if (!result.error && result.status === 0) {
-      return python;
+// Missing yamllint (LS-10104). This used to be a quiet yellow warning that
+// returned success everywhere. CI runners had no yamllint, so the check
+// silently no-op'd in CI for its whole life while the step reported green,
+// and four violations accumulated on main that only local machines with
+// yamllint could see. A check that skips itself while passing is worse than
+// no check. So:
+//   - In CI (`CI` set) or with REQUIRE_YAMLLINT=1, missing yamllint is a
+//     FAILURE. CI installs a pinned yamllint (see ci-pipeline.yml
+//     custom-checks) so this branch should never trigger there.
+//   - On a local dev box it stays non-fatal, because a missing tool is an
+//     environment gap, not a workflow bug, and CI now enforces the rule
+//     regardless. It prints an unmissable banner saying the check DID NOT RUN.
+const DEFAULT_YAMLLINT_CANDIDATES = [
+  ['python3', '-m', 'yamllint'],
+  ['python', '-m', 'yamllint'],
+  // Standalone entrypoint, e.g. from `uv tool install yamllint` or pipx.
+  ['yamllint'],
+];
+
+// Python yamllint identifies itself as `yamllint X.Y.Z`.
+const PYTHON_YAMLLINT_VERSION = /^yamllint \d+\.\d+/m;
+
+// Returns the argv prefix ([command, ...args]) of the first runnable yamllint,
+// or null when none of the candidates work.
+//
+// "Runnable" is not enough: the repo's `yaml-lint` npm devDependency installs
+// its own `node_modules/.bin/yamllint`, which only checks that YAML parses. It
+// prints a bare `1.7.0` for --version and passes a 300-char line. `pnpm run`
+// puts node_modules/.bin first on PATH, so under `pnpm run test:scripts` the
+// bare `yamllint` candidate resolved to it and the lint passed vacuously
+// (LS-10104). Only accept a binary that identifies as Python yamllint.
+function isYamllintAvailable(candidates = DEFAULT_YAMLLINT_CANDIDATES) {
+  for (const candidate of candidates) {
+    const [command, ...args] = candidate;
+    const result = spawnSync(command, [...args, '--version'], {
+      encoding: 'utf8',
+    });
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+    if (
+      !result.error &&
+      result.status === 0 &&
+      PYTHON_YAMLLINT_VERSION.test(output)
+    ) {
+      return candidate;
     }
   }
   return null;
+}
+
+function isYamllintRequired(env = process.env) {
+  const truthy = (v) => Boolean(v) && !['0', 'false'].includes(v.toLowerCase());
+  return truthy(env.CI) || truthy(env.REQUIRE_YAMLLINT);
+}
+
+function reportYamllintDidNotRun(reason, env) {
+  if (isYamllintRequired(env)) {
+    log(
+      `\n❌ yamllint DID NOT RUN (${reason}), and it is required here ` +
+        '(CI or REQUIRE_YAMLLINT=1). Failing rather than silently skipping. ' +
+        'Install it with `uv tool install yamllint` or `pip install yamllint`.',
+      'red',
+    );
+    return false;
+  }
+  const bar = '!'.repeat(72);
+  log(
+    `\n${bar}\n` +
+      `⚠️  yamllint DID NOT RUN: ${reason}.\n` +
+      '   Workflow/action files were NOT linted. CI enforces this check and\n' +
+      '   WILL fail on violations. Install it (`uv tool install yamllint` or\n' +
+      '   `pip install yamllint`), or set REQUIRE_YAMLLINT=1 to make this fatal.\n' +
+      bar,
+    'yellow',
+  );
+  return true;
 }
 
 function runYamllintCheck({
   workflowFiles,
   actionFiles,
   repoRoot,
-  pythonCandidates,
+  candidates,
+  env = process.env,
 }) {
   log('\n🔍 Running yamllint...', 'cyan');
-
-  const python = isYamllintAvailable(pythonCandidates);
-  if (!python) {
-    log(
-      '⚠️  yamllint not available (no `python`/`python3` with the `yamllint` ' +
-        'module found on PATH) — SKIPPING this check. Install it with ' +
-        '`pip install yamllint` to catch these violations here instead of at ' +
-        'commit time.',
-      'yellow',
-    );
-    return true;
-  }
 
   const files = [...workflowFiles, ...actionFiles];
   if (files.length === 0) {
@@ -264,17 +316,25 @@ function runYamllintCheck({
     return true;
   }
 
-  const result = spawnSync(python, ['-m', 'yamllint', ...files], {
+  const runner = isYamllintAvailable(candidates);
+  if (!runner) {
+    return reportYamllintDidNotRun(
+      'no `python -m yamllint` or `yamllint` found on PATH',
+      env,
+    );
+  }
+
+  const [command, ...args] = runner;
+  const result = spawnSync(command, [...args, ...files], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
 
   if (result.error) {
-    log(
-      `⚠️  Failed to invoke yamllint (${result.error.message}) — SKIPPING this check.`,
-      'yellow',
+    return reportYamllintDidNotRun(
+      `failed to invoke yamllint: ${result.error.message}`,
+      env,
     );
-    return true;
   }
 
   if (result.status === 0) {
@@ -518,6 +578,7 @@ module.exports = {
   checkWorkingDirectoryPaths,
   isActionFile,
   isYamllintAvailable,
+  isYamllintRequired,
   runYamllintCheck,
 };
 

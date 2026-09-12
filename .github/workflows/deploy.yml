@@ -343,12 +343,12 @@ jobs:
       contents: write # create-release
       pages: write # GitHub Pages deploy
       id-token: write # AWS OIDC + GitHub Pages
+    # workflow_call outputs (version, build_number, release_tag) are declared in deploy-web.yml
+    # and accessible here via needs.deploy-web.outputs.* in rollup-status
     uses: ./.github/workflows/deploy-web.yml
     secrets: inherit
     with:
       suppress-notifications: true
-    # workflow_call outputs (version, build_number, release_tag) are declared in deploy-web.yml
-    # and accessible here via needs.deploy-web.outputs.* in rollup-status
 
   # ---------------------------------------------------------------------------
   # Child: Build Android App
