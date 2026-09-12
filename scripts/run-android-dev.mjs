@@ -121,7 +121,7 @@ const LONG_PATH_REMEDIATION = [
   'a .claude/worktrees/ checkout can fail with MAX_PATH / CMAKE_OBJECT_PATH_MAX',
   'errors (LS-8811, LS-9443). One-time fix (elevated PowerShell, then reboot):',
   "  New-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem' -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force",
-  'See .agents/skills/worktree-workflow/SKILL.md#known-limitation-native-android-builds-and-windows-max_path.',
+  'See .agents/skills/worktree-workflow/references/windows-long-paths.md.',
 ];
 
 /** Windows-only: warn (never fail) if LongPathsEnabled isn't set to 1. */

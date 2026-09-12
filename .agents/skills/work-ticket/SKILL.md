@@ -61,98 +61,11 @@ work-ticket <ticket-key> [--batch]
 
 ## Step 0: Session initialization
 
-### 0a: Register the active worktree (FIRST — before any worktree MCP tool)
-
-If the session was launched via the launcher's `worktree` checkbox (CWD is `.claude/worktrees/<name>/`), call `worktree_set` immediately:
-
-```
-worktree_set(key: "<absolute .claude/worktrees/... path>")
-```
-
-The worktree MCP server tracks an "active" worktree independently of the session CWD. Without this call it defaults to whatever worktree was active in a previous session, causing `worktree_rename_session`, `worktree_commit`, `worktree_run`, and all other worktree MCP tools to silently target the wrong tree (a past-incident root cause — see the "Agent committed/ran against the WRONG worktree" row in `.agents/skills/failure-archaeology/references/incident-index.md` if you want the ticket history; it has no bearing on the ticket you're working now). Use `pwd` or the `WORKTREE_PATH` env var to get the absolute path.
-
-Skip this sub-step only if no worktree MCP tools will be used in this session (rare — `worktree_rename_session` in Step 1 already requires it).
-
-**If `worktree_set` (or any `worktree_*`/`nx_*`/`make_*` tool) is unexpectedly absent** — `ToolSearch` returns "No matching deferred tools found" for an exact-name query — do not silently fall through to Bash/`git`/`make`/`npx nx` for the rest of the session. This is a recurring, documented failure mode in local Windows launcher-worktree sessions specifically (not only degraded cloud sessions), tracked under LS-8774/LS-9743. Run the [diagnostics checklist](../mcp-first/references/diagnostics.md) first — it already covers this exact symptom (Check 1: `node_modules/.bin/tsx`) with recovery steps — and report the diagnosis before deciding a shell fallback is appropriate for the immediate operation.
-
-### 0b: Verify Jira auth
-
-```
-jira_auth_status()
-```
-
-**If `jira_auth_status` returns a connection error** (the MCP server itself didn't start), wait ~10 seconds and retry once — the `legacy-sports-jira` server sometimes needs a moment to initialize. If it still fails, this is an MCP startup issue, not a credential issue; see the node_modules symlink note in AGENTS.md.
-
-**If `jira_auth_status` doesn't exist at all** (`ToolSearch("select:jira_auth_status")` returns nothing, no error) — distinct from the connection-error case above, this means the `legacy-sports-jira` connector never registered for this session (observed in CCR sessions, LS-9576; the identical symptom recurs in local worktree-launcher sessions too — LS-9749). Retry the `ToolSearch` once after a few seconds first. If it's still absent, this evaluates as `configured: false` below, and the same applies to `legacy-sports-github`'s tools for the rest of this workflow — see the [CCR substitution table](../mcp-first/references/auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576) (also linked from the [local-session variant](../mcp-first/references/auth-and-routing.md#jira-github-hosted-servers-absent-in-a-local-worktree-session-ls-9749)) for the per-tool fallback and which guardrails you need to compensate for by hand. **Do not trust `auth_check_all` alone to rule this out** — its presence-only check can report `ok: true` from local credentials even when the connector never registered; pass `sessionToolNames` (your session's own tool-name list) to get an explicit `rosterAbsent` flag instead (LS-9749).
-
-> **This absence-at-Step-0b check is not final for the session (LS-9370).** In local launcher-worktree sessions the hosted `legacy-sports-jira`/`legacy-sports-github` connectors routinely attach later in the same session — sometimes under a UUID-prefixed tool alias rather than their configured names — after Step 0b already committed to a REST/`acli`/`gh` fallback. Do not run the whole claim → transition → comment → PR lifecycle on that fallback by default: before each subsequent Jira/GitHub-touching step, re-run `ToolSearch` on the bare tool name you need next (e.g. `select:jira_transition`, `select:github_open_pr`) and switch to it if found. Full protocol: [mcp-first — hosted connector late-attach](../mcp-first/references/tool-surfaces.md#hosted-connector-late-attach-ls-9370).
-
-**If `configured: false`**, stop immediately. The error message depends on your environment:
-
-- **Copilot Coding Agent**: "Jira credentials are missing. Add `JIRA_EMAIL` + `JIRA_API_TOKEN` (Basic Auth) or `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID` (OAuth 2.0) to Settings → Environments → `copilot` → Environment secrets, then re-run the task."
-- **Claude Code on the web**: "Jira auth is not configured. Either set credentials in your cloud environment settings, or I can fall back to the native Atlassian plugin — just say so."
-- **Local session**: "Jira auth is not configured. Check your `.netrc` or set `JIRA_EMAIL`/`JIRA_API_TOKEN` env vars."
-
-> **Precondition for Jira access**: use the `legacy-sports-jira` MCP server (or the Atlassian plugin in cloud sessions). `acli` is local-only and not installed in cloud environments — a "command not found" from `acli jira workitem view LS-####` in a cloud session indicates the wrong tool, not an inaccessible Jira. Reserve `acli` for local sessions where both the MCP server and the Atlassian plugin are confirmed unavailable. Note: `configured: true` from `jira_auth_status` confirms credentials are loaded but not reachability — in cloud sessions HTTPS egress to `api.atlassian.com` may be proxy-blocked. If `jira_auth_status` returns `configured: true` but `jira_view` fails with `fetch failed`, see the proxy quirk in `.agents/skills/cloud-agent-mode/SKILL.md`. In worktree sessions where only the Atlassian plugin is available, **never call `mcp__*__getJiraIssue`** — it returns the parent epic's children instead of the requested issue (LS-3715); use `searchJiraIssuesUsingJql(jql: "key = LS-XXXX", maxResults: 1)` instead.
-
-Do not proceed until auth is confirmed working or the user explicitly opts in to a plugin fallback.
+Register the active worktree before any worktree MCP tool, then verify Jira auth (including the retry-once rule for a plain connection error, and the stop-condition when the hosted connector never registers at all): **[references/session-init.md](references/session-init.md)**.
 
 ## Step 1: Orient — read the whole ticket
 
-```
-jira_view(key: "LS-####")
-```
-
-After `jira_view` returns, **rename the current session** to include the ticket key and summary:
-
-```
-worktree_rename_session(title: "LS-#### <summary, truncated to 80 chars>")
-```
-
-**⚠️ Critical — read the full description before continuing.** The ticket summary is never sufficient. The single most common failure mode for this skill is agents skimming the title, building a mental model from the summary alone, and producing a PR that misses ACs or violates `Out of Scope`. Defeat that mode here:
-
-1. **Read the full `jira_view` response body** — every section, end to end. No skimming. Always pass `include: ['comments']` — clarifications, scope adjustments, and additional ACs are routinely added as comments after ticket creation.
-2. **Quote back the ticket structure into your next assistant message** before any state-changing tool call (no transitions, no worktree creation, no code edits until this is done). Use this exact format. If a section is missing from the ticket, write `MISSING` — do not invent content:
-
-   ```
-   Ticket: LS-####
-   Problem / Context: <quote or paraphrase>
-   Acceptance Criteria:
-     AC1: <verbatim>
-     AC2: <verbatim>
-     AC3: <verbatim>
-     ...
-   Technical Approach: <quote or paraphrase>
-   Out of Scope: <quote or list MISSING>
-   Open Questions: <quote or list MISSING>
-   ```
-
-   Numbering ACs (`AC1`, `AC2`, ...) is required — you will check each one off explicitly in the Leaf Mode self-review gate before being allowed to mark the PR ready.
-
-3. **Self-quiz before proceeding.** You may not move past this gate until you can answer all of the following from the ticket body alone:
-   - What specifically must be true when this ticket is Done?
-   - What must I build, change, or delete to get there?
-   - Which files or systems are in scope, and which are explicitly out of scope?
-   - Is there any AC I cannot currently see a path to satisfying?
-
-> **Precondition for implementation**: every AC must be readable, unambiguous, and answerable from the ticket body alone. If you cannot answer every self-quiz question above, the ticket is underspecified — go to Step 1c for enrichment **before planning begins**. Reading the ticket carefully now costs less than a rejected PR later.
-
-Determine the ticket type and whether it has leaf descendants by fetching the full subtree in one call:
-
-```
-jira_get_all_descendants(key: "LS-####", status: "To Do")
-```
-
-This call traverses the full tree (not just two levels) and returns all leaf-typed To Do descendants annotated with inline blocker status (`blocked` and `blockers[]` per descendant) — no separate `jira_check_blockers` calls are needed.
-
-| Condition                                                                         | Mode                                                                                                                        |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `total == 0` (no To Do leaf descendants)                                          | **Leaf mode** — [references/leaf-mode.md](references/leaf-mode.md)                                                          |
-| `type == "Epic"` (any epic, with or without descendants)                          | **Batch dispatch** — auto-dispatch chips, no user prompt — [references/dispatch-modes.md](references/dispatch-modes.md)     |
-| `total > 0`, `type` in `{Story, Task}`, `--batch` flag absent                     | **Parent Dispatch** — ask the user how to dispatch — [references/dispatch-modes.md](references/dispatch-modes.md)           |
-| `total > 0`, `--batch` present (or implied by user text or bucket-epic detection) | **Batch dispatch** — one chip per unblocked To Do descendant — [references/dispatch-modes.md](references/dispatch-modes.md) |
-
-> **Bucket epic handling — per-child slash command varies by bucket.** Identify the bucket by calling `jira_get_bucket_epic` once per known bucket name (`design-sync`, `mcp-gaps`, `client-bugs`) and matching the input epic key against each returned key. Recognized bucket epics skip the user prompt and auto-batch-dispatch. Never hardcode bucket-epic keys — they rotate; no registry match → treat as a generic bucket epic (`/work-ticket` per child). Decision table: [references/bucket-epic-routing.md](references/bucket-epic-routing.md).
+Read the ticket end to end — the summary is never sufficient — resolve the parent/child shape, check blockers, and decide the dispatch mode: **[references/orient.md](references/orient.md)**.
 
 ## Step 1b: Plan
 

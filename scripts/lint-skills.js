@@ -12,6 +12,8 @@
 //     7. SKILL.md size budget — must be <= SKILL_MD_SIZE_BUDGET_BYTES. SKILL.md is
 //        always-resident (loaded on every substantive task per AGENTS.md routing),
 //        so lookup-table content belongs in references/*.md, loaded on demand.
+//        Enforced for every skill: the LS-9822 grandfather list was emptied and
+//        removed by LS-9982, which restructured the last 13 oversized skills.
 //   WARNINGS (reported, exit 0):
 //     4. `file.ext:NNN` line-number citations — cite anchors/symbols instead
 //     5. Known-retired tool names (they may legitimately appear when documenting
@@ -46,30 +48,6 @@ const SPINE_FILE = join(
 // SKILL.md (purpose, preconditions, a references table, critical rules) fits
 // comfortably under it. See .agents/skills/skill-authoring/SKILL.md.
 const SKILL_MD_SIZE_BUDGET_BYTES = 15 * 1024;
-
-// Grandfathered oversized skills: the budget landed with LS-9822, which
-// restructured mcp-first/pr-lifecycle/cloud-agent-mode (the highest-traffic
-// always-loaded skills) but left every other pre-existing oversized SKILL.md
-// alone — a full corpus-wide restructure is out of scope for one ticket (see
-// LS-9822's ticket notes). Follow-up: LS-9982. These are WARNINGS, not
-// errors, so CI doesn't block on backlog this check didn't create. Remove an
-// entry here (so it reverts to a normal ERROR) as part of restructuring that
-// skill; never add a newly created or freshly-rewritten SKILL.md to this list.
-const SIZE_BUDGET_GRANDFATHERED = new Set([
-  'cloudwatch-archaeology',
-  'design-sync',
-  'dev-environment',
-  'domain-reference',
-  'fix-integration-tests',
-  'nightly-green-campaign',
-  'read-playwright-report',
-  'repo-tooling',
-  'sweep-dependabot',
-  'testing',
-  'work-ticket',
-  'workflow-overview',
-  'worktree-workflow',
-]);
 
 // Tool names retired from the MCP servers / harness. Mentions are warnings,
 // not errors, because docs may legitimately name them when documenting the
@@ -204,14 +182,7 @@ for (const name of dirs) {
         `SKILL.md size budget — move lookup-table/reference content into ` +
         `references/*.md and leave SKILL.md a thin dispatcher. See ` +
         `skill-authoring/SKILL.md.`;
-      if (SIZE_BUDGET_GRANDFATHERED.has(name)) {
-        warnings.push({
-          file: `${name}/SKILL.md`,
-          msg: `[grandfathered, LS-9822] ${msg}`,
-        });
-      } else {
-        errors.push({ file: `${name}/SKILL.md`, msg });
-      }
+      errors.push({ file: `${name}/SKILL.md`, msg });
     }
   }
 

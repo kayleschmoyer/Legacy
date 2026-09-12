@@ -82,48 +82,9 @@ Native lambdas read the database from `.env` (`DATABASE_URL` / `DB_*`) — point
 
 Quick service health check: `make check-services` (probes `/health` on 5000–5003).
 
-## OS support matrix (run-and-operate targets)
-
-| Target                                | Windows | Linux/macOS | Notes                                                                                                                                                |
-| ------------------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make install` / `dev*` / `docker-up` | ✅      | ✅          | `install` routes to the modules-pool linker on Windows                                                                                               |
-| `make sync-env`                       | ✅      | ✅          | `.ps1` on Windows, `.sh` elsewhere; both need AWS creds                                                                                              |
-| `make kill-stale`                     | ✅      | ⛔ stub     | Prints "Windows-only"; on Linux, kill your background shells instead                                                                                 |
-| `make db-restore-dev` / `db-dump-dev` | ✅      | ⛔ stub     | PowerShell scripts; prints a Windows-only message elsewhere                                                                                          |
-| `make db-tunnel`                      | ⛔ stub | ✅          | Prints "requires bash" whenever `OS=Windows_NT` (even under Git Bash); use WSL, or the hosted `db_query` MCP tool ([database](../database/SKILL.md)) |
-| `scripts/db-query.ps1`                | ✅      | ⛔          | Data queries against dev RDS; cross-platform alternative: `ls-cli query-db` or the hosted `db_query` MCP tool ([database](../database/SKILL.md))     |
-| `pnpm run dev:web` wrapper            | ✅      | ⛔          | Plain `make dev-web` works everywhere                                                                                                                |
-
 ## Android native builds on Windows (long-path limitation)
 
-`node scripts/run-android-dev.mjs [--check]` (`make dev-mobile` equivalent for native builds — see [mobile-qa](../mobile-qa/SKILL.md) for emulator sweeps) preflights `LongPathsEnabled` on Windows and warns with the remediation command whenever it's `0`. **This is a warning, not a hard failure** — it can't reliably tell whether the current checkout is short enough to succeed anyway. If a native build (`expo run:android`, `./gradlew assembleDebug|assembleRelease`) then fails with a CMake `CMAKE_OBJECT_PATH_MAX` warning or a cascading `ninja: error: manifest 'build.ninja' still dirty after 100 tries`, this is the cause — see [worktree-workflow's full writeup](../worktree-workflow/SKILL.md#known-limitation-native-android-builds-and-windows-max_path) for the root cause, why `subst`/junction workarounds don't fix it, and the one-time fix.
-
-## The Legacy Sports CLI
-
-Admin, data-loading, and debugging commands live in one Commander program: `apps/cli/src/main.ts`. Full catalog (all commands, grouped by task, with options): [references/cli-commands.md](references/cli-commands.md).
-
-### Invocation per environment
-
-| Environment              | Command                                           | Notes                                                                            |
-| ------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Windows PowerShell       | `.\ls-cli.ps1 <command> [options]`                | Sets a 4 GB Node heap for large player loads                                     |
-| Linux / macOS / Git Bash | `./ls-cli.sh <command> [options]`                 | Both wrappers run `tsx` directly — need `node_modules/.bin/tsx` (`make install`) |
-| Docker stack             | `docker compose run --rm cli <command> [options]` | No local Node env needed; runs against the compose postgres                      |
-| Nx                       | `pnpm exec nx start cli -- <command> [options]`   | Equivalent; `--` separates CLI args from nx args                                 |
-| pnpm shortcuts           | `pnpm run cli:<name>`                             | Only a subset is registered in root `package.json` `scripts`                     |
-
-### Recovery / admin quick reference
-
-| Situation                                            | Command                                                                                                                                                           |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Draft finished but matchups never generated          | `./ls-cli.sh unblock-league --id <leagueId>`                                                                                                                      |
-| Player stats stuck in failed state                   | `./ls-cli.sh retry-failed-players --dry-run` then without `--dry-run`                                                                                             |
-| Leaked E2E/integration test leagues                  | `./ls-cli.sh cleanup-test-leagues --dry-run`                                                                                                                      |
-| Leaked `int-*@test.legacysports.dev` users (LS-4917) | `./ls-cli.sh cleanup-test-users --dry-run`                                                                                                                        |
-| Same person with two accounts (LS-7821)              | `./ls-cli.sh find-duplicate-accounts` → `merge-accounts --dry-run`                                                                                                |
-| Grant a user admin                                   | `./ls-cli.sh set-user-type --email <email> --type admin` — runbook: [docs/operations/promote-user-to-admin.md](../../../docs/operations/promote-user-to-admin.md) |
-
-Destructive commands (`reset-database`, `delete-league`, `merge-accounts`, `cleanup-*`) require an explicit `--confirm`/`--yes` flag and support `--dry-run` where listed — always dry-run first. More oncall runbooks: [docs/operations/](../../../docs/operations/README.md).
+`node scripts/run-android-dev.mjs [--check]` (`make dev-mobile` equivalent for native builds — see [mobile-qa](../mobile-qa/SKILL.md) for emulator sweeps) preflights `LongPathsEnabled` on Windows and warns with the remediation command whenever it's `0`. **This is a warning, not a hard failure** — it can't reliably tell whether the current checkout is short enough to succeed anyway. If a native build (`expo run:android`, `./gradlew assembleDebug|assembleRelease`) then fails with a CMake `CMAKE_OBJECT_PATH_MAX` warning or a cascading `ninja: error: manifest 'build.ninja' still dirty after 100 tries`, this is the cause — see [worktree-workflow's full writeup](../worktree-workflow/references/windows-long-paths.md) for the root cause, why `subst`/junction workarounds don't fix it, and the one-time fix.
 
 ## Where outputs land
 
@@ -133,6 +94,12 @@ Destructive commands (`reset-database`, `delete-league`, `merge-accounts`, `clea
 | Jest coverage                  | `coverage/<project path>` (e.g. `coverage/lambdas/db`)                           |
 | Playwright results (local)     | `apps/web-e2e/test-results/` — `summary.md` (agent-readable) + `results.json`    |
 | Ad-hoc scripts, bundle reports | `scratch/` (gitignored; `scratch/bundle-report.html` from the bundle visualizer) |
+
+## References
+
+- **[references/cli-overview.md](references/cli-overview.md)** — the Legacy Sports CLI: invocation wrappers, per-OS notes, and what it is for. Full command catalog: [references/cli-commands.md](references/cli-commands.md).
+- **[references/os-support.md](references/os-support.md)** — which run-and-operate Make targets work on which OS.
+- **[references/docker-local.md](references/docker-local.md)** — running the stack under Docker.
 
 ## Related skills
 

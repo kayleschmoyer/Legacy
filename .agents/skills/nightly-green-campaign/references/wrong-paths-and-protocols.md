@@ -1,0 +1,34 @@
+# Fenced-Off Wrong Paths, Suite-Config Protocol, and the Open-Workstream Ledger
+
+> Loaded from [nightly-green-campaign SKILL](../SKILL.md).
+
+## Fenced-off wrong paths
+
+Each of these was tried, made things worse, and is now fenced. If your remediation plan matches a row, stop.
+
+| Tempting move                                                                                          | What actually happened                                                                                                                                         | Fence                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Patch the one failing phase of `waitForSeasonActive` (timeout bump, one more reload, one guarded poll) | 10 consecutive tickets, LS-4237→LS-4353 — each single-phase fix let the same class re-fail the next night on a sibling phase                                   | Class-of-bug check is mandatory (Phase 5 rule 1); antipatterns #1/#2 in [e2e-determinism.md](../../testing/references/e2e-determinism.md#antipatterns-from-past-regressions--class-of-bug-catalog)                                    |
+| Add retries to "fix" flake                                                                             | 2 retries hid most real flake from CI signal (measured share in the config comment)                                                                            | `retries: 0` in both Playwright configs (comment in `playwright.integration.config.ts` is the record); the workflow adds no `--retries` for integration                                                                               |
+| Raise the shard count to speed the suite up                                                            | 3 unstaggered shards produced a 39× HTTP 429 cascade (run 27186006949, LS-7866); collapsing to 1 shard then blew the 120-min ceiling at 69/186 tests (LS-7867) | `INTEGRATION_SHARD_CEILING` clamp in the workflow (its env block holds the current value); raise only via the [Suite-config change protocol](#suite-config-change-protocol)                                                           |
+| Turn on `trace: 'retain-on-failure'` in CI for forensics                                               | A single trace zip exceeded GitHub's 100 MB per-file gh-pages limit and broke report deploys (LS-4537)                                                         | `trace: 'off'` in both configs; reproduce locally with `nx_run_e2e_specs(..., withTracing: true)` instead — [e2e-determinism lever 10](../../testing/references/e2e-determinism.md#10-failure-forensics-on-demand-not-retained-in-ci) |
+| Bump a per-phase deadline because "the backend was slow"                                               | Deadline creep from 2→10 min while nightly stayed red; the contention is unbounded by the test's timeout                                                       | Antipattern #4: name the contention axis or escalate to the [ledger](#open-workstream-ledger) items                                                                                                                                   |
+
+## Suite-config change protocol
+
+Applies to any change to `INTEGRATION_SHARD_CEILING`, stagger, workers, `playwright.integration.config.ts`, `integration-shard-weights.json`, `shard-partition.ts`, or global setup/teardown.
+
+1. **Normal PR review** — no suite-config change ships outside the standard PR flow ([pr-lifecycle](../../pr-lifecycle/SKILL.md)).
+2. **Ceiling raises are validated BEFORE merge**: dispatch `run-playwright-tests.yml` with `test-suite=integration` at the proposed count and confirm **0 429-driven failures across ≥2 consecutive runs** — this is the raise protocol recorded in the workflow's own `INTEGRATION_SHARD_CEILING` comment block (the SSOT). Note the workflow clamps `shard-total` to the ceiling, so the validation dispatch must come from the branch that raises the constant.
+3. **All other suite-config changes are observed AFTER merge**: the change is not "done" until **2 consecutive nightly reports show 0 failed / 0 flaked**. Track this as an explicit task; a single clean night is statistical noise.
+4. Success is read from report totals (`summary.md` via `ci_get_playwright_report`), never judged by eye.
+
+## Open-workstream ledger
+
+Structural fixes that would shrink the whole failure surface. Each is OPEN — cite the ticket instead of re-proposing the idea.
+
+| Item                                        | Status              | What closes it                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-spec teardown (LS-4356)                 | OPEN                | Every integration spec deletes its own leagues **by ID** in its `afterAll`; `globalTeardown` then reverts to an all-modes orphan safety net. Doctrine: [integration-testing.md § Test Isolation](../../testing/references/integration-testing.md#7-test-isolation--per-spec-setupteardown-required) |
+| Per-spec user pool (LS-4357)                | OPEN                | JIT-registered ephemeral users per spec replace the shared 14-seat pool defaults — the only full fix for cross-shard shared-user contention (today's dominant nightly failure mode). Until then, mitigation is the write→read visibility pattern (antipattern #3)                                   |
+| Fastest-shard teardown workaround (LS-4318) | WORKAROUND IN PLACE | Sharded runs skip `globalTeardown`'s league sweep (the fastest shard was deleting leagues still in use by slower shards); the next run's `globalSetup` sweeps instead — see the LS-4318 comment in `apps/web-e2e/src/integration/global-teardown.ts`. Superseded when LS-4356 lands                 |

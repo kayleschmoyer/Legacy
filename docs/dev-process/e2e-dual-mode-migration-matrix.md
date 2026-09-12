@@ -5,7 +5,7 @@ convergence). Every spec under `apps/web-e2e/src/integration/tests/` (24 files) 
 scored against the ADR-0016 backend seam (`apps/web-e2e/src/fixtures/dual.ts` +
 `apps/web-e2e/src/fixtures/test-data.ts`). See
 [ADR-0016](../decisions/0016-test-dependency-injection.md) and the
-[testing skill](../../.agents/skills/testing/SKILL.md#test-dependency-injection-adr-0016) for the
+[testing skill](../../.agents/skills/testing/references/test-architecture.md#test-dependency-injection-adr-0016) for the
 mechanism itself.
 
 ## TL;DR
@@ -119,4 +119,4 @@ Child tickets for waves 1-3 are filed under LS-9663 — see ticket comments on L
 ## Standard for new specs
 
 See the "Dual-mode by default" standard added to
-[the testing skill](../../.agents/skills/testing/SKILL.md#dual-mode-by-default-for-new-ui-flow-specs).
+[the testing skill](../../.agents/skills/testing/references/test-architecture.md#dual-mode-by-default-for-new-ui-flow-specs).

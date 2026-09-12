@@ -1,6 +1,6 @@
 # CLI Command Catalog
 
-Every command registered in `apps/cli/src/main.ts`, grouped by task. Invocation wrappers and per-OS notes: [../SKILL.md](../SKILL.md#the-legacy-sports-cli). Examples below use `./ls-cli.sh` — substitute `.\ls-cli.ps1` (Windows) or `docker compose run --rm cli` (Docker) freely.
+Every command registered in `apps/cli/src/main.ts`, grouped by task. Invocation wrappers and per-OS notes: [cli-overview.md](cli-overview.md). Examples below use `./ls-cli.sh` — substitute `.\ls-cli.ps1` (Windows) or `docker compose run --rm cli` (Docker) freely.
 
 **Global options** (any command): `--use-dotenv-file` (default true — reads `.env`), `--log-file <path>` (tee logs to a file).
 

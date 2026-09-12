@@ -41,7 +41,7 @@ audit wave — out of scope for this refresh pass.
 Neither bundle can be fetched from this session (see environment constraint above), so no
 implementation ticket has been filed for either yet — there is no bundle content to scope
 one against. Once either is pulled locally, file its standard design-sync ticket per the
-[per-design ticket template](../../.agents/skills/design-sync/SKILL.md#per-design-ticket-description-template)
+[per-design ticket template](../../.agents/skills/design-sync/references/phase1-cloud-sync.md#per-design-ticket-description-template)
 as part of that pull.
 
 ## AC3 — archive card-feed entry: DONE

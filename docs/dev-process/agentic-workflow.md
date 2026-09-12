@@ -23,23 +23,23 @@ Neither gate may be skipped to "save time".
 
 ## Step-by-step (with canonical references)
 
-| #   | Step             | Canonical reference                                                                                                                                                                             |
-| --- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Claim ticket     | [`workflow-overview` steps 0–3](../../.agents/skills/workflow-overview/SKILL.md#agent-workflow-checklist-steps-016)                                                                             |
-| 2   | Worktree         | [`worktree-workflow`](../../.agents/skills/worktree-workflow/SKILL.md)                                                                                                                          |
-| 3   | Plan + code      | [`planning`](../../.agents/skills/plan-ticket/references/planning.md) · [`architecture` FILE-MAP](../../.agents/skills/architecture/FILE-MAP.md)                                                |
-| 4   | Migrations       | [`repo-tooling`](../../.agents/skills/repo-tooling/SKILL.md)                                                                                                                                    |
-| 5   | `make pc` gate   | [`workflow-overview` Phase 1](../../.agents/skills/workflow-overview/SKILL.md#phase-1-local-validation)                                                                                         |
-| 6   | Self-review gate | [`pr-lifecycle/references/self-review.md`](../../.agents/skills/pr-lifecycle/references/self-review.md)                                                                                         |
-| 7   | Draft PR         | [`pr-lifecycle`](../../.agents/skills/pr-lifecycle/SKILL.md)                                                                                                                                    |
-| 8   | Mark ready       | [`workflow-overview` Phase 2](../../.agents/skills/workflow-overview/SKILL.md#phase-2-pr-creation)                                                                                              |
-| 9   | CI pipeline      | [`workflow-overview` Phase 3](../../.agents/skills/workflow-overview/SKILL.md#phase-3-ci-pipeline) · [ci-checks-reference](../../.agents/skills/pr-lifecycle/references/ci-checks-reference.md) |
-| 10  | Bot review       | [Author Agent Contract](../../.agents/skills/pr-lifecycle/references/author-agent-contract.md)                                                                                                  |
-| 11  | Watch to merge   | [`workflow-overview` Phase 5–6](../../.agents/skills/workflow-overview/SKILL.md#phase-5-jira-branch-sync-jira-branch-syncyml)                                                                   |
-| 12  | Merge queue      | [`workflow-overview` Phase 6](../../.agents/skills/workflow-overview/SKILL.md#phase-6-merge-queue-merge-queueyml)                                                                               |
-| 13  | Post-merge       | [`workflow-overview` Phase 7](../../.agents/skills/workflow-overview/SKILL.md#phase-7-post-merge)                                                                                               |
-| 14  | MCP gap audit    | [`mcp-first` gaps reference](../../.agents/skills/mcp-first/references/gaps.md)                                                                                                                 |
-| 15  | Cleanup          | [`worktree-workflow`](../../.agents/skills/worktree-workflow/SKILL.md)                                                                                                                          |
+| #   | Step             | Canonical reference                                                                                                                                                                                                |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Claim ticket     | [ticket-to-merge spine, steps 0–3](../../.agents/skills/workflow-overview/references/ticket-to-merge-spine.md)                                                                                                     |
+| 2   | Worktree         | [`worktree-workflow`](../../.agents/skills/worktree-workflow/SKILL.md)                                                                                                                                             |
+| 3   | Plan + code      | [`planning`](../../.agents/skills/plan-ticket/references/planning.md) · [`architecture` FILE-MAP](../../.agents/skills/architecture/FILE-MAP.md)                                                                   |
+| 4   | Migrations       | [`repo-tooling`](../../.agents/skills/repo-tooling/SKILL.md)                                                                                                                                                       |
+| 5   | `make pc` gate   | [`workflow-overview` local validation gates](../../.agents/skills/workflow-overview/references/local-validation-gates.md)                                                                                          |
+| 6   | Self-review gate | [`pr-lifecycle/references/self-review.md`](../../.agents/skills/pr-lifecycle/references/self-review.md)                                                                                                            |
+| 7   | Draft PR         | [`pr-lifecycle`](../../.agents/skills/pr-lifecycle/SKILL.md)                                                                                                                                                       |
+| 8   | Mark ready       | [`workflow-overview` local tool binding](../../.agents/skills/workflow-overview/references/local-tool-binding.md)                                                                                                  |
+| 9   | CI pipeline      | [`workflow-overview` CI & merge pipeline](../../.agents/skills/workflow-overview/references/ci-and-merge-pipeline.md) · [ci-checks-reference](../../.agents/skills/pr-lifecycle/references/ci-checks-reference.md) |
+| 10  | Bot review       | [Author Agent Contract](../../.agents/skills/pr-lifecycle/references/author-agent-contract.md)                                                                                                                     |
+| 11  | Watch to merge   | [`workflow-overview` CI & merge pipeline](../../.agents/skills/workflow-overview/references/ci-and-merge-pipeline.md)                                                                                              |
+| 12  | Merge queue      | [`workflow-overview` merge queue](../../.agents/skills/workflow-overview/references/ci-and-merge-pipeline.md)                                                                                                      |
+| 13  | Post-merge       | [`workflow-overview` post-merge & deploy](../../.agents/skills/workflow-overview/references/post-merge-and-deploy.md)                                                                                              |
+| 14  | MCP gap audit    | [`mcp-first` gaps reference](../../.agents/skills/mcp-first/references/gaps.md)                                                                                                                                    |
+| 15  | Cleanup          | [`worktree-workflow`](../../.agents/skills/worktree-workflow/SKILL.md)                                                                                                                                             |
 
 ## The bot-PR cycle
 
@@ -61,7 +61,7 @@ These are the moments where an agent must **stop and ask** rather than improvise
 
 - A blocker ticket is not yet "In Review" or "Done" → halt and surface to the user.
 - `make pc` fails on a step the agent can't diagnose from the structured `steps[]` output.
-- `node_modules` symlink resolves but `nx` is missing (empty target) → repair per [`workflow-overview` step 5](../../.agents/skills/workflow-overview/SKILL.md#agent-workflow-checklist-steps-016).
+- `node_modules` symlink resolves but `nx` is missing (empty target) → repair per [`workflow-overview` step 5](../../.agents/skills/workflow-overview/references/ticket-to-merge-spine.md).
 - The PR's branch can't be cleanly rebased on `main` and the conflict needs domain judgment.
 - A `CANNOT-COMPLY:` reply is rejected and `bot-review` remains failing → escalate via `review-bot-override` (maintainer action).
 

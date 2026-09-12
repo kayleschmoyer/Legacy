@@ -233,7 +233,7 @@ Zero failures across 50 runs is the bar. Less is statistical noise.
 
 ## Antipatterns from past regressions — class-of-bug catalog
 
-These five patterns account for the bulk of nightly-only integration failures in this repo over the last six weeks. Each is documented with its symptom, why the obvious fix is wrong, and the right fix. When the [fix-integration-tests skill](../../fix-integration-tests/SKILL.md#class-of-bug-check--fix-the-pattern-not-the-phase) sends an agent here, it's because the root cause matches one of these — the agent's mandate is then to fix every instance of the pattern in the file/helper, or file an explicit follow-up listing them.
+These five patterns account for the bulk of nightly-only integration failures in this repo over the last six weeks. Each is documented with its symptom, why the obvious fix is wrong, and the right fix. When the [fix-integration-tests skill](../../fix-integration-tests/references/workflow.md#class-of-bug-check--fix-the-pattern-not-the-phase) sends an agent here, it's because the root cause matches one of these — the agent's mandate is then to fix every instance of the pattern in the file/helper, or file an explicit follow-up listing them.
 
 ### 1. `expect.poll` callback throws instead of returning
 

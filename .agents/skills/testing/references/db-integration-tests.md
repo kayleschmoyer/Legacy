@@ -2,6 +2,58 @@
 
 DB integration tests (`*.db.spec.ts`) run Jest against a **real PostgreSQL database** — either local Docker or the dev RDS via SSM tunnel. The DB may contain real production data (players, real leagues owned by real users). All patterns below exist to keep tests isolated from that data.
 
+## Setup and running
+
+DB integration tests live in `lambdas/db/src/schema/*.db.spec.ts`. They use **Jest + real PostgreSQL** (not SQLite, not mocks) via the `jest.db.config.ts` config and the Nx `test:db` target.
+
+**Key files:**
+
+- `lambdas/db/integration-test-setup.ts` — pool setup, `getTestDatabase()`, `cleanupTestData()`, `getTestPlayers()`, exports `integrationTestSchema` (= `PublicSchema` from `@legacy-sports/db-client`)
+- `lambdas/db/integration-test-global-setup.ts` / `…teardown.ts` — Jest globalSetup/Teardown hooks
+- `lambdas/db/jest.db.config.ts` — Jest config (`testMatch: ['**/*.db.spec.ts']`, `testTimeout: 30000`)
+
+**Running locally (Docker Postgres):**
+
+```bash
+# Start Docker Postgres first
+docker compose up -d postgres
+
+# Run via Nx MCP tool (preferred)
+nx_run(project: "db", target: "test:db")
+
+# Shell fallback
+pnpm exec nx run db:test:db
+```
+
+**Running against the dev RDS via SSM tunnel:**
+
+Tunnel setup — tag-based NAT-instance discovery (never hardcode an instance ID; it churns, LS-5247), RDS endpoint discovery, and `make db-tunnel` — is homed in [cloudwatch-archaeology Step 5](../../cloudwatch-archaeology/SKILL.md#step-5--fall-back-to-the-database). With the tunnel up on `localhost:15432`:
+
+```bash
+# 1. Fetch creds from Secrets Manager (name prefix legacy-sports-dev-db-creds-;
+#    find the full suffixed name with: aws secretsmanager list-secrets)
+aws secretsmanager get-secret-value --region us-east-1 \
+  --secret-id "legacy-sports-dev-db-creds-<suffix>" \
+  --query SecretString --output text > scratch/migcreds.json
+
+# 2. Run (NODE_TLS_REJECT_UNAUTHORIZED=0 bypasses self-signed cert over tunnel)
+TEST_DATABASE_URL="postgresql://$(jq -r .username scratch/migcreds.json):$(jq -r .password scratch/migcreds.json)@127.0.0.1:15432/postgres" \
+  NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  pnpm exec nx run db:test:db --skip-nx-cache
+```
+
+**Environment variable:** tests read `TEST_DATABASE_URL` (preferred) or `DATABASE_URL`. Must point to a real PostgreSQL instance.
+
+**Schema access:** always import `integrationTestSchema` from `../../integration-test-setup` — never create a manual SQLite schema mirror. `integrationTestSchema` re-exports `PublicSchema`, so tests always run against the exact production schema.
+
+**Fixtures and cleanup:** see [references/db-integration-tests.md](db-integration-tests.md) for the full fixture model, cleanup strategy, and required patterns when writing new DB tests.
+
+**Cleanup summary:** `cleanupTestData()` deletes only test-owned rows — `DELETE FROM leagues WHERE owner IN (1, 2, 3)` (which cascade-deletes teams, drafts, matchups, draft_picks, etc.) plus bulk-test users 100–119. It never truncates: the DB may contain real production data (real players, real leagues) that must be preserved. See the reference doc for the full invariant.
+
+## DB Integration Test Reference Files
+
+- [DB Integration Tests Guide](db-integration-tests.md) — fixture model, cleanup strategy, ID collision rules, query scoping, player data
+
 ## Fixture Model
 
 ### Pre-seeded Users (IDs 1–3)
