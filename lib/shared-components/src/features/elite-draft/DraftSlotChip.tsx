@@ -39,11 +39,37 @@ const BENCH_POSITION_TYPE = 'BENCH';
 
 export type DraftSlotChipState = 'filled' | 'need' | 'open';
 
-/** Per-size metrics — `md` is the desktop strip, `sm` the phone squad strip. */
-const SIZES = {
-  md: { width: 46, minWidth: 34, mark: 22, pos: 10, monogram: 9, need: 12 },
-  sm: { width: 40, minWidth: 30, mark: 19, pos: 9, monogram: 8, need: 11 },
+/**
+ * Per-size metrics — `md` is the desktop strip, `sm` the phone squad strip.
+ *
+ * `minHeight` is the touch-target floor. The desktop strip is pointer-driven
+ * and lets the chip size to its content (`board.css` `.sb-slot` sets no
+ * height), so `md` is unconstrained; the phone strip is a touch surface and
+ * the design pins it at 44px — `mobile.css` `.mob-squad .sb-slot { flex: 0 0
+ * 40px; min-height: 44px }`, which is also LS-10001's 44px hit-target AC.
+ */
+export const DRAFT_SLOT_CHIP_SIZES = {
+  md: {
+    width: 46,
+    minWidth: 34,
+    minHeight: 0,
+    mark: 22,
+    pos: 10,
+    monogram: 9,
+    need: 12,
+  },
+  sm: {
+    width: 40,
+    minWidth: 30,
+    minHeight: 44,
+    mark: 19,
+    pos: 9,
+    monogram: 8,
+    need: 11,
+  },
 } as const;
+
+const SIZES = DRAFT_SLOT_CHIP_SIZES;
 
 export type DraftSlotChipSize = keyof typeof SIZES;
 
@@ -117,8 +143,10 @@ export function DraftSlotChip({
       data-state={state}
       width={metrics.width}
       minWidth={metrics.minWidth}
+      minHeight={metrics.minHeight}
       flexShrink={0}
       alignItems="center"
+      justifyContent="center"
       gap={4}
       paddingTop={5}
       paddingBottom={6}

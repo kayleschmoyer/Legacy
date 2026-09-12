@@ -234,7 +234,7 @@ jest.mock('./DraftBottomNav', () => ({
       data-active-tab={activeTab}
       data-unread-chat={String(!!unreadChat)}
       data-bottom-inset={String(bottomInset)}
-      onClick={() => onChangeTab('team')}
+      onClick={() => onChangeTab('chat')}
     />
   ),
 }));
@@ -263,26 +263,39 @@ jest.mock('./DraftPickSheet', () => ({
       onClick={onPress}
     />
   ),
+  SQUAD_SHEET_HEIGHT_PERCENT: 74,
+  // The phone board raises two sheets from this one host (LS-10001 added the
+  // squad sheet alongside LS-10002's player browser), so the mock has to honor
+  // `testID` — otherwise both render as `draft-pick-sheet` and every
+  // `getByTestId` here becomes ambiguous.
   DraftPickSheet: ({
     open,
     onOpenChange,
+    title,
     subtitle,
+    heightPercent,
     bottomInset,
+    testID = 'draft-pick-sheet',
     children,
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    title?: string;
     subtitle?: string;
+    heightPercent?: number;
     bottomInset?: number;
+    testID?: string;
     children: React.ReactNode;
   }) => (
     <div
-      data-testid="draft-pick-sheet"
+      data-testid={testID}
       data-open={String(open)}
+      data-title={title ?? ''}
       data-subtitle={subtitle ?? ''}
+      data-height-percent={String(heightPercent)}
       data-bottom-inset={String(bottomInset)}
     >
-      <button onClick={() => onOpenChange(false)}>close-sheet</button>
+      <button onClick={() => onOpenChange(false)}>close-{testID}</button>
       {open ? children : null}
     </div>
   ),
@@ -385,6 +398,13 @@ jest.mock('./DraftPlayersTab', () => ({
 }));
 jest.mock('./DraftQueueTab', () => ({
   DraftQueueTab: () => <div data-testid="draft-queue-tab" />,
+}));
+// Squad strip (LS-10001) — DraftSquadStrip.spec.tsx covers the strip itself;
+// here it only has to be mounted and to raise the squad sheet.
+jest.mock('./DraftSquadStrip', () => ({
+  DraftSquadStrip: ({ onOpen }: { onOpen: () => void }) => (
+    <button data-testid="draft-squad-strip" onClick={onOpen} />
+  ),
 }));
 jest.mock('./DraftTeamTab', () => ({
   DraftTeamTab: () => <div data-testid="draft-team-tab" />,
@@ -1582,7 +1602,7 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
     fireEvent.click(screen.getByTestId('draft-pick-cta'));
-    fireEvent.click(screen.getByText('close-sheet'));
+    fireEvent.click(screen.getByText('close-draft-pick-sheet'));
 
     expect(
       screen.getByTestId('draft-pick-sheet').getAttribute('data-open'),
@@ -1923,7 +1943,81 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
 
     fireEvent.click(nav);
 
-    expect(setActiveTab).toHaveBeenCalledWith('team');
+    expect(setActiveTab).toHaveBeenCalledWith('chat');
+  });
+
+  // ---- Squad strip / squad sheet (LS-10001) ----
+
+  // "Persistent" is the whole point: now that Team has left the tab set, the
+  // strip is the only route to the roster, so it has to survive a tab change.
+  it.each(['board', 'queue', 'chat'] as const)(
+    'keeps the squad strip mounted on the %s tab',
+    (activeTab) => {
+      setupCompactLiveDraft({ ui: { activeTab } });
+
+      render(<EliteDraftBoardScreen {...defaultProps} />);
+
+      expect(screen.getByTestId('draft-squad-strip')).toBeTruthy();
+    },
+  );
+
+  it('raises the squad sheet from the strip, and keeps it down until then', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    const sheet = (): HTMLElement => screen.getByTestId('draft-squad-sheet');
+    expect(sheet().getAttribute('data-open')).toBe('false');
+
+    fireEvent.click(screen.getByTestId('draft-squad-strip'));
+
+    expect(sheet().getAttribute('data-open')).toBe('true');
+    expect(sheet().getAttribute('data-title')).toBe('Squad');
+    // The design's `.mob-sheet { max-height: 74% }`, shorter than the pick
+    // sheet so more of the board stays visible behind it.
+    expect(sheet().getAttribute('data-height-percent')).toBe('74');
+  });
+
+  it('hosts the roster in the squad sheet rather than a tab', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    // Down: the roster is not mounted anywhere, on any tab.
+    expect(screen.queryByTestId('draft-team-tab')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('draft-squad-strip'));
+
+    // Up: the roster — and the compact home for the Draft Details panel that
+    // came with the old Team tab (LS-9857) — is inside the sheet.
+    expect(screen.getByTestId('draft-team-tab')).toBeTruthy();
+  });
+
+  it('dismisses the squad sheet from its own close path', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    fireEvent.click(screen.getByTestId('draft-squad-strip'));
+    expect(
+      screen.getByTestId('draft-squad-sheet').getAttribute('data-open'),
+    ).toBe('true');
+
+    fireEvent.click(screen.getByText('close-draft-squad-sheet'));
+
+    expect(
+      screen.getByTestId('draft-squad-sheet').getAttribute('data-open'),
+    ).toBe('false');
+  });
+
+  it('forwards the bottom safe-area inset to the squad sheet', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
+
+    expect(
+      screen.getByTestId('draft-squad-sheet').getAttribute('data-bottom-inset'),
+    ).toBe('48');
   });
 
   // LS-9444: the draft room is pushed outside the `(tabs)` shell, so its own

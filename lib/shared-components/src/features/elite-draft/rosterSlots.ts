@@ -204,3 +204,23 @@ export function rosterSlotFillCounts(slots: readonly RosterSlotInstance[]): {
     total: slots.length,
   };
 }
+
+/**
+ * Distinct starter slot types still open, in lineup order — the phone squad
+ * strip's "Open slots: 1B, SS" summary (LS-10001, design `.mob-squad .hd .open`).
+ *
+ * Bench slots are excluded for the same reason {@link nextPrioritySlotKey}
+ * skips them: "bench" is not a need you draft *for*. Deduplicated because a
+ * roster with four open SP slots should read "SP", not "SP, SP, SP, SP".
+ * Empty when every starter is filled, which the caller renders as "Roster set".
+ */
+export function openStarterSlotLabels(
+  slots: readonly RosterSlotInstance[],
+): string[] {
+  const seen = new Set<string>();
+  for (const slot of slots) {
+    if (slot.isBench || slot.player != null) continue;
+    seen.add(slot.positionType);
+  }
+  return [...seen];
+}

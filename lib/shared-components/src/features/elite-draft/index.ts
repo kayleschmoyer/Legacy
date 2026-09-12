@@ -66,6 +66,12 @@ export {
 } from './DraftSlotChip';
 export { DraftSlotStrip, type DraftSlotStripProps } from './DraftSlotStrip';
 export {
+  DraftSquadStrip,
+  openSlotsSummary,
+  ROSTER_SET_LABEL,
+  type DraftSquadStripProps,
+} from './DraftSquadStrip';
+export {
   buildRosterSlotInstances,
   nextPrioritySlotKey,
   rosterSlotFillCounts,

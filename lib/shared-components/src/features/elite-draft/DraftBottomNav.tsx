@@ -4,7 +4,6 @@ import {
   ClipboardList,
   LayoutGrid,
   MessageCircle,
-  Users,
 } from '@tamagui/lucide-icons';
 import type { DraftRoomTab } from './hooks/useDraftUIState';
 
@@ -46,7 +45,6 @@ const TABS: ReadonlyArray<{
 }> = [
   { tab: 'board', label: 'Board', Icon: LayoutGrid },
   { tab: 'queue', label: 'Queue', Icon: ClipboardList },
-  { tab: 'team', label: 'Team', Icon: Users },
   { tab: 'chat', label: 'Chat', Icon: MessageCircle },
 ];
 
@@ -57,6 +55,11 @@ const TABS: ReadonlyArray<{
  * No Players tab: the phone player browser lives in the pick sheet raised
  * over the Board tab (LS-10002), so a second route to the same list would
  * only compete with it.
+ *
+ * No Team tab either, for the same reason: LS-10001 moved the roster into the
+ * persistent squad strip pinned directly above this nav, which expands into
+ * the full squad sheet (team switcher included). The roster is now always
+ * visible rather than one of four destinations.
  */
 export function DraftBottomNav({
   activeTab,

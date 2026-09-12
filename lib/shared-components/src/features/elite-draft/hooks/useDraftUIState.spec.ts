@@ -107,12 +107,12 @@ describe('useDraftUIState — Draft Room v2 shell additions (LS-9397)', () => {
     const { result } = renderHook(() => useDraftUIState());
 
     act(() => {
-      result.current.setActiveTab('team');
+      result.current.setActiveTab('queue');
       result.current.setSelectedTeamId(7);
       result.current.setUnreadChat(true);
     });
 
-    expect(result.current.activeTab).toBe('team');
+    expect(result.current.activeTab).toBe('queue');
     expect(result.current.selectedTeamId).toBe(7);
     expect(result.current.unreadChat).toBe(true);
   });

@@ -7,13 +7,21 @@ import {
 import { fireEvent, render, screen } from '../../test-utils';
 
 describe('DraftBottomNav', () => {
-  it('renders the Board, Queue, Team and Chat tabs', () => {
+  it('renders the Board, Queue and Chat tabs', () => {
     render(<DraftBottomNav activeTab="board" onChangeTab={jest.fn()} />);
 
     expect(screen.getByText('Board')).toBeTruthy();
     expect(screen.getByText('Queue')).toBeTruthy();
-    expect(screen.getByText('Team')).toBeTruthy();
     expect(screen.getByText('Chat')).toBeTruthy();
+  });
+
+  // LS-10001: the roster left the tab set for the persistent squad strip
+  // pinned above this nav. Nothing should route to a Team tab any more.
+  it('has no Team tab', () => {
+    render(<DraftBottomNav activeTab="board" onChangeTab={jest.fn()} />);
+
+    expect(screen.queryByText('Team')).toBeNull();
+    expect(screen.queryByTestId('draft-bottom-nav-team')).toBeNull();
   });
 
   // LS-10002: the phone player browser rides in the Board tab's pick sheet,
@@ -42,9 +50,9 @@ describe('DraftBottomNav', () => {
     const onChangeTab = jest.fn();
     render(<DraftBottomNav activeTab="board" onChangeTab={onChangeTab} />);
 
-    fireEvent.click(screen.getByTestId('draft-bottom-nav-team'));
+    fireEvent.click(screen.getByTestId('draft-bottom-nav-queue'));
 
-    expect(onChangeTab).toHaveBeenCalledWith('team');
+    expect(onChangeTab).toHaveBeenCalledWith('queue');
   });
 
   it('shows the unread-chat dot on the Chat tab icon when unreadChat is true', () => {
@@ -77,7 +85,7 @@ describe('DraftBottomNav', () => {
     );
 
     expect(screen.getByTestId('draft-bottom-nav')).toBeTruthy();
-    for (const label of ['Board', 'Queue', 'Team', 'Chat']) {
+    for (const label of ['Board', 'Queue', 'Chat']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });

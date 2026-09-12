@@ -21,7 +21,12 @@ import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
 import { DraftSlotStrip } from './DraftSlotStrip';
 import { DraftPlayersTab } from './DraftPlayersTab';
-import { DraftPickCta, DraftPickSheet } from './DraftPickSheet';
+import {
+  DraftPickCta,
+  DraftPickSheet,
+  SQUAD_SHEET_HEIGHT_PERCENT,
+} from './DraftPickSheet';
+import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
 import { DraftPickToast } from './DraftPickToast';
@@ -275,6 +280,12 @@ function CompactLiveDraftBoard({
   // nothing outside the phone board ever reads it.
   const [pickSheetOpen, setPickSheetOpen] = useState(false);
 
+  // Squad sheet (LS-10001) — raised from the persistent squad strip. Local for
+  // the same reason as the pick sheet above: nothing outside the phone board
+  // reads it. The *selected team* it shows still lives in `useDraftUIState`,
+  // which is what survived the roster tab's removal.
+  const [squadSheetOpen, setSquadSheetOpen] = useState(false);
+
   // AC3 (LS-9402): the same `celebrate` flag the pre-v2 full-screen
   // DraftPickAnnouncement consumed — currently hardcoded on, since there is
   // no user-facing celebration toggle yet (README "Settings surfaced in the
@@ -433,30 +444,6 @@ function CompactLiveDraftBoard({
           onRemove={(playerId) => void actions.handleToggleQueue(playerId)}
           onError={(message) => ui.showToast(message, 'error')}
         />
-      ) : ui.activeTab === 'team' ? (
-        <DraftTeamTab
-          teams={
-            queries.boardOrderedTeams.length > 0
-              ? queries.boardOrderedTeams
-              : queries.leagueTeams
-          }
-          myTeamId={queries.myTeamId}
-          selectedTeamId={ui.selectedTeamId}
-          onSelectTeam={ui.setSelectedTeamId}
-          pickHistory={queries.pickHistory}
-          statsLookup={playerData.statsLookup}
-          leaguePositions={queries.leaguePositions}
-          sport={sport}
-          maxRosterSize={queries.league?.maxRosterSize ?? null}
-          footer={
-            <YStack marginTop="$3">
-              <DraftDetailsPanel
-                settings={draftDetails}
-                testID="draft-details-panel-compact"
-              />
-            </YStack>
-          }
-        />
       ) : ui.activeTab === 'chat' && !hasChatTab ? (
         <YStack
           flex={1}
@@ -542,6 +529,62 @@ function CompactLiveDraftBoard({
           </YStack>
         </>
       )}
+
+      {/* ---- Squad strip (LS-10001): replaces the roster tab ----
+          Outside the activeTab switch on purpose — "persistent" is the point.
+          Now that Team is gone from the nav, this is the *only* route to the
+          roster, so it has to be reachable from Queue and Chat too, not just
+          the Board. Sits directly above the bottom nav, matching the design's
+          `.mob-squad` as the bottom-most band with the CTA above it. */}
+      <DraftSquadStrip
+        leaguePositions={queries.leaguePositions}
+        players={playerData.myTeam}
+        sport={sport}
+        maxRosterSize={queries.league?.maxRosterSize ?? null}
+        onOpen={() => setSquadSheetOpen(true)}
+      />
+
+      {/* ---- Squad sheet (LS-10001): the expanded strip ----
+          Hosts the existing DraftTeamTab verbatim rather than a second roster
+          view — it already owns the team switcher the design's `.mob-sheet`
+          keeps ("any team's roster is inspectable") and the compact home for
+          the Draft Details panel (LS-9857), both of which would otherwise be
+          lost with the tab. */}
+      <DraftPickSheet
+        open={squadSheetOpen}
+        onOpenChange={setSquadSheetOpen}
+        title="Squad"
+        heightPercent={SQUAD_SHEET_HEIGHT_PERCENT}
+        testID="draft-squad-sheet"
+        bottomInset={bottomInset}
+      >
+        {/* No wrapper scroller: DraftTeamTab owns its own ScrollView (the one
+            its `footer` renders inside), and nesting a second would strand the
+            inner list's gesture. The sheet frame only bounds it. */}
+        <DraftTeamTab
+          teams={
+            queries.boardOrderedTeams.length > 0
+              ? queries.boardOrderedTeams
+              : queries.leagueTeams
+          }
+          myTeamId={queries.myTeamId}
+          selectedTeamId={ui.selectedTeamId}
+          onSelectTeam={ui.setSelectedTeamId}
+          pickHistory={queries.pickHistory}
+          statsLookup={playerData.statsLookup}
+          leaguePositions={queries.leaguePositions}
+          sport={sport}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
+          footer={
+            <YStack marginTop="$3">
+              <DraftDetailsPanel
+                settings={draftDetails}
+                testID="draft-details-panel-compact"
+              />
+            </YStack>
+          }
+        />
+      </DraftPickSheet>
 
       {/* ---- Pick sheet (LS-10002): the phone tier's one player browser ---- */}
       <DraftPickSheet

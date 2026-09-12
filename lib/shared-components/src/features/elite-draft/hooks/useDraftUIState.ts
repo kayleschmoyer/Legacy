@@ -29,7 +29,13 @@ export interface ToastMessage {
 /** The persistent bottom-nav destinations in the Draft Room v2 shell (LS-9397).
  *  The player browser is not one of them — it rides in the Board tab's pick
  *  sheet (LS-10002). */
-export type DraftRoomTab = 'board' | 'queue' | 'team' | 'chat';
+/**
+ * Phone draft-room tabs. No `team` tab: LS-10001 moved the roster out of the
+ * tab set and into the persistent squad strip pinned above this nav, which
+ * expands into the full squad sheet. `selectedTeamId` below still exists —
+ * the sheet keeps the team switcher, it just no longer has a tab of its own.
+ */
+export type DraftRoomTab = 'board' | 'queue' | 'chat';
 
 /** One queued AI-pick toast (Draft Room v2 header/overlay chrome, LS-9397). Rendering
  *  and dequeue-on-dismiss timing belong to the overlay ticket (child 6) — this hook

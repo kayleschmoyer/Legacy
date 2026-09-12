@@ -15,6 +15,12 @@
  * `DraftRoomMobile.html` and `styles/mobile.css`, wired by the picksheet block
  * in `scripts/draft.js`.
  *
+ * The sheet host is shared, not pick-specific: LS-10001's squad sheet
+ * (`.mob-sheet`) is the same chrome — grab bar, heading, close control, scrim,
+ * bounded internally-scrolling frame — at a different title, height and body,
+ * so it passes `title` / `heightPercent` / `testID` here instead of forking a
+ * second near-identical sheet. `DraftPickCta` below stays pick-specific.
+ *
  * Anchored to the viewport, bounded, internally scrollable: a floating layer
  * that sizes itself to its content lets its bottom controls fall off the fold
  * (LS-8501, and again LS-9900 on the DateTimePicker). Tamagui's modal `Sheet`
@@ -33,6 +39,11 @@ import { withAlpha } from '../../utils/colors';
 /** The design's `.mob-picksheet { max-height: 84% }` — the board stays visible
  *  above it, so the viewer never loses the round they are picking into. */
 export const PICK_SHEET_HEIGHT_PERCENT = 84;
+
+/** The design's `.mob-sheet { max-height: 74% }` — the squad sheet raised from
+ *  the persistent squad strip (LS-10001). Shorter than the pick sheet so more
+ *  of the board stays visible behind a purely informational surface. */
+export const SQUAD_SHEET_HEIGHT_PERCENT = 74;
 
 /** Touch-target floor shared by the CTA and the close control. */
 const MIN_TOUCH = 44;
@@ -114,19 +125,34 @@ export function DraftPickCta(props: DraftPickCtaProps): React.JSX.Element {
 export interface DraftPickSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Sheet heading, also the dialog's accessible name. Defaults to the player
+   * browser's. The phone board raises two sheets from this one host — the
+   * player browser (LS-10002) and the squad sheet (LS-10001) — which differ
+   * only in title, height and body, so they share the chrome rather than
+   * forking a second near-identical sheet.
+   */
+  title?: string;
   /** One-line context under the title, e.g. "Pick #42 · Round 4". */
   subtitle?: string;
+  /** Share of the viewport the sheet snaps to. */
+  heightPercent?: number;
   /** Bottom safe-area inset (LS-9444) — the sheet covers the bottom nav, so it
    *  reserves the system navigation bar itself. */
   bottomInset?: number;
+  /** Overrides the root `testID`, so the two sheets are separately targetable. */
+  testID?: string;
   children: React.ReactNode;
 }
 
 export function DraftPickSheet({
   open,
   onOpenChange,
+  title = 'Available players',
   subtitle,
+  heightPercent = PICK_SHEET_HEIGHT_PERCENT,
   bottomInset = 0,
+  testID = 'draft-pick-sheet',
   children,
 }: DraftPickSheetProps): React.JSX.Element {
   const palette = useDraftPalette();
@@ -140,7 +166,7 @@ export function DraftPickSheet({
       open={open}
       onOpenChange={onOpenChange}
       snapPointsMode="percent"
-      snapPoints={[PICK_SHEET_HEIGHT_PERCENT]}
+      snapPoints={[heightPercent]}
       dismissOnSnapToBottom
       dismissOnOverlayPress
       // The body is a FlatList: letting the frame's pan gesture compete with
@@ -155,18 +181,18 @@ export function DraftPickSheet({
       animation={animation}
     >
       <Sheet.Overlay
-        testID="draft-pick-sheet-scrim"
+        testID={`${testID}-scrim`}
         animation={animation}
         backgroundColor={palette.scrim}
         enterStyle={{ opacity: 0 }}
         exitStyle={{ opacity: 0 }}
       />
       <Sheet.Frame
-        testID="draft-pick-sheet"
+        testID={testID}
         role="dialog"
         aria-modal
-        aria-label="Available players"
-        accessibilityLabel="Available players"
+        aria-label={title}
+        accessibilityLabel={title}
         backgroundColor={palette.surface.surfaceSubtle}
         borderWidth={1}
         borderBottomWidth={0}
@@ -199,11 +225,11 @@ export function DraftPickSheet({
               textTransform="uppercase"
               color={palette.text.fg1}
             >
-              Available players
+              {title}
             </Text>
             {subtitle ? (
               <Text
-                testID="draft-pick-sheet-subtitle"
+                testID={`${testID}-subtitle`}
                 marginTop={3}
                 fontSize={10.5}
                 color={palette.text.fg3}
@@ -214,7 +240,7 @@ export function DraftPickSheet({
             ) : null}
           </YStack>
           <YStack
-            testID="draft-pick-sheet-close"
+            testID={`${testID}-close`}
             minWidth={MIN_TOUCH}
             minHeight={MIN_TOUCH}
             marginTop={-10}
@@ -228,8 +254,8 @@ export function DraftPickSheet({
             accessibilityRole="button"
             tabIndex={0}
             onKeyDown={handleKeyActivate(close)}
-            aria-label="Close available players"
-            accessibilityLabel="Close available players"
+            aria-label={`Close ${title.toLowerCase()}`}
+            accessibilityLabel={`Close ${title.toLowerCase()}`}
           >
             <Text fontSize={19} lineHeight={19} color={palette.text.fg3}>
               ✕
