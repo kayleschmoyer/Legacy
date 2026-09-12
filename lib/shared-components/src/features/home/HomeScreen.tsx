@@ -2883,15 +2883,24 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   const sortedSummaries = useMemo(() => sortByUrgency(leagues), [leagues]);
   const hasLeagues = sortedSummaries.length > 0;
   // Narrow-viewport gate for the "Scoreboard First" returning-user layout
-  // (folded in from MobileHomeScreen by LS-9055) — never the platform. Reads
-  // the `$sm` (≤640px) breakpoint explicitly, rather than `!gtSm`, so the
-  // Tamagui jest mock's base tier (every breakpoint false/undefined) resolves
-  // to the wide branch by default, matching the "base = desktop" convention
-  // the rest of this codebase's tests rely on. Bind `useMedia` through an
-  // explicit signature so the call/result stay type-safe under this
-  // project's typed ESLint rules (same pattern as `LeagueDetailShell.tsx`).
-  const readMedia = useMedia as () => { sm?: boolean };
-  const isNarrow = Boolean(readMedia().sm);
+  // (folded in from MobileHomeScreen by LS-9055) — never the platform.
+  //
+  // Keyed to `$xs` (≤799 — the design system's phone band) rather than `$sm`.
+  // This gate previously read `$sm` under a comment calling it "≤640px": it
+  // was never 640, but at the stock 800 it did approximate the phone
+  // boundary. LS-9898 widened `$sm` to 859, which would have pulled
+  // small-tablet-portrait widths (800–859) into a layout whose whole premise
+  // is "this is a phone" — so the token, not the intent, is what changed
+  // here (LS-9885 audit).
+  //
+  // Read explicitly rather than as `!gtXs` so the Tamagui jest mock's base
+  // tier (every breakpoint false/undefined) resolves to the wide branch by
+  // default, matching the "base = desktop" convention the rest of this
+  // codebase's tests rely on. Bind `useMedia` through an explicit signature
+  // so the call/result stay type-safe under this project's typed ESLint
+  // rules (same pattern as `LeagueDetailShell.tsx`).
+  const readMedia = useMedia as () => { xs?: boolean };
+  const isNarrow = Boolean(readMedia().xs);
 
   const orderedSports = useMemo(
     () =>

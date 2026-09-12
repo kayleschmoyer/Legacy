@@ -594,7 +594,10 @@ describe('HomeScreen', () => {
     };
 
     beforeEach(() => {
-      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+      // `xs`, not `sm`: the narrow gate is keyed to the design system's phone
+      // band (≤799). It read `sm` until LS-9898 widened that token to 859,
+      // which would have put small tablets on the phone layout.
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
     });
 
     it('renders the compact greeting instead of the wide GreetingHeader', () => {
@@ -1021,7 +1024,7 @@ describe('HomeScreen', () => {
     });
 
     it('accepts topInset on the narrow returning-user branch without throwing', () => {
-      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
       expect(() =>
         render(<HomeScreen {...baseProps} leagues={[league]} topInset={44} />),
       ).not.toThrow();
@@ -1047,7 +1050,7 @@ describe('HomeScreen', () => {
     });
 
     it('attaches the ref on the narrow returning-user branch', () => {
-      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
       expect(renderWithRef({ leagues: [league] }).current).not.toBeNull();
     });
 

@@ -210,12 +210,19 @@ export function LeagueDetailHero({
 
   // Responsive tiers (desktop-first, matching this file's existing convention
   // where the un-mediated base = desktop). Design breakpoints ~380/600/780 map
-  // to the nearest Tamagui max-width tokens: base = desktop, `$sm` = ≤800
-  // (compact tablet/large phone), `$xs` = ≤799 (the design system's whole
-  // phone band — crest, invite, and era are dropped here). LS-9897 widened
+  // to the nearest Tamagui max-width tokens: base = desktop, `$sm` = ≤859
+  // (the design system's compact-tablet band), `$xs` = ≤799 (its whole phone
+  // band — crest, invite, and era are dropped here). LS-9897 widened
   // `$xs` from the stock 660 to the design-token 799, so the declutter now
   // covers large phones and small tablets in portrait too, which is the
-  // intended design-system behaviour (the mock's phone band is 0–799). The crest icon `size` is a component prop (not a
+  // intended design-system behaviour (the mock's phone band is 0–799).
+  //
+  // `$sm` stays the right key for the crest SIZE below, and LS-9898 is what
+  // makes it meaningful: because `$xs` drops the crest entirely at ≤799, the
+  // 26px branch could only ever match at exactly 800px while `$sm` was the
+  // stock ≤800. At ≤859 it now covers the whole 800–859 band — the compact
+  // tablet showing a shrunken crest, which is what the design asks for.
+  // The crest icon `size` is a component prop (not a
   // style), so it can't take media props — resolve it via useMedia instead.
   // Bind useMedia through an explicit signature so the call/result stay
   // type-safe under this project's typed ESLint rules (same pattern as the tab

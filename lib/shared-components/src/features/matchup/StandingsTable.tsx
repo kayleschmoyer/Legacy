@@ -455,8 +455,11 @@ function StandingsRow({
  * optional Waiver column. All columns are sortable, including Rank (sorts by
  * win%, the ranking criterion) and Waiver. Supports division grouping (rank
  * resets per division), current-user row highlight, row press navigation,
- * and responsive column hiding (T/Win% hide below `$sm`, PF/PA/Diff/Waiver
- * hide below `$md`).
+ * and responsive column hiding: T/Win% appear from `$gtSm` (≥860) and
+ * PF/PA/Diff/Waiver from `$gtMd` (≥980), so the column set grows with the
+ * design-token bands — minimal ≤859, +T/Win% across 860–979, full from 980.
+ * ("Hide below `$sm`" is the wrong way to read a maxWidth token: `$sm`
+ * matches its own band AND everything narrower.)
  */
 export function StandingsTable({
   standings,

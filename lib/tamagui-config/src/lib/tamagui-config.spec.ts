@@ -4,10 +4,12 @@ jest.mock('@tamagui/config', () => ({
     themes: {},
     tokens: {},
     // The real stock media scale, copied from
-    // node_modules/@tamagui/config/dist/cjs/media.js. Only the keys LS-9885
-    // has not migrated yet are read from here, but the whole set is present
-    // so the "still stock" assertions below compare against real values
-    // rather than `undefined`.
+    // node_modules/@tamagui/config/dist/cjs/media.js. Since LS-9898 the
+    // config overrides every one of these keys, so nothing reads them any
+    // more — the set is kept so the "no key left on the stock scale"
+    // assertion below compares against real values rather than `undefined`,
+    // and so a regression that drops the override is visible as the stock
+    // number rather than as `undefined`.
     media: {
       xl: { maxWidth: 1650 },
       lg: { maxWidth: 1280 },
@@ -99,10 +101,12 @@ describe('media config (design-token breakpoint alignment)', () => {
     // `$gtX` is a minWidth at that same lower bound. The two are complements.
     expect(media.xxs).toEqual({ maxWidth: breakpoints.xs - 1 }); // ≤659
     expect(media.xs).toEqual({ maxWidth: breakpoints.sm - 1 }); // ≤799
+    expect(media.sm).toEqual({ maxWidth: breakpoints.md - 1 }); // ≤859
     expect(media.md).toEqual({ maxWidth: breakpoints.lg - 1 }); // ≤979
     expect(media.lg).toEqual({ maxWidth: breakpoints.xl - 1 }); // ≤1119
     expect(media.xl).toEqual({ maxWidth: breakpoints.xxl - 1 }); // ≤1279
     expect(media.gtXs).toEqual({ minWidth: breakpoints.sm }); // ≥800
+    expect(media.gtSm).toEqual({ minWidth: breakpoints.md }); // ≥860
     expect(media.gtMd).toEqual({ minWidth: breakpoints.lg }); // ≥980
     expect(media.gtLg).toEqual({ minWidth: breakpoints.xl }); // ≥1120
     expect(media.gtXl).toEqual({ minWidth: breakpoints.xxl }); // ≥1280
@@ -127,26 +131,22 @@ describe('media config (design-token breakpoint alignment)', () => {
     expect(settings.mediaQueryDefaultActive.sm).toBe(true);
   });
 
-  it('keeps the not-yet-migrated keys on the stock scale (staged rollout)', () => {
-    // Deleting a line here is the signal that a follow-up slice has landed.
-    expect(media.sm).toEqual({ maxWidth: 800 }); // → LS-9898 → 859
-    expect(media.gtSm).toEqual({ minWidth: 801 }); // → LS-9898 → 860
+  it('leaves no key on the stock @tamagui/config scale', () => {
+    // The staged rollout (LS-9895→9898) is complete: every `$` band and its
+    // `gt` complement is now derived from `breakpoints`. Nothing reads
+    // `config.media` any more, so a key reappearing at a stock value here
+    // means an override crept back in.
+    const stock = { sm: 800, xs: 660, md: 1020, lg: 1280, xl: 1650 };
+    for (const [key, width] of Object.entries(stock)) {
+      expect(media[key].maxWidth).not.toBe(width);
+    }
   });
 
-  it('leaves a transient 1px $sm band, which is valid and not a defect', () => {
-    // LS-9897 takes `xs` to its final 799 while `sm` is still the stock 800,
-    // so the `sm` band is exactly one pixel wide (800–800) until LS-9898
-    // widens `sm` to 859. Pinned deliberately: the monotonic-order assertion
-    // below would also pass if the two collided, and a reviewer seeing a 1px
-    // band should find it asserted as intended rather than guess. No call site
-    // can express a treatment observable only in a 1px window.
-    expect(media.sm.maxWidth).toBe((media.xs.maxWidth as number) + 1);
-  });
-
-  it('keeps the band order monotonic across the staged rollout', () => {
-    // The invariant that makes partial migration safe: each maxWidth band must
-    // stay strictly below the next, or a narrower token would out-rank a wider
-    // one and the mobile-first cascade would invert.
+  it('keeps the band order monotonic', () => {
+    // Each maxWidth band must stay strictly below the next, or a narrower
+    // token would out-rank a wider one and the mobile-first cascade would
+    // invert. Now that every key is derived this also pins the full scale:
+    // 659 < 799 < 859 < 979 < 1119 < 1279 < 1280+.
     const ascending = ['xxs', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
     const widths = ascending.map((key) => media[key].maxWidth as number);
     expect(widths).toEqual([...widths].sort((a, b) => a - b));
@@ -158,6 +158,7 @@ describe('media config (design-token breakpoint alignment)', () => {
   it('makes $X and $gtX exact complements for every migrated pair', () => {
     for (const [band, gt] of [
       ['xs', 'gtXs'],
+      ['sm', 'gtSm'],
       ['md', 'gtMd'],
       ['lg', 'gtLg'],
       ['xl', 'gtXl'],

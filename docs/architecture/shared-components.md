@@ -97,23 +97,24 @@ Tamagui supports inline media-query overrides directly on any primitive:
 ```tsx
 <XStack
   flexDirection="row"
-  $sm={{ flexDirection: 'column' }}   // ≤800px: stack vertically
+  $sm={{ flexDirection: 'column' }}   // ≤859px: stack vertically
   gap="$4"
-  $gtMd={{ gap: '$6' }}               // ≥1021px: wider gap
+  $gtMd={{ gap: '$6' }}               // ≥980px: wider gap
 >
 ```
 
-Tokens as `@tamagui/config` actually compiles them:
+Tokens as this workspace's `media` config compiles them (derived from
+`@legacy-sports/design-tokens`, not `@tamagui/config`'s stock scale):
 
 - `$xxs` — ≤659px
 - `$xs` / `$gtXs` — ≤799px / ≥800px
-- `$sm` / `$gtSm` — ≤800px / ≥801px (the last key still on the stock scale — LS-9898 moves it to 859/860)
+- `$sm` / `$gtSm` — ≤859px / ≥860px
 - `$md` / `$gtMd` — ≤979px / ≥980px
 - `$lg` / `$gtLg` — ≤1119px / ≥1120px
 - `$xl` / `$gtXl` — ≤1279px / ≥1280px
 - `$xxl` — ≥1280px (no `gt` counterpart)
 
-As of LS-9885 these are **derived from `lib/design-tokens/src/lib/breakpoints.ts`** rather than inherited from `@tamagui/config`, so a `$md` prop and `breakpoints.md` describe the same widths. Note the bracket direction still differs: a `breakpoints.X` value is its band's _lower_ bound, while a `$X` media key is a _maxWidth_ at the top of that band. The live per-key status lives in [`responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md#tier-table--ground-truth).
+As of LS-9885 these are **derived from `lib/design-tokens/src/lib/breakpoints.ts`** rather than inherited from `@tamagui/config`, so a `$md` prop and `breakpoints.md` describe the same widths. The alignment completed with LS-9898, so every width above is the live runtime. Note the bracket direction still differs: a `breakpoints.X` value is its band's _lower_ bound, while a `$X` media key is a _maxWidth_ at the top of that band. The canonical tier table lives in [`responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md#tier-table--ground-truth).
 
 ### 2. `useMedia()` hook (conditional rendering)
 

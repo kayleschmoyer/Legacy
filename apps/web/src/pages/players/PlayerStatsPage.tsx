@@ -1250,10 +1250,14 @@ export function PlayerStatsRoute() {
 
   // Viewport-adaptive presentation (LS-9075): phone-width browsers get the
   // card feed (PlayersCardFeed, already shipped on native — LS-8832/LS-9072/
-  // LS-9073), desktop keeps the existing stats table. `media.sm` (maxWidth
-  // 800) is the same breakpoint predicate FootballPlayersPage.tsx already
-  // uses to choose between its own cards/table default, so this stays
-  // consistent with the one other place in the codebase making this call.
+  // LS-9073), desktop keeps the existing stats table. `media.sm` is maxWidth
+  // 859 since LS-9898 aligned the token to the design scale, so the swap now
+  // lands exactly on the mock's phone↔tablet seam (860) instead of 59px
+  // early. The native mirror of this branch — `apps/app`'s
+  // `(tabs)/players.tsx` — reads the same `sm` predicate, so the two
+  // platforms switch presentation at the same width.
+  // (This comment previously cited FootballPlayersPage.tsx as the peer; that
+  // file no longer exists.)
   // Read directly on every render (not seeded once) so resizing the window
   // mid-session — or the phone-width MobileBottomBar's Stats tab landing here
   // — switches presentation immediately, matching the ticket's framing of the

@@ -40,10 +40,10 @@ A `$X` key matches its own band _and everything narrower_ — the mobile-first c
 one pixel below the next band's lower bound. That also makes `$X` and `$gtX` exact complements,
 which is why `mediaQueries` here uses the next band's lower bound for each `gt` query.
 
-**The alignment is landing in slices** (LS-9895 → LS-9896/9897/9898). Until they all land, the
-`md`, `xs` and `sm` rows above describe the target, not today's runtime. The Status column in
-[`responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md) is the live
-state.
+**The alignment is complete** as of LS-9898 (landed in slices LS-9895 → LS-9896 → LS-9897 →
+LS-9898). Every row above is today's runtime, and `lib/tamagui-config`'s
+`tamagui-config.spec.ts` asserts the derivation so a future drift fails CI rather than going
+unnoticed the way the original one did.
 
 **History.** LS-9416 audited this drift and chose to keep the two as separate vocabularies
 (option (c)), removing `xxl`/`gtXl` because no `@tamagui/config` counterpart existed — `$xxl={{ … }}`

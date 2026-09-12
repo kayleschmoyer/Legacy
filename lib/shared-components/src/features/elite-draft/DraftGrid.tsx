@@ -395,10 +395,10 @@ export function DraftGrid({
           // Plain CSS grid sizing, deliberately not Tamagui `$token` style
           // props: structural layout derives from design-token breakpoints
           // (or useDraftViewportTier()), never from Tamagui breakpoint keys.
-          // Those keys are mid-migration onto @legacy-sports/design-tokens a
-          // few at a time (LS-9895 → LS-9898), so which of them still resolve
-          // against @tamagui/config's stock widths changes as that lands —
-          // which is exactly why layout shouldn't be pinned to them. The
+          // Those keys finished migrating onto @legacy-sports/design-tokens
+          // in LS-9895 → LS-9898, so they now agree with the breakpoints this
+          // grid uses; the separation is kept regardless, because structural
+          // layout that reads the tokens directly cannot drift from them. The
           // 132px floor is option C's, widened from 100px to fit the
           // three-line cell (LS-10096).
           gridTemplateColumns: `60px repeat(${teams.length}, minmax(132px, 1fr))`,

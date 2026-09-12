@@ -24,9 +24,16 @@
  *     'none' }}` — hidden at 799px, visible at 800px. `$xs` is the only media
  *     key that element sets `display` on, so the flip reads the `xs` band
  *     directly rather than the resolution of two overlapping keys.
+ *   - the `$sm`/`$gtSm` boundary, which LS-9898 moved from 800/801 → 859/860.
+ *     Probe: `StandingsTable`'s T column header, `display: none` with
+ *     `$gtSm={{ display: 'flex' }}` — hidden at 859px, visible at 860px. Same
+ *     table as the `$md` case above but a different column, so the two bands
+ *     are read independently: T is gated on `$gtSm` alone and PF on `$gtMd`
+ *     alone.
  *
- * LS-9898 (`$sm`) adds its own boundary case here when it lands, so the whole
- * scale ends up pinned at real viewport widths.
+ * With `$sm` covered the whole scale is now pinned at real viewport widths,
+ * which is the point: every band's flip is asserted in a browser, not just in
+ * the config object.
  *
  * Page-object convention (ADR-0015): locators live on `leaguePage`/
  * `standingsPage`, so this spec is selector-free. Viewport is the spec's to
@@ -292,5 +299,78 @@ test.describe('Breakpoint alignment — $xs/$gtXs fire on the design-token scale
     await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
 
     await leaguePage.heroInviteButton.expectHidden();
+  });
+});
+
+/**
+ * Design-token `md` band lower bound — the first width at which `$gtSm` fires
+ * and `$sm` stops applying. Derived, not hardcoded, for the same reason as
+ * `XS_BOUNDARY`.
+ */
+const SM_BOUNDARY = breakpoints.md;
+
+test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale @regression', () => {
+  test(`T column hides one pixel below the boundary (${SM_BOUNDARY - 1}px)`, async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    await page.setViewportSize({ width: SM_BOUNDARY - 1, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    // `$sm` (≤859) leaves this column's base `display: none` in effect.
+    await leaguePage.standingsColumnHeader(/^T$/).expectHidden();
+  });
+
+  test(`T column shows at the boundary (${SM_BOUNDARY}px)`, async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    // `$gtSm` (≥860) has flipped this column to `display: flex`.
+    await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
+  });
+
+  test('the stock Tamagui $gtSm width (801) is no longer the flip point', async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    // The discriminating case: before LS-9898 `$gtSm` resolved to
+    // `minWidth: 801`, so an 830px viewport already revealed the T column.
+    // 830 is now inside the `sm` band and the column stays hidden. This
+    // assertion fails against the stock config.
+    await page.setViewportSize({ width: 830, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    await leaguePage.standingsColumnHeader(/^T$/).expectHidden();
+  });
+
+  test(`both bands resolve independently at the boundary (${SM_BOUNDARY}px)`, async ({
+    page,
+    leaguePage,
+    standingsPage,
+  }) => {
+    // Guards the invariant that made this slice indivisible: `$sm` and
+    // `$gtSm` must be exact complements. If `$sm` had moved to 859 while
+    // `$gtSm` stayed at 801, widths 801–859 would match BOTH keys and this
+    // column's visibility would depend on cascade order rather than width.
+    // At 860 the `gtSm` column is visible while the wider `gtMd` one is not.
+    await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
+    await mockStandingsForBoundary(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
+    await leaguePage.standingsColumnHeader(/^PF$/).expectHidden();
   });
 });

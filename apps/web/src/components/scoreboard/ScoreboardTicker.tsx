@@ -174,7 +174,7 @@ function GameChip({ game }: { game: TickerGame }) {
          * Mobile font-size bumps: the default Tamagui scale renders `$1` at
          * 11 px and `$4` at 14 px, which is barely legible on a scrolling
          * ticker at mobile widths. The `$sm` overrides bump each piece of
-         * text up one to two steps for viewports ≤800 px while preserving
+         * text up one to two steps for viewports ≤859 px while preserving
          * the tighter desktop layout.
          */}
 

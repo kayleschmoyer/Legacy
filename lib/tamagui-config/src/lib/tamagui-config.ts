@@ -502,32 +502,30 @@ const designTokenMedia = {
   gtXl: { minWidth: breakpoints.xxl }, // ≥1280
 } as const;
 
-// Staged rollout (LS-9885). Aligning a media key changes the width at which
-// every `$token` style prop using it fires, across ~51 files — a
-// visual-regression change, not a config one. So the scale migrates one
-// complementary pair at a time, each with its own call-site audit:
+// The staged rollout of this scale (LS-9885) is COMPLETE. Aligning a media key
+// changes the width at which every `$token` style prop using it fires, so the
+// scale migrated one complementary pair at a time, each slice carrying its own
+// call-site audit rather than a mechanical rename:
 //
-//   LS-9895 — xxs, lg, xl, xxl, gtLg, gtXl.  4 existing sites (landed)
-//   LS-9896 — md, gtMd  (53 sites) + elite-draft convergence      (landed)
-//   LS-9897 (this change) — xs, gtXs  (17 sites)
-//   LS-9898               — sm, gtSm  (184 sites) — the bulk, landed last
+//   LS-9895 — xxs, lg, xl, xxl, gtLg, gtXl    4 sites
+//   LS-9896 — md, gtMd + elite-draft convergence   53 sites
+//   LS-9897 — xs, gtXs                        17 sites
+//   LS-9898 — sm, gtSm                       202 sites (the bulk, landed last)
 //
-// Two invariants hold at every step, so no intermediate state is broken:
+// `designTokenMedia` above is now spread unmodified: there are no stock
+// holdouts left, and no `config.media` key is read any more. Two invariants
+// governed every step and still hold as assertions in `tamagui-config.spec.ts`:
 //   1. `$X` and `$gtX` always move together. Moving `$sm` to 859 while `$gtSm`
-//      stayed at 801 would make 801–859 match BOTH keys.
-//   2. Band order stays monotonic — each key's `maxWidth` is below the next's.
-//      Here: xxs 659 < xs 799 < sm 800 < md 979 < lg 1119 < xl 1279 < xxl.
-//      The staging seam is now a 1px `sm` band (800–800): `xs` has reached its
-//      final 799 while `sm` is still the stock 800. That is valid — the two
-//      keys stay distinct and monotonic — and unobservable in practice, since
-//      no call site can express a treatment meaningful only in a 1px window.
-//      LS-9898 widens `sm` to 859 and the seam disappears.
+//      stayed at 801 would have made 801–859 match BOTH keys.
+//   2. Band order stays monotonic — each key's `maxWidth` is below the next's:
+//      xxs 659 < xs 799 < sm 859 < md 979 < lg 1119 < xl 1279 < xxl 1280+.
 //
-// Each entry below is one line to delete when its slice lands.
+// Do NOT reintroduce a `sm: config.media.sm`-style override to "fix" a
+// surface that looks wrong at a new width — that re-opens the drift this
+// ticket closed. Fix the call site against the tier table in
+// `.agents/skills/ui/references/responsive-density.md` instead.
 const media = {
   ...designTokenMedia,
-  sm: config.media.sm, // → LS-9898
-  gtSm: config.media.gtSm, // → LS-9898
   // Not a design-token band — a viewport-HEIGHT escape hatch (LS-9900).
   // `DateTimePicker`'s popover-to-Sheet adaptation was gated on `sm`
   // (viewport WIDTH), the wrong axis for "does this floating layer fit on

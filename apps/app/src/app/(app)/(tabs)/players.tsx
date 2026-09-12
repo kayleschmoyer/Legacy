@@ -444,12 +444,17 @@ export default function PlayersTab(): React.JSX.Element {
 
   // Tablet+ widths get the stats table instead of the card feed; phone
   // widths keep the card feed (LS-9079 — the native mirror of LS-9074's
-  // web-side viewport branching). Reads the `$sm` (≤800px) breakpoint
-  // explicitly, matching the established convention (PlayersScreen.tsx,
-  // apps/web's PlayerStatsPage.tsx/FootballPlayersPage.tsx).
-  // Bind `useMedia` through an explicit signature (matches
-  // PlayersScreen.tsx's LS-9074 pattern) so the call/result stay type-safe
-  // under this project's typed ESLint rules.
+  // web-side viewport branching). Reads the `$sm` (≤859px) breakpoint
+  // explicitly — LS-9898 aligned `$sm` to the design-token scale, so the
+  // card-feed/stats-table swap now happens exactly at the mock's phone↔tablet
+  // seam (860) instead of 59px early.
+  // Matching the established convention in apps/web's PlayerStatsPage.tsx —
+  // the surviving peer that makes this same call. Both other files this
+  // comment used to cite are retired: `FootballPlayersPage` was folded into
+  // PlayerStatsPage (LS-8442) and the `PlayersScreen` shell went with the
+  // sport-agnostic stats refactor, so neither is a live reference.
+  // Bind `useMedia` through an explicit signature (the LS-9074 pattern) so
+  // the call/result stay type-safe under this project's typed ESLint rules.
   const readMedia = useMedia as () => { sm?: boolean };
   const isNarrowViewport = Boolean(readMedia().sm);
 

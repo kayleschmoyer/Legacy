@@ -17,7 +17,11 @@ const Container = styled(YStack, {
   margin: '0 auto',
   padding: '$6',
   gap: '$5',
-  $sm: {
+  // Keyed to `$xs` (≤799), not `$sm` (≤859): this compaction is tuned to
+  // "the container has stopped having viewport slack", and the cap above is
+  // 800. LS-9898 widened `$sm` to 859, which would apply phone padding
+  // while the container still renders at its full width (LS-9885 audit).
+  $xs: {
     padding: '$3',
     gap: '$4',
   },

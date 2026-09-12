@@ -41,6 +41,11 @@ const HeroCard = tamaguiStyled(Card, {
   borderColor: withAlpha(BRAND_GOLD_LIGHT, 0.35),
   backgroundColor: withAlpha(BRAND_NAVY, 0.5),
   width: '100%',
+  // This 800 pin is why every compaction in this file is keyed to `$xs`
+  // (≤799) rather than `$sm`. The two were the same number until LS-9898
+  // widened `$sm` to 859; past that point `$sm` would drop the score type
+  // and padding to phone sizes while the card is still rendering at its
+  // full 800px — phone typography inside a max-width card (LS-9885 audit).
   maxWidth: 800,
 }) as StyledComponent;
 
@@ -54,7 +59,7 @@ const TopBand = tamaguiStyled(XStack, {
   borderBottomColor: withAlpha('#FFFFFF', 0.06),
   flexWrap: 'wrap',
   gap: '$2',
-  $sm: {
+  $xs: {
     paddingHorizontal: '$3',
     paddingVertical: '$2',
   },
@@ -69,7 +74,7 @@ const TeamSide = tamaguiStyled(YStack, {
   gap: '$2',
   paddingVertical: '$5',
   paddingHorizontal: '$3',
-  $sm: {
+  $xs: {
     paddingVertical: '$3',
     paddingHorizontal: '$2',
   },
@@ -83,7 +88,7 @@ const Avatar = tamaguiStyled(YStack, {
   justifyContent: 'center',
   borderWidth: 1,
   borderColor: withAlpha('#FFFFFF', 0.14),
-  $sm: {
+  $xs: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -97,7 +102,7 @@ const ScoreText = tamaguiStyled(Text, {
   letterSpacing: -1,
   lineHeight: 56,
   marginTop: '$1',
-  $sm: {
+  $xs: {
     lineHeight: 42,
   },
 }) as StyledComponent;
@@ -294,7 +299,7 @@ function TeamPanel({
       </Text>
       <ScoreText
         fontSize={52}
-        $sm={{ fontSize: 40 }}
+        $xs={{ fontSize: 40 }}
         color={scoreColor}
         aria-live="polite"
         aria-atomic="true"
@@ -404,7 +409,7 @@ export function MatchupScoreboardHero({
           backgroundColor={withAlpha(BLACK, 0.28)}
           borderBottomWidth={1}
           borderBottomColor={withAlpha(WHITE, 0.06)}
-          $sm={{ paddingHorizontal: '$3' }}
+          $xs={{ paddingHorizontal: '$3' }}
         >
           <XCircle size={14} color={TEXT_MUTED} />
           <Text fontSize="$2" fontWeight="600" color={TEXT_MUTED}>

@@ -290,7 +290,11 @@ export function DateTimePicker({
          * how much room the popover has below it) depends on the host
          * page's own layout, not the picker. `short` (maxHeight 800) covers
          * that axis; `sm` is kept for genuinely narrow viewports where the
-         * popover's own width also doesn't fit. Gated to
+         * popover's own width also doesn't fit. LS-9898 widened `sm` from
+         * ≤800 to ≤859, so the Sheet now also engages across 801–859. That
+         * is the safe direction for this gate — a Sheet is always reachable,
+         * which is the whole point of the adaptation — so the wider band is
+         * deliberate rather than something to claw back. Gated to
          * `Platform.OS === 'web'` so native (which always renders this
          * custom picker) keeps its current behaviour (LS-8501).
          */}

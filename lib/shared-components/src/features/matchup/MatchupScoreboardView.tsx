@@ -35,6 +35,11 @@ const ScoreboardCard = tamaguiStyled(Card, {
   borderWidth: 1,
   borderColor: '$surfacePanelBorder',
   width: '100%',
+  // This 800 pin is why every compaction in this file is keyed to `$xs`
+  // (≤799) rather than `$sm`. The two were the same number until LS-9898
+  // widened `$sm` to 859; past that point `$sm` would drop the score type
+  // and padding to phone sizes while the card is still rendering at its
+  // full 800px — phone typography inside a max-width card (LS-9885 audit).
   maxWidth: 800,
 }) as StyledComponent;
 
@@ -48,7 +53,7 @@ const TopBar = tamaguiStyled(XStack, {
   borderBottomColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
   flexWrap: 'wrap',
   gap: '$2',
-  $sm: {
+  $xs: {
     paddingHorizontal: '$3',
     paddingVertical: '$2',
   },
@@ -72,7 +77,7 @@ const TeamPanel = tamaguiStyled(YStack, {
   paddingVertical: '$5',
   paddingHorizontal: '$4',
   gap: '$2',
-  $sm: {
+  $xs: {
     paddingVertical: '$3',
     paddingHorizontal: '$2',
   },
@@ -84,7 +89,7 @@ const ScoreDisplay = tamaguiStyled(Text, {
   fontVariant: ['tabular-nums'],
   letterSpacing: -1,
   lineHeight: 52,
-  $sm: {
+  $xs: {
     lineHeight: 40,
   },
 }) as StyledComponent;
@@ -297,7 +302,7 @@ export function MatchupScoreboardView({
           backgroundColor="$orange3"
           borderBottomWidth={1}
           borderBottomColor="$orange7"
-          $sm={{ paddingHorizontal: '$3' }}
+          $xs={{ paddingHorizontal: '$3' }}
         >
           <AlertTriangle size={14} color="var(--orange11)" />
           <Text fontSize="$2" fontWeight="600" color="$orange11">
@@ -320,7 +325,7 @@ export function MatchupScoreboardView({
           backgroundColor="$gray3"
           borderBottomWidth={1}
           borderBottomColor="$gray7"
-          $sm={{ paddingHorizontal: '$3' }}
+          $xs={{ paddingHorizontal: '$3' }}
         >
           <XCircle size={14} color="var(--gray11)" />
           <Text fontSize="$2" fontWeight="600" color="$gray11">
@@ -417,7 +422,7 @@ export function MatchupScoreboardView({
           )}
           <ScoreDisplay
             fontSize={48}
-            $sm={{ fontSize: 32 }}
+            $xs={{ fontSize: 32 }}
             color={team1Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {(team1Score == null ? 0 : team1Animated).toFixed(2)}
@@ -532,7 +537,7 @@ export function MatchupScoreboardView({
           )}
           <ScoreDisplay
             fontSize={48}
-            $sm={{ fontSize: 32 }}
+            $xs={{ fontSize: 32 }}
             color={team2Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {(team2Score == null ? 0 : team2Animated).toFixed(2)}

@@ -26,23 +26,25 @@ Adjacent Tamagui rendering traps that bite while restyling per tier — string `
 
 These are the media tokens Tamagui actually compiles. **Use the token names, never raw pixel values** — pixels drift, token names do not.
 
-As of LS-9885 the workspace `media` config is **derived from `@legacy-sports/design-tokens` `breakpoints`**, so a `$md` prop and `breakpoints.md` finally describe the same widths. That alignment is landing in slices, because moving a key changes the width at which every call site using it fires. The **Status** column below is the live state — a row marked _stock_ still fires at the old @tamagui/config width.
+As of LS-9885 the workspace `media` config is **derived from `@legacy-sports/design-tokens` `breakpoints`**, so a `$md` prop and `breakpoints.md` describe the same widths. The alignment landed in slices (LS-9895 → LS-9896 → LS-9897 → LS-9898, complete); every row below is the live runtime, asserted by `lib/tamagui-config/src/lib/tamagui-config.spec.ts`.
 
-| Token  | Fires at | `gt` counterpart   | Status                       | Typical use                          |
-| ------ | -------- | ------------------ | ---------------------------- | ------------------------------------ |
-| `$xxs` | ≤ 659px  | —                  | ✅ aligned                   | Smallest phones. Last-resort tier.   |
-| `$xs`  | ≤ 799px  | `$gtXs` (≥ 800px)  | ✅ aligned                   | Phone. The main "compact" tier.      |
-| `$sm`  | ≤ 800px  | `$gtSm` (≥ 801px)  | ⏳ stock — LS-9898 → 859/860 | Large phone / small tablet portrait. |
-| `$md`  | ≤ 979px  | `$gtMd` (≥ 980px)  | ✅ aligned                   | Tablet. Multi-column starts above.   |
-| `$lg`  | ≤ 1119px | `$gtLg` (≥ 1120px) | ✅ aligned                   | Laptop.                              |
-| `$xl`  | ≤ 1279px | `$gtXl` (≥ 1280px) | ✅ aligned                   | Desktop.                             |
-| `$xxl` | ≥ 1280px | —                  | ✅ aligned (new)             | Wide desktop. Top band.              |
+| Token  | Fires at | `gt` counterpart   | Typical use                          |
+| ------ | -------- | ------------------ | ------------------------------------ |
+| `$xxs` | ≤ 659px  | —                  | Smallest phones. Last-resort tier.   |
+| `$xs`  | ≤ 799px  | `$gtXs` (≥ 800px)  | Phone. The main "compact" tier.      |
+| `$sm`  | ≤ 859px  | `$gtSm` (≥ 860px)  | Large phone / small tablet portrait. |
+| `$md`  | ≤ 979px  | `$gtMd` (≥ 980px)  | Tablet. Multi-column starts above.   |
+| `$lg`  | ≤ 1119px | `$gtLg` (≥ 1120px) | Laptop.                              |
+| `$xl`  | ≤ 1279px | `$gtXl` (≥ 1280px) | Desktop.                             |
+| `$xxl` | ≥ 1280px | —                  | Wide desktop. Top band.              |
 
-Once LS-9898 lands, the whole table reads off the design-token scale and the Status column goes away.
-
-`$sm` is the last stock row, and until LS-9898 moves it to 859 it sits one pixel above the
-now-aligned `$xs` (799) — a transient 1px `sm` band. It is valid and unobservable (no treatment
-is meaningful in a 1px window); do not write a call site that relies on it.
+**`$xs` and `$sm` are 60px apart, and the difference matters.** `$xs` (≤799) is the design
+system's phone band; `$sm` (≤859) adds small-tablet-portrait widths on top of it. Reach for
+`$xs` when the treatment's premise is "this is a phone" — a mobile-only layout, dropping content,
+or a compaction tuned to an 800px-capped container, all of which over-apply at 859. Reach for
+`$sm` for density that should also cover a compact tablet. LS-9898's call-site audit re-keyed
+several sites from `$sm` to `$xs` on exactly this distinction; the reasoning is recorded inline at
+each one.
 
 Three things that bite:
 
@@ -174,14 +176,17 @@ Consequences to plan around:
 
 ## Known drift
 
-**Largely resolved.** LS-9416 first recorded this as two deliberately separate vocabularies;
+**Resolved.** LS-9416 first recorded this as two deliberately separate vocabularies;
 LS-9885 then made `lib/tamagui-config` derive Tamagui's `media` config from
-`lib/design-tokens/src/lib/breakpoints.ts`, so the scales are converging rather than coexisting.
+`lib/design-tokens/src/lib/breakpoints.ts`. The staged rollout is complete — LS-9895
+(`xxs`/`lg`/`xl`/`xxl`), LS-9896 (`md`/`gtMd`), LS-9897 (`xs`/`gtXs`) and LS-9898
+(`sm`/`gtSm`) have all landed — so no key carries stock @tamagui/config values any more and
+the [tier table](#tier-table--ground-truth) is simply the scale.
 
-What remains is the staged rollout: only `sm`/`gtSm` (LS-9898) still carries stock
-@tamagui/config values; `md`/`gtMd` (LS-9896) and `xs`/`gtXs` (LS-9897) have landed. The
-Status column in the [tier table](#tier-table--ground-truth) is the live state — read it there,
-not from a second table here.
+The guard against this recurring is `lib/tamagui-config/src/lib/tamagui-config.spec.ts`,
+which asserts the derivation, plus `apps/web-e2e/src/tests/breakpoint-alignment.spec.ts`,
+which pins every band's flip at a real viewport width. The original drift survived because a
+comment claimed the alignment instead of a test asserting it.
 
 The one difference that is **not** drift and will never go away is the bracket direction:
 `breakpoints.X` is a band's lower bound, a `$X` media key is a maxWidth at the top of that band.
