@@ -95,7 +95,7 @@ export interface MatchupHistoryFilters {
   leagueId: number;
   season?: number | null;
   teamId?: number;
-  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
   startDate?: string;
   endDate?: string;
   /** Maximum number of matchups to return. Applied at the DB level. */

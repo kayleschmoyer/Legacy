@@ -81,6 +81,14 @@ export function statusConfigFor(status?: string | null): MatchupStatusConfig {
         label: 'Scheduled',
         live: false,
       };
+    case MatchupStatus.Bye:
+      return {
+        bg: withAlpha(TEXT_MUTED, 0.14),
+        border: withAlpha(TEXT_MUTED, 0.4),
+        text: TEXT_MUTED,
+        label: 'Bye',
+        live: false,
+      };
     default: {
       // Compile-time exhaustiveness: adding a new MatchupStatus without a case
       // here will cause a TypeScript error.

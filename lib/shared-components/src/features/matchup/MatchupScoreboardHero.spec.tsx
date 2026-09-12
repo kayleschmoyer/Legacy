@@ -212,6 +212,37 @@ describe('MatchupScoreboardHero', () => {
     expect(screen.getByText('Status unknown · Week 5')).toBeTruthy();
   });
 
+  it('shows the Bye chip and dedicated bye layout for a bye-week matchup', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          status: MatchupStatus.Bye,
+          team1: { id: 10, name: 'Team A' },
+          team2: { id: null, name: 'Team 2' },
+        })}
+      />,
+    );
+    expect(screen.getByText('Bye · Week 5')).toBeTruthy();
+    expect(screen.getByText('BYE WEEK')).toBeTruthy();
+    expect(screen.getByText('Team A has no game this week')).toBeTruthy();
+    // The normal VS / two-score layout must not render for a bye matchup.
+    expect(screen.queryByText('VS')).toBeNull();
+    expect(screen.queryByText('0.00')).toBeNull();
+  });
+
+  it('announces the bye team via the live region', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          status: MatchupStatus.Bye,
+          team1: { id: 10, name: 'Team A' },
+          team2: { id: null, name: 'Team 2' },
+        })}
+      />,
+    );
+    expect(screen.getByText('Team A is on a bye this week')).toBeTruthy();
+  });
+
   it('announces the leading team and score via a live region', () => {
     render(<MatchupScoreboardHero {...baseProps()} />);
     expect(screen.getByText('Team B now leads 138.00 to 87.50')).toBeTruthy();

@@ -89,9 +89,18 @@ const matchupRecapSchema = z.object({
 
 // ── Enum Types ───────────────────────────────────────────────────────────────
 
-// Matchup status enum
+// Matchup status enum. 'bye' marks a matchup where one team has no
+// opponent that week (odd-team schedule, or an explicit commissioner bye
+// entry) — it never transitions through in_progress/completed since there
+// is no game to play (LS-6366).
 export const MatchupStatus = builder.enumType('MatchupStatus', {
-  values: ['scheduled', 'in_progress', 'completed', 'cancelled'] as const,
+  values: [
+    'scheduled',
+    'in_progress',
+    'completed',
+    'cancelled',
+    'bye',
+  ] as const,
 });
 
 // Playoff clinch/seeding status enum (LS-6345)
@@ -122,7 +131,7 @@ export const Matchup = builder.objectRef<{
   team2Id: number | null;
   team1Score: string | null; // Decimal stored as string
   team2Score: string | null; // Decimal stored as string
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
   statsLoadingStatus:
     | 'not_started'
     | 'queued'
@@ -591,7 +600,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     team2Id: number | null;
     team1Score: string | null;
     team2Score: string | null;
-    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
     statsLoadingStatus:
       | 'not_started'
       | 'queued'

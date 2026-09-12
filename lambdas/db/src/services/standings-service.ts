@@ -60,7 +60,7 @@ export interface MatchupHistoryParams {
   leagueId: number;
   season?: number | null;
   teamId?: number;
-  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
   startDate?: string;
   endDate?: string;
   limit?: number;

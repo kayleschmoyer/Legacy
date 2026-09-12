@@ -89,12 +89,19 @@ builder.mutationField('createMatchup', (t) =>
         .limit(1);
 
       if (!league[0]) {
-        throw new Error('League not found');
+        throw NotFoundError('League not found');
       }
 
       const gamesPerMatchup =
         args.input.gamesPerMatchup ?? league[0].gamesPerMatchup ?? 5;
       const pitcherStartsPerMatchup = league[0].pitcherStartsPerMatchup ?? 1;
+
+      const team1Id = args.input.team1Id ?? null;
+      const team2Id = args.input.team2Id ?? null;
+      // A matchup with either team missing has no opponent — it's a bye,
+      // not a normal head-to-head, so it never enters the
+      // scheduled -> in_progress -> completed flow (LS-6366).
+      const status = team1Id == null || team2Id == null ? 'bye' : 'scheduled';
 
       // Insert the matchup
       const results = await context.db
@@ -102,13 +109,13 @@ builder.mutationField('createMatchup', (t) =>
         .values({
           leagueId: args.input.leagueId,
           weekNumber: args.input.weekNumber,
-          team1Id: args.input.team1Id ?? null,
-          team2Id: args.input.team2Id ?? null,
+          team1Id,
+          team2Id,
           gamesPerMatchup,
           pitcherStartsPerMatchup,
           startTime: args.input.startTime ?? null,
           endTime: args.input.endTime ?? null,
-          status: 'scheduled',
+          status,
         })
         .returning();
 
@@ -2070,7 +2077,10 @@ export async function adjustMatchupsForNewTotal(
           team2Id: matchup.team2Id,
           gamesPerMatchup,
           pitcherStartsPerMatchup,
-          status: 'scheduled' as const,
+          // Bye-week pairings (team1Id or team2Id null) come through as
+          // status: 'bye' from the scheduler; everything else starts
+          // 'scheduled' (LS-6366).
+          status: matchup.status,
           team1Score: null,
           team2Score: null,
           startTime: null,
@@ -2506,7 +2516,10 @@ builder.mutationField('adminRegenerateLeagueSchedule', (t) =>
             team2Id: matchup.team2Id,
             gamesPerMatchup,
             pitcherStartsPerMatchup,
-            status: 'scheduled',
+            // Bye-week pairings (team1Id or team2Id null) come through as
+            // status: 'bye' from the scheduler; everything else starts
+            // 'scheduled' (LS-6366).
+            status: matchup.status,
             team1Score: null,
             team2Score: null,
             startTime: null,

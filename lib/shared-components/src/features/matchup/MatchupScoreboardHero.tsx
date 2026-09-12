@@ -317,6 +317,7 @@ export function MatchupScoreboardHero({
   scoringIsStale,
   scoringChangeLog,
 }: MatchupScoreboardHeroProps) {
+  const isBye = status === 'bye';
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
@@ -326,8 +327,13 @@ export function MatchupScoreboardHero({
 
   const team1Name = team1.name ?? 'Team 1';
   const team2Name = team2.name ?? 'Team 2';
-  const scoreAnnouncement =
-    preLock && score1 === 0 && score2 === 0
+  // A bye matchup has no opponent — whichever side kept its team id is the
+  // team actually on bye; render that name instead of the two-team layout
+  // (LS-6366).
+  const byeTeamName = (team1.id != null ? team1.name : team2.name) ?? 'Team';
+  const scoreAnnouncement = isBye
+    ? `${byeTeamName} is on a bye this week`
+    : preLock && score1 === 0 && score2 === 0
       ? `${team1Name} vs ${team2Name}: matchup has not started yet`
       : score1 === score2
         ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
@@ -390,35 +396,64 @@ export function MatchupScoreboardHero({
         </XStack>
       </TopBand>
 
-      <XStack alignItems="flex-start">
-        <TeamPanel
-          team={team1}
-          leading={team1Leading}
-          gamesPlayed={gamesPlayed}
-          totalGames={totalGames}
-          onTeamPress={onTeamPress}
-          preLock={preLock}
-        />
-        <YStack alignSelf="center" paddingHorizontal="$2">
+      {isBye ? (
+        <YStack
+          alignItems="center"
+          justifyContent="center"
+          gap="$2"
+          paddingVertical="$7"
+          paddingHorizontal="$4"
+        >
           <Text
             fontFamily={FONT_DISPLAY}
             fontWeight="800"
-            fontSize="$5"
-            letterSpacing={3}
-            color={withAlpha(TEXT_MUTED, 0.8)}
+            fontSize="$7"
+            letterSpacing={2}
+            color={TEXT_PRIMARY}
+            textAlign="center"
           >
-            VS
+            BYE WEEK
+          </Text>
+          <Text
+            fontFamily={FONT_MONO}
+            fontSize="$3"
+            color={TEXT_MUTED}
+            textAlign="center"
+          >
+            {byeTeamName} has no game this week
           </Text>
         </YStack>
-        <TeamPanel
-          team={team2}
-          leading={!team1Leading}
-          gamesPlayed={gamesPlayed}
-          totalGames={totalGames}
-          onTeamPress={onTeamPress}
-          preLock={preLock}
-        />
-      </XStack>
+      ) : (
+        <XStack alignItems="flex-start">
+          <TeamPanel
+            team={team1}
+            leading={team1Leading}
+            gamesPlayed={gamesPlayed}
+            totalGames={totalGames}
+            onTeamPress={onTeamPress}
+            preLock={preLock}
+          />
+          <YStack alignSelf="center" paddingHorizontal="$2">
+            <Text
+              fontFamily={FONT_DISPLAY}
+              fontWeight="800"
+              fontSize="$5"
+              letterSpacing={3}
+              color={withAlpha(TEXT_MUTED, 0.8)}
+            >
+              VS
+            </Text>
+          </YStack>
+          <TeamPanel
+            team={team2}
+            leading={!team1Leading}
+            gamesPlayed={gamesPlayed}
+            totalGames={totalGames}
+            onTeamPress={onTeamPress}
+            preLock={preLock}
+          />
+        </XStack>
+      )}
     </HeroCard>
   );
 }

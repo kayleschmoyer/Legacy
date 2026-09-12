@@ -2304,6 +2304,7 @@ type MatchupRecap {
 union MatchupStats = BaseballMatchupStats | FootballMatchupStats
 
 enum MatchupStatus {
+  bye
   cancelled
   completed
   in_progress

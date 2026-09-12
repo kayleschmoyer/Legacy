@@ -77,14 +77,19 @@ export class MatchupScheduler {
         );
       }
 
-      // Build scheduled matchup
+      // Build scheduled matchup. A pairing with either team missing (bye
+      // week) has no game to play, so it never enters the normal
+      // scheduled -> in_progress -> completed flow (LS-6366).
       matchups.push({
         weekNumber: pairing.weekNumber,
         leagueId: leagueConfig.id,
         team1Id: pairing.team1Id,
         team2Id: pairing.team2Id,
         gamesPerMatchup: leagueConfig.gamesPerMatchup,
-        status: 'scheduled',
+        status:
+          pairing.team1Id == null || pairing.team2Id == null
+            ? 'bye'
+            : 'scheduled',
       });
     }
 

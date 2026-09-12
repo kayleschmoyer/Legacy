@@ -641,7 +641,7 @@ export async function updateMatchupScore(
 export async function updateMatchupStatus(
   db: PublicDb,
   matchupId: number,
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye',
 ): Promise<Matchup> {
   const results = await db
     .update(Schema.matchups)

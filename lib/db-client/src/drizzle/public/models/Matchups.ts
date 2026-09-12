@@ -31,6 +31,7 @@ export const matchupStatus = pgEnum('matchup_status', [
   'in_progress',
   'completed',
   'cancelled',
+  'bye',
 ]);
 
 export const statsLoadingStatus = pgEnum('stats_loading_status', [

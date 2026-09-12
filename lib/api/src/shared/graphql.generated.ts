@@ -1927,6 +1927,7 @@ export type MatchupRecap = {
 export type MatchupStats = BaseballMatchupStats | FootballMatchupStats;
 
 export enum MatchupStatus {
+  Bye = 'bye',
   Cancelled = 'cancelled',
   Completed = 'completed',
   InProgress = 'in_progress',

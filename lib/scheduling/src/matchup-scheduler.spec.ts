@@ -7,10 +7,12 @@ import { RoundRobinStrategy } from './strategies/round-robin-strategy';
 import { RandomStrategy } from './strategies/random-strategy';
 import type {
   LeagueConfig,
+  MatchupPairing,
   ScheduleParams,
   SeasonInfo,
   TeamInfo,
 } from './types';
+import type { SchedulingStrategy } from './strategies/strategy-interface';
 
 describe('MatchupScheduler', () => {
   const teams: TeamInfo[] = [
@@ -201,5 +203,32 @@ describe('MatchupScheduler', () => {
     const usage2022 = result.seasonUsage.get(2022) ?? 0;
 
     expect(Math.abs(usage2023 - usage2022)).toBeLessThanOrEqual(10);
+  });
+
+  it('marks a pairing with a missing team as a bye instead of scheduled (LS-6366)', () => {
+    const byePairing = {
+      team1Id: 1,
+      team2Id: null,
+      weekNumber: 1,
+      gamesPerMatchup: 5,
+    } as unknown as MatchupPairing;
+    const stubStrategy: SchedulingStrategy = {
+      generatePairings: () => [byePairing],
+      getName: () => 'stub',
+    };
+    const scheduler = new MatchupScheduler(stubStrategy);
+
+    const params: ScheduleParams = {
+      teams,
+      numberOfWeeks: 1,
+      leagueConfig,
+      eligibleSeasons,
+    };
+
+    const result = scheduler.generateSchedule(params);
+
+    expect(result.matchups).toHaveLength(1);
+    expect(result.matchups[0].status).toBe('bye');
+    expect(result.matchups[0].team2Id).toBeNull();
   });
 });

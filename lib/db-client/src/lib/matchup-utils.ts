@@ -303,7 +303,7 @@ export interface CreateMatchupParams {
   team2Id: number | null;
   gamesPerMatchup: number | null;
   pitcherStartsPerMatchup?: number | null;
-  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
 }
 
 export class MatchupService {
@@ -537,6 +537,11 @@ export class MatchupService {
     db: GenericDatabase<typeof PublicSchema>,
     params: CreateMatchupParams,
   ): Promise<number> {
+    // A matchup with either team missing has no opponent to play — default
+    // it to 'bye' rather than the normal 'scheduled' flow (LS-6366), unless
+    // the caller explicitly requested a different status.
+    const defaultStatus =
+      params.team1Id == null || params.team2Id == null ? 'bye' : 'scheduled';
     const result = await db
       .insert(PublicSchema.matchups)
       .values({
@@ -546,7 +551,7 @@ export class MatchupService {
         team2Id: params.team2Id,
         gamesPerMatchup: params.gamesPerMatchup,
         pitcherStartsPerMatchup: params.pitcherStartsPerMatchup ?? null,
-        status: params.status ?? 'scheduled',
+        status: params.status ?? defaultStatus,
         team1Score: null,
         team2Score: null,
         startTime: null,
@@ -1361,7 +1366,10 @@ export async function createAllMatchupsForLeague(
         team2Id: matchup.team2Id,
         gamesPerMatchup,
         pitcherStartsPerMatchup,
-        status: 'scheduled',
+        // Bye-week pairings (team1Id or team2Id null) come through as
+        // status: 'bye' from the scheduler; everything else starts
+        // 'scheduled' (LS-6366).
+        status: matchup.status,
         team1Score: null,
         team2Score: null,
         startTime: null,

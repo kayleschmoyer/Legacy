@@ -32,7 +32,7 @@ export interface ScheduledMatchup {
   team1Id: number | null; // null for bye weeks
   team2Id: number | null; // null for bye weeks
   gamesPerMatchup: number | null;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'bye';
 }
 
 /** Season eligibility information */
