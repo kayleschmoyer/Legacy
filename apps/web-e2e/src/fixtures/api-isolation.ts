@@ -1,4 +1,4 @@
-import { type Page, type TestInfo } from '@playwright/test';
+import { type Page, type Route, type TestInfo } from '@playwright/test';
 
 import {
   extractOperationName,
@@ -143,183 +143,25 @@ export async function withApiIsolation(
   await page.route(
     (url) => !isStaticServerRequest(url),
     async (route) => {
-      const reqUrl = route.request().url();
-
-      if (reqUrl.includes('/graphql')) {
-        const opName = extractOperationName(route);
-        const key = opName.toLowerCase();
-        const response = resolveBaselineResponse(
-          key,
-          extractOperationVariables(route),
-        );
-
-        if (response) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(response),
-          });
-          return;
+      try {
+        await routeRequest(route, page, unmockedOps);
+      } catch (error) {
+        // A handler invocation (most likely the refresh-jwt branch's
+        // `await page.context().cookies()`) can still be mid-flight when the
+        // test ends and the browser context tears down. The `unrouteAll()`
+        // call in the teardown below only stops NEW dispatches — it cannot
+        // cancel one already in progress — so a request that slips in during
+        // the gap between test-end and unrouteAll still throws here. That
+        // failure isn't attributable to any specific test, so Playwright's
+        // `--retries` doesn't retry it and the whole job fails outright
+        // (LS-10019, same bug class as LS-9742). There is no test left to
+        // observe the response either way, so swallow only the teardown-race
+        // error and let anything else propagate as a real bug.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/test ended/i.test(message)) {
+          throw error;
         }
-
-        // Unknown operation — record it and return empty data so the UI
-        // doesn't crash via error boundaries mid-test. The fixture
-        // reports unmocked ops as a test error after the body completes.
-        unmockedOps.push(opName);
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
-        return;
       }
-
-      // Google Identity Services script — return a mock that provides the
-      // global stubs the app expects so PublicLandingPage can render without
-      // hitting the real accounts.google.com endpoint.
-      if (reqUrl.includes('accounts.google.com/gsi/client')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/javascript',
-          body: GSI_MOCK_SCRIPT,
-        });
-        return;
-      }
-
-      // Giphy API — tests mock this via page.route() in beforeEach.
-      // Return safe empty data so unmocked Giphy calls don't crash the UI.
-      const isGiphyRequest = (() => {
-        try {
-          return new URL(reqUrl).hostname === 'api.giphy.com';
-        } catch {
-          return false;
-        }
-      })();
-      if (isGiphyRequest) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: [], meta: { status: 200 } }),
-        });
-        return;
-      }
-
-      // OAuth JWT refresh — only return a fresh hermetic JWT when the
-      // request looks authenticated and the token is not yet expired.
-      // This mirrors oauth-proxy behavior closely enough for E2E flows:
-      //   • No token → fall through to the 401 catch-all below.
-      //   • Expired token → 401 (session-expiry tests expect this).
-      //   • Valid cookie token, wrong CSRF → 403.
-      //   • Valid cookie token + correct CSRF → fresh JWT (same identity).
-      //   • Bearer token (no CSRF needed) → fresh JWT.
-      const isRefreshJwtRequest = (() => {
-        if (route.request().method() !== 'POST') {
-          return false;
-        }
-        try {
-          // The app uses oauthProxyUrl = 'http://localhost:5001' (no /oauth prefix),
-          // so the actual path is /refresh-jwt. Accept both to be future-proof.
-          // Also match paths with a stage prefix (e.g. /dev/refresh-jwt,
-          // /dev/oauth/refresh-jwt) for local production builds that bake in
-          // the full AWS API Gateway URL.
-          const pathname = new URL(reqUrl).pathname;
-          return pathname.endsWith('/refresh-jwt');
-        } catch {
-          return false;
-        }
-      })();
-      if (isRefreshJwtRequest) {
-        const headers = await route.request().allHeaders();
-        const authHeader = headers['authorization'] ?? '';
-        const csrfHeader =
-          headers['x-csrf-token'] ?? headers['x-xsrf-token'] ?? '';
-
-        // Read the ls_jwt cookie from Playwright's cookie jar rather than the
-        // intercepted request's Cookie header. WebKit does not reliably
-        // forward HttpOnly cookies set via storageState on page.route()
-        // intercepted requests — the Cookie header seen here is empty even
-        // though the cookie jar has it, which permanently 503s the refresh
-        // and leaves useWebSocket's `!token` guard deferring client creation
-        // forever (LS-9328). context().cookies() reads the jar directly, so
-        // it is accurate on every engine.
-        const contextCookies = await page.context().cookies();
-        const cookieToken =
-          contextCookies.find((c) => c.name === 'ls_jwt')?.value ?? '';
-
-        // Decode the JWT payload: check expiry and extract claims.
-        // Expired tokens must 401 so session-expiry tests pass.
-        // Non-expired tokens are re-signed with the same claims to
-        // preserve adminTest/createCustomAuthTest session identities.
-        let cookieTokenValid = false;
-        let cookieClaims: Record<string, unknown> = {};
-        if (cookieToken) {
-          try {
-            const payload = E2EJwtUtil.decodeJwtPayload(cookieToken);
-            const exp = typeof payload.exp === 'number' ? payload.exp : 0;
-            cookieTokenValid = exp > Math.floor(Date.now() / 1000);
-            if (cookieTokenValid) {
-              const { iat: _iat, exp: _exp, nbf: _nbf, ...claims } = payload;
-              cookieClaims = claims;
-            }
-          } catch {
-            cookieTokenValid = false;
-          }
-        }
-
-        const hasBearerToken = /^Bearer\s+\S+$/i.test(authHeader);
-
-        // Bearer auth bypasses CSRF (mirrors real oauth-proxy behaviour).
-        // Only enforce CSRF for cookie-only authenticated requests.
-        if (
-          cookieTokenValid &&
-          !hasBearerToken &&
-          csrfHeader !== E2E_CSRF_TOKEN
-        ) {
-          await route.fulfill({
-            status: 403,
-            contentType: 'application/json',
-            body: JSON.stringify({ error: 'CSRF validation failed' }),
-          });
-          return;
-        }
-
-        if (cookieTokenValid || hasBearerToken) {
-          const freshJwt = cookieTokenValid
-            ? signE2EJwt(cookieClaims, E2E_SIGNING_SECRET, '1h')
-            : signTestJwt();
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              jwt: freshJwt,
-              csrfToken: E2E_CSRF_TOKEN,
-            }),
-          });
-          return;
-        }
-
-        // No valid cookie token and no bearer token.  Return 503 (not
-        // 401) so AuthService treats this as a transient network error
-        // rather than an AuthSessionExpiredError, which would log the
-        // user out and break tests that rely on the cached localStorage
-        // profile for authentication (e.g. WebKit, where storageState
-        // ls_jwt cookie is not reliably sent with intercepted requests).
-        await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'Token refresh unavailable in E2E isolation mode',
-          }),
-        });
-        return;
-      }
-
-      // Any other non-GraphQL external request: reject outright.
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Blocked by E2E API isolation' }),
-      });
     },
   );
 
@@ -363,4 +205,186 @@ export async function withApiIsolation(
       ].join('\n'),
     );
   }
+}
+
+/** The actual per-request routing logic, extracted so it can be wrapped in a
+ * try/catch that tolerates the test-end teardown race (see the call site in
+ * `withApiIsolation` above). */
+async function routeRequest(
+  route: Route,
+  page: Page,
+  unmockedOps: string[],
+): Promise<void> {
+  const reqUrl = route.request().url();
+
+  if (reqUrl.includes('/graphql')) {
+    const opName = extractOperationName(route);
+    const key = opName.toLowerCase();
+    const response = resolveBaselineResponse(
+      key,
+      extractOperationVariables(route),
+    );
+
+    if (response) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
+      return;
+    }
+
+    // Unknown operation — record it and return empty data so the UI
+    // doesn't crash via error boundaries mid-test. The fixture
+    // reports unmocked ops as a test error after the body completes.
+    unmockedOps.push(opName);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: {} }),
+    });
+    return;
+  }
+
+  // Google Identity Services script — return a mock that provides the
+  // global stubs the app expects so PublicLandingPage can render without
+  // hitting the real accounts.google.com endpoint.
+  if (reqUrl.includes('accounts.google.com/gsi/client')) {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: GSI_MOCK_SCRIPT,
+    });
+    return;
+  }
+
+  // Giphy API — tests mock this via page.route() in beforeEach.
+  // Return safe empty data so unmocked Giphy calls don't crash the UI.
+  const isGiphyRequest = (() => {
+    try {
+      return new URL(reqUrl).hostname === 'api.giphy.com';
+    } catch {
+      return false;
+    }
+  })();
+  if (isGiphyRequest) {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [], meta: { status: 200 } }),
+    });
+    return;
+  }
+
+  // OAuth JWT refresh — only return a fresh hermetic JWT when the
+  // request looks authenticated and the token is not yet expired.
+  // This mirrors oauth-proxy behavior closely enough for E2E flows:
+  //   • No token → fall through to the 401 catch-all below.
+  //   • Expired token → 401 (session-expiry tests expect this).
+  //   • Valid cookie token, wrong CSRF → 403.
+  //   • Valid cookie token + correct CSRF → fresh JWT (same identity).
+  //   • Bearer token (no CSRF needed) → fresh JWT.
+  const isRefreshJwtRequest = (() => {
+    if (route.request().method() !== 'POST') {
+      return false;
+    }
+    try {
+      // The app uses oauthProxyUrl = 'http://localhost:5001' (no /oauth prefix),
+      // so the actual path is /refresh-jwt. Accept both to be future-proof.
+      // Also match paths with a stage prefix (e.g. /dev/refresh-jwt,
+      // /dev/oauth/refresh-jwt) for local production builds that bake in
+      // the full AWS API Gateway URL.
+      const pathname = new URL(reqUrl).pathname;
+      return pathname.endsWith('/refresh-jwt');
+    } catch {
+      return false;
+    }
+  })();
+  if (isRefreshJwtRequest) {
+    const headers = await route.request().allHeaders();
+    const authHeader = headers['authorization'] ?? '';
+    const csrfHeader = headers['x-csrf-token'] ?? headers['x-xsrf-token'] ?? '';
+
+    // Read the ls_jwt cookie from Playwright's cookie jar rather than the
+    // intercepted request's Cookie header. WebKit does not reliably
+    // forward HttpOnly cookies set via storageState on page.route()
+    // intercepted requests — the Cookie header seen here is empty even
+    // though the cookie jar has it, which permanently 503s the refresh
+    // and leaves useWebSocket's `!token` guard deferring client creation
+    // forever (LS-9328). context().cookies() reads the jar directly, so
+    // it is accurate on every engine.
+    const contextCookies = await page.context().cookies();
+    const cookieToken =
+      contextCookies.find((c) => c.name === 'ls_jwt')?.value ?? '';
+
+    // Decode the JWT payload: check expiry and extract claims.
+    // Expired tokens must 401 so session-expiry tests pass.
+    // Non-expired tokens are re-signed with the same claims to
+    // preserve adminTest/createCustomAuthTest session identities.
+    let cookieTokenValid = false;
+    let cookieClaims: Record<string, unknown> = {};
+    if (cookieToken) {
+      try {
+        const payload = E2EJwtUtil.decodeJwtPayload(cookieToken);
+        const exp = typeof payload.exp === 'number' ? payload.exp : 0;
+        cookieTokenValid = exp > Math.floor(Date.now() / 1000);
+        if (cookieTokenValid) {
+          const { iat: _iat, exp: _exp, nbf: _nbf, ...claims } = payload;
+          cookieClaims = claims;
+        }
+      } catch {
+        cookieTokenValid = false;
+      }
+    }
+
+    const hasBearerToken = /^Bearer\s+\S+$/i.test(authHeader);
+
+    // Bearer auth bypasses CSRF (mirrors real oauth-proxy behaviour).
+    // Only enforce CSRF for cookie-only authenticated requests.
+    if (cookieTokenValid && !hasBearerToken && csrfHeader !== E2E_CSRF_TOKEN) {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'CSRF validation failed' }),
+      });
+      return;
+    }
+
+    if (cookieTokenValid || hasBearerToken) {
+      const freshJwt = cookieTokenValid
+        ? signE2EJwt(cookieClaims, E2E_SIGNING_SECRET, '1h')
+        : signTestJwt();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jwt: freshJwt,
+          csrfToken: E2E_CSRF_TOKEN,
+        }),
+      });
+      return;
+    }
+
+    // No valid cookie token and no bearer token.  Return 503 (not
+    // 401) so AuthService treats this as a transient network error
+    // rather than an AuthSessionExpiredError, which would log the
+    // user out and break tests that rely on the cached localStorage
+    // profile for authentication (e.g. WebKit, where storageState
+    // ls_jwt cookie is not reliably sent with intercepted requests).
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: 'Token refresh unavailable in E2E isolation mode',
+      }),
+    });
+    return;
+  }
+
+  // Any other non-GraphQL external request: reject outright.
+  await route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'Blocked by E2E API isolation' }),
+  });
 }
