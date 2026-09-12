@@ -214,7 +214,7 @@ server.tool(
 // --- aws_lambda_status ---
 server.tool(
   'aws_lambda_status',
-  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-25) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others.',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-25) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others. Pass `includeEnv` to also report the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Values stay hidden unless `includeEnvValues` is also set, and secret-named variables are redacted even then. Both flags apply per function in batch mode.',
   {
     function: z
       .string()
@@ -234,6 +234,18 @@ server.tool(
       .enum(['dev', 'prod'])
       .default('dev')
       .describe('AWS environment (default: dev)'),
+    includeEnv: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Also return `environment: { variableNames }` — the names of the environment variables set on the deployed function (default: false). Names only; use `includeEnvValues` for values.',
+      ),
+    includeEnvValues: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Opt in to environment variable VALUES as well as names (default: false; implies `includeEnv`). Variables whose names match the secret heuristics (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back as "[REDACTED]" and are listed in `environment.redactedNames`; the rest are returned verbatim. Use for config verification, never to read credential material.',
+      ),
   },
   async (params) => lambdaStatus(params),
 );

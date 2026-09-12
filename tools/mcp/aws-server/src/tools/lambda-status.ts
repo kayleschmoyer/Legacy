@@ -11,15 +11,46 @@ interface LambdaConfig {
   Handler?: string;
   CodeSize?: number;
   Description?: string;
+  Environment?: { Variables?: Record<string, string> };
 }
 
 interface LambdaStatusCommonParams {
   environment: string;
+  includeEnv?: boolean;
+  includeEnvValues?: boolean;
 }
 
 export interface LambdaStatusParams extends LambdaStatusCommonParams {
   function?: string;
   functions?: string[];
+}
+
+/** Placeholder substituted for the value of any secret-named variable. */
+export const REDACTED = '[REDACTED]';
+
+/**
+ * Name-shaped heuristics for variables whose values are assumed to be
+ * credential material. Matching variables are never returned verbatim, even
+ * under `includeEnvValues` — see `.agents/skills/secrets-handling/SKILL.md`.
+ */
+const SECRET_NAME_PATTERNS = [/_SECRET/, /_TOKEN/, /PASSWORD/, /_KEY/];
+
+/** True when `name` looks like it holds credential material. */
+export function isSecretName(name: string): boolean {
+  const upper = name.toUpperCase();
+  return SECRET_NAME_PATTERNS.some((re) => re.test(upper));
+}
+
+export interface LambdaEnvironmentReport {
+  /** Every variable name set on the function, sorted. Always present. */
+  variableNames: string[];
+  /**
+   * Values, present only under `includeEnvValues`. Secret-named variables map
+   * to `REDACTED` rather than their real value.
+   */
+  variables?: Record<string, string>;
+  /** Names whose values were redacted. Present only under `includeEnvValues`. */
+  redactedNames?: string[];
 }
 
 export interface LambdaStatusSuccess {
@@ -33,6 +64,7 @@ export interface LambdaStatusSuccess {
   handler: string | undefined;
   codeSize: number | undefined;
   description: string | null;
+  environment?: LambdaEnvironmentReport;
 }
 
 export interface LambdaStatusNotFound {
@@ -66,6 +98,31 @@ function toFullName(name: string, environment: string): string {
   return `legacy-sports-${environment}-${normalizeFunctionName(name)}`;
 }
 
+/**
+ * Build the `environment` block for a function's config. Names are always
+ * listed; values appear only when `includeValues` is set, and secret-named
+ * variables are redacted even then.
+ */
+export function buildEnvironmentReport(
+  variables: Record<string, string> | undefined,
+  includeValues: boolean,
+): LambdaEnvironmentReport {
+  const names = Object.keys(variables ?? {}).sort();
+  if (!includeValues) return { variableNames: names };
+
+  const values: Record<string, string> = {};
+  const redactedNames: string[] = [];
+  for (const name of names) {
+    if (isSecretName(name)) {
+      values[name] = REDACTED;
+      redactedNames.push(name);
+    } else {
+      values[name] = variables?.[name] ?? '';
+    }
+  }
+  return { variableNames: names, variables: values, redactedNames };
+}
+
 function classifyRemedy(message: string): string | undefined {
   const isSsoError =
     /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i.test(
@@ -76,10 +133,18 @@ function classifyRemedy(message: string): string | undefined {
     : undefined;
 }
 
+interface EnvOptions {
+  /** Include the `environment` block at all. */
+  includeEnv: boolean;
+  /** Include (redacted) values inside it. Implies `includeEnv`. */
+  includeEnvValues: boolean;
+}
+
 async function fetchOne(
   fn: string,
   environment: string,
   runner: CommandRunner,
+  envOptions: EnvOptions,
 ): Promise<
   | { ok: true; entry: LambdaStatusEntry }
   | { ok: false; error: string; remedy: string | undefined; fullName: string }
@@ -116,6 +181,14 @@ async function fetchOne(
         handler: config.Handler,
         codeSize: config.CodeSize,
         description: config.Description || null,
+        ...(envOptions.includeEnv
+          ? {
+              environment: buildEnvironmentReport(
+                config.Environment?.Variables,
+                envOptions.includeEnvValues,
+              ),
+            }
+          : {}),
       },
     };
   } catch (err) {
@@ -176,6 +249,13 @@ export async function lambdaStatus(
   runner: CommandRunner = defaultRunner,
 ): Promise<ToolResult> {
   const fns = params.functions;
+  // `includeEnvValues` is the explicit values opt-in; asking for values without
+  // also asking for the block would otherwise silently return nothing.
+  const includeEnvValues = params.includeEnvValues === true;
+  const envOptions: EnvOptions = {
+    includeEnv: params.includeEnv === true || includeEnvValues,
+    includeEnvValues,
+  };
 
   if (fns && fns.length > 0) {
     if (params.function) {
@@ -190,7 +270,7 @@ export async function lambdaStatus(
     }
 
     const results = await runWithConcurrency(fns, BATCH_CONCURRENCY, (fn) =>
-      fetchOne(fn, params.environment, runner),
+      fetchOne(fn, params.environment, runner, envOptions),
     );
     const statuses: Record<string, LambdaStatusEntry> = {};
     const missing: Array<{
@@ -222,7 +302,12 @@ export async function lambdaStatus(
     return toolError('Either `function` or `functions` must be provided.');
   }
 
-  const result = await fetchOne(params.function, params.environment, runner);
+  const result = await fetchOne(
+    params.function,
+    params.environment,
+    runner,
+    envOptions,
+  );
   if (result.ok) {
     return {
       content: [{ type: 'text', text: JSON.stringify(result.entry) }],
