@@ -41,11 +41,7 @@
       "options": {
         "targetName": "lint"
       },
-      "exclude": [
-        "package.json",
-        "tools/mcp/aws-server/**",
-        "tools/mcp/rollbar-server/**"
-      ]
+      "exclude": ["package.json"]
     },
     {
       "plugin": "@nx/storybook/plugin",

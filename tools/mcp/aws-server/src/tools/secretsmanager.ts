@@ -1,16 +1,16 @@
 import {
-  resolve,
-  sep,
-  dirname,
-  basename,
-  isAbsolute as pathIsAbsolute,
-} from 'node:path';
-import { writeFileSync, chmodSync, mkdirSync, realpathSync } from 'node:fs';
-import {
   markdownTable,
   minifiedJson,
   pickFields,
 } from '@legacy-sports/mcp-format';
+import {
+  basename,
+  dirname,
+  isAbsolute as pathIsAbsolute,
+  resolve,
+  sep,
+} from 'node:path';
+import { chmodSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import { SSO_ERROR_PATTERN, ssoRemedy } from '../aws-error.js';
@@ -135,8 +135,10 @@ export async function describeSecret(
             lastAccessedDate: data.LastAccessedDate ?? null,
             tags: Object.fromEntries(
               (data.Tags ?? [])
-                .filter((t) => t.Key !== undefined)
-                .map((t) => [t.Key!, t.Value ?? '']),
+                .filter(
+                  (t): t is typeof t & { Key: string } => t.Key !== undefined,
+                )
+                .map((t) => [t.Key, t.Value ?? '']),
             ),
             versionCount: Object.keys(data.VersionIdsToStages ?? {}).length,
           }),

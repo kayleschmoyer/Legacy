@@ -115,7 +115,9 @@ async function defaultWriteGithubSecret(
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stderrBuf = '';
-    child.stdout.on('data', () => {});
+    // Drain stdout without buffering it — its contents aren't needed, but the
+    // stream must be consumed or the child process can stall on a full pipe.
+    child.stdout.resume();
     child.stderr.on('data', (chunk: Buffer) => {
       stderrBuf += chunk.toString('utf-8');
     });
@@ -173,7 +175,7 @@ export async function syncSecretToGithub(
   }
   if (scope !== 'repo' && scope !== 'environment' && scope !== 'dependabot') {
     return errorResponse(
-      `Invalid scope "${scope}": must be one of "repo", "environment", or "dependabot".`,
+      `Invalid scope "${String(scope)}": must be one of "repo", "environment", or "dependabot".`,
     );
   }
   if (scope === 'environment' && (env === undefined || env === '')) {
@@ -216,8 +218,8 @@ export async function syncSecretToGithub(
   const ghArgs = ['secret', 'set', repoSecret];
   if (scope === 'dependabot') {
     ghArgs.push('--app', 'dependabot');
-  } else if (scope === 'environment') {
-    ghArgs.push('--env', env!);
+  } else if (scope === 'environment' && env !== undefined) {
+    ghArgs.push('--env', env);
   }
   if (repo !== undefined) {
     ghArgs.push('--repo', repo);

@@ -137,7 +137,9 @@ export async function logsFilter(
   let result: LogsFilterResult;
   try {
     const output = await runner('aws', args, repoRoot);
-    const parsed: AwsFilterResponse = output ? JSON.parse(output) : {};
+    const parsed: AwsFilterResponse = output
+      ? (JSON.parse(output) as AwsFilterResponse)
+      : {};
     const rawEvents: AwsLogEvent[] = parsed.events ?? [];
 
     // Apply char-budget truncation on top of event-count limit

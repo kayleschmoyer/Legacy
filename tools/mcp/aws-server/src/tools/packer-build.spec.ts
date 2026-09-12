@@ -4,6 +4,8 @@ jest.mock('../run-command.js', () => ({
   runCommandCaptureExit: jest.fn(),
 }));
 
+import type { JobRunner, JobSnapshot } from '@legacy-sports/mcp-jobs';
+
 // packer-build runs its builds on the shared job runner (LS-8564). Mock the
 // runner so tests drive the tool contract through controlled snapshots
 // instead of real child processes.
@@ -24,25 +26,39 @@ jest.mock('@legacy-sports/mcp-jobs', () => {
   };
 });
 
-import type { JobSnapshot } from '@legacy-sports/mcp-jobs';
-import { runCommand, runCommandCaptureExit } from '../run-command.js';
 import {
   packerBuild,
   packerBuildStatus,
   packerBuildWait,
 } from './packer-build.js';
+import { runCommand, runCommandCaptureExit } from '../run-command.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
 const mockedCaptureExit = runCommandCaptureExit as jest.MockedFunction<
   typeof runCommandCaptureExit
 >;
-const { __mock: runnerMock } = jest.requireMock('@legacy-sports/mcp-jobs') as {
+
+interface MockedJobsModule {
   __mock: {
-    startJob: jest.Mock;
-    snapshotJob: jest.Mock;
-    waitForJob: jest.Mock;
+    startJob: jest.MockedFunction<JobRunner['startJob']>;
+    snapshotJob: jest.MockedFunction<JobRunner['snapshotJob']>;
+    waitForJob: jest.MockedFunction<JobRunner['waitForJob']>;
   };
-};
+}
+
+// Routing the cast through an `unknown` param (rather than an inline
+// `x as T`) avoids a typescript-eslint 8.60+ no-unnecessary-type-assertion
+// false positive that would otherwise get autofixed away by pc-lint.
+function asMockedJobsModule(v: unknown): MockedJobsModule {
+  return v as MockedJobsModule;
+}
+
+const { __mock: runnerMock } = asMockedJobsModule(
+  jest.requireMock('@legacy-sports/mcp-jobs'),
+);
+const mockStartJob = runnerMock.startJob;
+const mockSnapshotJob = runnerMock.snapshotJob;
+const mockWaitForJob = runnerMock.waitForJob;
 
 const BUILD_LOG =
   "==> amazon-ebs.runner: AMI: ami-0abc1234def56789a\nBuild 'amazon-ebs.runner' finished after 2 minutes 5 seconds.\n";
@@ -73,7 +89,7 @@ function snapshot(overrides: Partial<JobSnapshot>): JobSnapshot {
 }
 
 function startedJob(): void {
-  runnerMock.startJob.mockReturnValue({
+  mockStartJob.mockReturnValue({
     jobId: BUILD_ID,
     logPath: `/tmp/packer-builds/${BUILD_ID}.log`,
     existing: false,
@@ -103,9 +119,9 @@ function mockCommands(): void {
 beforeEach(() => {
   mockedRun.mockReset();
   mockedCaptureExit.mockReset();
-  runnerMock.startJob.mockReset();
-  runnerMock.snapshotJob.mockReset();
-  runnerMock.waitForJob.mockReset();
+  mockStartJob.mockReset();
+  mockSnapshotJob.mockReset();
+  mockWaitForJob.mockReset();
 });
 
 describe('packerBuild input validation', () => {
@@ -119,7 +135,7 @@ describe('packerBuild input validation', () => {
     expect(isError).toBe(true);
     expect(String(parsed.error)).toMatch(/Invalid hclPath/);
     expect(mockedRun).not.toHaveBeenCalled();
-    expect(runnerMock.startJob).not.toHaveBeenCalled();
+    expect(mockStartJob).not.toHaveBeenCalled();
   });
 
   it('rejects a var value with shell metacharacters without invoking packer', async () => {
@@ -133,7 +149,7 @@ describe('packerBuild input validation', () => {
     expect(isError).toBe(true);
     expect(String(parsed.error)).toMatch(/disallowed characters/);
     expect(mockedRun).not.toHaveBeenCalled();
-    expect(runnerMock.startJob).not.toHaveBeenCalled();
+    expect(mockStartJob).not.toHaveBeenCalled();
   });
 
   it('rejects a var value with spaces (argument smuggling through the shell join)', async () => {
@@ -146,7 +162,7 @@ describe('packerBuild input validation', () => {
     );
     expect(isError).toBe(true);
     expect(String(parsed.error)).toMatch(/disallowed characters/);
-    expect(runnerMock.startJob).not.toHaveBeenCalled();
+    expect(mockStartJob).not.toHaveBeenCalled();
   });
 
   it('rejects a var name that is not a plain identifier', async () => {
@@ -159,7 +175,7 @@ describe('packerBuild input validation', () => {
     );
     expect(isError).toBe(true);
     expect(String(parsed.error)).toMatch(/Invalid var name/);
-    expect(runnerMock.startJob).not.toHaveBeenCalled();
+    expect(mockStartJob).not.toHaveBeenCalled();
   });
 
   it('accepts a Windows-style absolute hclPath', async () => {
@@ -198,12 +214,8 @@ describe('packerBuild', () => {
       runInBackground: true,
     });
 
-    expect(runnerMock.startJob).toHaveBeenCalledTimes(1);
-    const opts = runnerMock.startJob.mock.calls[0][0] as {
-      command: string;
-      args: string[];
-      shell?: boolean;
-    };
+    expect(mockStartJob).toHaveBeenCalledTimes(1);
+    const opts = mockStartJob.mock.calls[0][0];
     expect(opts.command).toBe('packer');
     expect(opts.shell).toBe(true);
     expect(opts.args[0]).toBe('init');
@@ -214,7 +226,7 @@ describe('packerBuild', () => {
 
   it('returns a running snapshot with a re-arm hint when the build outlives the sync budget', async () => {
     startedJob();
-    runnerMock.waitForJob.mockResolvedValue(
+    mockWaitForJob.mockResolvedValue(
       snapshot({ status: 'running', logTail: 'transforming...' }),
     );
 
@@ -230,7 +242,7 @@ describe('packerBuild', () => {
   it('returns the finished structured result when the build completes within the budget', async () => {
     mockCommands();
     startedJob();
-    runnerMock.waitForJob.mockResolvedValue(
+    mockWaitForJob.mockResolvedValue(
       snapshot({ status: 'done', exitCode: 0, log: BUILD_LOG }),
     );
 
@@ -249,7 +261,7 @@ describe('packerBuild', () => {
     startedJob();
     // `packer init` runs inside the composite job: a plugin-download failure
     // exits the job non-zero and its output lands in the job log.
-    runnerMock.waitForJob.mockResolvedValue(
+    mockWaitForJob.mockResolvedValue(
       snapshot({
         status: 'failed',
         exitCode: 1,
@@ -270,7 +282,7 @@ describe('packerBuild', () => {
 
 describe('packerBuildWait', () => {
   it('errors on an unknown buildId', async () => {
-    runnerMock.waitForJob.mockResolvedValue(null);
+    mockWaitForJob.mockResolvedValue(null);
 
     const { parsed, isError } = body(
       await packerBuildWait({ buildId: 'packer-nope' }),
@@ -280,7 +292,7 @@ describe('packerBuildWait', () => {
   });
 
   it('returns a non-error running snapshot when the wait cap expires', async () => {
-    runnerMock.waitForJob.mockResolvedValue(
+    mockWaitForJob.mockResolvedValue(
       snapshot({ status: 'running', logTail: 'still baking' }),
     );
 
@@ -295,7 +307,7 @@ describe('packerBuildWait', () => {
 
   it('returns the finished result once the build completes', async () => {
     mockCommands();
-    runnerMock.waitForJob.mockResolvedValue(
+    mockWaitForJob.mockResolvedValue(
       snapshot({ status: 'done', exitCode: 0, log: BUILD_LOG }),
     );
 
@@ -314,7 +326,7 @@ describe('packerBuildWait', () => {
 
 describe('packerBuildStatus', () => {
   it('reports running with elapsed time for an in-flight build', async () => {
-    runnerMock.snapshotJob.mockReturnValue(
+    mockSnapshotJob.mockReturnValue(
       snapshot({ status: 'running', logTail: 'transforming...' }),
     );
 
@@ -327,7 +339,7 @@ describe('packerBuildStatus', () => {
   });
 
   it('reports a disk-recovered build with no recorded result as orphaned', async () => {
-    runnerMock.snapshotJob.mockReturnValue(
+    mockSnapshotJob.mockReturnValue(
       snapshot({
         status: 'orphaned',
         logTail: BUILD_LOG,

@@ -257,6 +257,11 @@ export default [
       'node_modules/',
       '.modules-pool/',
       'dist/',
+      // Root-relative 'dist/' above only covers the repo-root build dir.
+      // Nested per-project build output (e.g. tools/mcp/rollbar-server/dist)
+      // is gitignored but present in any worktree that has built an MCP
+      // server, and must never be linted (LS-9300).
+      '**/dist/**',
       'webpack.config.*',
       '**/.tamagui/**',
       // Mini-repo FIXTURE for the e2e-graph generator tests (LS-9661): test
@@ -265,24 +270,5 @@ export default [
       // would otherwise hard-error here (no react plugin at root scope).
       '.github/scripts/e2e-graph/__tests__/fixtures/**',
     ],
-  },
-  {
-    // Pinned to the repo root — see the basePath comment on the VITE_*
-    // restriction block above for why.
-    //
-    // None of these directories had their own .eslintrc.json before this
-    // migration, so under the legacy setup they were silently excluded by
-    // root's `ignorePatterns: ["**/*"]` blanket ignore (root:true, with no
-    // per-project "!**/*" un-ignore to opt back in — the standard Nx
-    // pattern). Flat config correctly drops that blanket ignore, which
-    // would otherwise newly enforce lint on years of previously-unlinted
-    // tooling in the same PR as the ESLint 9 migration. Preserving the
-    // pre-migration scope here for remaining projects; LS-8747 tracks a
-    // dedicated cleanup pass. tools/mcp/nx-server (LS-8737), tools/mcp/ci-server
-    // (LS-9297), tools/mcp/db-admin-server, and tools/mcp/dev-process-server
-    // (LS-9299) have been removed from this ignore list and their lint
-    // violations fixed.
-    basePath: repoRoot,
-    ignores: ['tools/mcp/aws-server/**', 'tools/mcp/rollbar-server/**'],
   },
 ];

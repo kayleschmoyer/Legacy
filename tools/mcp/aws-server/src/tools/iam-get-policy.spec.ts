@@ -3,8 +3,8 @@ jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
 }));
 
-import { runCommand } from '../run-command.js';
 import { iamGetPolicy } from './iam-get-policy.js';
+import { runCommand } from '../run-command.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
 
@@ -36,19 +36,23 @@ describe('iamGetPolicy policyArn validation', () => {
   });
 
   it('accepts a well-formed customer-managed policy ARN', async () => {
-    mockedRun.mockImplementation(async (_cmd, args) => {
-      if ((args as string[]).includes('get-policy-version')) {
-        return JSON.stringify({
-          PolicyVersion: { Document: { Version: '2012-10-17' } },
-        });
+    mockedRun.mockImplementation((_cmd, args) => {
+      if (args.includes('get-policy-version')) {
+        return Promise.resolve(
+          JSON.stringify({
+            PolicyVersion: { Document: { Version: '2012-10-17' } },
+          }),
+        );
       }
-      return JSON.stringify({
-        Policy: {
-          PolicyName: 'MyPolicy',
-          Arn: 'arn:aws:iam::123456789012:policy/MyPolicy',
-          DefaultVersionId: 'v1',
-        },
-      });
+      return Promise.resolve(
+        JSON.stringify({
+          Policy: {
+            PolicyName: 'MyPolicy',
+            Arn: 'arn:aws:iam::123456789012:policy/MyPolicy',
+            DefaultVersionId: 'v1',
+          },
+        }),
+      );
     });
 
     const { text, isError } = body(

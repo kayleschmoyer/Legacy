@@ -3,7 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import { errorResult } from './aws-error.js';
 
 function unwrap(result: ReturnType<typeof errorResult>) {
-  return JSON.parse(result.content[0].text as string) as {
+  return JSON.parse(result.content[0].text) as {
     ok: false;
     error: string;
     remedy?: string;

@@ -4,10 +4,10 @@ jest.mock('../run-command.js', () => ({
 }));
 
 import {
+  type CommandRunner,
+  logsFilter,
   MAX_CHARS,
   MAX_EVENTS,
-  logsFilter,
-  type CommandRunner,
 } from './logs-filter.js';
 
 function rawText(result: Awaited<ReturnType<typeof logsFilter>>): string {
@@ -61,11 +61,7 @@ describe('logsFilter', () => {
         .fn()
         .mockResolvedValue(makeAwsOutput([]));
       await logsFilter({ logGroup: LOG_GROUP, format: 'json' }, runner);
-      const call = (runner as jest.Mock).mock.calls[0] as [
-        string,
-        string[],
-        string,
-      ];
+      const call = jest.mocked(runner).mock.calls[0];
       const args = call[1];
       const lgIdx = args.indexOf('--log-group-name');
       expect(args[lgIdx + 1]).toBe(LOG_GROUP);
@@ -79,7 +75,7 @@ describe('logsFilter', () => {
         { logGroup: LOG_GROUP, filterPattern: 'ERROR', format: 'json' },
         runner,
       );
-      const args = (runner as jest.Mock).mock.calls[0][1] as string[];
+      const args = jest.mocked(runner).mock.calls[0][1];
       expect(args).toContain('--filter-pattern');
       expect(args[args.indexOf('--filter-pattern') + 1]).toBe('ERROR');
     });
@@ -97,7 +93,7 @@ describe('logsFilter', () => {
         },
         runner,
       );
-      const args = (runner as jest.Mock).mock.calls[0][1] as string[];
+      const args = jest.mocked(runner).mock.calls[0][1];
       expect(args).toContain('--start-time');
       expect(args[args.indexOf('--start-time') + 1]).toBe('1700000000000');
       expect(args).toContain('--end-time');
@@ -111,7 +107,7 @@ describe('logsFilter', () => {
         { logGroup: LOG_GROUP, limit: 9999, format: 'json' },
         runner,
       );
-      const args = (runner as jest.Mock).mock.calls[0][1] as string[];
+      const args = jest.mocked(runner).mock.calls[0][1];
       const limitIdx = args.indexOf('--limit');
       expect(Number(args[limitIdx + 1])).toBe(MAX_EVENTS);
     });

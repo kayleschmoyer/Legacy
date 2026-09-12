@@ -16,7 +16,7 @@ import { iamListAttachedRolePolicies } from './tools/iam-list-attached-role-poli
 import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
-import { logsFilter, MAX_EVENTS, MAX_CHARS } from './tools/logs-filter.js';
+import { logsFilter, MAX_CHARS, MAX_EVENTS } from './tools/logs-filter.js';
 import {
   describeSecret,
   getSecretValue,

@@ -16,6 +16,7 @@ import {
   CSP as DOCS_CSP,
   PAGE as DOCS_PAGE,
 } from '@legacy-sports/mcp-docs/pages/rollbar';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { ROLLBAR_READ_TOKEN_ENV, tryGetRollbarToken } from './auth.js';
 import { listItems } from './tools/list-items.js';
 import { getItem } from './tools/get-item.js';
@@ -24,7 +25,6 @@ import { graphqlIntrospectType } from './tools/graphql-introspect-type.js';
 import { listOccurrences } from './tools/list-occurrences.js';
 import { setStatus } from './tools/set-status.js';
 import { topActiveItems } from './tools/top-active-items.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 function createMcpServer(): McpServer {
   const server = new McpServer({

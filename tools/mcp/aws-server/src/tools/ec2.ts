@@ -5,7 +5,7 @@ import {
 } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
-import { SSO_ERROR_PATTERN, errorResult, ssoRemedy } from '../aws-error.js';
+import { errorResult, SSO_ERROR_PATTERN, ssoRemedy } from '../aws-error.js';
 import { EC2_INSTANCE_COLUMNS } from '../format.js';
 
 // ---------------------------------------------------------------------------

@@ -3,8 +3,8 @@ jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
 }));
 
-import { runCommand } from '../run-command.js';
 import { describeSecret, listSecrets } from './secretsmanager.js';
+import { runCommand } from '../run-command.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
 

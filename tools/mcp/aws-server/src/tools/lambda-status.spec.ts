@@ -5,9 +5,9 @@ jest.mock('../run-command.js', () => ({
 
 import {
   BATCH_CONCURRENCY,
-  MAX_BATCH_FUNCTIONS,
-  lambdaStatus,
   type CommandRunner,
+  lambdaStatus,
+  MAX_BATCH_FUNCTIONS,
 } from './lambda-status.js';
 
 function unwrap(result: Awaited<ReturnType<typeof lambdaStatus>>): {
@@ -56,8 +56,8 @@ describe('lambdaStatus (singular)', () => {
   it('strips the -lambda suffix when expanding the deployed name', async () => {
     const runner: CommandRunner = jest.fn().mockResolvedValue(configJson());
     await lambdaStatus({ ...baseParams, function: 'stats-lambda' }, runner);
-    const call = (runner as jest.Mock).mock.calls[0];
-    const args = call[1] as string[];
+    const call = jest.mocked(runner).mock.calls[0];
+    const args = call[1];
     const nameIdx = args.indexOf('--function-name');
     expect(args[nameIdx + 1]).toBe('legacy-sports-dev-stats');
   });
@@ -91,10 +91,10 @@ describe('lambdaStatus (singular)', () => {
 
 describe('lambdaStatus (batch)', () => {
   it('returns a per-function entry under `statuses` for each requested function', async () => {
-    const runner: CommandRunner = jest.fn(async (_cmd, args) => {
-      const nameIdx = (args as string[]).indexOf('--function-name');
-      const full = (args as string[])[nameIdx + 1];
-      return configJson({ FunctionName: full });
+    const runner: CommandRunner = jest.fn((_cmd, args) => {
+      const nameIdx = args.indexOf('--function-name');
+      const full = args[nameIdx + 1];
+      return Promise.resolve(configJson({ FunctionName: full }));
     });
 
     const { body, isError } = unwrap(
@@ -117,13 +117,13 @@ describe('lambdaStatus (batch)', () => {
   });
 
   it('records ResourceNotFound as exists:false in `statuses` (not in `missing`)', async () => {
-    const runner: CommandRunner = jest.fn(async (_cmd, args) => {
-      const nameIdx = (args as string[]).indexOf('--function-name');
-      const full = (args as string[])[nameIdx + 1];
+    const runner: CommandRunner = jest.fn((_cmd, args) => {
+      const nameIdx = args.indexOf('--function-name');
+      const full = args[nameIdx + 1];
       if (full.endsWith('db')) {
         throw new Error('ResourceNotFoundException: Function not found: db');
       }
-      return configJson({ FunctionName: full });
+      return Promise.resolve(configJson({ FunctionName: full }));
     });
 
     const { body } = unwrap(
@@ -143,13 +143,13 @@ describe('lambdaStatus (batch)', () => {
   });
 
   it('isolates real failures to `missing[]` without failing the rest of the batch', async () => {
-    const runner: CommandRunner = jest.fn(async (_cmd, args) => {
-      const nameIdx = (args as string[]).indexOf('--function-name');
-      const full = (args as string[])[nameIdx + 1];
+    const runner: CommandRunner = jest.fn((_cmd, args) => {
+      const nameIdx = args.indexOf('--function-name');
+      const full = args[nameIdx + 1];
       if (full.endsWith('graphql')) {
         throw new Error('boom for graphql');
       }
-      return configJson({ FunctionName: full });
+      return Promise.resolve(configJson({ FunctionName: full }));
     });
 
     const { body, isError } = unwrap(
@@ -229,8 +229,8 @@ describe('lambdaStatus (batch)', () => {
       peak = Math.max(peak, inFlight);
       await new Promise((r) => setTimeout(r, 5));
       inFlight--;
-      const nameIdx = (args as string[]).indexOf('--function-name');
-      const full = (args as string[])[nameIdx + 1];
+      const nameIdx = args.indexOf('--function-name');
+      const full = args[nameIdx + 1];
       return configJson({ FunctionName: full });
     });
 

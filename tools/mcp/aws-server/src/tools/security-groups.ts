@@ -221,8 +221,8 @@ export async function describeSecurityGroups(
       vpcId: sg.VpcId ?? null,
       tags: Object.fromEntries(
         (sg.Tags ?? [])
-          .filter((t) => t.Key !== undefined)
-          .map((t) => [t.Key!, t.Value ?? '']),
+          .filter((t): t is typeof t & { Key: string } => t.Key !== undefined)
+          .map((t) => [t.Key, t.Value ?? '']),
       ),
       inboundRules: (sg.IpPermissions ?? []).map(formatPermission),
       outboundRules: (sg.IpPermissionsEgress ?? []).map(formatPermission),

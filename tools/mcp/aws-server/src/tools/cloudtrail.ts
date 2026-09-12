@@ -224,10 +224,27 @@ export async function cloudTrailLookup(
 
   try {
     if (mode === 'death-verdict') {
+      // Guarded above, but narrows `instanceId` from `string | undefined` to
+      // `string` for TypeScript within this block.
+      if (!instanceId) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ok: false,
+                error: 'mode "death-verdict" requires instanceId.',
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
       // Run two parallel lookups: one by ResourceName (catches TerminateInstances)
       // and one by EventName=BidEvictedEvent (spot evictions have empty ResourceName).
       const [byResourceEvents, bidEvictedEvents] = await Promise.all([
-        lookupByAttribute('ResourceName', instanceId!, startTime, endTime, cwd),
+        lookupByAttribute('ResourceName', instanceId, startTime, endTime, cwd),
         lookupByAttribute(
           'EventName',
           'BidEvictedEvent',
@@ -239,7 +256,7 @@ export async function cloudTrailLookup(
 
       // Filter BidEvictedEvents to those mentioning this instanceId in the payload.
       const relevantBidEvicted = bidEvictedEvents.filter((e) =>
-        extractInstanceIds(e).includes(instanceId!),
+        extractInstanceIds(e).includes(instanceId),
       );
 
       const terminationEvents = byResourceEvents.filter(
@@ -297,15 +314,18 @@ export async function cloudTrailLookup(
           extractInstanceIds(e).includes(instanceId),
         );
       }
-    } else {
+    } else if (instanceId) {
       // instanceId only: look up by ResourceName.
       rawEvents = await lookupByAttribute(
         'ResourceName',
-        instanceId!,
+        instanceId,
         startTime,
         endTime,
         cwd,
       );
+    } else {
+      // Unreachable: guarded by the instanceId-or-eventName check above.
+      rawEvents = [];
     }
 
     const events = rawEvents.slice(0, MAX_EVENTS).map(toCompactEvent);

@@ -3,7 +3,7 @@ jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
 }));
 
-import { syncSecretToGithub, type SyncSecretDeps } from './sync-to-github.js';
+import { type SyncSecretDeps, syncSecretToGithub } from './sync-to-github.js';
 
 function unwrap(result: Awaited<ReturnType<typeof syncSecretToGithub>>): {
   body: Record<string, unknown>;
@@ -23,7 +23,7 @@ function makeDeps(overrides: Partial<SyncSecretDeps> = {}): {
   deps: SyncSecretDeps;
   fetchAwsSecret: jest.Mock;
   writeGithubSecret: jest.Mock;
-  audit: jest.Mock;
+  audit: jest.MockedFunction<NonNullable<SyncSecretDeps['audit']>>;
 } {
   const fetchAwsSecret = jest.fn().mockResolvedValue('s3cr3t-value');
   const writeGithubSecret = jest.fn().mockResolvedValue(null);
@@ -219,7 +219,7 @@ describe('syncSecretToGithub — never leaks the secret value', () => {
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain('TOP-SECRET-VALUE-XYZ');
     for (const call of audit.mock.calls) {
-      expect(call[0] as string).not.toContain('TOP-SECRET-VALUE-XYZ');
+      expect(call[0]).not.toContain('TOP-SECRET-VALUE-XYZ');
     }
   });
 });

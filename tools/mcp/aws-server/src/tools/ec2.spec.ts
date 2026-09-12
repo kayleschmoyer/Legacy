@@ -3,7 +3,6 @@ jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
 }));
 
-import { runCommand } from '../run-command.js';
 import {
   ec2ConsoleOutput,
   ec2DescribeImage,
@@ -11,6 +10,7 @@ import {
   ec2LaunchTemplateInspect,
   ec2NetworkInspect,
 } from './ec2.js';
+import { runCommand } from '../run-command.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
 
@@ -158,31 +158,35 @@ describe('ec2ConsoleOutput', () => {
 
 describe('ec2LaunchTemplateInspect resolveSsmParam validation', () => {
   it('refuses to query an SSM parameter name containing shell metacharacters', async () => {
-    mockedRun.mockImplementation(async (_cmd, args) => {
-      const a = args as string[];
+    mockedRun.mockImplementation((_cmd, args) => {
+      const a = args;
       if (a.includes('describe-launch-templates')) {
-        return JSON.stringify({
-          LaunchTemplates: [
-            {
-              LaunchTemplateId: 'lt-0123',
-              LaunchTemplateName: 'runner',
-              Tags: [],
-            },
-          ],
-        });
+        return Promise.resolve(
+          JSON.stringify({
+            LaunchTemplates: [
+              {
+                LaunchTemplateId: 'lt-0123',
+                LaunchTemplateName: 'runner',
+                Tags: [],
+              },
+            ],
+          }),
+        );
       }
       if (a.includes('describe-launch-template-versions')) {
-        return JSON.stringify({
-          LaunchTemplateVersions: [
-            {
-              VersionNumber: 1,
-              LaunchTemplateData: {
-                ImageId: 'resolve:ssm:/bad;rm -rf /',
-                InstanceType: 't3.medium',
+        return Promise.resolve(
+          JSON.stringify({
+            LaunchTemplateVersions: [
+              {
+                VersionNumber: 1,
+                LaunchTemplateData: {
+                  ImageId: 'resolve:ssm:/bad;rm -rf /',
+                  InstanceType: 't3.medium',
+                },
               },
-            },
-          ],
-        });
+            ],
+          }),
+        );
       }
       // get-parameter must never be reached for an unsafe name.
       throw new Error('unexpected runCommand call: ' + a.join(' '));
@@ -217,12 +221,13 @@ describe('ec2NetworkInspect', () => {
   const subnetsResponse = JSON.stringify({ Subnets: [] });
 
   function mockRunFor(handlers: Record<string, () => string>): void {
-    mockedRun.mockImplementation(async (_cmd, args) => {
-      const a = args as string[];
-      if (a.includes('describe-vpcs')) return vpcResponse;
-      if (a.includes('describe-subnets')) return subnetsResponse;
+    mockedRun.mockImplementation((_cmd, args) => {
+      const a = args;
+      if (a.includes('describe-vpcs')) return Promise.resolve(vpcResponse);
+      if (a.includes('describe-subnets'))
+        return Promise.resolve(subnetsResponse);
       for (const [key, handler] of Object.entries(handlers)) {
-        if (a.includes(key)) return handler();
+        if (a.includes(key)) return Promise.resolve(handler());
       }
       throw new Error('unexpected runCommand call: ' + a.join(' '));
     });
@@ -366,23 +371,28 @@ describe('ec2NetworkInspect', () => {
   });
 
   it('includeDnsAttributes returns both DNS attribute values', async () => {
-    mockedRun.mockImplementation(async (_cmd, args) => {
-      const a = args as string[];
-      if (a.includes('describe-vpcs')) return vpcResponse;
-      if (a.includes('describe-subnets')) return subnetsResponse;
+    mockedRun.mockImplementation((_cmd, args) => {
+      const a = args;
+      if (a.includes('describe-vpcs')) return Promise.resolve(vpcResponse);
+      if (a.includes('describe-subnets'))
+        return Promise.resolve(subnetsResponse);
       if (a.includes('describe-vpc-attribute')) {
         const attrIdx = a.indexOf('--attribute');
         const attribute = a[attrIdx + 1];
         if (attribute === 'enableDnsSupport') {
-          return JSON.stringify({
-            VpcId: 'vpc-0abc123',
-            EnableDnsSupport: { Value: true },
-          });
+          return Promise.resolve(
+            JSON.stringify({
+              VpcId: 'vpc-0abc123',
+              EnableDnsSupport: { Value: true },
+            }),
+          );
         }
-        return JSON.stringify({
-          VpcId: 'vpc-0abc123',
-          EnableDnsHostnames: { Value: false },
-        });
+        return Promise.resolve(
+          JSON.stringify({
+            VpcId: 'vpc-0abc123',
+            EnableDnsHostnames: { Value: false },
+          }),
+        );
       }
       throw new Error('unexpected runCommand call: ' + a.join(' '));
     });

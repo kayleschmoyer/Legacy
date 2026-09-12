@@ -19,7 +19,9 @@ describe('runCommand', () => {
     );
 
     expect(output).toBe(parametersJson);
-    expect(() => JSON.parse(output)).not.toThrow();
+    expect(() => {
+      JSON.parse(output);
+    }).not.toThrow();
   });
 
   it('resolves with the partial output instead of rejecting when stdout exceeds maxBuffer', async () => {

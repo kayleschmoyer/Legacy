@@ -146,7 +146,7 @@ async function runWithConcurrency<T, R>(
   limit: number,
   worker: (item: T) => Promise<R>,
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results: R[] = new Array<R>(items.length);
   let idx = 0;
   const workers = Array.from(
     { length: Math.min(limit, items.length) },

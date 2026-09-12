@@ -1,6 +1,6 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { rollbarGet } from '../rollbar-api.js';
 import type { ToolResult } from '../types.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** Sections of `data` that {@link GetOccurrenceParams.include} can select. */
 export type OccurrenceSection =
@@ -124,7 +124,7 @@ function filterOccurrence(
         };
       }
       if (Array.isArray(body.trace_chain)) {
-        body.trace_chain = body.trace_chain.map((entry) =>
+        body.trace_chain = body.trace_chain.map((entry: unknown) =>
           isRecord(entry) && Array.isArray(entry.frames)
             ? { ...entry, frames: capFrames(entry.frames, maxFrames) }
             : entry,

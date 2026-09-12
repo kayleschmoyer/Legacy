@@ -3,8 +3,8 @@ jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
 }));
 
-import { runCommand } from '../run-command.js';
 import { cloudTrailLookup } from './cloudtrail.js';
+import { runCommand } from '../run-command.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
 
@@ -102,7 +102,7 @@ describe('cloudTrailLookup — events mode', () => {
     // TERMINATE_EVENT has a scale-down username so reason is scale-down-terminate
     expect(events[0].terminationReason).toBe('scale-down-terminate');
 
-    const callArgs = mockedRun.mock.calls[0][1] as string[];
+    const callArgs = mockedRun.mock.calls[0][1];
     expect(callArgs).toContain(
       'AttributeKey=ResourceName,AttributeValue=i-0abc1234def56789a',
     );
@@ -113,7 +113,7 @@ describe('cloudTrailLookup — events mode', () => {
     const result = await cloudTrailLookup({ eventName: 'TerminateInstances' });
     expect(parsed(result).ok).toBe(true);
 
-    const callArgs = mockedRun.mock.calls[0][1] as string[];
+    const callArgs = mockedRun.mock.calls[0][1];
     expect(callArgs).toContain(
       'AttributeKey=EventName,AttributeValue=TerminateInstances',
     );
@@ -256,9 +256,7 @@ describe('cloudTrailLookup — death-verdict mode', () => {
       mode: 'death-verdict',
     });
     expect(mockedRun).toHaveBeenCalledTimes(2);
-    const lookupArgs = mockedRun.mock.calls.map((c) =>
-      (c[1] as string[]).join(' '),
-    );
+    const lookupArgs = mockedRun.mock.calls.map((c) => c[1].join(' '));
     expect(lookupArgs.some((a) => a.includes('ResourceName'))).toBe(true);
     expect(lookupArgs.some((a) => a.includes('BidEvictedEvent'))).toBe(true);
   });

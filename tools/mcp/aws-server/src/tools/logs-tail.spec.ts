@@ -5,14 +5,14 @@ jest.mock('../run-command.js', () => ({
 
 import {
   BATCH_CONCURRENCY,
+  type CommandRunner,
   ERROR_LINE_PATTERN,
-  MAX_BATCH_FUNCTIONS,
-  RECENT_LINES,
   extractErrorLines,
   logsTail,
+  MAX_BATCH_FUNCTIONS,
+  RECENT_LINES,
   renderLogsAsMarkdown,
   truncateToByteLimit,
-  type CommandRunner,
 } from './logs-tail.js';
 
 function parseText(text: string): unknown {
@@ -289,11 +289,11 @@ describe('logsTail maxBytes cap', () => {
 
 describe('logsTail (batch)', () => {
   it('returns a per-function block under `logs` for each requested function', async () => {
-    const runner: CommandRunner = jest.fn(async (_cmd, args) => {
+    const runner: CommandRunner = jest.fn((_cmd, args) => {
       const group = args[2];
-      if (group.endsWith('graphql')) return 'g1\ng2';
-      if (group.endsWith('db')) return 'd1';
-      return '';
+      if (group.endsWith('graphql')) return Promise.resolve('g1\ng2');
+      if (group.endsWith('db')) return Promise.resolve('d1');
+      return Promise.resolve('');
     });
 
     const { body, isError } = unwrap(
@@ -318,10 +318,10 @@ describe('logsTail (batch)', () => {
   });
 
   it('isolates failures: one function erroring does not fail the others', async () => {
-    const runner: CommandRunner = jest.fn(async (_cmd, args) => {
+    const runner: CommandRunner = jest.fn((_cmd, args) => {
       const group = args[2];
       if (group.endsWith('graphql')) throw new Error('boom for graphql');
-      return 'ok-line';
+      return Promise.resolve('ok-line');
     });
 
     const { body, isError } = unwrap(
@@ -499,7 +499,7 @@ describe('logsTail markdown integration', () => {
   });
 
   it('renders one section per function in batch markdown mode', async () => {
-    const runner: CommandRunner = jest.fn(async () => 'INFO ok');
+    const runner: CommandRunner = jest.fn(() => Promise.resolve('INFO ok'));
     const text = rawText(
       await logsTail(
         {
