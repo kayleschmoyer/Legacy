@@ -28,11 +28,16 @@ PW_CONFIG="apps/web-e2e/playwright.native.config.ts"
 # spec to a list): "login → league list" (bypass build lands authenticated,
 # then the shared LeaguePage drives the league-discovery / list surface) plus
 # the football roster bench↔starter lineup assignment
-# (`lib/shared-components/src/features/roster/**`). Add further specs here as
+# (`lib/shared-components/src/features/roster/**`), plus (LS-6441) the
+# lock-window and bye-week conditional-state specs — same shared
+# `RosterBoard`/`TestData.footballLineup*()` machinery, so they are as
+# native-capable as the bench↔starter spec above. Add further specs here as
 # more surfaces get native proof coverage.
 PROOF_SPECS=(
   "league-discovery-search.dual.spec.ts"
   "football-lineup.dual.spec.ts"
+  "football-lineup-lock-window.dual.spec.ts"
+  "football-lineup-bye-week.dual.spec.ts"
 )
 
 mkdir -p "$ARTIFACT_DIR"

@@ -27,6 +27,8 @@ import type {
   InviteJoinResult,
   SeededDiscoverySearch,
   SeededFootballLineup,
+  SeededFootballLineupByeWeek,
+  SeededFootballLineupLocked,
   SeededLeague,
   SeededLeagueInvite,
   SeededLeagueWithMember,
@@ -49,7 +51,12 @@ import {
   careerPitchingLeadersResponse,
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
-import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
+import {
+  createFootballLineupFixture,
+  type FootballLineupFixture,
+  mockRosterPlayer,
+  mockTeamMember,
+} from '../mocks/graphql/roster.mocks';
 import { createWaiverQueueFixture } from '../mocks/graphql/waiver-queue.mocks';
 import { createMatchupFixture } from '../mocks/graphql/matchup-fixture.mocks';
 import { GraphQLMockServer } from '../mocks/graphql/server/native-mock-server';
@@ -186,19 +193,97 @@ export class NativeMockTestData implements TestData {
     return Promise.resolve({ fullName: 'Mike Trout', searchTerm: 'Trout' });
   }
 
-  footballLineup(): Promise<SeededFootballLineup> {
-    // Same fixture, same handler map, same mutable roster as the web verb —
-    // only the registration differs (`server.override` here, `page.route()`
-    // there). No forked payloads (ADR-0017 AC2).
-    const fixture = createFootballLineupFixture();
+  /**
+   * Register a {@link FootballLineupFixture}'s handler map on the per-worker
+   * mock server — shared by {@link footballLineup}, {@link footballLineupLocked}
+   * and {@link footballLineupByeWeek}. Same fixture, same handler map, same
+   * mutable roster as the web verb — only the registration differs
+   * (`server.override` here, `page.route()` there). No forked payloads
+   * (ADR-0017 AC2).
+   */
+  #installFootballLineupRoutes(fixture: FootballLineupFixture): void {
     for (const [op, handler] of Object.entries(fixture.handlers)) {
       this.#server.override(op, (request) => handler(request.variables));
     }
+  }
+
+  footballLineup(): Promise<SeededFootballLineup> {
+    const fixture = createFootballLineupFixture();
+    this.#installFootballLineupRoutes(fixture);
     return Promise.resolve({
       leagueId: fixture.leagueId,
       teamId: fixture.teamId,
       openSlot: fixture.openSlot,
       benchPlayer: fixture.benchPlayer,
+    });
+  }
+
+  footballLineupLocked(): Promise<SeededFootballLineupLocked> {
+    // Same scenario construction as MockTestData.footballLineupLocked() —
+    // kept in sync deliberately (ADR-0017 AC2): one locked starter (QB), one
+    // locked bench player eligible for the open WR slot.
+    const lockedStarter = mockTeamMember({
+      id: 301,
+      positionId: 1,
+      isLocked: true,
+      player: mockRosterPlayer({
+        id: 910,
+        firstName: 'Patrick',
+        lastName: 'Mahomes',
+        eligiblePositions: ['QB'],
+        nflTeam: 'KC',
+      }),
+    });
+    const lockedBenchPlayer = mockTeamMember({
+      id: 302,
+      positionId: null,
+      isLocked: true,
+      player: mockRosterPlayer({
+        id: 911,
+        firstName: 'Justin',
+        lastName: 'Jefferson',
+        eligiblePositions: ['WR'],
+        nflTeam: 'MIN',
+      }),
+    });
+    const fixture = createFootballLineupFixture({
+      positionTypes: ['QB', 'WR'],
+      members: [lockedStarter, lockedBenchPlayer],
+    });
+    this.#installFootballLineupRoutes(fixture);
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      lockedStarter: { fullName: 'Patrick Mahomes', positionType: 'QB' },
+      lockedBenchPlayer: { fullName: 'Justin Jefferson', positionType: 'WR' },
+      openSlotPositionType: 'WR',
+    });
+  }
+
+  footballLineupByeWeek(): Promise<SeededFootballLineupByeWeek> {
+    // Same scenario construction as MockTestData.footballLineupByeWeek().
+    const byeStarter = mockTeamMember({
+      id: 401,
+      positionId: 1,
+      player: mockRosterPlayer({
+        id: 920,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        eligiblePositions: ['QB'],
+        nflTeam: 'BUF',
+      }),
+    });
+    const fixture = createFootballLineupFixture({
+      positionTypes: ['QB'],
+      members: [byeStarter],
+      currentWeekNumber: 1,
+      byeWeeksByTeam: { BUF: 1 },
+    });
+    this.#installFootballLineupRoutes(fixture);
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      byeStarter: { fullName: 'Josh Allen', positionType: 'QB' },
     });
   }
 

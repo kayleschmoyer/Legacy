@@ -27,7 +27,12 @@ import {
   careerPitchingLeadersResponse,
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
-import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
+import {
+  createFootballLineupFixture,
+  type FootballLineupFixture,
+  mockRosterPlayer,
+  mockTeamMember,
+} from '../mocks/graphql/roster.mocks';
 import {
   createWaiverQueueFixture,
   type WaiverQueueFixture,
@@ -111,6 +116,40 @@ export interface SeededFootballLineup {
     /** Full display name rendered on the bench row. */
     fullName: string;
   };
+}
+
+/** A player handle for the lock-window/bye-week scenarios below (LS-6441). */
+export interface SeededFootballLineupPlayer {
+  /** Full display name rendered on the slot/bench row. */
+  fullName: string;
+  /** NFL position code the player is eligible for / rostered at, e.g. `QB`. */
+  positionType: string;
+}
+
+export interface SeededFootballLineupLocked {
+  /** League to navigate to (`/football/league/:leagueId/roster`). */
+  leagueId: number;
+  /** The viewer's team in that league. */
+  teamId: number;
+  /**
+   * A starter whose game has started — `isLocked: true` — matching what
+   * `checkPlayersNotLocked` (`lambdas/db/src/schema/authorization.ts`) sets
+   * once their team's matchup leaves `'scheduled'` (LS-6428).
+   */
+  lockedStarter: SeededFootballLineupPlayer;
+  /** A locked bench player, eligible for {@link openSlotPositionType}. */
+  lockedBenchPlayer: SeededFootballLineupPlayer;
+  /** The open (unoccupied, unlocked) slot's position type, e.g. `WR`. */
+  openSlotPositionType: string;
+}
+
+export interface SeededFootballLineupByeWeek {
+  /** League to navigate to (`/football/league/:leagueId/roster`). */
+  leagueId: number;
+  /** The viewer's team in that league. */
+  teamId: number;
+  /** A starter whose NFL team is on a bye during the league's active week. */
+  byeStarter: SeededFootballLineupPlayer;
 }
 
 /**
@@ -333,6 +372,27 @@ export interface TestData {
    * (see LS-9655 "Out of Scope").
    */
   footballLineup(): Promise<SeededFootballLineup>;
+
+  /**
+   * Ensure a football roster (LS-6441 lock-window scenario) has one starter
+   * whose game has started (`isLocked: true` — see {@link SeededFootballLineupLocked})
+   * plus one locked bench player eligible for a separate, open, unlocked
+   * slot. Mock: extends the football-lineup fixture's `members` with two
+   * locked team members. Live: **throws**, same reasoning as
+   * {@link footballLineup} — see {@link FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON}.
+   */
+  footballLineupLocked(): Promise<SeededFootballLineupLocked>;
+
+  /**
+   * Ensure a football roster (LS-6441 bye-week scenario) has one starter
+   * whose NFL team is on a bye during the league's active week — the
+   * precondition `RosterBoard`'s `onBye` flag (LS-6430) reads via
+   * `byeWeeksByTeam`/`currentWeek`. Mock: extends the football-lineup fixture
+   * with a `GetNflTeamSeasonMetadata` bye entry matching the starter's
+   * `nflTeam` and the league's current week. Live: **throws**, same
+   * reasoning as {@link footballLineup}.
+   */
+  footballLineupByeWeek(): Promise<SeededFootballLineupByeWeek>;
 
   /**
    * Ensure a league exists whose commissioner-facing overview shows the
@@ -560,13 +620,19 @@ export class MockTestData implements TestData {
     return { fullName: 'Mike Trout', searchTerm: 'Trout' };
   }
 
-  async footballLineup(): Promise<SeededFootballLineup> {
-    // Every payload — and the stateful assignment logic behind the lineup
-    // mutations — comes from the shared fixture, so this handler is pure
-    // transport: look the operation up, serialise whatever it returns. The
-    // native implementation drives the SAME map through `server.override`
-    // (ADR-0017 AC2), which is what keeps the round-trip identical.
-    const fixture = createFootballLineupFixture();
+  /**
+   * Register a {@link FootballLineupFixture}'s handler map as `page.route()`
+   * transport — shared by {@link footballLineup}, {@link footballLineupLocked}
+   * and {@link footballLineupByeWeek}. Every payload — and the stateful
+   * assignment logic behind the lineup mutations — comes from the fixture, so
+   * this is pure transport: look the operation up, serialise whatever it
+   * returns. The native implementation drives the SAME map through
+   * `server.override` (ADR-0017 AC2), which is what keeps the round-trip
+   * identical.
+   */
+  async #installFootballLineupRoutes(
+    fixture: FootballLineupFixture,
+  ): Promise<void> {
     await this.#page.route(isGraphQLEndpoint, async (route) => {
       const handler =
         fixture.handlers[extractOperationName(route).toLowerCase()];
@@ -580,12 +646,99 @@ export class MockTestData implements TestData {
         body: JSON.stringify(handler(extractOperationVariables(route))),
       });
     });
+  }
+
+  async footballLineup(): Promise<SeededFootballLineup> {
+    const fixture = createFootballLineupFixture();
+    await this.#installFootballLineupRoutes(fixture);
 
     return {
       leagueId: fixture.leagueId,
       teamId: fixture.teamId,
       openSlot: fixture.openSlot,
       benchPlayer: fixture.benchPlayer,
+    };
+  }
+
+  async footballLineupLocked(): Promise<SeededFootballLineupLocked> {
+    // Two starting slots: QB (occupied by a locked starter — "can an already
+    // -placed player be moved") and WR (open, so a locked BENCH player has
+    // somewhere it would go if the lock didn't block the tap). Both LOCKED_*
+    // players carry `isLocked: true`, matching what the server's
+    // `checkPlayersNotLocked` sets once a team's matchup leaves 'scheduled'
+    // (LS-6428) — RosterBoard's lock UI is driven entirely by that flag
+    // client-side, so no mutation ever needs to actually round-trip here.
+    const lockedStarter = mockTeamMember({
+      id: 301,
+      positionId: 1,
+      isLocked: true,
+      player: mockRosterPlayer({
+        id: 910,
+        firstName: 'Patrick',
+        lastName: 'Mahomes',
+        eligiblePositions: ['QB'],
+        nflTeam: 'KC',
+      }),
+    });
+    const lockedBenchPlayer = mockTeamMember({
+      id: 302,
+      positionId: null,
+      isLocked: true,
+      player: mockRosterPlayer({
+        id: 911,
+        firstName: 'Justin',
+        lastName: 'Jefferson',
+        eligiblePositions: ['WR'],
+        nflTeam: 'MIN',
+      }),
+    });
+    const fixture = createFootballLineupFixture({
+      positionTypes: ['QB', 'WR'],
+      members: [lockedStarter, lockedBenchPlayer],
+    });
+    await this.#installFootballLineupRoutes(fixture);
+
+    return {
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      lockedStarter: { fullName: 'Patrick Mahomes', positionType: 'QB' },
+      lockedBenchPlayer: { fullName: 'Justin Jefferson', positionType: 'WR' },
+      openSlotPositionType: 'WR',
+    };
+  }
+
+  async footballLineupByeWeek(): Promise<SeededFootballLineupByeWeek> {
+    // A single starter, already assigned to the QB slot, whose NFL team
+    // (BUF) is flagged on bye for the league's (default) current week — only
+    // a STARTER's bye status renders (LS-6430's `onBye` computation reads the
+    // slot occupant, not the bench), so the scenario seeds no bench player.
+    const byeStarter = mockTeamMember({
+      id: 401,
+      positionId: 1,
+      player: mockRosterPlayer({
+        id: 920,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        eligiblePositions: ['QB'],
+        nflTeam: 'BUF',
+      }),
+    });
+    const fixture = createFootballLineupFixture({
+      positionTypes: ['QB'],
+      members: [byeStarter],
+      // mockLeague defaults currentWeekNumber to null, which the Roster tab
+      // treats as week 1 (`league.currentWeekNumber ?? 1`) — pin it
+      // explicitly so the bye week below stays correct even if that default
+      // ever changes.
+      currentWeekNumber: 1,
+      byeWeeksByTeam: { BUF: 1 },
+    });
+    await this.#installFootballLineupRoutes(fixture);
+
+    return {
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      byeStarter: { fullName: 'Josh Allen', positionType: 'QB' },
     };
   }
 
@@ -1126,6 +1279,19 @@ export class LiveTestData implements TestData {
     // TestData verb to issue real mutations — league creation, team ownership,
     // roster seeding and teardown. That is its own ticket and its own design
     // review (LS-9655 "Out of Scope").
+    throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
+  }
+
+  footballLineupLocked(): Promise<SeededFootballLineupLocked> {
+    // Same reasoning as `footballLineup` above — a locked-player precondition
+    // needs the same real league/team/roster seeding, plus waiting for (or
+    // faking) a real NFL game start, which no live verb does.
+    throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
+  }
+
+  footballLineupByeWeek(): Promise<SeededFootballLineupByeWeek> {
+    // Same reasoning as `footballLineup` above, plus this precondition would
+    // also need a real NFL bye week to be active for the seeded team.
     throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
   }
 

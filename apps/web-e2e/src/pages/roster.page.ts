@@ -62,6 +62,40 @@ export class RosterPage extends BaseScreen {
   }
 
   /**
+   * The occupied, LOCKED slot button for `fullName` at `positionType` —
+   * `"<Player> at <POS> — locked"` (LS-6441 lock-window scenario). A locked
+   * occupant's row disables `onPress` entirely (`RosterBoard.tsx`), so this
+   * is both the "communicates why" assertion target and proof the row can't
+   * be tapped into a selection.
+   */
+  lockedSlot(fullName: string, positionType: string): UIElement {
+    return this.slotButton(
+      new RegExp(`${fullName} at ${positionType} — locked`, 'i'),
+    );
+  }
+
+  /**
+   * The LOCKED bench row for `fullName` — `"<Player> — bench, locked"`
+   * (LS-6441 lock-window scenario). Bench rows share the slot buttons'
+   * `role="button"` vocabulary, so this is a thin `slotButton` wrapper like
+   * {@link lockedSlot}.
+   */
+  lockedBenchRow(fullName: string): UIElement {
+    return this.slotButton(new RegExp(`${fullName} — bench, locked`, 'i'));
+  }
+
+  /**
+   * The occupied slot button for `fullName` at `positionType`, flagged as on
+   * a bye week — `"<Player> at <POS> — on bye week"` (LS-6441 bye-week
+   * scenario, `RosterBoard`'s `onBye`/`ByeWeekChip`, LS-6430).
+   */
+  byeSlot(fullName: string, positionType: string): UIElement {
+    return this.slotButton(
+      new RegExp(`${fullName} at ${positionType} — on bye week`, 'i'),
+    );
+  }
+
+  /**
    * The Starting Pitchers section card (`roster-section-pitchers`). Scope
    * position-abbreviation reads to it so an "SP" label never collides with the
    * same text elsewhere on the page.

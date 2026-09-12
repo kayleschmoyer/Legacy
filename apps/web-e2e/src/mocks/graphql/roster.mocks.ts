@@ -163,6 +163,37 @@ export function footballPositionsResponse(positions?: MockFootballPosition[]) {
   return { data: { leaguePositions: positions ?? mockFootballPositions() } };
 }
 
+// ── NFL team season metadata (bye weeks) ────────────────────────────
+
+/** A row of the `nflTeamSeasonMetadata` query (LS-6441 bye-week scenario). */
+export interface MockNflTeamSeasonMetadata {
+  __typename: 'NflTeamSeasonMetadata';
+  teamAbbreviation: string;
+  byeWeek: number;
+  sosTier: string | null;
+  season: number;
+}
+
+/**
+ * Mock response for `GetNflTeamSeasonMetadata`, keyed by NFL team
+ * abbreviation → bye week number. Empty by default, matching the football
+ * lineup fixture's pre-LS-6441 behaviour (no team ever on bye).
+ */
+export function nflTeamSeasonMetadataResponse(
+  byeWeeksByTeam: Readonly<Record<string, number>> = {},
+) {
+  const nflTeamSeasonMetadata: MockNflTeamSeasonMetadata[] = Object.entries(
+    byeWeeksByTeam,
+  ).map(([teamAbbreviation, byeWeek]) => ({
+    __typename: 'NflTeamSeasonMetadata',
+    teamAbbreviation,
+    byeWeek,
+    sosTier: null,
+    season: 1,
+  }));
+  return { data: { nflTeamSeasonMetadata } };
+}
+
 // ── Team, as selected by GetLeagueTeams ─────────────────────────────
 
 /**
@@ -233,6 +264,20 @@ export interface FootballLineupFixtureOptions {
   positionTypes?: readonly string[];
   /** Roster to start from. Defaults to one benched, QB-eligible player. */
   members?: MockTeamMember[];
+  /**
+   * The league's active week, served as `League.currentWeekNumber` (LS-6441
+   * bye-week scenario — `RosterBoard`'s `onBye` computation compares a
+   * player's NFL team's bye week against this). Defaults to `undefined`, i.e.
+   * whatever {@link mockLeague}'s own default is (`null` → the Roster tab
+   * treats it as week 1) — unchanged from the pre-LS-6441 fixture.
+   */
+  currentWeekNumber?: number;
+  /**
+   * NFL team abbreviation → bye week number, served by
+   * `GetNflTeamSeasonMetadata` (LS-6441 bye-week scenario). Empty by default —
+   * the pre-LS-6441 fixture never had a team on bye.
+   */
+  byeWeeksByTeam?: Readonly<Record<string, number>>;
 }
 
 export interface FootballLineupFixture {
@@ -314,6 +359,7 @@ export function createFootballLineupFixture(
     draftStatus: 'completed',
     currentMatchup: 1,
     numberOfTeams: 4,
+    currentWeekNumber: options.currentWeekNumber,
     userMembership: {
       __typename: 'LeagueMember',
       leagueId,
@@ -384,7 +430,8 @@ export function createFootballLineupFixture(
     // The Roster tab's matchup scoreline pipeline degrades gracefully on empty
     // data; pin both so neither backend falls through to the baseline.
     getmatchupplayers: () => ({ data: { getMatchupPlayers: [] } }),
-    getnflteamseasonmetadata: () => ({ data: { nflTeamSeasonMetadata: [] } }),
+    getnflteamseasonmetadata: () =>
+      nflTeamSeasonMetadataResponse(options.byeWeeksByTeam),
     updateteammemberposition: (variables) => {
       const teamMemberId = toId(variables['teamMemberId'], 'teamMemberId');
       const positionId = toNullableId(variables['positionId'], 'positionId');
