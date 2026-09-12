@@ -66,6 +66,11 @@ jest.mock('@legacy-sports/db-client', () => ({
       team2Id: 'matchups.team2_id',
       status: 'matchups.status',
     },
+    players: {
+      id: 'players.id',
+      firstName: 'players.first_name',
+      lastName: 'players.last_name',
+    },
     users: {
       id: 'users.id',
       accessLevel: 'users.access_level',
@@ -651,15 +656,24 @@ describe('checkPlayersNotLocked', () => {
           from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
         };
       }
-      // matchup-status check — team 10's matchup for the current week has
-      // already started (status !== 'scheduled')
-      const where = jest.fn().mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+      if (selectCall === 3) {
+        // matchup-status check — team 10's matchup for the current week has
+        // already started (status !== 'scheduled')
+        const where = jest
+          .fn()
+          .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      // player-name lookup for the locked player
+      const where = jest
+        .fn()
+        .mockResolvedValue([{ id: 50, firstName: 'Josh', lastName: 'Allen' }]);
       return { from: jest.fn(() => ({ where })) };
     });
     const db = { select };
 
     await expect(checkPlayersNotLocked(db as never, [1])).rejects.toThrow(
-      'Player is locked — the matchup for the current week has already started',
+      "Player is locked — Josh Allen cannot be moved because their team's matchup for the current week has already started.",
     );
   });
 
@@ -685,15 +699,24 @@ describe('checkPlayersNotLocked', () => {
           from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
         };
       }
-      // matchup-status check reports the team's matchup as in_progress —
-      // no stats rows are consulted anywhere in this mock.
-      const where = jest.fn().mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+      if (selectCall === 3) {
+        // matchup-status check reports the team's matchup as in_progress —
+        // no stats rows are consulted anywhere in this mock.
+        const where = jest
+          .fn()
+          .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      // player-name lookup for the locked player
+      const where = jest
+        .fn()
+        .mockResolvedValue([{ id: 50, firstName: 'Josh', lastName: 'Allen' }]);
       return { from: jest.fn(() => ({ where })) };
     });
     const db = { select };
 
     await expect(checkPlayersNotLocked(db as never, [1])).rejects.toThrow(
-      'Player is locked — the matchup for the current week has already started',
+      "Player is locked — Josh Allen cannot be moved because their team's matchup for the current week has already started.",
     );
   });
 
@@ -733,19 +756,30 @@ describe('checkPlayersNotLocked', () => {
           from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
         };
       }
-      // matchup-status check — team 10's fantasy matchup is in_progress
-      // because the Thursday game already flipped it; no matchup_player_games
-      // rows are consulted anywhere in this mock.
-      const where = jest.fn().mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+      if (selectCall === 3) {
+        // matchup-status check — team 10's fantasy matchup is in_progress
+        // because the Thursday game already flipped it; no
+        // matchup_player_games rows are consulted anywhere in this mock.
+        const where = jest
+          .fn()
+          .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      // player-name lookup for both locked players
+      const where = jest.fn().mockResolvedValue([
+        { id: 50, firstName: 'Josh', lastName: 'Allen' },
+        { id: 51, firstName: 'Stefon', lastName: 'Diggs' },
+      ]);
       return { from: jest.fn(() => ({ where })) };
     });
     const db = { select };
 
     // Attempting to move EITHER player throws — the whole team is locked
     // together, so the not-yet-played Sunday starter can't be used as a
-    // loophole to bypass the Thursday starter's lock.
+    // loophole to bypass the Thursday starter's lock. Both locked players'
+    // names are named in the message, not just the first one hit (LS-6440).
     await expect(checkPlayersNotLocked(db as never, [1, 2])).rejects.toThrow(
-      'Player is locked — the matchup for the current week has already started',
+      "Players are locked — Josh Allen, Stefon Diggs cannot be moved because their teams' matchups for the current week have already started.",
     );
   });
 });
@@ -1081,10 +1115,19 @@ describe('authorized() wrapper', () => {
             from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
           };
         }
-        // checkPlayersNotLocked → matchup-status check (team's matchup started)
+        if (selectCall === 5) {
+          // checkPlayersNotLocked → matchup-status check (team's matchup started)
+          const where = jest
+            .fn()
+            .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        // checkPlayersNotLocked → player-name lookup for the locked player
         const where = jest
           .fn()
-          .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+          .mockResolvedValue([
+            { id: 50, firstName: 'Josh', lastName: 'Allen' },
+          ]);
         return { from: jest.fn(() => ({ where })) };
       }),
     };
@@ -1092,7 +1135,7 @@ describe('authorized() wrapper', () => {
     await expect(
       resolve({}, { memberIds: [1] }, makeContext(USER, db)),
     ).rejects.toThrow(
-      'Player is locked — the matchup for the current week has already started',
+      "Player is locked — Josh Allen cannot be moved because their team's matchup for the current week has already started.",
     );
     expect(handler).not.toHaveBeenCalled();
   });

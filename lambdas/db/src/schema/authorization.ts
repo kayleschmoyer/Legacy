@@ -781,6 +781,10 @@ export async function isCommissionerActingOnOtherTeam(
  * out after lock. Checking matchup status instead closes that window
  * because the status flip does not depend on stats ingestion (LS-6031).
  *
+ * The thrown error names every locked player by name, not just the first
+ * one found, so a manager submitting a multi-player swap can tell exactly
+ * which move(s) were rejected instead of guessing (LS-6440).
+ *
  * @throws Error when one or more players' team is in a started matchup.
  */
 export async function checkPlayersNotLocked(
@@ -858,19 +862,44 @@ export async function checkPlayersNotLocked(
     if (m.team2Id != null) lockedTeamStatus.set(m.team2Id, m.status);
   }
 
-  const lockedMember = membersWithTeam.find((m) =>
+  // Collect every locked member, not just the first one hit, so a
+  // multi-player swap identifies all of the rejected players at once
+  // (LS-6440) rather than forcing the manager to resubmit repeatedly to
+  // discover each one.
+  const lockedMembers = membersWithTeam.filter((m) =>
     lockedTeamStatus.has(m.teamId),
   );
-  if (lockedMember) {
-    // Same condition/message as before (LS-9798) — only the wire error code
-    // changed, from generic BAD_USER_INPUT to MATCHUP_LOCKED, so the client
-    // can distinguish this expected, intentional validation from other
-    // input errors via `extensions.code` instead of message-string matching.
-    throw MatchupLockedError(
-      lockedTeamStatus.get(lockedMember.teamId) ?? 'in_progress',
-      'Player is locked — the matchup for the current week has already started',
-    );
-  }
+  if (lockedMembers.length === 0) return;
+
+  const lockedPlayerIds = [...new Set(lockedMembers.map((m) => m.playerId))];
+  const lockedPlayers = await db
+    .select({
+      id: PublicSchema.players.id,
+      firstName: PublicSchema.players.firstName,
+      lastName: PublicSchema.players.lastName,
+    })
+    .from(PublicSchema.players)
+    .where(inArray(PublicSchema.players.id, lockedPlayerIds));
+
+  const playerNameById = new Map(
+    lockedPlayers.map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
+  );
+  const lockedPlayerNames = lockedMembers.map(
+    (m) => playerNameById.get(m.playerId) ?? `player #${m.playerId}`,
+  );
+
+  const status = lockedTeamStatus.get(lockedMembers[0].teamId) ?? 'in_progress';
+  const playerList = lockedPlayerNames.join(', ');
+  const message =
+    lockedPlayerNames.length === 1
+      ? `Player is locked — ${playerList} cannot be moved because their team's matchup for the current week has already started.`
+      : `Players are locked — ${playerList} cannot be moved because their teams' matchups for the current week have already started.`;
+
+  // Same condition as before (LS-9798) — only the wire error code changed,
+  // from generic BAD_USER_INPUT to MATCHUP_LOCKED, so the client can
+  // distinguish this expected, intentional validation from other input
+  // errors via `extensions.code` instead of message-string matching.
+  throw MatchupLockedError(status, message);
 }
 
 // ── Resolver Wrapper ("Functional Decorator") ──────────────────────────────
