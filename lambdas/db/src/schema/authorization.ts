@@ -35,6 +35,7 @@
  */
 
 import {
+  getTeamKickoffTimes,
   InternalSchema,
   PublicDb,
   PublicSchema,
@@ -47,6 +48,7 @@ import {
   ForbiddenError,
   MatchupLockedError,
   PremiumRequiredError,
+  UserInputError,
 } from './graphql-errors';
 import {
   ENTITLEMENT_LABELS,
@@ -738,6 +740,71 @@ export async function verifyTeamEditAccess(
 }
 
 /**
+ * Rejects a roster move the instant a specific player's own NFL team has
+ * actually kicked off — independent of the whole-week `matchups.status`
+ * (LS-9687).
+ *
+ * `matchups.status` only flips off `'scheduled'` via the once-nightly
+ * `autoSelectGames` cron (or a commissioner's manual advance), so it cannot
+ * by itself close the bootstrap-timing race: a freshly-drafted league's week
+ * 1 can still be `'scheduled'` after that week's first real game has
+ * already kicked off. This check is a real-time backstop layered *on top
+ * of* (never a replacement for) the coarse matchup-status lock in
+ * {@link checkPlayersNotLocked} — it has no dependency on any cron, league
+ * state, or matchup row at all, only on the player's own NFL team
+ * ({@link PublicSchema.players.nflTeam}) and the {@link getTeamKickoffTimes}
+ * data source.
+ *
+ * A player with no `nflTeam` (e.g. legacy/DST-less rows) or whose team has
+ * no known kickoff (bye week, or not yet populated) is never locked by this
+ * check — it fails open, leaving the coarse matchup-status check as the
+ * only lock for that player, exactly as before this ticket.
+ *
+ * @throws Error when one or more players' own NFL team has already kicked
+ * off.
+ */
+export async function assertPlayerGamesNotStarted(
+  db: PublicDb,
+  playerIds: number[],
+): Promise<void> {
+  const uniquePlayerIds = [...new Set(playerIds)];
+  if (uniquePlayerIds.length === 0) return;
+
+  const players = await db
+    .select({
+      id: PublicSchema.players.id,
+      nflTeam: PublicSchema.players.nflTeam,
+    })
+    .from(PublicSchema.players)
+    .where(inArray(PublicSchema.players.id, uniquePlayerIds));
+
+  const teamAbbreviations = [
+    ...new Set(
+      players
+        .map((p) => p.nflTeam)
+        .filter((team): team is string => team != null),
+    ),
+  ];
+  if (teamAbbreviations.length === 0) return;
+
+  const kickoffTimes = await getTeamKickoffTimes(db, teamAbbreviations);
+  if (kickoffTimes.size === 0) return;
+
+  const now = new Date();
+  const hasStartedGame = players.some(
+    (p) =>
+      p.nflTeam != null &&
+      (kickoffTimes.get(p.nflTeam)?.getTime() ?? Infinity) <= now.getTime(),
+  );
+
+  if (hasStartedGame) {
+    throw UserInputError(
+      'Player is locked — their NFL game has already started',
+    );
+  }
+}
+
+/**
  * Whether the calling user is a **commissioner** and the given team members
  * belong to a team other than the one they own (LS-6443). Used by
  * {@link authorized} to decide whether a commissioner's edit is exempt from
@@ -785,7 +852,13 @@ export async function isCommissionerActingOnOtherTeam(
  * one found, so a manager submitting a multi-player swap can tell exactly
  * which move(s) were rejected instead of guessing (LS-6440).
  *
- * @throws Error when one or more players' team is in a started matchup.
+ * Additionally (LS-9687) rejects the move the instant a specific player's
+ * own NFL team has kicked off, via {@link assertPlayerGamesNotStarted} —
+ * this closes the remaining bootstrap-timing race the status check alone
+ * cannot, since it has no dependency on the nightly cron ever having run.
+ *
+ * @throws Error when one or more players' team is in a started matchup, or
+ * a specific player's own NFL team has already kicked off.
  */
 export async function checkPlayersNotLocked(
   db: PublicDb,
@@ -793,6 +866,11 @@ export async function checkPlayersNotLocked(
 ): Promise<void> {
   const members = await getTeamMemberInfo(db, teamMemberIds);
   if (members.length === 0) return;
+
+  await assertPlayerGamesNotStarted(
+    db,
+    members.map((m) => m.playerId),
+  );
 
   // Get the current week for the league.
   // Prefer the authoritative `currentWeek` column; fall back to resolving

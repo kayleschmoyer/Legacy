@@ -36,6 +36,7 @@ import { computeFootballGamePoints } from './matchupScores';
 import { assertPositionAssignmentsEligible } from '../position-eligibility';
 import { builder, Context } from '../builder';
 import {
+  assertPlayerGamesNotStarted,
   checkAdminInDb,
   requireAdmin,
   requireEntitlement,
@@ -585,6 +586,18 @@ export async function performMatchupPlayerPositionUpdate(
       throw MatchupLockedError(lockedMatchup.status);
     }
 
+    // Per-player real-time kickoff backstop (LS-9687) — re-checked here,
+    // under the same row lock as isMatchupLocked above, so it applies
+    // regardless of whether matchups.status has caught up yet.
+    const [targetMatchupPlayer] = await tx
+      .select({ playerId: PublicSchema.matchupPlayers.playerId })
+      .from(PublicSchema.matchupPlayers)
+      .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerId))
+      .limit(1);
+    if (targetMatchupPlayer) {
+      await assertPlayerGamesNotStarted(tx, [targetMatchupPlayer.playerId]);
+    }
+
     // If assigning to a slot, evict any existing occupant first so only one
     // player can occupy a given slot at a time.
     if (positionId != null) {
@@ -646,6 +659,10 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
       if (await isMatchupLocked(context.db, matchup)) {
         throw MatchupLockedError(matchup.status);
       }
+
+      // Fast-fail path only — the authoritative re-check happens inside
+      // performMatchupPlayerPositionUpdate's transaction (LS-9687).
+      await assertPlayerGamesNotStarted(context.db, [matchupPlayer.playerId]);
 
       const db = context.db;
 
@@ -839,6 +856,7 @@ export async function performMatchupPlayerPositionSwap(
       .select({
         id: PublicSchema.matchupPlayers.id,
         positionId: PublicSchema.matchupPlayers.positionId,
+        playerId: PublicSchema.matchupPlayers.playerId,
       })
       .from(PublicSchema.matchupPlayers)
       .where(
@@ -849,6 +867,14 @@ export async function performMatchupPlayerPositionSwap(
       );
     const previousPositionById = new Map(
       previousRows.map((r) => [r.id, r.positionId]),
+    );
+
+    // Per-player real-time kickoff backstop (LS-9687) — re-checked here,
+    // under the same row lock as isMatchupLocked above, so it applies
+    // regardless of whether matchups.status has caught up yet.
+    await assertPlayerGamesNotStarted(
+      tx,
+      previousRows.map((r) => r.playerId),
     );
 
     // Clear both positions first to avoid unique constraint violations
@@ -1002,6 +1028,13 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
       if (await isMatchupLocked(context.db, matchupA)) {
         throw MatchupLockedError(matchupA.status);
       }
+
+      // Fast-fail path only — the authoritative re-check happens inside
+      // performMatchupPlayerPositionSwap's transaction (LS-9687).
+      await assertPlayerGamesNotStarted(context.db, [
+        playerA.playerId,
+        playerB.playerId,
+      ]);
 
       const db = context.db;
 

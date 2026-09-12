@@ -988,6 +988,74 @@ export async function getRosterLockRules(db: PublicDb, leagueId: number) {
 }
 
 /**
+ * Look up each given NFL team's current kickoff instant (LS-9687).
+ *
+ * Returns a `Map` keyed by team abbreviation; a team with no row, or a null
+ * `kickoffTime` (bye week / not yet populated), is simply absent from the
+ * map — callers must treat a missing entry as "no known kickoff", never as
+ * "started".
+ */
+export async function getTeamKickoffTimes(
+  db: PublicDb,
+  teamAbbreviations: string[],
+): Promise<Map<string, Date>> {
+  if (teamAbbreviations.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      teamAbbreviation: Schema.nflTeamKickoffTimes.teamAbbreviation,
+      kickoffTime: Schema.nflTeamKickoffTimes.kickoffTime,
+    })
+    .from(Schema.nflTeamKickoffTimes)
+    .where(
+      inArray(Schema.nflTeamKickoffTimes.teamAbbreviation, teamAbbreviations),
+    );
+
+  const result = new Map<string, Date>();
+  for (const row of rows) {
+    if (row.kickoffTime != null) {
+      result.set(row.teamAbbreviation, new Date(row.kickoffTime));
+    }
+  }
+  return result;
+}
+
+/**
+ * Upsert per-team kickoff instants (LS-9687) — the write side of the
+ * per-player kickoff-time data source. Pass `kickoffTime: null` to clear a
+ * team's kickoff (e.g. a bye week) without deleting the row.
+ *
+ * Intended to be called ahead of game day by whatever populates the real
+ * NFL schedule (an admin/ops script today; a future scheduled ingestion job
+ * against a live schedule feed) — deliberately decoupled from any single
+ * league's draft/cron state so it can be kept current independent of every
+ * league's own roster-lock timing.
+ */
+export async function upsertTeamKickoffTimes(
+  db: PublicDb,
+  entries: Array<{ teamAbbreviation: string; kickoffTime: Date | null }>,
+): Promise<void> {
+  if (entries.length === 0) return;
+
+  await db
+    .insert(Schema.nflTeamKickoffTimes)
+    .values(
+      entries.map((e) => ({
+        teamAbbreviation: e.teamAbbreviation,
+        kickoffTime: e.kickoffTime,
+        updatedAt: new Date(),
+      })),
+    )
+    .onConflictDoUpdate({
+      target: Schema.nflTeamKickoffTimes.teamAbbreviation,
+      set: {
+        kickoffTime: sql`excluded.kickoff_time`,
+        updatedAt: sql`excluded.updated_at`,
+      },
+    });
+}
+
+/**
  * Compute the effective roster lock time for a matchup, given the league's
  * `rosterLockTiming` setting and any custom lock rules. Pure function shared
  * by `isRosterLocked` and the `Matchup.lockTime` GraphQL resolver (LS-6368)

@@ -34,8 +34,15 @@ import {
 } from '../../../integration-test-setup';
 import { getLeague, getUser } from '../../__fixtures__';
 
-const { leagues, teams, matchups, matchupPlayers, leaguePosition } =
-  integrationTestSchema;
+const {
+  leagues,
+  teams,
+  matchups,
+  matchupPlayers,
+  leaguePosition,
+  players,
+  nflTeamKickoffTimes,
+} = integrationTestSchema;
 
 describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-6377)', () => {
   let db: Awaited<ReturnType<typeof getTestDatabase>>;
@@ -131,6 +138,53 @@ describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-
     expect(result.positionId).toBe(slot.id);
     expect(await loadPosition(rowB.id)).toBe(slot.id);
     expect(await loadPosition(rowA.id)).toBeNull();
+  });
+
+  // LS-9687: real-time per-player kickoff backstop. Reference/global tables
+  // (players.nfl_team, nfl_team_kickoff_times) are mutated directly, so both
+  // are always reset in `finally` — cleanupTestData only touches
+  // league-scoped rows.
+  it("rejects the update once the player's own NFL team has kicked off, even though matchup.status is still 'scheduled' and no rosterLockTiming rule fired (bootstrap race)", async () => {
+    const { team, matchup, slot, rowB } = await seedTwoPlayerMatchup();
+    const [playerB] = getTestPlayers().slice(1);
+
+    try {
+      await db
+        .update(players)
+        .set({ nflTeam: 'KC' })
+        .where(eq(players.id, playerB.id));
+      await db
+        .insert(nflTeamKickoffTimes)
+        .values({
+          teamAbbreviation: 'KC',
+          kickoffTime: new Date(Date.now() - 60_000),
+        })
+        .onConflictDoUpdate({
+          target: nflTeamKickoffTimes.teamAbbreviation,
+          set: { kickoffTime: new Date(Date.now() - 60_000) },
+        });
+
+      await expect(
+        performMatchupPlayerPositionUpdate(db, {
+          matchupId: matchup.id,
+          teamId: team.id,
+          matchupPlayerId: rowB.id,
+          positionId: slot.id,
+        }),
+      ).rejects.toThrow(
+        'Player is locked — their NFL game has already started',
+      );
+
+      expect(await loadPosition(rowB.id)).toBeNull();
+    } finally {
+      await db
+        .update(players)
+        .set({ nflTeam: null })
+        .where(eq(players.id, playerB.id));
+      await db
+        .delete(nflTeamKickoffTimes)
+        .where(eq(nflTeamKickoffTimes.teamAbbreviation, 'KC'));
+    }
   });
 
   it('rejects the update once the league-configured lock instant has passed, even while status is still scheduled and startTime is in the future (LS-6370)', async () => {
