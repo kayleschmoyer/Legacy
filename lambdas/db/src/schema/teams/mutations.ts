@@ -13,7 +13,8 @@ import {
 import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
 import { validateBrandingUrl } from './validate-branding-url';
 import { authorized, isTeamGeneralManager } from '../authorization';
-import { builder } from '../builder';
+import { builder, type Context } from '../builder';
+import { postSystemLeagueMessage } from '../league-messages-helper';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
 import {
   AuthenticationError,
@@ -199,6 +200,41 @@ export async function syncCurrentMatchupPositions(
   }
 }
 
+/**
+ * Posts a system message to league chat when a commissioner edits a roster
+ * they don't own after lock (LS-6443 / `allowCommissionerLockOverride`). This
+ * is how the action is made visible to the league — never silent — so the
+ * affected manager and their opponents can see a commissioner, not the
+ * manager, made the change. Never throws (mirrors `postSystemLeagueMessage`):
+ * a failed chat post must not roll back a roster edit that already succeeded.
+ */
+async function announceCommissionerLockOverride(
+  context: Context,
+  params: { leagueId: number; teamId: number | null },
+): Promise<void> {
+  const commissionerName = context.user?.username ?? `user_${context.user?.id}`;
+
+  let teamName = params.teamId != null ? `Team #${params.teamId}` : 'a team';
+  if (params.teamId != null) {
+    const [team] = await context.db
+      .select({ name: PublicSchema.teams.name })
+      .from(PublicSchema.teams)
+      .where(eq(PublicSchema.teams.id, params.teamId))
+      .limit(1);
+    teamName = team?.name ?? teamName;
+  }
+
+  await postSystemLeagueMessage(context.db, context.notificationService, {
+    leagueId: params.leagueId,
+    messageType: 'system_commissioner_lock_override',
+    messageText: `⚙️ Commissioner ${commissionerName} edited ${teamName}'s lineup after lock`,
+    metadata: {
+      teamId: params.teamId,
+      commissionerUsername: commissionerName,
+    },
+  });
+}
+
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
 // `positionId: null` on this mutation only ever clears the `team_members`
@@ -227,8 +263,12 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
         checkLocked: true,
         // Lineup edits are core assistant-manager responsibilities (LS-6024).
         allowAssistantManager: true,
+        // Commissioners can correct another manager's lineup after lock
+        // (LS-6443) — attributed and announced in league chat below, never
+        // silent.
+        allowCommissionerLockOverride: true,
       },
-      async (_parent, args, context, user) => {
+      async (_parent, args, context, user, meta) => {
         const { teamMemberId, positionId } = args;
         const db = context.db;
 
@@ -348,6 +388,13 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
             return { member };
           });
 
+          if (meta.isCommissionerLockOverride) {
+            await announceCommissionerLockOverride(context, {
+              leagueId: member.leagueId,
+              teamId: member.teamId,
+            });
+          }
+
           return member;
         } catch (error) {
           LOGGER.error('Error updating team member position', {
@@ -379,8 +426,12 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
         checkLocked: true,
         // Lineup edits are core assistant-manager responsibilities (LS-6024).
         allowAssistantManager: true,
+        // Commissioners can correct another manager's lineup after lock
+        // (LS-6443) — attributed and announced in league chat below, never
+        // silent.
+        allowCommissionerLockOverride: true,
       },
-      async (_parent, args, context, user) => {
+      async (_parent, args, context, user, meta) => {
         const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB } = args;
         const db = context.db;
 
@@ -487,6 +538,13 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
 
             return [updatedA[0], updatedB[0]];
           });
+
+          if (meta.isCommissionerLockOverride) {
+            await announceCommissionerLockOverride(context, {
+              leagueId: results[0].leagueId,
+              teamId: results[0].teamId,
+            });
+          }
 
           return results;
         } catch (error) {

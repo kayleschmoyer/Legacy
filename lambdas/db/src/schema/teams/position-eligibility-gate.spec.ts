@@ -78,7 +78,9 @@ async function captureResolvers(): Promise<Record<string, Resolver>> {
     authorized:
       (_config: unknown, handler: Resolver) =>
       (parent: unknown, args: unknown, context: { user: unknown }) =>
-        handler(parent, args, context, context.user),
+        handler(parent, args, context, context.user, {
+          isCommissionerLockOverride: false,
+        }),
     isTeamGeneralManager: jest.fn(),
   }));
 

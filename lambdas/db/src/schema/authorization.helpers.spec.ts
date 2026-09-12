@@ -769,7 +769,9 @@ describe('authorized() wrapper', () => {
 
     const result = await resolve({}, {}, makeContext(USER));
     expect(result).toBe('ok');
-    expect(handler).toHaveBeenCalledWith({}, {}, expect.anything(), USER);
+    expect(handler).toHaveBeenCalledWith({}, {}, expect.anything(), USER, {
+      isCommissionerLockOverride: false,
+    });
   });
 
   it('verifies league membership when memberOf is provided', async () => {
@@ -784,7 +786,9 @@ describe('authorized() wrapper', () => {
 
     const result = await resolve({}, { leagueId: 1 }, ctx);
     expect(result).toBe('result');
-    expect(handler).toHaveBeenCalledWith({}, { leagueId: 1 }, ctx, USER);
+    expect(handler).toHaveBeenCalledWith({}, { leagueId: 1 }, ctx, USER, {
+      isCommissionerLockOverride: false,
+    });
   });
 
   it('throws FORBIDDEN for memberOf check when user is not a member', async () => {
@@ -1069,6 +1073,147 @@ describe('authorized() wrapper', () => {
           return { from: jest.fn(() => ({ where })) };
         }
         if (selectCall === 4) {
+          // checkPlayersNotLocked → league currentWeek + currentMatchup
+          const limit = jest
+            .fn()
+            .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+          return {
+            from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+          };
+        }
+        // checkPlayersNotLocked → matchup-status check (team's matchup started)
+        const where = jest
+          .fn()
+          .mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+        return { from: jest.fn(() => ({ where })) };
+      }),
+    };
+
+    await expect(
+      resolve({}, { memberIds: [1] }, makeContext(USER, db)),
+    ).rejects.toThrow(
+      'Player is locked — the matchup for the current week has already started',
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('bypasses checkPlayersNotLocked for a commissioner editing a team they do not own when allowCommissionerLockOverride is set (LS-6443)', async () => {
+    const handler = jest.fn().mockResolvedValue('ok');
+    const resolve = authorized(
+      {
+        teamMembers: (args: { memberIds: number[] }) => args.memberIds,
+        checkLocked: true,
+        allowCommissionerLockOverride: true,
+      },
+      handler,
+    );
+
+    let selectCall = 0;
+    const db = {
+      select: jest.fn(() => {
+        selectCall++;
+        if (selectCall === 1) {
+          // verifyTeamEditAccess → getTeamMemberInfo
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        if (selectCall === 2) {
+          // verifyTeamEditAccess → getLeagueMembership (commissioner of a
+          // different team than the one being edited)
+          const limit = jest
+            .fn()
+            .mockResolvedValue([
+              { permissionLevel: 'commissioner', teamId: 999 },
+            ]);
+          return {
+            from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+          };
+        }
+        if (selectCall === 3) {
+          // isCommissionerActingOnOtherTeam → getTeamMemberInfo
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        // isCommissionerActingOnOtherTeam → getLeagueMembership
+        const limit = jest
+          .fn()
+          .mockResolvedValue([
+            { permissionLevel: 'commissioner', teamId: 999 },
+          ]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }),
+    };
+
+    const result = await resolve({}, { memberIds: [1] }, makeContext(USER, db));
+
+    expect(result).toBe('ok');
+    // No checkPlayersNotLocked calls happen beyond the 4 above (it's skipped).
+    expect(db.select).toHaveBeenCalledTimes(4);
+    expect(handler).toHaveBeenCalledWith(
+      {},
+      { memberIds: [1] },
+      expect.anything(),
+      expect.anything(),
+      { isCommissionerLockOverride: true },
+    );
+  });
+
+  it('still enforces checkPlayersNotLocked for a commissioner editing their OWN team even with allowCommissionerLockOverride set', async () => {
+    const handler = jest.fn();
+    const resolve = authorized(
+      {
+        teamMembers: (args: { memberIds: number[] }) => args.memberIds,
+        checkLocked: true,
+        allowCommissionerLockOverride: true,
+      },
+      handler,
+    );
+
+    let selectCall = 0;
+    const db = {
+      select: jest.fn(() => {
+        selectCall++;
+        if (selectCall === 1 || selectCall === 3) {
+          // getTeamMemberInfo (verifyTeamEditAccess, then
+          // isCommissionerActingOnOtherTeam)
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        if (selectCall === 2 || selectCall === 4) {
+          // getLeagueMembership — commissioner IS the owner of team 10
+          const limit = jest
+            .fn()
+            .mockResolvedValue([
+              { permissionLevel: 'commissioner', teamId: 10 },
+            ]);
+          return {
+            from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+          };
+        }
+        if (selectCall === 5) {
+          // checkPlayersNotLocked → getTeamMemberInfo
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        if (selectCall === 6) {
           // checkPlayersNotLocked → league currentWeek + currentMatchup
           const limit = jest
             .fn()

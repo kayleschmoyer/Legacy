@@ -159,6 +159,21 @@ export interface AuthConfig<TArgs> {
   checkLocked?: boolean;
 
   /**
+   * When `true` (and `checkLocked`/`teamMembers` are also set), a
+   * **commissioner** editing a roster slot on a team they do not own is
+   * exempt from {@link checkPlayersNotLocked} — commissioner lineup
+   * corrections after lock are a deliberate commissioner power (LS-6443),
+   * not a bug. Does NOT extend to a general_manager/assistant_manager
+   * editing their own team, nor to a commissioner editing their own team:
+   * the bypass only fires when the two are different teams, which is what
+   * `handler`'s `meta.isCommissionerLockOverride` reflects — callers use it
+   * to post a clearly-attributed system message to league chat.
+   *
+   * @default false
+   */
+  allowCommissionerLockOverride?: boolean;
+
+  /**
    * When `true`, the wrapper will call {@link requireNotImpersonating} to
    * block the mutation during admin impersonation sessions.  Use this for
    * any mutation with financial or subscription consequences.
@@ -168,16 +183,30 @@ export interface AuthConfig<TArgs> {
   noImpersonation?: boolean;
 }
 
+/** Extra metadata `authorized()` passes to the handler about checks it ran. */
+export interface AuthorizedMeta {
+  /**
+   * `true` when this call was let through {@link checkPlayersNotLocked} only
+   * because the caller is a commissioner editing a roster they don't own
+   * (see {@link AuthConfig.allowCommissionerLockOverride}). The handler
+   * should post a clearly-attributed system message to league chat when this
+   * is `true` — see `postSystemLeagueMessage` in `league-messages-helper.ts`.
+   */
+  isCommissionerLockOverride: boolean;
+}
+
 /**
  * The handler signature passed to {@link authorized}.  Identical to a normal
  * Pothos resolver but with the authenticated `user` provided as the fourth
- * argument so you never need to call `requireAuth` yourself.
+ * argument (so you never need to call `requireAuth` yourself) and check
+ * metadata as the fifth.
  */
 export type AuthorizedHandler<TParent, TArgs, TResult> = (
   parent: TParent,
   args: TArgs,
   context: Context,
   user: AuthenticatedUser,
+  meta: AuthorizedMeta,
 ) => TResult | Promise<TResult>;
 
 // ── Building Blocks ────────────────────────────────────────────────────────────
@@ -709,6 +738,35 @@ export async function verifyTeamEditAccess(
 }
 
 /**
+ * Whether the calling user is a **commissioner** and the given team members
+ * belong to a team other than the one they own (LS-6443). Used by
+ * {@link authorized} to decide whether a commissioner's edit is exempt from
+ * {@link checkPlayersNotLocked} — a general_manager/assistant_manager editing
+ * their own (already lock-checked) team never qualifies, and a commissioner
+ * editing their own team doesn't either, since that's an ordinary self-edit,
+ * not use of commissioner power.
+ *
+ * Assumes `teamMemberIds` all belong to one team (already enforced by
+ * {@link verifyTeamEditAccess} before this is called).
+ */
+export async function isCommissionerActingOnOtherTeam(
+  db: PublicDb,
+  userId: number,
+  teamMemberIds: number[],
+): Promise<boolean> {
+  const members = await getTeamMemberInfo(db, teamMemberIds);
+  if (members.length === 0) return false;
+
+  const targetTeamId = members[0].teamId;
+  const membership = await getLeagueMembership(db, members[0].leagueId, userId);
+
+  return (
+    membership?.permissionLevel === 'commissioner' &&
+    membership.teamId !== targetTeamId
+  );
+}
+
+/**
  * Checks whether any of the given team members' matchup for the current
  * week has already started. A player is "locked" once their team's matchup
  * is no longer `scheduled` (i.e. `in_progress` or `completed`) — the same
@@ -882,6 +940,7 @@ export function authorized<TArgs, TResult>(
     }
 
     // 5. Team edit access check (team owner OR commissioner)
+    let isCommissionerLockOverride = false;
     if (config.teamMembers) {
       const memberIds = config.teamMembers(args);
       await verifyTeamEditAccess(
@@ -893,7 +952,17 @@ export function authorized<TArgs, TResult>(
 
       // 6. Player lock check (only meaningful when team members are specified)
       if (config.checkLocked) {
-        await checkPlayersNotLocked(db, memberIds);
+        if (config.allowCommissionerLockOverride) {
+          isCommissionerLockOverride = await isCommissionerActingOnOtherTeam(
+            db,
+            user.id,
+            memberIds,
+          );
+        }
+
+        if (!isCommissionerLockOverride) {
+          await checkPlayersNotLocked(db, memberIds);
+        }
       }
     }
 
@@ -902,6 +971,6 @@ export function authorized<TArgs, TResult>(
       await requirePremium(context);
     }
 
-    return handler(parent, args, context, user);
+    return handler(parent, args, context, user, { isCommissionerLockOverride });
   };
 }
