@@ -53,7 +53,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "reviewer_telemetry" {
 
 # Write-only policy: reviewer workflow can upload records; no read or delete.
 resource "aws_iam_policy" "reviewer_telemetry" {
-  name        = "${local.name_prefix}-reviewer-telemetry"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-reviewer-telemetry-"
   description = "Allow CI reviewer workflow to write JSONL telemetry to S3 via OIDC (write-only, not human-accessible)"
 
   policy = jsonencode({
@@ -68,12 +74,25 @@ resource "aws_iam_policy" "reviewer_telemetry" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Attach to the existing ci_artifacts OIDC role (trusts any branch + pull_request).
 resource "aws_iam_role_policy_attachment" "ci_artifacts_reviewer_telemetry" {
   role       = aws_iam_role.ci_artifacts.name
   policy_arn = aws_iam_policy.reviewer_telemetry.arn
+
+  # Paired with create_before_destroy on the policy above: the new attachment is
+  # made before the old one is removed, so the role is never left without this
+  # policy mid-apply. Added by hand -- this attachment's resource name does not
+  # match the policy's, so scratch/convert-iam-policy.py deliberately refuses it
+  # rather than converting the policy and leaving the attachment behind.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 output "reviewer_telemetry_bucket_name" {
