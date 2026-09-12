@@ -105,14 +105,15 @@ Tamagui supports inline media-query overrides directly on any primitive:
 
 Tokens as `@tamagui/config` actually compiles them:
 
-- `$xxs` — ≤390px
-- `$xs` / `$gtXs` — ≤660px / ≥661px
-- `$sm` / `$gtSm` — ≤800px / ≥801px
-- `$md` / `$gtMd` — ≤1020px / ≥1021px
-- `$lg` / `$gtLg` — ≤1280px / ≥1281px
-- `$xl` / `$gtXl` — ≤1650px / ≥1651px
+- `$xxs` — ≤659px
+- `$xs` / `$gtXs` — ≤799px / ≥800px
+- `$sm` / `$gtSm` — ≤800px / ≥801px (the last key still on the stock scale — LS-9898 moves it to 859/860)
+- `$md` / `$gtMd` — ≤979px / ≥980px
+- `$lg` / `$gtLg` — ≤1119px / ≥1120px
+- `$xl` / `$gtXl` — ≤1279px / ≥1280px
+- `$xxl` — ≥1280px (no `gt` counterpart)
 
-There is no `$xxl`. `lib/design-tokens/src/lib/breakpoints.ts` defines one, and its `md`/`lg`/`xl` values differ from the above; it is the source for raw numbers outside Tamagui, not for media props.
+As of LS-9885 these are **derived from `lib/design-tokens/src/lib/breakpoints.ts`** rather than inherited from `@tamagui/config`, so a `$md` prop and `breakpoints.md` describe the same widths. Note the bracket direction still differs: a `breakpoints.X` value is its band's _lower_ bound, while a `$X` media key is a _maxWidth_ at the top of that band. The live per-key status lives in [`responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md#tier-table--ground-truth).
 
 ### 2. `useMedia()` hook (conditional rendering)
 

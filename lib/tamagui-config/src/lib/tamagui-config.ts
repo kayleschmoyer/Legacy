@@ -508,23 +508,24 @@ const designTokenMedia = {
 // complementary pair at a time, each with its own call-site audit:
 //
 //   LS-9895 — xxs, lg, xl, xxl, gtLg, gtXl.  4 existing sites (landed)
-//   LS-9896 (this change) — md, gtMd  (53 sites) + elite-draft convergence
-//   LS-9897               — xs, gtXs  (17 sites)
+//   LS-9896 — md, gtMd  (53 sites) + elite-draft convergence      (landed)
+//   LS-9897 (this change) — xs, gtXs  (17 sites)
 //   LS-9898               — sm, gtSm  (184 sites) — the bulk, landed last
 //
 // Two invariants hold at every step, so no intermediate state is broken:
 //   1. `$X` and `$gtX` always move together. Moving `$sm` to 859 while `$gtSm`
 //      stayed at 801 would make 801–859 match BOTH keys.
 //   2. Band order stays monotonic — each key's `maxWidth` is below the next's.
-//      Here: xxs 659 < xs 660 < sm 800 < md 979 < lg 1119 < xl 1279 < xxl.
-//      (xxs 659 sitting one pixel under the still-stock xs 660 is the visible
-//      seam of the staging; LS-9897 widens xs to 799 and it disappears.)
+//      Here: xxs 659 < xs 799 < sm 800 < md 979 < lg 1119 < xl 1279 < xxl.
+//      The staging seam is now a 1px `sm` band (800–800): `xs` has reached its
+//      final 799 while `sm` is still the stock 800. That is valid — the two
+//      keys stay distinct and monotonic — and unobservable in practice, since
+//      no call site can express a treatment meaningful only in a 1px window.
+//      LS-9898 widens `sm` to 859 and the seam disappears.
 //
 // Each entry below is one line to delete when its slice lands.
 const media = {
   ...designTokenMedia,
-  xs: config.media.xs, // → LS-9897
-  gtXs: config.media.gtXs, // → LS-9897
   sm: config.media.sm, // → LS-9898
   gtSm: config.media.gtSm, // → LS-9898
   // Not a design-token band — a viewport-HEIGHT escape hatch (LS-9900).

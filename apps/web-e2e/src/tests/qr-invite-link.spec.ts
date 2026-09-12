@@ -10,7 +10,9 @@
  * Default test JWT has id=1, so leagues with owner=1 give commissioner access.
  */
 
+import { breakpoints } from '@legacy-sports/design-tokens';
 import { expect, test } from '../fixtures/auth-enhanced';
+
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -19,12 +21,16 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// LeagueDetailShell hides the hero "Invite" button entirely below the $xs
-// breakpoint (lib/design-tokens/src/lib/breakpoints.ts, maxWidth 660px) as a
-// deliberate design declutter (LS-8650, PR #6300) — the InviteCard's "Invite
-// Link" / "Invite Code" / "Show QR Code to Invite" controls remain as the
-// in-page invite entry point on small phones.
-const SMALL_PHONE_MAX_WIDTH = 660;
+// LeagueDetailShell hides the hero "Invite" button entirely at or below the
+// $xs breakpoint as a deliberate design declutter (LS-8650, PR #6300) — the
+// InviteCard's "Invite Link" / "Invite Code" / "Show QR Code to Invite"
+// controls remain as the in-page invite entry point on phones.
+//
+// `$xs` is the top of the design-token phone band: `breakpoints.sm - 1`, i.e.
+// 799 since LS-9897 moved it off @tamagui/config's stock 660. Derived rather
+// than hardcoded so this helper cannot drift from the config again; the flip
+// itself is pinned at real viewport widths in breakpoint-alignment.spec.ts.
+const SMALL_PHONE_MAX_WIDTH = breakpoints.sm - 1;
 
 function isSmallPhoneViewport(page: import('@playwright/test').Page) {
   const viewport = page.viewportSize();

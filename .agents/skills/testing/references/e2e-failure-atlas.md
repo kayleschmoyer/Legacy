@@ -382,7 +382,7 @@ Not "the same UI, smaller". Below the breakpoint the app renders **different com
 | --------------- | -------------------------------------------------------------------------------------------------------- | ------------------------- |
 | Player stats    | `PlayersCardFeed` replaces the data grid ≤800px — no sortable headers, no column picker, no Share/Export | LS-9326, LS-9493, LS-9660 |
 | Pending waivers | `compact={!isCurrent \|\| isNarrow}` → a summary pill with no header, rows or cancel buttons ≤768px      | LS-9408                   |
-| League hero     | The hero "Invite" button is hidden below `$xs` (≤660px) by design                                        | LS-8994                   |
+| League hero     | The hero "Invite" button is hidden below `$xs` (≤799px since LS-9897) by design                          | LS-8994                   |
 | Standings       | T/PF/PA column headers hidden via `$gtSm`/`$gtMd`                                                        | LS-9493                   |
 | Draft board     | `CompactLiveDraftBoard` replaces the wide board at ≤`$sm` (640px)                                        | —                         |
 

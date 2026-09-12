@@ -100,7 +100,7 @@ Tamagui media tokens apply inline style overrides at defined breakpoints. Use th
 
 Tokens as the workspace `media` config compiles them today — aligning to `@legacy-sports/design-tokens` is landing in stages (LS-9885):
 
-- `$xxs` — **≤659px** · `$xs`/`$gtXs` — **≤660px**/**≥661px** (stock) · `$sm`/`$gtSm` — **≤800px**/**≥801px** (stock)
+- `$xxs` — **≤659px** · `$xs`/`$gtXs` — **≤799px**/**≥800px** · `$sm`/`$gtSm` — **≤800px**/**≥801px** (stock)
 - `$md`/`$gtMd` — **≤979px**/**≥980px** · `$lg`/`$gtLg` — **≤1119px**/**≥1120px** · `$xl`/`$gtXl` — **≤1279px**/**≥1280px** · `$xxl` — **≥1280px** (no `gt` counterpart)
 
 See the Status column in [`../ui/references/responsive-density.md`](../ui/references/responsive-density.md#tier-table--ground-truth) for which keys are design-token aligned vs. still stock, and for the bracket-direction gotcha.

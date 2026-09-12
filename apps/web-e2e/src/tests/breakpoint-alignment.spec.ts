@@ -19,15 +19,21 @@
  *   - the `$md`/`$gtMd` boundary, which LS-9896 moved from 1020/1021 → 979/980.
  *     Probe: `StandingsTable`'s PF column header, `display: none` with
  *     `$gtMd={{ display: 'flex' }}` — hidden at 979px, visible at 980px.
+ *   - the `$xs`/`$gtXs` boundary, which LS-9897 moved from 660/661 → 799/800.
+ *     Probe: `LeagueHero`'s quick-share "Invite" button, `$xs={{ display:
+ *     'none' }}` — hidden at 799px, visible at 800px. `$xs` is the only media
+ *     key that element sets `display` on, so the flip reads the `xs` band
+ *     directly rather than the resolution of two overlapping keys.
  *
- * This is the template for the remaining slices — LS-9897 (`$xs`) and
- * LS-9898 (`$sm`) each add their own boundary case here as they land, so the
- * whole scale ends up pinned at real viewport widths.
+ * LS-9898 (`$sm`) adds its own boundary case here when it lands, so the whole
+ * scale ends up pinned at real viewport widths.
  *
  * Page-object convention (ADR-0015): locators live on `leaguePage`/
  * `standingsPage`, so this spec is selector-free. Viewport is the spec's to
  * own.
  */
+
+import { breakpoints } from '@legacy-sports/design-tokens';
 
 import { expect, leagueTest as test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
@@ -202,5 +208,89 @@ test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale
     await standingsPage.expectNoAppError();
 
     await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
+  });
+});
+
+/**
+ * Design-token `sm` band lower bound — the first width at which `$gtXs` fires
+ * and `$xs` stops applying. Derived, not hardcoded: the point of LS-9885 is
+ * that this number lives in one place.
+ */
+const XS_BOUNDARY = breakpoints.sm;
+
+const XS_LEAGUE = {
+  __typename: 'League',
+  id: 1,
+  name: 'Breakpoint League',
+  sport: 'baseball',
+  owner: 1,
+  draftStatus: 'not-started',
+  inviteCode: 'INVITE123',
+  numberOfTeams: 4,
+  isPublic: false,
+  userMembership: { teamId: 1 },
+};
+
+async function mockLeagueForXsBoundary(page: import('@playwright/test').Page) {
+  await createGraphQLRouter(page, {
+    getleaguebyid: (route) =>
+      fulfillJson(route, { data: { league: XS_LEAGUE } }),
+    getleague: (route) => fulfillJson(route, { data: { league: XS_LEAGUE } }),
+    getleagueteams: (route) =>
+      fulfillJson(route, { data: { leagueTeams: [] } }),
+    getpositionsforleague: (route) =>
+      fulfillJson(route, { data: { leaguePositions: [] } }),
+    getuserteamid: (route) => fulfillJson(route, { data: { userTeamId: 1 } }),
+    getuserleagues: (route) =>
+      fulfillJson(route, { data: { userLeagues: [XS_LEAGUE] } }),
+  });
+}
+
+test.describe('Breakpoint alignment — $xs/$gtXs fire on the design-token scale @regression', () => {
+  test(`hero Invite is hidden one pixel below the boundary (${XS_BOUNDARY - 1}px)`, async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.setViewportSize({
+      width: XS_BOUNDARY - 1,
+      height: VIEWPORT_HEIGHT,
+    });
+    await mockLeagueForXsBoundary(page);
+    await leaguePage.gotoDetail(1, 'overview');
+    // The title always renders, so it is the settle signal — the button under
+    // test is expected to be absent here and cannot gate on itself.
+    await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
+
+    // `$xs` (≤799) has this button's `display: none` in effect.
+    await leaguePage.heroInviteButton.expectHidden();
+  });
+
+  test(`hero Invite shows at the boundary (${XS_BOUNDARY}px)`, async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.setViewportSize({ width: XS_BOUNDARY, height: VIEWPORT_HEIGHT });
+    await mockLeagueForXsBoundary(page);
+    await leaguePage.gotoDetail(1, 'overview');
+    await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
+
+    // `$gtXs` (≥800): `$xs` no longer applies, so the button is back.
+    await leaguePage.heroInviteButton.expectVisible();
+  });
+
+  test('the stock Tamagui $xs width (660) is no longer the flip point', async ({
+    page,
+    leaguePage,
+  }) => {
+    // The discriminating case, and the largest single shift in the migration
+    // (+139px): before LS-9897 `$xs` resolved to `maxWidth: 660`, so a 700px
+    // viewport showed the hero Invite button. It is now inside the phone band
+    // and the declutter applies. This assertion fails against the stock config.
+    await page.setViewportSize({ width: 700, height: VIEWPORT_HEIGHT });
+    await mockLeagueForXsBoundary(page);
+    await leaguePage.gotoDetail(1, 'overview');
+    await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
+
+    await leaguePage.heroInviteButton.expectHidden();
   });
 });

@@ -315,6 +315,20 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('qr-code-svg');
   }
 
+  /**
+   * The hero's quick-share "Invite" button (`LeagueHero`, commissioner-only).
+   * Exact-match so it does not collide with the InviteCard's "Invite Link" /
+   * "Invite Code" controls lower on the page.
+   *
+   * `LeagueHero` hides this entirely at `$xs` (`display: 'none'`) while the
+   * InviteCard stays, which makes it the `$xs`/`$gtXs` boundary probe in
+   * breakpoint-alignment.spec.ts: `$xs` is the only media key this element
+   * sets `display` on, so the flip reads the `xs` band directly.
+   */
+  get heroInviteButton(): UIElement {
+    return this.driver.byRole('button', { name: 'Invite', exact: true });
+  }
+
   /** The "Invite Friends" card heading on the detail overview tab. */
   get inviteFriendsHeading(): UIElement {
     return this.driver.byText('Invite Friends');

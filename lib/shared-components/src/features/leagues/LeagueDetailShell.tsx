@@ -211,8 +211,11 @@ export function LeagueDetailHero({
   // Responsive tiers (desktop-first, matching this file's existing convention
   // where the un-mediated base = desktop). Design breakpoints ~380/600/780 map
   // to the nearest Tamagui max-width tokens: base = desktop, `$sm` = ≤800
-  // (compact tablet/large phone), `$xs` = ≤660 (small phone — crest, invite,
-  // and era are dropped here). The crest icon `size` is a component prop (not a
+  // (compact tablet/large phone), `$xs` = ≤799 (the design system's whole
+  // phone band — crest, invite, and era are dropped here). LS-9897 widened
+  // `$xs` from the stock 660 to the design-token 799, so the declutter now
+  // covers large phones and small tablets in portrait too, which is the
+  // intended design-system behaviour (the mock's phone band is 0–799). The crest icon `size` is a component prop (not a
   // style), so it can't take media props — resolve it via useMedia instead.
   // Bind useMedia through an explicit signature so the call/result stay
   // type-safe under this project's typed ESLint rules (same pattern as the tab
@@ -861,8 +864,12 @@ export function LeagueTabBar({
   );
   // The tab bar scrolls horizontally, so the trailing commissioner-only tab
   // sits off-screen on a phone and commissioners can't discover their admin
-  // (LS-7562). On phone-width viewports only (`xs` = ≤660px, so tablets/desktop
-  // keep the canonical order), hoist it next to the leading tab. The canonical
+  // (LS-7562). On phone-width viewports only (`xs` = ≤799px since LS-9897, so
+  // tablets in landscape and desktop keep the canonical order), hoist it next
+  // to the leading tab. Widening the band only extends a reorder that is
+  // harmless where it is unnecessary — the tab set and its roles are
+  // unchanged, so a 700px viewport that did not previously overflow simply
+  // sees the commissioner entry earlier. The canonical
   // order (tabConfig.ts / native tab arrays) is left untouched — only the
   // rendered list is reordered, and the entry stays a role="tab" in the tablist.
   const ordered =

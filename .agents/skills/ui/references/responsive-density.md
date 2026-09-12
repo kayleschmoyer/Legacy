@@ -31,14 +31,18 @@ As of LS-9885 the workspace `media` config is **derived from `@legacy-sports/des
 | Token  | Fires at | `gt` counterpart   | Status                       | Typical use                          |
 | ------ | -------- | ------------------ | ---------------------------- | ------------------------------------ |
 | `$xxs` | ≤ 659px  | —                  | ✅ aligned                   | Smallest phones. Last-resort tier.   |
-| `$xs`  | ≤ 660px  | `$gtXs` (≥ 661px)  | ⏳ stock — LS-9897 → 799/800 | Phone. The main "compact" tier.      |
+| `$xs`  | ≤ 799px  | `$gtXs` (≥ 800px)  | ✅ aligned                   | Phone. The main "compact" tier.      |
 | `$sm`  | ≤ 800px  | `$gtSm` (≥ 801px)  | ⏳ stock — LS-9898 → 859/860 | Large phone / small tablet portrait. |
 | `$md`  | ≤ 979px  | `$gtMd` (≥ 980px)  | ✅ aligned                   | Tablet. Multi-column starts above.   |
 | `$lg`  | ≤ 1119px | `$gtLg` (≥ 1120px) | ✅ aligned                   | Laptop.                              |
 | `$xl`  | ≤ 1279px | `$gtXl` (≥ 1280px) | ✅ aligned                   | Desktop.                             |
 | `$xxl` | ≥ 1280px | —                  | ✅ aligned (new)             | Wide desktop. Top band.              |
 
-Once LS-9897/9898 land, the whole table reads off the design-token scale and the Status column goes away.
+Once LS-9898 lands, the whole table reads off the design-token scale and the Status column goes away.
+
+`$sm` is the last stock row, and until LS-9898 moves it to 859 it sits one pixel above the
+now-aligned `$xs` (799) — a transient 1px `sm` band. It is valid and unobservable (no treatment
+is meaningful in a 1px window); do not write a call site that relies on it.
 
 Three things that bite:
 
@@ -174,8 +178,8 @@ Consequences to plan around:
 LS-9885 then made `lib/tamagui-config` derive Tamagui's `media` config from
 `lib/design-tokens/src/lib/breakpoints.ts`, so the scales are converging rather than coexisting.
 
-What remains is the staged rollout: `md`/`gtMd` (LS-9896), `xs`/`gtXs` (LS-9897) and
-`sm`/`gtSm` (LS-9898) still carry stock @tamagui/config values until each slice lands. The
+What remains is the staged rollout: only `sm`/`gtSm` (LS-9898) still carries stock
+@tamagui/config values; `md`/`gtMd` (LS-9896) and `xs`/`gtXs` (LS-9897) have landed. The
 Status column in the [tier table](#tier-table--ground-truth) is the live state — read it there,
 not from a second table here.
 
