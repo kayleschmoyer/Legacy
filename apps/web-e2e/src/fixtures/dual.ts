@@ -7,6 +7,7 @@ import {
   type TestInfo,
 } from '@playwright/test';
 
+import { createRequire } from 'node:module';
 import { withApiIsolation } from './api-isolation';
 import { attributePageCoverage, snapshotCoverageBaseline } from './coverage';
 import {
@@ -38,6 +39,21 @@ import {
 } from '../driver';
 import { isNativeEmulatorConfigured } from '../driver/appium-env';
 import type { GraphQLMockServer } from '../mocks/graphql/server/native-mock-server';
+
+// LS-10033: Playwright's TS-aware ESM loader (`node:module.register`, see
+// esmLoaderHost.js) is registered only in the process that calls
+// `loadConfig()` while reading `playwright.config.ts` — the worker processes
+// that actually execute fixtures/specs load their config via
+// `deserializeConfig()` instead and never register it. A worker-side dynamic
+// `import()` of a project `.ts` file therefore falls through to Node's raw
+// ESM loader, which cannot parse `.ts`/`import` syntax under this
+// CommonJS-default project ("Cannot use import statement outside a
+// module"). Static `import`s elsewhere in this file are unaffected — they go
+// through Playwright's separate, always-installed CommonJS require-hook.
+// `createRequire` reuses that same working CJS path for this one
+// intentionally-lazy load (still executed only on the emulator-configured
+// native branch, so `webdriverio` stays out of the hermetic web lane).
+const requireFromHere = createRequire(__filename);
 
 /**
  * Dual-mode fixtures (ADR-0016 §backend seam) — ONE spec, selectable backend.
@@ -490,7 +506,8 @@ export const test = base.extend<
         // Drive a real Appium/UiAutomator2 session when an emulator harness
         // is configured (`E2E_NATIVE_APP` set — the scheduled, watched login →
         // league-list job of LS-8450). The `webdriverio` runtime is pulled in
-        // via a dynamic import ONLY on this path, so the hermetic web PR-CI
+        // lazily via `requireFromHere` ONLY on this path (see LS-10033 above
+        // for why not a raw dynamic `import()`), so the hermetic web PR-CI
         // collection of these shared specs never loads wdio (ADR-0016; see
         // appium-session.ts).
         if (!isNativeEmulatorConfigured()) {
@@ -501,8 +518,9 @@ export const test = base.extend<
           await use(createNativeDriver());
           return;
         }
-        const { createAndroidSession } =
-          await import('../driver/appium-session');
+        const { createAndroidSession } = requireFromHere(
+          '../driver/appium-session',
+        ) as typeof import('../driver/appium-session');
         const { driver, dispose } = await createAndroidSession();
         try {
           await use(driver);
