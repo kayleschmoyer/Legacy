@@ -22,7 +22,7 @@ Extract Bash tool_use calls (and optionally MCP overflows/failures) from the cur
 | --- | --- | --- | --- | --- |
 | `sessionId` | string |  | — | Session UUID. Defaults to the most recently modified JSONL in the project directory. |
 | `project` | string |  | — | Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted. |
-| `projectsDir` | string |  | — | Base directory holding project session folders. Overrides auto-detection — needed when the server process's home does not match the session location (some CCR topologies). |
+| `projectsDir` | string |  | — | Base directory holding project session folders. Overrides auto-detection; cannot help in CCR — use `make audit-session` (LS-8890). |
 | `transcriptContent` | string |  | — | Raw transcript JSONL; bypasses path resolution (no shared filesystem case, LS-9362). |
 | `includeMcp` | boolean |  | — | Include MCP tool overflows and failures in the report (default: false). |
 | `pid` | number |  | coerced, integer, > 0 | Process ID to look up session ID from ~/.claude/sessions/. |

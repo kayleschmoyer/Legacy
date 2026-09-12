@@ -911,8 +911,8 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe(
-          'Base directory holding project session folders. Overrides auto-detection — needed when the ' +
-            "server process's home does not match the session location (some CCR topologies).",
+          'Base directory holding project session folders. Overrides auto-detection; cannot help in CCR ' +
+            '— use `make audit-session` (LS-8890).',
         ),
       transcriptContent: z
         .string()

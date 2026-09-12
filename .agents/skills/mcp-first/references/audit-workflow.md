@@ -15,7 +15,7 @@ This produces a structured JSON report with:
 - **Noise filtering** (one-off investigative commands auto-excluded)
 - **Overflow/failure triage** items for review
 
-The tool is Node-native (LS-8316) — it needs no Python interpreter and works in every environment (local Windows, cloud Linux, hosted server). There is no shell fallback; if the `legacy-sports-ci` MCP server is unavailable, fix the server connection instead (see [diagnostics.md](diagnostics.md)).
+The tool is Node-native (LS-8316) — it needs no Python interpreter and works in every environment (local Windows, cloud Linux, hosted server). If the `legacy-sports-ci` MCP server is _unavailable_, fix the server connection (see [diagnostics.md](diagnostics.md)). If it is connected but **cannot read your transcript** — the CCR case, where it runs in a different container/namespace — use the local CLI: [run the audit locally](#when-the-server-cannot-see-the-transcript-ccr-run-the-audit-locally) (LS-8890).
 
 > **Pass `sessionToolNames` so `gh pr *`/`gh run *` etc. are classified accurately (LS-9749).** The tool's coverage table pre-classifies these Bash commands as `covered` by `github-mcp`/`ci-mcp` on prefix match alone — it has no visibility into whether that server's tools were actually present in your session. If `legacy-sports-github` was absent for this session (see the [absent-hosted-connector cases](auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576)), every `gh pr *` fallback command gets silently filed under `informational.covered_commands` instead of surfacing as the real gap it is. Pass your session's current tool-name list (the deferred-tools listing, or a `ToolSearch` result) as `sessionToolNames` and any command whose "covering" server isn't actually in that list is reclassified as a real gap (`expected_mcp_tool` + a note explaining why), not silently dropped: `ci_audit_session_bash({ auditMode: true, sessionToolNames: [...] })`.
 
@@ -129,7 +129,45 @@ Summarize to the user:
 - Overflows/failures classified
 - Noise auto-filtered
 
-## Manual fallback when the server cannot see the transcript
+## When the server cannot see the transcript (CCR): run the audit locally
+
+**In a Claude Code Remote (CCR) session, go straight here — do not retry the
+MCP tool and do not hand-roll the audit.** The ci MCP server process runs in a
+different container/user namespace than your Bash tool: the transcript is real
+and readable by _you_ (e.g. root-owned, mode `0700`, under
+`/root/.claude/projects/<slug>/`), but no path you can name is visible to the
+_server_, so neither auto-detection nor an explicit `projectsDir` override can
+ever succeed. LS-8867 / LS-9268 / LS-9458 / LS-9538 each narrowed the server's
+path search and each confirmed this; eight recorded sessions then fell back to
+a fully manual Phase 1 (LS-8890, LS-9196, LS-9200).
+
+The fix (LS-8890) moves the process boundary instead of the path: the same
+`auditSessionBash` implementation also ships as a local CLI, run in _your_
+namespace, where the transcript is readable.
+
+```bash
+make audit-session ARGS="--auditMode"
+```
+
+It prints the identical report `ci_audit_session_bash({ auditMode: true })`
+would have — same pre-classification, same draft summaries, same subagent
+coverage — so continue from [Step 2](#2-review-the-report) unchanged. Pass any
+of the tool's params as flags (`--gapsOnly`, `--scanScratch`, `--sessionId`,
+`--project`, `--pid`, `--sessionToolNames a,b`); `--auditMode` is the default
+when `ARGS` is omitted. Pass `--sessionToolNames` here for the same reason you
+would pass `sessionToolNames` to the tool (LS-9749).
+
+Equivalent direct invocation, if `make` is unavailable:
+
+```bash
+node .github/copilot/hooks/mcp-bootstrap.mjs node --import tsx \
+  tools/mcp/ci-server/src/cli/audit-session-bash-cli.ts --auditMode
+```
+
+(The `mcp-bootstrap.mjs` wrapper only sets `TSX_TSCONFIG_PATH` so the
+workspace `@legacy-sports/*` path aliases resolve — it starts no server.)
+
+## Manual fallback when neither the tool nor the local CLI works
 
 `ci_audit_session_bash` resolves the Claude projects directory from `$HOME`
 (falling back to `node:os` `homedir()`, then an explicit `projectsDir`
@@ -140,8 +178,10 @@ namespace than the agent's own Bash tool: a transcript path the agent can
 `ls` directly is still invisible to the server, so even an explicit
 `projectsDir` override fails (LS-9458, a recurrence of LS-8867). The tool
 detects this case and raises an actionable error naming it, rather than the
-generic "Could not find" message — but there is no code-level fix for a
-transcript the server process genuinely cannot read.
+generic "Could not find" message, and every such error now names the
+`make audit-session` recovery above (LS-8890). There is no code-level fix that
+lets the _server_ read a transcript in another namespace — the fix is to not
+route the read through the server at all.
 
 `findClaudeProjectsDir` also distinguishes _why_ a candidate is unreadable
 (LS-9538): when the directory exists but the server process's OS user lacks
@@ -176,15 +216,18 @@ When neither `projectsDir` nor `transcriptContent` gets you a working audit
 (e.g. the CCR cross-container case where the server can't read _any_
 directory you point it at, LS-9458/LS-9538):
 
-1. Confirm the transcript exists from the agent's own Bash tool (`ls -la
+1. Run `make audit-session ARGS="--auditMode"` (above) — this is the supported
+   recovery for that exact case, and it does not involve the server at all.
+   Only if it too fails, continue:
+2. Confirm the transcript exists from the agent's own Bash tool (`ls -la
 ~/.claude/projects/<slug>/`) — if it's actually absent, that's a
    different bug, not this one.
-2. If it exists but the tool still can't see it, do the Phase 1 gap review
-   by hand: read back through the session's own Bash tool-call history
-   (visible in the transcript already loaded into context) and classify
-   commands per the [Steps](#steps) above, instead of via the automated
-   report.
-3. File (or comment on) an MCP gap ticket for the specific recurrence —
+3. If it exists but neither the tool nor the CLI can read it, do the Phase 1
+   gap review by hand: read back through the session's own Bash tool-call
+   history (visible in the transcript already loaded into context) and
+   classify commands per the [Steps](#steps) above, instead of via the
+   automated report.
+4. File (or comment on) an MCP gap ticket for the specific recurrence —
    check `jira_list_children` on the current MCP gaps bucket epic first so
    repeat CCR-namespace occurrences land as comments on one ticket rather
    than duplicates.

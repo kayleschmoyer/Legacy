@@ -155,9 +155,13 @@ describe('findClaudeProjectsDir', () => {
       /not readable \*from the MCP server process\*/,
     );
     expect(thrown?.message).toContain('LS-9458');
-    expect(thrown?.message).toContain(
-      "manual review of the session's Bash history",
-    );
+    // LS-8890: the message now leads with the automated recovery (run the
+    // same audit locally, where the transcript IS readable) and keeps manual
+    // review only as the last resort — it used to send the caller straight
+    // to a hand-rolled audit, which is why eight CCR sessions in a row
+    // skipped Phase 1 entirely.
+    expect(thrown?.message).toContain('make audit-session');
+    expect(thrown?.message).toContain('Only if that also fails');
   });
 
   it('distinguishes permission-denied from not-found on an unreadable explicit override (LS-9538)', () => {
@@ -247,6 +251,59 @@ describe('findClaudeProjectsDir', () => {
       );
       expect((err as Error).message).toContain('/nonexistent-override-xyz');
     }
+  });
+
+  it('names the local-CLI recovery on the generic not-found error (LS-8890)', () => {
+    // The generic branch is the one every CCR session actually hit
+    // (LS-8890/LS-9196/LS-9200 all report the bare "Tried: ..." message).
+    // It must now point at the automated recovery, not dead-end.
+    process.env['CLAUDE_PROJECTS_DIR'] = '/nonexistent-override-xyz';
+    process.env['APPDATA'] = '/nonexistent-appdata-xyz';
+    (homedir as jest.Mock).mockReturnValue(join(tmpDir, 'no-such-homedir'));
+    process.env['HOME'] = join(tmpDir, 'no-such-home');
+    let thrown: Error | undefined;
+    try {
+      findClaudeProjectsDir(undefined, {
+        rootHome: join(tmpDir, 'no-such-root'),
+        homesRoot: join(tmpDir, 'no-such-homes'),
+      });
+    } catch (err) {
+      thrown = err as Error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown?.message).toContain('make audit-session');
+    expect(thrown?.message).toContain('audit-session-bash-cli.ts');
+  });
+
+  it('names the local-CLI recovery on the permission-denied error (LS-8890)', () => {
+    // The EACCES branch (LS-9538) is unrecoverable by any projectsDir value,
+    // so it is the branch that most needs to hand the caller a working path.
+    const restricted = join(tmpDir, 'eacces-projects');
+    const eacces = Object.assign(new Error('EACCES: permission denied'), {
+      code: 'EACCES',
+    });
+    process.env['CLAUDE_PROJECTS_DIR'] = restricted;
+    delete process.env['APPDATA'];
+    (homedir as jest.Mock).mockReturnValue(join(tmpDir, 'no-such-homedir'));
+    process.env['HOME'] = join(tmpDir, 'no-such-home');
+    (statSync as jest.Mock).mockImplementation((...args: unknown[]) => {
+      if (args[0] === restricted) throw eacces;
+      return jest
+        .requireActual<typeof import('node:fs')>('node:fs')
+        .statSync(...(args as Parameters<typeof statSync>));
+    });
+    let thrown: Error | undefined;
+    try {
+      findClaudeProjectsDir(undefined, {
+        rootHome: join(tmpDir, 'no-such-root'),
+        homesRoot: join(tmpDir, 'no-such-homes'),
+      });
+    } catch (err) {
+      thrown = err as Error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown?.message).toContain('Permission denied (not not-found)');
+    expect(thrown?.message).toContain('make audit-session');
   });
 });
 

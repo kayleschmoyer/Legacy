@@ -94,3 +94,40 @@ Distinct from both the LS-9576 "never registers at all" case and a mid-session 4
 - If the re-probe finds the tool (under its configured name or a UUID alias), use it — switch off any REST/`acli`/`gh` fallback already in flight for the rest of the session.
 - If the re-probe still finds nothing, proceed with the documented fallback for the failure shape you're seeing (`configured: false` → Step 0b's stop condition; `Incompatible auth server…` → [Auth per surface](auth-and-routing.md#auth-per-surface) row below; entirely absent for the session → the [LS-9576 substitution table](auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576), which applies here too even though this failure mode isn't CCR-specific), and note in the MCP gap audit which lifecycle steps ran on the fallback so a late attach mid-lifecycle is visible in the record.
 - This costs one extra `ToolSearch` call per lifecycle step against the alternative of running the entire claim → PR → merge path on REST/CLI fallbacks — cheap by comparison, and it's the only way to recover the real tools once they attach.
+
+### A connected server that still cannot reach your filesystem (CCR, LS-8890)
+
+A fourth failure shape, distinct from every case above: the server **connects
+fine and answers**, but cannot read a file on the path you name. In CCR the
+stdio/hosted server process runs in a different container and OS user than the
+agent, so a transcript the agent can `ls` directly — `/root/.claude/projects/<slug>/`,
+root-owned, mode `0700` — is invisible to it. `ci_audit_session_bash` is the
+worked example: `findClaudeProjectsDir` probes an explicit `projectsDir`
+override, `$CLAUDE_PROJECTS_DIR`, `$HOME`, `homedir()`, `%APPDATA%`, `/root`
+and every `/home/*`, and in CCR **none of them can succeed**, because the
+problem is a namespace boundary rather than a wrong path (LS-8867, LS-9268,
+LS-9458 and LS-9538 each narrowed the search and each confirmed it).
+
+**Recognise it by the shape, not the wording:** auth is fine, the tool returns
+a normal error rather than a connection failure, and an explicit path override
+the agent has verified from its own Bash tool still fails. That combination
+means no parameter value will ever work — stop retrying path variations.
+
+**Sanctioned response — move the process boundary, not the path.** Where the
+work is pure computation over a file the agent _can_ read, run the same
+implementation locally instead of shipping the file to the server:
+
+```bash
+make audit-session ARGS="--auditMode"
+```
+
+This is the identical `auditSessionBash` code executed in the agent's own
+namespace, so the report matches the MCP tool's exactly. Prefer it over the
+`transcriptContent` upload param, which also works but costs the whole
+transcript (hundreds of KB) through the context window. Full routing:
+[audit-workflow.md](audit-workflow.md#when-the-server-cannot-see-the-transcript-ccr-run-the-audit-locally).
+
+When adding a tool that reads a caller-side path, assume this boundary exists:
+make the failure name a recovery the caller can actually run, rather than
+ending at "do it by hand" — that wording alone kept Phase 1 of the gap audit
+un-run across eight CCR sessions.

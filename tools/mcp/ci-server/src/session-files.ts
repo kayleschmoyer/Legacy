@@ -47,6 +47,25 @@ function probeDir(dir: string): ProbeResult {
 }
 
 /**
+ * Recovery guidance appended to every "can't reach the transcript" error.
+ *
+ * Before LS-8890 these errors all ended at "fall back to a manual review",
+ * which made Phase 1 of the gap audit a permanent no-op for the whole CCR
+ * environment class (LS-8890 / LS-9196 / LS-9200: eight recorded sessions
+ * each rediscovered the failure and each hand-rolled the audit). There *is*
+ * an automated path — the same audit run as a local process in the agent's
+ * own namespace, where the transcript is readable — so name it here rather
+ * than sending the caller to do the work by hand.
+ */
+const RECOVERY_HINT =
+  `Recovery: run the audit locally instead — \`make audit-session ARGS="--auditMode"\` ` +
+  `(equivalently \`node .github/copilot/hooks/mcp-bootstrap.mjs node --import tsx ` +
+  `tools/mcp/ci-server/src/cli/audit-session-bash-cli.ts --auditMode\`). It is this same ` +
+  `audit, executed in your own process, so it reads the transcript this server cannot. ` +
+  `Only if that also fails, fall back to a manual review ` +
+  `(.agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript).`;
+
+/**
  * Locate the Claude Code projects directory, probing platform-appropriate
  * paths so the tool works in both local Windows sessions and Linux/macOS/cloud
  * environments.
@@ -148,8 +167,7 @@ export function findClaudeProjectsDir(
           `OS user than your Bash tool and lacks read access to this directory, a known ` +
           `CCR limitation, LS-9538/LS-9458). No projectsDir value can work around this; ` +
           `retrying path variations will not help. ` +
-          `Fall back to a manual review of the session's Bash history for the gap audit ` +
-          `(see .agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript). ` +
+          `${RECOVERY_HINT} ` +
           `All candidates tried: ${candidates.join(', ')}`,
       );
     }
@@ -158,8 +176,7 @@ export function findClaudeProjectsDir(
         `"${explicit}" does not exist or is not readable *from the MCP server process* ` +
         `(it may be visible from your Bash tool but not from the server, if they run in ` +
         `different containers/mount namespaces — a known CCR limitation, LS-9458). ` +
-        `Fall back to a manual review of the session's Bash history for the gap audit ` +
-        `(see .agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript). ` +
+        `${RECOVERY_HINT} ` +
         `All candidates tried: ${candidates.join(', ')}`,
     );
   }
@@ -171,12 +188,14 @@ export function findClaudeProjectsDir(
         `Permission denied (not not-found) on: ${permissionDenied.map((p) => p.dir).join(', ')} ` +
         `— the MCP server process's OS user lacks read access to this directory, a known ` +
         `CCR limitation (LS-9538). Pass an explicit projectsDir override only if it points ` +
-        `to a directory the server process itself can read; otherwise no override will help.`,
+        `to a directory the server process itself can read; otherwise no override will help. ` +
+        `${RECOVERY_HINT}`,
     );
   }
 
   throw new Error(
-    `Could not find Claude projects directory. Tried: ${candidates.join(', ')}`,
+    `Could not find Claude projects directory. Tried: ${candidates.join(', ')}. ` +
+      `${RECOVERY_HINT}`,
   );
 }
 
