@@ -109,3 +109,147 @@ describe('ci-orchestrator.yml — report-runner-shutdown scheduling (LS-9710)', 
     );
   });
 });
+
+/**
+ * LS-10091 negative control.
+ *
+ * The fix for LS-10091 regenerates a MISSING verdict (see
+ * .github/workflows/rerun-cancelled-ci.yml); it must never manufacture a
+ * GREEN one. Stripping `merge-when-ready` when a pipeline was cancelled is
+ * correct, fail-safe behaviour — a cancelled run proved nothing, so the PR has
+ * not been shown green, and leaving the label on would let untested code into
+ * the merge queue.
+ *
+ * These tests exist to fail loudly if anyone "fixes" the symptom by exempting
+ * cancellations from label removal instead of re-running the pipeline.
+ */
+describe('ci-orchestrator.yml — cancelled pipelines never hold merge-when-ready (LS-10091)', () => {
+  const COLLECT_RESULTS_PATH = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    'actions',
+    'collect-results',
+    'action.yml',
+  );
+
+  it('maps a cancelled critical job to overall-status "failure", not "success"', () => {
+    const raw = fs.readFileSync(COLLECT_RESULTS_PATH, 'utf8');
+    assert.match(
+      raw,
+      /\[ "\$STEP_RESULT" = "failure" \] \|\| \[ "\$STEP_RESULT" = "cancelled" \]/,
+      'collect-results must keep folding `cancelled` into `failure` — this is ' +
+        'the single point that makes a cancelled pipeline not-green. ' +
+        'Exempting `cancelled` here would let an unverified SHA keep ' +
+        'merge-when-ready (LS-10091).',
+    );
+  });
+
+  it('only restores merge-when-ready on an exact "success" verdict', () => {
+    const { parsed } = loadOrchestrator();
+    const condition = parsed.jobs['restore-merge-label-on-success'].if;
+
+    assert.match(
+      condition,
+      /needs\.ci-pipeline\.outputs\.overall-status == 'success'/,
+      'restore-merge-label-on-success must require an exact `success` verdict. ' +
+        'Widening this to accept `cancelled` (or anything not-failure) would ' +
+        're-arm the merge queue on a pipeline that never ran (LS-10091).',
+    );
+    assert.doesNotMatch(
+      condition,
+      /cancelled'/,
+      'restore-merge-label-on-success must not special-case a cancelled ' +
+        'pipeline — a cancelled run has no verdict to restore from.',
+    );
+  });
+
+  it('keeps remove-merge-label-on-failure free of any cancellation exemption', () => {
+    const { parsed } = loadOrchestrator();
+    const condition = parsed.jobs['remove-merge-label-on-failure'].if;
+
+    assert.match(
+      condition,
+      /needs\.ci-pipeline\.outputs\.overall-status == 'failure'/,
+      'remove-merge-label-on-failure must keep keying on the `failure` verdict ' +
+        '— which `cancelled` folds into (see collect-results).',
+    );
+    assert.doesNotMatch(
+      condition,
+      /overall-status != 'cancelled'|result != 'cancelled'/,
+      'remove-merge-label-on-failure must NOT exempt cancellations from label ' +
+        'removal. The LS-10091 fix is to re-run the cancelled pipeline so a ' +
+        'genuine verdict appears, not to keep the label without one.',
+    );
+  });
+});
+
+/**
+ * LS-10091 — the automatic re-run of a cancelled pipeline.
+ *
+ * A run cannot re-run itself (`rerun-failed-jobs` is rejected while the run is
+ * in progress), so this lives in its own `workflow_run`-triggered workflow.
+ */
+describe('rerun-cancelled-ci.yml — re-run guards (LS-10091)', () => {
+  const RERUN_PATH = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    'workflows',
+    'rerun-cancelled-ci.yml',
+  );
+
+  function loadRerun() {
+    const raw = fs.readFileSync(RERUN_PATH, 'utf8');
+    return { raw, parsed: yaml.load(raw) };
+  }
+
+  it('triggers only on a completed CI Orchestrator run', () => {
+    const { parsed } = loadRerun();
+    // `on` parses as boolean `true` in YAML 1.1 unless quoted; js-yaml gives us
+    // the key either way, so look it up defensively.
+    const on = parsed.on ?? parsed[true];
+    assert.deepEqual(on.workflow_run.workflows, [
+      'Legacy Sports CI Orchestrator',
+    ]);
+    assert.deepEqual(on.workflow_run.types, ['completed']);
+  });
+
+  it('acts only on a cancelled conclusion, never on a real failure verdict', () => {
+    const { parsed } = loadRerun();
+    const condition = parsed.jobs.rerun.if;
+    assert.match(condition, /conclusion == 'cancelled'/);
+    assert.doesNotMatch(
+      condition,
+      /conclusion == 'failure'/,
+      'a `failure` conclusion is a genuine verdict — re-running it would ' +
+        'silently retry a SHA that has already been ruled on.',
+    );
+  });
+
+  it('requests actions:write only for itself, not for ci-orchestrator', () => {
+    const { parsed: rerun } = loadRerun();
+    assert.equal(rerun.permissions.actions, 'write');
+
+    const { parsed: orchestrator } = loadOrchestrator();
+    assert.equal(
+      orchestrator.permissions.actions,
+      'read',
+      'ci-orchestrator.yml must keep `actions: read`. Its workflow-level ' +
+        'permissions are inherited by every reusable workflow it calls, so ' +
+        'widening them to grant the re-run would hand actions:write to the ' +
+        'whole pipeline (LS-10091).',
+    );
+  });
+
+  it('runs on ubuntu-latest — the self-hosted pool may be the thing that died', () => {
+    const { parsed } = loadRerun();
+    assert.equal(
+      parsed.jobs.rerun['runs-on'],
+      'ubuntu-latest',
+      'same reasoning as report-runner-shutdown (LS-9710): a job whose reason ' +
+        'for existing is that the runner pool shut down cannot be scheduled on ' +
+        'that pool.',
+    );
+  });
+});

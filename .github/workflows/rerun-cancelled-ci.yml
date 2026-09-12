@@ -1,0 +1,170 @@
+# =============================================================================
+# Re-run Cancelled CI
+# =============================================================================
+# LS-10091. When a CI Orchestrator run ends `cancelled`, the head SHA is left
+# without a verdict: `CI Gate` never turns green, so
+# `restore-merge-label-on-success` can never fire and `merge-when-ready` — once
+# any sweep has correctly stripped it — never comes back. Until now the only
+# recovery was a human pressing "Re-run failed jobs" or forcing a new SHA (how
+# PR #7894 was recovered, by merging main to produce 3468f1f11).
+#
+# Note what this deliberately does NOT do: it does not exempt cancellations
+# from label removal. Stripping `merge-when-ready` on a cancelled pipeline is
+# correct, fail-safe behaviour — a cancelled run proved nothing, so the PR has
+# not been shown green. The fix is to REGENERATE the missing verdict, not to
+# pretend one exists. `remove-merge-label-on-failure` is untouched.
+#
+# Why a separate workflow rather than a job inside ci-orchestrator.yml: a run
+# cannot re-run itself. `rerun-failed-jobs` is rejected while the run is still
+# in progress, and any job that could call it is by definition still in
+# progress. `workflow_run: [completed]` is the earliest point the API accepts.
+#
+# Guards live in .github/scripts/runner-cancellation.js (unit-tested) and fail
+# CLOSED — superseded SHA, deliberate cancellation, or attempt cap reached all
+# mean "leave it for a human".
+# =============================================================================
+
+name: "Re-run Cancelled CI"
+
+on:
+  workflow_run:
+    workflows: ["Legacy Sports CI Orchestrator"]
+    types: [completed]
+
+# `actions: write` is scoped to this workflow alone — deliberately NOT added to
+# ci-orchestrator.yml, whose workflow-level permissions are inherited by every
+# reusable workflow it calls (see the permissions note there).
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+
+# One re-run decision per triggering run. `cancel-in-progress: false` so a burst
+# of orchestrator completions cannot drop a decision on the floor.
+concurrency:
+  group: rerun-cancelled-ci-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  rerun:
+    name: "🔁 Re-run Cancelled Pipeline"
+    # Only cancelled runs are candidates. A `failure` conclusion is a real
+    # verdict — the SHA has been ruled on and must not be silently retried.
+    if: github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/runner-cancellation.js
+          sparse-checkout-cone-mode: false
+
+      - name: "Decide and re-run"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const {
+              classifyJobLog,
+              shouldRerunCancelledRun,
+              DELIBERATE_CANCEL,
+              RUNNER_SHUTDOWN,
+            } = require('./.github/scripts/runner-cancellation.js');
+
+            const { owner, repo } = context.repo;
+            const run = context.payload.workflow_run;
+            const runId = run.id;
+            const runHeadSha = run.head_sha;
+
+            // A cancelled orchestrator run with no PR is a dispatch against a
+            // branch — there is no merge label to restore, so nothing to do.
+            //
+            // `workflow_run.pull_requests` is unreliable: GitHub leaves it
+            // empty whenever the head branch does not live in this repo, and
+            // populates it only opportunistically otherwise. Fall back to
+            // resolving the PR from the head SHA so a real PR is never missed.
+            let prNumber = (run.pull_requests || [])[0]?.number;
+            if (!prNumber) {
+              const { data: associated } =
+                await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner, repo, commit_sha: runHeadSha,
+                });
+              prNumber = associated.find((p) => p.state === 'open')?.number;
+            }
+            if (!prNumber) {
+              core.info(`Run ${runId} has no associated open PR — nothing to re-run.`);
+              return;
+            }
+
+            // Re-read the PR: the payload's head SHA is a snapshot and may
+            // already be stale if the author pushed again.
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: prNumber,
+            });
+
+            // Classify the run: if ANY cancelled/failed job shows the runner
+            // dying under a live step, this was churn. If the only signals are
+            // post-cancel shutdowns, someone stopped it on purpose.
+            const { data: jobData } = await github.rest.actions.listJobsForWorkflowRun({
+              owner, repo, run_id: runId, per_page: 100,
+            });
+            const candidates = jobData.jobs.filter(
+              (j) => j.conclusion === 'failure' || j.conclusion === 'cancelled',
+            );
+
+            let classification = null;
+            for (const job of candidates) {
+              let logText = '';
+              try {
+                const res = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner, repo, job_id: job.id,
+                });
+                logText = typeof res.data === 'string' ? res.data : String(res.data || '');
+              } catch (e) {
+                core.warning(`Could not read logs for job "${job.name}": ${e.message}`);
+                continue;
+              }
+              const verdict = classifyJobLog(logText);
+              core.info(`Job "${job.name}" -> ${verdict}`);
+              if (verdict === RUNNER_SHUTDOWN) {
+                classification = RUNNER_SHUTDOWN;
+                break;
+              }
+              if (verdict === DELIBERATE_CANCEL) {
+                classification = DELIBERATE_CANCEL;
+              }
+            }
+
+            const { rerun, reason } = shouldRerunCancelledRun({
+              runAttempt: run.run_attempt,
+              runHeadSha,
+              prHeadSha: pr.head.sha,
+              classification,
+            });
+
+            if (!rerun) {
+              core.info(`Not re-running run ${runId}: ${reason}`);
+              core.summary
+                .addHeading('Cancelled CI run left alone')
+                .addRaw(`Run [${runId}](${run.html_url}) on PR #${prNumber}: ${reason}`)
+                .write();
+              return;
+            }
+
+            core.info(`Re-running run ${runId}: ${reason}`);
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner, repo, run_id: runId,
+            });
+            core.info(
+              `Requested re-run of failed/cancelled jobs for run ${runId} ` +
+                `(PR #${prNumber}, head ${runHeadSha}).`,
+            );
+            core.summary
+              .addHeading('Cancelled CI run re-triggered')
+              .addRaw(
+                `Run [${runId}](${run.html_url}) on PR #${prNumber} was cancelled ` +
+                  `without producing a verdict. ${reason}`,
+              )
+              .write();

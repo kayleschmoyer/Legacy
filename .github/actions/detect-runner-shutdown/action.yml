@@ -4,9 +4,15 @@ description: "Classify a failed workflow run as self-hosted-runner churn (spot i
 # ---------------------------------------------------------------------------
 # Every runner in this repo's pool is instanceLifecycle=spot (LS-1660), so a
 # run can go red purely because EC2 reclaimed the instance mid-job. GitHub
-# emits a fixed message on the dying job's log when that happens, and that
-# message is the only reliable discriminator between infrastructure churn and
-# a real failure.
+# emits a fixed message on the dying job's log when that happens.
+#
+# LS-10091: that message alone is NOT a discriminator. GitHub emits it on any
+# cancellation that tears the runner down, including a deliberate one (a human
+# pressing Cancel, a concurrency displacement, a fail-fast sibling abort), so
+# matching it on its own misattributed deliberate cancels as spot churn. The
+# ORDER of the shutdown notice relative to the step's "The operation was
+# canceled." line is what actually separates the two — see
+# .github/scripts/runner-cancellation.js for the rule and its evidence.
 #
 # This action reads the tail of every failed/cancelled job's log in a run and
 # reports whether that marker is present. It only classifies — labelling,
@@ -53,10 +59,10 @@ runs:
           const runId = Number(process.env.DETECT_RUN_ID || context.runId);
           const token = process.env.DETECT_TOKEN;
 
-          // Emitted verbatim by GitHub when the runner service is torn down
-          // under a running job. Matching the full sentence would be brittle
-          // (the tail varies), so match the stable clause only.
-          const SHUTDOWN_SIGNATURE = 'runner has received a shutdown signal';
+          const {
+            classifyJobLog,
+            RUNNER_SHUTDOWN,
+          } = require('./.github/scripts/runner-cancellation.js');
 
           let allJobs = [];
           let page = 1;
@@ -72,7 +78,8 @@ runs:
           // A spot-killed job surfaces as `failure` on lambda-terraform-apply
           // (observed on runs 31684987464 and 31721455767) but as `cancelled`
           // on ci-orchestrator, so both conclusions have to be scanned. The
-          // log marker — not the conclusion — is what actually classifies it.
+          // conclusion therefore cannot classify anything on its own — the log
+          // markers and their order do (LS-10091).
           const candidates = allJobs.filter(
             (j) => j.conclusion === 'failure' || j.conclusion === 'cancelled',
           );
@@ -103,11 +110,21 @@ runs:
                 core.info(`No redirect URL for job "${job.name}" — skipping log check`);
                 continue;
               }
-              // The shutdown notice is the last thing written to the log, so
-              // the trailing 8 KB is enough and keeps this fast on big logs.
-              const logRes = await fetch(logUrl, { headers: { Range: 'bytes=-8192' } });
+              // LS-10091: the window must hold BOTH markers, not just the
+              // shutdown notice, because classifyJobLog compares their order.
+              // On a deliberate cancel the "operation was canceled." line comes
+              // FIRST and is therefore the one a tail read can truncate away —
+              // losing it would make a deliberate cancel look like churn, the
+              // very misattribution this classifier exists to prevent. GitHub
+              // writes an `##[end-action …skipped]` pair for every remaining
+              // step after the cancel, so that gap grows with the job's step
+              // count; 64 KB covers the longest jobs in this repo while still
+              // avoiding a full download of a multi-MB E2E log.
+              const logRes = await fetch(logUrl, { headers: { Range: 'bytes=-65536' } });
               const logText = await logRes.text();
-              if (logText.includes(SHUTDOWN_SIGNATURE)) {
+              const verdict = classifyJobLog(logText);
+              core.info(`Job "${job.name}" classified as: ${verdict}`);
+              if (verdict === RUNNER_SHUTDOWN) {
                 shutdownJobs.push(job.name);
               }
             } catch (e) {
@@ -115,8 +132,10 @@ runs:
             }
           }
 
-          // Absence of the marker is deliberately treated as a genuine failure:
-          // a false "runner flake" verdict would hide a real terraform break.
+          // Absence of the marker — and a marker that arrives AFTER the cancel
+          // line — are both deliberately treated as "not runner churn": a false
+          // "runner flake" verdict would hide a real terraform break, and would
+          // mislabel an intentional cancellation as infrastructure (LS-10091).
           core.setOutput('shutdown-detected', shutdownJobs.length > 0 ? 'true' : 'false');
           core.setOutput('job-names', shutdownJobs.join(', '));
 
