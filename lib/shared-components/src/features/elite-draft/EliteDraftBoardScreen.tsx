@@ -1,14 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet } from 'react-native';
-import {
-  Input,
-  ScrollView,
-  Spinner,
-  Text,
-  useMedia,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Pressable } from 'react-native';
+import { ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { CSS } from './styles';
@@ -29,14 +21,13 @@ import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
 import { DraftSlotStrip } from './DraftSlotStrip';
 import { DraftPlayersTab } from './DraftPlayersTab';
+import { DraftPickCta, DraftPickSheet } from './DraftPickSheet';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
 import { DraftPickToast } from './DraftPickToast';
 import { DraftMyPickSplash } from './DraftMyPickSplash';
 import { DraftRoomRecap } from './DraftRoomRecap';
-import { useDraftPalette } from './nativeDraftPalette';
-import { resolveBoardRounds, statLineFor } from './nativeDraftBoard';
-import { getPositionColor } from './utils';
+import { resolveBoardRounds } from './nativeDraftBoard';
 import {
   AuctionNotSupportedScreen,
   AutomatedDraftScreen,
@@ -61,7 +52,6 @@ import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftChatTabRenderer } from './DraftChatTab';
 import type { DraftPickRecord, DraftPlayer } from './types';
-import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import { useHasEntitlement } from '../../hooks/useEntitlement';
 import type { SportKind } from '../../config/sports';
@@ -125,80 +115,23 @@ export interface EliteDraftBoardScreenProps {
   onDownloadDraftPacket?: (contents: string, filename: string) => void;
 }
 
-const POSITION_FILTERS = [
-  'ALL',
-  'C',
-  '1B',
-  '2B',
-  '3B',
-  'SS',
-  'OF',
-  'SP',
-  'RP',
-  'DH',
-] as const;
-
-type SortKey = 'adp' | 'pts';
-
 /** Type guard narrowing an unknown value to a known defensiveFormat literal. */
 function isDefensiveFormatLiteral(value: unknown): value is 'dst' | 'idp' {
   return value === 'dst' || value === 'idp';
 }
 
 /**
- * Draft Room v2 shell (LS-9397) + Players tab (LS-9399) + Queue/Team tabs
- * (LS-9400) + Chat tab (LS-9401): the Board tab keeps this file's existing
- * compact-board content; Players, Queue, Team, and Chat all render their
- * real bodies below — every tab now has a body, so no placeholder copy is
- * needed.
+ * Draft Room v2 shell (LS-9397) + Queue/Team tabs (LS-9400) + Chat tab
+ * (LS-9401). The Board tab is the round board (LS-10000) plus the pick sheet
+ * (LS-10002), which re-hosts the Players browser (LS-9399) over the board —
+ * that browser has no bottom-nav tab of its own on phone any more, so there
+ * is exactly one way to reach it.
  */
 
 // ---------------------------------------------------------------------------
 // Compact-branch chrome (narrow-viewport only — folded in from the former
 // EliteDraftBoardScreen.native.tsx fork, LS-9207)
 // ---------------------------------------------------------------------------
-
-/** The gold lozenge used for every primary action on the compact draft board. */
-function GoldButton({
-  label,
-  onPress,
-  disabled,
-  size = 'lg',
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  size?: 'lg' | 'sm';
-}) {
-  const large = size === 'lg';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
-      disabled={disabled}
-      onPress={onPress}
-    >
-      <YStack
-        backgroundColor="$brandGold"
-        borderRadius={999}
-        paddingVertical={large ? 15 : 8}
-        paddingHorizontal={large ? 34 : 12}
-        opacity={disabled ? 0.55 : 1}
-      >
-        <Text
-          fontFamily="$heading"
-          fontSize={large ? 19 : 11.5}
-          fontWeight="800"
-          letterSpacing={large ? 1.5 : 0.5}
-          color="$textOnAccent"
-        >
-          {label}
-        </Text>
-      </YStack>
-    </Pressable>
-  );
-}
 
 /** Outlined, low-emphasis action (commissioner toggles) on the compact board. */
 function GhostButton({
@@ -242,82 +175,6 @@ function GhostButton({
   );
 }
 
-/** A single row in the compact board's available-players list. */
-function PlayerRow({
-  player,
-  adp,
-  canDraft,
-  commPickMode,
-  onPress,
-}: {
-  player: DraftPlayer;
-  adp: number | null;
-  canDraft: boolean;
-  /** Drives the "ASSIGN" vs "DRAFT" label only — a real commissioner
-   *  force-pick override, never Control All Teams (LS-9253), which should
-   *  read as a first-class pick action rather than an override. */
-  commPickMode: boolean;
-  onPress: (id: number) => void;
-}) {
-  const posColor = getPositionColor('baseball', player.position);
-
-  return (
-    <XStack
-      alignItems="center"
-      gap={10}
-      backgroundColor="$surfaceCard"
-      borderWidth={1}
-      borderColor="$surfacePanelBorder"
-      borderRadius={12}
-      paddingVertical={10}
-      paddingHorizontal={13}
-      marginBottom={7}
-    >
-      <PositionBadge
-        position={player.position}
-        color={posColor}
-        alpha={0.14}
-        paddingHorizontal={8}
-        paddingVertical={3}
-        borderRadius={6}
-      />
-      <YStack flex={1} minWidth={0}>
-        <Text fontWeight="600" fontSize={15} color="$color" numberOfLines={1}>
-          {player.name}
-        </Text>
-        <Text
-          fontSize={11.5}
-          color="$textMuted"
-          marginTop={2}
-          numberOfLines={1}
-        >
-          {statLineFor(player)}
-        </Text>
-      </YStack>
-      <YStack alignItems="flex-end" flexShrink={0}>
-        <Text
-          fontFamily="$heading"
-          fontSize={16}
-          fontWeight="700"
-          color="$brandGoldLight"
-        >
-          {player.ppg != null ? player.ppg.toFixed(1) : '—'}
-        </Text>
-        <Text fontSize={9} color="$fg4" letterSpacing={0.5}>
-          ADP {adp ?? '—'}
-        </Text>
-      </YStack>
-      {canDraft && (
-        <GoldButton
-          size="sm"
-          label={commPickMode ? 'ASSIGN' : 'DRAFT'}
-          onPress={() => onPress(player.id)}
-        />
-      )}
-    </XStack>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Compact (narrow-viewport) live-board — a separate component so its
 // compact-only hooks (useDraftPalette et al) only run when this subtree
@@ -340,7 +197,7 @@ interface CompactLiveDraftBoardProps {
   /** Active league sport — drives Queue/Team tab position colors (LS-9400). */
   sport: SportKind;
   /** League's defensive format ('dst' | 'idp') — drives which football
-   *  position chips the Players tab offers (LS-9475). */
+   *  position chips the pick sheet's browser offers (LS-9475). */
   defensiveFormat: 'dst' | 'idp' | null;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
   isMockDraft: boolean;
@@ -398,7 +255,6 @@ function CompactLiveDraftBoard({
   userId,
   renderChatTab,
 }: CompactLiveDraftBoardProps): React.JSX.Element {
-  const palette = useDraftPalette();
   const hasChatTab = leagueId !== null && !!renderChatTab;
 
   // Unread-chat dot (LS-9401, README "Chat tab"): clears the moment the
@@ -413,7 +269,11 @@ function CompactLiveDraftBoard({
   useEffect(() => {
     if (ui.activeTab === 'chat') ui.setUnreadChat(false);
   }, [ui]);
-  const [sortKey, setSortKey] = useState<SortKey>('adp');
+
+  // Pick sheet (LS-10002) — raised over the board by the CTA or the viewer's
+  // own on-the-clock tile; owned here rather than in useDraftUIState because
+  // nothing outside the phone board ever reads it.
+  const [pickSheetOpen, setPickSheetOpen] = useState(false);
 
   // AC3 (LS-9402): the same `celebrate` flag the pre-v2 full-screen
   // DraftPickAnnouncement consumed — currently hardcoded on, since there is
@@ -435,32 +295,6 @@ function CompactLiveDraftBoard({
       0,
     ),
   });
-
-  // `adp` is the server's stack-rank fallback (player_scoring_cache, LS-696)
-  // — a stable rank across the league's whole draftable pool, not the
-  // player's index within the current remaining/paginated list. Sorting by
-  // "ADP" re-sorts ascending by that stable value instead of trusting
-  // whatever order the server returned the page in (the default fetch order
-  // is by projectedMatchupPoints, which can disagree with the adp stack
-  // rank's own ordering).
-  const rankedPlayers = useMemo(
-    () =>
-      playerData.enrichedPlayers.map((player) => ({
-        player,
-        adp: player.adp ?? null,
-      })),
-    [playerData.enrichedPlayers],
-  );
-  const listedPlayers = useMemo(() => {
-    if (sortKey === 'adp') {
-      return [...rankedPlayers].sort(
-        (a, b) => (a.adp ?? Infinity) - (b.adp ?? Infinity),
-      );
-    }
-    return [...rankedPlayers].sort(
-      (a, b) => (b.player.ppg ?? 0) - (a.player.ppg ?? 0),
-    );
-  }, [rankedPlayers, sortKey]);
 
   // A real commissioner force-pick override — never true for Control All
   // Teams mock drafts, since LS-9242 hides the commissioner bar (and its
@@ -532,13 +366,23 @@ function CompactLiveDraftBoard({
       : null;
   }, [isMyPick, queries.queueEntries, playerData.statsLookup]);
 
-  // Board tab (LS-9398): tapping the current-pick cell on my turn jumps to
-  // the Players tab — the tab body may still be LS-9397's placeholder, but
-  // the navigation call itself is the in-scope behavior (README AC4).
-  const { setActiveTab } = ui;
-  const handleMakePick = useCallback(() => {
-    setActiveTab('players');
-  }, [setActiveTab]);
+  // Board tab: tapping the viewer's own on-the-clock tile raises the pick
+  // sheet, same as the CTA — the pick happens without leaving the board.
+  const openPickSheet = useCallback(() => setPickSheetOpen(true), []);
+  // Drafting from the sheet completes the pick and drops the sheet, so the
+  // pick toast/splash lands on the board rather than behind the scrim. A
+  // failed pick still surfaces through the board's own urgent-error overlay.
+  const handleSheetDraft = useCallback(
+    (id: number) => {
+      handlePlayerRowPress(id);
+      setPickSheetOpen(false);
+    },
+    [handlePlayerRowPress],
+  );
+  const currentPickInfo = queries.currentPickInfo;
+  const pickSheetSubtitle = currentPickInfo
+    ? `Pick #${currentPickInfo.overallPick} · Round ${currentPickInfo.round}`
+    : undefined;
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -580,26 +424,7 @@ function CompactLiveDraftBoard({
           })}
         </YStack>
       )}
-      {ui.activeTab === 'players' ? (
-        <DraftPlayersTab
-          players={playerData.enrichedPlayers}
-          myTeam={playerData.myTeam}
-          leaguePositions={queries.leaguePositions}
-          defensiveFormat={defensiveFormat}
-          maxRosterSize={queries.league?.maxRosterSize ?? null}
-          selectedPosition={ui.selectedPosition}
-          searchTerm={ui.searchTerm}
-          onSetSelectedPosition={ui.setSelectedPosition}
-          onSetSearchTerm={ui.setSearchTerm}
-          canDraft={canDraft}
-          currentPickInfo={queries.currentPickInfo}
-          boardOrderedTeams={boardTeams}
-          myTeamId={queries.myTeamId}
-          queuedPlayerIds={queries.queuedPlayerIds}
-          onToggleQueue={handleToggleQueue}
-          onDraftPlayer={handlePlayerRowPress}
-        />
-      ) : ui.activeTab === 'queue' ? (
+      {ui.activeTab === 'queue' ? (
         <DraftQueueTab
           draftId={queries.draftId ?? 0}
           entries={queries.queueEntries}
@@ -646,199 +471,109 @@ function CompactLiveDraftBoard({
       ) : null}
       {ui.activeTab === 'board' && (
         <>
-          <DraftRoundBoard
-            teams={boardTeams}
-            picks={queries.pickHistory}
-            currentPickInfo={queries.currentPickInfo}
-            myTeamId={queries.myTeamId}
-            statsLookup={playerData.statsLookup}
-            rounds={boardRounds}
-            sport={sport}
-            onMakePick={handleMakePick}
-          />
-
-          {/* ---- Commissioner controls ---- */}
-          {showCommissionerBar && (
-            <XStack
-              gap="$2"
-              paddingHorizontal="$3"
-              paddingTop={8}
-              alignItems="center"
-            >
-              {!ui.draftPaused ? (
-                <GhostButton
-                  label="PAUSE"
-                  disabled={actions.pauseLoading}
-                  onPress={() => void actions.handlePauseDraft()}
-                />
-              ) : (
-                <GhostButton
-                  label="RESUME"
-                  tone="active"
-                  disabled={actions.resumeLoading}
-                  onPress={() => void actions.handleResumeDraft()}
-                />
-              )}
-              <GhostButton
-                label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
-                tone={ui.commPickMode ? 'active' : 'neutral'}
-                onPress={() => ui.setCommPickMode(!ui.commPickMode)}
-              />
-            </XStack>
-          )}
-
-          {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
-          {isMockDraft && (
-            <XStack
-              gap="$2"
-              paddingHorizontal="$3"
-              paddingTop={8}
-              alignItems="center"
-            >
-              <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
-            </XStack>
-          )}
-
-          {/* ---- Search + sort ---- */}
-          <XStack
-            gap="$2"
-            paddingHorizontal="$3"
-            paddingTop={9}
-            alignItems="center"
-          >
-            <Input
-              flex={1}
-              minWidth={0}
-              size="$3"
-              borderRadius={10}
-              backgroundColor="$surfacePanel"
-              borderColor="$surfacePanelBorder"
-              color="$color"
-              placeholder="Search…"
-              placeholderTextColor={palette.text.fg4}
-              value={ui.searchTerm}
-              onChangeText={ui.setSearchTerm}
+          {/* The board scrolls; the CTA below it does not. A 14-team round
+              plus the commissioner bar outgrows a short phone, and the pick
+              control must never be the thing that falls off the fold. */}
+          <ScrollView flex={1} contentContainerStyle={{ paddingBottom: 8 }}>
+            <DraftRoundBoard
+              teams={boardTeams}
+              picks={queries.pickHistory}
+              currentPickInfo={queries.currentPickInfo}
+              myTeamId={queries.myTeamId}
+              statsLookup={playerData.statsLookup}
+              rounds={boardRounds}
+              sport={sport}
+              onMakePick={openPickSheet}
             />
-            <XStack
-              borderWidth={1}
-              borderColor="$surfacePanelBorder"
-              borderRadius={9}
-              overflow="hidden"
-            >
-              {(['adp', 'pts'] as const).map((key) => {
-                const active = sortKey === key;
-                return (
-                  <Pressable
-                    key={key}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Sort by ${key.toUpperCase()}`}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setSortKey(key)}
-                  >
-                    <YStack
-                      paddingVertical={8}
-                      paddingHorizontal={11}
-                      backgroundColor={
-                        active ? '$surfaceRaised' : 'transparent'
-                      }
-                    >
-                      <Text
-                        fontSize={11}
-                        fontWeight="800"
-                        color={active ? '$color' : '$fg4'}
-                      >
-                        {key.toUpperCase()}
-                      </Text>
-                    </YStack>
-                  </Pressable>
-                );
-              })}
-            </XStack>
-          </XStack>
 
-          {/* ---- Position filter chips ---- */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            flexGrow={0}
-            flexShrink={0}
-          >
-            <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
-              {POSITION_FILTERS.map((pos) => {
-                const active = ui.selectedPosition === pos;
-                const tint =
-                  pos === 'ALL'
-                    ? palette.gold.gold
-                    : getPositionColor('baseball', pos);
-                return (
-                  <Pressable
-                    key={pos}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Filter by ${pos}`}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => ui.setSelectedPosition(pos)}
-                  >
-                    <YStack
-                      paddingVertical={4}
-                      paddingHorizontal={10}
-                      borderRadius={999}
-                      borderWidth={1}
-                      borderColor={active ? tint : '$outlineDefault'}
-                      backgroundColor={active ? tint : 'transparent'}
-                    >
-                      <Text
-                        fontSize={11.5}
-                        fontWeight="700"
-                        color={active ? '$textOnAccent' : '$textMuted'}
-                      >
-                        {pos}
-                      </Text>
-                    </YStack>
-                  </Pressable>
-                );
-              })}
-            </XStack>
+            {/* ---- Commissioner controls ---- */}
+            {showCommissionerBar && (
+              <XStack
+                gap="$2"
+                paddingHorizontal="$3"
+                paddingTop={8}
+                alignItems="center"
+              >
+                {!ui.draftPaused ? (
+                  <GhostButton
+                    label="PAUSE"
+                    disabled={actions.pauseLoading}
+                    onPress={() => void actions.handlePauseDraft()}
+                  />
+                ) : (
+                  <GhostButton
+                    label="RESUME"
+                    tone="active"
+                    disabled={actions.resumeLoading}
+                    onPress={() => void actions.handleResumeDraft()}
+                  />
+                )}
+                <GhostButton
+                  label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
+                  tone={ui.commPickMode ? 'active' : 'neutral'}
+                  onPress={() => ui.setCommPickMode(!ui.commPickMode)}
+                />
+              </XStack>
+            )}
+
+            {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
+            {isMockDraft && (
+              <XStack
+                gap="$2"
+                paddingHorizontal="$3"
+                paddingTop={8}
+                alignItems="center"
+              >
+                <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
+              </XStack>
+            )}
           </ScrollView>
 
-          {/* ---- Available players ---- */}
-          <FlatList
-            data={listedPlayers}
-            keyExtractor={(item) => String(item.player.id)}
-            contentContainerStyle={styles.playerList}
-            renderItem={({ item }) => (
-              <PlayerRow
-                player={item.player}
-                adp={item.adp}
-                canDraft={canDraft}
-                commPickMode={isRealCommPick}
-                onPress={handlePlayerRowPress}
-              />
-            )}
-            onEndReached={() => {
-              if (queries.hasMorePlayers && !queries.loadingMore) {
-                onLoadMore();
-              }
-            }}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              queries.loadingMore ? (
-                <YStack
-                  testID="draft-loading-more"
-                  padding="$3"
-                  alignItems="center"
-                >
-                  <Spinner color="$brandGold" />
-                </YStack>
-              ) : null
-            }
-            ListEmptyComponent={
-              <YStack padding="$6" alignItems="center">
-                <Text color="$textMuted">No players match that filter</Text>
-              </YStack>
-            }
-          />
+          {/* ---- Pick CTA (LS-10002) ---- */}
+          <YStack paddingHorizontal={14} paddingVertical={10}>
+            <DraftPickCta
+              canDraft={canDraft}
+              untimed={untimed}
+              draftPaused={ui.draftPaused}
+              timeRemaining={timeRemaining}
+              pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+              onPress={openPickSheet}
+            />
+          </YStack>
         </>
       )}
+
+      {/* ---- Pick sheet (LS-10002): the phone tier's one player browser ---- */}
+      <DraftPickSheet
+        open={pickSheetOpen}
+        onOpenChange={setPickSheetOpen}
+        subtitle={pickSheetSubtitle}
+        bottomInset={bottomInset}
+      >
+        <DraftPlayersTab
+          players={playerData.enrichedPlayers}
+          myTeam={playerData.myTeam}
+          sport={sport}
+          leaguePositions={queries.leaguePositions}
+          defensiveFormat={defensiveFormat}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
+          selectedPosition={ui.selectedPosition}
+          searchTerm={ui.searchTerm}
+          onSetSelectedPosition={ui.setSelectedPosition}
+          onSetSearchTerm={ui.setSearchTerm}
+          canDraft={canDraft}
+          draftActionLabel={isRealCommPick ? 'ASSIGN' : 'DRAFT'}
+          currentPickInfo={queries.currentPickInfo}
+          boardOrderedTeams={boardTeams}
+          myTeamId={queries.myTeamId}
+          queuedPlayerIds={queries.queuedPlayerIds}
+          onToggleQueue={handleToggleQueue}
+          onDraftPlayer={handleSheetDraft}
+          hasMorePlayers={queries.hasMorePlayers}
+          loadingMore={queries.loadingMore}
+          onLoadMore={onLoadMore}
+        />
+      </DraftPickSheet>
 
       {/* ---- Draft Room v2 overlays (LS-9402): AI-pick toast + my-pick splash ---- */}
       <DraftPickToast
@@ -1846,15 +1581,3 @@ export function EliteDraftBoardScreen({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styles (compact-branch FlatList only — the wide branch uses the raw-CSS
-// `.d-*` classes injected via <style>{CSS}</style> above)
-// ---------------------------------------------------------------------------
-const styles = StyleSheet.create({
-  playerList: {
-    paddingHorizontal: 12,
-    paddingTop: 2,
-    paddingBottom: 16,
-  },
-});

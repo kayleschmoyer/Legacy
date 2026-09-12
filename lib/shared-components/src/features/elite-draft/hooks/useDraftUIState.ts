@@ -26,8 +26,10 @@ export interface ToastMessage {
   type: 'error' | 'warning' | 'info' | 'success';
 }
 
-/** The five persistent bottom-nav destinations in the Draft Room v2 shell (LS-9397). */
-export type DraftRoomTab = 'board' | 'players' | 'queue' | 'team' | 'chat';
+/** The persistent bottom-nav destinations in the Draft Room v2 shell (LS-9397).
+ *  The player browser is not one of them — it rides in the Board tab's pick
+ *  sheet (LS-10002). */
+export type DraftRoomTab = 'board' | 'queue' | 'team' | 'chat';
 
 /** One queued AI-pick toast (Draft Room v2 header/overlay chrome, LS-9397). Rendering
  *  and dequeue-on-dismiss timing belong to the overlay ticket (child 6) — this hook

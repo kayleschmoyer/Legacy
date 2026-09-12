@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
-import { Input, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   buildDepthChartBuckets,
-  footballPositionPills,
+  positionPillsForSport,
 } from './DraftPlayerBoard';
 import { computeMyUpcomingPicks } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
@@ -11,8 +11,12 @@ import { getPositionColor } from './utils';
 import type { CurrentDraftPickInfo, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
+import type { SportKind } from '../../config/sports';
 
 const dash = '—';
+
+type SortKey = 'adp' | 'pts';
+const SORT_KEYS: readonly SortKey[] = ['adp', 'pts'];
 
 interface PlayerListRow {
   kind: 'player';
@@ -34,6 +38,11 @@ export interface DraftPlayersTabProps {
    *  client-side re-filtering here (AC6: no new data wiring). */
   players: DraftPlayer[];
   myTeam: DraftPlayer[];
+  /** Drives the position chips, their tints, and the roster-count buckets.
+   *  Required, never defaulted: a baseball default once silently mis-colored
+   *  football boards (LS-8784), and a football one offered baseball leagues
+   *  QB/RB chips (LS-10002). */
+  sport: SportKind;
   leaguePositions: ReadonlyArray<{ positionType: string }>;
   /** League's defensive format ('dst' | 'idp') — drives which position chips
    *  are offered (LS-9475). */
@@ -47,22 +56,35 @@ export interface DraftPlayersTabProps {
    *  mirrors the Board tab's `canDraft` (isMyPick || controlAllTeams ||
    *  real commissioner pick), so the affordance is consistent across tabs. */
   canDraft: boolean;
+  /** Label on the per-row pick action. `ASSIGN` for a real commissioner
+   *  force-pick override; Control All Teams keeps `DRAFT` (LS-9253). */
+  draftActionLabel?: string;
   currentPickInfo: CurrentDraftPickInfo | null;
   boardOrderedTeams: LeagueTeam[];
   myTeamId: number | null;
   queuedPlayerIds: ReadonlySet<number>;
   onToggleQueue: (playerId: number) => void;
   onDraftPlayer: (playerId: number) => void;
+  /** Pagination over `GetAvailableDraftPlayers` — the list asks for the next
+   *  page as it nears the end, and shows a spinner footer while it loads. */
+  hasMorePlayers?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-/** The Players tab (LS-9399) — README "Players tab": search, position chips
- *  with roster counts, player rows with a queue star and conditional DRAFT
- *  button, and inline "YOUR PICK" markers ahead of the viewer's next two
- *  picks. Data comes entirely from `usePlayerData`/`useDraftActions` (via
- *  props) — no new queries or mutations (AC6). */
+/** The phone tier's player browser (LS-9399) — README "Players tab": search
+ *  with an ADP/PTS sort, position chips with roster counts, player rows with
+ *  a queue star and conditional DRAFT button, and inline "YOUR PICK" markers
+ *  ahead of the viewer's next two picks. Data comes entirely from
+ *  `usePlayerData`/`useDraftActions` (via props) — no new queries or
+ *  mutations (AC6).
+ *
+ *  Host-agnostic: it fills whatever box it is given, so the phone pick sheet
+ *  (LS-10002) re-hosts it rather than forking a second browser. */
 export function DraftPlayersTab({
   players,
   myTeam,
+  sport,
   leaguePositions,
   defensiveFormat,
   maxRosterSize,
@@ -71,28 +93,27 @@ export function DraftPlayersTab({
   onSetSelectedPosition,
   onSetSearchTerm,
   canDraft,
+  draftActionLabel = 'DRAFT',
   currentPickInfo,
   boardOrderedTeams,
   myTeamId,
   queuedPlayerIds,
   onToggleQueue,
   onDraftPlayer,
+  hasMorePlayers = false,
+  loadingMore = false,
+  onLoadMore,
 }: DraftPlayersTabProps): React.JSX.Element {
   const palette = useDraftPalette();
+  const [sortKey, setSortKey] = useState<SortKey>('adp');
   const positionChips = useMemo(
-    () => footballPositionPills(defensiveFormat),
-    [defensiveFormat],
+    () => positionPillsForSport(sport, defensiveFormat),
+    [sport, defensiveFormat],
   );
 
   const rosterBuckets = useMemo(
-    () =>
-      buildDepthChartBuckets(
-        leaguePositions,
-        myTeam,
-        'football',
-        maxRosterSize,
-      ),
-    [leaguePositions, myTeam, maxRosterSize],
+    () => buildDepthChartBuckets(leaguePositions, myTeam, sport, maxRosterSize),
+    [leaguePositions, myTeam, sport, maxRosterSize],
   );
   const bucketByPosition = useMemo(() => {
     const map = new Map<string, { total: number; filled: number }>();
@@ -139,12 +160,21 @@ export function DraftPlayersTab({
     // ever edited them. Stable for the life of the draft: it does not
     // renumber when other players are picked, so it is not simply the
     // player's index within this (already server-sorted, already-drafted-
-    // excluded) list. Real historical ADP data isn't collected yet.
-    const playerRows: PlayerListRow[] = players.map((player) => ({
-      kind: 'player',
-      player,
-      adp: player.adp ?? null,
-    }));
+    // excluded) list. Real historical ADP data isn't collected yet. Sorting
+    // by "ADP" therefore re-sorts ascending by that stable value rather than
+    // trusting the server's page order (projectedMatchupPoints), and sorting
+    // by "PTS" never renumbers it.
+    const playerRows: PlayerListRow[] = players
+      .map<PlayerListRow>((player) => ({
+        kind: 'player',
+        player,
+        adp: player.adp ?? null,
+      }))
+      .sort((a, b) =>
+        sortKey === 'adp'
+          ? (a.adp ?? Infinity) - (b.adp ?? Infinity)
+          : (b.player.ppg ?? 0) - (a.player.ppg ?? 0),
+      );
     if (!showMarkers || upcomingPicks.length === 0) return playerRows;
 
     const result: ListRow[] = [];
@@ -174,13 +204,19 @@ export function DraftPlayersTab({
       nextMarkerIdx++;
     }
     return result;
-  }, [players, showMarkers, upcomingPicks]);
+  }, [players, sortKey, showMarkers, upcomingPicks]);
 
   return (
     <YStack flex={1}>
-      <XStack paddingHorizontal="$3" paddingTop={9}>
+      <XStack
+        paddingHorizontal="$3"
+        paddingTop={9}
+        gap="$2"
+        alignItems="center"
+      >
         <Input
           flex={1}
+          minWidth={0}
           borderRadius={10}
           paddingVertical={9}
           paddingHorizontal={12}
@@ -193,6 +229,41 @@ export function DraftPlayersTab({
           value={searchTerm}
           onChangeText={onSetSearchTerm}
         />
+        <XStack
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+          borderRadius={9}
+          overflow="hidden"
+        >
+          {SORT_KEYS.map((key) => {
+            const active = sortKey === key;
+            return (
+              <Pressable
+                key={key}
+                testID={`draft-players-sort-${key}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort by ${key.toUpperCase()}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => setSortKey(key)}
+              >
+                <YStack
+                  minHeight={36}
+                  justifyContent="center"
+                  paddingHorizontal={11}
+                  backgroundColor={active ? '$surfaceRaised' : 'transparent'}
+                >
+                  <Text
+                    fontSize={11}
+                    fontWeight="800"
+                    color={active ? '$color' : '$fg4'}
+                  >
+                    {key.toUpperCase()}
+                  </Text>
+                </YStack>
+              </Pressable>
+            );
+          })}
+        </XStack>
       </XStack>
 
       <ScrollView
@@ -205,9 +276,7 @@ export function DraftPlayersTab({
           {positionChips.map((pos) => {
             const active = selectedPosition === pos;
             const tint =
-              pos === 'ALL'
-                ? palette.gold.gold
-                : getPositionColor('football', pos);
+              pos === 'ALL' ? palette.gold.gold : getPositionColor(sport, pos);
             const countLabel =
               pos === 'ALL'
                 ? `${myTeam.length}/${totalRosterSlots}`
@@ -271,12 +340,29 @@ export function DraftPlayersTab({
             <PlayersTabRow
               player={item.player}
               adp={item.adp}
+              sport={sport}
               isQueued={queuedPlayerIds.has(item.player.id)}
               canDraft={canDraft}
+              draftActionLabel={draftActionLabel}
               onToggleQueue={onToggleQueue}
               onDraftPlayer={onDraftPlayer}
             />
           )
+        }
+        onEndReached={() => {
+          if (hasMorePlayers && !loadingMore) onLoadMore?.();
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <YStack
+              testID="draft-loading-more"
+              padding="$3"
+              alignItems="center"
+            >
+              <Spinner color="$brandGold" />
+            </YStack>
+          ) : null
         }
         ListEmptyComponent={
           <YStack padding="$6" alignItems="center">
@@ -330,20 +416,24 @@ function YourPickMarker({
 function PlayersTabRow({
   player,
   adp,
+  sport,
   isQueued,
   canDraft,
+  draftActionLabel,
   onToggleQueue,
   onDraftPlayer,
 }: {
   player: DraftPlayer;
   adp: number | null;
+  sport: SportKind;
   isQueued: boolean;
   canDraft: boolean;
+  draftActionLabel: string;
   onToggleQueue: (playerId: number) => void;
   onDraftPlayer: (playerId: number) => void;
 }): React.JSX.Element {
   const palette = useDraftPalette();
-  const posColor = getPositionColor('football', player.position);
+  const posColor = getPositionColor(sport, player.position);
   const proj = player.ppg != null ? player.ppg.toFixed(1) : dash;
 
   return (
@@ -421,7 +511,8 @@ function PlayersTabRow({
         <Pressable
           testID={`draft-players-draft-${player.id}`}
           accessibilityRole="button"
-          accessibilityLabel={`Draft ${player.name}`}
+          // Announces what the button says: "Draft Josh Allen" / "Assign …".
+          accessibilityLabel={`${draftActionLabel.charAt(0)}${draftActionLabel.slice(1).toLowerCase()} ${player.name}`}
           onPress={() => onDraftPlayer(player.id)}
         >
           <YStack
@@ -439,7 +530,7 @@ function PlayersTabRow({
               letterSpacing={1}
               color="$textOnAccent"
             >
-              DRAFT
+              {draftActionLabel}
             </Text>
           </YStack>
         </Pressable>

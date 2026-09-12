@@ -36,6 +36,8 @@ jest.mock('react-native', () => {
       renderItem,
       keyExtractor,
       ListEmptyComponent,
+      ListFooterComponent,
+      onEndReached,
     }: {
       data?: ReadonlyArray<unknown>;
       renderItem?: (info: {
@@ -45,6 +47,8 @@ jest.mock('react-native', () => {
       }) => React.ReactElement | null;
       keyExtractor?: (item: unknown, index: number) => string;
       ListEmptyComponent?: React.ReactNode;
+      ListFooterComponent?: React.ReactNode;
+      onEndReached?: () => void;
     }) => {
       const items =
         data && data.length > 0
@@ -62,10 +66,18 @@ jest.mock('react-native', () => {
           : ListEmptyComponent
             ? [ListEmptyComponent]
             : null;
+      // A button stands in for "scrolled near the end" so specs can drive
+      // the pagination callback the real list fires on its own.
       return ReactLocal.createElement(
         'div',
         { 'data-testid': 'flatlist' },
         items,
+        ListFooterComponent,
+        ReactLocal.createElement(
+          'button',
+          { 'data-testid': 'flatlist-end-reached', onClick: onEndReached },
+          'end',
+        ),
       );
     },
   };
@@ -129,6 +141,7 @@ function baseProps(
   return {
     players: [],
     myTeam: [],
+    sport: 'football',
     leaguePositions: LEAGUE_POSITIONS,
     maxRosterSize: 10,
     selectedPosition: 'ALL',
@@ -287,5 +300,120 @@ describe('DraftPlayersTab', () => {
     );
 
     expect(screen.queryByTestId('draft-players-your-pick-marker')).toBeNull();
+  });
+
+  // LS-10002: the phone pick sheet re-hosts this browser for every sport, so
+  // chips and roster buckets follow the league's sport rather than football.
+  it('offers baseball position chips and baseball roster buckets for a baseball league', () => {
+    render(
+      <DraftPlayersTab
+        {...baseProps({
+          sport: 'baseball',
+          leaguePositions: [
+            { positionType: 'C' },
+            { positionType: 'SS' },
+            { positionType: 'OF' },
+            { positionType: 'OF' },
+          ],
+          myTeam: [makePlayer({ id: 9, position: 'OF' })],
+        })}
+      />,
+    );
+
+    for (const pos of ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P']) {
+      expect(screen.getByLabelText(`Filter by ${pos}`)).toBeTruthy();
+    }
+    expect(screen.queryByLabelText('Filter by QB')).toBeNull();
+    expect(
+      within(screen.getByLabelText('Filter by OF')).getByText('1/2'),
+    ).toBeTruthy();
+  });
+
+  it('sorts by ADP by default and re-sorts by projected points without renumbering ADP', () => {
+    render(
+      <DraftPlayersTab
+        {...baseProps({
+          searchTerm: 'x',
+          players: [
+            makePlayer({ id: 1, name: 'Bo Baker', ppg: 12, adp: 2 }),
+            makePlayer({ id: 2, name: 'Ace Adams', ppg: 6, adp: 1 }),
+          ],
+        })}
+      />,
+    );
+
+    const names = () =>
+      screen.getAllByText(/Adams|Baker/).map((node) => node.textContent);
+    expect(names()).toEqual(['Ace Adams', 'Bo Baker']);
+
+    fireEvent.click(screen.getByLabelText('Sort by PTS'));
+
+    expect(names()).toEqual(['Bo Baker', 'Ace Adams']);
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.textContent === 'ADP 2.0 · PROJ 12.0 · ROST —',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('asks for the next page near the end of the list only while more remain and none is loading', () => {
+    const onLoadMore = jest.fn();
+    const { rerender } = render(
+      <DraftPlayersTab
+        {...baseProps({
+          players: [makePlayer()],
+          hasMorePlayers: true,
+          onLoadMore,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('flatlist-end-reached'));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <DraftPlayersTab
+        {...baseProps({
+          players: [makePlayer()],
+          hasMorePlayers: true,
+          loadingMore: true,
+          onLoadMore,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('flatlist-end-reached'));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('draft-loading-more')).toBeTruthy();
+
+    rerender(
+      <DraftPlayersTab
+        {...baseProps({
+          players: [makePlayer()],
+          hasMorePlayers: false,
+          onLoadMore,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('flatlist-end-reached'));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('draft-loading-more')).toBeNull();
+  });
+
+  it('labels the pick action with draftActionLabel for a commissioner override', () => {
+    render(
+      <DraftPlayersTab
+        {...baseProps({
+          players: [makePlayer()],
+          canDraft: true,
+          draftActionLabel: 'ASSIGN',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('ASSIGN')).toBeTruthy();
+    expect(screen.queryByText('DRAFT')).toBeNull();
+    // Screen readers hear the same verb the button shows.
+    expect(screen.getByLabelText('Assign Josh Allen')).toBeTruthy();
   });
 });

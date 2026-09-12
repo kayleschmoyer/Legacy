@@ -7,14 +7,22 @@ import {
 import { fireEvent, render, screen } from '../../test-utils';
 
 describe('DraftBottomNav', () => {
-  it('renders all 5 tabs', () => {
+  it('renders the Board, Queue, Team and Chat tabs', () => {
     render(<DraftBottomNav activeTab="board" onChangeTab={jest.fn()} />);
 
     expect(screen.getByText('Board')).toBeTruthy();
-    expect(screen.getByText('Players')).toBeTruthy();
     expect(screen.getByText('Queue')).toBeTruthy();
     expect(screen.getByText('Team')).toBeTruthy();
     expect(screen.getByText('Chat')).toBeTruthy();
+  });
+
+  // LS-10002: the phone player browser rides in the Board tab's pick sheet,
+  // so a Players tab would be a second route to the same list.
+  it('has no Players tab', () => {
+    render(<DraftBottomNav activeTab="board" onChangeTab={jest.fn()} />);
+
+    expect(screen.queryByText('Players')).toBeNull();
+    expect(screen.queryByTestId('draft-bottom-nav-players')).toBeNull();
   });
 
   it('marks the active tab selected and the rest not selected', () => {
@@ -69,7 +77,7 @@ describe('DraftBottomNav', () => {
     );
 
     expect(screen.getByTestId('draft-bottom-nav')).toBeTruthy();
-    for (const label of ['Board', 'Players', 'Queue', 'Team', 'Chat']) {
+    for (const label of ['Board', 'Queue', 'Team', 'Chat']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });

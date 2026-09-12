@@ -95,7 +95,7 @@ export function footballPositionPills(
     : FOOTBALL_POSITIONS_DST;
 }
 
-function positionPillsForSport(
+export function positionPillsForSport(
   sport: SportKind,
   defensiveFormat: string | null | undefined,
 ): readonly string[] {

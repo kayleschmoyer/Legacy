@@ -694,10 +694,11 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 /**
  * Runs at both desktop and phone-width projects (LS-9732 removed the
  * `DESKTOP_VIEWPORT` pin LS-9712 left here). `useDraftViewportTier()` swaps
- * in `CompactLiveDraftBoard` -> `DraftPlayersTab` on its `phone` tier (below
- * 800px) in place of the wide `DraftPlayerBoard` (`draft-board` root), so the
- * "draft mocks are wired and the player pool rendered" gate below branches on
- * viewport width to wait on the surface that tier actually shows. The deep
+ * in `CompactLiveDraftBoard` on its `phone` tier (below 800px) in place of the
+ * wide `DraftPlayerBoard` (`draft-board` root), and there `DraftPlayersTab`
+ * is reached only through the pick sheet the gold CTA raises (LS-10002), so
+ * the "draft mocks are wired and the player pool rendered" gate below branches
+ * on viewport width to wait on the surface that tier actually shows. The deep
  * link itself (`playersPage.gotoDetail`) is identical either way — neither
  * board is the thing under test past that gate. Compact board's own
  * affordances (search/chips/queue/draft-button) get dedicated coverage in
@@ -718,7 +719,9 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
     // depends on viewport width (useDraftViewportTier's `phone` tier).
     const viewportWidth = page.viewportSize()?.width ?? 0;
     if (viewportWidth < 800) {
-      await page.getByTestId('draft-bottom-nav-players').click();
+      // The phone player browser rides in the pick sheet raised by the gold
+      // CTA (LS-10002); it replaced the Players bottom-nav tab.
+      await page.getByTestId('draft-pick-cta').click();
       await page.waitForSelector('[data-testid="draft-players-row"]', {
         timeout: 15000,
       });

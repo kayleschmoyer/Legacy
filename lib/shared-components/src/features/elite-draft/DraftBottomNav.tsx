@@ -3,7 +3,6 @@ import { Text, XStack, YStack } from 'tamagui';
 import {
   ClipboardList,
   LayoutGrid,
-  List,
   MessageCircle,
   Users,
 } from '@tamagui/lucide-icons';
@@ -46,16 +45,18 @@ const TABS: ReadonlyArray<{
   Icon: typeof LayoutGrid;
 }> = [
   { tab: 'board', label: 'Board', Icon: LayoutGrid },
-  { tab: 'players', label: 'Players', Icon: List },
   { tab: 'queue', label: 'Queue', Icon: ClipboardList },
   { tab: 'team', label: 'Team', Icon: Users },
   { tab: 'chat', label: 'Chat', Icon: MessageCircle },
 ];
 
 /**
- * Persistent 5-tab bottom nav for the Draft Room v2 shell (LS-9397) —
- * README "Bottom nav (persistent)". Tab bodies are wired by siblings 2-6;
- * this component only owns tab selection.
+ * Persistent bottom nav for the Draft Room v2 shell (LS-9397) — README
+ * "Bottom nav (persistent)". This component only owns tab selection.
+ *
+ * No Players tab: the phone player browser lives in the pick sheet raised
+ * over the Board tab (LS-10002), so a second route to the same list would
+ * only compete with it.
  */
 export function DraftBottomNav({
   activeTab,

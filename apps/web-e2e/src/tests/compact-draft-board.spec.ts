@@ -1,22 +1,21 @@
 /**
- * E2E Tests: Compact Draft Board — Players Tab (LS-9732)
+ * E2E Tests: Compact Draft Board — pick sheet (LS-9732, LS-10002)
  *
- * `EliteDraftBoardScreen` swaps in `CompactLiveDraftBoard` ->
- * `DraftPlayersTab` below `useDraftViewportTier()`'s `phone` tier (<800px),
- * in place of the wide `DraftPlayerBoard` (whose root carries
- * `data-testid="draft-board"`). That surface had zero E2E coverage — LS-9712
+ * `EliteDraftBoardScreen` swaps in `CompactLiveDraftBoard` below
+ * `useDraftViewportTier()`'s `phone` tier (<800px), in place of the wide
+ * `DraftPlayerBoard` (whose root carries `data-testid="draft-board"`). LS-9712
  * pinned the desktop-board specs (`draft-selection-workflow.spec.ts`,
  * `player-detail-deep-link.spec.ts`'s draft-board describe) to a desktop
  * viewport rather than skip them at mobile width, deferring compact coverage
- * here rather than bolting a `draft-board`-shaped testID onto a component
- * that doesn't have that surface.
+ * here.
  *
- * Covers `DraftPlayersTab`'s own affordances at phone width: the search
- * input, the position chip rail (and its active/selected state), the queue
- * star, and the DRAFT button — the same `GetAvailableDraftPlayers` data the
- * desktop board reads (no new queries/mutations beyond what
- * `draft-selection-workflow.spec.ts` already exercises for the desktop
- * board).
+ * On phone the player browser (`DraftPlayersTab`) rides in a sheet raised
+ * over the round board by the gold CTA (LS-10002) — it replaced the Players
+ * bottom-nav tab. Covers the sheet against real Tamagui (open, scrim and close
+ * dismissal, viewport bounds, draft-then-dismiss — the jest Sheet mock can't)
+ * and the browser's own affordances inside it: the search input, the position
+ * chip rail (and its active/selected state), the queue star, and the DRAFT
+ * button — the same `GetAvailableDraftPlayers` data the desktop board reads.
  *
  * All GraphQL is mocked (ADR-0015 §6) via `createGraphQLRouter`.
  */
@@ -161,7 +160,7 @@ interface DraftRouteOptions {
  * the same operation set `draft-selection-workflow.spec.ts` and
  * `player-detail-deep-link.spec.ts`'s `installDraftMocks` already exercise
  * for the desktop board — this spec drives the same data through the
- * compact board's Players tab. Tracks queue and pick mutations so tests can
+ * compact board's pick sheet. Tracks queue and pick mutations so tests can
  * assert on them, and keeps queue state (`getmydraftqueue`) live so the
  * queue star's post-toggle UI state reflects a real refetch rather than
  * optimistic-only local state.
@@ -304,27 +303,122 @@ async function setupCompactDraftRoute(
   return { capturedMutations };
 }
 
-/** Navigate to the draft and switch to the compact board's Players tab. */
-async function gotoDraftPlayersTab(page: import('@playwright/test').Page) {
+/**
+ * Navigate to the draft and raise the compact board's pick sheet (LS-10002).
+ * The sheet is the phone tier's only route to `DraftPlayersTab` — the Players
+ * bottom-nav tab it replaced is gone.
+ */
+async function openPickSheet(page: import('@playwright/test').Page) {
   await page.goto(DRAFT_URL);
   await page.waitForLoadState('load');
   // Confirms the compact board (not the desktop `draft-board` grid) rendered.
   await page.getByTestId('draft-bottom-nav').waitFor({ timeout: 15000 });
-  await page.getByTestId('draft-bottom-nav-players').click();
+  await page.getByTestId('draft-pick-cta').click();
   await page
     .getByTestId('draft-players-row')
     .first()
     .waitFor({ timeout: 15000 });
 }
 
-test.describe('Compact Draft Board — Players Tab @regression', () => {
+test.describe('Compact Draft Board — pick sheet @regression', () => {
   test.use({ viewport: MOBILE_VIEWPORT });
 
-  test('renders the Players tab with search, chip rail, and the player list', async ({
+  test('the CTA raises the player sheet over the board, which has no Players tab', async ({
     page,
   }) => {
     await setupCompactDraftRoute(page);
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
+
+    await expect(page.getByTestId('draft-pick-sheet')).toBeVisible();
+    await expect(page.getByText('Available players')).toBeVisible();
+    // Over the board, not instead of it.
+    await expect(page.getByTestId('draft-round-board')).toBeAttached();
+    await expect(page.getByTestId('draft-bottom-nav-players')).toHaveCount(0);
+  });
+
+  test('the sheet stays inside the viewport with its close control on screen', async ({
+    page,
+  }) => {
+    // LS-8501 / LS-9900: a viewport-anchored layer that sizes to its content
+    // pushes its own controls off the fold. The sheet is snapped to a bounded
+    // share of the viewport instead, and its list scrolls inside it.
+    await setupCompactDraftRoute(page);
+    await openPickSheet(page);
+
+    const frame = page.getByTestId('draft-pick-sheet');
+    // Measured once the slide-in settles — mid-animation the frame is still
+    // translated below the fold.
+    await expect
+      .poll(async () => {
+        const box = await frame.boundingBox();
+        return box ? box.y + box.height : Infinity;
+      })
+      .toBeLessThanOrEqual(MOBILE_VIEWPORT.height + 1);
+    const sheet = await frame.boundingBox();
+    expect(sheet).not.toBeNull();
+    if (!sheet) return;
+    // Bounded: the board stays visible above it.
+    expect(sheet.y).toBeGreaterThan(0);
+    expect(sheet.height).toBeLessThanOrEqual(MOBILE_VIEWPORT.height * 0.85);
+
+    const close = await page
+      .getByTestId('draft-pick-sheet-close')
+      .boundingBox();
+    expect(close).not.toBeNull();
+    if (!close) return;
+    expect(close.y).toBeGreaterThanOrEqual(sheet.y);
+    expect(close.y + close.height).toBeLessThanOrEqual(MOBILE_VIEWPORT.height);
+  });
+
+  test('the close control dismisses the sheet', async ({ page }) => {
+    await setupCompactDraftRoute(page);
+    await openPickSheet(page);
+
+    await page.getByTestId('draft-pick-sheet-close').click();
+
+    await expect(page.getByTestId('draft-players-row')).toHaveCount(0);
+    // Nothing is left intercepting taps on the board behind it.
+    await page.getByTestId('draft-pick-cta').click();
+    await expect(page.getByTestId('draft-players-row').first()).toBeVisible();
+  });
+
+  test('tapping the scrim above the sheet dismisses it', async ({ page }) => {
+    await setupCompactDraftRoute(page);
+    await openPickSheet(page);
+
+    // The top of the viewport is scrim — the sheet only covers the lower 84%.
+    await page.mouse.click(MOBILE_VIEWPORT.width / 2, 20);
+
+    await expect(page.getByTestId('draft-players-row')).toHaveCount(0);
+  });
+
+  test('drafting from the sheet completes the pick and dismisses the sheet', async ({
+    page,
+  }) => {
+    const { capturedMutations } = await setupCompactDraftRoute(page, {
+      currentPickTeamId: 1,
+    });
+    await openPickSheet(page);
+
+    await page.getByTestId(`draft-players-draft-${PLAYER_B.id}`).click();
+
+    await expect
+      .poll(
+        () =>
+          capturedMutations.filter((m) => m.operationName === 'MakeDraftPick')
+            .length,
+      )
+      .toBeGreaterThan(0);
+    await expect(page.getByTestId('draft-players-row')).toHaveCount(0);
+  });
+});
+
+test.describe('Compact Draft Board — player browser in the pick sheet @regression', () => {
+  test.use({ viewport: MOBILE_VIEWPORT });
+
+  test('renders search, chip rail, and the player list', async ({ page }) => {
+    await setupCompactDraftRoute(page);
+    await openPickSheet(page);
 
     await expect(page.getByPlaceholder('Search players…')).toBeVisible();
     await expect(page.getByTestId('draft-players-chip-ALL')).toBeVisible();
@@ -340,14 +434,14 @@ test.describe('Compact Draft Board — Players Tab @regression', () => {
 
   test('search input accepts a filter term', async ({ page }) => {
     await setupCompactDraftRoute(page);
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
 
     const search = page.getByPlaceholder('Search players…');
     await search.fill('Ohtani');
     await expect(search).toHaveValue('Ohtani');
   });
 
-  test('position chip rail marks the tapped chip as the active filter', async ({
+  test('position chip rail offers the league sport and marks the tapped chip as the active filter', async ({
     page,
   }) => {
     // `accessibilityState={{ selected }}` on these chips (DraftPlayersTab.tsx)
@@ -359,17 +453,21 @@ test.describe('Compact Draft Board — Players Tab @regression', () => {
     // class, which is style-static) instead of an ARIA attribute that isn't
     // actually wired up for web.
     await setupCompactDraftRoute(page);
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
+
+    // A baseball league gets baseball chips (LS-10002 — the browser used to
+    // offer football chips to every league).
+    await expect(page.getByTestId('draft-players-chip-QB')).toHaveCount(0);
 
     const allChip = page.getByTestId('draft-players-chip-ALL');
-    const qbChip = page.getByTestId('draft-players-chip-QB');
+    const ssChip = page.getByTestId('draft-players-chip-SS');
 
     const allHtmlBefore = await allChip.innerHTML();
-    const qbHtmlBefore = await qbChip.innerHTML();
+    const ssHtmlBefore = await ssChip.innerHTML();
 
-    await qbChip.click();
+    await ssChip.click();
 
-    await expect.poll(() => qbChip.innerHTML()).not.toBe(qbHtmlBefore);
+    await expect.poll(() => ssChip.innerHTML()).not.toBe(ssHtmlBefore);
     await expect.poll(() => allChip.innerHTML()).not.toBe(allHtmlBefore);
   });
 
@@ -377,7 +475,7 @@ test.describe('Compact Draft Board — Players Tab @regression', () => {
     page,
   }) => {
     const { capturedMutations } = await setupCompactDraftRoute(page);
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
 
     const queueButton = page.getByTestId(`draft-players-queue-${PLAYER_A.id}`);
     await expect(queueButton).toHaveAccessibleName(
@@ -416,7 +514,7 @@ test.describe('Compact Draft Board — Players Tab @regression', () => {
     const { capturedMutations } = await setupCompactDraftRoute(page, {
       currentPickTeamId: 1,
     });
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
 
     const draftButton = page.getByTestId(`draft-players-draft-${PLAYER_B.id}`);
     await expect(draftButton).toBeVisible();
@@ -439,7 +537,7 @@ test.describe('Compact Draft Board — Players Tab @regression', () => {
     page,
   }) => {
     await setupCompactDraftRoute(page, { currentPickTeamId: 2 });
-    await gotoDraftPlayersTab(page);
+    await openPickSheet(page);
 
     await expect(
       page.getByTestId(`draft-players-draft-${PLAYER_A.id}`),
