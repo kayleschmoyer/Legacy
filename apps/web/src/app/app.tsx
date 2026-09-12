@@ -868,7 +868,7 @@ function App() {
               element={<JoinMockDraftPage />}
             />
             <Route
-              path="/baseball/mock-draft/join:inviteCode"
+              path="/baseball/mock-draft/join/:inviteCode"
               element={<JoinMockDraftPage />}
             />
             <Route
