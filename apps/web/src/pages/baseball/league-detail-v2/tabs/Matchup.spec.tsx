@@ -82,6 +82,9 @@ jest.mock('../../../../lib/scoring/mapGraphQLToScoringFormat', () => ({
 }));
 
 // --- generated types -------------------------------------------------------
+const mockUseGetLeagueStandingsQuery = jest.fn(() => ({
+  data: { getLeagueStandings: [] },
+}));
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
     InProgress: 'in_progress',
@@ -93,6 +96,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     data: { getMatchupPlayers: [] },
     error: null,
   })),
+  useGetLeagueStandingsQuery: (...args: unknown[]) =>
+    mockUseGetLeagueStandingsQuery(...args),
 }));
 
 // --- heavy sub-components --------------------------------------------------
@@ -111,8 +116,20 @@ jest.mock('../../../../features/matchup/MatchupScoreboard', () => ({
     totalGames: 5,
   }),
 }));
+const mockMatchupScoreboardHero = jest.fn();
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
-  MatchupScoreboardHero: () => <div data-testid="scoreboard-hero" />,
+  MatchupScoreboardHero: (props: {
+    team1: { name?: string | null; record?: string | null };
+    team2: { name?: string | null; record?: string | null };
+  }) => {
+    mockMatchupScoreboardHero(props);
+    return (
+      <div data-testid="scoreboard-hero">
+        <span data-testid="team1-record">{props.team1.record ?? '—'}</span>
+        <span data-testid="team2-record">{props.team2.record ?? '—'}</span>
+      </div>
+    );
+  },
 }));
 const mockMatchupGrid = jest.fn();
 jest.mock('../../../../features/matchup/MatchupGrid', () => ({
@@ -606,6 +623,40 @@ describe('MatchupTab — matchup-scoped WebSocket context (LS-6355)', () => {
     });
     expect(() => renderTab({}, { initialMatchupId: '1' })).not.toThrow();
     expect(mockUpdateContext).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchupTab — team records from league standings (LS-10026)', () => {
+  beforeEach(() => {
+    mockUseGetLeagueStandingsQuery.mockReturnValue({
+      data: {
+        getLeagueStandings: [
+          { teamId: 10, wins: 7, losses: 3, ties: 1 },
+          { teamId: 20, wins: 4, losses: 6, ties: 0 },
+        ],
+      },
+    });
+  });
+
+  it('populates both teams win-loss records from league standings', () => {
+    renderTab();
+    expect(screen.getByTestId('team1-record')).toHaveTextContent('7-3-1');
+    expect(screen.getByTestId('team2-record')).toHaveTextContent('4-6');
+  });
+
+  it('renders records for football leagues too', () => {
+    renderTab({ sport: 'football' });
+    expect(screen.getByTestId('team1-record')).toHaveTextContent('7-3-1');
+    expect(screen.getByTestId('team2-record')).toHaveTextContent('4-6');
+  });
+
+  it('falls back to null (rendered as —) when standings has no entry for a team', () => {
+    mockUseGetLeagueStandingsQuery.mockReturnValue({
+      data: { getLeagueStandings: [] },
+    });
+    renderTab();
+    expect(screen.getByTestId('team1-record')).toHaveTextContent('—');
+    expect(screen.getByTestId('team2-record')).toHaveTextContent('—');
   });
 });
 

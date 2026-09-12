@@ -4,11 +4,13 @@ import {
   MatchupScoreboardHero,
   type MatchupScoreboardHeroTeam,
 } from '@legacy-sports/shared-components/matchup';
+import { formatRecord } from '@legacy-sports/shared-components/utils';
 import {
   type LeagueFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
   Sport,
+  useGetLeagueStandingsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
 import {
@@ -228,12 +230,45 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     ],
   );
 
+  // Fetch league standings to surface each team's W-L-T record in the header,
+  // mirroring MatchupScoreboard's fix for the same missing-record problem
+  // (LS-9678).
+  const { data: standingsData } = useGetLeagueStandingsQuery({
+    variables: { leagueId: league.id ?? 0 },
+    skip: !league.id,
+  });
+
+  const team1Record = useMemo(() => {
+    const standing = standingsData?.getLeagueStandings?.find(
+      (s) => Number(s.teamId) === matchup?.team1Id,
+    );
+    if (!standing) return null;
+    return formatRecord(
+      standing.wins ?? 0,
+      standing.losses ?? 0,
+      standing.ties ?? 0,
+    );
+  }, [matchup?.team1Id, standingsData]);
+
+  const team2Record = useMemo(() => {
+    const standing = standingsData?.getLeagueStandings?.find(
+      (s) => Number(s.teamId) === matchup?.team2Id,
+    );
+    if (!standing) return null;
+    return formatRecord(
+      standing.wins ?? 0,
+      standing.losses ?? 0,
+      standing.ties ?? 0,
+    );
+  }, [matchup?.team2Id, standingsData]);
+
   const team1Side: MatchupScoreboardHeroTeam = matchup
     ? {
         id: matchup.team1Id ?? null,
         name: matchup.team1?.name ?? 'Team 1',
         score: computed.team1Score,
         projectedScore: computed.team1Projected,
+        record: team1Record,
       }
     : { name: 'Team 1' };
   const team2Side: MatchupScoreboardHeroTeam = matchup
@@ -242,6 +277,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         name: matchup.team2?.name ?? 'Team 2',
         score: computed.team2Score,
         projectedScore: computed.team2Projected,
+        record: team2Record,
       }
     : { name: 'Team 2' };
 
