@@ -13,9 +13,9 @@ import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 // The `@legacy-sports/shared-components` barrel exports `SpectatorScreenProps`
 // from the web `SpectatorScreen.tsx` (tsc has no notion of Metro's `.native.tsx`
 // platform-resolution), but `SpectatorScreen.native.tsx` — the component this
-// app actually renders — additionally accepts `websocketToken` (same prop name
-// EliteDraftBoardScreen.native.tsx uses for its own WS auth). Widen the type at
-// this call site rather than editing the shared barrel, which would affect web.
+// app actually renders — additionally accepts `websocketToken` for its own WS
+// auth. Widen the type at this call site rather than editing the shared barrel,
+// which would affect web.
 type NativeSpectatorScreenProps = SpectatorScreenProps & {
   websocketToken?: string;
 };
