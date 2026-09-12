@@ -15,8 +15,10 @@ import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
 import { Chip, useWebSocket } from '@legacy-sports/shared-components';
 import {
+  FootballScoringBreakdown,
   MatchupAdditionalSections,
   MatchupRecapPanel,
+  toFootballScoringBreakdownTeams,
 } from '@legacy-sports/shared-components/matchup';
 import {
   ALLOWED_POSITIONS_BY_SPORT,
@@ -519,10 +521,11 @@ export function FootballMatchupScreen(
   // scores are keyed by league week rather than matchupId, so this is a second
   // query — skipped until both the league and the matchup's week number are known.
   const weekNumber = matchup?.weekNumber ?? null;
-  const { data: matchupScoresData } = useMatchupScoresQuery({
-    variables: { leagueId: leagueId ?? 0, weekNum: weekNumber ?? 0 },
-    skip: leagueId == null || weekNumber == null,
-  });
+  const { data: matchupScoresData, loading: matchupScoresLoading } =
+    useMatchupScoresQuery({
+      variables: { leagueId: leagueId ?? 0, weekNum: weekNumber ?? 0 },
+      skip: leagueId == null || weekNumber == null,
+    });
 
   const teamProjectedScore = (
     teamId: number | null | undefined,
@@ -561,6 +564,19 @@ export function FootballMatchupScreen(
     }
     return map;
   }, [matchupScoresData]);
+
+  // Per-player game-level box score (FMD-029 / LS-6393). The same matchupScores
+  // payload that feeds the roster rows above also carries each player's per-game
+  // pass/rush/recv/kick/def/IDP lines, so the breakdown section below costs no
+  // extra round trip — only the widened selection set on the shared document.
+  const breakdownTeams = useMemo(
+    () =>
+      toFootballScoringBreakdownTeams(matchupScoresData?.matchupScores, [
+        matchup?.team1Id,
+        matchup?.team2Id,
+      ]),
+    [matchupScoresData, matchup?.team1Id, matchup?.team2Id],
+  );
 
   // The lineup editor replaces the read-only roster card for the user's own
   // team while the matchup is still open to changes — mirrors the baseball
@@ -698,6 +714,11 @@ export function FootballMatchupScreen(
             )}
           </>
         )}
+
+        <FootballScoringBreakdown
+          teams={breakdownTeams}
+          loading={matchupScoresLoading}
+        />
 
         {matchup.status === MatchupStatus.Completed && matchupId != null ? (
           <PremiumGate

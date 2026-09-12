@@ -224,13 +224,44 @@ jest.mock('../../../features/subscription/PremiumGate', () => ({
 // MatchupAdditionalSections is self-fetching (its own GraphQL hooks) and
 // fully covered by its own spec — stub it here rather than re-testing its
 // internals (playoff implications, key players, etc.) at this layer.
+// The box score's own rendering (accordion, per-game stat lines) is covered by
+// FootballScoringBreakdown.spec.tsx in shared-components. Here it is stubbed so
+// this screen's specs can assert only what the screen owns: that the section is
+// wired with the matchup's own two teams. `toFootballScoringBreakdownTeams` is
+// the real implementation, since that mapping is the wiring under test (LS-6393).
+interface MockBreakdownProps {
+  teams: readonly {
+    teamId: number;
+    teamName: string;
+    players: readonly {
+      playerId: number;
+      games: readonly { passing?: { yds?: number | null } | null }[];
+    }[];
+  }[];
+  loading?: boolean;
+}
+const mockScoringBreakdown = jest.fn<void, [MockBreakdownProps]>();
+
 jest.mock('@legacy-sports/shared-components/matchup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<RNComponents>('react-native');
+  const actualBreakdown = jest.requireActual<
+    typeof import('../../../../../../lib/shared-components/src/features/matchup/FootballScoringBreakdown')
+  >(
+    '../../../../../../lib/shared-components/src/features/matchup/FootballScoringBreakdown',
+  );
   return {
     MatchupAdditionalSections: () => null,
     MatchupRecapPanel: () =>
       ReactActual.createElement(View, { testID: 'recap-panel' }),
+    toFootballScoringBreakdownTeams:
+      actualBreakdown.toFootballScoringBreakdownTeams,
+    FootballScoringBreakdown: (props: MockBreakdownProps) => {
+      mockScoringBreakdown(props);
+      return ReactActual.createElement(View, {
+        testID: 'football-scoring-breakdown',
+      });
+    },
   };
 });
 
@@ -602,6 +633,80 @@ describe('FootballMatchupScreen', () => {
     render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('wires the box score with both matchup teams from matchupScores (FMD-029)', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: {
+        matchupScores: [
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 20,
+            teamName: 'Team 20',
+            totalPoints: 87.3,
+            projectedPoints: 95,
+            players: [],
+          },
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 99,
+            teamName: 'Another matchup entirely',
+            totalPoints: 70,
+            projectedPoints: 71,
+            players: [],
+          },
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 10,
+            teamName: 'Team 10',
+            totalPoints: 102.5,
+            projectedPoints: 121.4,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 5,
+                playerName: 'Patrick Mahomes',
+                position: 'QB',
+                totalPoints: 24.6,
+                projectedPoints: 22.1,
+                games: [
+                  {
+                    gameNum: 1,
+                    opponent: 'DEN',
+                    fantasyPoints: 24.6,
+                    passing: { cmp: 24, att: 35, yds: 291, td: 3, int: 0 },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getByTestId('football-scoring-breakdown')).toBeTruthy();
+
+    const props = mockScoringBreakdown.mock.calls.at(-1)?.[0];
+    // team1 first, team2 second, and the unrelated matchup's team dropped.
+    expect(props?.teams.map((team) => team.teamId)).toEqual([10, 20]);
+    expect(props?.teams[0].players[0].games[0].passing?.yds).toBe(291);
+    expect(props?.loading).toBe(false);
+  });
+
+  it('passes the box score through the loading state while scores are in flight (FMD-029)', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: undefined,
+      loading: true,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    const props = mockScoringBreakdown.mock.calls.at(-1)?.[0];
+    expect(props?.loading).toBe(true);
+    expect(props?.teams).toEqual([]);
   });
 
   it('navigates to the team roster route when an empty starter slot is pressed (LS-6382)', () => {

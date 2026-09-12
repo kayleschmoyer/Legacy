@@ -13544,11 +13544,56 @@ export type MatchupScoresQuery = {
           games: Array<{
             __typename?: 'FootballMatchupPlayerGame';
             gameNum: number;
+            opponent?: string | null;
+            fantasyPoints: number;
+            passing?: {
+              __typename?: 'FootballGamePassingStats';
+              att?: number | null;
+              cmp?: number | null;
+              yds?: number | null;
+              td?: number | null;
+              int?: number | null;
+            } | null;
+            rushing?: {
+              __typename?: 'FootballGameRushingStats';
+              att?: number | null;
+              yds?: number | null;
+              td?: number | null;
+            } | null;
             receiving?: {
               __typename?: 'FootballGameReceivingStats';
+              tgt?: number | null;
               rec?: number | null;
               yds?: number | null;
               td?: number | null;
+            } | null;
+            kicking?: {
+              __typename?: 'FootballGameKickingStats';
+              fgm?: number | null;
+              fga?: number | null;
+              xpm?: number | null;
+              xpa?: number | null;
+            } | null;
+            defense?: {
+              __typename?: 'FootballGameDefenseStats';
+              sacks?: number | null;
+              int?: number | null;
+              fumRec?: number | null;
+              defTd?: number | null;
+              safeties?: number | null;
+              ptsAllowed?: number | null;
+              ydsAllowed?: number | null;
+            } | null;
+            idp?: {
+              __typename?: 'FootballGameIDPStats';
+              soloTkl?: number | null;
+              astTkl?: number | null;
+              sacks?: number | null;
+              int?: number | null;
+              ff?: number | null;
+              fr?: number | null;
+              pd?: number | null;
+              defTd?: number | null;
             } | null;
           }>;
         }>;
@@ -33616,10 +33661,50 @@ export const MatchupScores = gql`
           projectedPoints
           games {
             gameNum
+            opponent
+            fantasyPoints
+            passing {
+              att
+              cmp
+              yds
+              td
+              int
+            }
+            rushing {
+              att
+              yds
+              td
+            }
             receiving {
+              tgt
               rec
               yds
               td
+            }
+            kicking {
+              fgm
+              fga
+              xpm
+              xpa
+            }
+            defense {
+              sacks
+              int
+              fumRec
+              defTd
+              safeties
+              ptsAllowed
+              ydsAllowed
+            }
+            idp {
+              soloTkl
+              astTkl
+              sacks
+              int
+              ff
+              fr
+              pd
+              defTd
             }
           }
         }

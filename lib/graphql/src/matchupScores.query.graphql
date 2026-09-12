@@ -13,15 +13,58 @@ query MatchupScores($leagueId: Int!, $weekNum: Int!) {
         projectedPoints
         games {
           gameNum
-          # LS-6454: the receiving group feeds the premium scoring-format
-          # simulator on football Team Detail. Only this group is selected —
-          # the presets differ solely in the reception multiplier, and every
-          # other term cancels in the simulator's baseline-vs-target
-          # subtraction, so fetching them would add payload for no accuracy.
+          opponent
+          fantasyPoints
+          # LS-6454 selected only `receiving` here, because the premium
+          # scoring-format simulator on football Team Detail is the only
+          # consumer that reads a stat group and the presets differ solely in
+          # the reception multiplier. LS-6393 adds the remaining groups: the
+          # mobile matchup box score (FootballScoringBreakdown) renders a
+          # per-player, per-game pass/rush/recv/kick/def/IDP line, and this is
+          # the query that already carries the same week's roster, so a second
+          # round trip would only re-fetch what this document returns anyway.
+          passing {
+            att
+            cmp
+            yds
+            td
+            int
+          }
+          rushing {
+            att
+            yds
+            td
+          }
           receiving {
+            tgt
             rec
             yds
             td
+          }
+          kicking {
+            fgm
+            fga
+            xpm
+            xpa
+          }
+          defense {
+            sacks
+            int
+            fumRec
+            defTd
+            safeties
+            ptsAllowed
+            ydsAllowed
+          }
+          idp {
+            soloTkl
+            astTkl
+            sacks
+            int
+            ff
+            fr
+            pd
+            defTd
           }
         }
       }
