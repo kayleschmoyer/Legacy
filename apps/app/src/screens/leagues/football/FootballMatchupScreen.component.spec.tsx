@@ -90,7 +90,10 @@ const mockPlayer = {
 
 // League position ids -> slot labels, mirroring the leaguePositions table
 // (LS-6379). Matchup player fixtures reference these ids via `positionId`,
-// the server-stored source of truth for slot assignment.
+// the server-stored source of truth for slot assignment. This is a
+// DST-format league's 7 starter slots — a real league never configures both
+// DST and DL/LB/DB (LS-9475), so IDP/Superflex tests below supply their own
+// leaguePositions fixture instead of reusing this one.
 const mockLeaguePositions = [
   { id: 1301, positionType: 'QB' },
   { id: 1302, positionType: 'RB' },
@@ -99,9 +102,6 @@ const mockLeaguePositions = [
   { id: 1305, positionType: 'FLEX' },
   { id: 1306, positionType: 'K' },
   { id: 1307, positionType: 'DST' },
-  { id: 1308, positionType: 'DL' },
-  { id: 1309, positionType: 'LB' },
-  { id: 1310, positionType: 'DB' },
 ];
 
 const mockMatchupPlayer = {
@@ -260,24 +260,30 @@ jest.mock('../../../features/matchup/components/MatchupScoreboard', () => ({
     mockMatchupScoreboard(props),
 }));
 
-jest.mock('@legacy-sports/utils', () => ({
-  ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
-  ALLOWED_POSITIONS_BY_SPORT: {
-    football: {
-      QB: ['QB'],
-      RB: ['RB'],
-      WR: ['WR'],
-      TE: ['TE'],
-      K: ['K'],
-      DST: ['DST'],
-      DL: ['DL'],
-      LB: ['LB'],
-      DB: ['DB'],
-      FLEX: ['RB', 'WR', 'TE'],
-      SFLEX: ['QB', 'RB', 'WR', 'TE'],
+jest.mock('@legacy-sports/utils', () => {
+  const actual = jest.requireActual<typeof import('@legacy-sports/utils')>(
+    '@legacy-sports/utils',
+  );
+  return {
+    ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
+    ALLOWED_POSITIONS_BY_SPORT: {
+      football: {
+        QB: ['QB'],
+        RB: ['RB'],
+        WR: ['WR'],
+        TE: ['TE'],
+        K: ['K'],
+        DST: ['DST'],
+        DL: ['DL'],
+        LB: ['LB'],
+        DB: ['DB'],
+        FLEX: ['RB', 'WR', 'TE'],
+        SFLEX: ['QB', 'RB', 'WR', 'TE'],
+      },
     },
-  },
-}));
+    deriveFootballSlotOrder: actual.deriveFootballSlotOrder,
+  };
+});
 
 jest.mock('tamagui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>(
@@ -367,6 +373,13 @@ describe('FootballMatchupScreen', () => {
       data: undefined,
       loading: false,
     } as ReturnType<typeof graphqlLib.useGetHeadToHeadRecordQuery>);
+    // Reset to the default DST-format leaguePositions fixture — individual
+    // tests below override this for IDP/Superflex scenarios, and clearAllMocks
+    // above clears call history but not a prior mockReturnValue.
+    jest.mocked(graphqlLib.useGetPositionsForLeagueQuery).mockReturnValue({
+      data: { leaguePositions: mockLeaguePositions },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetPositionsForLeagueQuery>);
   });
 
   it('shows spinner while matchup is loading', () => {
@@ -535,12 +548,12 @@ describe('FootballMatchupScreen', () => {
   });
 
   it('renders player name for team 1', () => {
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
     expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
   });
 
   it('navigates to the football player detail route when a player row is pressed', () => {
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     fireEvent.press(screen.getByText('Patrick Mahomes'));
 
@@ -574,7 +587,7 @@ describe('FootballMatchupScreen', () => {
       loading: false,
     } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
 
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getByText('24.6')).toBeTruthy();
     expect(screen.getByText('22.1')).toBeTruthy();
@@ -586,13 +599,13 @@ describe('FootballMatchupScreen', () => {
       loading: false,
     } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
 
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('navigates to the team roster route when an empty starter slot is pressed (LS-6382)', () => {
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     // team1 (id 10) has only QB filled — its first 'Empty' row is the next
     // starter slot (RB); team2 (id 20) has no players, so all its slots read
@@ -705,7 +718,7 @@ describe('FootballMatchupScreen', () => {
       refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
 
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getByText('Dedicated Runningback')).toBeTruthy();
     expect(screen.getByText('Flex Player')).toBeTruthy();
@@ -731,21 +744,87 @@ describe('FootballMatchupScreen', () => {
       refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
 
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getByText('Benched Flexer')).toBeTruthy();
     expect(screen.getByText('BN')).toBeTruthy();
   });
 
   it('renders DST position slot in DST format', () => {
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
     // Both team rosters render the slot label; at least one must be present
     expect(screen.getAllByText('D/ST').length).toBeGreaterThan(0);
   });
 
-  it('renders DL position slot in IDP format', () => {
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="idp" />);
+  it('renders DL position slot for an IDP-configured league', () => {
+    jest.mocked(graphqlLib.useGetPositionsForLeagueQuery).mockReturnValue({
+      data: {
+        leaguePositions: [
+          { id: 1301, positionType: 'QB' },
+          { id: 1302, positionType: 'RB' },
+          { id: 1303, positionType: 'WR' },
+          { id: 1304, positionType: 'TE' },
+          { id: 1305, positionType: 'FLEX' },
+          { id: 1306, positionType: 'K' },
+          { id: 1308, positionType: 'DL' },
+          { id: 1309, positionType: 'LB' },
+          { id: 1310, positionType: 'DB' },
+        ],
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetPositionsForLeagueQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
     expect(screen.getAllByText('DL').length).toBeGreaterThan(0);
+    // A DST-format slot has no rows for this IDP league, so it must not render.
+    expect(screen.queryByText('D/ST')).toBeNull();
+  });
+
+  // LS-9734: Superflex (SFLEX) leagues configure a second, premium
+  // QB-eligible slot on top of the normal QB slot. Previously this slot type
+  // was entirely absent from the mobile screen's hardcoded position-order
+  // arrays, so a Superflex league's QB2 had nowhere to render and was
+  // silently benched even though it's a legitimately eligible starting slot.
+  it('renders a SFLEX (QB2) slot for a Superflex-configured league (LS-9734)', () => {
+    jest.mocked(graphqlLib.useGetPositionsForLeagueQuery).mockReturnValue({
+      data: {
+        leaguePositions: [
+          { id: 1301, positionType: 'QB' },
+          { id: 1320, positionType: 'SFLEX' },
+          { id: 1302, positionType: 'RB' },
+          { id: 1303, positionType: 'WR' },
+          { id: 1304, positionType: 'TE' },
+          { id: 1305, positionType: 'FLEX' },
+          { id: 1306, positionType: 'K' },
+          { id: 1307, positionType: 'DST' },
+        ],
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetPositionsForLeagueQuery>);
+    const qb2Player = {
+      id: 601,
+      playerId: 601,
+      teamId: 10,
+      positionId: 1320, // SFLEX
+      player: {
+        id: 601,
+        firstName: 'Justin',
+        lastName: 'Fields',
+        eligiblePositions: ['QB'],
+      },
+    };
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: { getMatchupPlayers: [mockMatchupPlayer, qb2Player] },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getAllByText('SFLEX').length).toBeGreaterThan(0);
+    // The QB2 player rendered into the SFLEX slot, not benched.
+    expect(screen.getByText('Justin Fields')).toBeTruthy();
+    expect(screen.queryByText('BN')).toBeNull();
   });
 
   it('shows the bench count and capacity when maxRosterSize is available (LS-6383)', () => {
@@ -773,13 +852,7 @@ describe('FootballMatchupScreen', () => {
     // dst format has 7 starter slots; maxRosterSize 8 leaves a bench cap of
     // 1. Mahomes fills the QB starter slot, leaving 'Bench Guy' as the one
     // bench player.
-    render(
-      <FootballMatchupScreen
-        matchupId={1}
-        defensiveFormat="dst"
-        maxRosterSize={8}
-      />,
-    );
+    render(<FootballMatchupScreen matchupId={1} maxRosterSize={8} />);
 
     expect(screen.getByText('BENCH (1/1)')).toBeTruthy();
   });
@@ -806,7 +879,7 @@ describe('FootballMatchupScreen', () => {
       refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
 
-    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+    render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getAllByText('BENCH').length).toBeGreaterThan(0);
     expect(screen.queryByText(/BENCH \(/)).toBeNull();
@@ -835,13 +908,7 @@ describe('FootballMatchupScreen', () => {
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
 
     // dst format has 7 starter slots; maxRosterSize 7 leaves no bench cap.
-    render(
-      <FootballMatchupScreen
-        matchupId={1}
-        defensiveFormat="dst"
-        maxRosterSize={7}
-      />,
-    );
+    render(<FootballMatchupScreen matchupId={1} maxRosterSize={7} />);
 
     expect(screen.getAllByText('BENCH').length).toBeGreaterThan(0);
     expect(screen.queryByText(/BENCH \(/)).toBeNull();

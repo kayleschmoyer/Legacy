@@ -3,6 +3,8 @@ import {
   ALLOWED_POSITIONS_BY_SPORT,
   BATTING_POSITIONS,
   DEFENSIVE_POSITIONS,
+  deriveFootballSlotOrder,
+  FOOTBALL_STARTING_SLOT_DISPLAY_ORDER,
   OFFENSIVE_POSITIONS,
   PITCHING_POSITIONS,
 } from './allowed-positions';
@@ -130,6 +132,91 @@ describe('OFFENSIVE_POSITIONS (football)', () => {
 
   it('does not include DST', () => {
     expect(OFFENSIVE_POSITIONS.has('DST')).toBe(false);
+  });
+});
+
+describe('deriveFootballSlotOrder (LS-9734)', () => {
+  it('returns starting slots in canonical order, not leaguePositions row order', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: 'DST' },
+      { positionType: 'QB' },
+      { positionType: 'FLEX' },
+      { positionType: 'RB' },
+    ]);
+    expect(order).toEqual(['QB', 'RB', 'FLEX', 'DST']);
+  });
+
+  it('includes a SFLEX slot for a Superflex-configured league', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: 'QB' },
+      { positionType: 'SFLEX' },
+      { positionType: 'RB' },
+      { positionType: 'WR' },
+      { positionType: 'TE' },
+      { positionType: 'K' },
+      { positionType: 'DST' },
+    ]);
+    expect(order).toContain('SFLEX');
+    expect(order.indexOf('SFLEX')).toBe(order.indexOf('QB') + 1);
+  });
+
+  it('omits slot types the league has no rows for (e.g. DST for an IDP league)', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: 'QB' },
+      { positionType: 'DL' },
+      { positionType: 'LB' },
+      { positionType: 'DB' },
+    ]);
+    expect(order).not.toContain('DST');
+    expect(order).toEqual(['QB', 'DL', 'LB', 'DB']);
+  });
+
+  it('de-duplicates multiple rows of the same slot type', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: 'RB' },
+      { positionType: 'RB' },
+      { positionType: 'WR' },
+      { positionType: 'WR' },
+    ]);
+    expect(order).toEqual(['RB', 'WR']);
+  });
+
+  it('ignores rows with a null/undefined/unknown positionType', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: null },
+      { positionType: undefined },
+      undefined,
+      null,
+      { positionType: 'QB' },
+    ]);
+    expect(order).toEqual(['QB']);
+  });
+
+  it('returns an empty array for null/undefined/empty input', () => {
+    expect(deriveFootballSlotOrder(null)).toEqual([]);
+    expect(deriveFootballSlotOrder(undefined)).toEqual([]);
+    expect(deriveFootballSlotOrder([])).toEqual([]);
+  });
+
+  it('includes IDP_FLEX and ST for an IDP league configured with them (LS-6448)', () => {
+    const order = deriveFootballSlotOrder([
+      { positionType: 'QB' },
+      { positionType: 'DL' },
+      { positionType: 'LB' },
+      { positionType: 'DB' },
+      { positionType: 'IDP_FLEX' },
+      { positionType: 'ST' },
+    ]);
+    expect(order).toEqual(['QB', 'DL', 'LB', 'DB', 'IDP_FLEX', 'ST']);
+  });
+
+  it('never returns a slot type outside the canonical display order', () => {
+    const order = deriveFootballSlotOrder(
+      FOOTBALL_STARTING_SLOT_DISPLAY_ORDER.map((positionType) => ({
+        positionType,
+      })),
+    );
+    expect(order).toEqual(FOOTBALL_STARTING_SLOT_DISPLAY_ORDER);
   });
 });
 

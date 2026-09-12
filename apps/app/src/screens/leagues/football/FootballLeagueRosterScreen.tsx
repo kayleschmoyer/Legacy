@@ -16,6 +16,7 @@ import {
   type LeaguePositionFragment,
   useGetTeamMembersQuery,
 } from '@legacy-sports/graphql';
+import { deriveFootballSlotOrder } from '@legacy-sports/utils';
 import { PremiumGate } from '../../../features/subscription/PremiumGate';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
@@ -23,31 +24,7 @@ type TeamMember = NonNullable<
   NonNullable<GetTeamMembersQuery['teamMembers']>[number]
 >;
 
-const DST_SLOT_ORDER = [
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DST',
-  'BN',
-] as const;
-
-const IDP_SLOT_ORDER = [
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DL',
-  'LB',
-  'DB',
-  'IDP_FLEX',
-  'ST',
-  'BN',
-] as const;
+const BENCH_SLOT = 'BN';
 
 const DEFENSIVE_FORMAT_LABELS: Record<string, string> = {
   idp: 'IDP League (Individual Defensive Players)',
@@ -68,6 +45,7 @@ export function getDefensiveFormatLabel(
 
 const SLOT_LABELS: Record<string, string> = {
   QB: 'Quarterback',
+  SFLEX: 'Superflex',
   RB: 'Running Back',
   WR: 'Wide Receiver',
   TE: 'Tight End',
@@ -84,8 +62,11 @@ const SLOT_LABELS: Record<string, string> = {
 
 interface FootballLeagueRosterScreenProps {
   readonly teamId: number;
-  readonly defensiveFormat?: string | null;
   readonly rosterSlots?: readonly (LeaguePositionFragment | null)[];
+  /** League's defensive scoring format ('dst' or 'idp'), used only for the
+   *  display label (LS-6453) — slot order itself is derived dynamically
+   *  from `rosterSlots`, not from this value. */
+  readonly defensiveFormat?: string | null;
   /**
    * Per-NFL-team bye week for the league's active season, keyed by team
    * abbreviation (LS-6430). Paired with `currentWeek` to flag roster members
@@ -195,19 +176,6 @@ export function groupMembersBySlot(
 }
 
 /**
- * Returns the ordered list of roster position slots for the given defensive format.
- * Uses IDP slots (DL, LB, DB, …) for IDP leagues; DST slot for all others.
- *
- * @param defensiveFormat - 'idp' for individual defensive players, or 'dst'/null for team defense.
- * @returns Ordered array of position slot labels for the roster grid.
- */
-export function getSlotOrder(
-  defensiveFormat: string | null | undefined,
-): readonly string[] {
-  return defensiveFormat === 'idp' ? IDP_SLOT_ORDER : DST_SLOT_ORDER;
-}
-
-/**
  * Returns the display name for a roster member.
  * Concatenates first and last name; falls back to 'Unknown Player' when either is absent.
  *
@@ -240,10 +208,10 @@ export function FootballLeagueRosterScreen(
 ): React.JSX.Element {
   const {
     teamId,
-    defensiveFormat,
     rosterSlots = [],
     byeWeeksByTeam,
     currentWeek,
+    defensiveFormat,
   } = props;
 
   const { data, loading, error } = useGetTeamMembersQuery({
@@ -271,8 +239,8 @@ export function FootballLeagueRosterScreen(
   }, [error, teamId]);
 
   const slotOrder = useMemo(
-    () => getSlotOrder(defensiveFormat),
-    [defensiveFormat],
+    () => [...deriveFootballSlotOrder(rosterSlots), BENCH_SLOT],
+    [rosterSlots],
   );
 
   const renderSlots = useMemo(

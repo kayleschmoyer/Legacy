@@ -2,7 +2,6 @@ import {
   buildRenderSlots,
   getPlayerLabel,
   getPositionBadge,
-  getSlotOrder,
   groupMembersBySlot,
   isMemberOnBye,
 } from './FootballLeagueRosterScreen';
@@ -22,61 +21,6 @@ jest.mock('../../../features/subscription/PremiumGate', () => ({
 jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: { advanced_search_filters: 'advanced_search_filters' },
 }));
-
-describe('getSlotOrder', () => {
-  it('returns DST slot order when defensiveFormat is dst', () => {
-    const order = getSlotOrder('dst');
-    expect(order).toContain('DST');
-    expect(order).not.toContain('DL');
-    expect(order).not.toContain('LB');
-    expect(order).not.toContain('DB');
-  });
-
-  it('returns DST slot order when defensiveFormat is null', () => {
-    const order = getSlotOrder(null);
-    expect(order).toContain('DST');
-    expect(order).not.toContain('DL');
-  });
-
-  it('returns DST slot order when defensiveFormat is undefined', () => {
-    const order = getSlotOrder(undefined);
-    expect(order).toContain('DST');
-    expect(order).not.toContain('DL');
-  });
-
-  it('returns IDP slot order when defensiveFormat is idp', () => {
-    const order = getSlotOrder('idp');
-    expect(order).toContain('DL');
-    expect(order).toContain('LB');
-    expect(order).toContain('DB');
-    expect(order).not.toContain('DST');
-  });
-
-  it('includes IDP_FLEX in the IDP slot order', () => {
-    const order = getSlotOrder('idp');
-    expect(order).toContain('IDP_FLEX');
-  });
-
-  it('includes ST (special teams) in the IDP slot order', () => {
-    const order = getSlotOrder('idp');
-    expect(order).toContain('ST');
-  });
-
-  it('does not include IDP_FLEX or ST in the DST slot order', () => {
-    const order = getSlotOrder('dst');
-    expect(order).not.toContain('IDP_FLEX');
-    expect(order).not.toContain('ST');
-  });
-
-  it('includes common offensive slots in both formats', () => {
-    const dst = getSlotOrder('dst');
-    const idp = getSlotOrder('idp');
-    for (const slot of ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'BN']) {
-      expect(dst).toContain(slot);
-      expect(idp).toContain(slot);
-    }
-  });
-});
 
 describe('getPlayerLabel', () => {
   it('returns full name when both firstName and lastName are present', () => {

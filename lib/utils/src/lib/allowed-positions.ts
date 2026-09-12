@@ -114,3 +114,53 @@ export const OFFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
 export const DEFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
   new Set(['DST', 'DL', 'LB', 'DB']),
 );
+
+/**
+ * Canonical starting-slot display order for football, spanning every slot
+ * type a league might configure — DST-format or IDP-format, Superflex or
+ * not. A given league only ever has a subset of these types configured as
+ * actual `leaguePosition` rows (never both DST and DL/LB/DB); pass those
+ * rows to `deriveFootballSlotOrder` to get that league's real slot order.
+ */
+export const FOOTBALL_STARTING_SLOT_DISPLAY_ORDER: readonly string[] =
+  Object.freeze([
+    'QB',
+    'SFLEX',
+    'RB',
+    'WR',
+    'TE',
+    'FLEX',
+    'K',
+    'DST',
+    'DL',
+    'LB',
+    'DB',
+    /** IDP_FLEX (any of DL/LB/DB) and ST (special teams) — configurable IDP
+     *  slot types alongside DL/LB/DB (LS-6448). */
+    'IDP_FLEX',
+    'ST',
+  ]);
+
+/**
+ * Derives a league's actual starting-slot order from its real roster-slot
+ * rows (the `leaguePositions` query / `LeaguePositionFragment`), rather than
+ * a hardcoded per-format array — so any current or future slot
+ * configuration (e.g. Superflex's QB2/SFLEX slot, LS-9734) renders
+ * correctly without special-casing it here.
+ */
+export function deriveFootballSlotOrder(
+  leaguePositions:
+    | readonly ({ positionType?: string | null } | null | undefined)[]
+    | null
+    | undefined,
+): readonly string[] {
+  const configuredSlotTypes = new Set<string>();
+  for (const position of leaguePositions ?? []) {
+    if (position?.positionType) {
+      configuredSlotTypes.add(position.positionType);
+    }
+  }
+  return FOOTBALL_STARTING_SLOT_DISPLAY_ORDER.filter((slot) =>
+    configuredSlotTypes.has(slot),
+  );
+}

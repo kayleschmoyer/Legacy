@@ -436,7 +436,6 @@ interface TabContentProps {
   leagueId: number;
   avatarUrl: string | null | undefined;
   bannerUrl: string | null | undefined;
-  defensiveFormat: string | null | undefined;
   scoringFormat: FootballScoringFormat | undefined;
   getPlayerStats: (player: AppTeamMemberFragment) => RosterPlayerStats | null;
   matchup: MatchupFragment | null | undefined;
@@ -445,6 +444,7 @@ interface TabContentProps {
   matchupError: unknown;
   byeWeeksByTeam: Readonly<Record<string, number>>;
   currentWeek: number | null | undefined;
+  defensiveFormat: string | null | undefined;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -460,7 +460,6 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     leagueId,
     avatarUrl,
     bannerUrl,
-    defensiveFormat,
     scoringFormat,
     getPlayerStats,
     matchup,
@@ -469,6 +468,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     matchupError,
     byeWeeksByTeam,
     currentWeek,
+    defensiveFormat,
   } = props;
 
   switch (selectedTab) {
@@ -476,10 +476,10 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       return (
         <FootballLeagueRosterScreen
           teamId={teamId}
-          defensiveFormat={defensiveFormat}
           rosterSlots={rosterSlots}
           byeWeeksByTeam={byeWeeksByTeam}
           currentWeek={currentWeek}
+          defensiveFormat={defensiveFormat}
         />
       );
     case 'Matchup':

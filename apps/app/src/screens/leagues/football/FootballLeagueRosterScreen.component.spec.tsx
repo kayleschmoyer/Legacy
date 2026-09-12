@@ -168,25 +168,99 @@ describe('FootballLeagueRosterScreen', () => {
     expect(screen.getByText(/Failed to load roster\./)).toBeTruthy();
   });
 
-  it('renders QB slot header in DST format', () => {
-    render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+  const dstRosterSlots = [
+    { id: 1, leagueId: 1, positionType: 'QB' },
+    { id: 2, leagueId: 1, positionType: 'RB' },
+    { id: 3, leagueId: 1, positionType: 'WR' },
+    { id: 4, leagueId: 1, positionType: 'TE' },
+    { id: 5, leagueId: 1, positionType: 'FLEX' },
+    { id: 6, leagueId: 1, positionType: 'K' },
+    { id: 7, leagueId: 1, positionType: 'DST' },
+  ];
+
+  const idpRosterSlots = [
+    { id: 1, leagueId: 1, positionType: 'QB' },
+    { id: 2, leagueId: 1, positionType: 'RB' },
+    { id: 3, leagueId: 1, positionType: 'WR' },
+    { id: 4, leagueId: 1, positionType: 'TE' },
+    { id: 5, leagueId: 1, positionType: 'FLEX' },
+    { id: 6, leagueId: 1, positionType: 'K' },
+    { id: 8, leagueId: 1, positionType: 'DL' },
+    { id: 9, leagueId: 1, positionType: 'LB' },
+    { id: 10, leagueId: 1, positionType: 'DB' },
+  ];
+
+  it('renders QB slot header for a league with a QB slot configured', () => {
+    render(
+      <FootballLeagueRosterScreen teamId={1} rosterSlots={dstRosterSlots} />,
+    );
     // QB appears as slot label and as player position badge
     expect(screen.getAllByText('QB').length).toBeGreaterThan(0);
   });
 
-  it('renders DST slot in DST format', () => {
-    render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+  it('renders DST slot for a DST-format league', () => {
+    render(
+      <FootballLeagueRosterScreen teamId={1} rosterSlots={dstRosterSlots} />,
+    );
     expect(screen.getAllByText('DST').length).toBeGreaterThan(0);
   });
 
-  it('renders DL slot in IDP format', () => {
-    render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="idp" />);
+  it('renders DL slot for an IDP-format league', () => {
+    render(
+      <FootballLeagueRosterScreen teamId={1} rosterSlots={idpRosterSlots} />,
+    );
     expect(screen.getAllByText('DL').length).toBeGreaterThan(0);
   });
 
-  it('does not render DST slot in IDP format', () => {
-    render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="idp" />);
+  it('does not render a DST slot for an IDP-format league', () => {
+    render(
+      <FootballLeagueRosterScreen teamId={1} rosterSlots={idpRosterSlots} />,
+    );
     expect(screen.queryByText('DST')).toBeNull();
+  });
+
+  // LS-9734: SFLEX (Superflex) is a legitimately eligible starting slot —
+  // a league that configures it must render it, and a player assigned to it
+  // must show up as a starter rather than being silently benched.
+  it('renders a SFLEX slot, with its assigned player, for a Superflex-configured league', () => {
+    const superflexRosterSlots = [
+      { id: 1, leagueId: 1, positionType: 'QB' },
+      { id: 11, leagueId: 1, positionType: 'SFLEX' },
+      { id: 2, leagueId: 1, positionType: 'RB' },
+      { id: 3, leagueId: 1, positionType: 'WR' },
+      { id: 4, leagueId: 1, positionType: 'TE' },
+      { id: 6, leagueId: 1, positionType: 'K' },
+      { id: 7, leagueId: 1, positionType: 'DST' },
+    ];
+    const qb2Member = {
+      id: 301,
+      playerId: 9,
+      positionId: 11, // SFLEX
+      player: {
+        id: 9,
+        firstName: 'Justin',
+        lastName: 'Fields',
+        eligiblePositions: ['QB'],
+      },
+    };
+    jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+      data: { teamMembers: [mockMember, qb2Member] },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+
+    render(
+      <FootballLeagueRosterScreen
+        teamId={1}
+        rosterSlots={superflexRosterSlots}
+      />,
+    );
+
+    expect(screen.getAllByText('SFLEX').length).toBeGreaterThan(0);
+    const sflexCard = screen.getByTestId('sflex-card');
+    expect(within(sflexCard).getByText('Justin Fields')).toBeTruthy();
+    const bnCard = screen.getByTestId('bn-card');
+    expect(within(bnCard).queryByText('Justin Fields')).toBeNull();
   });
 
   describe('defensive format badge (LS-6453)', () => {
@@ -208,7 +282,9 @@ describe('FootballLeagueRosterScreen', () => {
   });
 
   it('renders player name in roster', () => {
-    render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+    render(
+      <FootballLeagueRosterScreen teamId={1} rosterSlots={dstRosterSlots} />,
+    );
     expect(screen.getByText('Josh Allen')).toBeTruthy();
   });
 
@@ -234,7 +310,6 @@ describe('FootballLeagueRosterScreen', () => {
       render(
         <FootballLeagueRosterScreen
           teamId={1}
-          defensiveFormat="dst"
           byeWeeksByTeam={{ KC: 6 }}
           currentWeek={6}
         />,
@@ -251,7 +326,6 @@ describe('FootballLeagueRosterScreen', () => {
       render(
         <FootballLeagueRosterScreen
           teamId={1}
-          defensiveFormat="dst"
           byeWeeksByTeam={{ KC: 12 }}
           currentWeek={6}
         />,
@@ -265,7 +339,7 @@ describe('FootballLeagueRosterScreen', () => {
         loading: false,
         error: undefined,
       } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
-      render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+      render(<FootballLeagueRosterScreen teamId={1} />);
       expect(screen.queryByText('BYE')).toBeNull();
     });
   });
@@ -291,8 +365,10 @@ describe('FootballLeagueRosterScreen', () => {
     render(
       <FootballLeagueRosterScreen
         teamId={1}
-        defensiveFormat="dst"
-        rosterSlots={[{ id: 55, leagueId: 1, positionType: 'FLEX' }]}
+        rosterSlots={[
+          { id: 55, leagueId: 1, positionType: 'FLEX' },
+          { id: 56, leagueId: 1, positionType: 'WR' },
+        ]}
       />,
     );
 
@@ -323,7 +399,6 @@ describe('FootballLeagueRosterScreen', () => {
     render(
       <FootballLeagueRosterScreen
         teamId={1}
-        defensiveFormat="dst"
         rosterSlots={[{ id: 9, leagueId: 1, positionType: 'QB' }]}
       />,
     );
@@ -370,11 +445,7 @@ describe('FootballLeagueRosterScreen', () => {
       } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
 
       render(
-        <FootballLeagueRosterScreen
-          teamId={1}
-          defensiveFormat="dst"
-          rosterSlots={twoQbSlots}
-        />,
+        <FootballLeagueRosterScreen teamId={1} rosterSlots={twoQbSlots} />,
       );
 
       const slotForMahomes = screen.getByTestId('qb-20-card');
@@ -394,11 +465,7 @@ describe('FootballLeagueRosterScreen', () => {
       } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
 
       render(
-        <FootballLeagueRosterScreen
-          teamId={1}
-          defensiveFormat="dst"
-          rosterSlots={twoQbSlots}
-        />,
+        <FootballLeagueRosterScreen teamId={1} rosterSlots={twoQbSlots} />,
       );
 
       const filledSlot = screen.getByTestId('qb-20-card');

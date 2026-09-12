@@ -18,7 +18,11 @@ import {
   MatchupAdditionalSections,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
-import { ALLOWED_POSITIONS_BY_SPORT, ENTITLEMENTS } from '@legacy-sports/utils';
+import {
+  ALLOWED_POSITIONS_BY_SPORT,
+  deriveFootballSlotOrder,
+  ENTITLEMENTS,
+} from '@legacy-sports/utils';
 import {
   type GetHeadToHeadRecordQuery,
   type GetMatchupPlayersQuery,
@@ -44,26 +48,6 @@ type HeadToHeadRecord = NonNullable<
   GetHeadToHeadRecordQuery['getHeadToHeadRecord']
 >;
 
-const DST_POSITION_ORDER = [
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DST',
-] as const;
-const IDP_POSITION_ORDER = [
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DL',
-  'LB',
-  'DB',
-] as const;
 const BENCH_SLOT = 'BN';
 
 const POSITION_LABELS: Record<string, string> = {
@@ -94,25 +78,11 @@ export function getFlexSubLabel(slot: string): string | undefined {
 
 interface FootballMatchupScreenProps {
   readonly matchupId: number;
-  readonly defensiveFormat?: string | null;
   /** League's total matchup weeks, for the "Matchup {week}/{total}" counter. */
   readonly totalMatchups?: number | null;
   readonly leagueId?: number | null;
   /** League's total roster size, for the bench-capacity indicator (LS-6383). */
   readonly maxRosterSize?: number | null;
-}
-
-/**
- * Returns the ordered list of position slots for the matchup roster display.
- * Uses IDP slots (DL, LB, DB, …) for IDP leagues; DST slot for all others.
- *
- * @param defensiveFormat - 'idp' for individual defensive players, or 'dst'/null for team defense.
- * @returns Ordered array of position slot labels for each team's lineup column.
- */
-export function getPositionOrder(
-  defensiveFormat: string | null | undefined,
-): readonly string[] {
-  return defensiveFormat === 'idp' ? IDP_POSITION_ORDER : DST_POSITION_ORDER;
 }
 
 /**
@@ -386,8 +356,7 @@ function RosterSection({
 export function FootballMatchupScreen(
   props: FootballMatchupScreenProps,
 ): React.JSX.Element {
-  const { matchupId, defensiveFormat, totalMatchups, leagueId, maxRosterSize } =
-    props;
+  const { matchupId, totalMatchups, leagueId, maxRosterSize } = props;
   const router = useRouter();
   const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
@@ -532,8 +501,8 @@ export function FootballMatchupScreen(
   const matchup = matchupData?.getMatchupById;
   const players = playersData?.getMatchupPlayers ?? [];
   const positionOrder = useMemo(
-    () => getPositionOrder(defensiveFormat),
-    [defensiveFormat],
+    () => deriveFootballSlotOrder(positionsData?.leaguePositions),
+    [positionsData],
   );
 
   const { data: h2hData, loading: h2hLoading } = useGetHeadToHeadRecordQuery({

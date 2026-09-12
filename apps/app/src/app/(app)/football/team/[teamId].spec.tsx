@@ -183,21 +183,17 @@ jest.mock(
     return {
       FootballLeagueRosterScreen: ({
         teamId,
-        defensiveFormat,
         rosterSlots,
         byeWeeksByTeam,
         currentWeek,
       }: {
         teamId: number;
-        defensiveFormat?: string | null;
         rosterSlots?: readonly unknown[];
         byeWeeksByTeam?: Record<string, number>;
         currentWeek?: number | null;
       }) => (
         <View
-          testID={`roster-screen-${teamId}-${defensiveFormat ?? 'dst'}-slots-${
-            rosterSlots?.length ?? 0
-          }`}
+          testID={`roster-screen-${teamId}-slots-${rosterSlots?.length ?? 0}`}
         >
           <Text testID="roster-screen-bye-weeks">
             {JSON.stringify(byeWeeksByTeam ?? {})}
@@ -675,7 +671,7 @@ describe('FootballTeam route', () => {
 
   it('shows roster screen on Roster tab by default', () => {
     render(<FootballTeam />);
-    expect(screen.getByTestId('roster-screen-42-dst-slots-1')).toBeTruthy();
+    expect(screen.getByTestId('roster-screen-42-slots-1')).toBeTruthy();
   });
 
   it('passes rosterSlots (league positions) to FootballLeagueRosterScreen', () => {
@@ -689,7 +685,7 @@ describe('FootballTeam route', () => {
       },
     });
     render(<FootballTeam />);
-    expect(screen.getByTestId('roster-screen-42-dst-slots-2')).toBeTruthy();
+    expect(screen.getByTestId('roster-screen-42-slots-2')).toBeTruthy();
   });
 
   it('renders the shared RosterBoard for football on the Lineup tab', () => {
@@ -844,15 +840,6 @@ describe('FootballTeam route', () => {
     });
     // The old wiring fired two independent, non-transactional updates here.
     expect(mockUpdateTeamMemberPosition).not.toHaveBeenCalled();
-  });
-
-  it('passes defensiveFormat to FootballLeagueRosterScreen', () => {
-    mockUseGetLeagueByIdQuery.mockReturnValue({
-      loading: false,
-      data: { league: { ...mockLeague, defensiveFormat: 'idp' } },
-    });
-    render(<FootballTeam />);
-    expect(screen.getByTestId('roster-screen-42-idp-slots-1')).toBeTruthy();
   });
 
   it('shows the current matchup card when the Matchup tab is selected', () => {

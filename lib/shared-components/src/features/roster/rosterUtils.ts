@@ -34,15 +34,16 @@ export const POSITION_SLOT_ORDER: Record<string, number> = {
   RP: 21,
   // Football
   QB: 30,
-  RB: 31,
-  WR: 32,
-  TE: 33,
-  FLEX: 34,
-  K: 35,
-  DST: 36,
-  DL: 37,
-  LB: 38,
-  DB: 39,
+  SFLEX: 31,
+  RB: 32,
+  WR: 33,
+  TE: 34,
+  FLEX: 35,
+  K: 36,
+  DST: 37,
+  DL: 38,
+  LB: 39,
+  DB: 40,
 };
 
 export const PITCHER_POSITION_TYPES = new Set<string>(['SP', 'RP']);
