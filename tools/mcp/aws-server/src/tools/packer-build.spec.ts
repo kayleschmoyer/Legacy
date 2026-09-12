@@ -5,6 +5,7 @@ jest.mock('../run-command.js', () => ({
 }));
 
 import type { JobRunner, JobSnapshot } from '@legacy-sports/mcp-jobs';
+import { join } from 'node:path';
 
 // packer-build runs its builds on the shared job runner (LS-8564). Mock the
 // runner so tests drive the tool contract through controlled snapshots
@@ -381,7 +382,7 @@ describe('packerBuild action: "fmt"', () => {
     expect(parsed.diff).toBe('');
     expect(mockedCaptureExit).toHaveBeenCalledWith(
       'packer',
-      ['fmt', '-check', '-diff', '/repo/x.pkr.hcl'],
+      ['fmt', '-check', '-diff', join('/repo', 'x.pkr.hcl')],
       '/repo',
     );
   });
@@ -412,7 +413,7 @@ describe('packerBuild action: "fmt"', () => {
     });
     expect(mockedCaptureExit).toHaveBeenCalledWith(
       'packer',
-      ['fmt', '/repo/x.pkr.hcl'],
+      ['fmt', join('/repo', 'x.pkr.hcl')],
       '/repo',
     );
   });
@@ -456,7 +457,7 @@ describe('packerBuild action: "validate"', () => {
     expect(parsed.errors).toEqual([]);
     expect(mockedCaptureExit).toHaveBeenCalledWith(
       'packer',
-      ['validate', '-syntax-only', '/repo/x.pkr.hcl'],
+      ['validate', '-syntax-only', join('/repo', 'x.pkr.hcl')],
       '/repo',
     );
   });
@@ -491,7 +492,7 @@ describe('packerBuild action: "validate"', () => {
     });
     expect(mockedCaptureExit).toHaveBeenCalledWith(
       'packer',
-      ['validate', '/repo/x.pkr.hcl'],
+      ['validate', join('/repo', 'x.pkr.hcl')],
       '/repo',
     );
   });

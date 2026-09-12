@@ -18,6 +18,25 @@ describe('resolveBashExecutable (LS-9021)', () => {
   beforeEach(() => {
     jest.resetModules();
     tmpRoot = mkdtempSync(join(tmpdir(), 'resolve-bash-test-'));
+    // resolveBashExecutable also probes hardcoded C:\Program Files paths and
+    // `where bash`, which find the real Git Bash on a Windows dev machine.
+    // Confine it to files under tmpRoot so every scenario is hermetic.
+    jest.doMock('node:fs', () => {
+      const actual = jest.requireActual<typeof import('node:fs')>('node:fs');
+      return {
+        ...actual,
+        existsSync: (p: string) =>
+          p.startsWith(tmpRoot) && actual.existsSync(p),
+      };
+    });
+    jest.doMock('node:child_process', () => ({
+      ...jest.requireActual<typeof import('node:child_process')>(
+        'node:child_process',
+      ),
+      execSync: () => {
+        throw new Error('where: bash not found');
+      },
+    }));
   });
 
   afterEach(() => {

@@ -34,6 +34,13 @@ const ROOT = resolve('/repo');
 const DB = resolve('/repo/lambdas/db');
 const WEB = resolve('/repo/apps/web');
 const WEB_E2E = resolve('/repo/apps/web-e2e');
+// binJobSpec appends .cmd on the real host platform (not mocked here).
+const ESLINT_BIN = resolve(
+  ROOT,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'eslint.cmd' : 'eslint',
+);
 
 // Real target files are assumed to exist unless explicitly listed as missing
 // via `setMissingFiles` — only `eslint.config.mjs` presence is governed by
@@ -123,9 +130,7 @@ describe('runESLint', () => {
     expect(jobCallOpts().cwd).toBe(ROOT);
     // LS-10021: invoked as the local .bin shim directly, never via
     // `pnpm exec` — see localBinJobSpec's doc comment for why.
-    expect(jobCallOpts().command).toBe(
-      resolve(ROOT, 'node_modules', '.bin', 'eslint'),
-    );
+    expect(jobCallOpts().command).toBe(ESLINT_BIN);
     expect(result.isError).toBeUndefined();
     expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
@@ -303,9 +308,7 @@ describe('runESLint', () => {
     // Resolved from the *repo* root's node_modules/.bin (hoisted), not a
     // nonexistent apps/web-e2e/node_modules/.bin — this is what binJobSpec
     // guarantees by taking repoRoot as a separate argument from cwd.
-    expect(jobCallOpts().command).toBe(
-      resolve(ROOT, 'node_modules', '.bin', 'eslint'),
-    );
+    expect(jobCallOpts().command).toBe(ESLINT_BIN);
   });
 
   it('lints a package-less nested-project file (apps/web-e2e) via an absolute path (LS-10006 repro)', async () => {

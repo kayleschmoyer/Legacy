@@ -1,4 +1,9 @@
+import { resolve } from 'node:path';
+
 import { validateOutputPath } from './index';
+
+// validateOutputPath returns platform-native resolved paths, so expected
+// values go through resolve() too (on Windows '/repo' resolves to 'D:\repo').
 
 describe('validateOutputPath', () => {
   it('rejects a relative path', () => {
@@ -11,20 +16,23 @@ describe('validateOutputPath', () => {
 
   it('accepts a path that equals an allowed root exactly', () => {
     const result = validateOutputPath('/repo', ['/repo']);
-    expect(result).toEqual({ ok: true, resolved: '/repo' });
+    expect(result).toEqual({ ok: true, resolved: resolve('/repo') });
   });
 
   it('accepts a path nested under an allowed root', () => {
     const result = validateOutputPath('/repo/terraform/main/x.tf', ['/repo']);
     expect(result).toEqual({
       ok: true,
-      resolved: '/repo/terraform/main/x.tf',
+      resolved: resolve('/repo/terraform/main/x.tf'),
     });
   });
 
   it('accepts a path under the second allowed root when the first does not match', () => {
     const result = validateOutputPath('/tmp/scratch/x.tf', ['/repo', '/tmp']);
-    expect(result).toEqual({ ok: true, resolved: '/tmp/scratch/x.tf' });
+    expect(result).toEqual({
+      ok: true,
+      resolved: resolve('/tmp/scratch/x.tf'),
+    });
   });
 
   it('rejects a path outside every allowed root', () => {
@@ -32,8 +40,8 @@ describe('validateOutputPath', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('outside the allowed write targets');
-      expect(result.error).toContain('/repo');
-      expect(result.error).toContain('/tmp');
+      expect(result.error).toContain(resolve('/repo'));
+      expect(result.error).toContain(resolve('/tmp'));
     }
   });
 

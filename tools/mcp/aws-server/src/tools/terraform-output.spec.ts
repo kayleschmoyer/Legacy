@@ -121,7 +121,7 @@ describe('terraformOutput worktree fallback', () => {
 
     expect(isError).toBe(true);
     expect(parsed.ok).toBe(false);
-    expect(String(parsed.chdir)).toContain('/repo');
+    expect(parsed.chdir).toBe(resolveExpected('/repo', 'terraform/main'));
     expect(String(parsed.error)).toMatch(/not terraform-initialized/);
     expect(String(parsed.error)).toMatch(/fallback.*also failed/);
     expect(String(parsed.remedy)).toMatch(/terraform init/);

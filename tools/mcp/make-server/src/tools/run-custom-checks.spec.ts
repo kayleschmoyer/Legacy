@@ -35,7 +35,9 @@ jest.mock('../run-command.js', () => {
       args: string[],
       cwd: string,
       timeoutMs = 300_000,
-      shell = true,
+      // Matches the real runCommand default. shell:true would route a
+      // resolved "C:\Program Files\Git\bin\bash.exe" through cmd.exe unquoted.
+      shell = false,
       maxBuffer = 10 * 1024 * 1024,
     ) =>
       new Promise((resolve, reject) => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { join } from 'node:path';
 
 jest.mock('node:fs', () => ({
   existsSync: jest.fn(),
@@ -18,6 +19,13 @@ const mockReadFileSync = readFileSync as jest.MockedFunction<
   typeof readFileSync
 >;
 const mockRunNx = runNx as jest.MockedFunction<typeof runNx>;
+// Production joins with node:path, so match its platform-native separators.
+const CI_SERVER_PROJECT_JSON = join(
+  '/repo',
+  'tools/mcp',
+  'ci-server',
+  'project.json',
+);
 
 describe('suggestProjectNames', () => {
   beforeEach(() => {
@@ -28,7 +36,7 @@ describe('suggestProjectNames', () => {
 
   it('resolves the real name from a project.json found under tools/mcp/<name> (LS-9880 repro)', async () => {
     mockExistsSync.mockImplementation(
-      (p) => String(p) === '/repo/tools/mcp/ci-server/project.json',
+      (p) => String(p) === CI_SERVER_PROJECT_JSON,
     );
     mockReadFileSync.mockReturnValue(JSON.stringify({ name: 'mcp-ci-server' }));
 
@@ -62,7 +70,7 @@ describe('suggestProjectNames', () => {
 
   it('combines both strategies and dedupes', async () => {
     mockExistsSync.mockImplementation(
-      (p) => String(p) === '/repo/tools/mcp/ci-server/project.json',
+      (p) => String(p) === CI_SERVER_PROJECT_JSON,
     );
     mockReadFileSync.mockReturnValue(JSON.stringify({ name: 'mcp-ci-server' }));
     mockRunNx.mockResolvedValue(
@@ -94,7 +102,7 @@ describe('suggestProjectNames', () => {
 
   it('ignores a malformed project.json rather than throwing', async () => {
     mockExistsSync.mockImplementation(
-      (p) => String(p) === '/repo/tools/mcp/ci-server/project.json',
+      (p) => String(p) === CI_SERVER_PROJECT_JSON,
     );
     mockReadFileSync.mockReturnValue('not json');
 
@@ -139,7 +147,7 @@ describe('buildProjectNotFoundHint', () => {
 
   it('builds a "Did you mean" hint mirroring ci_list_runs style for the exact LS-9880 repro', async () => {
     mockExistsSync.mockImplementation(
-      (p) => String(p) === '/repo/tools/mcp/ci-server/project.json',
+      (p) => String(p) === CI_SERVER_PROJECT_JSON,
     );
     mockReadFileSync.mockReturnValue(JSON.stringify({ name: 'mcp-ci-server' }));
 

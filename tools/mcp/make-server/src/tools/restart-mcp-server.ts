@@ -114,6 +114,10 @@ async function findPidsPosix(entryRel: string): Promise<number[]> {
  * into the PowerShell command string — it comes from this repo's own
  * .mcp.json, not user input, but reading it back through $env: keeps it pure
  * data even to PowerShell's parser, with no quoting/escaping surface at all.
+ *
+ * PowerShell only pre-filters by substring; each "<pid>\t<commandLine>" line
+ * is then held to the same whole-token check as POSIX, so a similarly-named
+ * entrypoint (e.g. "old-aws-server/src/index.ts") is never matched and killed.
  */
 async function findPidsWindows(entryRel: string): Promise<number[]> {
   const { stdout } = await execFileAsync(
@@ -123,16 +127,19 @@ async function findPidsWindows(entryRel: string): Promise<number[]> {
       '-Command',
       'Get-CimInstance Win32_Process | ' +
         'Where-Object { $_.CommandLine -and $_.CommandLine -match [regex]::Escape($env:MCP_RESTART_ENTRY) } | ' +
-        'Select-Object -ExpandProperty ProcessId',
+        'ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }',
     ],
     { env: { ...process.env, MCP_RESTART_ENTRY: entryRel } },
   );
-  return stdout
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map(Number)
-    .filter((n) => Number.isFinite(n) && n > 0);
+  const pids: number[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const tab = line.indexOf('\t');
+    if (tab < 0) continue;
+    const pid = Number(line.slice(0, tab).trim());
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    if (containsEntryToken(line.slice(tab + 1), entryRel)) pids.push(pid);
+  }
+  return pids;
 }
 
 async function findPidsForEntry(entryRel: string): Promise<number[]> {

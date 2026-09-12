@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { join, resolve } from 'node:path';
 
 import { detectDirectBranchCcrCwd } from './direct-branch-ccr';
 
@@ -13,8 +14,10 @@ describe('detectDirectBranchCcrCwd', () => {
       isCcrEnv: true,
       pathExists,
     });
-    expect(result).toBe('/home/user/legacy-sports');
-    expect(pathExists).toHaveBeenCalledWith('/home/user/legacy-sports/.git');
+    expect(result).toBe(resolve('/home/user/legacy-sports'));
+    expect(pathExists).toHaveBeenCalledWith(
+      join(resolve('/home/user/legacy-sports'), '.git'),
+    );
   });
 
   it('returns null when not a CCR session', () => {
@@ -54,6 +57,6 @@ describe('detectDirectBranchCcrCwd', () => {
       isCcrEnv: true,
       pathExists: () => true,
     });
-    expect(result).toBe('/home/user/legacy-sports');
+    expect(result).toBe(resolve('/home/user/legacy-sports'));
   });
 });

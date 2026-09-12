@@ -1,14 +1,21 @@
+import os, { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { androidApp } from './app.js';
 
 describe('androidApp', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
+    // Hide the OS default SDK path too (it hangs off os.homedir()).
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
+    jest
+      .spyOn(os, 'homedir')
+      .mockReturnValue(join(tmpdir(), 'android-server-spec-no-home'));
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.env = { ...originalEnv };
   });
 

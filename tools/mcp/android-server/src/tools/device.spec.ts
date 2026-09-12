@@ -1,5 +1,5 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync } from 'node:fs';
+import os, { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import {
@@ -42,11 +42,17 @@ describe('androidDevice', () => {
     // No SDK is installed in this sandbox/CI runner — force every candidate
     // path to miss so resolveAndroidSdk() deterministically fails, exercising
     // the real (non-mocked) error path every android_* tool shares.
+    // The OS default install path hangs off os.homedir(), so point it at a
+    // directory that doesn't exist (a dev machine may have a real SDK there).
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
+    jest
+      .spyOn(os, 'homedir')
+      .mockReturnValue(join(tmpdir(), 'android-server-spec-no-home'));
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.env = { ...originalEnv };
   });
 
@@ -74,13 +80,16 @@ describe('spawnEmulatorDetached', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('reports stderr when the process fails immediately, ignoring argv', () => {
-    const script = join(tmpDir, 'failing-emulator.sh');
-    writeFileSync(script, '#!/bin/sh\necho "boom" 1>&2\nexit 1\n');
-    chmodSync(script, 0o755);
-    return spawnEmulatorDetached(script, 'some-avd').then((err) => {
-      expect(err).toContain('boom');
-    });
+  // Fake emulators are `node -e` scripts rather than #!/bin/sh files, which
+  // Windows can't spawn (EFTYPE). The trailing '--' keeps node from parsing
+  // the appended `-avd <name>` as its own options.
+  it('reports stderr when the process fails immediately, ignoring argv', async () => {
+    const err = await spawnEmulatorDetached(process.execPath, 'some-avd', [
+      '-e',
+      'console.error("boom"); process.exit(1)',
+      '--',
+    ]);
+    expect(err).toContain('boom');
   });
 
   it('reports a spawn error for a nonexistent binary', async () => {
@@ -92,10 +101,11 @@ describe('spawnEmulatorDetached', () => {
   });
 
   it('resolves undefined once the process survives the grace window', async () => {
-    const script = join(tmpDir, 'long-running-emulator.sh');
-    writeFileSync(script, '#!/bin/sh\nsleep 10\n');
-    chmodSync(script, 0o755);
-    const err = await spawnEmulatorDetached(script, 'some-avd');
+    const err = await spawnEmulatorDetached(process.execPath, 'some-avd', [
+      '-e',
+      'setTimeout(() => {}, 10000)',
+      '--',
+    ]);
     expect(err).toBeUndefined();
   }, 10_000);
 });

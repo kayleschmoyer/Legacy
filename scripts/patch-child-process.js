@@ -31,6 +31,7 @@ require('events').setMaxListeners(20);
 if (process.platform !== 'win32') return;
 
 const cp = require('child_process');
+const { promisify } = require('util');
 
 // Ensure an options object exists and has windowsHide: true.
 // Mutates in place so callers like Nx that inspect the object after
@@ -46,24 +47,61 @@ function hide(opts) {
 // The second argument is ambiguous — Array means args, Object means options.
 // We detect which form the caller used and inject windowsHide into the
 // correct position so the original function's argument parsing is preserved.
+
+// Return a copy of `rest` (the arguments after the command) with windowsHide
+// injected into the options slot at `optIndex`, forwarding exactly what the
+// caller passed. Never pads with a trailing `undefined`: Node's
+// util.promisify.custom implementations for exec/execFile append their own
+// callback after the forwarded arguments, so a padded slot shifts that callback
+// out of position and the returned promise never settles (LS-10120).
+function injectHiddenOptions(rest, optIndex) {
+  const out = rest.slice();
+  if (optIndex >= out.length) {
+    out.push({ windowsHide: true });
+    return out;
+  }
+  const opt = out[optIndex];
+  if (typeof opt === 'function') {
+    // A callback sits where options would go — insert options before it.
+    out.splice(optIndex, 0, { windowsHide: true });
+  } else if (opt == null) {
+    out[optIndex] = { windowsHide: true };
+  } else if (typeof opt === 'object') {
+    out[optIndex] = hide(opt);
+  }
+  // Any other value is invalid input — leave it for Node's own validation.
+  return out;
+}
+
 function patchArgsOpts(original) {
-  return function (cmd, args, options, ...rest) {
-    if (Array.isArray(args)) {
-      return original.call(this, cmd, args, hide(options), ...rest);
-    }
-    if (
-      args != null &&
-      typeof args === 'object' &&
-      typeof args !== 'function'
-    ) {
-      return original.call(this, cmd, hide(args), options, ...rest);
-    }
-    if (typeof args === 'function') {
-      // (cmd, callback) — no args or options
-      return original.call(this, cmd, { windowsHide: true }, args, ...rest);
-    }
-    return original.call(this, cmd, [], { windowsHide: true }, ...rest);
+  const patched = function (cmd, ...rest) {
+    // (cmd, args, ...) or (cmd, null/undefined, options, ...) → options at 1.
+    const hasArgsSlot =
+      Array.isArray(rest[0]) || (rest[0] == null && rest.length > 1);
+    return original.call(
+      this,
+      cmd,
+      ...injectHiddenOptions(rest, hasArgsSlot ? 1 : 0),
+    );
   };
+  preservePromisifyCustom(original, patched, patchArgsOpts);
+  return patched;
+}
+
+// execFile and exec carry a util.promisify.custom implementation that resolves
+// { stdout, stderr }. A bare wrapper drops it, so util.promisify(execFile)
+// would fall back to resolving only the first callback value (the stdout
+// string) — breaking every `const { stdout } = await execFileAsync(...)` that
+// runs under a Makefile target on Windows (LS-10120). Re-attach a patched copy.
+function preservePromisifyCustom(original, patched, patchFn) {
+  const custom = original[promisify.custom];
+  if (typeof custom !== 'function') return;
+  Object.defineProperty(patched, promisify.custom, {
+    value: patchFn(custom),
+    enumerable: false,
+    writable: false,
+    configurable: true,
+  });
 }
 
 cp.spawn = patchArgsOpts(cp.spawn);
@@ -74,12 +112,14 @@ cp.execFileSync = patchArgsOpts(cp.execFileSync);
 
 // --- exec / execSync ---
 // Signature: (command[, options][, callback])
-const _exec = cp.exec;
-cp.exec = function (cmd, options, cb) {
-  if (typeof options === 'function')
-    return _exec.call(this, cmd, { windowsHide: true }, options);
-  return _exec.call(this, cmd, hide(options), cb);
-};
+function patchExec(original) {
+  const patched = function (cmd, ...rest) {
+    return original.call(this, cmd, ...injectHiddenOptions(rest, 0));
+  };
+  preservePromisifyCustom(original, patched, patchExec);
+  return patched;
+}
+cp.exec = patchExec(cp.exec);
 
 const _execSync = cp.execSync;
 cp.execSync = function (cmd, options) {

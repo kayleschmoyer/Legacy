@@ -39,12 +39,16 @@ const EMULATOR_LAUNCH_GRACE_MS = 1500;
  * Resolves with an error message if the process errored or exited within
  * the grace window; resolves with `undefined` (and detaches it) once it's
  * still running past that window, which is the normal cold-boot case.
+ *
+ * `argsPrefix` is inserted before `-avd` — it lets specs stand in a
+ * cross-platform `node -e` fake for the emulator binary.
  */
 export function spawnEmulatorDetached(
   emulator: string,
   avd: string,
+  argsPrefix: string[] = [],
 ): Promise<string | undefined> {
-  const child = spawn(emulator, ['-avd', avd], {
+  const child = spawn(emulator, [...argsPrefix, '-avd', avd], {
     detached: true,
     stdio: ['ignore', 'ignore', 'pipe'],
   });

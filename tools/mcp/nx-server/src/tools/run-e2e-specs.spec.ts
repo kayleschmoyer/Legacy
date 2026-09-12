@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { join } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Module mocks — must be declared before the import under test
@@ -412,7 +413,7 @@ describe('runE2ESpecs', () => {
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
       const opts = jobCallOpts();
-      expect(opts.cwd).toBe('/repo/apps/web-e2e');
+      expect(opts.cwd).toBe(join('/repo', 'apps', 'web-e2e'));
       expect(opts.args).toContain('--config=playwright.config.ts');
       expect(opts.args).toContain('src/tests/auth.spec.ts');
     });
@@ -642,7 +643,11 @@ describe('runE2ESpecs', () => {
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
       const opts = jobCallOpts();
-      expect(opts.command).toBe('/repo/node_modules/.bin/playwright');
+      // Only the .cmd suffix / shell choice follows the mocked platform —
+      // node:path keeps the host's separators.
+      expect(opts.command).toBe(
+        join('/repo', 'node_modules', '.bin', 'playwright'),
+      );
       expect(opts.shell).toBe(false);
     });
 
@@ -661,7 +666,7 @@ describe('runE2ESpecs', () => {
       expect(opts.args).not.toContain('exec');
       expect(opts.args).not.toContain('playwright');
       expect(opts.args[0]).toBe('test');
-      expect(opts.cwd).toBe('/repo/apps/web-e2e');
+      expect(opts.cwd).toBe(join('/repo', 'apps', 'web-e2e'));
     });
   });
 

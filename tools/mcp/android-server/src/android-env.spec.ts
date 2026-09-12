@@ -1,3 +1,5 @@
+import os, { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   AndroidEnvError,
   resolveAndroidSdk,
@@ -8,11 +10,17 @@ describe('resolveAndroidSdk', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
+    // The OS default install path hangs off os.homedir(), so point it at a
+    // directory that doesn't exist (a dev machine may have a real SDK there).
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
+    jest
+      .spyOn(os, 'homedir')
+      .mockReturnValue(join(tmpdir(), 'android-server-spec-no-home'));
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.env = { ...originalEnv };
   });
 
