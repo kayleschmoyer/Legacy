@@ -80,7 +80,15 @@ describe('Draft-first schema (LS-10073)', () => {
 
     const [draft] = await db
       .insert(drafts)
-      .values({ leagueId: league.id, draftMode: 'live', currentPick: 0 })
+      .values({
+        leagueId: league.id,
+        // draft_mode and selection_method are NOT NULL with no physical
+        // default (the Drizzle .default() is insert-typing only), so every
+        // drafts insert must pass them explicitly (LS-10085).
+        draftMode: 'live',
+        selectionMethod: 'standard',
+        currentPick: 0,
+      })
       .returning();
 
     await db.insert(draftTeams).values(
@@ -94,6 +102,27 @@ describe('Draft-first schema (LS-10073)', () => {
     );
 
     return { owner, league, draft, teams: teamFixtures };
+  }
+
+  /**
+   * Assert a write fails on a specific constraint. Drizzle wraps pg errors, so
+   * `error.message` is only "Failed query: ..." — the constraint name lives on
+   * `error.cause`. Takes a thunk because a Drizzle query builder re-executes
+   * every time it is awaited.
+   */
+  async function expectConstraintViolation(
+    run: () => PromiseLike<unknown>,
+    constraint: string,
+  ) {
+    const error = await Promise.resolve(run()).then(
+      () => null,
+      (e: unknown) => e as (Error & { cause?: { message?: string } }) | null,
+    );
+    expect(error).not.toBeNull();
+    const chain = [error?.message, error?.cause?.message]
+      .filter(Boolean)
+      .join(' | ');
+    expect(chain).toContain(constraint);
   }
 
   const seatsOf = (draftId: number) =>
@@ -151,45 +180,55 @@ describe('Draft-first schema (LS-10073)', () => {
 
     it('reject a mock draft that is tied to a league', async () => {
       const { league, owner } = await seedLeagueDraft(1);
-      await expect(
-        db.insert(drafts).values({
-          leagueId: league.id,
-          kind: 'mock',
-          mockMode: 'online',
-          createdBy: owner.id,
-        }),
-      ).rejects.toThrow(/drafts_kind_league_ck/);
+      await expectConstraintViolation(
+        () =>
+          db.insert(drafts).values({
+            leagueId: league.id,
+            kind: 'mock',
+            mockMode: 'online',
+            createdBy: owner.id,
+            draftMode: 'live',
+            selectionMethod: 'standard',
+          }),
+        'drafts_kind_league_ck',
+      );
     });
 
     it('accept a league-less online mock draft and reject it going public offline', async () => {
       const owner = getUser(1);
       await db.execute(sql`
-        INSERT INTO drafts (kind, mock_mode, is_public, status, created_by, sport)
-        VALUES ('mock', 'online', true, 'not-started', ${owner.id}, 'baseball')
+        INSERT INTO drafts
+          (kind, mock_mode, is_public, status, created_by, sport, draft_mode, selection_method)
+        VALUES ('mock', 'online', true, 'not-started', ${owner.id}, 'baseball', 'live', 'standard')
       `);
-      await expect(
-        db.execute(sql`
-          INSERT INTO drafts (kind, mock_mode, is_public, status, created_by, sport)
-          VALUES ('mock', 'offline', true, 'not-started', ${owner.id}, 'baseball')
-        `),
-      ).rejects.toThrow(/drafts_is_public_ck/);
+      await expectConstraintViolation(
+        () =>
+          db.execute(sql`
+            INSERT INTO drafts
+              (kind, mock_mode, is_public, status, created_by, sport, draft_mode, selection_method)
+            VALUES ('mock', 'offline', true, 'not-started', ${owner.id}, 'baseball', 'live', 'standard')
+          `),
+        'drafts_is_public_ck',
+      );
       // Test-data cleanup only removes league-owned drafts.
       await db.execute(sql`DELETE FROM drafts WHERE kind = 'mock'`);
     });
 
     it('reject a seat holding both a team and a user', async () => {
       const { draft, league, teams: teamFix, owner } = await seedLeagueDraft(1);
-      await expect(
-        db.insert(draftParticipants).values({
-          draftId: draft.id,
-          slot: 2,
-          teamId: teamFix[0].id,
-          leagueId: league.id,
-          userId: owner.id,
-          controller: 'user',
-          seatName: 'x',
-        }),
-      ).rejects.toThrow(/draft_participants_team_or_user_ck/);
+      await expectConstraintViolation(
+        () =>
+          db.insert(draftParticipants).values({
+            draftId: draft.id,
+            slot: 2,
+            teamId: teamFix[0].id,
+            leagueId: league.id,
+            userId: owner.id,
+            controller: 'user',
+            seatName: 'x',
+          }),
+        'draft_participants_team_or_user_ck',
+      );
     });
   });
 
