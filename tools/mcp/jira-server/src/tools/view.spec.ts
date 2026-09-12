@@ -3,14 +3,19 @@ import { view } from './view';
 
 jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
+  jiraRequestBinary: jest.fn(),
 }));
 
 jest.mock('../jql-search', () => ({
   searchJqlAll: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock<{
+const {
+  jiraRequest: mockJiraRequest,
+  jiraRequestBinary: mockJiraRequestBinary,
+} = jest.requireMock<{
   jiraRequest: jest.Mock;
+  jiraRequestBinary: jest.Mock;
 }>('../jira-api');
 
 const { searchJqlAll: mockSearchJqlAll } = jest.requireMock<{
@@ -381,6 +386,127 @@ describe('view', () => {
       const block = result.content[0] as { type: string; text: string };
       expect(block.text).toContain('LS-999');
       expect(block.text).toContain('404 Not Found');
+    });
+  });
+
+  describe('single-key — include: attachments (LS-10016)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    const attachment = {
+      id: 10501,
+      filename: 'screenshot.png',
+      mimeType: 'image/png',
+      size: 2048,
+      created: '2026-09-01T10:00:00.000Z',
+      author: { displayName: 'Reporter' },
+    };
+
+    it('asks for the attachment field on the same issue fetch (no extra call)', async () => {
+      mockJiraRequest.mockResolvedValueOnce({
+        ...issue,
+        fields: { ...issue.fields, attachment: [attachment] },
+      });
+
+      await view({ key: 'LS-9000', include: ['attachments'] });
+
+      expect(mockJiraRequest).toHaveBeenCalledTimes(1);
+      const [call] = (
+        mockJiraRequest.mock.calls as Array<[{ query: { fields: string } }]>
+      )[0];
+      expect(call.query.fields).toContain(',attachment');
+    });
+
+    it('omits the attachment field when attachments were not requested', async () => {
+      mockJiraRequest.mockResolvedValueOnce(issue);
+
+      await view({ key: 'LS-9000' });
+
+      const [call] = (
+        mockJiraRequest.mock.calls as Array<[{ query: { fields: string } }]>
+      )[0];
+      expect(call.query.fields).not.toContain('attachment');
+    });
+
+    it('renders an attachment table plus a read hint in the markdown card', async () => {
+      mockJiraRequest.mockResolvedValueOnce({
+        ...issue,
+        fields: { ...issue.fields, attachment: [attachment] },
+      });
+
+      const out = text(
+        await view({ key: 'LS-9000', include: ['attachments'] }),
+      );
+
+      expect(out).toContain('### Attachments');
+      expect(out).toContain('screenshot.png');
+      expect(out).toContain('10501');
+      expect(out).toContain('attachment: "<id|filename>"');
+    });
+
+    it('renders _None._ for a ticket with no attachments', async () => {
+      mockJiraRequest.mockResolvedValueOnce(issue);
+
+      const out = text(
+        await view({ key: 'LS-9000', include: ['attachments'] }),
+      );
+
+      expect(out).toContain('### Attachments');
+      expect(out).toContain('_None._');
+    });
+
+    it('includes attachments in the JSON shape', async () => {
+      mockJiraRequest.mockResolvedValueOnce({
+        ...issue,
+        fields: { ...issue.fields, attachment: [attachment] },
+      });
+
+      const data = parseJson(
+        await view({
+          key: 'LS-9000',
+          format: 'json',
+          include: ['attachments'],
+        }),
+      ) as { attachments: Array<{ id: string; filename: string }> };
+
+      expect(data.attachments).toEqual([
+        expect.objectContaining({ id: '10501', filename: 'screenshot.png' }),
+      ]);
+    });
+  });
+
+  describe('single-key — attachment mode (LS-10016)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('returns the attachment content instead of the ticket card', async () => {
+      mockJiraRequest.mockResolvedValueOnce({
+        fields: {
+          attachment: [
+            {
+              id: 10501,
+              filename: 'screenshot.png',
+              mimeType: 'image/png',
+              size: 10,
+              created: '2026-09-01T10:00:00.000Z',
+              author: { displayName: 'Reporter' },
+            },
+          ],
+        },
+      });
+      mockJiraRequestBinary.mockResolvedValueOnce({
+        bytes: new Uint8Array([1, 2, 3]),
+        contentType: 'image/png',
+      });
+
+      const result = await view({ key: 'LS-9000', attachment: 'latest' });
+
+      expect(result.content.some((c) => c.type === 'image')).toBe(true);
+      expect(mockJiraRequestBinary).toHaveBeenCalledWith(
+        '/rest/api/3/attachment/content/10501',
+      );
     });
   });
 

@@ -7541,7 +7541,7 @@
         },
         {
           "name": "jira_view",
-          "description": "View ticket details. By default returns base fields only (summary, status, type, description, etc.). Pass `include` to fetch additional sub-resources in the same call — replaces the former jira_get_comments and jira_get_transitions tools. Single-key mode: pass `key` (and optionally `format`) to get a compact markdown card by default, or JSON with `format: \"json\"`. Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call; responses are `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`. Exactly one of `key` or `keys` must be provided. include options: \"blockers\" (linked blocker issues), \"children\" (child issues via JQL), \"comments\" (all comments ordered by creation), \"transitions\" (available workflow transitions). Each include option that triggers an extra API call (comments, transitions, children) fires one request per key in parallel.",
+          "description": "View ticket details. By default returns base fields only (summary, status, type, description, etc.). Pass `include` to fetch additional sub-resources in the same call — replaces the former jira_get_comments and jira_get_transitions tools. Single-key mode: pass `key` (and optionally `format`) to get a compact markdown card by default, or JSON with `format: \"json\"`. Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call; responses are `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`. Exactly one of `key` or `keys` must be provided. include options: \"blockers\" (linked blocker issues), \"children\" (child issues via JQL), \"comments\" (all comments ordered by creation), \"transitions\" (available workflow transitions), \"attachments\" (attachment metadata, no extra call). Each include option that triggers an extra API call (comments, transitions, children) fires one request per key in parallel. Attachment mode: pass `attachment` (id, filename, or \"latest\") with `key` to get that attachment inline — image block for screenshots, text for text files. Use it on bug tickets whose only real description is a screenshot.",
           "inputs": {
             "key": {
               "type": "string",
@@ -7580,10 +7580,16 @@
                   "comments",
                   "transitions",
                   "blockers",
-                  "children"
+                  "children",
+                  "attachments"
                 ]
               },
-              "description": "Sub-resources to fetch alongside base fields. Omit for base fields only. \"blockers\": linked blockers. \"children\": child issues. \"comments\": all comments. \"transitions\": available workflow transitions."
+              "description": "Sub-resources to fetch alongside base fields. Omit for base fields only. \"blockers\": linked blockers. \"children\": child issues. \"comments\": all comments. \"transitions\": available workflow transitions. \"attachments\": attachment metadata."
+            },
+            "attachment": {
+              "type": "string",
+              "optional": true,
+              "description": "Attachment id, filename, or \"latest\". With `key`, returns that attachment instead of the ticket card."
             }
           },
           "transports": [

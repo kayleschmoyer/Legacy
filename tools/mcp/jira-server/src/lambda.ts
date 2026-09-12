@@ -316,17 +316,38 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_view',
-    'View ticket details. Base fields by default; pass include[] to also fetch comments, transitions, blockers, or children. ' +
-      'Replaces jira_get_comments and jira_get_transitions. Returns markdown card by default; pass format: "json" for the structured shape.',
+    'View ticket details. Base fields by default; pass include[] to also fetch comments, transitions, blockers, children, or attachments. ' +
+      'Replaces jira_get_comments and jira_get_transitions. Returns markdown card by default; pass format: "json" for the structured shape. ' +
+      'Pass `attachment` (id, filename, or "latest") with `key` to get that attachment inline — image block for screenshots, text for text files.',
     {
       key: z.string().optional(),
       keys: z.array(z.string()).min(1).max(50).optional(),
       format: z.enum(['markdown', 'json']).optional(),
       include: z
-        .array(z.enum(['comments', 'transitions', 'blockers', 'children']))
+        .array(
+          z.enum([
+            'comments',
+            'transitions',
+            'blockers',
+            'children',
+            'attachments',
+          ]),
+        )
         .optional(),
+      attachment: z.string().optional(),
     },
     async (p) => {
+      if (p.keys && p.attachment) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'jira_view: `attachment` works with a single `key` only, not batch `keys`.',
+            },
+          ],
+        };
+      }
       if (p.keys && p.key) {
         return {
           isError: true,
@@ -340,7 +361,13 @@ export function createMcpServer(): McpServer {
       }
       const include = p.include;
       if (p.keys) return view({ keys: p.keys, include });
-      if (p.key) return view({ key: p.key, format: p.format, include });
+      if (p.key)
+        return view({
+          key: p.key,
+          format: p.format,
+          include,
+          attachment: p.attachment,
+        });
       return {
         isError: true,
         content: [

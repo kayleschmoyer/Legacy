@@ -91,6 +91,21 @@ describe('lambda createMcpServer registrations', () => {
     expect(Object.keys(props)).toEqual(expect.arrayContaining(['key', 'body']));
   });
 
+  it('registers jira_view with the attachment param and include option (LS-10016)', async () => {
+    const tools = await listTools();
+    const viewTool = tools.find((t) => t.name === 'jira_view');
+
+    expect(viewTool).toBeDefined();
+    const props = viewTool?.inputSchema['properties'] as Record<
+      string,
+      { type?: string; items?: { enum?: string[] } }
+    >;
+    expect(props['attachment']?.type).toBe('string');
+    expect(props['include']?.items?.enum).toEqual(
+      expect.arrayContaining(['attachments']),
+    );
+  });
+
   it('does not restrict jira_transition status to a closed enum', async () => {
     const tools = await listTools();
     const transition = tools.find((t) => t.name === 'jira_transition');

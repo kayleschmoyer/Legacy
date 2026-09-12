@@ -4,6 +4,11 @@ import {
   pickFields,
 } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ATTACHMENT_COLUMNS,
+  type AttachmentMeta,
+  viewAttachment,
+} from './attachment.js';
 import { isBlockerLink } from '../blockers.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
@@ -15,10 +20,20 @@ export type IncludeOption =
   | 'comments'
   | 'transitions'
   | 'blockers'
-  | 'children';
+  | 'children'
+  | 'attachments';
 
 export type ViewParams =
-  | { key: string; format?: 'markdown' | 'json'; include?: IncludeOption[] }
+  | {
+      key: string;
+      format?: 'markdown' | 'json';
+      include?: IncludeOption[];
+      /**
+       * Attachment id, filename, or `"latest"`. When set, the call returns that
+       * attachment's content (images inline) instead of the ticket card.
+       */
+      attachment?: string;
+    }
   | { keys: string[]; include?: IncludeOption[] };
 
 interface JiraIssueLink {
@@ -44,6 +59,14 @@ interface JiraIssueResponse {
     priority: { name: string } | null;
     created: string;
     updated: string;
+    attachment?: Array<{
+      id: string | number;
+      filename: string;
+      mimeType?: string;
+      size?: number;
+      created: string;
+      author?: { displayName?: string };
+    }>;
   };
 }
 
@@ -100,6 +123,7 @@ interface Ticket {
   children?: ChildInfo[];
   comments?: CommentInfo[];
   transitions?: TransitionInfo[];
+  attachments?: AttachmentMeta[];
 }
 
 /** Extract blocker keys (and, when expanded, summary/status) from issue links. */
@@ -254,6 +278,24 @@ export function renderMarkdown(ticket: Ticket): string {
     }
   }
 
+  if (ticket.attachments !== undefined) {
+    lines.push('');
+    lines.push('### Attachments');
+    if (ticket.attachments.length === 0) {
+      lines.push('_None._');
+    } else {
+      lines.push(
+        markdownTable(pickFields(ticket.attachments, ATTACHMENT_COLUMNS), {
+          columns: ATTACHMENT_COLUMNS,
+        }),
+      );
+      lines.push('');
+      lines.push(
+        `_Read one with jira_view({ key: "${ticket.key}", attachment: "<id|filename>" })._`,
+      );
+    }
+  }
+
   if (ticket.comments !== undefined) {
     lines.push('');
     lines.push('### Comments');
@@ -299,6 +341,9 @@ function ticketToJson(ticket: Ticket): Record<string, unknown> {
   if (ticket.transitions !== undefined) {
     json.transitions = ticket.transitions;
   }
+  if (ticket.attachments !== undefined) {
+    json.attachments = pickFields(ticket.attachments, ATTACHMENT_COLUMNS);
+  }
   return json;
 }
 
@@ -311,6 +356,7 @@ async function fetchTicket(
   const wantBlockers = include.includes('blockers');
   const wantComments = include.includes('comments');
   const wantTransitions = include.includes('transitions');
+  const wantAttachments = include.includes('attachments');
 
   const [issue, childResult, commentResult, transitionResult] =
     await Promise.all([
@@ -318,8 +364,10 @@ async function fetchTicket(
         method: 'GET',
         path: `/rest/api/3/issue/${key}`,
         query: {
+          // `attachment` rides along on the issue fetch — no extra request.
           fields:
-            'summary,status,issuetype,description,assignee,reporter,parent,issuelinks,labels,priority,created,updated',
+            'summary,status,issuetype,description,assignee,reporter,parent,issuelinks,labels,priority,created,updated' +
+            (wantAttachments ? ',attachment' : ''),
         },
       }),
       wantChildren
@@ -365,6 +413,16 @@ async function fetchTicket(
     children,
     comments: commentResult,
     transitions: transitionResult,
+    attachments: wantAttachments
+      ? (issue.fields.attachment ?? []).map((a) => ({
+          id: String(a.id),
+          filename: a.filename,
+          mimeType: a.mimeType ?? 'application/octet-stream',
+          size: a.size ?? 0,
+          created: a.created,
+          author: a.author?.displayName ?? '',
+        }))
+      : undefined,
   };
 }
 
@@ -382,6 +440,12 @@ async function fetchTicket(
  * - `'children'` — child issues (one JQL query per key)
  * - `'comments'` — all comments ordered by creation date (one API call per key)
  * - `'transitions'` — available workflow transitions (one API call per key)
+ * - `'attachments'` — attachment metadata (rides along on the issue fetch, no extra API call)
+ *
+ * Attachment mode (`{ key, attachment }`): downloads that attachment through
+ * this server's credentials and returns it inline — an image content block for
+ * screenshots, decoded text for text files. This is the only path that works
+ * from a session whose egress proxy blocks Atlassian media URLs (LS-10016).
  *
  * Default (include omitted) returns base fields only.
  * Each key in batch mode resolves the same include[].
@@ -416,6 +480,11 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
   }
 
   const { key, format = 'markdown' } = params;
+
+  if (params.attachment !== undefined) {
+    return viewAttachment(key, params.attachment);
+  }
+
   try {
     const ticket = await fetchTicket(key, include);
     const text =

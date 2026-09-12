@@ -715,6 +715,7 @@ const includeOptionSchema = z.enum([
   'transitions',
   'blockers',
   'children',
+  'attachments',
 ]);
 
 server.tool(
@@ -725,8 +726,11 @@ server.tool(
     'Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call; responses are `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`. ' +
     'Exactly one of `key` or `keys` must be provided. ' +
     'include options: "blockers" (linked blocker issues), "children" (child issues via JQL), ' +
-    '"comments" (all comments ordered by creation), "transitions" (available workflow transitions). ' +
-    'Each include option that triggers an extra API call (comments, transitions, children) fires one request per key in parallel.',
+    '"comments" (all comments ordered by creation), "transitions" (available workflow transitions), ' +
+    '"attachments" (attachment metadata, no extra call). ' +
+    'Each include option that triggers an extra API call (comments, transitions, children) fires one request per key in parallel. ' +
+    'Attachment mode: pass `attachment` (id, filename, or "latest") with `key` to get that attachment inline — image block for ' +
+    'screenshots, text for text files. Use it on bug tickets whose only real description is a screenshot.',
   {
     key: z
       .string()
@@ -751,7 +755,14 @@ server.tool(
       .optional()
       .describe(
         'Sub-resources to fetch alongside base fields. Omit for base fields only. ' +
-          '"blockers": linked blockers. "children": child issues. "comments": all comments. "transitions": available workflow transitions.',
+          '"blockers": linked blockers. "children": child issues. "comments": all comments. "transitions": available workflow transitions. ' +
+          '"attachments": attachment metadata.',
+      ),
+    attachment: z
+      .string()
+      .optional()
+      .describe(
+        'Attachment id, filename, or "latest". With `key`, returns that attachment instead of the ticket card.',
       ),
   },
   async (params) => {
@@ -766,10 +777,26 @@ server.tool(
         ],
       };
     }
+    if (params.keys && params.attachment) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'jira_view: `attachment` works with a single `key` only, not batch `keys`.',
+          },
+        ],
+      };
+    }
     const include = params.include;
     if (params.keys) return view({ keys: params.keys, include });
     if (params.key)
-      return view({ key: params.key, format: params.format, include });
+      return view({
+        key: params.key,
+        format: params.format,
+        include,
+        attachment: params.attachment,
+      });
     return {
       isError: true,
       content: [

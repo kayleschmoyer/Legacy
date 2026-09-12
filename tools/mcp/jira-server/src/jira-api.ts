@@ -200,3 +200,69 @@ export async function jiraRequest<T = unknown>(
     return jiraRequestOnce<T>(opts);
   }
 }
+
+interface JiraBinaryResponse {
+  /** Raw response bytes. */
+  bytes: Uint8Array;
+  /** Content-Type reported by Jira (or the redirect target), lower-cased. */
+  contentType: string;
+}
+
+/**
+ * Fetch a binary Jira resource (e.g. attachment content or thumbnail) using the
+ * server's own credentials.
+ *
+ * This exists because attachment content lives behind `api.atlassian.com` /
+ * media-CDN URLs that agent sessions cannot reach directly (egress proxy blocks
+ * them). Routing the download through this server's credentials is what makes
+ * screenshot-only bug tickets readable (LS-10016).
+ *
+ * Jira answers the content endpoint with a 302 to a pre-signed media URL;
+ * `fetch` follows it, and undici drops the Authorization header on the
+ * cross-origin hop, which is exactly what the pre-signed URL expects.
+ *
+ * Retries once on transient connection errors, matching `jiraRequest` (these
+ * are GETs, so the retry is safe).
+ */
+export async function jiraRequestBinary(
+  path: string,
+): Promise<JiraBinaryResponse> {
+  const attempt = async (): Promise<JiraBinaryResponse> => {
+    const creds = await getJiraCredentials();
+    const response = await fetch(`${getApiBaseUrl(creds)}${path}`, {
+      method: 'GET',
+      headers: {
+        Authorization: await getAuthHeader(creds),
+        Accept: '*/*',
+      },
+      redirect: 'follow',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Jira API GET ${path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
+      );
+    }
+
+    return {
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      contentType: (
+        response.headers.get('content-type') ?? 'application/octet-stream'
+      )
+        .split(';')[0]
+        .trim()
+        .toLowerCase(),
+    };
+  };
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (!isConnectionError(err)) throw err;
+    process.stderr.write(
+      `[legacy-sports-jira] Connection error on GET ${path}. Retrying…\n`,
+    );
+    return attempt();
+  }
+}
