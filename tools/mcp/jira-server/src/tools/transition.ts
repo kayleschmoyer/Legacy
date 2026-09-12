@@ -219,6 +219,25 @@ interface PerKeyResult {
 }
 
 /**
+ * Read an error message out of a tool result's text block. Tool error branches
+ * return either a JSON payload carrying an `error` field or bare plain text, so
+ * try JSON first and fall back to the raw text rather than letting a parse
+ * failure replace the real message with a `SyntaxError` (LS-10072). Surfacing
+ * an error must never throw, so a missing or blank text block yields
+ * `fallback` instead of dereferencing it.
+ */
+function extractErrorText(text: string | undefined, fallback: string): string {
+  if (text === undefined || text.trim().length === 0) return fallback;
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (typeof parsed['error'] === 'string') return parsed['error'];
+  } catch {
+    // Not JSON — fall through to the raw text below.
+  }
+  return text;
+}
+
+/**
  * Consolidated entry point for `jira_transition`. Handles both single-key and
  * multi-key transitions, and the `claim` action which performs the
  * assignee-set + transition sequence atomically (delegates to `claimTicket`).
@@ -277,15 +296,16 @@ export async function consolidatedTransition(
           openPrs: params.openPrs,
         });
         const text = (claim.content[0] as { text: string }).text;
-        const parsed = JSON.parse(text) as Record<string, unknown>;
         if (claim.isError) {
-          const parsedError =
-            typeof parsed['error'] === 'string' ? parsed['error'] : undefined;
-          results[key] = {
-            error: parsedError ?? text ?? 'claim failed',
-          };
+          // `claimTicket`'s error branch returns plain text
+          // (`Failed to claim ticket <key>: <message>`), not JSON, so the
+          // success-path `JSON.parse` below must not run first — it would
+          // throw and mask the real Jira failure with a SyntaxError
+          // (LS-10072).
+          results[key] = { error: extractErrorText(text, 'claim failed') };
           return;
         }
+        const parsed = JSON.parse(text) as Record<string, unknown>;
         // Merge claim metadata (action, claimed, ticket, warnings, blockers).
         results[key] = {
           ...(parsed as PerKeyResult),

@@ -566,4 +566,28 @@ describe('consolidatedTransition — claim action', () => {
     );
     expect(mutations).toHaveLength(0);
   });
+
+  it("LS-10072: surfaces claimTicket's real error instead of a JSON SyntaxError", async () => {
+    // `claimTicket`'s error branch returns plain text, not JSON. Before the
+    // fix, `runOne` ran `JSON.parse` on it before checking `isError`, so the
+    // per-key error became "Unexpected token 'F' ... is not valid JSON" and
+    // the real Jira failure was lost.
+    mockJiraRequest.mockRejectedValue(
+      new Error('Jira API error: 403 Forbidden (403)'),
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: 'In Progress',
+      action: 'claim',
+    });
+    const data = parse(result);
+    const results = data['results'] as Record<string, PerKey>;
+    const error = results['LS-1']?.['error'];
+
+    expect(typeof error).toBe('string');
+    expect(error).toContain('Failed to claim ticket LS-1');
+    expect(error).toContain('Jira API error: 403 Forbidden (403)');
+    expect(error).not.toContain('is not valid JSON');
+  });
 });
