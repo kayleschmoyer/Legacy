@@ -66,6 +66,13 @@ jest.mock('../../../../hooks/useMatchup', () => ({
 const mockUseLeagueWebSocket = jest.fn<{ connected: boolean }, [unknown]>(
   () => ({ connected: true }),
 );
+// MatchupTab resolves premium status to gate the score "+N" flourish
+// (LS-6392); this spec renders the tab without an AuthProvider or Apollo, so
+// the hook is stubbed to the free-tier default.
+jest.mock('../../../../hooks/useIsPremium', () => ({
+  useIsPremium: () => false,
+}));
+
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
   useLeagueWebSocket: (options: unknown) => mockUseLeagueWebSocket(options),
 }));

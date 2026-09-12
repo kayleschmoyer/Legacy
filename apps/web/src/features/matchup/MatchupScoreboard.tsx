@@ -18,6 +18,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { getEnvironmentConfig } from '../../config/environment';
 import {
   type ScoringSettings,
@@ -345,6 +346,10 @@ export function MatchupScoreboard({
   onTeamClick,
   liveUpdateSignal,
 }: MatchupScoreboardProps) {
+  // Gates the premium "+N points" score flourish (LS-6392). Resolved here in
+  // the data wrapper so the shared view stays presentational.
+  const isPremium = useIsPremium();
+
   // Extract IDs before early return to use in hooks
   const matchupIdStr = matchup?.id;
   const leagueIdNum = matchup?.leagueId ?? undefined;
@@ -488,6 +493,7 @@ export function MatchupScoreboard({
       onTeamClick={onTeamClick}
       scoringIsStale={matchup?.scoringIsStale}
       scoringChangeLog={matchup?.scoringChangeLog}
+      isPremium={isPremium}
     />
   );
 }

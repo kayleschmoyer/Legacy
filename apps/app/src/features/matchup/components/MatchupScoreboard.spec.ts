@@ -1,5 +1,13 @@
 import { formatTeamRecord, type TeamStandingRecord } from './MatchupScoreboard';
 
+// The module under test now resolves premium status to gate the score "+N"
+// flourish (LS-6392). `useSubscription` reaches Expo native modules through
+// the websocket/keychain layers, which this pure-logic spec has no runtime
+// for — stub it so importing the module stays side-effect free.
+jest.mock('../../subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: false }),
+}));
+
 describe('formatTeamRecord', () => {
   const standings: readonly TeamStandingRecord[] = [
     { teamId: 10, wins: 5, losses: 2, ties: 0 },

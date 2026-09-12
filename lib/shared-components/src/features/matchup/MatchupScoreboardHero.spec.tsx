@@ -334,4 +334,99 @@ describe('MatchupScoreboardHero', () => {
       expect(screen.queryByTestId('stale-scoring-indicator')).toBeNull();
     });
   });
+  // LS-6392 / FMD-012 — animated score increase + premium "+N" flourish.
+  describe('score increase animation', () => {
+    it('announces the settled score, not an intermediate animation frame', () => {
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            team1: {
+              id: 10,
+              name: 'Team A',
+              score: 94.5,
+              projectedScore: 120.5,
+            },
+          })}
+        />,
+      );
+
+      // The live region is labelled with the real new score immediately. The
+      // visible digits count up, but assistive tech must not hear every frame.
+      expect(screen.getByLabelText('Team A score 94.50')).toBeTruthy();
+    });
+
+    it('shows the "+N" badge to premium users when a score increases', () => {
+      const { rerender } = render(
+        <MatchupScoreboardHero {...baseProps({ isPremium: true })} />,
+      );
+
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            isPremium: true,
+            team1: {
+              id: 10,
+              name: 'Team A',
+              score: 94.5,
+              projectedScore: 120.5,
+            },
+          })}
+        />,
+      );
+
+      expect(screen.getByTestId('score-delta-10')).toBeTruthy();
+      expect(screen.getByText('+7.00')).toBeTruthy();
+    });
+
+    it('withholds the "+N" badge from free-tier users', () => {
+      const { rerender } = render(
+        <MatchupScoreboardHero {...baseProps({ isPremium: false })} />,
+      );
+
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            isPremium: false,
+            team1: {
+              id: 10,
+              name: 'Team A',
+              score: 94.5,
+              projectedScore: 120.5,
+            },
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+    });
+
+    it('withholds the "+N" badge when isPremium is not supplied at all', () => {
+      // Defaulting to false keeps an unwired caller from leaking a premium
+      // affordance to every tier.
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            team1: {
+              id: 10,
+              name: 'Team A',
+              score: 94.5,
+              projectedScore: 120.5,
+            },
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+    });
+
+    it('shows no badge on first render, when there is no increase yet', () => {
+      render(<MatchupScoreboardHero {...baseProps({ isPremium: true })} />);
+      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+      expect(screen.queryByTestId('score-delta-20')).toBeNull();
+    });
+  });
 });

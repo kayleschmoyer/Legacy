@@ -11,6 +11,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
+import { useSubscription } from '../../subscription/useSubscription';
 import { useLeagueScoringSettings } from '../../../common/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQLToScoringFormat';
 import { computeMatchupScores } from '../computeMatchupScores';
@@ -91,6 +92,9 @@ export function MatchupScoreboard({
   team1ProjectedScore,
   team2ProjectedScore,
 }: MatchupScoreboardProps) {
+  // Gates the premium "+N points" score flourish (LS-6392). Resolved here in
+  // the data wrapper so the shared hero stays presentational.
+  const { isPremium } = useSubscription();
   const matchupIdNum = matchup?.id ? parseInt(matchup.id, 10) : 0;
 
   const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
@@ -170,6 +174,7 @@ export function MatchupScoreboard({
         </YStack>
       ) : null}
       <MatchupScoreboardHero
+        isPremium={isPremium}
         weekNumber={matchup?.weekNumber}
         totalMatchups={totalMatchups}
         status={matchup?.status}

@@ -20,6 +20,8 @@ import {
 } from '../../utils/colors';
 import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
+import { useAnimatedNumber } from '../../hooks/useAnimatedNumber';
+import { ScoreDeltaBadge } from '../../components/ScoreDeltaBadge';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
@@ -137,6 +139,17 @@ export interface MatchupScoreboardViewProps {
   team1Projected: number | null;
   team2Projected: number | null;
   /**
+   * Whether the viewing user has premium access. Gates the "+N points"
+   * flourish shown alongside a score increase (LS-6392). The score count-up
+   * itself is ungated — the instant replacement it fixes was a defect on
+   * every tier, not a premium feature.
+   *
+   * Resolved by the platform's data wrapper and passed in, keeping this
+   * component presentational and free of data fetching. Defaults to `false`
+   * so an unwired caller shows no premium affordance.
+   */
+  isPremium?: boolean;
+  /**
    * True when the live player-stats query errored and the scores shown are the
    * server-stored fallback values; surfaces a stale-data warning banner.
    */
@@ -181,6 +194,7 @@ export function MatchupScoreboardView({
   team2Record,
   team1Score,
   team2Score,
+  isPremium = false,
   team1Projected,
   team2Projected,
   hasPlayersError = false,
@@ -189,6 +203,17 @@ export function MatchupScoreboardView({
   scoringIsStale,
   scoringChangeLog,
 }: MatchupScoreboardViewProps) {
+  // Count each score up to its new value rather than replacing it instantly
+  // (LS-6392). Hooks run unconditionally; a score that never changes simply
+  // never tweens. These must stay above the `hasMatchup` early return —
+  // React requires the same hook order on every render.
+  const { current: team1Animated, delta: team1Delta } = useAnimatedNumber(
+    team1Score ?? 0,
+  );
+  const { current: team2Animated, delta: team2Delta } = useAnimatedNumber(
+    team2Score ?? 0,
+  );
+
   if (!hasMatchup) {
     return (
       <ScoreboardCard>
@@ -395,8 +420,19 @@ export function MatchupScoreboardView({
             $sm={{ fontSize: 32 }}
             color={team1Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
-            {team1Score?.toFixed(2) ?? '0.00'}
+            {(team1Score == null ? 0 : team1Animated).toFixed(2)}
           </ScoreDisplay>
+          {isPremium && (
+            // Fixed-height slot — see MatchupScoreboardHero: an inline
+            // mount/unmount would shift everything below the score each time
+            // the badge appears.
+            <YStack height={22} justifyContent="center">
+              <ScoreDeltaBadge
+                delta={team1Delta}
+                testID={team1Id != null ? `score-delta-${team1Id}` : undefined}
+              />
+            </YStack>
+          )}
           {team1Leading && !isTied && (
             <XStack alignItems="center" gap="$1.5">
               <YStack
@@ -499,8 +535,19 @@ export function MatchupScoreboardView({
             $sm={{ fontSize: 32 }}
             color={team2Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
-            {team2Score?.toFixed(2) ?? '0.00'}
+            {(team2Score == null ? 0 : team2Animated).toFixed(2)}
           </ScoreDisplay>
+          {isPremium && (
+            // Fixed-height slot — see MatchupScoreboardHero: an inline
+            // mount/unmount would shift everything below the score each time
+            // the badge appears.
+            <YStack height={22} justifyContent="center">
+              <ScoreDeltaBadge
+                delta={team2Delta}
+                testID={team2Id != null ? `score-delta-${team2Id}` : undefined}
+              />
+            </YStack>
+          )}
           {team2Leading && !isTied && (
             <XStack alignItems="center" gap="$1.5">
               <YStack

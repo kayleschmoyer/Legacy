@@ -244,6 +244,8 @@ export type {
   SegmentedControlProps,
   SegmentedOption,
 } from './components/ToggleControls';
+export { ScoreDeltaBadge } from './components/ScoreDeltaBadge';
+export type { ScoreDeltaBadgeProps } from './components/ScoreDeltaBadge';
 export { Spinner, Skeleton, SkeletonRow } from './components/Spinner';
 export type { SpinnerProps, SkeletonProps } from './components/Spinner';
 export { Dialog } from './components/Dialog';

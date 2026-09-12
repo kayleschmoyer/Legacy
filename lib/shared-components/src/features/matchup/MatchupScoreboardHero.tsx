@@ -25,6 +25,8 @@ import {
 } from '../../utils/colors';
 import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
+import { useAnimatedNumber } from '../../hooks/useAnimatedNumber';
+import { ScoreDeltaBadge } from '../../components/ScoreDeltaBadge';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
@@ -199,6 +201,20 @@ export interface MatchupScoreboardHeroProps {
   scoringIsStale?: boolean | null;
   /** `Matchup.scoringChangeLog` — shown on interaction with the indicator. */
   scoringChangeLog?: readonly StaleScoringChangeLogEntry[] | null;
+  /**
+   * Whether the viewing user has premium access. Gates the "+N points"
+   * flourish that accompanies a score increase (LS-6392); the score count-up
+   * itself is not gated, since the instant-replacement it fixes was a defect
+   * for every tier, not a premium feature.
+   *
+   * Resolved by each platform and passed down rather than read here, because
+   * this component is deliberately presentational and does no data fetching —
+   * the same contract that lets its specs render it without an Apollo or auth
+   * provider. Mirrors the existing `FootballPlayerDetail.isPremium` /
+   * `MLBHome.isPremium` prop pattern. Defaults to `false`, so a caller that
+   * has not been wired up shows no premium affordance rather than leaking one.
+   */
+  isPremium?: boolean;
 }
 
 // ── Team panel ──────────────────────────────────────────────────────────────
@@ -210,6 +226,7 @@ function TeamPanel({
   totalGames,
   onTeamPress,
   preLock,
+  isPremium,
 }: {
   team: MatchupScoreboardHeroTeam;
   leading: boolean;
@@ -217,12 +234,24 @@ function TeamPanel({
   totalGames: number;
   onTeamPress?: (teamId: number) => void;
   preLock: boolean;
+  isPremium: boolean;
 }) {
   const score = team.score ?? 0;
   // Pre-lock (scheduled, no games started), a 0 score means "no stats yet",
   // not "your team scored zero" — show a placeholder instead (LS-6386).
   const showPlaceholder = preLock && score === 0;
-  const scoreDisplay = showPlaceholder ? '—' : score.toFixed(2);
+  // Count the score up to its new value instead of swapping it instantly
+  // (LS-6392). Suppressed pre-lock, where the score is a placeholder rather
+  // than a number to count toward.
+  const { current, delta } = useAnimatedNumber(score, {
+    disabled: showPlaceholder,
+  });
+  const scoreDisplay = showPlaceholder ? '—' : current.toFixed(2);
+  // The announced value is always the settled score, never a mid-tween frame:
+  // `aria-atomic` makes assistive tech read this label rather than the visible
+  // digits, so the live region fires once per real score change instead of
+  // once per animation frame.
+  const announcedScore = showPlaceholder ? '—' : score.toFixed(2);
   const pace = paceColor(score, team.projectedScore, gamesPlayed, totalGames);
   const scoreColor = pace ?? (leading ? BRAND_GOLD_LIGHT : TEXT_PRIMARY);
   const pressable = onTeamPress != null && team.id != null;
@@ -272,11 +301,23 @@ function TeamPanel({
         aria-label={
           showPlaceholder
             ? `${team.name ?? 'Team'} score not yet available`
-            : `${team.name ?? 'Team'} score ${scoreDisplay}`
+            : `${team.name ?? 'Team'} score ${announcedScore}`
         }
       >
         {scoreDisplay}
       </ScoreText>
+      {isPremium && (
+        // Fixed-height slot: the badge mounts and unmounts on every score
+        // change, and letting it do that inline would shove the projected
+        // score below it down for the ~1.6s it is visible — reintroducing
+        // exactly the jarring movement this ticket set out to remove.
+        <YStack height={22} justifyContent="center">
+          <ScoreDeltaBadge
+            delta={delta}
+            testID={team.id != null ? `score-delta-${team.id}` : undefined}
+          />
+        </YStack>
+      )}
       {team.projectedScore != null && (
         <Text
           fontFamily={FONT_MONO}
@@ -316,6 +357,7 @@ export function MatchupScoreboardHero({
   onTeamPress,
   scoringIsStale,
   scoringChangeLog,
+  isPremium = false,
 }: MatchupScoreboardHeroProps) {
   const isBye = status === 'bye';
   const score1 = team1.score ?? 0;
@@ -396,6 +438,8 @@ export function MatchupScoreboardHero({
         </XStack>
       </TopBand>
 
+      {/* Bye week (LS-6366, from main) has no opposing team to render; the
+          premium score flourish only applies to the head-to-head layout. */}
       {isBye ? (
         <YStack
           alignItems="center"
@@ -432,6 +476,7 @@ export function MatchupScoreboardHero({
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
+            isPremium={isPremium}
           />
           <YStack alignSelf="center" paddingHorizontal="$2">
             <Text
@@ -451,6 +496,7 @@ export function MatchupScoreboardHero({
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
+            isPremium={isPremium}
           />
         </XStack>
       )}

@@ -24,6 +24,7 @@ import { useLeagueWebSocketClient } from '../../../../context/LeagueWebSocketCon
 import { MatchupRosterComparison } from '../../../../features/matchup/MatchupRosterComparison';
 import { MatchupGrid } from '../../../../features/matchup/MatchupGrid';
 import { computeMatchupScores } from '../../../../features/matchup/MatchupScoreboard';
+import { useIsPremium } from '../../../../hooks/useIsPremium';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQLToScoringFormat';
 import { I } from '../Icons';
@@ -65,6 +66,9 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   onCommish,
 }) => {
   const isFootball = league.sport === Sport.Football;
+  // Gates the premium "+N points" score flourish on the scoreboard hero
+  // (LS-6392); the count-up animation itself is ungated.
+  const isPremium = useIsPremium();
   const { currentWeek } = useCurrentWeek(league.id ?? null);
   const [week, setWeek] = useState<number>(
     league.currentWeekNumber ?? currentWeek ?? 1,
@@ -514,6 +518,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         gamesPlayed={gamesPlayed}
         totalGames={totalGames}
         onTeamPress={onTeam}
+        isPremium={isPremium}
       />
 
       {!isFootball && totalGames > 0 ? (

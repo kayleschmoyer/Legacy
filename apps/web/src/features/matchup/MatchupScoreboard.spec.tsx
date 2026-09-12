@@ -62,6 +62,13 @@ jest.mock('@legacy-sports/graphql', () => {
 const mockUseLeagueScoringSettings = jest.fn(() => ({
   settings: { batting: {}, pitching: {}, fielding: {} },
 }));
+// The wrapper resolves premium status to gate the score "+N" flourish
+// (LS-6392); these specs render it in isolation, without an AuthProvider or
+// Apollo, so the hook is stubbed to the free-tier default.
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: () => false,
+}));
+
 jest.mock('../../lib/scoring', () => ({
   useLeagueScoringSettings: (id: unknown): unknown =>
     mockUseLeagueScoringSettings(id),
