@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
-import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Input,
+  ScrollView,
+  Spinner,
+  Text,
+  useMedia,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { CSS } from './styles';
@@ -943,6 +951,27 @@ export function EliteDraftBoardScreen({
   // `CompactLiveDraftBoard`; `tablet` and `desktop` both render the wide
   // branch below and differ only in the CSS `styles.ts` applies to it.
   const isCompact = useDraftViewportTier() === 'phone';
+  // `.d-layout`'s responsive grid (LS-10067) — ported off styles.ts's
+  // `@media (max-width: ...)` rules onto Tamagui's `useMedia()`. Called
+  // unconditionally here (rules-of-hooks: several early returns follow
+  // below, e.g. `NoLeagueScreen`/`LoadingScreen`) even though the computed
+  // value below is only consumed by the wide-viewport branch's `.d-layout`
+  // div — see `layoutGridStyle` near that JSX.
+  //
+  // `$md`/`$lg` derive from `@legacy-sports/design-tokens` `breakpoints`
+  // (LS-9885/9896), the same scale `styles.ts`'s `BP_TABLET_MAX`/`BP_LAND_MAX`
+  // already use (`breakpoints.lg - 1` / `breakpoints.xl - 1`), so this
+  // reproduces the exact same 979px/1119px boundaries as the CSS it replaces
+  // — not the 1034px figure that appears in some ticket descriptions of this
+  // work, which doesn't match any breakpoint actually defined in this file.
+  //
+  // Bound through an explicit signature so the call/result stay type-safe
+  // under this project's typed ESLint rules (same pattern as PreDraftLobby's
+  // `readMedia`/`iconFontSize`).
+  const readMedia = useMedia as
+    | (() => { md?: boolean; lg?: boolean })
+    | undefined;
+  const media = readMedia?.() ?? {};
 
   const { data: userSubscriptionData } = useGetUserByIdQuery({
     variables: { id: userId },
@@ -1553,6 +1582,32 @@ export function EliteDraftBoardScreen({
   }
 
   // ---- Main Live Draft UI: wide-viewport branch ----
+  //
+  // `.d-layout`'s three responsive states (LS-10067), reproducing
+  // styles.ts's `BP_TABLET_MAX`/`BP_LAND_MAX` media queries via `media` from
+  // `useMedia()` above rather than raw CSS:
+  //   - `media.md` (≤979, the tablet tier `isCompact` doesn't already cover
+  //     as `phone`): rail stacks above main as a single column.
+  //   - `media.lg && !media.md` (980–1119): side rail, narrowed to 280px.
+  //   - neither (≥1120): side rail at its full 320px.
+  // The base `.d-layout` class (styles.ts) still supplies everything this
+  // doesn't touch — position, height, overflow, z-index — this only
+  // overrides the grid template, the same `gridArea`-needs-a-`style`-escape-
+  // hatch tradeoff DraftRail.tsx/DraftTopBand.tsx/DraftPlayerBoard.tsx
+  // already make for their own placement within this grid.
+  const isNarrowDesktopRail = Boolean(media.lg) && !media.md;
+  const layoutGridStyle: React.CSSProperties = media.md
+    ? {
+        gridTemplateColumns: '1fr',
+        gridTemplateRows: 'auto auto 1fr',
+        gridTemplateAreas: '"topband" "rail" "main"',
+      }
+    : {
+        gridTemplateColumns: isNarrowDesktopRail ? '1fr 280px' : '1fr 320px',
+        gridTemplateRows: 'auto 1fr',
+        gridTemplateAreas: '"topband topband" "main rail"',
+      };
+
   return (
     <div className="d-root" data-sport={sport}>
       <style>{CSS}</style>
@@ -1570,7 +1625,7 @@ export function EliteDraftBoardScreen({
           <DraftConnectionBanner onRetry={retryConnection} />
         </div>
       )}
-      <div className="d-layout">
+      <div className="d-layout" style={layoutGridStyle}>
         <DraftTopBand
           connectionStale={connectionStale}
           draftPaused={ui.draftPaused}

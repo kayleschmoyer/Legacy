@@ -78,6 +78,14 @@ const NAV_Z_INDEX = 200;
  * LeagueDetailShell.tsx's sticky-below-nav header handles the same
  * web-only-positioning split ("native renders it inline").
  *
+ * Unlike PickAnnouncement.tsx's `style={{ position: 'fixed', ... }}` — a
+ * deliberate web-only capability shim, since that overlay never mounts on
+ * native — this lobby screen DOES run natively (it's reachable from the
+ * mobile app before a draft starts), which is exactly why it needs the
+ * platform branch below instead of the shim. DraftStateScreens.tsx's
+ * `resolveDraftRootShellOverlayProps` mirrors this same split for the same
+ * reason.
+ *
  * Exported as a pure function (rather than inlined in the component) so it
  * can be unit-tested directly — Tamagui's Jest mock strips
  * position/top/right/bottom/left/flex before they reach the DOM, which makes

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { brand, scaleDark, withAlpha } from '@legacy-sports/design-tokens';
 import { SkeletonCard } from './SkeletonCard';
@@ -21,10 +22,47 @@ const BG_FX_IMAGE = [
 ].join(', ');
 
 /**
- * Shared full-screen root for every draft-board state screen. `position:
- * fixed` has no Tamagui/RN prop — the `style` escape hatch is a web-only
- * capability shim (this file has no `.native` counterpart), not a layout
- * branch.
+ * `position: 'fixed'` has no React Native equivalent (RN only supports
+ * 'absolute'/'relative') — unlike PickAnnouncement.tsx's identical-looking
+ * `style={{ position: 'fixed', ... }}` (a deliberate web-only capability
+ * shim: that overlay never mounts on native), every state screen in this
+ * file DOES run natively — `EliteDraftBoardScreen`'s loading/error/complete
+ * states are reachable on the mobile app. Unconditionally applying
+ * `position: 'fixed'` there leaves the shell with no resolved size and
+ * renders a blank screen (same failure mode as LS-9392, PreDraftLobby.tsx's
+ * `resolveLobbyOverlayProps`, which this mirrors): native instead falls back
+ * to `flex: 1`, relying on the parent's own full-bleed container the same
+ * way PreDraftLobby does.
+ *
+ * Exported as a pure function (rather than inlined in the component) so it
+ * can be unit-tested directly — Tamagui's Jest mock strips
+ * position/top/right/bottom/left/flex before they reach the DOM, which makes
+ * this branch unobservable through a mounted-component assertion (same
+ * constraint PreDraftLobby.tsx's `resolveLobbyOverlayProps` documents).
+ */
+export function resolveDraftRootShellOverlayProps(platformOS: string):
+  | {
+      position: 'fixed';
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    }
+  | { flex: number } {
+  if (platformOS === 'web') {
+    return {
+      position: 'fixed',
+      top: NAV_HEIGHT_PX,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    };
+  }
+  return { flex: 1 };
+}
+
+/**
+ * Shared full-screen root for every draft-board state screen.
  */
 function DraftRootShell({
   children,
@@ -48,13 +86,11 @@ function DraftRootShell({
       aria-live={ariaLive}
       aria-busy={ariaBusy}
       aria-label={ariaLabel}
-      style={{
-        position: 'fixed',
-        top: NAV_HEIGHT_PX,
-        right: 0,
-        bottom: 0,
-        left: 0,
-      }}
+      // Optional-chained: some suites (e.g. EliteDraftBoardScreen.spec.tsx)
+      // replace 'react-native' with a factory that omits `Platform` entirely
+      // for their own compact-branch needs, same rationale as PreDraftLobby's
+      // `readMedia?.()` guard for `useMedia`.
+      style={resolveDraftRootShellOverlayProps(Platform?.OS ?? 'web')}
       zIndex={NAV_Z_INDEX - 2}
       backgroundColor="$background"
       overflow="hidden"
