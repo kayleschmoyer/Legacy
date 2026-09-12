@@ -277,6 +277,7 @@ export function useDraftQueries({
           pickedAt: p.pickedAt as string,
           teamId: p.teamId as number,
           playerId: p.playerId as number,
+          adp: p.adp ?? null,
           player:
             p.player?.id != null
               ? {

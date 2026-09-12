@@ -155,6 +155,18 @@ export interface DraftPickRecord {
   pickedAt: string;
   teamId: number;
   playerId: number;
+  /**
+   * The drafted player's consensus rank (stack-rank ADP), from the server and
+   * computed over the same pool as AvailableDraftPlayer.adp. `overallPick -
+   * adp` is the pick's value, which is what tints the draft-board cell
+   * (LS-10096).
+   *
+   * Null when no rank is on file. Historical ADP data isn't collected yet, so
+   * this is routine rather than exceptional: the board renders an em dash,
+   * applies no tint, and leaves the pick out of its team's net-value total —
+   * never a 0, which would read as "drafted exactly on consensus".
+   */
+  adp?: number | null;
   /** Player name fields returned directly from getDraftPicks. Used to display
    * names for picks that are absent from the careerBattingStats map (e.g. pure
    * pitchers). eligiblePositions is used to fix position display for drafted

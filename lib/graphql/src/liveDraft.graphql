@@ -284,6 +284,7 @@ query GetDraftPicks($draftId: Int!) {
     pickedAt
     teamId
     playerId
+    adp
     player {
       id
       firstName

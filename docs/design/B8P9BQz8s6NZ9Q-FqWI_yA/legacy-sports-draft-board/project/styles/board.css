@@ -302,18 +302,20 @@
 }
 .board-grid .tbl {
   display: grid;
-  grid-template-columns: 46px repeat(12, minmax(112px, 1fr));
-  gap: 4px;
-  min-width: 1260px;
+  /* Option C carries three lines per cell, so the columns widen from the old
+     112px to the prototype's 132px floor (LS-10096). */
+  grid-template-columns: 44px repeat(12, minmax(132px, 1fr));
+  gap: 6px;
+  min-width: 1500px;
 }
 .board-grid .cell {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 7px 8px;
-  min-height: 58px;
+  min-height: 60px;
   position: relative;
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 2px;
 }
 .board-grid .th-team {
   font-family: var(--f-display); font-weight: 700; font-size: 10px;
@@ -357,6 +359,72 @@
 .board-grid .cell.empty { background: transparent; border-style: dashed; }
 .board-grid .cell.current { background: rgba(197,165,90,0.12); border-color: var(--gold); box-shadow: var(--shadow-gold); }
 .board-grid .cell.current .pname { color: var(--gold); font-style: italic; }
+
+/* ── Value heat (option C — LS-10096) ─────────────────────
+   Each cell's value is the overall pick number minus the player's consensus
+   rank: positive means the player fell to this pick (a steal), negative means
+   he went early (a reach). `data-v` is the tint band, from thresholds of 6 and
+   14 in both directions — the same numbers the legend quotes. A pick whose
+   rank is unknown carries data-v="0" (no tint) and an em dash for the delta,
+   and contributes nothing to its team's NET VALUE total: the board never
+   invents a value it doesn't have.
+
+   The tint is deliberately not the only channel. Every cell also carries the
+   signed number, so the steal/reach signal survives for a colorblind reader
+   and at the low tint alphas below. */
+.board-grid .cell[data-v="3"]  { background: rgba(74,174,124,0.16); border-color: rgba(74,174,124,0.45); }
+.board-grid .cell[data-v="2"]  { background: rgba(74,174,124,0.09); border-color: rgba(74,174,124,0.28); }
+.board-grid .cell[data-v="-2"] { background: rgba(196,30,58,0.09);  border-color: rgba(196,30,58,0.28); }
+.board-grid .cell[data-v="-3"] { background: rgba(196,30,58,0.16);  border-color: rgba(196,30,58,0.45); }
+.board-grid .cell .top { flex: 0 0 auto; }
+.board-grid .cell .statline { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.board-grid .cell .pname { font-family: var(--f-display); font-weight: 700; font-size: 15px; line-height: 1.05; letter-spacing: 0.01em; }
+.board-grid .cell .meta { font-family: var(--f-body); font-size: 10px; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-grid .cell .meta .pos { font-family: var(--f-display); font-weight: 700; font-size: 9px; letter-spacing: 0.08em; }
+.board-grid .cell .stat { font-family: var(--f-display); font-weight: 700; font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.board-grid .cell .stat span { color: var(--text-mute); font-size: 9px; letter-spacing: 0.06em; margin-left: 3px; }
+.board-grid .cell .delta { font-family: var(--f-display); font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* The on-the-clock cell keeps its italic body-font placeholder rather than
+   adopting the display-font headline the drafted cells now use. */
+.board-grid .cell.current .pname { font-family: var(--f-body); font-weight: 400; font-size: 12px; font-style: italic; }
+
+/* NET VALUE footer row — one cell per team, colored by the sign of the sum,
+   with the signed-in user's team edged in --gold-dim. */
+.board-grid .footlbl {
+  font-family: var(--f-display); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.06em; color: var(--text-mute); text-align: center;
+  align-self: center; line-height: 1.1;
+}
+.board-grid .foot {
+  font-family: var(--f-display); font-weight: 800; font-size: 12px;
+  text-align: center; padding: 8px 6px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg-elevated);
+  font-variant-numeric: tabular-nums;
+}
+.board-grid .foot small {
+  display: block; font-weight: 700; font-size: 8px; letter-spacing: 0.1em;
+  color: var(--text-mute); margin-bottom: 2px;
+}
+
+/* Tint legend, sitting under the board. */
+.board-legend {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border);
+  font-family: var(--f-body); font-size: 11px; color: var(--text-sec);
+}
+.board-legend b {
+  font-family: var(--f-display); font-weight: 700; letter-spacing: 0.08em;
+  font-size: 10px; text-transform: uppercase; color: var(--text-mute);
+}
+.board-legend .swatch {
+  display: inline-block; width: 18px; height: 10px; border-radius: 2px;
+  vertical-align: -1px; margin-right: 5px; border: 1px solid var(--border);
+}
+.board-legend .swatch.v3  { background: rgba(74,174,124,0.16); border-color: rgba(74,174,124,0.45); }
+.board-legend .swatch.v2  { background: rgba(74,174,124,0.09); border-color: rgba(74,174,124,0.28); }
+.board-legend .swatch.v0  { background: var(--bg-subtle); }
+.board-legend .swatch.vm2 { background: rgba(196,30,58,0.09); border-color: rgba(196,30,58,0.28); }
+.board-legend .swatch.vm3 { background: rgba(196,30,58,0.16); border-color: rgba(196,30,58,0.45); }
 
 /* ── Depth Chart view ───────────────────────────────────── */
 .depth {

@@ -719,6 +719,12 @@ export type DraftFootballPlayerStats = {
 /** A single pick made during a draft */
 export type DraftPick = {
   __typename?: 'DraftPick';
+  /**
+   * The drafted player's consensus rank — the same stack-rank ADP DraftPlayer.adp reports for undrafted players, computed over the identical pool so the two cannot disagree. Exposed here because a player disappears from the available-player list the moment they are drafted, which left the board unable to say anything about a completed pick (LS-10096). Subtracting it from `overallPick` gives the pick's value: positive means the player fell to this pick, negative means they went early.
+   *
+   * Null when no rank is on file for the player. Real historical ADP data is not collected yet, so this is a routine state rather than an edge case, and it stays null rather than defaulting to 0 — a fabricated rank would become a fabricated pick value.
+   */
+  adp?: Maybe<Scalars['Int']['output']>;
   draftId?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   overallPick?: Maybe<Scalars['Int']['output']>;
@@ -13019,6 +13025,7 @@ export type GetDraftPicksQuery = {
     pickedAt?: string | null;
     teamId?: number | null;
     playerId?: number | null;
+    adp?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -32542,6 +32549,7 @@ export const GetDraftPicks = gql`
       pickedAt
       teamId
       playerId
+      adp
       player {
         id
         firstName

@@ -2,17 +2,14 @@
  * Draft domain — query fields
  */
 
-import {
-  buildEligibilityConditions,
-  type PublicDb,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDefaultRosterPositions } from '@legacy-sports/utils';
 
 import type { PlayerDraftInfo } from './candidate-pool';
+import { buildDraftAdpCte, buildDraftAdpPoolConditions } from './draft-adp';
 import {
   deriveDraftRecommendationSignal,
   type DraftRecommendationSignal,
@@ -397,24 +394,36 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // carries sport='baseball'.
       const leagueSport = league?.sport ?? 'baseball';
       const isFootball = leagueSport === 'football';
-      const sportCondition = sql`p.sport = ${leagueSport}`;
-      sqlConditions.push(sportCondition);
+
+      // The pool-defining predicates — sport, the rostered-player exclusion
+      // (LS-8674: keepers are applied to rosters before the first pick, so
+      // kept players are not draftable; a no-op for redraft leagues), and the
+      // league's static eligibility rules (player pool, career games/seasons,
+      // Hall-of-Fame, era — LS-8071, the SAME shared builder the pick
+      // endpoints use, so a player shown here can never be rejected by a pick
+      // on eligibility, or vice-versa).
+      //
+      // They come from buildDraftAdpPoolConditions() rather than being built
+      // here, because these same predicates define the window the ADP stack
+      // rank is taken over, and DraftPick.adp ranks drafted players over that
+      // window too (LS-10096). One definition, so the rank a manager saw on
+      // the board and the rank their completed pick is judged against cannot
+      // drift apart. Everything layered on below — the already-drafted
+      // exclusion, search, position pill, open roster slots — narrows what is
+      // *listed*, never what is *ranked*.
+      const poolConditions = buildDraftAdpPoolConditions({
+        draftId,
+        leagueId: draft.leagueId,
+        leagueSport,
+        league,
+      });
+      sqlConditions.push(...poolConditions);
 
       // Exclude already-drafted players via NOT EXISTS (avoids growing literal list)
       sqlConditions.push(sql`NOT EXISTS (
         SELECT 1 FROM public.draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )`);
-
-      // Exclude players already rostered in this league (LS-8674: keeper
-      // designations are applied to rosters before the draft's first pick,
-      // so kept players must not appear in the draftable pool). A no-op for
-      // redraft leagues, whose rosters are empty at draft time.
-      const rosteredExclusionCondition = sql`NOT EXISTS (
-        SELECT 1 FROM public.team_members tm
-        WHERE tm.league_id = ${draft.leagueId} AND tm.player_id = p.id
-      )`;
-      sqlConditions.push(rosteredExclusionCondition);
 
       // Apply optional name filter
       if (search && search.trim().length > 0) {
@@ -460,26 +469,6 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
               WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
             )`,
         );
-      }
-
-      // Apply the league's static eligibility predicates (player pool, career
-      // games/seasons, Hall-of-Fame, era) via the SAME shared builder the pick
-      // endpoints use (LS-8071). The board layers its undrafted/search/position
-      // filters on top of this set, so it can only ever narrow the pool — never
-      // show a player the pick endpoints would reject. Career minimums default
-      // to 50 games / 3 seasons when the league has no explicit setting.
-      const eligibilityConditions = buildEligibilityConditions({
-        sport: leagueSport,
-        playerPool: league?.playerPool ?? 'all',
-        minCareerGames: league?.minCareerGames ?? 50,
-        minCareerSeasons: league?.minCareerSeasons ?? 3,
-        baseballHofOnly: league?.baseballHofOnly ?? false,
-        baseballEraFilter: league?.baseballEraFilter ?? undefined,
-        customEraStartYear: league?.customEraStartYear ?? null,
-        customEraEndYear: league?.customEraEndYear ?? null,
-      });
-      for (const { condition } of eligibilityConditions) {
-        sqlConditions.push(condition);
       }
 
       // Hide players who don't meet a still-open roster position requirement
@@ -547,62 +536,18 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         `COALESCE(cs.hitter_avg_ppg, 0) * ${gpm} + COALESCE(cs.pitching_avg_ppg, 0) * ${spm}`,
       );
 
-      // "True" ADP (real historical draft data) isn't collected yet, so the
-      // board falls back to a stack rank: each player's 1-based position when
-      // the league's *entire* draftable pool is ordered by projected value,
-      // using the league's own customized scoring settings when the league
-      // has ever edited them (scoring-cache row keyed by this league's id —
-      // LS-696), falling back to the default (league_id IS NULL) scoring
-      // profile otherwise, and finally to the projections/ADP pipeline
-      // column (players.projected_fantasy_points) for any player neither
-      // cache has computed yet. Football reads football_player_scoring_cache
-      // (LS-9484) instead of player_scoring_cache — same fallback shape.
-      //
-      // Computed as a window function over the pool-defining predicates only
-      // (sport, rostered-players exclusion, static eligibility) — deliberately
-      // *not* the already-drafted exclusion, search term, position pill, or
-      // open-roster-slot predicates layered on below — so a player's rank is
-      // fixed for the life of the draft: it does not shift when other players
-      // are picked, searched for, or filtered off the current page. Previously
-      // the board recomputed "ADP" as each player's array index within the
-      // remaining/paginated list, so drafting the top player reset the next
-      // best remaining player's ADP to 1 instead of preserving their rank.
-      const poolConditions = [
-        sportCondition,
-        rosteredExclusionCondition,
-        ...eligibilityConditions.map(({ condition }) => condition),
-      ];
-      const poolWhereClause = sql`WHERE ${sql.join(poolConditions, sql` AND `)}`;
-      const draftAdpCte =
-        leagueSport === 'football'
-          ? sql`
-        WITH draft_adp AS (
-          SELECT p.id AS player_id,
-            RANK() OVER (
-              ORDER BY COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric, 0) DESC
-            ) AS adp
-          FROM public.players p
-          LEFT JOIN public.football_player_scoring_cache cs_league
-            ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
-          LEFT JOIN public.football_player_scoring_cache cs_default
-            ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
-          ${poolWhereClause}
-        )
-      `
-          : sql`
-        WITH draft_adp AS (
-          SELECT p.id AS player_id,
-            RANK() OVER (
-              ORDER BY COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0) DESC
-            ) AS adp
-          FROM public.players p
-          LEFT JOIN public.player_scoring_cache cs_league
-            ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
-          LEFT JOIN public.player_scoring_cache cs_default
-            ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
-          ${poolWhereClause}
-        )
-      `;
+      // The rank shown in this column is the same stack rank DraftPick.adp
+      // reports for picks already made — both come from buildDraftAdpCte(),
+      // which owns the definition and the reasoning behind it (LS-10096).
+      // The pool predicates passed here are the pool-defining ones only:
+      // deliberately not the already-drafted exclusion, search term, position
+      // pill, or open-roster-slot filters layered on below, so a player's rank
+      // is fixed for the life of the draft.
+      const draftAdpCte = buildDraftAdpCte({
+        leagueId: draft.leagueId,
+        leagueSport,
+        poolConditions,
+      });
 
       // Base SELECT — no scoring join (used for non-scoring sorts).
       const basePlayerSelect = sql`

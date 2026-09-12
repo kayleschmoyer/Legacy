@@ -7,15 +7,30 @@ import {
   type LeagueTeam,
 } from './types';
 import { getPositionColor, normalizeTeamId } from './utils';
+import {
+  formatDelta,
+  formatNetValue,
+  pickValue,
+  signatureStat,
+  teamInitials,
+  teamNetValue,
+  type TintBand,
+  tintBand,
+} from './valueHeat';
 import type { SportKind } from '../../config/sports';
 import {
   BLUE_LIGHT,
   BRAND_GOLD,
+  BRAND_GOLD_PRESS,
   EMERALD_LIGHT,
   OUTLINE_SUBTLE,
+  SCORE_LOSS,
+  SCORE_WIN,
   SLATE_400,
+  SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  TEXT_SECONDARY,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
@@ -130,9 +145,13 @@ const Cell = tamaguiStyled(YStack, {
   overflow: 'hidden',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 28,
-  paddingHorizontal: 4,
-  paddingVertical: 5,
+  // Option C stacks three lines in the cell — pick/rank + delta, the player
+  // name, then position/club + signature stat — so the cell is taller than
+  // the single-line version it replaces (LS-10096).
+  minHeight: 60,
+  paddingHorizontal: 6,
+  paddingVertical: 6,
+  gap: 2,
   backgroundColor: SURFACE_OVERLAY_FAINT,
   borderWidth: 1,
   borderColor: BORDER_HAIRLINE,
@@ -142,6 +161,10 @@ const Cell = tamaguiStyled(YStack, {
       true: {
         backgroundColor: SURFACE_OVERLAY_SUBTLE,
         hoverStyle: { backgroundColor: SURFACE_OVERLAY_STRONG },
+        // A drafted cell lays its three lines out full-width top-to-bottom;
+        // an empty or on-the-clock cell keeps the centered single glyph.
+        alignItems: 'stretch',
+        justifyContent: 'space-between',
       },
       false: {},
     },
@@ -171,19 +194,140 @@ const CellName = tamaguiStyled(Text, {
   fontSize: 10,
 }) as StyledComponent;
 
-const CellPosGlyph = tamaguiStyled(Text, {
-  position: 'absolute',
-  bottom: 1,
-  right: 4,
+// ---------------------------------------------------------------------------
+// Value heat (LS-10096)
+//
+// Tint grounds and borders derive from the same SCORE_WIN / SCORE_LOSS tokens
+// the signed delta uses, at the alphas the option-C prototype established —
+// no new hues, and the ground and the number in it can never disagree about
+// which direction a pick went. DraftRail.tsx already tints a ground with
+// withAlpha(SCORE_WIN, …); this follows it.
+//
+// The tint is a *second* channel only. Every drafted cell also carries the
+// signed number, so the steal/reach signal survives for a colorblind reader
+// and at these deliberately low alphas. Both delta colors clear 4.5:1 against
+// their own tinted ground (SCORE_WIN #6FD39A and SCORE_LOSS #E07A8C are the
+// semantic *foreground* tokens, chosen over the darker base hues for exactly
+// that reason).
+// ---------------------------------------------------------------------------
+
+const TINT_GROUND: Record<TintBand, string | undefined> = {
+  3: withAlpha(SCORE_WIN, 0.14),
+  2: withAlpha(SCORE_WIN, 0.07),
+  0: undefined,
+  '-2': withAlpha(SCORE_LOSS, 0.07),
+  '-3': withAlpha(SCORE_LOSS, 0.14),
+};
+
+const TINT_BORDER: Record<TintBand, string | undefined> = {
+  3: withAlpha(SCORE_WIN, 0.42),
+  2: withAlpha(SCORE_WIN, 0.26),
+  0: undefined,
+  '-2': withAlpha(SCORE_LOSS, 0.26),
+  '-3': withAlpha(SCORE_LOSS, 0.42),
+};
+
+/** Color for a signed value: green above zero, red below, muted at zero, and
+ *  muted again when the value is unknown (rendered as an em dash). */
+const valueColor = (value: number | null): string => {
+  if (value == null || value === 0) return TEXT_MUTED;
+  return value > 0 ? SCORE_WIN : SCORE_LOSS;
+};
+
+const CellTopLine = tamaguiStyled(YStack, {
+  tag: 'div',
+  flexDirection: 'row',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  width: '100%',
+  gap: 4,
+}) as StyledComponent;
+
+const CellPickLabel = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700',
+  fontSize: 9,
+  letterSpacing: 0.4,
+  color: TEXT_MUTED,
+}) as StyledComponent;
+
+const CellDelta = tamaguiStyled(Text, {
   fontFamily: FONT_DISPLAY,
   fontWeight: '800',
-  fontSize: 16,
-  lineHeight: 16,
-  letterSpacing: 0.6,
-  opacity: 0.22,
-  pointerEvents: 'none',
+  fontSize: 12,
+}) as StyledComponent;
+
+const CellMeta = tamaguiStyled(Text, {
+  fontSize: 9,
+  color: TEXT_SECONDARY,
+  numberOfLines: 1,
+}) as StyledComponent;
+
+const CellStat = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700',
+  fontSize: 10,
   color: TEXT_PRIMARY,
 }) as StyledComponent;
+
+const CellStatLabel = tamaguiStyled(Text, {
+  fontSize: 8,
+  letterSpacing: 0.5,
+  color: TEXT_MUTED,
+  marginLeft: 3,
+}) as StyledComponent;
+
+const FooterLabelCell = tamaguiStyled(YStack, {
+  tag: 'div',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 4,
+  paddingVertical: 6,
+}) as StyledComponent;
+
+const FooterCell = tamaguiStyled(YStack, {
+  tag: 'div',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 4,
+  paddingVertical: 6,
+  backgroundColor: SURFACE_CARD,
+  borderWidth: 1,
+  borderColor: OUTLINE_SUBTLE,
+  borderRadius: 6,
+}) as StyledComponent;
+
+const LegendRow = tamaguiStyled(YStack, {
+  tag: 'div',
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 12,
+  marginTop: 10,
+  paddingTop: 10,
+  borderTopWidth: 1,
+  borderTopColor: OUTLINE_SUBTLE,
+}) as StyledComponent;
+
+const LegendSwatch = tamaguiStyled(YStack, {
+  width: 18,
+  height: 10,
+  borderRadius: 2,
+  borderWidth: 1,
+  borderColor: OUTLINE_SUBTLE,
+  marginRight: 5,
+}) as StyledComponent;
+
+/** Legend entries, in board order. The copy quotes the thresholds tintBand()
+ *  actually uses — the option-C prototype's legend said "8+" against code
+ *  that branches on 6 and 14, and that wrong copy is not carried across. */
+const LEGEND_BANDS: ReadonlyArray<{ band: TintBand; label: string }> = [
+  { band: 3, label: 'big steal — fell 14+ slots' },
+  { band: 2, label: 'steal — fell 6–13 slots' },
+  { band: 0, label: 'on consensus — within 5 slots' },
+  { band: -2, label: 'reach — 6–13 slots early' },
+  { band: -3, label: 'big reach — 14+ slots early' },
+];
 
 // `Text` from 'tamagui' doesn't type a `title` (web tooltip) prop; wrapping
 // via tamaguiStyled() relaxes it to Record<string, unknown> like the other
@@ -227,6 +371,20 @@ export function DraftGrid({
     return grid;
   }, [picks]);
 
+  // Picks grouped by team, for the footer totals. Keyed by String(teamId) to
+  // match how team identity is compared everywhere else in this component —
+  // team.id is a string and pick.teamId is a number.
+  const picksByTeam = useMemo(() => {
+    const byTeam = new Map<string, DraftPickRecord[]>();
+    for (const pick of picks) {
+      const key = String(pick.teamId);
+      const bucket = byTeam.get(key);
+      if (bucket) bucket.push(pick);
+      else byTeam.set(key, [pick]);
+    }
+    return byTeam;
+  }, [picks]);
+
   const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
   const currentTeamId = normalizeTeamId(currentPickInfo?.teamId);
 
@@ -234,7 +392,16 @@ export function DraftGrid({
     <GridView>
       <GridTable
         style={{
-          gridTemplateColumns: `60px repeat(${teams.length}, minmax(100px, 1fr))`,
+          // Plain CSS grid sizing, deliberately not Tamagui `$token` style
+          // props: structural layout derives from design-token breakpoints
+          // (or useDraftViewportTier()), never from Tamagui breakpoint keys.
+          // Those keys are mid-migration onto @legacy-sports/design-tokens a
+          // few at a time (LS-9895 → LS-9898), so which of them still resolve
+          // against @tamagui/config's stock widths changes as that lands —
+          // which is exactly why layout shouldn't be pinned to them. The
+          // 132px floor is option C's, widened from 100px to fit the
+          // three-line cell (LS-10096).
+          gridTemplateColumns: `60px repeat(${teams.length}, minmax(132px, 1fr))`,
         }}
       >
         {/* Header row */}
@@ -314,6 +481,20 @@ export function DraftGrid({
                   ? getPositionColor(sport, position)
                   : undefined;
                 const isMyTeam = pick.teamId === myTeamId;
+                const club = player?.club ?? pick.player?.club ?? null;
+                const stat = signatureStat(player, sport);
+
+                const value = pickValue(pick);
+                const band = tintBand(value);
+                const delta = formatDelta(value);
+                // The value's own tint wins over the position tint when the
+                // pick is a steal or a reach: the board's whole argument is
+                // about value, and two competing grounds in one cell would
+                // read as neither. Band 0 (on consensus, or rank unknown)
+                // leaves the position tint alone.
+                const ground = TINT_GROUND[band];
+                const edge = TINT_BORDER[band];
+
                 return (
                   <Cell
                     key={team.id}
@@ -321,9 +502,16 @@ export function DraftGrid({
                     meTeam={isMyTeam}
                     className={isMyTeam ? 'me-team' : undefined}
                     data-pos={position ?? undefined}
-                    title={`Pick #${pick.overallPick}: ${playerName}${position ? ` (${position})` : ''}`}
-                    style={
-                      posColor
+                    data-v={band}
+                    title={`Pick #${pick.overallPick}: ${playerName}${
+                      position ? ` (${position})` : ''
+                    } — ${
+                      value == null
+                        ? 'no consensus rank on file'
+                        : `consensus #${pick.adp}, ${delta}`
+                    }`}
+                    style={{
+                      ...(posColor
                         ? {
                             borderLeftWidth: 3,
                             borderLeftStyle: 'solid',
@@ -332,21 +520,47 @@ export function DraftGrid({
                               ? undefined
                               : withAlpha(posColor, POS_TINT_ALPHA),
                           }
-                        : undefined
-                    }
+                        : {}),
+                      ...(ground ? { backgroundColor: ground } : {}),
+                      ...(edge && !isMyTeam ? { borderColor: edge } : {}),
+                    }}
                   >
-                    <CellName color={TEXT_PRIMARY} fontWeight="600">
+                    <CellTopLine>
+                      <CellPickLabel>
+                        {`#${pick.overallPick} · ${
+                          pick.adp == null ? '#—' : `#${pick.adp}`
+                        }`}
+                      </CellPickLabel>
+                      <CellDelta
+                        color={valueColor(value)}
+                        aria-label={
+                          value == null
+                            ? 'Pick value unknown — no consensus rank on file'
+                            : `Pick value ${delta}`
+                        }
+                      >
+                        {delta}
+                      </CellDelta>
+                    </CellTopLine>
+                    <CellName
+                      color={TEXT_PRIMARY}
+                      fontWeight="700"
+                      fontSize={12}
+                      numberOfLines={1}
+                    >
                       {playerName}
                     </CellName>
-                    {position && (
-                      <CellPosGlyph
-                        aria-hidden="true"
-                        color={posColor}
-                        opacity={posColor ? 0.55 : 0.22}
-                      >
-                        {position}
-                      </CellPosGlyph>
-                    )}
+                    <CellTopLine>
+                      <CellMeta>
+                        {[position, club].filter(Boolean).join(' · ')}
+                      </CellMeta>
+                      {stat && (
+                        <CellStat>
+                          {stat.value}
+                          <CellStatLabel>{stat.label}</CellStatLabel>
+                        </CellStat>
+                      )}
+                    </CellTopLine>
                   </Cell>
                 );
               }
@@ -361,7 +575,84 @@ export function DraftGrid({
             })}
           </React.Fragment>
         ))}
+
+        {/* NET VALUE footer — one cell per team, colored by the sign of the
+            sum. Picks with no consensus rank contribute nothing (teamNetValue
+            skips them) rather than counting as zero. */}
+        <FooterLabelCell>
+          <Text
+            fontFamily={FONT_DISPLAY}
+            fontWeight="700"
+            fontSize={9}
+            letterSpacing={0.6}
+            color={TEXT_MUTED}
+            textAlign="center"
+          >
+            NET VALUE
+          </Text>
+        </FooterLabelCell>
+        {teams.map((team) => {
+          const isMyTeam = String(team.id) === String(myTeamId);
+          const total = teamNetValue(picksByTeam.get(String(team.id)) ?? []);
+          return (
+            <FooterCell
+              key={team.id}
+              borderColor={isMyTeam ? BRAND_GOLD_PRESS : undefined}
+            >
+              <Text fontSize={8} letterSpacing={0.8} color={TEXT_MUTED}>
+                {teamInitials(team.name)}
+              </Text>
+              <Text
+                fontFamily={FONT_DISPLAY}
+                fontWeight="800"
+                fontSize={12}
+                color={valueColor(total)}
+                aria-label={`${team.name} net draft value ${formatNetValue(total)}`}
+              >
+                {formatNetValue(total)}
+              </Text>
+            </FooterCell>
+          );
+        })}
       </GridTable>
+
+      {/* Tint legend. The bands quote the thresholds tintBand() uses, and the
+          last entry states that the signed number — not the tint — is the
+          signal every cell always carries. */}
+      <LegendRow>
+        <Text
+          fontFamily={FONT_DISPLAY}
+          fontWeight="700"
+          fontSize={10}
+          letterSpacing={0.8}
+          color={TEXT_MUTED}
+        >
+          TINT
+        </Text>
+        {LEGEND_BANDS.map(({ band, label }) => (
+          <YStack
+            key={band}
+            tag="div"
+            flexDirection="row"
+            alignItems="center"
+            gap={0}
+          >
+            <LegendSwatch
+              aria-hidden="true"
+              backgroundColor={TINT_GROUND[band] ?? SURFACE_CARD}
+              borderColor={TINT_BORDER[band] ?? OUTLINE_SUBTLE}
+            />
+            <Text fontSize={11} color={TEXT_SECONDARY}>
+              {label}
+            </Text>
+          </YStack>
+        ))}
+        <Text fontSize={11} color={TEXT_SECONDARY}>
+          Every cell shows the signed number too — pick number minus consensus
+          rank. An em dash means no consensus rank is on file: the pick takes no
+          tint and is left out of its team&rsquo;s net value.
+        </Text>
+      </LegendRow>
     </GridView>
   );
 }

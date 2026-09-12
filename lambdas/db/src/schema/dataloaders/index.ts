@@ -27,6 +27,8 @@ import {
   createSeasonPitchingLoader,
 } from './statistics-loaders';
 
+import { createDraftedPlayerAdpLoader } from './draft-loaders';
+
 import {
   createEligiblePositionsLoader,
   createLeaguePayrollConfigLoader,
@@ -108,6 +110,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   lockedTeamMembers: createLockedTeamMembersLoader(db),
   latestScoringChangeAt: createLatestScoringChangeAtLoader(db),
   scoringChangeLog: createScoringChangeLogLoader(db),
+  draftedPlayerAdp: createDraftedPlayerAdpLoader(db),
 });
 
 /**
