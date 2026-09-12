@@ -266,7 +266,6 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
-      rosterSize: 15,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'all',
@@ -285,11 +284,29 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
   });
 
+  it('does not send a rosterSize — the server uses the sport default (LS-10086)', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'all',
+      sport: 'baseball',
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    await screen.findByRole('button', { name: /Start Mock Draft/i });
+    expect(
+      mockInitializeMockDraft.mock.calls[0][0].variables,
+    ).not.toHaveProperty('rosterSize');
+  });
+
   it('forwards sport=football to initializeMockDraft and navigates to the football draft board', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
-      rosterSize: 15,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'afc',
@@ -319,7 +336,6 @@ describe('MockDraftPage — offline mode threading (LS-9144)', () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
-      rosterSize: 15,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'all',
@@ -345,7 +361,6 @@ describe('MockDraftPage — offline mode threading (LS-9144)', () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
-      rosterSize: 15,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'all',
@@ -375,7 +390,6 @@ describe('MockDraftPage — Shared-mode invite pause (LS-9181)', () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
-      rosterSize: 15,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'all',

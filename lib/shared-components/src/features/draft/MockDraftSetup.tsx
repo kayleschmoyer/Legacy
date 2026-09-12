@@ -4,7 +4,7 @@
  * Extracted from the canonical web `MockDraftPage` setup screen (LS-7711) so
  * web and native render the same battle-tested settings form instead of
  * maintaining parallel forks. This component owns the interactive settings
- * (team count, roster size, draft position, draft order, player pool, optional
+ * (team count, draft position, draft order, player pool, optional
  * sport toggle) plus the Start/Cancel actions and inline error/usage surfaces.
  *
  * Page-level chrome stays with each consumer: web wraps this in its gradient
@@ -43,9 +43,15 @@ export type MockDraftSport = 'baseball' | 'football';
  */
 export type MockDraftMode = 'shared' | 'offline';
 
+/**
+ * A mock draft always drafts a full sport-default roster (LS-10086) — the
+ * server derives the roster size from `DEFAULT_ROSTER_SIZE_BY_SPORT` and seeds
+ * the sport's default starting lineup into `league_positions`, so there is no
+ * roster-size setting to collect here. A shorter roster left most of the depth
+ * chart unfillable.
+ */
 export interface MockDraftSettings {
   numTeams: number;
-  rosterSize: number;
   userPickPosition: number;
   draftOrder: MockDraftOrder;
   playerPool: MockDraftPlayerPool;
@@ -100,7 +106,6 @@ export interface MockDraftSetupProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TEAM_OPTIONS = [4, 6, 8, 10, 12] as const;
-const ROSTER_OPTIONS = [5, 8, 10, 15] as const;
 
 const DRAFT_ORDER_OPTIONS: { label: string; value: MockDraftOrder }[] = [
   { label: 'Snake', value: 'snake' },
@@ -302,7 +307,6 @@ export function MockDraftSetup({
   const [numTeams, setNumTeams] = React.useState(
     initialNumTeams != null ? clampToTeamOption(initialNumTeams) : 8,
   );
-  const [rosterSize, setRosterSize] = React.useState(10);
   const [userPickPosition, setUserPickPosition] = React.useState(1);
   const [draftOrder, setDraftOrder] = React.useState<MockDraftOrder>(
     initialDraftOrder ?? 'snake',
@@ -326,7 +330,6 @@ export function MockDraftSetup({
   const handleStart = () => {
     onStart({
       numTeams,
-      rosterSize,
       userPickPosition,
       draftOrder,
       playerPool,
@@ -491,21 +494,6 @@ export function MockDraftSetup({
                 setNumTeams(n);
                 if (userPickPosition > n) setUserPickPosition(n);
               }}
-            />
-          ))}
-        </XStack>
-      </FieldSection>
-
-      {/* Rounds / Roster Size */}
-      <FieldSection label="Rounds (Roster Size)" labelId="roster-label">
-        <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-          {ROSTER_OPTIONS.map((n) => (
-            <OptionButton
-              key={n}
-              label={String(n)}
-              selected={rosterSize === n}
-              accent={EMERALD}
-              onPress={() => setRosterSize(n)}
             />
           ))}
         </XStack>

@@ -2738,9 +2738,9 @@ type Mutation {
     playerPool: String
 
     """
-    Number of roster slots per team
+    Deprecated and ignored (LS-10086). A mock draft always uses the sport's full default roster size so every configured starting slot can actually be filled. Retained as an optional argument so older clients keep working.
     """
-    rosterSize: Int!
+    rosterSize: Int
 
     """
     Sport for the mock draft league: "baseball" (default) or "football" (LS-9040).

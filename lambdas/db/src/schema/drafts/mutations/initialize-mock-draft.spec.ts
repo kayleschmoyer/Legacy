@@ -14,6 +14,11 @@
  * Control All Teams (LS-9253).
  */
 
+import {
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+  getDefaultRosterPositions,
+} from '@legacy-sports/utils';
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -72,6 +77,7 @@ async function captureInitializeMockDraftResolver(opts?: {
         inviteCode: 'inviteCode',
       },
       teams: { id: 'id', leagueId: 'leagueId' },
+      leaguePosition: { leagueId: 'leagueId', positionType: 'positionType' },
       leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
       drafts: { id: 'id', leagueId: 'leagueId' },
       draftTeams: { draftId: 'draftId', teamId: 'teamId' },
@@ -266,6 +272,96 @@ describe('initializeMockDraft transaction behavior', () => {
       undefined,
     );
     expect(result).toMatchObject({ leagueId: 1, draftId: 100 });
+  });
+
+  // ── Roster shape (LS-10086) ──────────────────────────────────────────────
+  // A mock league used to be created with zero league_positions rows and the
+  // caller's short practice roster, which left the draft room's depth chart
+  // with no starter slots to fill.
+  it('seeds the default baseball lineup and sizes the roster from the sport default, ignoring the caller rosterSize (LS-10086)', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }]) // league
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }]) // teams
+      .mockResolvedValueOnce([{ id: 100 }]); // draft
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    // rosterSize: 5 is the shortest option the old setup form offered — far
+    // below the 17-slot default baseball lineup. It must not be honored.
+    await resolve(
+      {},
+      { ...VALID_ARGS, rosterSize: 5 },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+
+    // First values() call is the league insert; second is the positions seed.
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      maxRosterSize: DEFAULT_ROSTER_SIZE_BY_SPORT.baseball,
+    });
+    expect(chain.values.mock.calls[1][0]).toEqual(
+      getDefaultRosterPositions('baseball').map((positionType) => ({
+        leagueId: 1,
+        positionType,
+      })),
+    );
+  });
+
+  it('seeds the IDP lineup and the football roster size for a football mock draft (LS-10086)', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }])
+      .mockResolvedValueOnce([{ id: 100 }]);
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    await resolve(
+      {},
+      { ...VALID_ARGS, sport: 'football', playerPool: 'afc' },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      defensiveFormat: 'idp',
+      maxRosterSize: DEFAULT_ROSTER_SIZE_BY_SPORT.football,
+    });
+    // Mock football leagues are always IDP, so the seed must be the IDP
+    // lineup — a DST slot could never be filled (LS-9475).
+    expect(chain.values.mock.calls[1][0]).toEqual(
+      getDefaultRosterPositions('football', 'idp').map((positionType) => ({
+        leagueId: 1,
+        positionType,
+      })),
+    );
   });
 
   it('propagates the error and returns no partial data when the transaction fails', async () => {

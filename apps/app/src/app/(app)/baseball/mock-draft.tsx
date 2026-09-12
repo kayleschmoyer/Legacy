@@ -207,7 +207,8 @@ export function MockDraftPage(): React.JSX.Element {
     const result = await initializeMockDraft({
       variables: {
         numTeams: settings.numTeams,
-        rosterSize: settings.rosterSize,
+        // rosterSize is deliberately omitted (LS-10086) — mock drafts always
+        // run the sport's full default roster, derived server-side.
         userPickPosition: settings.userPickPosition,
         // Offline mode ignores this and uses its own untimed sentinel server-side.
         pickTimeLimitSeconds: isOffline ? undefined : PICK_TIME_LIMIT_SECONDS,

@@ -166,8 +166,9 @@ describe('MockDraftPage', () => {
       await waitFor(() => {
         expect(mockInitMutate).toHaveBeenCalledWith({
           variables: {
+            // No rosterSize (LS-10086) — the server always uses the sport's
+            // full default roster for a mock draft.
             numTeams: 8,
-            rosterSize: 10,
             userPickPosition: 1,
             pickTimeLimitSeconds: 90,
             draftOrder: 'snake',

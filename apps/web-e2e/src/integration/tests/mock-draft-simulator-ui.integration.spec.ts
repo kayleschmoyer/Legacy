@@ -53,7 +53,10 @@ test.describe
   test.describe.configure({ retries: 0 });
 
   test.beforeAll(async ({ apiCommissioner }) => {
-    state = { leagueId: 0, numTeams: 4, rosterSize: 5 };
+    // rosterSize is no longer a setting the form collects (LS-10086) — every
+    // mock draft runs the sport's full default roster, so this mirrors
+    // DEFAULT_ROSTER_SIZE_BY_SPORT.baseball rather than a chosen value.
+    state = { leagueId: 0, numTeams: 4, rosterSize: 25 };
     // Reset the per-spec commissioner's free-tier weekly mock-draft usage so
     // MockDraftPage renders the setup form (not LimitReachedScreen) regardless
     // of leftover mock-draft leagues from prior runs (LS-7872).
@@ -104,12 +107,10 @@ test.describe
       }
     });
 
-    await test.step('Verify rounds (roster size) options are displayed', async () => {
-      for (const n of [5, 8, 10, 15]) {
-        await expect(
-          page.getByRole('button', { name: String(n), exact: true }).first(),
-        ).toBeVisible({ timeout: 5_000 });
-      }
+    await test.step('Verify there is no rounds (roster size) setting (LS-10086)', async () => {
+      // A mock draft always runs the sport's full default roster, so the
+      // setup form no longer collects a roster size.
+      await expect(page.getByText('Rounds (Roster Size)')).toHaveCount(0);
     });
 
     await test.step('Verify draft position buttons are displayed', async () => {
@@ -131,13 +132,6 @@ test.describe
       // Pick "Position 1" explicitly
       await page
         .getByRole('button', { name: '1', exact: true })
-        .first()
-        .click();
-    });
-
-    await test.step('Select 5 rounds (roster size)', async () => {
-      await page
-        .getByRole('button', { name: '5', exact: true })
         .first()
         .click();
     });
@@ -173,16 +167,10 @@ test.describe
       ).toBeVisible({ timeout: 30_000 });
     });
 
-    await test.step('Configure: 4 teams, 5 rounds, position 1', async () => {
+    await test.step('Configure: 4 teams, position 1', async () => {
       // Teams: 4
       await page
         .getByRole('button', { name: '4', exact: true })
-        .first()
-        .click();
-
-      // Roster size: 5
-      await page
-        .getByRole('button', { name: '5', exact: true })
         .first()
         .click();
 
@@ -249,10 +237,12 @@ test.describe
     commissionerPage: page,
     commissionerJwt,
   }) => {
-    // 4 teams × 5 rounds = 20 picks total.
-    // User (position 1) makes 5 picks; AI makes 15 picks via the nudge mechanism
-    // (30 s pick timer — mock-draft default).  15 × ~35 s ≈ 9 minutes.
-    test.setTimeout(15 * 60_000); // 15-minute ceiling
+    // 4 teams × 25 rounds = 100 picks total — a mock draft now runs the sport's
+    // full default roster (LS-10086), where it used to run a 5-round practice
+    // draft. User (position 1) makes 25 picks; AI makes 75 via the nudge
+    // mechanism, which drives a pick roughly every NUDGE_INTERVAL_MS (5 s)
+    // rather than waiting on the browser-side pick timer.
+    test.setTimeout(20 * 60_000); // 20-minute ceiling
 
     // ---- Direct-nudge helper -----------------------------------------------
     // Calling autoProcessDraftPicks from Node.js is more reliable than waiting
@@ -321,7 +311,7 @@ test.describe
         .not.toBeNull();
     });
 
-    const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20
+    const totalPicks = state.numTeams * state.rosterSize; // 4 × 25 = 100
     let pickCount = 0;
     const maxPicks = totalPicks + 5; // safety margin
     let consecutiveMisses = 0;

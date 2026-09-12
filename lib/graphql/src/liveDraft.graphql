@@ -449,7 +449,6 @@ query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
 
 mutation InitializeMockDraft(
   $numTeams: Int!
-  $rosterSize: Int!
   $userPickPosition: Int!
   $pickTimeLimitSeconds: Int
   $draftOrder: String
@@ -460,7 +459,6 @@ mutation InitializeMockDraft(
 ) {
   initializeMockDraft(
     numTeams: $numTeams
-    rosterSize: $rosterSize
     userPickPosition: $userPickPosition
     pickTimeLimitSeconds: $pickTimeLimitSeconds
     draftOrder: $draftOrder

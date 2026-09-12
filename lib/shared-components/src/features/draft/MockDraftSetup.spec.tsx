@@ -20,7 +20,6 @@ describe('MockDraftSetup', () => {
     expect(getByText('Shared')).toBeTruthy();
     expect(getByText('Offline')).toBeTruthy();
     expect(getByText('Number of Teams')).toBeTruthy();
-    expect(getByText('Rounds (Roster Size)')).toBeTruthy();
     expect(getByText('Draft Order')).toBeTruthy();
     expect(getByText('Player Pool')).toBeTruthy();
     expect(getByText('All MLB')).toBeTruthy();
@@ -40,7 +39,6 @@ describe('MockDraftSetup', () => {
 
     expect(onStart).toHaveBeenCalledWith<[MockDraftSettings]>({
       numTeams: 8,
-      rosterSize: 10,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'all',
@@ -48,6 +46,14 @@ describe('MockDraftSetup', () => {
       mode: 'shared',
       controlAllTeams: false,
     });
+  });
+
+  it('does not offer a roster-size setting — a mock always drafts the full default roster (LS-10086)', () => {
+    const { queryByText } = render(
+      <MockDraftSetup onStart={noop} onCancel={noop} />,
+    );
+
+    expect(queryByText('Rounds (Roster Size)')).toBeNull();
   });
 
   it('reflects Offline mode selection in the onStart payload (LS-9144)', () => {
@@ -186,7 +192,6 @@ describe('MockDraftSetup', () => {
 
     expect(onStart).toHaveBeenCalledWith<[MockDraftSettings]>({
       numTeams: 8,
-      rosterSize: 10,
       userPickPosition: 1,
       draftOrder: 'snake',
       playerPool: 'afc',

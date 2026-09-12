@@ -4,6 +4,10 @@
  * Creates an ephemeral mock draft league using the real EliteDraftBoard UI.
  * No rosters are persisted and no matchups are created at the end.
  *
+ * Both modes seed the sport's default starting lineup into `league_positions`
+ * and size the roster from `DEFAULT_ROSTER_SIZE_BY_SPORT` (LS-10086), so a
+ * mock league has the same roster shape a real league of that sport does.
+ *
  * Two modes, selected by `isOffline`:
  *
  *  - Offline (isOffline=true): solo practice against AI auto-pick teams,
@@ -34,6 +38,10 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+  getDefaultRosterPositions,
+} from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 
@@ -149,8 +157,12 @@ builder.mutationField('initializeMockDraft', (t) =>
         description: 'Total number of teams in the mock draft (2–12)',
       }),
       rosterSize: t.arg.int({
-        required: true,
-        description: 'Number of roster slots per team',
+        required: false,
+        description:
+          'Deprecated and ignored (LS-10086). A mock draft always uses the ' +
+          "sport's full default roster size so every configured starting " +
+          'slot can actually be filled. Retained as an optional argument so ' +
+          'older clients keep working.',
       }),
       userPickPosition: t.arg.int({
         required: true,
@@ -199,7 +211,6 @@ builder.mutationField('initializeMockDraft', (t) =>
 
       const {
         numTeams,
-        rosterSize,
         userPickPosition,
         pickTimeLimitSeconds: rawTimeLimit,
         draftOrder: rawDraftOrder,
@@ -231,9 +242,6 @@ builder.mutationField('initializeMockDraft', (t) =>
       // Validate inputs
       if (numTeams < 2 || numTeams > 12) {
         throw UserInputError('numTeams must be between 2 and 12');
-      }
-      if (rosterSize < 1 || rosterSize > 50) {
-        throw UserInputError('rosterSize must be between 1 and 50');
       }
       if (userPickPosition < 1 || userPickPosition > numTeams) {
         throw UserInputError(
@@ -301,6 +309,25 @@ builder.mutationField('initializeMockDraft', (t) =>
         );
       }
 
+      // Explicit rather than relying on the column's DEFAULT 'dst' (LS-9475):
+      // career_football_defense is empty, so a 'dst' mock draft's DST slot
+      // could never be filled. Only meaningful for football — baseball
+      // ignores this value.
+      const leagueDefensiveFormat = 'idp' as const;
+
+      // Roster shape (LS-10086). A mock draft mirrors a real league: the
+      // sport's default starting lineup is seeded into `league_positions`
+      // below, and the roster runs the sport's full default size so every
+      // starter slot is reachable. The caller's `rosterSize` is ignored — the
+      // short practice rosters it used to carry (5/8/10/15) were smaller than
+      // the default starting lineup, which left the draft room's depth chart
+      // and slot strip with no fillable starter slots at all.
+      const rosterSize = DEFAULT_ROSTER_SIZE_BY_SPORT[sport];
+      const defaultPositions = getDefaultRosterPositions(
+        sport,
+        leagueDefensiveFormat,
+      );
+
       LOGGER.info('Initializing mock draft', {
         userId,
         numTeams,
@@ -333,11 +360,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           name: 'Mock Draft Practice',
           owner: userId,
           sport,
-          // Explicit rather than relying on the column's DEFAULT 'dst'
-          // (LS-9475): career_football_defense is empty, so a 'dst' mock
-          // draft's DST slot could never be filled. Only meaningful for
-          // football — baseball ignores this column.
-          defensiveFormat: 'idp' as const,
+          defensiveFormat: leagueDefensiveFormat,
           playerPool,
           maxRosterSize: rosterSize,
           draftStatus: 'not-started' as const,
@@ -368,6 +391,20 @@ builder.mutationField('initializeMockDraft', (t) =>
             .insert(PublicSchema.leagues)
             .values(leagueValues)
             .returning();
+
+          // ── 1b. Seed the league's roster slots (LS-10086) ───────────────
+          // Real league creation seeds `league_positions` from the same
+          // helper; mock drafts never did, so the draft room's depth chart
+          // (which derives every starter bucket from these rows) had no
+          // starter slots and dropped every pick onto the bench. Seeding
+          // them also makes CPU auto-pickers position-aware, since
+          // getUnfilledPositionTypes returns [] for a league with no slots.
+          await tx.insert(PublicSchema.leaguePosition).values(
+            defaultPositions.map((positionType) => ({
+              leagueId: league.id,
+              positionType,
+            })),
+          );
 
           // ── 2. Create teams ─────────────────────────────────────────────
           // Teams are created in draft-order slots 1..numTeams. Slot

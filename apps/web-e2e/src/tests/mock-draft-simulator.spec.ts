@@ -207,7 +207,9 @@ test.describe('Mock Draft Simulator @regression', () => {
     }
   });
 
-  test('setup screen shows roster size (rounds) options', async ({ page }) => {
+  test('setup screen has no roster size (rounds) setting (LS-10086)', async ({
+    page,
+  }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/mock-draft');
     await page.waitForLoadState('load');
@@ -216,12 +218,9 @@ test.describe('Mock Draft Simulator @regression', () => {
       page.getByRole('heading', { name: /Mock Draft Simulator/i }),
     ).toBeVisible();
 
-    // All roster size buttons are visible
-    for (const n of [5, 8, 10, 15]) {
-      await expect(
-        page.getByRole('button', { name: String(n), exact: true }).first(),
-      ).toBeVisible();
-    }
+    // A mock draft always runs the sport's full default roster, so the form
+    // no longer collects a roster size.
+    await expect(page.getByText('Rounds (Roster Size)')).toHaveCount(0);
   });
 
   test('empty draft state shows Start Mock Draft button', async ({ page }) => {

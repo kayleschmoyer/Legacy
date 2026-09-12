@@ -2524,7 +2524,7 @@ export type MutationInitializeMockDraftArgs = {
   numTeams: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
-  rosterSize: Scalars['Int']['input'];
+  rosterSize?: InputMaybe<Scalars['Int']['input']>;
   sport?: InputMaybe<Scalars['String']['input']>;
   userPickPosition: Scalars['Int']['input'];
 };
@@ -13214,7 +13214,6 @@ export type GetDraftRecommendationsQuery = {
 
 export type InitializeMockDraftMutationVariables = Exact<{
   numTeams: Scalars['Int']['input'];
-  rosterSize: Scalars['Int']['input'];
   userPickPosition: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
@@ -33364,7 +33363,6 @@ export type GetDraftRecommendationsQueryResult = Apollo.QueryResult<
 export const InitializeMockDraft = gql`
   mutation InitializeMockDraft(
     $numTeams: Int!
-    $rosterSize: Int!
     $userPickPosition: Int!
     $pickTimeLimitSeconds: Int
     $draftOrder: String
@@ -33375,7 +33373,6 @@ export const InitializeMockDraft = gql`
   ) {
     initializeMockDraft(
       numTeams: $numTeams
-      rosterSize: $rosterSize
       userPickPosition: $userPickPosition
       pickTimeLimitSeconds: $pickTimeLimitSeconds
       draftOrder: $draftOrder
@@ -33409,7 +33406,6 @@ export type InitializeMockDraftMutationFn = MutationFunction<
  * const [initializeMockDraftMutation, { data, loading, error }] = useInitializeMockDraftMutation({
  *   variables: {
  *      numTeams: // value for 'numTeams'
- *      rosterSize: // value for 'rosterSize'
  *      userPickPosition: // value for 'userPickPosition'
  *      pickTimeLimitSeconds: // value for 'pickTimeLimitSeconds'
  *      draftOrder: // value for 'draftOrder'
