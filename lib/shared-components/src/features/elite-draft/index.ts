@@ -31,6 +31,17 @@ export {
   type TimelinePickState,
   type TimelineRound,
 } from './draftTimeline';
+export { DraftPlayerDock } from './DraftPlayerDock';
+export {
+  dockPickLabel,
+  dockRowColumns,
+  formatAvailableCount,
+  formatOpenSlots,
+  openSlotPositions,
+  playerFitsOpenSlot,
+  type DockRowColumns,
+  type DockSlotBucket,
+} from './draftDock';
 export { PickAnnouncement } from './PickAnnouncement';
 export { SkeletonCard as DraftSkeletonCard } from './SkeletonCard';
 

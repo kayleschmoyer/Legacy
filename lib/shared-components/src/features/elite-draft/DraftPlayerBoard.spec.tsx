@@ -473,3 +473,109 @@ describe('DraftPlayerBoard — Draft Board projection by tier (LS-10003)', () =>
     expect(queryByTestId('draft-grid')).toBeNull();
   });
 });
+
+// LS-10005: the player list rides in a dock under the board at every tier
+// this component renders, re-hosting the Cards/Table views' player browser
+// rather than forking one.
+describe('DraftPlayerBoard — player dock (LS-10005)', () => {
+  const dockProps = (overrides: Record<string, unknown> = {}) =>
+    makeProps({
+      viewMode: 'board' as const,
+      isMyPick: true,
+      boardOrderedTeams: [
+        { id: '1', name: 'Bronx Bombers', leagueId: 1 },
+        { id: '2', name: 'Sandlot Swingers', leagueId: 1 },
+      ],
+      currentPickInfo: {
+        draftId: 42,
+        teamId: 1,
+        round: 1,
+        pickNumber: 1,
+        overallPick: 1,
+        isComplete: false,
+      },
+      timeRemaining: 47,
+      pickTimeLimitSeconds: 90,
+      ...overrides,
+    });
+
+  it.each(['tablet', 'desktop'] as const)(
+    'docks under the board at the %s tier',
+    (tier) => {
+      mockTier = tier;
+      const { getByTestId } = render(<DraftPlayerBoard {...dockProps()} />);
+      expect(getByTestId('draft-player-dock')).toBeTruthy();
+    },
+  );
+
+  it('lays rows out 1-up at the tablet tier', () => {
+    mockTier = 'tablet';
+    const { getByTestId } = render(<DraftPlayerBoard {...dockProps()} />);
+    expect(
+      getByTestId('draft-player-dock-rows').getAttribute('data-cols'),
+    ).toBe('1');
+  });
+
+  it('is not part of the other views', () => {
+    const { queryByTestId } = render(
+      <DraftPlayerBoard {...dockProps({ viewMode: 'table' as const })} />,
+    );
+    expect(queryByTestId('draft-player-dock')).toBeNull();
+  });
+
+  it('fills its bar from the board state it already holds', () => {
+    const { getByText } = render(
+      <DraftPlayerBoard {...dockProps({ hasMorePlayers: true })} />,
+    );
+
+    expect(getByText('Your pick · #1')).toBeTruthy();
+    expect(
+      getByText(/^1\+ available · open slots: C, 1B, 2B, 3B/),
+    ).toBeTruthy();
+    expect(getByText('0:47 left')).toBeTruthy();
+  });
+
+  it('lists the same filtered rows the other views render', () => {
+    const { getByTestId } = render(<DraftPlayerBoard {...dockProps()} />);
+    expect(getByTestId('draft-player-dock-row-1').textContent).toContain(
+      'Test Hitter',
+    );
+  });
+
+  it('re-hosts the shared search + position control, wired to the same state', () => {
+    const onSetSearchTerm = jest.fn();
+    const onSetSelectedPosition = jest.fn();
+    const { getByTestId } = render(
+      <DraftPlayerBoard
+        {...dockProps({ onSetSearchTerm, onSetSelectedPosition })}
+      />,
+    );
+    const body = within(getByTestId('draft-player-dock-body'));
+
+    fireEvent.change(body.getByLabelText('Search players'), {
+      target: { value: 'gehrig' },
+    });
+    expect(onSetSearchTerm).toHaveBeenCalledWith('gehrig');
+
+    expect(body.getByRole('radiogroup')).toBeTruthy();
+    fireEvent.click(body.getByText('SS'));
+    expect(onSetSelectedPosition).toHaveBeenCalledWith('SS');
+  });
+
+  it('drafts through the board pick routing', () => {
+    const onDraftPlayer = jest.fn();
+    const { getByLabelText } = render(
+      <DraftPlayerBoard {...dockProps({ onDraftPlayer })} />,
+    );
+
+    fireEvent.click(getByLabelText('Draft Test Hitter'));
+    expect(onDraftPlayer).toHaveBeenCalledWith(1);
+  });
+
+  it("offers no DRAFT action on another team's turn", () => {
+    const { queryByLabelText } = render(
+      <DraftPlayerBoard {...dockProps({ isMyPick: false })} />,
+    );
+    expect(queryByLabelText('Draft Test Hitter')).toBeNull();
+  });
+});

@@ -31,6 +31,11 @@ export interface DepthChartBucket {
   positionType: string;
   total: number;
   players: DraftPlayer[];
+  /** Stat positions this slot accepts (the union across every roster row
+   *  that collapsed into it), or `null` for BENCH, which accepts anyone.
+   *  Lets the player dock (LS-10005) ask "does this player fill an open
+   *  slot?" without re-deriving slot eligibility. */
+  accepts: ReadonlySet<string> | null;
 }
 
 export const BENCH_SLOT = 'BENCH';
@@ -90,7 +95,12 @@ export function buildDepthChartBuckets(
   const buckets = new Map<string, DepthChartBucket>(
     order.map((key) => [
       key,
-      { positionType: key, total: totals.get(key) ?? 0, players: [] },
+      {
+        positionType: key,
+        total: totals.get(key) ?? 0,
+        players: [],
+        accepts: key === BENCH_SLOT ? null : (allowedByBucket.get(key) ?? null),
+      },
     ]),
   );
 

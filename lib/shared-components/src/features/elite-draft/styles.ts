@@ -1473,6 +1473,115 @@ export const CSS = `
 .d-tl-pick.now .d-tl-pick-name { color: var(--d-accent); font-style: italic; }
 .d-tl-pick.up .d-tl-pick-name { color: var(--d-text-muted); }
 
+/* ===== Draft Board player dock (LS-10005) =====
+   The player list pinned to the bottom of the board pane under whichever
+   projection is mounted, collapsed to a bar until opened. Ported from the
+   mock's .bd-dock rules in
+   docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/project/
+   styles/mobile.css. Deliberately NOT width-gated: the mock shows the dock at
+   every tier of its desktop frame, and the rows-per-line split (1/2/3-up) is
+   a React decision on the design-token tier, set here via data-cols rather
+   than a media query. Raw rgba washes in the mock map onto --d-* tokens (the
+   LS-8518 theme-compliance ratchet admits no new literals). */
+.d-dock {
+  position: sticky; bottom: 0; z-index: 5;
+  margin: 12px -2px 0;
+  background: var(--d-panel);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--d-accent-dark);
+  border-bottom: 0;
+  border-radius: var(--d-radius-md) var(--d-radius-md) 0 0;
+  box-shadow: var(--d-panel-shadow);
+}
+.d-dock-bar { display: flex; align-items: center; gap: 14px; padding: 11px 14px; }
+.d-dock-bar-text { flex: 1; min-width: 0; }
+.d-dock-label {
+  font-family: var(--f-display); font-weight: 800; font-size: 11px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--d-accent);
+}
+.d-dock-sub {
+  font-size: 11px; color: var(--d-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.d-dock-cta {
+  min-height: 40px; padding: 0 18px; flex: none;
+  border-radius: var(--d-radius-sm);
+  border: 1px solid var(--d-accent); background: var(--d-accent);
+  color: var(--d-bg);
+  font-family: var(--f-display); font-weight: 800; font-size: 13px;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.d-dock-chev {
+  min-width: 36px; min-height: 36px; flex: none;
+  border-radius: var(--d-radius-sm);
+  border: 1px solid var(--d-border); background: var(--d-panel);
+  color: var(--d-text-secondary); font-size: 13px; cursor: pointer;
+  transition: transform 200ms ease, color 140ms;
+}
+.d-dock[data-open="true"] .d-dock-chev { transform: rotate(180deg); color: var(--d-accent); }
+.d-dock-cta:focus-visible, .d-dock-chev:focus-visible, .d-dock-go:focus-visible, .d-dock-more:focus-visible {
+  outline: 2px solid var(--d-accent); outline-offset: 2px;
+}
+/* Collapses by max-height, never display:none or unmount, so the rows keep
+   their scroll position across a close/open. */
+.d-dock-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 260ms cubic-bezier(.22,.7,.2,1);
+}
+.d-dock[data-open="true"] .d-dock-body { max-height: 340px; }
+.d-dock-inner { border-top: 1px solid var(--d-border); padding: 12px 14px 14px; }
+.d-dock-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.d-dock-rows {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px; max-height: 232px; overflow-y: auto;
+}
+.d-dock-rows[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
+.d-dock-rows[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.d-dock-prow {
+  display: grid; grid-template-columns: 26px 1fr auto;
+  gap: 10px; align-items: center;
+  padding: 8px 10px;
+  background: var(--d-card);
+  border: 1px solid var(--d-border);
+  border-radius: var(--d-radius-sm);
+}
+.d-dock-prow.fits { border-color: var(--d-accent-dark); }
+.d-dock-rk {
+  font-family: var(--f-display); font-weight: 800; font-size: 11px;
+  color: var(--d-text-muted); text-align: center; font-variant-numeric: tabular-nums;
+}
+.d-dock-prow-body { min-width: 0; }
+.d-dock-nm {
+  font-family: var(--f-display); font-weight: 700; font-size: 15px; line-height: 1.1;
+  color: var(--d-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.d-dock-mt {
+  font-size: 10px; color: var(--d-text-secondary); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.d-dock-go {
+  min-height: 32px; padding: 6px 11px;
+  border-radius: 6px; border: 1px solid var(--d-accent-dark);
+  background: var(--d-accent-dim); color: var(--d-accent);
+  font-family: var(--f-display); font-weight: 800; font-size: 10px;
+  letter-spacing: 0.08em; cursor: pointer;
+}
+.d-dock-go:hover { border-color: var(--d-accent); }
+.d-dock-go:disabled { opacity: 0.5; cursor: default; }
+.d-dock-empty {
+  grid-column: 1 / -1; padding: 18px; text-align: center;
+  font-size: 12px; font-style: italic; color: var(--d-text-muted);
+}
+.d-dock-more {
+  grid-column: 1 / -1; min-height: 36px;
+  border-radius: var(--d-radius-sm); border: 1px solid var(--d-border);
+  background: var(--d-panel); color: var(--d-text-secondary);
+  font-family: var(--f-display); font-weight: 700; font-size: 12px;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.d-dock-more:hover { color: var(--d-text); border-color: var(--d-border-hover); }
+
 /* ===== Toast Notifications ===== */
 .d-toast {
   position: fixed; bottom: 20px; right: 20px; z-index: 2000;

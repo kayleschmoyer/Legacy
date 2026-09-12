@@ -84,3 +84,21 @@ describe('elite-draft timeline is not media-gated (LS-10003)', () => {
     }
   });
 });
+
+// LS-10005: the player dock shows at every tier of the wide layout and its
+// 1/2/3-up row split is a React decision on the design-token tier (`data-cols`).
+// A width query touching `.d-dock` would be a second, drift-prone boundary.
+describe('elite-draft player dock is not media-gated (LS-10005)', () => {
+  it('defines .d-dock and its column rules outside every media query', () => {
+    const withoutMediaBlocks = CSS.replace(/@media[^{]*\{[\s\S]*?\n\}/g, '');
+    expect(withoutMediaBlocks).toContain('.d-dock {');
+    expect(withoutMediaBlocks).toContain('.d-dock-rows[data-cols="1"]');
+    expect(withoutMediaBlocks).toContain('.d-dock-rows[data-cols="3"]');
+  });
+
+  it('never restyles the dock by width', () => {
+    for (const block of CSS.matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)) {
+      expect(block[1]).not.toContain('.d-dock');
+    }
+  });
+});

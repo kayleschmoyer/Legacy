@@ -11,6 +11,17 @@ import type {
 import { DraftGrid } from './DraftGrid';
 import { DraftBoardTimeline } from './DraftBoardTimeline';
 import { BENCH_SLOT, buildDepthChartBuckets } from './rosterSlots';
+import { DraftPlayerDock } from './DraftPlayerDock';
+import {
+  dockPickLabel,
+  dockRowColumns,
+  type DockRowColumns,
+  formatAvailableCount,
+  formatOpenSlots,
+  openSlotPositions,
+  playerFitsOpenSlot,
+} from './draftDock';
+import { computeMyUpcomingPicks, formatClock } from './nativeDraftBoard';
 import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
@@ -240,9 +251,8 @@ interface DraftPlayerBoardProps {
   loadingMore: boolean;
   onlineTeamIds: ReadonlySet<string>;
   /** Seconds left on the current pick. Feeds the Draft Board timeline's clock
-   *  header below the `desktop` tier (LS-10003); the grid has no clock of its
-   *  own, so this is unused at and above that boundary. Already-loaded screen
-   *  state, not a new query. */
+   *  header below the `desktop` tier (LS-10003) and the player dock's bar at
+   *  every tier (LS-10005). Already-loaded screen state, not a new query. */
   timeRemaining?: number;
   /** Seconds the current pick started with — the timeline ring's denominator. */
   pickTimeLimitSeconds?: number;
@@ -298,6 +308,15 @@ function useDepthGridColumns(): number {
   return width >= breakpoints.xl ? 4 : 3;
 }
 
+/** The player dock's rows-per-line (LS-10005) — 1-up / 2-up / 3-up. Same
+ *  provider-free tier + width inputs as `useDepthGridColumns`; the mapping
+ *  itself lives in `draftDock.ts`. */
+function useDockRowColumns(): DockRowColumns {
+  const tier = useDraftViewportTier();
+  const { width } = useWindowDimensions();
+  return dockRowColumns(tier, width);
+}
+
 // Colors are sourced exclusively from the CSS custom properties `styles.ts`
 // injects (every consumer of this component renders `<style>{CSS}</style>`
 // before it) rather than hex/rgba literals, per the theme-compliance ratchet
@@ -316,6 +335,164 @@ const TEXT = 'var(--d-text)';
 const TEXT_SECONDARY = 'var(--d-text-secondary)';
 const TEXT_MUTED = 'var(--d-text-muted)';
 const PANEL = 'var(--d-panel)';
+
+/**
+ * Search field + position-filter pills — the player browser's filter
+ * control. One component, two hosts: the Cards / Data Table views' controls
+ * bar, and the Draft Board's player dock (LS-10005). Both drive the same
+ * screen-level `searchTerm` / `selectedPosition` state, so a filter set in one
+ * is still set in the other.
+ */
+function DraftPlayerFilters({
+  positions,
+  selectedPosition,
+  searchTerm,
+  loading: availablePlayersLoading,
+  onSetSearchTerm,
+  onSetSelectedPosition,
+}: {
+  positions: readonly string[];
+  selectedPosition: string;
+  searchTerm: string;
+  loading: boolean;
+  onSetSearchTerm: (v: string) => void;
+  onSetSelectedPosition: (v: string) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <SearchWrap>
+        <YStack position="absolute" left={12} zIndex={1} pointerEvents="none">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={TEXT_MUTED}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width={15}
+            height={15}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </YStack>
+        <Input
+          flex={1}
+          size="$3"
+          borderRadius={10}
+          borderWidth={1}
+          borderColor={BORDER}
+          backgroundColor={PANEL}
+          color={TEXT}
+          fontSize={13}
+          paddingLeft={38}
+          paddingRight={searchTerm ? 34 : 14}
+          placeholder="Search available players..."
+          placeholderTextColor={TEXT_MUTED}
+          aria-label="Search players"
+          value={searchTerm}
+          onChangeText={onSetSearchTerm}
+        />
+        {searchTerm ? (
+          <YStack
+            role="button"
+            tabIndex={0}
+            accessibilityRole="button"
+            aria-label="Clear search"
+            onPress={() => onSetSearchTerm('')}
+            cursor="pointer"
+            position="absolute"
+            right={8}
+            padding={4}
+            borderRadius={999}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={TEXT_MUTED}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="14"
+              height="14"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </YStack>
+        ) : availablePlayersLoading ? (
+          <YStack position="absolute" right={12}>
+            <Spinner size="small" color={ACCENT} />
+          </YStack>
+        ) : null}
+      </SearchWrap>
+      <PillsRow
+        role="radiogroup"
+        accessibilityRole="radiogroup"
+        aria-label="Filter by position"
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+          const idx = positions.indexOf(selectedPosition);
+          let next = idx;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            next = (idx + 1) % positions.length;
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            next = (idx - 1 + positions.length) % positions.length;
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            next = 0;
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            next = positions.length - 1;
+          }
+          if (next !== idx) {
+            onSetSelectedPosition(positions[next]);
+            e.currentTarget
+              .querySelectorAll<HTMLButtonElement>('[role="radio"]')
+              [next]?.focus();
+          }
+        }}
+      >
+        {positions.map((pos) => {
+          const active = selectedPosition === pos;
+          return (
+            <XStack
+              key={pos}
+              role="radio"
+              accessibilityRole="radio"
+              aria-checked={active}
+              accessibilityState={{ selected: active }}
+              tabIndex={active ? 0 : -1}
+              onPress={() => onSetSelectedPosition(pos)}
+              cursor="pointer"
+              paddingVertical={6}
+              paddingHorizontal={13}
+              borderRadius={999}
+              borderWidth={1}
+              borderColor={active ? ACCENT_DIM : BORDER}
+              style={csp({
+                background: active
+                  ? `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`
+                  : SURFACE,
+              })}
+              // mirrors the original `.d-pill`'s `$md:` (≤768px) min-height bump
+              $md={{ minHeight: 36 }}
+            >
+              <Text
+                fontSize={12}
+                fontWeight="600"
+                color={active ? 'white' : TEXT_SECONDARY}
+              >
+                {pos}
+              </Text>
+            </XStack>
+          );
+        })}
+      </PillsRow>
+    </>
+  );
+}
 
 export function DraftPlayerBoard({
   viewMode,
@@ -371,6 +548,7 @@ export function DraftPlayerBoard({
   // exactly where the mock's own `@container vp (max-width: 979px)` block
   // hides `.board-grid` and shows `.board-timeline`.
   const showBoardTimeline = useDraftViewportTier() !== 'desktop';
+  const dockColumns = useDockRowColumns();
 
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
@@ -519,6 +697,39 @@ export function DraftPlayerBoard({
     [statsLookup],
   );
 
+  // ── Player dock (LS-10005) — every value below re-projects state this
+  // component already holds; the dock adds no query and no list state. ──
+  const openSlots = useMemo(
+    () => openSlotPositions(depthChartBuckets),
+    [depthChartBuckets],
+  );
+  const fitsOpenSlot = useCallback(
+    (player: DraftPlayer) => playerFitsOpenSlot(player, depthChartBuckets),
+    [depthChartBuckets],
+  );
+  const myNextOverallPick = useMemo(() => {
+    const myTeamIndex =
+      myTeamId == null
+        ? -1
+        : boardOrderedTeams.findIndex((t) => String(t.id) === String(myTeamId));
+    return (
+      computeMyUpcomingPicks({
+        currentPickInfo,
+        teamCount: boardOrderedTeams.length,
+        myTeamIndex,
+        count: 1,
+      })[0]?.overallPick ?? null
+    );
+  }, [boardOrderedTeams, myTeamId, currentPickInfo]);
+  const pickOnClock = currentPickInfo != null && !currentPickInfo.isComplete;
+  const dockClockLabel = !pickOnClock
+    ? null
+    : draftPaused
+      ? 'Paused'
+      : untimed
+        ? null
+        : `${formatClock(timeRemaining)} left`;
+
   const showSearchControls =
     viewMode === 'grid' ||
     viewMode === 'list' ||
@@ -605,140 +816,14 @@ export function DraftPlayerBoard({
               boxShadow: PANEL_SHADOW,
             })}
           >
-            <SearchWrap>
-              <YStack
-                position="absolute"
-                left={12}
-                zIndex={1}
-                pointerEvents="none"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={TEXT_MUTED}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  width={15}
-                  height={15}
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </YStack>
-              <Input
-                flex={1}
-                size="$3"
-                borderRadius={10}
-                borderWidth={1}
-                borderColor={BORDER}
-                backgroundColor={PANEL}
-                color={TEXT}
-                fontSize={13}
-                paddingLeft={38}
-                paddingRight={searchTerm ? 34 : 14}
-                placeholder="Search available players..."
-                placeholderTextColor={TEXT_MUTED}
-                aria-label="Search players"
-                value={searchTerm}
-                onChangeText={onSetSearchTerm}
-              />
-              {searchTerm ? (
-                <YStack
-                  role="button"
-                  accessibilityRole="button"
-                  aria-label="Clear search"
-                  onPress={() => onSetSearchTerm('')}
-                  cursor="pointer"
-                  position="absolute"
-                  right={8}
-                  padding={4}
-                  borderRadius={999}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={TEXT_MUTED}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    width="14"
-                    height="14"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </YStack>
-              ) : availablePlayersLoading ? (
-                <YStack position="absolute" right={12}>
-                  <Spinner size="small" color={ACCENT} />
-                </YStack>
-              ) : null}
-            </SearchWrap>
-            <PillsRow
-              role="radiogroup"
-              accessibilityRole="radiogroup"
-              aria-label="Filter by position"
-              onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
-                const idx = positions.indexOf(selectedPosition);
-                let next = idx;
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  next = (idx + 1) % positions.length;
-                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  next = (idx - 1 + positions.length) % positions.length;
-                } else if (e.key === 'Home') {
-                  e.preventDefault();
-                  next = 0;
-                } else if (e.key === 'End') {
-                  e.preventDefault();
-                  next = positions.length - 1;
-                }
-                if (next !== idx) {
-                  onSetSelectedPosition(positions[next]);
-                  e.currentTarget
-                    .querySelectorAll<HTMLButtonElement>('[role="radio"]')
-                    [next]?.focus();
-                }
-              }}
-            >
-              {positions.map((pos) => {
-                const active = selectedPosition === pos;
-                return (
-                  <XStack
-                    key={pos}
-                    role="radio"
-                    accessibilityRole="radio"
-                    aria-checked={active}
-                    accessibilityState={{ selected: active }}
-                    tabIndex={active ? 0 : -1}
-                    onPress={() => onSetSelectedPosition(pos)}
-                    cursor="pointer"
-                    paddingVertical={6}
-                    paddingHorizontal={13}
-                    borderRadius={999}
-                    borderWidth={1}
-                    borderColor={active ? ACCENT_DIM : BORDER}
-                    style={csp({
-                      background: active
-                        ? `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`
-                        : SURFACE,
-                    })}
-                    // mirrors the original `.d-pill`'s `$md:` (≤768px) min-height bump
-                    $md={{ minHeight: 36 }}
-                  >
-                    <Text
-                      fontSize={12}
-                      fontWeight="600"
-                      color={active ? 'white' : TEXT_SECONDARY}
-                    >
-                      {pos}
-                    </Text>
-                  </XStack>
-                );
-              })}
-            </PillsRow>
+            <DraftPlayerFilters
+              positions={positions}
+              selectedPosition={selectedPosition}
+              searchTerm={searchTerm}
+              loading={availablePlayersLoading}
+              onSetSearchTerm={onSetSearchTerm}
+              onSetSelectedPosition={onSetSelectedPosition}
+            />
           </ControlsBar>
         )}
 
@@ -781,6 +866,53 @@ export function DraftPlayerBoard({
                 : 20
             }
             onlineTeamIds={onlineTeamIds}
+          />
+        )}
+
+        {/* Player dock (LS-10005) — pinned under whichever board projection
+            is mounted, at every tier this component renders. The mock places
+            `.bd-dock` beside both `.board-timeline` and `.board-grid` and no
+            width rule hides it; only its row count varies by tier. */}
+        {viewMode === 'board' && (
+          <DraftPlayerDock
+            sport={sport}
+            pickLabel={dockPickLabel({
+              currentPickInfo,
+              isMyPick,
+              myNextOverallPick,
+            })}
+            availableLabel={formatAvailableCount(
+              filteredPlayers.length,
+              hasMorePlayers,
+            )}
+            openSlotsLabel={formatOpenSlots(openSlots)}
+            clockLabel={dockClockLabel}
+            columns={dockColumns}
+            tools={
+              <DraftPlayerFilters
+                positions={positions}
+                selectedPosition={selectedPosition}
+                searchTerm={searchTerm}
+                loading={availablePlayersLoading}
+                onSetSearchTerm={onSetSearchTerm}
+                onSetSelectedPosition={onSetSelectedPosition}
+              />
+            }
+            players={filteredPlayers}
+            fitsOpenSlot={fitsOpenSlot}
+            canDraft={pickOnClock && canPickForTeam}
+            isCommPick={isRealCommPick}
+            pickLoading={
+              isRealCommPick || (controlAllTeams && !isMyPick)
+                ? false
+                : pickLoading
+            }
+            loading={availablePlayersLoading}
+            hasMore={hasMorePlayers}
+            loadingMore={loadingMore}
+            searchTerm={searchTerm}
+            onDraftPlayer={handleDraftPlayer}
+            onLoadMore={onLoadMore}
           />
         )}
 
