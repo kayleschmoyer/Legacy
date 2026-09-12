@@ -10,7 +10,7 @@ export default [
     rules: {},
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['apps/graphql-explorer/tsconfig.*?.json'],
       },
     },
   },

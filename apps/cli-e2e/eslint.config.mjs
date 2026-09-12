@@ -8,7 +8,7 @@ export default [
     rules: {},
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['apps/cli-e2e/tsconfig.*?.json'],
       },
     },
   },

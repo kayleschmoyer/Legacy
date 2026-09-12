@@ -588,9 +588,7 @@ const customConfig = {
 // web, mobile, and any other platforms using Tamagui
 
 // Create and export the Tamagui configuration
-export const tamaguiConfig: TamaguiInternalConfig = createTamagui(
-  customConfig,
-) as TamaguiInternalConfig;
+export const tamaguiConfig: TamaguiInternalConfig = createTamagui(customConfig);
 
 // Foundation tokens (spacing scale, radii, typography ramp, box-shadow
 // recipes) re-exported for downstream code paths that need the raw value

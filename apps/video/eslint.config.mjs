@@ -8,8 +8,11 @@ export default [
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['apps/video/tsconfig.json'],
       },
     },
+  },
+  {
+    ignores: ['**/remotion.config.ts'],
   },
 ];

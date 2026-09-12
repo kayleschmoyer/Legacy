@@ -8,7 +8,7 @@ export default [
     rules: {},
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['lambdas/jira-proxy/tsconfig.*?.json'],
       },
     },
   },

@@ -23,7 +23,7 @@ export default [
     rules: {},
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['lambdas/db/tsconfig.*?.json'],
       },
     },
   },
@@ -79,6 +79,8 @@ export default [
       '**/dist',
       '**/src/.startup.ts',
       '**/index.js',
+      'scripts/print-schema.ts',
+      'test-setup.ts',
     ],
   },
 ];

@@ -30,7 +30,7 @@ export default [
     },
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: ['apps/app-e2e/tsconfig.*?.json'],
       },
     },
   },
@@ -38,5 +38,8 @@ export default [
     files: ['**/*.js', '**/*.jsx'],
     // Override or add rules here
     rules: {},
+  },
+  {
+    ignores: ['**/test-setup.ts'],
   },
 ];
