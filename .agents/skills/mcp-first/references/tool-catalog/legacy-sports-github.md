@@ -356,7 +356,7 @@ Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved thread
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `numbers` | number[] | **required** | min 1, max 50, coerced, integer, > 0 | PR numbers |
-| `compact` | boolean |  | — | Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage |
+| `compact` | boolean |  | — | Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads) |
 
 ### `github_pr_commits`
 

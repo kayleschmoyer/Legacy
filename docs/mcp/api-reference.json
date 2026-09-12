@@ -5592,7 +5592,7 @@
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage"
+              "description": "Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads)"
             }
           },
           "transports": [

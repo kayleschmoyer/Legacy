@@ -1,6 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
+import { CI_FAILURE_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
 import {
   dedupeLatestByName,
@@ -11,21 +12,6 @@ import {
   deriveReviewDecision,
   fetchAllReviews,
 } from '../utils/github-reviews.js';
-
-// GraphQL CheckConclusionState values that represent a genuine failure for
-// `checksSummary`. CANCELLED and STALE are deliberately excluded: both mean the
-// run was superseded by a newer run on the same SHA (concurrency dedup, a later
-// push invalidating a stale check) rather than a real failure, and folding them
-// into `failed` misleads the drive-to-green loop into diagnosing CI failures
-// that do not exist (LS-9384). Expressed as an explicit failure allow-list
-// (rather than excluding known-benign conclusions) so an unrecognized future
-// conclusion value defaults to "not a failure" instead of silently failing.
-const FAILURE_CONCLUSIONS = new Set([
-  'FAILURE',
-  'TIMED_OUT',
-  'ACTION_REQUIRED',
-  'STARTUP_FAILURE',
-]);
 
 type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
 
@@ -397,12 +383,18 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
     const include = new Set<ViewPRField>(params.fields ?? []);
 
     const checksRaw = dedupeLatestByName(normalizeChecks(checkNodes));
+    // CANCELLED and STALE are deliberately not failures: both mean the run was
+    // superseded by a newer run on the same SHA (concurrency dedup, a later push
+    // invalidating a stale check) rather than a real failure, and folding them
+    // into `failed` misleads the drive-to-green loop into diagnosing CI failures
+    // that do not exist (LS-9384). The allow-list is shared with
+    // `summarizeCIStatus` since LS-10116 so the two cannot drift apart again.
     const failed = checksRaw.filter(
-      (c) => c.conclusion !== null && FAILURE_CONCLUSIONS.has(c.conclusion),
+      (c) => c.conclusion !== null && CI_FAILURE_CONCLUSIONS.has(c.conclusion),
     );
     const pending = checksRaw.filter((c) => !c.conclusion);
     const passed = checksRaw.filter(
-      (c) => c.conclusion !== null && !FAILURE_CONCLUSIONS.has(c.conclusion),
+      (c) => c.conclusion !== null && !CI_FAILURE_CONCLUSIONS.has(c.conclusion),
     );
 
     const output: Record<string, unknown> = {

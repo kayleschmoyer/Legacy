@@ -1169,7 +1169,7 @@ export function createServer(): McpServer {
       compact: coercedBoolean
         .default(false)
         .describe(
-          'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage',
+          'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads)',
         ),
     },
     async (params) => prBatchStatus(params),

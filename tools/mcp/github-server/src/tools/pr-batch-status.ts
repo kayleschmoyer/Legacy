@@ -1,7 +1,11 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
-import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
+import {
+  CI_FAILURE_CONCLUSIONS,
+  summarizeCIStatus,
+  SUPERSEDED_CONCLUSIONS,
+} from '../types.js';
 import type { ToolResult } from '../types.js';
 import {
   dedupeLatestByName,
@@ -236,7 +240,20 @@ export async function prBatchStatus(
         // Compact mode: omit verbose fields (ciJobs, reviews, labels, url)
         if (params.compact) {
           const failedJobs = ciJobs
-            .filter((j) => j.conclusion && FAILED_CONCLUSIONS.has(j.conclusion))
+            .filter(
+              (j) => j.conclusion && CI_FAILURE_CONCLUSIONS.has(j.conclusion),
+            )
+            .map((j) => j.name);
+          // Superseded jobs stay visible rather than being silently dropped, so a
+          // caller that cares (e.g. diagnosing a merge-queue churn loop) can still
+          // see them without re-calling the full form (LS-10116). SKIPPED is
+          // excluded: it was never counted as failing, and this repo's pipeline
+          // skips enough jobs that listing them would bloat the hot-path payload
+          // the compact form exists to keep cheap.
+          const cancelledJobs = ciJobs
+            .filter(
+              (j) => j.conclusion && SUPERSEDED_CONCLUSIONS.has(j.conclusion),
+            )
             .map((j) => j.name);
 
           return {
@@ -245,6 +262,7 @@ export async function prBatchStatus(
             mergeable: pr.mergeable,
             ciSummary,
             ...(failedJobs.length > 0 ? { failedJobs } : {}),
+            ...(cancelledJobs.length > 0 ? { cancelledJobs } : {}),
             unresolvedThreads,
             ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
             ...(threadCountTruncated ? { threadCountTruncated: true } : {}),

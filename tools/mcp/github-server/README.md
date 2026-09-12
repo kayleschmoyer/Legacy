@@ -65,7 +65,7 @@ The git-heavy tools (`github_bulk_rebase`, `github_open_pr`'s push phase) run un
 - **github_list_commit_statuses** — List commit statuses (Statuses API) for a commit SHA or PR HEAD; accepts sha, prNumber/number, and optional context filter
 - **github_set_commit_status** — Set a commit status (success/failure/pending)
 - **github_retrigger_check** — Retrigger a check run
-- **github_pr_batch_status** — Detailed status for multiple PRs (mergeable, CI, reviews, threads)
+- **github_pr_batch_status** — Detailed status for multiple PRs (mergeable, CI, reviews, threads). `ciSummary`/`failedJobs` count only genuine failures; CANCELLED/STALE jobs (e.g. a superseded merge-queue attempt) are reported in `cancelledJobs` instead (LS-10116)
 - **github_pr_scan** — Scan all open PRs for CI and review state
 - **github_pr_dashboard** — Dashboard view of all open PRs
 
