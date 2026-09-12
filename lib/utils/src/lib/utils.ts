@@ -3,6 +3,38 @@ export function utils(): string {
 }
 
 /**
+ * Map over `items` with at most `concurrency` calls to `fn` in flight at
+ * once, preserving input order in the returned array.
+ *
+ * Use this instead of `Promise.all(items.map(fn))` when `fn` acquires a
+ * scarce shared resource (e.g. a DB pool connection) per call — unbounded
+ * fan-out over a large `items` list can request more connections than the
+ * pool has available and surface as connection-acquisition timeouts rather
+ * than a clear error (LS-9713).
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  return results;
+}
+
+/**
  * Return a cryptographically-secure random integer in [0, max).
  * Uses the Web Crypto API (works in Node.js, browsers, and React Native).
  * Rejection sampling eliminates modulo bias.

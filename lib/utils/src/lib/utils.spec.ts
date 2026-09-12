@@ -1,6 +1,7 @@
 import {
   cleanDescription,
   extractPlayerNameFromDescription,
+  mapWithConcurrency,
   stripDiacritics,
   utils,
 } from './utils';
@@ -8,6 +9,56 @@ import {
 describe('utils', () => {
   it('should work', () => {
     expect(utils()).toEqual('utils');
+  });
+});
+
+describe('mapWithConcurrency', () => {
+  it('returns results in input order regardless of completion order', async () => {
+    const items = [30, 10, 20];
+    const result = await mapWithConcurrency(items, 2, async (ms) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return ms;
+    });
+    expect(result).toEqual([30, 10, 20]);
+  });
+
+  it('never runs more than `concurrency` calls at once', async () => {
+    const items = Array.from({ length: 10 }, (_, i) => i);
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    await mapWithConcurrency(items, 3, async (i) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight--;
+      return i;
+    });
+
+    expect(maxInFlight).toBeLessThanOrEqual(3);
+  });
+
+  it('returns an empty array for an empty input without calling fn', async () => {
+    const fn = jest.fn();
+    const result = await mapWithConcurrency([], 3, fn);
+    expect(result).toEqual([]);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('caps effective concurrency at the item count', async () => {
+    const fn = jest.fn().mockResolvedValue('ok');
+    const result = await mapWithConcurrency([1, 2], 10, fn);
+    expect(result).toEqual(['ok', 'ok']);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a rejection from fn', async () => {
+    await expect(
+      mapWithConcurrency([1, 2, 3], 2, (i) => {
+        if (i === 2) return Promise.reject(new Error('boom'));
+        return Promise.resolve(i);
+      }),
+    ).rejects.toThrow('boom');
   });
 });
 

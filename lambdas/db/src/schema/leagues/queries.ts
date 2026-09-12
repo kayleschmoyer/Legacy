@@ -12,6 +12,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { mapWithConcurrency } from '@legacy-sports/utils';
 import {
   and,
   count,
@@ -46,6 +47,15 @@ import {
 // no arguments keep receiving exactly the same page they always have.
 const DEFAULT_USER_LEAGUES_LIMIT = 50;
 const MAX_USER_LEAGUES_LIMIT = 100;
+
+// Cap on concurrent StandingsService.getStandings calls when fanning out
+// across a user's leagues. Each call issues several parallel queries of its
+// own (see _computeStandings in matchup-history.ts), so unbounded
+// Promise.all(leagues.map(...)) for a user in many leagues can request more
+// connections than the per-Lambda DB pool (max: 5, see PgDbConnection.ts)
+// has available, surfacing as "timeout exceeded when trying to connect"
+// (LS-9713).
+const STANDINGS_FANOUT_CONCURRENCY = 3;
 
 /**
  * userLeagues paginates via an opaque cursor: a base64-encoded offset into the
@@ -1958,8 +1968,10 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
       const { StandingsService } =
         await import('../../services/standings-service');
 
-      return Promise.all(
-        leagues.map(async (league) => {
+      return mapWithConcurrency(
+        leagues,
+        STANDINGS_FANOUT_CONCURRENCY,
+        async (league) => {
           const standings = await StandingsService.getStandings(context.db, {
             leagueId: league.id,
           });
@@ -1995,7 +2007,7 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
             customEraEndYear: league.customEraEndYear,
             isCommissioner: deriveIsCommissioner(league.permissionLevel),
           } satisfies UserLeagueSummaryShape;
-        }),
+        },
       );
     },
   }),
@@ -2079,8 +2091,10 @@ builder.queryField('getUserLeagueStandings', (t) =>
       const { StandingsService } =
         await import('../../services/standings-service');
 
-      return Promise.all(
-        leagues.map(async (league) => {
+      return mapWithConcurrency(
+        leagues,
+        STANDINGS_FANOUT_CONCURRENCY,
+        async (league) => {
           const standings = await StandingsService.getStandings(context.db, {
             leagueId: league.id,
           });
@@ -2095,7 +2109,7 @@ builder.queryField('getUserLeagueStandings', (t) =>
             rank: userStanding?.rank ?? null,
             totalTeams: standings.length,
           } satisfies UserLeagueStandingsShape;
-        }),
+        },
       );
     },
   }),

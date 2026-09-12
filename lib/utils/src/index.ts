@@ -8,6 +8,7 @@ export {
   cleanDescription,
   extractPlayerNameFromDescription,
   stripDiacritics,
+  mapWithConcurrency,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
 export * from './lib/format-draft-date';

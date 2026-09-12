@@ -219,4 +219,39 @@ describe('getUserLeagueStandings query (LS-9528)', () => {
     // nothing active must not pay for it at all.
     expect(mockGetStandings).not.toHaveBeenCalled();
   });
+
+  it('caps concurrent StandingsService.getStandings calls for a user in many leagues (LS-9713)', async () => {
+    // Regression test: an unbounded Promise.all(leagues.map(...)) fan-out here
+    // requested one DB-pool connection per league simultaneously, and a user in
+    // more leagues than the per-Lambda pool has connections for (max: 5, see
+    // PgDbConnection.ts) surfaced as "timeout exceeded when trying to connect"
+    // inside StandingsService's own query fan-out (Rollbar item #243).
+    const leagues = Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      userTeamId: 100 + i,
+    }));
+    mockDb.then.mockImplementationOnce((resolve) => resolve(leagues));
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    mockGetStandings.mockImplementation(async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight--;
+      return [];
+    });
+
+    const result = (await getResolver()(
+      {},
+      {},
+      mockContext,
+      undefined as never,
+    )) as unknown[];
+
+    expect(result).toHaveLength(leagues.length);
+    expect(mockGetStandings).toHaveBeenCalledTimes(leagues.length);
+    expect(maxInFlight).toBeLessThanOrEqual(3);
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
 });
