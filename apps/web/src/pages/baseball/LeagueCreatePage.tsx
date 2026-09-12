@@ -66,8 +66,10 @@ import {
   GetUserLeaguesQuery,
   DefensiveFormat as GqlDefensiveFormat,
   RosterContinuity as GqlRosterContinuity,
+  LeagueFragment,
   Sport,
   useCreateLeagueAndTeamsMutation,
+  useGetLeagueDraftLazyQuery,
   useGetUserLeaguesQuery,
   usePreviewEligiblePlayerCountQuery,
 } from '@legacy-sports/graphql';
@@ -895,6 +897,79 @@ export const VALIDATION_ERROR_SECTION: Record<string, string> = {
   salaryEscalationPct: 'waiver-budget',
   salaryDecayPct: 'waiver-budget',
 };
+
+// ── Duplicate-from-existing-league prefill (LS-6062) ─────────────────────────
+// numberOfTeams and scoringFormat are intentionally NOT mapped — see the
+// ticket's Out of Scope for why (no persisted numberOfTeams column; scoring
+// preset reverse-mapping is nontrivial).
+
+export function mapLeagueToPrefillData(
+  league: LeagueFragment,
+  draft?: {
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    pickTimeLimitSeconds?: number | null;
+  } | null,
+): Partial<CreateLeagueFormData> {
+  const prefill: Partial<CreateLeagueFormData> = {
+    sport: league.sport === Sport.Football ? 'football' : 'baseball',
+    maxRosterSize: league.maxRosterSize ?? undefined,
+    playerPool: league.playerPool ?? undefined,
+    waiverType:
+      league.waiverType === 'faab' || league.waiverType === 'standard'
+        ? league.waiverType
+        : undefined,
+    faabBudgetDefault: league.faabBudgetDefault ?? undefined,
+    gamesPerMatchup: league.gamesPerMatchup ?? undefined,
+    salaryCapEnabled: league.salaryCapEnabled ?? undefined,
+    salaryCap: league.salaryCap ?? undefined,
+    salaryFloor: league.salaryFloor ?? undefined,
+    luxuryTaxThreshold: league.luxuryTaxThreshold ?? undefined,
+    minSalary: league.minSalary ?? undefined,
+    salaryEscalationPct: league.salaryEscalationPct ?? undefined,
+    salaryDecayPct: league.salaryDecayPct ?? undefined,
+    auctionBudget: league.auctionBudget ?? undefined,
+    auctionMinBid: league.auctionMinBid ?? undefined,
+    baseballEraFilter: league.eraFilter ?? undefined,
+    baseballHofOnly: league.baseballHofOnly ?? undefined,
+    customEraStartYear: league.customEraStartYear ?? undefined,
+    customEraEndYear: league.customEraEndYear ?? undefined,
+    isPublic: league.isPublic ?? undefined,
+    defensiveFormat:
+      league.defensiveFormat === GqlDefensiveFormat.Idp
+        ? 'idp'
+        : league.defensiveFormat === GqlDefensiveFormat.Dst
+          ? 'dst'
+          : undefined,
+    numberOfDivisions: league.numberOfDivisions ?? undefined,
+    schedulingStrategy:
+      league.schedulingStrategy === 'divisional' ||
+      league.schedulingStrategy === 'round-robin' ||
+      league.schedulingStrategy === 'random'
+        ? league.schedulingStrategy
+        : undefined,
+    schedulingDivisionalWeightPct:
+      league.schedulingDivisionalWeightPct ?? undefined,
+  };
+
+  if (draft) {
+    if (draft.draftMode === 'live' || draft.draftMode === 'automated')
+      prefill.draftMode = draft.draftMode;
+    if (
+      draft.selectionMethod === 'standard' ||
+      draft.selectionMethod === 'auction' ||
+      draft.selectionMethod === 'random'
+    )
+      prefill.selectionMethod = draft.selectionMethod;
+    if (draft.draftOrder === 'snake' || draft.draftOrder === 'linear')
+      prefill.draftOrder = draft.draftOrder;
+    if (draft.pickTimeLimitSeconds != null)
+      prefill.pickTimeLimitSeconds = draft.pickTimeLimitSeconds;
+  }
+
+  return prefill;
+}
 
 // ── Sport switcher ───────────────────────────────────────────────────────────
 
@@ -2202,6 +2277,74 @@ export function LeagueCreatePage(): React.JSX.Element {
   );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // ── Duplicate from existing league (LS-6062) ──────────────────────────────
+  // Only leagues the current user commissions, matching the sport tab
+  // currently selected (avoids mismatched defaultsForSport() results).
+  const commissionableLeagues = useMemo(
+    () =>
+      (leaguesData?.userLeagues ?? []).filter(
+        (l): l is LeagueFragment & { id: number } =>
+          !!l &&
+          l.id != null &&
+          l.sport ===
+            (selectedSport === 'football' ? Sport.Football : Sport.Baseball) &&
+          l.userMembership?.permissionLevel === 'commissioner',
+      ),
+    [leaguesData, selectedSport],
+  );
+  const [selectedDuplicateLeagueId, setSelectedDuplicateLeagueId] = useState<
+    number | null
+  >(null);
+  const [duplicateLeagueError, setDuplicateLeagueError] = useState<
+    string | null
+  >(null);
+  const [fetchLeagueDraft] = useGetLeagueDraftLazyQuery();
+
+  // Clear the picker's selection when the sport tab changes — a league id
+  // selected under one sport is not a valid option once the list is
+  // re-filtered to the other sport.
+  useEffect(() => {
+    setSelectedDuplicateLeagueId(null);
+  }, [selectedSport]);
+
+  const handleDuplicateLeagueSelect = async (
+    leagueIdValue: string,
+  ): Promise<void> => {
+    const leagueId = Number(leagueIdValue);
+    setSelectedDuplicateLeagueId(Number.isNaN(leagueId) ? null : leagueId);
+    if (!leagueId) return;
+    const source = commissionableLeagues.find((l) => l.id === leagueId);
+    if (!source) return;
+
+    setDuplicateLeagueError(null);
+    let draft: {
+      draftMode?: string | null;
+      selectionMethod?: string | null;
+      draftOrder?: string | null;
+      pickTimeLimitSeconds?: number | null;
+    } | null = null;
+    try {
+      const { data } = await fetchLeagueDraft({ variables: { leagueId } });
+      draft = data?.getLeagueDraft ?? null;
+    } catch (error) {
+      LOGGER.error(
+        'Failed to fetch draft settings for duplicate-league prefill',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      setDuplicateLeagueError(
+        'Could not load draft settings from that league — draft settings were left at their defaults.',
+      );
+    }
+
+    const mapped = mapLeagueToPrefillData(source, draft);
+    setHasUnsavedChanges(true);
+    setFormData((prev) => ({
+      ...prev,
+      ...defaultsForSport(prev.sport),
+      ...mapped,
+    }));
+  };
+
   // Unsaved-changes navigation guard (LS-6109). Without this, a stray click on
   // a nav link mid-flow (or the browser back button / a refresh) silently
   // discards everything the user has entered.
@@ -2952,6 +3095,64 @@ export function LeagueCreatePage(): React.JSX.Element {
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
             >
+              {/* ── Duplicate from existing league (LS-6062) ── */}
+              {(isPremium
+                ? commissionableLeagues.length > 0
+                : !premiumLoading) && (
+                <Card
+                  padding="$4"
+                  borderWidth={1}
+                  borderColor={withAlpha(BRAND_GOLD, 0.35)}
+                  borderRadius="$5"
+                  backgroundColor="$color1"
+                  data-testid="duplicate-league-card"
+                >
+                  <PremiumGate
+                    isPremium={!!isPremium}
+                    isUserLoaded={!premiumLoading}
+                    featureName="Duplicate League Settings"
+                    featureDescription="Start a new league pre-filled from one of your existing leagues' settings — no re-entering everything by hand each season."
+                    testId="duplicate-league-premium-gate"
+                  >
+                    <FieldRow
+                      label="Duplicate from Existing League"
+                      hint="Pre-fill this form from a league you commission. You can still edit anything before creating."
+                    >
+                      <select
+                        data-testid="duplicate-league-select"
+                        aria-label="Duplicate from existing league"
+                        value={selectedDuplicateLeagueId ?? ''}
+                        disabled={isFormDisabled}
+                        onChange={(e) => {
+                          void handleDuplicateLeagueSelect(e.target.value);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: '1px solid var(--borderColor, #444)',
+                          background: 'transparent',
+                          color: 'inherit',
+                          fontSize: 14,
+                        }}
+                      >
+                        <option value="">Start from a blank league</option>
+                        {commissionableLeagues.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name ?? 'Unnamed League'}
+                          </option>
+                        ))}
+                      </select>
+                    </FieldRow>
+                    {duplicateLeagueError && (
+                      <Text fontSize={12} color="$red10" marginTop="$2">
+                        {duplicateLeagueError}
+                      </Text>
+                    )}
+                  </PremiumGate>
+                </Card>
+              )}
+
               {/* ── Section 1: Basic Settings ── */}
               <CollapsibleSection
                 id="basic"

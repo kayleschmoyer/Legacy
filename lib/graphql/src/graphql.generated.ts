@@ -1538,6 +1538,7 @@ export type League = {
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  numberOfDivisions?: Maybe<Scalars['Int']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
@@ -1553,6 +1554,8 @@ export type League = {
   salaryDecayPct?: Maybe<Scalars['Int']['output']>;
   salaryEscalationPct?: Maybe<Scalars['Int']['output']>;
   salaryFloor?: Maybe<Scalars['Int']['output']>;
+  schedulingDivisionalWeightPct?: Maybe<Scalars['Int']['output']>;
+  schedulingStrategy?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
@@ -6742,6 +6745,9 @@ export type CreateLeagueAndTeamsMutation = {
       tradeDeadlineWeek?: number | null;
       allowDraftSlotTrading?: boolean | null;
       rosterContinuity?: RosterContinuity | null;
+      numberOfDivisions?: number | null;
+      schedulingStrategy?: string | null;
+      schedulingDivisionalWeightPct?: number | null;
       keeperSettings?: {
         __typename?: 'KeeperSettings';
         keeperCount?: number | null;
@@ -6825,6 +6831,9 @@ export type GetUserLeaguesQuery = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     tierFrozenAt?: string | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
@@ -6907,6 +6916,9 @@ export type GetMyLeaguesQuery = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     tierFrozenAt?: string | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
@@ -7007,6 +7019,9 @@ export type StartDraftMutation = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     tierFrozenAt?: string | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
@@ -7164,6 +7179,9 @@ export type StartSeasonMutation = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
       keeperCount?: number | null;
@@ -10346,6 +10364,9 @@ export type UpdateLeagueSettingsMutation = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
       keeperCount?: number | null;
@@ -11538,6 +11559,9 @@ export type GetLeagueByIdQuery = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     tierFrozenAt?: string | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
@@ -12565,6 +12589,9 @@ export type LeagueFragment = {
   tradeDeadlineWeek?: number | null;
   allowDraftSlotTrading?: boolean | null;
   rosterContinuity?: RosterContinuity | null;
+  numberOfDivisions?: number | null;
+  schedulingStrategy?: string | null;
+  schedulingDivisionalWeightPct?: number | null;
   keeperSettings?: {
     __typename?: 'KeeperSettings';
     keeperCount?: number | null;
@@ -14040,6 +14067,9 @@ export type RenewLeagueMutation = {
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
     rosterContinuity?: RosterContinuity | null;
+    numberOfDivisions?: number | null;
+    schedulingStrategy?: string | null;
+    schedulingDivisionalWeightPct?: number | null;
     keeperSettings?: {
       __typename?: 'KeeperSettings';
       keeperCount?: number | null;
@@ -16703,6 +16733,9 @@ export const LeagueFragmentDoc = gql`
       maxConsecutiveKeeps
       rookieExempt
     }
+    numberOfDivisions
+    schedulingStrategy
+    schedulingDivisionalWeightPct
     userMembership {
       ...LeagueMember
     }

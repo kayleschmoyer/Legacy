@@ -669,9 +669,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // tap to `onUpgrade` (LS-5174).
       await leaguePage.clickButton('Dead Ball (pre-1920)');
 
-      await leaguePage.text('Upgrade to Premium').expectVisible({
-        timeout: 10000,
-      });
+      // Scoped to the modal dialog rather than raw text — the
+      // Duplicate-from-Existing-League card (LS-6062) also shows an
+      // "Upgrade to Premium" CTA for free users, which would otherwise make
+      // a page-wide text locator ambiguous.
+      await leaguePage.upgradeModal.expectVisible({ timeout: 10000 });
       await leaguePage
         .text('Unlock Historical Era Selection and more')
         .expectVisible();

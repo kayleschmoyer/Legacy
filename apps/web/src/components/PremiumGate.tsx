@@ -33,6 +33,12 @@ export interface PremiumGateProps {
   featureName: string;
   /** Optional description displayed in the upgrade prompt overlay and modal. */
   featureDescription?: string;
+  /**
+   * Overlay `data-testid`, for pages that render more than one `PremiumGate`
+   * simultaneously — a shared default would make e2e locators ambiguous
+   * across instances. Defaults to `'premium-feature-gate'`.
+   */
+  testId?: string;
   /** Content to tease (blurred) for free users or render normally for premium. */
   children: React.ReactNode;
   /**
@@ -86,6 +92,7 @@ export function PremiumGate({
   isUserLoaded = true,
   featureName,
   featureDescription,
+  testId = 'premium-feature-gate',
   children,
   hideBlurredContentFromAssistiveTech = false,
 }: PremiumGateProps): React.ReactNode {
@@ -148,7 +155,7 @@ export function PremiumGate({
         {/* Gradient overlay with lock card — only rendered for free users */}
         {!isPremium && (
           <YStack
-            data-testid="premium-feature-gate"
+            data-testid={testId}
             position="absolute"
             top={0}
             left={0}

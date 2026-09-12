@@ -134,6 +134,40 @@ describe('Leagues - DB Integration Tests', () => {
         .limit(1);
       expect(reread.sport).toBe('football');
     });
+
+    it('persists and returns scheduling settings needed for duplicate-league prefill (LS-6062)', async () => {
+      const user = getUser(2);
+      const league = getLeague(0);
+
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: league.name,
+          owner: user.id,
+          inviteCode: 'SCHED001',
+          numberOfDivisions: 4,
+          schedulingStrategy: 'divisional',
+          schedulingDivisionalWeightPct: 80,
+        })
+        .returning();
+
+      const [result] = await db
+        .select({
+          numberOfDivisions: integrationTestSchema.leagues.numberOfDivisions,
+          schedulingStrategy: integrationTestSchema.leagues.schedulingStrategy,
+          schedulingDivisionalWeightPct:
+            integrationTestSchema.leagues.schedulingDivisionalWeightPct,
+        })
+        .from(integrationTestSchema.leagues)
+        .where(eq(integrationTestSchema.leagues.id, inserted.id))
+        .limit(1);
+
+      expect(result).toMatchObject({
+        numberOfDivisions: 4,
+        schedulingStrategy: 'divisional',
+        schedulingDivisionalWeightPct: 80,
+      });
+    });
   });
 
   describe('getLeaguesByOwner', () => {

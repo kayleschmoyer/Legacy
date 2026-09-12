@@ -160,6 +160,16 @@ export class LeaguePage extends BaseScreen {
   }
 
   /**
+   * The Duplicate-from-Existing-League card's premium gate overlay — always
+   * rendered for free users regardless of section expand state (LS-6062), so
+   * it uses a distinct testId from {@link premiumGate} to stay unambiguous
+   * whenever a section-scoped gate is also on screen.
+   */
+  get duplicateLeaguePremiumGate(): UIElement {
+    return this.driver.byTestId('duplicate-league-premium-gate');
+  }
+
+  /**
    * The `UpgradeModal` dialog (`apps/web/src/components/UpgradeModal.tsx`) —
    * opened by any premium-gated control's upgrade CTA, including create-form
    * fields (FAAB waivers, historical eras, salary cap) and the {@link premiumGate}
@@ -630,6 +640,13 @@ export class LeaguePage extends BaseScreen {
   /** Click the {@link premiumGate}'s "Upgrade to Premium" CTA. */
   async clickPremiumGateUpgrade(): Promise<void> {
     await this.premiumGate
+      .byRole('button', { name: /upgrade to premium/i })
+      .tap();
+  }
+
+  /** Click the {@link duplicateLeaguePremiumGate}'s "Upgrade to Premium" CTA. */
+  async clickDuplicateLeaguePremiumGateUpgrade(): Promise<void> {
+    await this.duplicateLeaguePremiumGate
       .byRole('button', { name: /upgrade to premium/i })
       .tap();
   }

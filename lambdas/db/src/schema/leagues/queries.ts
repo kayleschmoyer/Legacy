@@ -350,6 +350,17 @@ builder.queryField('userLeagues', (t) =>
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            // Era filter settings (LS-6062: needed to duplicate a league's settings)
+            baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+            baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            // Scheduling settings (LS-6062: needed to duplicate a league's settings)
+            numberOfDivisions: PublicSchema.leagues.numberOfDivisions,
+            schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
+            schedulingDivisionalWeightPct:
+              PublicSchema.leagues.schedulingDivisionalWeightPct,
             // Salary cap settings (LS-646)
             salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
             salaryCap: PublicSchema.leagues.salaryCap,
@@ -366,6 +377,10 @@ builder.queryField('userLeagues', (t) =>
             // Roster continuity (LS-8671)
             rosterContinuity: PublicSchema.leagues.rosterContinuity,
             keeperSettings: PublicSchema.leagues.keeperSettings,
+            // Membership (LS-6062: needed to filter the duplicate-league picker
+            // to leagues the current user commissions)
+            memberTeamId: PublicSchema.leagueMembers.teamId,
+            memberPermissionLevel: PublicSchema.leagueMembers.permissionLevel,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -403,6 +418,14 @@ builder.queryField('userLeagues', (t) =>
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
+          gamesPerMatchup: league.gamesPerMatchup ?? undefined,
+          baseballEraFilter: league.baseballEraFilter,
+          baseballHofOnly: league.baseballHofOnly,
+          customEraStartYear: league.customEraStartYear,
+          customEraEndYear: league.customEraEndYear,
+          numberOfDivisions: league.numberOfDivisions,
+          schedulingStrategy: league.schedulingStrategy,
+          schedulingDivisionalWeightPct: league.schedulingDivisionalWeightPct,
           // Salary cap settings
           salaryCapEnabled: league.salaryCapEnabled,
           salaryCap: league.salaryCap,
@@ -416,6 +439,12 @@ builder.queryField('userLeagues', (t) =>
           allowDraftSlotTrading: league.allowDraftSlotTrading,
           // Tier downgrade freeze (LS-846)
           tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
+          userMembership: {
+            leagueId: league.id,
+            userId,
+            teamId: league.memberTeamId,
+            permissionLevel: league.memberPermissionLevel,
+          },
         }));
       } catch (error) {
         LOGGER.error(

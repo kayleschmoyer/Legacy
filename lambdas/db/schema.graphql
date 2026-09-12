@@ -1816,6 +1816,7 @@ type League {
   minCareerSeasons: Int
   minSalary: Int
   name: String
+  numberOfDivisions: Int
   owner: Int
   pitcherStartsPerMatchup: Int
   playerPool: String
@@ -1834,6 +1835,8 @@ type League {
   salaryDecayPct: Int
   salaryEscalationPct: Int
   salaryFloor: Int
+  schedulingDivisionalWeightPct: Int
+  schedulingStrategy: String
   scoringProfile: ScoringConfig
   seasonNumber: Int
   secondaryColor: String

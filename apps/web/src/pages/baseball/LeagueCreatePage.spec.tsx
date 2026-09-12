@@ -30,10 +30,12 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import { TEAM_COUNT_OPTIONS_BY_SPORT as WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT } from '@legacy-sports/shared-components/leagues';
+import type { LeagueFragment } from '@legacy-sports/graphql';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
 import {
   applyImportedSettings,
   isPoolTooSmall,
+  mapLeagueToPrefillData,
   TEAM_COUNT_OPTIONS_BY_SPORT,
   validateFormFull,
   VALIDATION_ERROR_SECTION,
@@ -306,24 +308,35 @@ jest.mock('tamagui', () => {
 });
 
 const mockCreateLeague = jest.fn();
+const mockFetchLeagueDraft = jest.fn();
 let mockLeagueCount = 0;
 // Authoritative total (LS-9101). Defaults to mockLeagueCount so existing
 // tests (small counts, well under the pagination page size) are unaffected;
 // tests exercising pagination override it independently of the array length.
 let mockUserLeagueCount: number | undefined;
+// Extra per-league fields for LS-6062's "Duplicate from existing league"
+// picker tests. Defaults to sport: 'baseball' + commissioner so the picker
+// (and its pre-existing consumers, the free-league-limit tests) keep working
+// unmodified; individual tests override via mockUserLeaguesOverride.
+let mockUserLeaguesOverride: unknown[] | null = null;
 jest.mock('@legacy-sports/graphql', () => ({
   GetUserLeagues: 'GetUserLeagues',
   Sport: { Baseball: 'baseball', Football: 'football' },
+  DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   useCreateLeagueAndTeamsMutation: jest.fn(() => [
     mockCreateLeague,
     { loading: false },
   ]),
   useGetUserLeaguesQuery: jest.fn(() => ({
     data: {
-      userLeagues: Array.from({ length: mockLeagueCount }, (_, i) => ({
-        id: i + 1,
-        name: `League ${i + 1}`,
-      })),
+      userLeagues:
+        mockUserLeaguesOverride ??
+        Array.from({ length: mockLeagueCount }, (_, i) => ({
+          id: i + 1,
+          name: `League ${i + 1}`,
+          sport: 'baseball',
+          userMembership: { permissionLevel: 'commissioner' },
+        })),
       userLeagueCount: mockUserLeagueCount ?? mockLeagueCount,
     },
   })),
@@ -331,7 +344,13 @@ jest.mock('@legacy-sports/graphql', () => ({
     data: undefined,
     loading: false,
   })),
+  useGetLeagueDraftLazyQuery: jest.fn(() => [mockFetchLeagueDraft]),
 }));
+
+afterEach(() => {
+  mockUserLeaguesOverride = null;
+  mockFetchLeagueDraft.mockReset();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -2905,6 +2924,195 @@ describe('LeagueCreatePage — premiumLoading cold-load era display (LS-6088)', 
       screen.queryByTestId('era-entitlements-loading'),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('skeleton-block')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-6062 — Duplicate from existing league
+// ---------------------------------------------------------------------------
+
+describe('mapLeagueToPrefillData (LS-6062)', () => {
+  const sourceLeague = {
+    id: 7,
+    sport: 'football',
+    maxRosterSize: 18,
+    playerPool: 'nfc',
+    waiverType: 'faab',
+    faabBudgetDefault: 250,
+    gamesPerMatchup: 1,
+    salaryCapEnabled: true,
+    salaryCap: 500,
+    salaryFloor: 100,
+    luxuryTaxThreshold: 450,
+    minSalary: 2,
+    salaryEscalationPct: 15,
+    salaryDecayPct: 30,
+    auctionBudget: 300,
+    auctionMinBid: 2,
+    eraFilter: 'custom',
+    baseballHofOnly: true,
+    customEraStartYear: 1990,
+    customEraEndYear: 2005,
+    isPublic: true,
+    defensiveFormat: 'idp',
+    numberOfDivisions: 4,
+    schedulingStrategy: 'round-robin',
+    schedulingDivisionalWeightPct: 80,
+  } as const;
+
+  it('maps every League field enumerated in AC2/AC3 into the form-data partial', () => {
+    const prefill = mapLeagueToPrefillData(
+      sourceLeague as unknown as LeagueFragment,
+    );
+    expect(prefill).toMatchObject({
+      sport: 'football',
+      maxRosterSize: 18,
+      playerPool: 'nfc',
+      waiverType: 'faab',
+      faabBudgetDefault: 250,
+      gamesPerMatchup: 1,
+      salaryCapEnabled: true,
+      salaryCap: 500,
+      salaryFloor: 100,
+      luxuryTaxThreshold: 450,
+      minSalary: 2,
+      salaryEscalationPct: 15,
+      salaryDecayPct: 30,
+      auctionBudget: 300,
+      auctionMinBid: 2,
+      baseballEraFilter: 'custom',
+      baseballHofOnly: true,
+      customEraStartYear: 1990,
+      customEraEndYear: 2005,
+      isPublic: true,
+      defensiveFormat: 'idp',
+      numberOfDivisions: 4,
+      schedulingStrategy: 'round-robin',
+      schedulingDivisionalWeightPct: 80,
+    });
+  });
+
+  it('does not include numberOfTeams or scoringFormat (Out of Scope)', () => {
+    const prefill = mapLeagueToPrefillData(
+      sourceLeague as unknown as LeagueFragment,
+    );
+    expect(prefill).not.toHaveProperty('numberOfTeams');
+    expect(prefill).not.toHaveProperty('scoringFormat');
+  });
+
+  it('maps draft settings only when a draft is supplied', () => {
+    const withoutDraft = mapLeagueToPrefillData(
+      sourceLeague as unknown as LeagueFragment,
+    );
+    expect(withoutDraft).not.toHaveProperty('draftMode');
+    expect(withoutDraft).not.toHaveProperty('selectionMethod');
+    expect(withoutDraft).not.toHaveProperty('draftOrder');
+    expect(withoutDraft).not.toHaveProperty('pickTimeLimitSeconds');
+
+    const withDraft = mapLeagueToPrefillData(
+      sourceLeague as unknown as LeagueFragment,
+      {
+        draftMode: 'automated',
+        selectionMethod: 'auction',
+        draftOrder: 'linear',
+        pickTimeLimitSeconds: 90,
+      },
+    );
+    expect(withDraft).toMatchObject({
+      draftMode: 'automated',
+      selectionMethod: 'auction',
+      draftOrder: 'linear',
+      pickTimeLimitSeconds: 90,
+    });
+  });
+
+  it('ignores unrecognized enum-like values instead of writing garbage into form data', () => {
+    const prefill = mapLeagueToPrefillData({
+      ...sourceLeague,
+      waiverType: 'bogus',
+      schedulingStrategy: 'bogus',
+    } as unknown as LeagueFragment);
+    expect(prefill.waiverType).toBeUndefined();
+    expect(prefill.schedulingStrategy).toBeUndefined();
+  });
+});
+
+// `screen.getByTestId` returns a plain HTMLElement — this narrows it to the
+// concrete <select> for tests that need .options/.value. Routed through an
+// `unknown`-typed param so eslint's no-unnecessary-type-assertion check
+// (false-positives on direct `x as unknown as T` casts) doesn't strip it.
+function asSelectElement(el: unknown): HTMLSelectElement {
+  return el as HTMLSelectElement;
+}
+
+describe('LeagueCreatePage — Duplicate from existing league picker (LS-6062)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockIsPremium = true;
+    mockUserLeaguesOverride = [
+      {
+        id: 1,
+        name: 'Dynasty Diamonds',
+        sport: 'baseball',
+        userMembership: { permissionLevel: 'commissioner' },
+        maxRosterSize: 30,
+        playerPool: 'al',
+        waiverType: 'faab',
+        faabBudgetDefault: 175,
+      },
+      {
+        // Not a commissioner of this one — must be excluded from the picker.
+        id: 2,
+        name: 'GM Only League',
+        sport: 'baseball',
+        userMembership: { permissionLevel: 'general_manager' },
+      },
+      {
+        // Right sport for football tab only.
+        id: 3,
+        name: 'Gridiron Greats',
+        sport: 'football',
+        userMembership: { permissionLevel: 'commissioner' },
+      },
+    ];
+    mockFetchLeagueDraft.mockResolvedValue({ data: { getLeagueDraft: null } });
+  });
+
+  it('lists only leagues the user commissions for the active sport tab', () => {
+    renderPage('/baseball/league/create');
+    const picker = asSelectElement(
+      screen.getByTestId('duplicate-league-select'),
+    );
+    const optionLabels = Array.from(picker.options).map((o) => o.textContent);
+    expect(optionLabels).toContain('Dynasty Diamonds');
+    expect(optionLabels).not.toContain('GM Only League');
+    expect(optionLabels).not.toContain('Gridiron Greats');
+  });
+
+  it('fetches draft settings and applies the mapped prefill when a league is selected', async () => {
+    renderPage('/baseball/league/create');
+    const picker = asSelectElement(
+      screen.getByTestId('duplicate-league-select'),
+    );
+    fireEvent.change(picker, { target: { value: '1' } });
+
+    await waitFor(() => {
+      expect(mockFetchLeagueDraft).toHaveBeenCalledWith({
+        variables: { leagueId: 1 },
+      });
+    });
+    await waitFor(() => {
+      expect(picker.value).toBe('1');
+    });
+  });
+
+  it('does not render the picker when the premium user has no commissioned leagues', () => {
+    mockUserLeaguesOverride = [];
+    renderPage('/baseball/league/create');
+    expect(
+      screen.queryByTestId('duplicate-league-card'),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -164,6 +164,10 @@ export const League = builder.objectRef<{
   baseballHofOnly?: boolean;
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
+  // Scheduling settings (LS-6062: needed to duplicate a league's settings)
+  numberOfDivisions?: number;
+  schedulingStrategy?: string;
+  schedulingDivisionalWeightPct?: number | null;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -318,6 +322,15 @@ League.implement({
     baseballHofOnly: t.exposeBoolean('baseballHofOnly', { nullable: true }),
     customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
     customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
+    // Scheduling settings (LS-6062: needed to duplicate a league's settings)
+    numberOfDivisions: t.exposeInt('numberOfDivisions', { nullable: true }),
+    schedulingStrategy: t.exposeString('schedulingStrategy', {
+      nullable: true,
+    }),
+    schedulingDivisionalWeightPct: t.exposeInt(
+      'schedulingDivisionalWeightPct',
+      { nullable: true },
+    ),
     userMembership: t.field({
       type: LeagueMember,
       nullable: true,

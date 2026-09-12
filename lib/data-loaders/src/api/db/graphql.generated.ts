@@ -1532,6 +1532,7 @@ export type League = {
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  numberOfDivisions?: Maybe<Scalars['Int']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
@@ -1547,6 +1548,8 @@ export type League = {
   salaryDecayPct?: Maybe<Scalars['Int']['output']>;
   salaryEscalationPct?: Maybe<Scalars['Int']['output']>;
   salaryFloor?: Maybe<Scalars['Int']['output']>;
+  schedulingDivisionalWeightPct?: Maybe<Scalars['Int']['output']>;
+  schedulingStrategy?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
