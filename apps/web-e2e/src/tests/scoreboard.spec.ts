@@ -531,9 +531,30 @@ test.describe('Scoreboard — sport filter @regression', () => {
 
     // No new GetScoreboard requests should fire while NFL is selected. With
     // no live game in this fixture there's no poll timer racing the switch,
-    // so this wait is no longer proving a negative against an active timer —
-    // it's just settle time for any (unexpected) re-render-driven refetch.
-    await page.waitForTimeout(300);
+    // so we're not proving a negative against an active timer — just giving
+    // any (unexpected) re-render-driven refetch a chance to land before we
+    // check. A fixed sleep here is a race by construction (LS-10018): too
+    // short under CI contention and a slow refetch reads as a false pass.
+    // Instead poll the request count until it has stopped changing for a
+    // few consecutive checks — this waits exactly as long as needed for the
+    // count to settle, and keeps waiting (up to the timeout) if a refetch is
+    // still in flight, so a genuinely-late unwanted request is still caught.
+    let lastObservedCount = -1;
+    let stableChecks = 0;
+    await expect
+      .poll(
+        () => {
+          if (scoreboardRequestCount === lastObservedCount) {
+            stableChecks += 1;
+          } else {
+            lastObservedCount = scoreboardRequestCount;
+            stableChecks = 0;
+          }
+          return stableChecks;
+        },
+        { timeout: 2000, intervals: [25, 25, 50, 50, 100, 100, 200] },
+      )
+      .toBeGreaterThanOrEqual(3);
     expect(scoreboardRequestCount).toBe(requestsAfterMount);
 
     // Switch back to MLB — placeholder hides, MLB cards return.
