@@ -9,9 +9,10 @@ type RNComponents = { View: typeof RNView; Text: typeof RNText };
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockRouterPush = jest.fn();
+const mockRouterNavigate = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({ teamId: '42' })),
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, navigate: mockRouterNavigate }),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -105,14 +106,85 @@ jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
 // NFLHome/FootballPlayerCard/etc. and @react-native-google-signin/google-signin
 // — an ESM-only package Jest can't parse (not in the app jest config's
 // transformIgnorePatterns allowlist).
-jest.mock('@legacy-sports/shared-components/football', () => ({
-  detectFootballScoringPreset: (rec: number) => {
-    if (rec === 0) return 'standard';
-    if (rec === 0.5) return 'half_ppr';
-    if (rec === 1) return 'ppr';
-    return 'custom';
+jest.mock('@legacy-sports/shared-components/football', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  return {
+    detectFootballScoringPreset: (rec: number) => {
+      if (rec === 0) return 'standard';
+      if (rec === 0.5) return 'half_ppr';
+      if (rec === 1) return 'ppr';
+      return 'custom';
+    },
+    // LS-6454 — stubbed so this spec asserts the props the page threads in
+    // rather than the simulator's own rendering, which has its own spec.
+    ScoringFormatSimulator: (props: {
+      players?: unknown[];
+      teamTotalPoints?: number;
+      leagueReceptionPoints?: number;
+      isPremium?: boolean;
+      onUpgrade?: () => void;
+    }) => {
+      const { Pressable, Text, View } =
+        jest.requireActual<typeof import('react-native')>('react-native');
+      return React.createElement(
+        View,
+        { testID: 'mock-scoring-format-simulator' },
+        React.createElement(
+          Text,
+          { testID: 'mock-simulator-is-premium' },
+          String(props.isPremium),
+        ),
+        React.createElement(
+          Text,
+          { testID: 'mock-simulator-league-reception-points' },
+          String(props.leagueReceptionPoints),
+        ),
+        React.createElement(
+          Text,
+          { testID: 'mock-simulator-team-total' },
+          String(props.teamTotalPoints),
+        ),
+        React.createElement(
+          Text,
+          { testID: 'mock-simulator-player-count' },
+          String(props.players?.length ?? 0),
+        ),
+        React.createElement(
+          Pressable,
+          { testID: 'mock-simulator-upgrade', onPress: props.onUpgrade },
+          React.createElement(Text, null, 'Upgrade'),
+        ),
+      );
+    },
+    getLeagueReceptionPoints: (profile: {
+      stats?: {
+        multiplier?: number | null;
+        definition?: { statGroup?: string; statKey?: string } | null;
+      }[];
+    }) =>
+      profile?.stats?.find(
+        (stat) =>
+          stat?.definition?.statGroup === 'receiving' &&
+          stat?.definition?.statKey === 'rec',
+      )?.multiplier ?? undefined,
+    toScoringFormatSimulatorPlayers: (players: unknown[] | undefined) =>
+      players ?? [],
+    SCORING_SIMULATOR_FEATURE_NAME: 'Scoring Format Simulator',
+  };
+});
+
+jest.mock('../../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: (...args: unknown[]) => mockUseHasEntitlement(...args),
+}));
+
+jest.mock('../../../../utils/analytics', () => ({
+  trackPremiumFeatureClick: (...args: unknown[]) => {
+    mockTrackPremiumFeatureClick(...args);
   },
 }));
+
+const mockUseHasEntitlement = jest.fn<boolean, unknown[]>();
+const mockTrackPremiumFeatureClick = jest.fn<void, unknown[]>();
 
 jest.mock('tamagui', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -624,6 +696,7 @@ describe('FootballTeam route', () => {
       loading: false,
       data: buildScoringProfile(1),
     });
+    mockUseHasEntitlement.mockReturnValue(true);
   });
 
   it('shows loading panel while data is loading', () => {
@@ -993,6 +1066,83 @@ describe('FootballTeam route', () => {
     expect(mockUseMatchupScoresQuery).toHaveBeenCalledWith({
       skip: false,
       variables: { leagueId: 10, weekNum: 5 },
+    });
+  });
+
+  describe('scoring format simulator (LS-6454)', () => {
+    const matchupScoresWithReceptions = {
+      matchupScores: [
+        {
+          __typename: 'FootballMatchupStats',
+          teamId: 42,
+          teamName: 'Test Team',
+          totalPoints: 96.5,
+          projectedPoints: 96.5,
+          players: [
+            {
+              playerId: 1,
+              playerName: 'Test Receiver',
+              position: 'WR',
+              totalPoints: 20,
+              projectedPoints: 20,
+              games: [{ gameNum: 1, receiving: { rec: 5, yds: 60, td: 0 } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    it("passes the team's authoritative total and league reception points through", () => {
+      mockUseMatchupScoresQuery.mockReturnValue({
+        loading: false,
+        data: matchupScoresWithReceptions,
+        refetch: mockRefetchMatchupScores,
+      });
+      mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+        loading: false,
+        data: buildScoringProfile(0.5),
+      });
+
+      render(<FootballTeam />);
+
+      expect(screen.getByTestId('mock-simulator-team-total')).toHaveTextContent(
+        '96.5',
+      );
+      expect(
+        screen.getByTestId('mock-simulator-league-reception-points'),
+      ).toHaveTextContent('0.5');
+      expect(
+        screen.getByTestId('mock-simulator-player-count'),
+      ).toHaveTextContent('1');
+    });
+
+    it('marks the viewer premium when they hold the football entitlement', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      render(<FootballTeam />);
+      expect(screen.getByTestId('mock-simulator-is-premium')).toHaveTextContent(
+        'true',
+      );
+    });
+
+    it('marks the viewer non-premium without the entitlement', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballTeam />);
+      expect(screen.getByTestId('mock-simulator-is-premium')).toHaveTextContent(
+        'false',
+      );
+    });
+
+    it('tracks the premium click and routes to subscription settings on upgrade', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+      render(<FootballTeam />);
+
+      fireEvent.press(screen.getByTestId('mock-simulator-upgrade'));
+
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledTimes(1);
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+        'Scoring Format Simulator',
+      );
+      expect(mockRouterNavigate).toHaveBeenCalledWith('subscription-settings');
     });
   });
 

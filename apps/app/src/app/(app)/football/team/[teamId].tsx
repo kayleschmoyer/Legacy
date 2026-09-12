@@ -8,7 +8,13 @@ import {
   useTeamLogoUpload,
 } from '@legacy-sports/shared-components';
 import { MatchupAdditionalSections } from '@legacy-sports/shared-components/matchup';
-import type { FootballScoringFormat } from '@legacy-sports/shared-components/football';
+import {
+  type FootballScoringFormat,
+  getLeagueReceptionPoints,
+  SCORING_SIMULATOR_FEATURE_NAME,
+  ScoringFormatSimulator,
+  toScoringFormatSimulatorPlayers,
+} from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/native';
 import {
   RosterBoard,
@@ -33,11 +39,14 @@ import {
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { FootballLeagueRosterScreen } from '../../../../screens/leagues/football/FootballLeagueRosterScreen';
 import { MatchupCard } from '../../../../features/matchup/components/MatchupCard';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { INTERNAL_JWT_KEY } from '../../../../common/auth/jwtRefresh';
+import { useHasEntitlement } from '../../../../features/subscription/useSubscription';
+import { trackPremiumFeatureClick } from '../../../../utils/analytics';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { deriveFootballScoringFormat } from '../../../../common/scoring/footballScoringFormat';
 import { LeagueWebSocketContext } from '../../../../context/LeagueWebSocketContext';
@@ -654,6 +663,36 @@ export default function FootballTeam(): React.JSX.Element {
     [matchupScoresData?.matchupScores, numTeamId],
   );
 
+  // LS-6454 (FTD-028): premium "what if my league used PPR?" preview. Reuses
+  // the matchup-score and scoring-profile queries this screen already runs —
+  // no extra request — and the shared football scoring engine for the math.
+  const simulatorRouter = useRouter();
+  const canSimulateScoring = useHasEntitlement(
+    ENTITLEMENTS.football_projections,
+  );
+
+  const simulatorTeamStats = useMemo(
+    () =>
+      matchupScoresData?.matchupScores
+        ?.filter(isFootballMatchupStats)
+        .find((stats) => stats.teamId === numTeamId),
+    [matchupScoresData?.matchupScores, numTeamId],
+  );
+
+  const simulatorPlayers = useMemo(
+    () => toScoringFormatSimulatorPlayers(simulatorTeamStats?.players),
+    [simulatorTeamStats?.players],
+  );
+
+  const leagueReceptionPoints = getLeagueReceptionPoints(
+    scoringProfileData?.leagueScoringProfile,
+  );
+
+  const handleSimulatorUpgrade = useCallback(() => {
+    trackPremiumFeatureClick(SCORING_SIMULATOR_FEATURE_NAME);
+    void simulatorRouter.navigate('subscription-settings');
+  }, [simulatorRouter]);
+
   const currentMatchupId = leagueData?.league?.currentMatchup;
 
   const {
@@ -874,6 +913,14 @@ export default function FootballTeam(): React.JSX.Element {
           <ScoringFormatCallout
             scoringFormat={scoringFormat}
             profile={scoringProfileData?.leagueScoringProfile}
+          />
+
+          <ScoringFormatSimulator
+            players={simulatorPlayers}
+            teamTotalPoints={simulatorTeamStats?.totalPoints ?? 0}
+            leagueReceptionPoints={leagueReceptionPoints}
+            isPremium={canSimulateScoring}
+            onUpgrade={handleSimulatorUpgrade}
           />
 
           <Separator />

@@ -31,7 +31,66 @@ jest.mock('react-router-dom', () => ({
 const mockTrackTeamViewed = jest.fn();
 jest.mock('../../utils/analytics', () => ({
   trackTeamViewed: (...args: unknown[]) => mockTrackTeamViewed(...args),
+  trackPremiumFeatureClick: (...args: unknown[]) =>
+    mockTrackPremiumFeatureClick(...args),
 }));
+
+const mockTrackPremiumFeatureClick = jest.fn();
+
+// ── Scoring format simulator (LS-6454) ──────────────────────────────────────
+// The simulator's own rendering and arithmetic are covered by
+// ScoringFormatSimulator.spec.tsx; this file asserts only the props the page
+// threads in and the upgrade path it wires up.
+jest.mock('@legacy-sports/shared-components/football', () => ({
+  ScoringFormatSimulator: ({
+    isPremium,
+    leagueReceptionPoints,
+    teamTotalPoints,
+    players,
+    onUpgrade,
+  }: {
+    isPremium: boolean;
+    leagueReceptionPoints?: number;
+    teamTotalPoints: number;
+    players: unknown[];
+    onUpgrade: () => void;
+  }) => (
+    <button
+      data-testid="scoring-format-simulator"
+      data-is-premium={String(isPremium)}
+      data-league-reception-points={String(leagueReceptionPoints)}
+      data-team-total-points={String(teamTotalPoints)}
+      data-player-count={String(players.length)}
+      onClick={onUpgrade}
+    />
+  ),
+  getLeagueReceptionPoints: (profile: {
+    stats?: {
+      multiplier?: number | null;
+      definition?: { statGroup?: string; statKey?: string } | null;
+    }[];
+  }) =>
+    profile?.stats?.find(
+      (stat) =>
+        stat?.definition?.statGroup === 'receiving' &&
+        stat?.definition?.statKey === 'rec',
+    )?.multiplier ?? undefined,
+  toScoringFormatSimulatorPlayers: (players: unknown[] | undefined) =>
+    players ?? [],
+  SCORING_SIMULATOR_FEATURE_NAME: 'Scoring Format Simulator',
+  SCORING_SIMULATOR_FEATURE_DESCRIPTION: 'Simulator upsell copy.',
+}));
+
+jest.mock('../../components/UpgradeModal', () => ({
+  UpgradeModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="upgrade-modal" /> : null,
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: (...args: unknown[]) => mockUseHasEntitlement(...args),
+}));
+
+const mockUseHasEntitlement = jest.fn<boolean, unknown[]>();
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
@@ -138,6 +197,8 @@ let mockTeamByIdResult: any;
 let mockViewerMembershipResult: any;
 let mockPositionsResult: any;
 let mockLeagueResult: any;
+let mockScoringProfileResult: any;
+let mockMatchupScoresResult: any;
 
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football', Baseball: 'baseball' },
@@ -146,6 +207,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetViewerMembershipQuery: jest.fn(() => mockViewerMembershipResult),
   useGetPositionsForLeagueQuery: jest.fn(() => mockPositionsResult),
   useGetLeagueByIdQuery: jest.fn(() => mockLeagueResult),
+  useGetLeagueScoringProfileQuery: jest.fn(() => mockScoringProfileResult),
+  useMatchupScoresQuery: jest.fn(() => mockMatchupScoresResult),
   useUpdateTeamMemberPositionMutation: jest.fn(() => [
     mockUpdateTeamMemberPosition,
     { loading: false },
@@ -230,10 +293,101 @@ beforeEach(() => {
         name: 'Sunday Money',
         sport: 'football',
         defensiveFormat: 'dst',
+        currentWeekNumber: 5,
       },
     },
     loading: false,
   };
+  mockScoringProfileResult = {
+    data: {
+      leagueScoringProfile: {
+        stats: [
+          {
+            multiplier: 1,
+            definition: { statGroup: 'receiving', statKey: 'rec' },
+          },
+        ],
+      },
+    },
+    loading: false,
+  };
+  mockMatchupScoresResult = {
+    data: {
+      matchupScores: [
+        {
+          __typename: 'FootballMatchupStats',
+          teamId: 1,
+          teamName: 'Gridiron FC',
+          totalPoints: 88.25,
+          projectedPoints: 88.25,
+          players: [
+            {
+              playerId: 7,
+              playerName: 'Test Receiver',
+              position: 'WR',
+              totalPoints: 20,
+              projectedPoints: 20,
+              games: [{ gameNum: 1, receiving: { rec: 5, yds: 60, td: 0 } }],
+            },
+          ],
+        },
+      ],
+    },
+    loading: false,
+  };
+  mockUseHasEntitlement.mockReturnValue(true);
+});
+
+// ── Scoring format simulator (LS-6454 / FTD-028) ────────────────────────────
+
+describe('scoring format simulator', () => {
+  it("passes the team's authoritative total, roster and league reception points", () => {
+    render(<FootballTeamDetailPage />);
+
+    const simulator = screen.getByTestId('scoring-format-simulator');
+    expect(simulator).toHaveAttribute('data-team-total-points', '88.25');
+    expect(simulator).toHaveAttribute('data-league-reception-points', '1');
+    expect(simulator).toHaveAttribute('data-player-count', '1');
+  });
+
+  it('marks the viewer premium when they hold the football entitlement', () => {
+    mockUseHasEntitlement.mockReturnValue(true);
+    render(<FootballTeamDetailPage />);
+    expect(screen.getByTestId('scoring-format-simulator')).toHaveAttribute(
+      'data-is-premium',
+      'true',
+    );
+  });
+
+  it('marks the viewer non-premium without the entitlement', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<FootballTeamDetailPage />);
+    expect(screen.getByTestId('scoring-format-simulator')).toHaveAttribute(
+      'data-is-premium',
+      'false',
+    );
+  });
+
+  it('tracks the premium click and opens the upgrade modal for a free manager', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<FootballTeamDetailPage />);
+
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
+    fireEvent.click(screen.getByTestId('scoring-format-simulator'));
+
+    expect(mockTrackPremiumFeatureClick).toHaveBeenCalledTimes(1);
+    expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+      'Scoring Format Simulator',
+    );
+    expect(screen.getByTestId('upgrade-modal')).toBeTruthy();
+  });
+
+  it('does not render the upgrade modal for a premium manager', () => {
+    mockUseHasEntitlement.mockReturnValue(true);
+    render(<FootballTeamDetailPage />);
+    fireEvent.click(screen.getByTestId('scoring-format-simulator'));
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();
+  });
 });
 
 // ── AC2: board wiring ───────────────────────────────────────────────────────

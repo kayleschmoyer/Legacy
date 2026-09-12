@@ -7,13 +7,23 @@ import {
   Sport,
   type TeamMemberFragment,
   useGetLeagueByIdQuery,
+  useGetLeagueScoringProfileQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
   useGetViewerMembershipQuery,
+  useMatchupScoresQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import {
+  getLeagueReceptionPoints,
+  SCORING_SIMULATOR_FEATURE_DESCRIPTION,
+  SCORING_SIMULATOR_FEATURE_NAME,
+  ScoringFormatSimulator,
+  toScoringFormatSimulatorPlayers,
+} from '@legacy-sports/shared-components/football';
 import { RosterBoard } from '@legacy-sports/shared-components/roster';
 import { LOGGER } from '@legacy-sports/logging';
 import { orderFootballPositions } from './footballRosterSlots';
@@ -24,7 +34,12 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import { trackTeamViewed } from '../../utils/analytics';
+import {
+  trackPremiumFeatureClick,
+  trackTeamViewed,
+} from '../../utils/analytics';
+import { UpgradeModal } from '../../components/UpgradeModal';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 
 /**
  * Football Team Detail (LS-6438).
@@ -90,6 +105,56 @@ export function FootballTeamDetailPage(): React.JSX.Element {
     skip: !leagueId,
   });
   const league = leagueData?.league;
+
+  // ── Scoring-format simulator (LS-6454 / FTD-028) ──────────────────────────
+  // The mobile team screen already runs both of these queries; web fetched
+  // neither, so the premium simulator brings its own. Both are skipped until
+  // the league (and its current week) resolve.
+  const currentWeekNumber = league?.currentWeekNumber;
+
+  const { data: scoringProfileData } = useGetLeagueScoringProfileQuery({
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+
+  const { data: matchupScoresData } = useMatchupScoresQuery({
+    variables: { leagueId: leagueId ?? 0, weekNum: currentWeekNumber ?? 0 },
+    skip: !leagueId || currentWeekNumber == null,
+  });
+
+  const canSimulateScoring = useHasEntitlement(
+    ENTITLEMENTS.football_projections,
+  );
+  const [showSimulatorUpgrade, setShowSimulatorUpgrade] = useState(false);
+
+  const footballTeamStats = useMemo(
+    () =>
+      matchupScoresData?.matchupScores?.find(
+        (
+          stats,
+        ): stats is Extract<
+          typeof stats,
+          { __typename?: 'FootballMatchupStats' }
+        > =>
+          stats.__typename === 'FootballMatchupStats' &&
+          stats.teamId === teamIdNum,
+      ),
+    [matchupScoresData?.matchupScores, teamIdNum],
+  );
+
+  const simulatorPlayers = useMemo(
+    () => toScoringFormatSimulatorPlayers(footballTeamStats?.players),
+    [footballTeamStats?.players],
+  );
+
+  const leagueReceptionPoints = getLeagueReceptionPoints(
+    scoringProfileData?.leagueScoringProfile,
+  );
+
+  function handleSimulatorUpgrade(): void {
+    trackPremiumFeatureClick(SCORING_SIMULATOR_FEATURE_NAME);
+    setShowSimulatorUpgrade(true);
+  }
 
   const {
     data: viewerMembershipData,
@@ -463,6 +528,23 @@ export function FootballTeamDetailPage(): React.JSX.Element {
           error={positionsError ?? null}
         />
       </YStack>
+
+      <ScoringFormatSimulator
+        players={simulatorPlayers}
+        teamTotalPoints={footballTeamStats?.totalPoints ?? 0}
+        leagueReceptionPoints={leagueReceptionPoints}
+        isPremium={canSimulateScoring}
+        onUpgrade={handleSimulatorUpgrade}
+      />
+
+      {!canSimulateScoring && (
+        <UpgradeModal
+          open={showSimulatorUpgrade}
+          onOpenChange={setShowSimulatorUpgrade}
+          featureName={SCORING_SIMULATOR_FEATURE_NAME}
+          featureDescription={SCORING_SIMULATOR_FEATURE_DESCRIPTION}
+        />
+      )}
 
       {/* ── Team Settings (LS-9670) — mirrors TeamDetailPage.tsx's gate:
            rendered for users who pass the page's edit gate, nothing for

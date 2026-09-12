@@ -36,3 +36,15 @@ export {
   detectPreset as detectFootballScoringPreset,
   type FootballScoringFormat,
 } from './ScoringSettingsEditor';
+export {
+  ScoringFormatSimulator,
+  SCORING_SIMULATOR_FEATURE_NAME,
+  SCORING_SIMULATOR_FEATURE_DESCRIPTION,
+  toScoringFormatSimulatorPlayers,
+  getLeagueReceptionPoints,
+  type ScoringFormatSimulatorProps,
+  type ScoringFormatSimulatorPlayer,
+  type ScoringFormatSimulatorReceivingLine,
+  type MatchupScoresPlayerLike,
+  type LeagueScoringProfileLike,
+} from './ScoringFormatSimulator';

@@ -13544,6 +13544,12 @@ export type MatchupScoresQuery = {
           games: Array<{
             __typename?: 'FootballMatchupPlayerGame';
             gameNum: number;
+            receiving?: {
+              __typename?: 'FootballGameReceivingStats';
+              rec?: number | null;
+              yds?: number | null;
+              td?: number | null;
+            } | null;
           }>;
         }>;
       }
@@ -33610,6 +33616,11 @@ export const MatchupScores = gql`
           projectedPoints
           games {
             gameNum
+            receiving {
+              rec
+              yds
+              td
+            }
           }
         }
       }

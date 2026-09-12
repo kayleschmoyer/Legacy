@@ -13,6 +13,16 @@ query MatchupScores($leagueId: Int!, $weekNum: Int!) {
         projectedPoints
         games {
           gameNum
+          # LS-6454: the receiving group feeds the premium scoring-format
+          # simulator on football Team Detail. Only this group is selected —
+          # the presets differ solely in the reception multiplier, and every
+          # other term cancels in the simulator's baseline-vs-target
+          # subtraction, so fetching them would add payload for no accuracy.
+          receiving {
+            rec
+            yds
+            td
+          }
         }
       }
     }
