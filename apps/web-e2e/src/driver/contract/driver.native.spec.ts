@@ -18,11 +18,14 @@
  *     fixture. Wiring that fixture screen + the hermetic backend is LS-8448 /
  *     LS-8449; this spec is the driver-side scaffold they light up.
  *
- * The wdio runtime is imported dynamically inside `beforeEach` so Playwright's
- * test collection (which imports every file under the config's testDir) does
- * not pull WebdriverIO into the hermetic web contract run.
+ * The wdio runtime is loaded lazily inside `beforeEach` (via `requireFromHere`,
+ * see below) so Playwright's test collection (which imports every file under
+ * the config's testDir) does not pull WebdriverIO into the hermetic web
+ * contract run.
  */
 import { test } from '@playwright/test';
+
+import { createRequire } from 'node:module';
 
 import {
   APP_DRIVER_CONTRACT_CASES,
@@ -30,6 +33,18 @@ import {
 } from './app-driver-contract';
 import type { AppDriver } from '../types';
 import { isNativeEmulatorConfigured, NATIVE_ENV } from '../appium-env';
+
+// LS-10132: load `appium-session` lazily via `createRequire`, NOT a raw dynamic
+// `import()`. Playwright registers its TS-aware ESM loader only in the process
+// that calls `loadConfig()`; the workers that execute this spec use
+// `deserializeConfig()` and never register it, so a worker-side `import()` of a
+// project `.ts` file hits Node's raw ESM loader and throws "Cannot use import
+// statement outside a module". `createRequire` reuses Playwright's
+// always-installed CJS require-hook instead. Full writeup at the first site
+// fixed this way, `../../fixtures/dual.ts` (LS-10033). The load still happens
+// only on the emulator-configured branch, so `webdriverio` stays out of the
+// hermetic web contract run (ADR-0016).
+const requireFromHere = createRequire(__filename);
 
 const NATIVE_CAPABILITIES = {
   networkMock: false,
@@ -48,7 +63,9 @@ test.describe('AppDriver contract — AppiumNativeDriver (android)', () => {
       !isNativeEmulatorConfigured(),
       'requires a native emulator (set E2E_NATIVE_APP + a running Appium server)',
     );
-    const { createAndroidSession } = await import('../appium-session');
+    const { createAndroidSession } = requireFromHere(
+      '../appium-session',
+    ) as typeof import('../appium-session');
     const session = await createAndroidSession();
     driver = session.driver;
     dispose = session.dispose;
