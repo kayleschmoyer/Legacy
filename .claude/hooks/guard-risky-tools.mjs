@@ -5,11 +5,18 @@
  * guard-make-pc, enforce-background) with a general safety net.
  *
  * Matched tools (see .claude/settings.json matcher):
- *   Bash, Edit, Write, NotebookEdit, and the db_query MCP tools.
+ *   Bash, Edit, Write, NotebookEdit, the db_query MCP tools, and
+ *   mcp__github__actions_list.
  *
- * Three severity tiers:
+ * Four severity tiers:
  *   CATASTROPHIC — blocked, no bypass (exit 2). rm -rf on root/home/.git,
  *     force pushes, any push to main, secret material embedded in tool args.
+ *   CORRECTABLE — blocked, no bypass (exit 2), but the remedy is rewriting the
+ *     call rather than abandoning it. Reserved for arguments that are accepted
+ *     by a tool's schema yet do not mean what they appear to mean, so the call
+ *     "succeeds" with silently wrong scope. A bypass marker would be actively
+ *     harmful here: there is no state of the world in which the mis-shaped call
+ *     is the one the caller wanted. See `actionsListFindings`.
  *   GUARDED — blocked (exit 2) but bypassable with a `# risk-ok: <reason>`
  *     marker (SQL: `-- risk-ok`) once the agent has verified the action is
  *     intentional. Covers repo Tier-1/2 rules: manual worktree removal,
@@ -54,14 +61,28 @@ const ti = input.tool_input ?? {};
 let command = ''; // shell command (Bash)
 let sql = ''; // SQL text (db_query)
 let content = ''; // file content being written (Edit/Write/NotebookEdit)
+let callArgs = ''; // serialised MCP arguments (structured-input tools)
+
+// Structured-input MCP tools carry no free text to pattern-match. They are
+// judged on their argument SHAPE instead (see `actionsListFindings`), so the
+// serialised arguments stand in as `raw` purely for the audit log and the
+// block message.
+const isActionsList = tool === 'mcp__github__actions_list';
 
 if (tool === 'Bash') command = String(ti.command ?? '');
 else if (tool === 'Edit') content = String(ti.new_string ?? '');
 else if (tool === 'Write') content = String(ti.content ?? '');
 else if (tool === 'NotebookEdit') content = String(ti.new_source ?? '');
 else if (/__db_query$/.test(tool)) sql = String(ti.sql ?? ti.query ?? '');
+else if (isActionsList) {
+  try {
+    callArgs = JSON.stringify(ti);
+  } catch {
+    callArgs = '[unserialisable arguments]';
+  }
+}
 
-const raw = command || sql || content;
+const raw = command || sql || content || callArgs;
 if (!raw) process.exit(0);
 
 // ---------------------------------------------------------------------------
@@ -256,7 +277,192 @@ function worktreeRemoveGate() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// mcp__github__actions_list — argument-shape rules (LS-10156, LS-9987)
+//
+// This tool belongs to the officially-hosted GitHub MCP server; it is not
+// vendored under tools/mcp/, so neither its lenient schema nor its silent
+// fallback can be patched from this repo. A PreToolUse guard is the only layer
+// we control, and it is the layer the two prior doc-only fixes lacked.
+//
+// The hazard is specific and verified against the live schema (2026-09-13):
+// the real input schema has NO top-level `workflow_id` or `branch` param and
+// NO `additionalProperties: false`, so the plausible-but-wrong
+// `{ workflow_id, branch }` shape is accepted with zero validation error and
+// silently no-ops — `resource_id` stays unset (the unscoped repo-wide
+// /actions/runs list is used) and no filter narrows the branch. Repro on this
+// repo, side by side:
+//
+//   wrong:   { workflow_id: "check-migrations-applied.yml", branch: "X" }
+//              -> total_count 40000, unrelated workflows, head_branch "main"
+//   correct: { resource_id: "check-migrations-applied.yml",
+//              workflow_runs_filter: { branch: "main" } }
+//              -> total_count 28, only that workflow, only that branch
+//
+// LS-10055 root-caused this and landed guidance in
+// .agents/skills/mcp-first/references/service-operations.md. The guidance was
+// correct and still did not hold: LS-10156 is the same wrong-shaped call made
+// again by a session that had not read that reference. Prose cannot reach a
+// call the agent is about to make; this hook can.
+// ---------------------------------------------------------------------------
+
+/** Every top-level key the live schema actually accepts. */
+const ACTIONS_LIST_KEYS = new Set([
+  'method',
+  'owner',
+  'repo',
+  'page',
+  'perPage',
+  'resource_id',
+  'workflow_jobs_filter',
+  'workflow_runs_filter',
+]);
+
+/**
+ * Where each commonly-invented key really belongs. Every entry here has been
+ * observed in a real session (LS-9632, LS-8738, LS-10055, LS-10156) — these
+ * are not hypothetical typos. `null` marks a filter the tool cannot express at
+ * all, where the only correct answer is a different tool.
+ */
+const ACTIONS_LIST_PHANTOM_KEYS = {
+  workflow_id: 'resource_id',
+  workflow: 'resource_id',
+  workflow_ref: 'resource_id',
+  workflow_file: 'resource_id',
+  workflow_name: 'resource_id',
+  run_id: 'resource_id',
+  job_id: 'resource_id',
+  branch: 'workflow_runs_filter.branch',
+  event: 'workflow_runs_filter.event',
+  status: 'workflow_runs_filter.status',
+  actor: 'workflow_runs_filter.actor',
+  filter: 'workflow_jobs_filter.filter',
+  per_page: 'perPage',
+  page_size: 'perPage',
+  head_sha: null,
+  sha: null,
+  commit: null,
+};
+
+/**
+ * Runs are the verbose method: each run object embeds `head_commit.message`
+ * verbatim, and this repo's squash-merge convention puts an entire PR
+ * description (routinely 1-3 KB of markdown, measured up to 4.5 KB) in every
+ * one. There is no param to omit or truncate that field, so response size is
+ * governed entirely by `perPage` — whose default of 30 is itself the bad
+ * default LS-9987 reports (30 runs measured at 132,491 chars, over the
+ * tool-result cap). Five is the largest page observed to come back under the
+ * cap on this repo.
+ */
+const ACTIONS_LIST_RUNS_PAGE_MAX = 5;
+const ACTIONS_LIST_RUNS_PAGE_DEFAULT = 30;
+
+const CI_LIST_RUNS_HINT =
+  'Prefer `ci_list_runs({ branch, workflow, commit, limit })` (legacy-sports-ci): it builds the ' +
+  'scoped /actions/workflows/{id}/runs path itself, resolves a display name/filename/numeric ID up ' +
+  'front and throws on an unresolvable one instead of silently falling back, and maps each run to a ' +
+  'small flat object rather than the full GitHub run payload. For one commit or PR, ' +
+  '`github_get_check_runs({ sha })` / `({ prNumber })` (legacy-sports-github) is smaller still. Both ' +
+  'servers are known to attach late in CCR sessions (LS-9576/LS-9370) — re-run ToolSearch for them ' +
+  'before concluding actions_list is the only path.';
+
+function actionsListFindings(args) {
+  const out = [];
+  const method = typeof args.method === 'string' ? args.method : '';
+  const isRuns = method === 'list_workflow_runs';
+
+  // --- Rule 1: params the schema silently swallows ---
+  const phantoms = Object.keys(args).filter((k) => !ACTIONS_LIST_KEYS.has(k));
+  if (phantoms.length > 0) {
+    const lines = phantoms.map((k) => {
+      // Object.hasOwn, not `in`: `in` walks the prototype chain, so a phantom
+      // key called `toString` or `constructor` would read as "known" and
+      // render a function where the parameter name belongs.
+      if (!Object.hasOwn(ACTIONS_LIST_PHANTOM_KEYS, k)) {
+        return `  - \`${k}\` — not a parameter of this tool; it will be dropped.`;
+      }
+      const real = ACTIONS_LIST_PHANTOM_KEYS[k];
+      return real === null
+        ? `  - \`${k}\` — this tool cannot filter by commit at all. Use \`ci_list_runs({ commit })\` instead.`
+        : `  - \`${k}\` — the real parameter is \`${real}\`.`;
+    });
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-list-phantom-params',
+      message:
+        `${phantoms.length === 1 ? 'This parameter is' : 'These parameters are'} not in ` +
+        `mcp__github__actions_list's schema, and the schema has no \`additionalProperties: false\` — ` +
+        `so the call would be ACCEPTED and the ${phantoms.length === 1 ? 'value' : 'values'} ` +
+        `silently dropped (LS-10156):\n${lines.join('\n')}\n\n` +
+        (isRuns
+          ? 'With the workflow/branch scope dropped, `list_workflow_runs` falls back to the unscoped ' +
+            'repo-wide run list and returns it as though it were filtered. Nothing in the response ' +
+            'marks it as unfiltered except an implausibly large `total_count`, so this fails silently ' +
+            'rather than loudly.'
+          : 'The call runs against whatever scope the remaining parameters imply, which is not the ' +
+            'one these parameters were meant to express.'),
+    });
+  }
+
+  // --- Rule 2: an unscoped run listing is the repo-wide firehose ---
+  // Present-but-empty is the same as absent to the API: `resource_id: ""`
+  // builds no workflow path segment and `workflow_runs_filter: {}` contributes
+  // no query params, so neither narrows anything. Checking only for
+  // `undefined` would let both through as if they were real scope.
+  const hasWorkflowScope =
+    typeof args.resource_id === 'string'
+      ? args.resource_id.trim() !== ''
+      : typeof args.resource_id === 'number';
+  const filter = args.workflow_runs_filter;
+  const hasFilterScope =
+    typeof filter === 'object' &&
+    filter !== null &&
+    Object.values(filter).some(
+      (v) => v !== undefined && v !== null && String(v).trim() !== '',
+    );
+
+  if (isRuns && !hasWorkflowScope && !hasFilterScope) {
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-list-unscoped-runs',
+      message:
+        'This `list_workflow_runs` call has neither `resource_id` nor `workflow_runs_filter`, so it ' +
+        'lists EVERY workflow run in the repository (~40,000 here) newest-first — runs from unrelated ' +
+        'workflows, branches and PRs, which read as a plausible answer to whatever you were actually ' +
+        'asking. Scope it with `resource_id: "<workflow-file>.yml"` and/or ' +
+        '`workflow_runs_filter: { branch, event, status, actor }`.',
+    });
+  }
+
+  // --- Rule 3: page size, against a response with no way to omit the bulk ---
+  if (isRuns) {
+    const explicit = args.perPage;
+    const requested =
+      typeof explicit === 'number' ? explicit : ACTIONS_LIST_RUNS_PAGE_DEFAULT;
+    if (requested > ACTIONS_LIST_RUNS_PAGE_MAX) {
+      out.push({
+        severity: 'CORRECTABLE',
+        rule: 'actions-list-verbose-runs',
+        message:
+          (explicit === undefined
+            ? `\`perPage\` is unset, so this call uses the tool's default of ${ACTIONS_LIST_RUNS_PAGE_DEFAULT}. `
+            : `\`perPage: ${explicit}\` exceeds the ${ACTIONS_LIST_RUNS_PAGE_MAX}-run ceiling this repo can return under the tool-result cap. `) +
+          'Every run embeds `head_commit.message` verbatim, and this repo squash-merges entire PR ' +
+          'descriptions into commit messages (1-3 KB each, measured up to 4.5 KB). There is no param ' +
+          'to omit or truncate that field, so page size is the only control there is: 30 runs measured ' +
+          '132,491 characters, over the cap (LS-9987). An overflowed result costs the tokens and ' +
+          'returns nothing usable.\n\n' +
+          `Pass \`perPage: ${ACTIONS_LIST_RUNS_PAGE_MAX}\` or fewer and page with \`page\` if you need more.`,
+      });
+    }
+  }
+
+  return out;
+}
+
 const findings = [];
+
+if (isActionsList) findings.push(...actionsListFindings(ti));
 
 // --- Secret scan (raw text, all tools) ---
 for (const [re, label] of SECRET_PATTERNS) {
@@ -412,10 +618,11 @@ if (findings.length === 0) process.exit(0);
 // ---------------------------------------------------------------------------
 // Resolve highest severity, honour bypass, log, and emit
 // ---------------------------------------------------------------------------
-const ORDER = { CATASTROPHIC: 0, GUARDED: 1, WARN: 2 };
+const ORDER = { CATASTROPHIC: 0, CORRECTABLE: 1, GUARDED: 2, WARN: 3 };
 findings.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
 const top = findings[0];
-const effectiveBypass = bypassed && top.severity !== 'CATASTROPHIC';
+const NO_BYPASS = new Set(['CATASTROPHIC', 'CORRECTABLE']);
+const effectiveBypass = bypassed && !NO_BYPASS.has(top.severity);
 
 // Mask any detected secret material before the text is written anywhere —
 // the audit log on disk AND the block message (which lands in the session
@@ -444,7 +651,9 @@ appendJsonl(join(auditDir(input), 'risk-guard.jsonl'), {
 
 if (effectiveBypass) process.exit(0);
 
-const snippet = truncate(safeRaw, 150);
+// A mis-shaped call's own arguments are the thing being corrected, so they are
+// shown in full rather than clipped to the 150-char command snippet.
+const snippet = truncate(safeRaw, top.severity === 'CORRECTABLE' ? 400 : 150);
 
 if (top.severity === 'WARN') {
   process.stdout.write(
@@ -454,16 +663,34 @@ if (top.severity === 'WARN') {
   process.exit(0);
 }
 
-const escape =
-  top.severity === 'GUARDED'
-    ? 'If you have verified this is intentional and safe, re-run with a `# risk-ok: <reason>` marker (SQL: `-- risk-ok`).'
-    : 'This action has NO bypass. If it is genuinely required, stop and ask the user to run it manually.';
+const ESCAPE = {
+  GUARDED:
+    'If you have verified this is intentional and safe, re-run with a `# risk-ok: <reason>` marker (SQL: `-- risk-ok`).',
+  CORRECTABLE:
+    'Re-issue the call with the corrected shape above — no bypass marker applies here. This is not a ' +
+    'judgement that the call is dangerous: it is that the arguments do not mean what they look like ' +
+    'they mean, so the result would be wrong rather than refused.',
+  CATASTROPHIC:
+    'This action has NO bypass. If it is genuinely required, stop and ask the user to run it manually.',
+};
+
+// Every CORRECTABLE finding has to be fixed before the call succeeds, and they
+// are cheap to fix together — showing only the top one would send the agent
+// round the loop once per rule. The risk tiers keep their single-message form:
+// there the first finding is the one that decides whether to proceed at all.
+const body =
+  top.severity === 'CORRECTABLE'
+    ? `${findings.map((f) => f.message).join('\n\n')}\n\n${CI_LIST_RUNS_HINT}`
+    : top.message;
+
+const header =
+  top.severity === 'CORRECTABLE' ? '[CALL SHAPE BLOCKED]' : '[RISK BLOCKED]';
 
 // Block messages go to stderr — on exit 2 Claude Code feeds stderr (not stdout)
 // back to the agent.
 process.stderr.write(
-  `[RISK BLOCKED] ${findings.map((f) => f.rule).join(', ')}\n\n` +
-    `${top.message}\n\n` +
-    `Blocked ${tool} call: ${snippet}\n\n${escape}\n`,
+  `${header} ${findings.map((f) => f.rule).join(', ')}\n\n` +
+    `${body}\n\n` +
+    `Blocked ${tool} call: ${snippet}\n\n${ESCAPE[top.severity]}\n`,
 );
 process.exit(2);

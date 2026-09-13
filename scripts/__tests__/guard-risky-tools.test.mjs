@@ -29,6 +29,7 @@ import {
   symlinkSync,
   writeFileSync,
   existsSync,
+  readFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -453,4 +454,289 @@ test('# risk-ok bypasses git restore --source=<ref> .', () => {
     ).code,
     0,
   );
+});
+
+// ---------------------------------------------------------------------------
+// mcp__github__actions_list argument-shape rules (LS-10156, LS-9987)
+//
+// The hazard these pin is the inverse of the pnpm rules above: not a dangerous
+// call that must be stopped, but a call that LOOKS right, is accepted by the
+// tool's schema, and returns confidently wrong data. `mcp__github__actions_list`
+// has no top-level `workflow_id`/`branch` param and no
+// `additionalProperties: false`, so those keys are swallowed without a
+// validation error and the tool falls back to the unscoped repo-wide run list.
+//
+// Verified live against this repo on 2026-09-13:
+//   { workflow_id: "check-migrations-applied.yml", branch: "<a branch>" }
+//     -> total_count 40000, name "Jira Status Audit", head_branch "main"
+//   { resource_id: "check-migrations-applied.yml",
+//     workflow_runs_filter: { branch: "main" } }
+//     -> total_count 28, name "Check Migrations Applied", head_branch "main"
+//
+// LS-10055 root-caused exactly this and fixed it with documentation; LS-10156
+// is the same call made again by a session that had not read the doc. So these
+// tests pin the ENFORCEMENT, not the prose: if the matcher entry in
+// .claude/settings.json or these rules are dropped, the silent-wrong-answer
+// path reopens and the next recurrence is indistinguishable from the last two.
+// ---------------------------------------------------------------------------
+
+const REPO = { owner: 'bkrupa', repo: 'legacy-sports' };
+
+/** Run the hook against an mcp__github__actions_list call. */
+function runActionsList(toolInput) {
+  const root = mkdtempSync(join(tmpdir(), 'grt-al-'));
+  try {
+    const res = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({
+        tool_name: 'mcp__github__actions_list',
+        tool_input: toolInput,
+        cwd: root,
+        session_id: 'guard-risky-tools-test',
+      }),
+      encoding: 'utf-8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? '' };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('blocks the exact LS-10156 repro call', () => {
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_id: 'migration-check.yml',
+    branch: 'claude/eager-brahmagupta-xpogzm',
+    perPage: 3,
+  });
+  assert.equal(code, 2, 'expected a block');
+  assert.match(stderr, /actions-list-phantom-params/);
+  // Both dropped params must be named, with their real homes — a message that
+  // only says "wrong shape" sends the agent guessing.
+  assert.match(stderr, /`workflow_id` — the real parameter is `resource_id`/);
+  assert.match(
+    stderr,
+    /`branch` — the real parameter is `workflow_runs_filter\.branch`/,
+  );
+});
+
+test('allows the verified-correct scoped call shape', () => {
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'check-migrations-applied.yml',
+    workflow_runs_filter: { branch: 'main' },
+    perPage: 3,
+  });
+  assert.equal(code, 0, 'the documented-correct shape must not be blocked');
+});
+
+test('blocks a run listing scoped by neither workflow nor filter', () => {
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    perPage: 3,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-list-unscoped-runs/);
+});
+
+test('a workflow_runs_filter alone is scope enough', () => {
+  // Not every lookup names a workflow — "what is running on my branch right
+  // now" is legitimately filter-only, and blocking it would push callers back
+  // toward the unscoped call this rule exists to prevent.
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_runs_filter: { branch: 'main', status: 'in_progress' },
+    perPage: 5,
+  });
+  assert.equal(code, 0);
+});
+
+test('blocks the default perPage of 30 on list_workflow_runs', () => {
+  // The bad default IS the LS-9987 bug: omitting perPage requests 30 runs,
+  // each carrying a verbatim squashed-PR-description commit message.
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci-orchestrator.yml',
+  });
+  assert.equal(code, 2, 'an omitted perPage must not silently mean 30');
+  assert.match(stderr, /actions-list-verbose-runs/);
+  assert.match(stderr, /`perPage` is unset/);
+});
+
+test('blocks an explicitly oversized perPage on list_workflow_runs', () => {
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci-orchestrator.yml',
+    perPage: 30,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-list-verbose-runs/);
+  assert.match(stderr, /132,491/, 'cite the measured overflow, not a guess');
+});
+
+test('allows perPage at the ceiling', () => {
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci-orchestrator.yml',
+    perPage: 5,
+  });
+  assert.equal(code, 0);
+});
+
+test('page-size rule does not fire on non-run methods', () => {
+  // Only list_workflow_runs embeds head_commit.message per item; list_workflows
+  // is small at any page size and must not be gratuitously blocked.
+  assert.equal(runActionsList({ method: 'list_workflows', ...REPO }).code, 0);
+  assert.equal(
+    runActionsList({
+      method: 'list_workflow_jobs',
+      ...REPO,
+      resource_id: '123',
+      workflow_jobs_filter: { filter: 'latest' },
+    }).code,
+    0,
+  );
+});
+
+test('catches the snake_case per_page alias', () => {
+  // Same family as the tail_lines/tailLines mismatch that recurred three times
+  // (LS-8198 / LS-9644 / LS-9951): a plausible alias that silently yields the
+  // default instead of the requested value.
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci.yml',
+    per_page: 3,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /`per_page` — the real parameter is `perPage`/);
+});
+
+test('routes commit-scoped lookups away from a filter that does not exist', () => {
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci.yml',
+    head_sha: 'a9682e05a77500a291807e66cd7dd19d33588b05',
+    perPage: 2,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /cannot filter by commit at all/);
+  assert.match(stderr, /ci_list_runs\(\{ commit \}\)/);
+});
+
+test('a risk-ok marker cannot bypass a CORRECTABLE block', () => {
+  // GUARDED rules are a judgement call the agent may override once verified.
+  // These are not: there is no state of the world where the mis-shaped call is
+  // the one the caller wanted, so an escape hatch would only restore the bug.
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_id: '# risk-ok: I checked',
+    perPage: 3,
+  });
+  assert.equal(code, 2, 'CORRECTABLE must not honour the bypass marker');
+});
+
+test('reports every correctable finding in one message', () => {
+  // Surfacing one rule at a time would cost a round trip per rule.
+  const { stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_id: 'ci.yml',
+  });
+  assert.match(stderr, /actions-list-phantom-params/);
+  assert.match(stderr, /actions-list-unscoped-runs/);
+  assert.match(stderr, /actions-list-verbose-runs/);
+});
+
+test('settings.json actually routes actions_list at this hook', () => {
+  // Every test above invokes the hook directly, so all of them would still pass
+  // if the PreToolUse matcher stopped covering the tool — and the guard would
+  // silently never run. Pin the wiring, not just the logic.
+  const settings = JSON.parse(
+    readFileSync(
+      resolve(import.meta.dirname, '..', '..', '.claude', 'settings.json'),
+      'utf-8',
+    ),
+  );
+  const entries = (settings.hooks?.PreToolUse ?? []).filter((e) =>
+    (e.hooks ?? []).some((h) => h.command?.includes('guard-risky-tools.mjs')),
+  );
+  assert.ok(entries.length > 0, 'guard-risky-tools.mjs is not registered');
+  assert.ok(
+    entries.some((e) =>
+      new RegExp(e.matcher).test('mcp__github__actions_list'),
+    ),
+    'no PreToolUse matcher routes mcp__github__actions_list to guard-risky-tools.mjs',
+  );
+});
+
+// --- Present-but-empty scope is not scope ---------------------------------
+
+test('an empty resource_id does not count as workflow scope', () => {
+  // "" builds no workflow path segment, so the API serves the unscoped list —
+  // checking only for `undefined` would wave this through as real scope.
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: '',
+    perPage: 3,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-list-unscoped-runs/);
+});
+
+test('an empty workflow_runs_filter does not count as scope', () => {
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_runs_filter: {},
+    perPage: 3,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-list-unscoped-runs/);
+});
+
+test('a filter whose only value is empty does not count as scope', () => {
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    workflow_runs_filter: { branch: '  ' },
+    perPage: 3,
+  });
+  assert.equal(code, 2);
+});
+
+test('a numeric resource_id counts as workflow scope', () => {
+  // The schema accepts a numeric workflow ID as well as a filename.
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 241232181,
+    perPage: 3,
+  });
+  assert.equal(code, 0);
+});
+
+test('a prototype-chain key name is reported as a real phantom param', () => {
+  // `'toString' in {}` is true, so an `in` check would treat this as a known
+  // alias and render a function where the parameter name belongs.
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'ci.yml',
+    toString: 'oops',
+    perPage: 3,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /`toString` — not a parameter of this tool/);
+  assert.doesNotMatch(stderr, /function toString/);
 });
