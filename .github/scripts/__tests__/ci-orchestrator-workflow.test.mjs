@@ -67,14 +67,15 @@ describe('ci-orchestrator.yml — report-runner-shutdown scheduling (LS-9710)', 
     // Confirms the LS-9710 fix only narrowed report-runner-shutdown's
     // scheduling, not the other post-pipeline jobs that don't share its
     // "reports on pool health" purpose.
+    //
+    // LS-10140 moved remove-merge-label-on-failure out of this set: it now
+    // consults the same runner-shutdown detector, so it inherits the same
+    // requirement to be schedulable while the self-hosted pool is down. See
+    // its own assertion in the LS-10140 describe block below.
     const { parsed } = loadOrchestrator();
     const fallbackExpr =
       "${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}";
-    for (const jobName of [
-      'label-pr',
-      'restore-merge-label-on-success',
-      'remove-merge-label-on-failure',
-    ]) {
+    for (const jobName of ['label-pr', 'restore-merge-label-on-success']) {
       const job = parsed.jobs[jobName];
       assert.ok(job, `${jobName} job must exist in ci-orchestrator.yml`);
       assert.equal(
@@ -134,14 +135,35 @@ describe('ci-orchestrator.yml — cancelled pipelines never hold merge-when-read
   );
 
   it('maps a cancelled critical job to overall-status "failure", not "success"', () => {
+    // LS-10140 split the single `failure || cancelled` branch into two so the
+    // two events can be told apart downstream (cancelled-steps /
+    // cancellation-only outputs), but the VERDICT must not move: a cancelled
+    // critical step still sets OVERALL_STATUS=failure. Asserted on the
+    // cancelled branch's body rather than the old combined condition, so this
+    // control survives the refactor it is meant to police.
     const raw = fs.readFileSync(COLLECT_RESULTS_PATH, 'utf8');
+    const cancelledBranch = raw.slice(
+      raw.indexOf('if [ "$STEP_RESULT" = "cancelled" ]; then'),
+      raw.indexOf('elif [ "$STEP_RESULT" = "failure" ]; then'),
+    );
+    assert.ok(
+      cancelledBranch.length > 0,
+      'collect-results must still have an explicit `cancelled` branch',
+    );
     assert.match(
-      raw,
-      /\[ "\$STEP_RESULT" = "failure" \] \|\| \[ "\$STEP_RESULT" = "cancelled" \]/,
-      'collect-results must keep folding `cancelled` into `failure` — this is ' +
-        'the single point that makes a cancelled pipeline not-green. ' +
-        'Exempting `cancelled` here would let an unverified SHA keep ' +
-        'merge-when-ready (LS-10091).',
+      cancelledBranch,
+      /OVERALL_STATUS="failure"/,
+      'a cancelled critical step must keep folding into OVERALL_STATUS ' +
+        '"failure" — this is the single point that makes a cancelled pipeline ' +
+        'not-green. Resolving it to "success" here would let an unverified ' +
+        'SHA read as green (LS-10091).',
+    );
+    assert.equal(
+      (raw.match(/OVERALL_STATUS="success"/g) || []).length,
+      1,
+      'OVERALL_STATUS may only be set to "success" once — at initialisation. ' +
+        'A second assignment would mean some branch resolves a not-green ' +
+        'pipeline back to success.',
     );
   });
 
@@ -251,5 +273,153 @@ describe('rerun-cancelled-ci.yml — re-run guards (LS-10091)', () => {
         'for existing is that the runner pool shut down cannot be scheduled on ' +
         'that pool.',
     );
+  });
+});
+
+/**
+ * LS-10140 — the runner-shutdown signal must reach the ACTION, not just a
+ * comment.
+ *
+ * The repo already detected a runner-shutdown cancellation correctly and
+ * posted "this is not caused by your code" on the PR. But that job ran after,
+ * and independently of, the label-strip and the gate — so the human-facing
+ * signal and the machine-facing decisions disagreed, and a PR that was green
+ * throughout lost `merge-when-ready` to a runner that died.
+ *
+ * These tests pin the wiring that makes them agree, and the boundaries that
+ * keep it from becoming a blanket cancellation exemption (which LS-10091's
+ * controls above still forbid).
+ */
+describe('ci-orchestrator.yml — the label strip consults runner-shutdown detection (LS-10140)', () => {
+  it('remove-merge-label-on-failure runs the shared detect-runner-shutdown action', () => {
+    const { parsed } = loadOrchestrator();
+    const steps = parsed.jobs['remove-merge-label-on-failure'].steps;
+    const detect = steps.find(
+      (s) => s.uses === './.github/actions/detect-runner-shutdown',
+    );
+    assert.ok(
+      detect,
+      'the label-strip job must classify the cancellation with the SAME ' +
+        'composite action report-runner-shutdown uses — a second, divergent ' +
+        'copy of the rule is how detection and action drifted apart in the ' +
+        'first place',
+    );
+    assert.equal(
+      detect.id,
+      'detect',
+      'the detect step needs a stable id for the strip step to gate on',
+    );
+    assert.ok(
+      steps.some((s) => s.uses && s.uses.startsWith('actions/checkout@')),
+      'the composite action is a local path — the job has to check out the repo',
+    );
+  });
+
+  it('the strip step is skipped ONLY for a runner-attributable shutdown', () => {
+    const { parsed } = loadOrchestrator();
+    const steps = parsed.jobs['remove-merge-label-on-failure'].steps;
+    const strip = steps.find((s) => s.name === 'Remove merge-when-ready label');
+    assert.ok(strip, 'the strip step must still exist');
+    assert.match(
+      strip.if,
+      /steps\.detect\.outputs\.shutdown-detected != 'true'/,
+      'every failure that is NOT an attributed runner shutdown — a genuine ' +
+        'break, a deliberate cancel, an unattributable one — must keep ' +
+        'stripping the label (LS-10091)',
+    );
+  });
+
+  it('NEGATIVE CONTROL: the job gate still keys on the failure verdict, with no cancellation exemption', () => {
+    // The fix must not be "exempt cancellations from the label strip". The
+    // job-level `if:` is unchanged; only an ATTRIBUTED runner shutdown, proven
+    // from the run's own job logs, skips the strip step.
+    const { parsed } = loadOrchestrator();
+    const condition = parsed.jobs['remove-merge-label-on-failure'].if;
+    assert.match(
+      condition,
+      /needs\.ci-pipeline\.outputs\.overall-status == 'failure'/,
+    );
+    assert.doesNotMatch(
+      condition,
+      /overall-status != 'cancelled'|result != 'cancelled'/,
+      'a blanket cancellation exemption at the job level would let every ' +
+        'unverified SHA keep merge-when-ready (LS-10091)',
+    );
+  });
+
+  it('the job is schedulable while the self-hosted pool is down (LS-9710 rationale)', () => {
+    const { parsed } = loadOrchestrator();
+    const job = parsed.jobs['remove-merge-label-on-failure'];
+    assert.equal(
+      job['runs-on'],
+      'ubuntu-latest',
+      'a job that asks "did the runner pool die?" must not itself queue for ' +
+        "that pool — and must not hold this run's concurrency slot waiting " +
+        'for a runner that will never arrive (LS-9710)',
+    );
+  });
+
+  it('documents why keeping the label is safe — the pending CI Gate, not the label, blocks the merge', () => {
+    const { raw } = loadOrchestrator();
+    const jobStart = raw.indexOf('remove-merge-label-on-failure:');
+    const jobEnd = raw.indexOf('report-runner-shutdown:');
+    const block = raw.slice(jobStart, jobEnd);
+    assert.match(
+      block,
+      /LS-10140/,
+      'the exemption needs its ticket reference for future readers',
+    );
+    assert.match(
+      block,
+      /CI Gate/,
+      'the comment must name the mechanism that still blocks the merge, or a ' +
+        'future reader will read this as "cancelled PRs can merge"',
+    );
+  });
+});
+
+/**
+ * LS-10140 regression — the seed job's sparse checkout must carry ci-gate.js's
+ * whole require graph.
+ *
+ * `seed-ci-gate` checks out a SINGLE file (`sparse-checkout:
+ * .github/scripts/ci-gate.js`) to beat the runner queue to the open→merge
+ * window (LS-9543). That makes any new top-level `require('./x.js')` in
+ * ci-gate.js an invisible dependency on a file the job does not have: the
+ * module loads, the nested require throws MODULE_NOT_FOUND, and the seed job
+ * fails — which is exactly what happened on PR #8000 (run 34786055610) when
+ * ci-gate.js started requiring runner-cancellation.js.
+ *
+ * Unit tests import ci-gate.js from a full checkout, so nothing else catches
+ * this. Asserted here rather than by adding a `catch` around the require,
+ * because the seed job genuinely needs the file — it just needs to check it
+ * out.
+ */
+describe('ci-orchestrator.yml — seed-ci-gate sparse checkout covers ci-gate.js deps (LS-10140)', () => {
+  it('every relative require in ci-gate.js is in the sparse-checkout list', () => {
+    const { parsed } = loadOrchestrator();
+    const checkoutStep = parsed.jobs['seed-ci-gate'].steps.find(
+      (s) => s.uses && s.uses.startsWith('actions/checkout@'),
+    );
+    assert.ok(checkoutStep, 'seed-ci-gate must check the repo out');
+    const sparse = checkoutStep.with['sparse-checkout'];
+    assert.ok(sparse, 'seed-ci-gate must keep its single-file sparse checkout');
+
+    const ciGate = fs.readFileSync(
+      path.resolve(__dirname, '..', 'ci-gate.js'),
+      'utf8',
+    );
+    const required = [...ciGate.matchAll(/require\('\.\/([^']+)'\)/g)].map(
+      (m) => m[1],
+    );
+
+    for (const dep of required) {
+      assert.ok(
+        sparse.includes(`.github/scripts/${dep}`),
+        `ci-gate.js requires "./${dep}", but seed-ci-gate's sparse-checkout ` +
+          'does not fetch it — the seed job would fail with MODULE_NOT_FOUND. ' +
+          `Add ".github/scripts/${dep}" to the sparse-checkout list.`,
+      );
+    }
   });
 });

@@ -43,13 +43,66 @@ past the SHA this run evaluated, so a slow stale run never posts a verdict.
 `CI Gate` folds the same job set as `overall-status`
 ([`collect-results`](../../.github/actions/collect-results/action.yml)):
 `success`/`skipped` pass; `failure`/`timed_out`/missing fail. One deliberate
-divergence (LS-8219): **`cancelled` is excluded from the gate verdict** — a
-cancelled granular job is a superseded/duplicate run (concurrency-cancel,
-post-merge SIGINT), and folding it as failure let a cancelled post-merge
-duplicate latch a fresh red `CI Gate` onto a SHA whose gating run was already
-green. `collect-results` still treats cancelled as failure for the in-run
-`overall-status`; see `GATE_INPUT_JOBS` and `isCancelled` in
-[`ci-gate.js`](../../.github/scripts/ci-gate.js).
+divergence (LS-8219): **`cancelled` is never folded as failure** — a cancelled
+granular job is a superseded/duplicate run (concurrency-cancel, post-merge
+SIGINT) or a job the runner pool died under, and folding it as failure let a
+cancelled post-merge duplicate latch a fresh red `CI Gate` onto a SHA whose
+gating run was already green. `collect-results` still treats cancelled as
+failure for the in-run `overall-status`; see `GATE_INPUT_JOBS` and
+`isCancelled` in [`ci-gate.js`](../../.github/scripts/ci-gate.js).
+
+### The third verdict: `pending` for a cancellation (LS-10140)
+
+Excluding `cancelled` outright had its own failure mode: with every other input
+green, a job that never ran was indistinguishable from one that passed, and the
+gate posted **`success` for checks that never executed**. Since LS-10140 the
+fold has three outcomes — `success`, `failure`, and **`no-verdict`** — and
+`no-verdict` posts a **`pending`** commit status.
+
+Pending is the honest state and it is not a soft one: a pending required
+context blocks GitHub's merge evaluator, and `merge-queue-processor.js`'s
+`validateStatusChecks` counts it as `inProgress`, so the merge queue waits.
+[`rerun-cancelled-ci.yml`](../../.github/workflows/rerun-cancelled-ci.yml)
+(LS-10091) then goes and gets a genuine verdict.
+
+Before folding, every cancelled input is classified from the run's own jobs
+using [`runner-cancellation.js`](../../.github/scripts/runner-cancellation.js)
+— the same module [`detect-runner-shutdown`](../../.github/actions/detect-runner-shutdown/action.yml)
+uses, so the gate and the "this is not caused by your code" PR comment can
+never disagree about the same job:
+
+| Classification      | Evidence                                               | Gate      |
+| ------------------- | ------------------------------------------------------ | --------- |
+| `real-failure`      | a step concluded `failure` before the cancel landed    | `failure` |
+| `never-ran`         | zero steps **and** the log blob 404s (BlobNotFound)    | `pending` |
+| `runner-shutdown`   | shutdown notice logged **before** "operation canceled" | `pending` |
+| `deliberate-cancel` | "operation canceled" logged **first**                  | `pending` |
+| `no-signal`         | neither marker, or the evidence could not be read      | `pending` |
+
+`real-failure` is checked first and outranks everything: a runner that dies
+after a test has already failed must not launder that failure into
+infrastructure. This generalises LS-9467 (PR #6909) from the two E2E matrix
+jobs to every gate input.
+
+Two guards keep the pending state from causing the very problem LS-8219 fixed:
+
+- A cancelled run carries **no evidence**, so it must never overwrite a verdict
+  a run that actually executed already earned. `assertNoVerdictIsSafe`
+  withholds the pending post whenever **any** terminal `CI Gate` verdict
+  already stands for the SHA — regardless of run age, unlike the success-path
+  recency guard below. The `pending` seed (LS-9543) is not terminal and is
+  correctly replaced.
+- It fails **closed** (withholds) when the statuses lookup errors: the seed has
+  already left a pending status on the SHA, so nothing is silently absent.
+
+`merge-when-ready` follows the same classification one level up:
+`remove-merge-label-on-failure` in
+[`ci-orchestrator.yml`](../../.github/workflows/ci-orchestrator.yml) runs the
+shared detector and skips the strip **only** for an attributed runner
+shutdown. Every other cancellation — deliberate, unattributable — and every
+genuine failure still strips the label (LS-10091). Keeping the label is safe
+precisely because the gate is pending: the label is not what holds an
+unverified SHA out of the merge queue, the required status is.
 
 ## Verdict recency (LS-9378)
 

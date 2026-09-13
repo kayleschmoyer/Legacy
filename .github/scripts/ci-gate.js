@@ -24,6 +24,16 @@
  * exception to the no-console rule (see AGENTS.md, Code Quality → No console.*).
  */
 
+const {
+  classifyCancelledJob,
+  gateEffectOfCancellation,
+  REAL_FAILURE,
+  NEVER_RAN,
+  RUNNER_SHUTDOWN,
+  DELIBERATE_CANCEL,
+  NO_SIGNAL,
+} = require('./runner-cancellation.js');
+
 // The required-check context name. Mirrored in .github/ruleset.json (_commitStatus).
 const CI_GATE_CONTEXT = 'CI Gate';
 
@@ -66,43 +76,69 @@ function isPass(result) {
 
 /**
  * A `cancelled` granular job is a superseded/duplicate run (concurrency-cancel,
- * post-merge SIGINT/exit-130), NOT a real failure. It is excluded from the gate
- * verdict so a cancelled duplicate run can never post a fresh FAILURE on a SHA
- * whose gating run was green (LS-8219).
+ * post-merge SIGINT/exit-130) or a job the runner pool died under, NOT a real
+ * failure. It is never folded as FAILURE, so a cancelled duplicate run can
+ * never post a fresh red `CI Gate` on a SHA whose gating run was green
+ * (LS-8219).
  */
 function isCancelled(result) {
   return result === 'cancelled';
 }
 
 /**
- * Fold the granular job results into a single gate conclusion.
- * Resolves `success` iff EVERY folded input passes; otherwise `failure`,
- * with the offending inputs listed (for the status description / logs).
+ * The third gate conclusion (LS-10140): every folded input that spoke passed,
+ * but at least one was CANCELLED and therefore never spoke at all.
  *
- * `cancelled` results are excluded from the verdict (treated as not-a-failure)
- * so a cancelled/post-merge duplicate run never latches a stale-red `CI Gate`.
+ * Neither terminal verdict is honest here. `failure` is the false-red this
+ * ticket exists to remove — a job cancelled before it ran any test body did
+ * not fail, and posting red burns a re-run allowance, strips
+ * `merge-when-ready`, and reads as a code break to the author, the merge
+ * queue, and any agent driving the PR. `success` is worse: it would claim the
+ * SHA passed checks that never executed.
+ *
+ * The caller maps this to a PENDING commit status, which blocks the merge
+ * (merge-queue-processor.js's validateStatusChecks counts a pending required
+ * context as `inProgress`, and GitHub's own evaluator treats it as an unmet
+ * requirement) without asserting a failure that did not happen.
+ */
+const NO_VERDICT = 'no-verdict';
+
+/**
+ * Fold the granular job results into a single gate conclusion.
+ *
+ *   - `success`  — every folded input passed (or was legitimately skipped).
+ *   - `failure`  — at least one input genuinely failed. Always wins: a real
+ *                  failure alongside a cancellation is still a failure.
+ *   - `no-verdict` — nothing failed, but at least one input was cancelled and
+ *                  so produced no result. See `NO_VERDICT`.
  *
  * @param {Record<string, string|undefined>} results map of job id → result
- * @returns {{ conclusion: 'success'|'failure', failing: string[], ignored: string[] }}
+ * @returns {{ conclusion: 'success'|'failure'|'no-verdict', failing: string[], cancelled: string[], ignored: string[] }}
+ *   `ignored` is retained as an alias of `cancelled` for callers (and log
+ *   lines) written against the pre-LS-10140 shape.
  */
 function computeGateConclusion(results) {
   const failing = [];
-  const ignored = [];
+  const cancelled = [];
   for (const job of GATE_INPUT_JOBS) {
     const result = results ? results[job] : undefined;
     if (isCancelled(result)) {
-      ignored.push(job);
+      cancelled.push(job);
       continue;
     }
     if (!isPass(result)) {
       failing.push(`${job} (${result || 'missing'})`);
     }
   }
-  return {
-    conclusion: failing.length === 0 ? 'success' : 'failure',
-    failing,
-    ignored,
-  };
+
+  let conclusion = 'success';
+  if (failing.length > 0) {
+    conclusion = 'failure';
+  } else if (cancelled.length > 0) {
+    conclusion = NO_VERDICT;
+  }
+
+  return { conclusion, failing, cancelled, ignored: cancelled };
 }
 
 /**
@@ -338,13 +374,225 @@ async function pipelineJobWasSkipped({
  * the summarize job, so a genuine test failure in one shard and an external
  * cancellation of the SAME shard can both surface as
  * `needs.e2e.result == 'cancelled'` if the cancellation is what the job rolls
- * up to. Only these two keys can matrix/mask this way — lint/test/build/
- * custom-checks/lockfile-check are single, non-matrix jobs.
+ * up to.
+ *
+ * Consumed by e2e-affected-gate.js as well as this module. LS-10140 widened
+ * the gate's own cancellation handling to every GATE_INPUT_JOBS entry — see
+ * `GATE_JOB_LEAF_NAMES` — but this constant keeps its original two-key shape
+ * because that is the contract e2e-affected-gate.js is written against.
  */
 const CANCELLABLE_TEST_JOB_NAME_PREFIX = Object.freeze({
   e2e: 'E2E Tests (Shard',
   'e2e-mobile': 'E2E Tests (Mobile Chrome',
 });
+
+/**
+ * Every GATE_INPUT_JOBS key mapped to the LEAF of its job name in the Jobs API
+ * — the part after the reusable-workflow call prefix ("🚀 CI Pipeline / ").
+ * These are the `name:` values in .github/workflows/ci-pipeline.yml; a unit
+ * test greps that workflow to catch drift.
+ *
+ * WHY A LEAF MATCH RATHER THAN `.includes()` (LS-10140): widening the lookup
+ * from the two matrix keys to all seven brings in short names — `test`,
+ * `build` — that a naive substring match would find inside unrelated job
+ * names. The leaf is split on " / " (space-slash-space), which the matrix
+ * shard suffix "(Shard 1/1)" does not contain, so the split is unambiguous.
+ * The match is the whole leaf, or the leaf up to a word boundary: the two
+ * matrix names carry a per-shard suffix ("E2E Tests (Shard 1/1)") that
+ * equality would reject. Requiring the trailing space keeps `build` from
+ * matching an unrelated "build-scan" job, which a bare `startsWith` would.
+ */
+const GATE_JOB_LEAF_NAMES = Object.freeze({
+  lint: 'lint & format',
+  test: 'test',
+  build: 'build',
+  'custom-checks': 'custom-checks',
+  'lockfile-check': 'lockfile-check',
+  e2e: 'E2E Tests (Shard',
+  'e2e-mobile': 'E2E Tests (Mobile Chrome',
+});
+
+/**
+ * Whether `jobName` (as reported by the Jobs API, prefix and all) is an
+ * instance of the GATE_INPUT_JOBS entry `jobKey`.
+ */
+function jobNameMatchesGateKey(jobName, jobKey) {
+  const leafName = GATE_JOB_LEAF_NAMES[jobKey];
+  if (!leafName || typeof jobName !== 'string') return false;
+  const separatorAt = jobName.lastIndexOf(' / ');
+  const leaf = separatorAt === -1 ? jobName : jobName.slice(separatorAt + 3);
+  return leaf === leafName || leaf.startsWith(`${leafName} `);
+}
+
+/**
+ * How many bytes of a cancelled job's log to read. The two markers
+ * `classifyJobLog` compares sit at the very end, but GitHub writes an
+ * `##[end-action …skipped]` pair for every remaining step after the cancel, so
+ * the gap between them grows with the job's step count. 64 KB covers the
+ * longest jobs in this repo — the same window .github/actions/
+ * detect-runner-shutdown uses, deliberately, so the two paths classify the
+ * same job identically.
+ */
+const JOB_LOG_TAIL_BYTES = 65536;
+
+/**
+ * Fetch the tail of one job's log.
+ *
+ * A 404 is not an error here — it is EVIDENCE. GitHub returns 404
+ * (BlobNotFound) for a job that was cancelled before it ever produced output,
+ * which is exactly the "never ran" signal `classifyCancelledJob` keys on
+ * (LS-10140). Any other error degrades to "log unreadable but assumed to
+ * exist", which keeps the classification on the log-ordering path rather than
+ * asserting the job never ran.
+ *
+ * @returns {Promise<{ available: boolean, text: string }>}
+ */
+async function fetchJobLogTail({ github, core, owner, repo, jobId }) {
+  try {
+    const res = await github.rest.actions.downloadJobLogsForWorkflowRun({
+      owner,
+      repo,
+      job_id: jobId,
+    });
+    const body = res && res.data;
+    const text =
+      typeof body === 'string'
+        ? body
+        : body
+          ? Buffer.from(body).toString('utf8')
+          : '';
+    return { available: true, text: text.slice(-JOB_LOG_TAIL_BYTES) };
+  } catch (e) {
+    if (e && e.status === 404) {
+      core.info(
+        `CI Gate: job ${jobId} has no log blob (404 BlobNotFound) — it never ` +
+          'produced output.',
+      );
+      return { available: false, text: '' };
+    }
+    core.warning(
+      `CI Gate: could not read the log for job ${jobId} (${e.message}) — ` +
+        'classifying from its step list alone.',
+    );
+    return { available: true, text: '' };
+  }
+}
+
+/**
+ * List every job in `runId`, paginated.
+ *
+ * @returns {Promise<Array<object>|null>} null when the lookup failed.
+ */
+async function listRunJobs({ github, core, owner, repo, runId }) {
+  try {
+    let jobs = [];
+    let page = 1;
+    while (true) {
+      const { data } = await github.rest.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+        per_page: 100,
+        page,
+      });
+      jobs = jobs.concat(data.jobs);
+      if (data.jobs.length < 100) break;
+      page++;
+    }
+    return jobs;
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not list jobs for run ${runId} (${e.message}) — a ` +
+        'cancelled gate input cannot be classified and is treated as ' +
+        'unattributed.',
+    );
+    return null;
+  }
+}
+
+/**
+ * Ordering used to fold several instances of one gate input (matrix shards)
+ * into a single classification. A real failure always wins — no other signal
+ * may mask it. Runner churn outranks the "never ran" and deliberate classes so
+ * the gate description names the infrastructure cause when one shard died to
+ * it.
+ */
+const CLASSIFICATION_PRECEDENCE = Object.freeze([
+  REAL_FAILURE,
+  RUNNER_SHUTDOWN,
+  NEVER_RAN,
+  DELIBERATE_CANCEL,
+  NO_SIGNAL,
+]);
+
+/**
+ * Classify why the GATE_INPUT_JOBS entry `jobKey` reported `cancelled`, from
+ * the job instances in THIS run (LS-10140).
+ *
+ * This is the gate's half of "detection and the gate must agree": it applies
+ * .github/scripts/runner-cancellation.js's rules — the same module
+ * .github/actions/detect-runner-shutdown runs — BEFORE the verdict is
+ * computed, rather than reporting the shutdown afterwards in a PR comment
+ * nothing reads.
+ *
+ * Fails to `no-signal` (an unattributed cancel, which the gate folds as
+ * `no-verdict` → pending) whenever the evidence cannot be gathered. That is
+ * the conservative direction: pending blocks the merge without claiming a
+ * failure that was never observed.
+ *
+ * @param {Array<object>} jobs All jobs in the run (from `listRunJobs`).
+ * @returns {Promise<string>} a `classifyCancelledJob` result.
+ */
+async function classifyCancelledGateJob({
+  github,
+  core,
+  owner,
+  repo,
+  jobs,
+  jobKey,
+}) {
+  const instances = (jobs || []).filter(
+    (job) =>
+      job &&
+      job.conclusion === 'cancelled' &&
+      jobNameMatchesGateKey(job.name, jobKey),
+  );
+
+  if (instances.length === 0) return NO_SIGNAL;
+
+  const verdicts = [];
+  for (const job of instances) {
+    // A job whose steps already record a failure needs no log read at all —
+    // the verdict is settled and the log download (multi-MB for an E2E shard)
+    // would be pure cost.
+    const settledBySteps = classifyCancelledJob({ steps: job.steps });
+    if (settledBySteps === REAL_FAILURE) {
+      verdicts.push(REAL_FAILURE);
+      continue;
+    }
+    const log = await fetchJobLogTail({
+      github,
+      core,
+      owner,
+      repo,
+      jobId: job.id,
+    });
+    const verdict = classifyCancelledJob({
+      steps: job.steps,
+      logText: log.text,
+      logAvailable: log.available,
+    });
+    core.info(
+      `CI Gate: cancelled job "${job.name}" (${jobKey}) classified as ` +
+        `${verdict}.`,
+    );
+    verdicts.push(verdict);
+  }
+
+  return (
+    CLASSIFICATION_PRECEDENCE.find((c) => verdicts.includes(c)) || NO_SIGNAL
+  );
+}
 
 /**
  * Whether a GATE_INPUT_JOBS entry reported `cancelled` even though one of its
@@ -364,6 +612,12 @@ const CANCELLABLE_TEST_JOB_NAME_PREFIX = Object.freeze({
  * intent preserved); a `cancelled` job with a genuinely failed step is
  * promoted to `failure` before folding.
  *
+ * Scoped to CANCELLABLE_TEST_JOB_NAME_PREFIX's two matrix keys, which is the
+ * contract e2e-affected-gate.js mirrors. `postCiGate` itself no longer calls
+ * this — since LS-10140 it runs `classifyCancelledGateJob` over EVERY
+ * GATE_INPUT_JOBS entry, of which this is the narrow, backwards-compatible
+ * special case.
+ *
  * Fails OPEN (returns `false`, i.e. "no real failure detected") on a lookup
  * error — this check is additive on top of the pre-existing LS-8219 default,
  * so an API hiccup here degrades to that prior behavior rather than newly
@@ -379,38 +633,16 @@ async function cancelledJobHadRealFailure({
   runId,
   jobKey,
 }) {
-  const prefix = CANCELLABLE_TEST_JOB_NAME_PREFIX[jobKey];
-  if (!prefix) return false;
-  try {
-    let jobs = [];
-    let page = 1;
-    while (true) {
-      const { data } = await github.rest.actions.listJobsForWorkflowRun({
-        owner,
-        repo,
-        run_id: runId,
-        per_page: 100,
-        page,
-      });
-      jobs = jobs.concat(data.jobs);
-      if (data.jobs.length < 100) break;
-      page++;
-    }
-    return jobs
-      .filter((j) => typeof j.name === 'string' && j.name.includes(prefix))
-      .some(
-        (j) =>
-          j.conclusion === 'cancelled' &&
-          (j.steps || []).some((s) => s.conclusion === 'failure'),
-      );
-  } catch (e) {
-    core.warning(
-      `CI Gate: could not inspect jobs for run ${runId} to check whether the ` +
-        `cancelled "${jobKey}" job actually had a failing step (${e.message}) ` +
-        '— treating it as excluded per the pre-existing LS-8219 default.',
+  if (!CANCELLABLE_TEST_JOB_NAME_PREFIX[jobKey]) return false;
+  const jobs = await listRunJobs({ github, core, owner, repo, runId });
+  if (jobs === null) return false;
+  return jobs
+    .filter((j) => jobNameMatchesGateKey(j.name, jobKey))
+    .some(
+      (j) =>
+        j.conclusion === 'cancelled' &&
+        (j.steps || []).some((s) => s.conclusion === 'failure'),
     );
-    return false;
-  }
 }
 
 /**
@@ -771,6 +1003,70 @@ async function assertFailureIsCurrent({
 }
 
 /**
+ * Decide whether THIS run may post the `no-verdict` PENDING gate for `sha`
+ * (LS-10140).
+ *
+ * WHY: a cancelled job produced no evidence. It cannot prove the SHA passed,
+ * which is why the gate goes pending rather than green — but by the same token
+ * it cannot overturn a verdict a run that DID execute already earned. Commit
+ * statuses are last-writer-wins by created_at, so posting pending over an
+ * existing `success` would re-block an already-merge-ready SHA, and posting it
+ * over an existing `failure` would hide a real break behind an in-flight
+ * amber. Both are regressions of LS-8219, whose evidence was exactly this
+ * shape: a cancelled post-merge duplicate speaking last on a SHA whose gating
+ * run had already spoken.
+ *
+ * Unlike `assertSuccessIsCurrent` this does NOT compare run ids. Age is
+ * irrelevant here: a cancelled run has nothing to say at any age, so ANY
+ * terminal verdict already on the SHA — older or newer — outranks it. The
+ * seeded `pending` from `seedPendingCiGate` is not terminal and is correctly
+ * overwritten (both are pending; the fuller description wins).
+ *
+ * Fails CLOSED (withholds the pending post) when the statuses lookup errors:
+ * the alternative is overwriting a verdict we could not read. A missing
+ * pending is harmless — `seedPendingCiGate` has already left a pending status
+ * on the SHA, so the gate is never silently absent.
+ *
+ * @returns {Promise<{allowed: boolean, reason?: string, existingState?: string}>}
+ */
+async function assertNoVerdictIsSafe({ github, core, owner, repo, sha }) {
+  let existingGateStatuses;
+  try {
+    const { data } = await withStatusRetry(() =>
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    );
+    existingGateStatuses = (data || []).filter(
+      (status) => status.context === CI_GATE_CONTEXT,
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not list commit statuses for ${sha} (${e.message}) — ` +
+        'withholding the no-verdict pending rather than risking an overwrite ' +
+        'of a terminal verdict this lookup could not read.',
+    );
+    return { allowed: false, reason: 'status-lookup-failed' };
+  }
+
+  const terminal = existingGateStatuses.find(
+    (status) => status.state === 'success' || status.state === 'failure',
+  );
+  if (terminal) {
+    return {
+      allowed: false,
+      reason: 'terminal-verdict-exists',
+      existingState: terminal.state,
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
  * Whether an Octokit REST error is a transient rate-limit/5xx condition worth
  * retrying (LS-9359). Primary GitHub App installation rate limits surface as
  * 403 with an "API rate limit exceeded" message; secondary rate limits can
@@ -884,46 +1180,71 @@ async function postCiGate({
     return { posted: false, reason: 'stale', sha: targetSha, currentSha };
   }
 
-  // LS-9467: a `cancelled` e2e/e2e-mobile result can mask a real test failure
-  // that already completed before the job's rollup landed on `cancelled` (see
-  // cancelledJobHadRealFailure). Promote those before folding so the LS-8219
-  // exclusion only ever applies to jobs that were genuinely cancelled clean.
+  // LS-9467 / LS-10140: a `cancelled` gate input is not self-explanatory. It
+  // can mean a real failure that completed just before the job's rollup landed
+  // on `cancelled` (LS-9467), a runner the pool tore down mid-install, a job
+  // that never got a runner at all and recorded zero steps, or a deliberate
+  // stop. Classify each one from the run's own jobs BEFORE folding — the same
+  // runner-cancellation.js rules .github/actions/detect-runner-shutdown
+  // applies — so the gate and the shutdown reporter can never disagree about
+  // the same job (LS-10140 AC2).
   const selfRunIdForJobCheck = Number(process.env.GITHUB_RUN_ID);
   let effectiveResults = results;
-  if (Number.isSafeInteger(selfRunIdForJobCheck)) {
-    for (const jobKey of Object.keys(CANCELLABLE_TEST_JOB_NAME_PREFIX)) {
-      if (results && results[jobKey] === 'cancelled') {
-        // Sequential is fine: at most 2 keys, each a single (paginated)
-        // same-run Jobs API lookup.
-        const hadRealFailure = await cancelledJobHadRealFailure({
-          github,
-          core,
-          owner,
-          repo,
-          runId: selfRunIdForJobCheck,
-          jobKey,
-        });
-        if (hadRealFailure) {
-          if (effectiveResults === results) effectiveResults = { ...results };
-          effectiveResults[jobKey] = 'failure';
-          core.warning(
-            `CI Gate: "${jobKey}" rolled up to 'cancelled' but a matching job ` +
-              `instance had a real failing step — treating it as 'failure' ` +
-              `(LS-9467).`,
-          );
-        }
+  /** @type {Record<string, string>} jobKey → classifyCancelledJob result */
+  const cancelClassifications = {};
+  const cancelledKeys = GATE_INPUT_JOBS.filter(
+    (jobKey) => results && results[jobKey] === 'cancelled',
+  );
+
+  if (cancelledKeys.length > 0 && Number.isSafeInteger(selfRunIdForJobCheck)) {
+    // One paginated Jobs lookup for the whole run, shared across every
+    // cancelled key — this path only runs when something was cancelled.
+    const jobs = await listRunJobs({
+      github,
+      core,
+      owner,
+      repo,
+      runId: selfRunIdForJobCheck,
+    });
+    for (const jobKey of cancelledKeys) {
+      const classification = await classifyCancelledGateJob({
+        github,
+        core,
+        owner,
+        repo,
+        jobs,
+        jobKey,
+      });
+      cancelClassifications[jobKey] = classification;
+      if (gateEffectOfCancellation(classification) === 'failure') {
+        if (effectiveResults === results) effectiveResults = { ...results };
+        effectiveResults[jobKey] = 'failure';
+        core.warning(
+          `CI Gate: "${jobKey}" rolled up to 'cancelled' but a matching job ` +
+            `instance had a real failing step — treating it as 'failure' ` +
+            `(LS-9467).`,
+        );
       }
     }
   }
 
-  const { conclusion, failing, ignored } =
+  const { conclusion, failing, cancelled, ignored } =
     computeGateConclusion(effectiveResults);
-  const state = conclusion === 'success' ? 'success' : 'failure';
+  const state =
+    conclusion === 'success'
+      ? 'success'
+      : conclusion === NO_VERDICT
+        ? 'pending'
+        : 'failure';
 
-  if (ignored.length > 0) {
+  if (cancelled.length > 0) {
+    const detail = cancelled
+      .map(
+        (jobKey) => `${jobKey} (${cancelClassifications[jobKey] || NO_SIGNAL})`,
+      )
+      .join(', ');
     core.info(
-      `CI Gate: ignoring cancelled (superseded/post-merge duplicate) jobs ` +
-        `for PR #${pr.number} ${targetSha}: ${ignored.join(', ')}`,
+      `CI Gate: cancelled jobs for PR #${pr.number} ${targetSha}: ${detail}`,
     );
   }
   // LS-9378: red may always be posted; green must prove it is the newest word
@@ -932,10 +1253,62 @@ async function postCiGate({
   const selfRunId = Number(process.env.GITHUB_RUN_ID);
   let effectiveState = state;
   let pendingReason;
-  let description =
-    conclusion === 'success'
-      ? 'All CI checks passed'
-      : `Failing: ${failing.join(', ')}`.slice(0, MAX_DESCRIPTION_LENGTH);
+  let description;
+  if (conclusion === 'success') {
+    description = 'All CI checks passed';
+  } else if (conclusion === NO_VERDICT) {
+    // Name the cause rather than just "cancelled": on a runner shutdown the
+    // author needs to read "not your code" from the required check itself, not
+    // only from the separate PR comment.
+    const detail = cancelled
+      .map(
+        (jobKey) => `${jobKey}: ${cancelClassifications[jobKey] || NO_SIGNAL}`,
+      )
+      .join(', ');
+    description = `No verdict — ${detail}; re-run pending`.slice(
+      0,
+      MAX_DESCRIPTION_LENGTH,
+    );
+  } else {
+    description = `Failing: ${failing.join(', ')}`.slice(
+      0,
+      MAX_DESCRIPTION_LENGTH,
+    );
+  }
+
+  if (state === 'pending') {
+    // LS-10140: a cancelled run produced NO evidence, so it must never
+    // downgrade a verdict some run actually earned for this SHA. Commit
+    // statuses are last-writer-wins by created_at, so posting pending over an
+    // existing green would block a merge that was legitimately unblocked —
+    // precisely the LS-8219 hazard (a cancelled post-merge duplicate latching
+    // onto a SHA whose gating run was already green), re-armed in a different
+    // colour. Withhold whenever ANY terminal `CI Gate` verdict already stands.
+    const pendingSafety = await assertNoVerdictIsSafe({
+      github,
+      core,
+      owner,
+      repo,
+      sha: targetSha,
+    });
+    if (!pendingSafety.allowed) {
+      core.info(
+        `CI Gate: withholding the no-verdict 'pending' for ${targetSha} on PR ` +
+          `#${pr.number} — a terminal '${pendingSafety.existingState}' verdict ` +
+          'already stands for this SHA and a cancelled run has no evidence to ' +
+          'overturn it.',
+      );
+      return {
+        posted: false,
+        reason: pendingSafety.reason,
+        sha: targetSha,
+        failing,
+        cancelled,
+        ignored,
+        cancelClassifications,
+      };
+    }
+  }
 
   if (state === 'failure') {
     // LS-9754: a stale failure must not outrank an already-posted newer
@@ -1063,7 +1436,9 @@ async function postCiGate({
     state: effectiveState,
     sha: targetSha,
     failing,
+    cancelled,
     ignored,
+    cancelClassifications,
     ...(pendingReason ? { reason: pendingReason } : {}),
   };
 }
@@ -1180,12 +1555,17 @@ module.exports = {
   CI_PIPELINE_JOB_NAME,
   CI_RUN_WORKFLOW_NAMES,
   CANCELLABLE_TEST_JOB_NAME_PREFIX,
+  GATE_JOB_LEAF_NAMES,
   GATE_INPUT_JOBS,
+  NO_VERDICT,
   MAX_SUPERSEDING_RUN_INSPECTIONS,
   computeGateConclusion,
   pipelineJobWasSkipped,
   runIdFromTargetUrl,
   cancelledJobHadRealFailure,
+  classifyCancelledGateJob,
+  jobNameMatchesGateKey,
+  assertNoVerdictIsSafe,
   assertSuccessIsCurrent,
   assertFailureIsCurrent,
   isRetryableStatusError,

@@ -35,6 +35,8 @@ const {
   GATE_INPUT_JOBS,
   MAX_SUPERSEDING_RUN_INSPECTIONS,
   computeGateConclusion,
+  GATE_JOB_LEAF_NAMES,
+  jobNameMatchesGateKey,
   runIdFromTargetUrl,
   isRetryableStatusError,
   cancelledJobHadRealFailure,
@@ -113,10 +115,13 @@ function allPass() {
   return Object.fromEntries(GATE_INPUT_JOBS.map((j) => [j, 'success']));
 }
 
+// A no-op `core`. The bodies return `undefined` explicitly rather than being
+// empty (`() => {}`), which @typescript-eslint/no-empty-function rejects once
+// this file is in the affected set.
 const core = {
-  info: () => {},
-  warning: () => {},
-  error: () => {},
+  info: () => undefined,
+  warning: () => undefined,
+  error: () => undefined,
 };
 
 // Minimal GitHub mock that records createCommitStatus calls and returns a
@@ -143,6 +148,12 @@ function makeGithub({
   // e.g. { [SELF_RUN_ID]: [{ name: 'E2E Tests (Shard 1/1)', conclusion: 'cancelled', steps: [...] }] }.
   jobsByRunId = {},
   jobsError = null,
+  // LS-10140: job-log bodies keyed by job id, served to
+  // downloadJobLogsForWorkflowRun. A job absent from this map 404s, exactly as
+  // GitHub does (BlobNotFound) for a job that never produced output — which is
+  // itself the "never ran" signal classifyCancelledJob keys on.
+  jobLogsById = {},
+  jobLogsError = null,
   // LS-9359: queue of errors createCommitStatus throws on successive calls,
   // consumed one per attempt (shift). Once empty, calls succeed normally.
   createStatusErrors = [],
@@ -153,6 +164,7 @@ function makeGithub({
     listRuns: 0,
     listStatuses: 0,
     listJobs: [],
+    jobLogs: [],
   };
   const github = {
     rest: {
@@ -173,6 +185,14 @@ function makeGithub({
           calls.listJobs.push(run_id);
           if (jobsError) throw new Error(jobsError);
           return { data: { jobs: jobsByRunId[run_id] || [] } };
+        },
+        downloadJobLogsForWorkflowRun: async ({ job_id }) => {
+          calls.jobLogs.push(job_id);
+          if (jobLogsError) throw jobLogsError;
+          if (!(job_id in jobLogsById)) {
+            throw statusError(404, 'Not Found');
+          }
+          return { data: jobLogsById[job_id] };
         },
       },
       repos: {
@@ -229,39 +249,46 @@ describe('ci-gate — computeGateConclusion folds inputs', () => {
     assert.ok(failing.some((f) => f.startsWith('test')));
   });
 
-  it('excludes cancelled jobs from the verdict — NOT a failure (LS-8219)', () => {
-    // A cancelled granular job is a superseded/post-merge duplicate, not a real
-    // failure. With every other job passing the gate must resolve success.
+  it('never folds a cancelled job as FAILURE (LS-8219)', () => {
+    // A cancelled granular job is a superseded/post-merge duplicate or a job
+    // the runner died under — not a real failure, and never red.
     const results = { ...allPass(), lint: 'cancelled' };
-    const { conclusion, failing, ignored } = computeGateConclusion(results);
-    assert.strictEqual(conclusion, 'success');
+    const { conclusion, failing, cancelled, ignored } =
+      computeGateConclusion(results);
+    assert.notStrictEqual(conclusion, 'failure');
     assert.deepStrictEqual(failing, []);
-    assert.deepStrictEqual(ignored, ['lint']);
+    assert.deepStrictEqual(cancelled, ['lint']);
+    assert.deepStrictEqual(ignored, ['lint'], '`ignored` stays an alias');
   });
 
-  it('cancelled duplicate + superseding success → SUCCESS, not FAILURE (LS-8219 regression)', () => {
-    // Reproduces PR #5540 / #5098 / #5440 / #5465: a post-merge override run (or
-    // concurrency-cancelled duplicate) is SIGINT'd mid-flight, so its granular
-    // jobs report `cancelled` even though every test project had already passed.
-    // The aggregate must NOT latch a fresh red on the (already-green) SHA.
+  it('a cancelled job yields NO-VERDICT, not success — it never spoke (LS-10140)', () => {
+    // LS-8219 excluded `cancelled` from the verdict entirely, which made a
+    // cancelled job indistinguishable from a passing one: with every other
+    // input green the gate claimed "All CI checks passed" for checks that had
+    // not run. Neither terminal state is honest, so the fold resolves
+    // `no-verdict` and postCiGate turns that into a merge-blocking PENDING.
     const results = {
       ...allPass(),
       test: 'cancelled', // exit-130 SIGINT after all Jest projects passed
       e2e: 'cancelled', // concurrency-cancelled duplicate shard
     };
-    const { conclusion, failing, ignored } = computeGateConclusion(results);
-    assert.strictEqual(conclusion, 'success');
+    const { conclusion, failing, cancelled } = computeGateConclusion(results);
+    assert.strictEqual(conclusion, 'no-verdict');
     assert.deepStrictEqual(failing, []);
-    assert.deepStrictEqual(ignored.sort(), ['e2e', 'test']);
+    assert.deepStrictEqual(cancelled.sort(), ['e2e', 'test']);
   });
 
-  it('a real failure alongside a cancelled job still fails (cancelled excluded, failure counted)', () => {
+  it('NEGATIVE CONTROL: no cancellations means no no-verdict — green stays green', () => {
+    assert.strictEqual(computeGateConclusion(allPass()).conclusion, 'success');
+  });
+
+  it('NEGATIVE CONTROL: a real failure alongside a cancelled job still FAILS — failure outranks no-verdict', () => {
     const results = { ...allPass(), test: 'cancelled', build: 'failure' };
-    const { conclusion, failing, ignored } = computeGateConclusion(results);
+    const { conclusion, failing, cancelled } = computeGateConclusion(results);
     assert.strictEqual(conclusion, 'failure');
     assert.ok(failing.some((f) => f.startsWith('build')));
     assert.ok(!failing.some((f) => f.startsWith('test')));
-    assert.deepStrictEqual(ignored, ['test']);
+    assert.deepStrictEqual(cancelled, ['test']);
   });
 
   it('treats a missing required input as failure (fail-safe)', () => {
@@ -424,11 +451,16 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     assert.match(calls.statuses[0].description, /build/);
   });
 
-  it('posts SUCCESS (not FAILURE) for a cancelled post-merge duplicate run (LS-8219 regression)', async () => {
-    // The SHA is still current (the gating run already merged it) but a duplicate
-    // post-merge run was SIGINT'd, so its jobs report `cancelled`. The aggregate
-    // must post success — never a fresh red — for this already-green SHA.
-    const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
+  it('posts nothing for a cancelled post-merge duplicate on an already-green SHA (LS-8219 regression)', async () => {
+    // The SHA is still current (the gating run already merged it) but a
+    // duplicate post-merge run was SIGINT'd, so its jobs report `cancelled`.
+    // A cancelled run carries no evidence: it must not post a fresh red (the
+    // original LS-8219 symptom) and — since LS-10140 gave cancellations their
+    // own PENDING state — it must not downgrade the standing green either.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      existingStatuses: [gateStatus('success', OLDER_RUN_ID)],
+    });
     const res = await postCiGate({
       github,
       context: makeContext(),
@@ -436,15 +468,237 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
       results: { ...allPass(), test: 'cancelled', e2e: 'cancelled' },
     });
 
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'terminal-verdict-exists');
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'a cancelled duplicate must neither redden nor un-green a SHA a real run already ruled on',
+    );
+    assert.deepStrictEqual(res.cancelled.sort(), ['e2e', 'test']);
+  });
+
+  it('posts PENDING — not red, not green — for a cancelled job on a SHA with no verdict yet (LS-10140)', async () => {
+    // PR #7976 run 34722062338: "🚀 CI Pipeline / test" waited 18 minutes for a
+    // ci-runner it never got and was cancelled with ZERO steps and no log
+    // blob. Nothing failed; nothing passed either. The gate must say exactly
+    // that, and a pending required context blocks the merge on its own
+    // (merge-queue-processor.js's validateStatusChecks counts it as inProgress).
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 991,
+            name: '🚀 CI Pipeline / test',
+            conclusion: 'cancelled',
+            steps: [],
+          },
+        ],
+      },
+      // job 991 is absent from jobLogsById → the mock 404s, as GitHub does.
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
     assert.strictEqual(res.posted, true);
     assert.strictEqual(calls.statuses.length, 1);
-    assert.strictEqual(
-      calls.statuses[0].state,
-      'success',
-      'a cancelled duplicate run must not post a fresh FAILURE on a green SHA',
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(res.cancelClassifications.test, 'never-ran');
+    assert.match(
+      calls.statuses[0].description,
+      /never-ran/,
+      'the description must name the cause so the author can read it off the required check itself',
     );
-    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
-    assert.deepStrictEqual(res.ignored.sort(), ['e2e', 'test']);
+  });
+
+  it('classifies a mid-install runner shutdown and still posts PENDING (LS-10140, PR #7976 case 2)', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 992,
+            name: '🚀 CI Pipeline / custom-checks',
+            conclusion: 'cancelled',
+            steps: [
+              { name: 'Set up job', conclusion: 'success' },
+              { name: 'Setup Workspace', conclusion: 'cancelled' },
+            ],
+          },
+        ],
+      },
+      jobLogsById: {
+        992:
+          '##[error]The runner has received a shutdown signal.\n' +
+          '##[error]The operation was canceled.',
+      },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), 'custom-checks': 'cancelled' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(
+      res.cancelClassifications['custom-checks'],
+      'runner-shutdown',
+    );
+  });
+
+  it('NEGATIVE CONTROL: a cancelled job that ran test bodies and FAILED still posts red (LS-10140)', async () => {
+    // The load-bearing AC: the pending path must never become a way to launder
+    // a genuine break. This is the LS-9467 / PR #6909 shape, now checked for
+    // every gate input rather than only the two matrix ones.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 993,
+            name: '🚀 CI Pipeline / test',
+            conclusion: 'cancelled',
+            steps: [
+              { name: 'Set up job', conclusion: 'success' },
+              { name: 'Run Tests', conclusion: 'failure' },
+            ],
+          },
+        ],
+      },
+      jobLogsById: {
+        993:
+          '##[error]The runner has received a shutdown signal.\n' +
+          '##[error]The operation was canceled.',
+      },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+    assert.ok(res.failing.some((f) => f.startsWith('test')));
+    assert.strictEqual(
+      calls.jobLogs.length,
+      0,
+      'a job whose steps already record a failure needs no log download',
+    );
+  });
+
+  it('a deliberate/superseding cancel is PENDING too — never a silent green (LS-10140)', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 994,
+            name: '🚀 CI Pipeline / build',
+            conclusion: 'cancelled',
+            steps: [{ name: 'Set up job', conclusion: 'success' }],
+          },
+        ],
+      },
+      jobLogsById: {
+        994:
+          '##[error]The operation was canceled.\n' +
+          '##[error]The runner has received a shutdown signal.',
+      },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), build: 'cancelled' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(res.cancelClassifications.build, 'deliberate-cancel');
+  });
+
+  it('withholds the pending post when a terminal FAILURE already stands (LS-10140)', async () => {
+    // Amber over red would hide a real break behind an in-flight-looking gate.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      existingStatuses: [gateStatus('failure', OLDER_RUN_ID)],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'terminal-verdict-exists');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('overwrites the seeded pending — a seed is not a terminal verdict (LS-10140)', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      existingStatuses: [gateStatus('pending', OLDER_RUN_ID)],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+  });
+
+  it('fails CLOSED — withholds the pending post when the statuses lookup errors (LS-10140)', async () => {
+    // seedPendingCiGate has already left a pending status on the SHA, so a
+    // withheld pending is never a silently-absent gate; overwriting a verdict
+    // we could not read would be the riskier direction.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      statusesError: 'boom',
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'status-lookup-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('an unclassifiable cancellation (jobs lookup errors) still posts PENDING, never green (LS-10140)', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsError: 'jobs api down',
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(res.cancelClassifications.test, 'no-signal');
   });
 
   it('no-ops (posts nothing) when the PR head advanced — SHA-currency guard', async () => {
@@ -592,7 +846,7 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     assert.match(calls.statuses[0].description, /e2e/);
   });
 
-  it('still excludes a cleanly-cancelled job with no failing step (LS-8219 preserved alongside LS-9467)', async () => {
+  it('a cleanly-cancelled job with no failing step is still NOT a failure (LS-8219 preserved alongside LS-9467)', async () => {
     const { github, calls } = makeGithub({
       currentSha: HEAD_SHA,
       jobsByRunId: {
@@ -614,8 +868,15 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     });
 
     assert.strictEqual(res.posted, true);
-    assert.strictEqual(calls.statuses[0].state, 'success');
-    assert.deepStrictEqual(res.ignored, ['e2e']);
+    assert.notStrictEqual(
+      calls.statuses[0].state,
+      'failure',
+      'LS-8219: a clean cancellation must never post red',
+    );
+    // LS-10140: and it is no longer laundered into green either — the job
+    // produced no verdict, so the gate says so and blocks with PENDING.
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.deepStrictEqual(res.cancelled, ['e2e']);
   });
 
   it('truncates the failure description to the 140-char status limit', async () => {
@@ -1909,5 +2170,81 @@ describe('ci-gate — seedPendingCiGate seeds a pending status on open/sync (LS-
     assert.strictEqual(res.seeded, true);
     assert.strictEqual(calls.statuses.length, 1);
     assert.strictEqual(calls.statuses[0].state, 'pending');
+  });
+});
+
+// ── LS-10140: gate-input job-name resolution ────────────────────────────────
+
+describe('ci-gate — jobNameMatchesGateKey (LS-10140)', () => {
+  it('matches the reusable-workflow-prefixed name for every gate input', () => {
+    assert.ok(jobNameMatchesGateKey('🚀 CI Pipeline / test', 'test'));
+    assert.ok(jobNameMatchesGateKey('🚀 CI Pipeline / lint & format', 'lint'));
+    assert.ok(
+      jobNameMatchesGateKey('🚀 CI Pipeline / E2E Tests (Shard 1/1)', 'e2e'),
+      'the matrix shard suffix contains a bare slash — the leaf split must ' +
+        'use " / " (spaced), not "/"',
+    );
+    assert.ok(
+      jobNameMatchesGateKey(
+        '🚀 CI Pipeline / E2E Tests (Mobile Chrome — Shard 1/2)',
+        'e2e-mobile',
+      ),
+    );
+  });
+
+  it('NEGATIVE CONTROL: a short key does not match an unrelated job that merely contains it', () => {
+    // Widening the lookup from the two matrix keys to all seven brought in
+    // `test` and `build`, which a naive `.includes()` would find inside other
+    // job names — mapping an unrelated job's cancellation onto a gate input.
+    assert.equal(
+      jobNameMatchesGateKey('🚀 CI Pipeline / E2E Tests (Shard 1/1)', 'test'),
+      false,
+    );
+    assert.equal(
+      jobNameMatchesGateKey('🔐 Security Scanning / build-scan', 'build'),
+      false,
+    );
+    assert.equal(
+      jobNameMatchesGateKey('🚀 CI Pipeline / test', 'build'),
+      false,
+    );
+    assert.equal(jobNameMatchesGateKey(undefined, 'test'), false);
+    assert.equal(jobNameMatchesGateKey('🚀 CI Pipeline / test', 'nope'), false);
+  });
+
+  it('covers every GATE_INPUT_JOBS entry — a new gate input must not silently go unclassifiable', () => {
+    for (const jobKey of GATE_INPUT_JOBS) {
+      assert.ok(
+        GATE_JOB_LEAF_NAMES[jobKey],
+        `GATE_JOB_LEAF_NAMES is missing "${jobKey}" — its cancellations would ` +
+          'classify as no-signal and the gate could never tell a real failure ' +
+          'behind them from runner churn',
+      );
+    }
+  });
+
+  it('the leaf names match ci-pipeline.yml (drift guard)', async () => {
+    // These are matched against the live Actions jobs listing. Renaming a job
+    // in ci-pipeline.yml without updating the constant would silently stop
+    // every cancellation of that job from being classifiable.
+    const pipeline = await readFile(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../workflows/ci-pipeline.yml',
+      ),
+      'utf8',
+    );
+    for (const [jobKey, leafName] of Object.entries(GATE_JOB_LEAF_NAMES)) {
+      // Find the job block's own `name:` — the first one after the job key.
+      const keyAt = pipeline.search(new RegExp(`^ {2}${jobKey}:$`, 'm'));
+      assert.ok(keyAt > -1, `ci-pipeline.yml has no "${jobKey}" job`);
+      const nameMatch = /^ {4}name: "(.+)"$/m.exec(pipeline.slice(keyAt));
+      assert.ok(nameMatch, `ci-pipeline.yml's "${jobKey}" job has no name:`);
+      assert.ok(
+        nameMatch[1].startsWith(leafName),
+        `ci-pipeline.yml's "${jobKey}" job is named "${nameMatch[1]}", which ` +
+          `no longer starts with GATE_JOB_LEAF_NAMES' "${leafName}"`,
+      );
+    }
   });
 });

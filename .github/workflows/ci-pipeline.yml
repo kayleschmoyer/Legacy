@@ -1637,14 +1637,29 @@ jobs:
           description: "Failed steps: ${{ steps.collect-results.outputs.failed-steps }}"
 
       - name: "Final Status"
+        env:
+          STATUS: ${{ steps.collect-results.outputs.overall-status }}
+          CANCELLATION_ONLY: ${{ steps.collect-results.outputs.cancellation-only }}
+          CANCELLED_STEPS: ${{ steps.collect-results.outputs.cancelled-steps }}
+          FAILED_STEPS: ${{ steps.collect-results.outputs.failed-steps }}
+          DURATION: ${{ steps.collect-results.outputs.workflow-duration }}
         run: |
-          STATUS="${{ steps.collect-results.outputs.overall-status }}"
           if [ "$STATUS" = "success" ]; then
             echo "CI Pipeline completed successfully!"
-            echo "Duration: ${{ steps.collect-results.outputs.workflow-duration }}s"
+            echo "Duration: ${DURATION}s"
+          elif [ "$CANCELLATION_ONLY" = "true" ]; then
+            # LS-10140: still a non-zero exit — a cancelled pipeline proved
+            # nothing and must not read as green — but say what actually
+            # happened. No step failed; these jobs never reached a verdict, and
+            # the CI Gate reflects that with a PENDING status rather than a
+            # false red.
+            echo "NO VERDICT: CI Pipeline did not complete — no step failed"
+            echo "Cancelled Steps: ${CANCELLED_STEPS}"
+            echo "Duration: ${DURATION}s"
+            exit 1
           else
             echo "FAILED: CI Pipeline failed"
-            echo "Failed Steps: ${{ steps.collect-results.outputs.failed-steps }}"
-            echo "Duration: ${{ steps.collect-results.outputs.workflow-duration }}s"
+            echo "Failed Steps: ${FAILED_STEPS}"
+            echo "Duration: ${DURATION}s"
             exit 1
           fi

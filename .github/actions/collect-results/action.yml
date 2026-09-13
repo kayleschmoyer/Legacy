@@ -30,6 +30,14 @@ outputs:
   failed-steps:
     description: "List of failed steps"
     value: ${{ steps.collect.outputs.failed-steps }}
+  cancelled-steps:
+    description: "Critical steps whose result was `cancelled` rather than a genuine failure (LS-10140)"
+    value: ${{ steps.collect.outputs.cancelled-steps }}
+  cancellation-only:
+    description: >-
+      "true" when the pipeline is not-green SOLELY because of cancellations —
+      no critical step actually failed or reported an unknown status (LS-10140).
+    value: ${{ steps.collect.outputs.cancellation-only }}
   performance-summary:
     description: "Performance analysis summary"
     value: ${{ steps.collect.outputs.performance-summary }}
@@ -59,6 +67,18 @@ runs:
         # Determine overall status based on failure threshold
         OVERALL_STATUS="success"
         FAILED_STEPS=()
+        # LS-10140: a cancelled critical step still folds into OVERALL_STATUS
+        # "failure" — a run that proved nothing must not keep merge-when-ready
+        # on the strength of this output alone (LS-10091). But `cancelled` and
+        # `failure` are NOT the same event, and collapsing them here left every
+        # downstream consumer unable to tell "the tests broke" from "the runner
+        # died before the tests ran". These two extra outputs carry that
+        # distinction without changing the fail-safe verdict: the CI Gate
+        # (.github/scripts/ci-gate.js) uses it to post PENDING instead of a
+        # false red, and ci-orchestrator.yml's label-strip job uses the
+        # runner-shutdown detector for the same reason.
+        CANCELLED_STEPS=()
+        REAL_FAILURE_SEEN="false"
 
         # Check each step against failure threshold
         IFS=',' read -ra CRITICAL_STEPS <<< "$FAILURE_THRESHOLD"
@@ -66,8 +86,14 @@ runs:
           step=$(echo "$step" | xargs) # trim whitespace
           STEP_RESULT=$(echo "$STEP_RESULTS" | jq -r ".[\"$step\"] // \"unknown\"")
           
-          if [ "$STEP_RESULT" = "failure" ] || [ "$STEP_RESULT" = "cancelled" ]; then
+          if [ "$STEP_RESULT" = "cancelled" ]; then
             OVERALL_STATUS="failure"
+            FAILED_STEPS+=("$step")
+            CANCELLED_STEPS+=("$step")
+            echo "[CANCELLED] Critical step '$step' status: $STEP_RESULT (no verdict — not a code failure)"
+          elif [ "$STEP_RESULT" = "failure" ]; then
+            OVERALL_STATUS="failure"
+            REAL_FAILURE_SEEN="true"
             FAILED_STEPS+=("$step")
             echo "[FAILED] Critical step '$step' status: $STEP_RESULT"
           elif [ "$STEP_RESULT" = "success" ] || [ "$STEP_RESULT" = "skipped" ]; then
@@ -75,6 +101,7 @@ runs:
           else
             # Unknown status — treat as failure to surface misconfiguration
             OVERALL_STATUS="failure"
+            REAL_FAILURE_SEEN="true"
             FAILED_STEPS+=("$step")
             echo "[UNKNOWN-FAIL] Critical step '$step' has unexpected status: $STEP_RESULT"
           fi
@@ -143,6 +170,12 @@ runs:
         echo "overall-status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
         echo "workflow-duration=$WORKFLOW_DURATION" >> $GITHUB_OUTPUT
         echo "failed-steps=$(printf '%s,' "${FAILED_STEPS[@]}" | sed 's/,$//')" >> $GITHUB_OUTPUT
+        echo "cancelled-steps=$(printf '%s,' "${CANCELLED_STEPS[@]}" | sed 's/,$//')" >> $GITHUB_OUTPUT
+        if [ ${#CANCELLED_STEPS[@]} -gt 0 ] && [ "$REAL_FAILURE_SEEN" = "false" ]; then
+          echo "cancellation-only=true" >> $GITHUB_OUTPUT
+        else
+          echo "cancellation-only=false" >> $GITHUB_OUTPUT
+        fi
         echo "performance-summary=$(echo "$PERFORMANCE_SUMMARY" | jq -c .)" >> $GITHUB_OUTPUT
 
         # Create step summary
@@ -150,6 +183,9 @@ runs:
         echo "- **Overall Status**: $( [ "$OVERALL_STATUS" = "success" ] && echo "SUCCESS" || echo "FAILED" )" >> $GITHUB_STEP_SUMMARY
         echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY
         echo "- **Failed Steps**: $( [ ${#FAILED_STEPS[@]} -eq 0 ] && echo "None" || printf '%s, ' "${FAILED_STEPS[@]}" | sed 's/, $//' )" >> $GITHUB_STEP_SUMMARY
+        if [ ${#CANCELLED_STEPS[@]} -gt 0 ]; then
+          echo "- **Cancelled (no verdict)**: $(printf '%s, ' "${CANCELLED_STEPS[@]}" | sed 's/, $//')" >> $GITHUB_STEP_SUMMARY
+        fi
 
         if [ "$INCLUDE_PERF" = "true" ] && [ "$WORKFLOW_DURATION" != "unknown" ]; then
           PERF_RATING=$(echo "$PERFORMANCE_SUMMARY" | jq -r '.rating')

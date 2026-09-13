@@ -162,11 +162,19 @@ jobs:
        github.event.action == 'reopened')
     timeout-minutes: 2
     steps:
+      # Single-file sparse checkout so this job beats the open->merge window
+      # (LS-9543) instead of paying for a full clone. That means ci-gate.js's
+      # require graph has to be listed here too: a top-level relative require
+      # of a file this list omits loads fine under the unit tests (full
+      # checkout) and throws MODULE_NOT_FOUND here. A unit test asserts this
+      # list covers every `require('./x.js')` in ci-gate.js -- see
+      # .github/scripts/__tests__/ci-orchestrator-workflow.test.mjs (LS-10140).
       - name: "🚀 Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           sparse-checkout: |
             .github/scripts/ci-gate.js
+            .github/scripts/runner-cancellation.js
           sparse-checkout-cone-mode: false
 
       - name: "Seed pending CI Gate"
@@ -925,9 +933,53 @@ jobs:
       !cancelled() &&
       github.event_name == 'pull_request_review' &&
       needs.ci-pipeline.outputs.overall-status == 'failure'
-    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
+    # LS-9710 rationale, applied here too (LS-10140): this job now consults the
+    # runner-shutdown detector, so it has to be schedulable in exactly the
+    # circumstance that detector reports — a self-hosted pool with no capacity.
+    # Pinning to GitHub-hosted infrastructure also keeps it from holding this
+    # run's `cancel-in-progress: false` concurrency slot while queued for a
+    # runner that will never arrive. It only makes API calls; it never needs
+    # the workspace image.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # LS-10140: `overall-status` folds `cancelled` into `failure`
+      # (.github/actions/collect-results), which is correct fail-safe behaviour
+      # for a cancel nobody can attribute — a run that proved nothing must not
+      # keep a merge label. But when the cancellation is the RUNNER POOL dying
+      # under a job, stripping the label punishes the author for infrastructure
+      # churn: on PR #7976 a `test` job that waited 18 minutes for a ci-runner
+      # it never got, recorded zero steps, and produced no log took the label
+      # off a diff that was green throughout.
+      #
+      # The repo already detected that case and posted "this is not caused by
+      # your code" as a PR comment — from the `report-runner-shutdown` job,
+      # which runs after and independently of this one, so the human-facing
+      # signal and the machine-facing action disagreed. Running the same
+      # composite action HERE is what makes them agree.
+      #
+      # This does NOT weaken LS-10091's invariant that an unverified SHA must
+      # not merge. That is enforced by the CI Gate, not by this label: since
+      # LS-10140 a cancelled gate input posts a PENDING `CI Gate`
+      # (.github/scripts/ci-gate.js), and a pending required context blocks
+      # both GitHub's own merge evaluator and merge-queue-processor.js's
+      # validateStatusChecks. The label stays; the merge still waits for a
+      # genuine verdict, which rerun-cancelled-ci.yml goes and gets.
+      #
+      # Scoped deliberately to runner-attributable cancellations only: a
+      # deliberate cancel, an unattributable one, and every genuine failure
+      # keep the pre-existing strip.
+      - name: "Detect runner shutdown"
+        id: detect
+        uses: ./.github/actions/detect-runner-shutdown
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Remove merge-when-ready label
+        if: steps.detect.outputs.shutdown-detected != 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
@@ -965,6 +1017,15 @@ jobs:
                     '---\n*Automated message from CI pipeline*'
             });
             console.log(`Posted failure comment on PR #${prNumber}`);
+
+      - name: "Keep merge-when-ready (runner shutdown)"
+        if: steps.detect.outputs.shutdown-detected == 'true'
+        shell: bash
+        env:
+          SHUTDOWN_JOBS: ${{ steps.detect.outputs.job-names }}
+        run: |
+          echo "::notice::Keeping 'merge-when-ready' — the CI failure is a runner shutdown in: ${SHUTDOWN_JOBS}."
+          echo "CI Gate stays pending for this SHA, so the merge queue still waits for a genuine verdict (LS-10140)."
 
   # ============================================================================
   # Report runner shutdown as a PR comment

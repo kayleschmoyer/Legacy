@@ -162,6 +162,120 @@ function shouldRerunCancelledRun({
   };
 }
 
+/**
+ * A cancelled job that recorded a genuinely failing step BEFORE the
+ * cancellation landed. Its verdict is real and must never be softened —
+ * see `classifyCancelledJob`.
+ */
+const REAL_FAILURE = 'real-failure';
+
+/**
+ * A cancelled job that never executed a single step and has no retrievable log
+ * blob: it sat in the queue waiting for a runner it never got, and the
+ * cancellation tore it down before "Set up job" ever ran (LS-10140).
+ *
+ * This is materially different from every other cancellation class: there is
+ * no evidence at all — not even a log — because no code from this repository
+ * was executed. Such a job is re-runnable and must read as "no verdict", never
+ * as a failure.
+ *
+ * Observed on PR #7976 run 34722062338: job "CI Pipeline / test" was created
+ * at 22:12:36, waited ~18 minutes for a ci-runner, and was cancelled at
+ * 22:30:29 having recorded ZERO steps; `GET /actions/jobs/{id}/logs` 404s with
+ * BlobNotFound.
+ */
+const NEVER_RAN = 'never-ran';
+
+/**
+ * Classify ONE cancelled (or failed) job from the two pieces of evidence the
+ * Actions API exposes about it: its step list and the tail of its log.
+ *
+ * WHY THIS EXISTS (LS-10140): `classifyJobLog` above answers "was the runner
+ * torn down under this job?" from the log alone. That is the right question
+ * for deciding whether to re-run, but it is NOT sufficient for deciding what a
+ * cancelled job means to the CI Gate, which needs two further distinctions the
+ * log ordering cannot make:
+ *
+ *   1. A job that ran test bodies and recorded a `failure` step before the
+ *      cancellation landed has a REAL verdict (LS-9467, PR #6909: a 30-minute
+ *      `timeout-minutes` rolled a job whose e2e step had already concluded
+ *      `failure` up to `cancelled`). Reading that as "no verdict" would let a
+ *      deterministically-broken spec merge. This check runs FIRST, so no
+ *      other signal can mask a genuine failure.
+ *   2. A job that never ran at all (no steps, no log) is not a cancellation of
+ *      work — it is the ABSENCE of work, and it is re-runnable.
+ *
+ * Precedence is deliberate and load-bearing: real failure → never ran → log
+ * ordering. A job can carry a shutdown marker AND a failing step (the runner
+ * died after a test already failed); the failing step wins, because the cost
+ * of masking a real break is a broken main and the cost of a false "runner
+ * shutdown" attribution is only a wasted re-run.
+ *
+ * @param {object} params
+ * @param {Array<{conclusion?: string|null}>} [params.steps] The job's `steps`
+ *   array from the Actions Jobs API.
+ * @param {string} [params.logText] Tail of the job's log (empty when absent).
+ * @param {boolean} [params.logAvailable] `false` when the log blob 404s
+ *   (BlobNotFound) — the signal that no log was ever written.
+ * @returns {'real-failure'|'never-ran'|'runner-shutdown'|'deliberate-cancel'|'no-signal'}
+ */
+function classifyCancelledJob({ steps, logText, logAvailable = true } = {}) {
+  const stepList = Array.isArray(steps) ? steps : [];
+
+  // (1) Never mask a genuine failure — checked before anything else.
+  if (stepList.some((step) => step && step.conclusion === 'failure')) {
+    return REAL_FAILURE;
+  }
+
+  // (2) No steps AND no log blob => the job never started. Both halves are
+  // required: a job with no steps but a retrievable log did reach the runner
+  // (the log is the proof), so it falls through to the ordering rule below.
+  if (stepList.length === 0 && !logAvailable) {
+    return NEVER_RAN;
+  }
+
+  // (3) Otherwise the log's marker ordering decides, exactly as it does for
+  // the re-run decision — one rule, one module, so the gate and the
+  // runner-shutdown reporter can never disagree about the same job.
+  return classifyJobLog(logText);
+}
+
+/**
+ * What a cancelled job's classification means to the CI Gate aggregate status
+ * (LS-10140).
+ *
+ * Only `real-failure` is a failure. Every other class — including a
+ * `deliberate-cancel` and an unattributable `no-signal` cancel — is
+ * `no-verdict`: the job produced no result, so the gate must neither claim the
+ * SHA failed (it did not) nor claim it passed (it was never proven). The
+ * caller turns `no-verdict` into a PENDING gate, which blocks the merge
+ * without asserting a code failure.
+ *
+ * @param {string} classification A `classifyCancelledJob` result.
+ * @returns {'failure'|'no-verdict'}
+ */
+function gateEffectOfCancellation(classification) {
+  return classification === REAL_FAILURE ? 'failure' : 'no-verdict';
+}
+
+/**
+ * Whether a cancellation is attributable to the runner pool dying under the
+ * job — infrastructure churn the author did not cause, and the only class for
+ * which `merge-when-ready` survives (LS-10140 AC3).
+ *
+ * `never-ran` counts: a job that waited out its whole queue window for a
+ * ci-runner it never got and was then torn down is the same pool exhaustion,
+ * observed one step earlier. A `deliberate-cancel` and an unattributable
+ * `no-signal` cancel deliberately do NOT count — those keep the pre-existing
+ * fail-safe label strip (LS-10091).
+ *
+ * @param {string} classification A `classifyCancelledJob` result.
+ * @returns {boolean}
+ */
+function isRunnerAttributable(classification) {
+  return classification === RUNNER_SHUTDOWN || classification === NEVER_RAN;
+}
+
 module.exports = {
   SHUTDOWN_SIGNATURE,
   CANCEL_SIGNATURE,
@@ -169,6 +283,11 @@ module.exports = {
   DELIBERATE_CANCEL,
   NO_SIGNAL,
   MAX_RERUN_ATTEMPTS,
+  REAL_FAILURE,
+  NEVER_RAN,
   classifyJobLog,
+  classifyCancelledJob,
+  gateEffectOfCancellation,
+  isRunnerAttributable,
   shouldRerunCancelledRun,
 };
