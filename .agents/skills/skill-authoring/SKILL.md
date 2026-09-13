@@ -102,7 +102,7 @@ Specifically: **step ordering for the ticket-to-merge flow has one home** — `w
 - a symbol or constant: "`MAX_CYCLE` in `.github/scripts/reviewer/lib/cycle-counter.mjs`"
 - a stable marker string: "the `_PC_*_CMD` block in the Makefile"
 
-`lint-skills.js` warns on `:<digits>` citations in skill files.
+`lint-skills.js` warns on `:<digits>` citations in skill files, and separately warns when a heading anchor itself doesn't resolve (GitHub slug rules) against the target file — see check 8 in `scripts/lint-skills.js` and the LS-10175 backlog it's tracking (LS-10133).
 
 ### 3. No unmaintained counts
 
