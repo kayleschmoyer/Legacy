@@ -1,6 +1,6 @@
-import { chromium } from 'playwright';
 import { state } from '../state.js';
 import { jsonResult } from '../format.js';
+import { launchChromium } from '../launch-chromium.js';
 import type { ToolResult } from '../types.js';
 
 export interface NavigateParams {
@@ -62,7 +62,7 @@ export async function navigate(params: NavigateParams): Promise<ToolResult> {
   try {
     // Lazy-initialize browser
     if (!state.browser) {
-      state.browser = await chromium.launch({ headless: true });
+      state.browser = await launchChromium();
     }
 
     // Create or reuse context

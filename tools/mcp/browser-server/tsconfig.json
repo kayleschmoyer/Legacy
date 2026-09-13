@@ -9,6 +9,7 @@
     "outDir": "./dist",
     "declaration": true,
     "paths": {
+      "@legacy-sports/logging": ["../../../lib/logging/src/index.ts"],
       "@legacy-sports/mcp-format": ["../../../lib/mcp-format/src/index.ts"]
     }
   },

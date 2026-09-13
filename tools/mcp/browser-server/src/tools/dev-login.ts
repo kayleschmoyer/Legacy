@@ -1,9 +1,9 @@
-import { chromium } from 'playwright';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { state } from '../state.js';
 import { jsonResult } from '../format.js';
+import { launchChromium } from '../launch-chromium.js';
 import type { ToolResult } from '../types.js';
 
 export interface DevLoginParams {
@@ -116,7 +116,7 @@ export async function devLogin(
 
     // Lazy-initialize browser/context/page, same convention as navigate().
     if (!state.browser) {
-      state.browser = await chromium.launch({ headless: true });
+      state.browser = await launchChromium();
     }
     if (!state.context) {
       state.context = await state.browser.newContext({
