@@ -63,21 +63,13 @@ describe('football resolvers', () => {
     loaders: typeof mockCareerFootballLoaders;
   };
 
-  beforeEach(() => {
+  // Build the schema once per file. The module mocks below are static (string
+  // columns and bare jest.fn stubs), and all per-test state reaches resolvers
+  // through mockContext, which beforeEach recreates. Rebuilding the full Pothos
+  // schema for each of this file's 100+ tests exhausted CI's 2048MB jest
+  // worker heap (LS-10128).
+  beforeAll(() => {
     jest.resetModules();
-
-    mockDb = {
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      $dynamic: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      offset: jest.fn().mockReturnThis(),
-      then: jest.fn((resolve) => resolve([])),
-    };
 
     jest.doMock('@legacy-sports/db-client', () => ({
       createDatabaseService: jest.fn(() => ({})),
@@ -315,6 +307,21 @@ describe('football resolvers', () => {
 
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
+  });
+
+  beforeEach(() => {
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      $dynamic: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      then: jest.fn((resolve) => resolve([])),
+    };
 
     mockCareerFootballLoaders = {
       careerFootballPassing: { load: jest.fn().mockResolvedValue(null) },

@@ -6,27 +6,17 @@ describe('League Mutations', () => {
   let schema: GraphQLSchema;
   let mockDb: any;
   let mockContext: any;
-  let mockCreateLeague: jest.Mock;
+  // Created once: the db-client mock factory below captures this reference, so
+  // it must survive across tests; beforeEach resets it instead of replacing it.
+  const mockCreateLeague = jest.fn();
 
-  beforeEach(async () => {
+  // Build the schema once per file. Rebuilding the full Pothos schema before
+  // each of this file's tests needed >1.5GB of heap on its own and pushed CI's
+  // 2048MB jest worker to the edge (LS-10128). The module mocks are static;
+  // per-test state reaches resolvers through mockDb / mockContext, which the
+  // factories read by reference at call time and beforeEach recreates.
+  beforeAll(() => {
     jest.resetModules();
-    mockCreateLeague = jest.fn();
-
-    // Mock database operations
-    mockDb = {
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      delete: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      values: jest.fn().mockReturnThis(),
-      returning: jest.fn().mockReturnThis(),
-      // deleteLeague runs the audit-log write + delete inside a transaction
-      // (LS-6308) — the callback receives the same mock db as its `tx`.
-      transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockDb)),
-    };
 
     // Mock database utilities. Spread the real module so entitlement constants
     // (ENTITLEMENTS, ENTITLEMENT_LABELS) used by the resolver's entitlement
@@ -38,92 +28,111 @@ describe('League Mutations', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    // Mock the database client
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(), // Mock database service initialization
-      runWithPublicClient: jest.fn(async (options, callback) => {
-        return callback(mockDb);
-      }),
-      createLeagueService: jest.fn(() => ({
-        createLeague: mockCreateLeague,
-      })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          owner: 'owner',
-          name: 'name',
+    // Mock the database client. PublicSchema / InternalSchema spread the real
+    // tables so resolver code that reaches a table this spec doesn't stub gets
+    // the real definition instead of `undefined` (LS-10128: the hand-written
+    // replica drifted and every gate test failed on a TypeError before the
+    // gate). The string stubs below override only what assertions inspect.
+    jest.doMock('@legacy-sports/db-client', () => {
+      const actual = jest.requireActual('@legacy-sports/db-client');
+      return {
+        createDatabaseService: jest.fn(), // Mock database service initialization
+        runWithPublicClient: jest.fn(async (options, callback) => {
+          return callback(mockDb);
+        }),
+        createLeagueService: jest.fn(() => ({
+          createLeague: mockCreateLeague,
+        })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          ...actual.PublicSchema,
+          leagues: {
+            id: 'id',
+            owner: 'owner',
+            name: 'name',
+          },
+          teams: {
+            id: 'id',
+            leagueId: 'leagueId',
+          },
+          teamMembers: {
+            id: 'id',
+            leagueId: 'leagueId',
+          },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            draftMode: 'draftMode',
+            selectionMethod: 'selectionMethod',
+            draftOrder: 'draftOrder',
+            createdAt: 'createdAt',
+          },
+          leaguePosition: {
+            id: 'id',
+            leagueId: 'leagueId',
+          },
+          // Needed by checkAdminInDb (admin systemWide path, LS-8240).
+          users: {
+            id: 'id',
+            accessLevel: 'accessLevel',
+          },
+          // Needed by writeAuditLog, called from deleteLeague (LS-6308).
+          commissionerAuditLog: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            action: 'action',
+            targetType: 'targetType',
+            targetId: 'targetId',
+            details: 'details',
+            reason: 'reason',
+          },
+          // Needed by deleteLeaguesAtomically's copy-provenance UPDATE (LS-8125).
+          leagueScoringProfiles: {
+            id: 'id',
+            leagueId: 'leagueId',
+            copiedFromProfileId: 'copiedFromProfileId',
+          },
+          // positionSlot (validateRosterSlots, LS-6145) comes from the real
+          // schema via the spread above.
         },
-        teams: {
-          id: 'id',
-          leagueId: 'leagueId',
+        InternalSchema: {
+          ...actual.InternalSchema,
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+            entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
+          },
+          // Fresh-from-Stripe validation (LS-8643) reads the caller's Stripe
+          // customer id here. Free-user gate tests return rows without a
+          // stripeCustomerId → null customer → empty live entitlements → the
+          // PREMIUM_REQUIRED gate fires (no Stripe call).
+          subscriptions: {
+            userId: 'app_internal.subscriptions.user_id',
+            stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
+            createdAt: 'app_internal.subscriptions.created_at',
+            id: 'app_internal.subscriptions.id',
+          },
         },
-        teamMembers: {
-          id: 'id',
-          leagueId: 'leagueId',
-        },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          permissionLevel: 'permissionLevel',
-        },
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          draftMode: 'draftMode',
-          selectionMethod: 'selectionMethod',
-          draftOrder: 'draftOrder',
-          createdAt: 'createdAt',
-        },
-        leaguePosition: {
-          id: 'id',
-          leagueId: 'leagueId',
-        },
-        // Needed by checkAdminInDb (admin systemWide path, LS-8240).
-        users: {
-          id: 'id',
-          accessLevel: 'accessLevel',
-        },
-        // Needed by writeAuditLog, called from deleteLeague (LS-6308).
-        commissionerAuditLog: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          action: 'action',
-          targetType: 'targetType',
-          targetId: 'targetId',
-          details: 'details',
-          reason: 'reason',
-        },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-          entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
-        },
-        // Fresh-from-Stripe validation (LS-8643) reads the caller's Stripe
-        // customer id here. Free-user gate tests return rows without a
-        // stripeCustomerId → null customer → empty live entitlements → the
-        // PREMIUM_REQUIRED gate fires (no Stripe call).
-        subscriptions: {
-          userId: 'app_internal.subscriptions.user_id',
-          stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
-        },
-      },
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      };
+    });
 
     // Load the schema after mocks are set up
     // Note: Do NOT use jest.isolateModules() as it creates a separate module realm
@@ -131,6 +140,38 @@ describe('League Mutations', () => {
 
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
+  });
+
+  beforeEach(() => {
+    // Shared module-level mocks outlive a single test now: drop persistent
+    // mockResolvedValue / queued mockRejectedValueOnce state, not just calls.
+    mockCreateLeague.mockReset();
+    (
+      require('@legacy-sports/db-client') as { createDraftForLeague: jest.Mock }
+    ).createDraftForLeague.mockReset();
+
+    // Mock database operations
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      // fresh-entitlements' Stripe customer lookup orders by newest row
+      // (LS-9349): .where().orderBy().limit(1).
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      // deleteLeaguesAtomically nulls cross-league copiedFromProfileId
+      // pointers with tx.update().set().where() before deleting (LS-8125).
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockReturnThis(),
+      // deleteLeague runs the audit-log write + delete inside a transaction
+      // (LS-6308) — the callback receives the same mock db as its `tx`.
+      transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockDb)),
+    };
 
     // Default authenticated user context
     mockContext = {

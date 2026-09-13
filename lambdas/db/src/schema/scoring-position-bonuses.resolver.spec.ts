@@ -131,13 +131,16 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
     return {
       select: jest.fn((columns?: Record<string, unknown>) => {
         if (columns && 'stripeCustomerId' in columns) {
+          // Newest subscription row wins (LS-9349): .where().orderBy().limit(1).
           return {
             from: () => ({
               where: () => ({
-                limit: () =>
-                  Promise.resolve(
-                    stripeCustomerId ? [{ stripeCustomerId }] : [],
-                  ),
+                orderBy: () => ({
+                  limit: () =>
+                    Promise.resolve(
+                      stripeCustomerId ? [{ stripeCustomerId }] : [],
+                    ),
+                }),
               }),
             }),
           };
@@ -262,14 +265,19 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
     expect(result).toMatchObject({ profileId: 5, leagueId: 10 });
     expect(
       databaseServiceMock.scoring.updatePositionBonuses,
-    ).toHaveBeenCalledWith(10, [
-      {
-        statDefinitionId: 1,
-        position: 'TE',
-        bonusMultiplier: 0.5,
-        isEnabled: undefined,
-      },
-    ]);
+    ).toHaveBeenCalledWith(
+      10,
+      [
+        {
+          statDefinitionId: 1,
+          position: 'TE',
+          bonusMultiplier: 0.5,
+          isEnabled: undefined,
+        },
+      ],
+      // changedBy: the caller, recorded in league_scoring_change_log (LS-9665).
+      1,
+    );
     expect(mockRefreshPlayerScoringCache).toHaveBeenCalledWith(
       expect.anything(),
       10,

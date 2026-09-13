@@ -403,7 +403,10 @@ describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () =
     );
 
     const { sql: text } = serializeExecutedQuery(db);
-    expect(text).toContain('p.last_name');
-    expect(text).not.toContain('player_scoring_cache');
+    expect(text).toContain('ORDER BY p.last_name ASC');
+    // The board's ADP CTE reads football's own cache (LS-9484/LS-10096);
+    // only baseball's player_scoring_cache must stay out of a football board.
+    expect(text).toContain('public.football_player_scoring_cache');
+    expect(text).not.toMatch(/public\.player_scoring_cache/);
   });
 });

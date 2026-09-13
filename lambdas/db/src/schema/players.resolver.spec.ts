@@ -9,7 +9,8 @@
  *   - searchPlayers: default limit (10), explicit limit
  */
 
-import type { GraphQLSchema } from 'graphql';
+import { defaultFieldResolver } from 'graphql';
+import type { GraphQLResolveInfo, GraphQLSchema } from 'graphql';
 
 describe('players resolver', () => {
   let schema: GraphQLSchema;
@@ -650,12 +651,20 @@ describe('players resolver', () => {
   // ── mlbTeam / jerseyNumber exposure (LS-8597) ────────────────────────────
 
   describe('Player.mlbTeam / Player.jerseyNumber', () => {
+    // Pothos builds `t.expose*` fields with `resolve: undefined` so graphql-js
+    // falls back to defaultFieldResolver. Assert the field is an exposure of
+    // the same-named property, then resolve it the way execution would.
     function getPlayerFieldResolver(name: 'mlbTeam' | 'jerseyNumber') {
       const playerType = schema.getType('Player');
 
       const field = (playerType as any)?.getFields?.()[name];
-      if (!field?.resolve) throw new Error(`Player.${name} resolver not found`);
-      return field.resolve.bind(field);
+      if (!field) throw new Error(`Player.${name} field not found`);
+      if (field.resolve) return field.resolve.bind(field);
+      expect(field.extensions?.pothosExposedField).toBe(name);
+      return (parent: unknown, args: unknown, context: unknown) =>
+        defaultFieldResolver(parent, args, context, {
+          fieldName: name,
+        } as GraphQLResolveInfo);
     }
 
     it('mlbTeam: exposes the mlbTeam property from the parent player', () => {

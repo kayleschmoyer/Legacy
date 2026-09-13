@@ -604,8 +604,9 @@ describe('initializeMockDraft Shared-mode lobby behavior (LS-9181)', () => {
 
     await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
 
-    // Second insert().values() call is the teams insert.
-    const teamNames = (chain.values.mock.calls[1][0] as { name: string }[]).map(
+    // Third insert().values() call is the teams insert (after league and the
+    // league_positions seed, LS-10086).
+    const teamNames = (chain.values.mock.calls[2][0] as { name: string }[]).map(
       (t) => t.name,
     );
     expect(teamNames).toContain('My Team');
@@ -626,8 +627,9 @@ describe('initializeMockDraft Shared-mode lobby behavior (LS-9181)', () => {
 
     await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
 
-    // 4 inserts: league, teams, leagueMembers, drafts — no draft_teams insert.
-    expect(mockTx.insert).toHaveBeenCalledTimes(4);
+    // 5 inserts: league, league_positions (LS-10086), teams, leagueMembers,
+    // drafts — no draft_teams insert.
+    expect(mockTx.insert).toHaveBeenCalledTimes(5);
     // No currentPickDeadline / draftStatus updates — league stays 'not-started'.
     expect(mockTx.update).not.toHaveBeenCalled();
   });
@@ -781,8 +783,9 @@ describe('initializeMockDraft Control All Teams (LS-9253)', () => {
     });
 
     // Teams insert: no "CPU Team" naming anywhere — every non-human slot is
-    // just "Team N".
-    const teamInserts = chain.values.mock.calls[1][0] as Array<{
+    // just "Team N". values() order: league, league_positions (LS-10086),
+    // teams, leagueMembers, drafts, draft_teams.
+    const teamInserts = chain.values.mock.calls[2][0] as Array<{
       name: string;
     }>;
     expect(teamInserts.map((t) => t.name)).toEqual([
@@ -794,13 +797,13 @@ describe('initializeMockDraft Control All Teams (LS-9253)', () => {
 
     // Drafts insert: draft-level auto-pick disabled — the authoritative
     // guard against autoProcessDraftPicks ever picking for this draft.
-    expect(chain.values.mock.calls[3][0]).toMatchObject({
+    expect(chain.values.mock.calls[4][0]).toMatchObject({
       autoPickDisabled: true,
     });
 
     // draft_teams insert: every team seated autoPick:false, including the
     // human's own slot — no CPU auto-picker anywhere on the board.
-    const draftTeamInserts = chain.values.mock.calls[4][0] as Array<{
+    const draftTeamInserts = chain.values.mock.calls[5][0] as Array<{
       autoPick: boolean;
     }>;
     expect(draftTeamInserts).toHaveLength(4);

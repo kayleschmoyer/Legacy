@@ -20,7 +20,7 @@
 
 Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
 
-As of 2026-07-02, lambda unit suites run under `nx affected -t test` like every other project (the `jest --onlyChanged` gap was closed by adding `project.json` jest targets — `lambdas/db` excepted, deliberately ungated pending red-suite cleanup) — so step 8 and CI both gate lambda tests. Which suites gate merge overall: see [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge).
+As of 2026-07-02, lambda unit suites run under `nx affected -t test` like every other project (the `jest --onlyChanged` gap was closed by adding `project.json` jest targets; `lambdas/db` joined 2026-09-13 once its red suites were fixed) — so step 8 and CI both gate lambda tests. Which suites gate merge overall: see [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge).
 
 ### pc-workflows: vendored JSON schemas
 

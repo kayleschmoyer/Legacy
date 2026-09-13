@@ -105,6 +105,12 @@ describe('League.inviteCode authorization (LS-6324)', () => {
           teamId: 'teamId',
           permissionLevel: 'permissionLevel',
         },
+        // The league query reads the draft's selectionMethod in parallel with
+        // the membership lookup (LS-9617).
+        drafts: {
+          leagueId: 'leagueId',
+          selectionMethod: 'selectionMethod',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {

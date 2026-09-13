@@ -48,7 +48,7 @@ The UI is built once in `lib/shared-components` and rendered on web and native; 
 
 Merge is blocked only by the four required contexts in `.github/ruleset.json` (`bot-review`, `No Merge Conflicts`, `Verify All Migrations Applied`, `CI Gate`). All test signal reaches the gate through **CI Gate** — one aggregate commit status per head SHA posted by the CI Pipeline summarize job (`.github/scripts/ci-gate.js`), folding in lint, format, build, unit tests, custom-checks, and affected hermetic e2e shards. `ruleset.json` is config, not necessarily live state — check the live required set before asserting it.
 
-- **Blocks merge:** unit + typecheck (`nx affected -t typecheck test`), lambda unit suites (**except `lambdas/db`**, deliberately ungated), and affected hermetic E2E shards.
+- **Blocks merge:** unit + typecheck (`nx affected -t typecheck test`), lambda unit suites (including `lambdas/db`'s unit config; its `*.db.spec.ts` suite does not gate), and affected hermetic E2E shards.
 - **Does not block merge:** DB specs (`run-db-tests.yml`, Discord notification only), live integration (nightly backstop + `run:integration` label), Storybook preview deploys.
 
 Per-suite table with where each runs, the `lambdas/db` gate hole, the never-run Storybook story target, `run:integration` label semantics, the hermetic/live directory split, the ADR-0014 nightly-backstop design, and the state of coverage tooling: [references/merge-gating.md](references/merge-gating.md).
