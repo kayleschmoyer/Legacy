@@ -24,6 +24,13 @@ const verifyLeagueMembership = jest.fn();
 // module scope so tests can assert the settings the resolver passes through.
 const buildEligibilityConditions = jest.fn(() => [] as unknown[]);
 
+/**
+ * The league settings the resolver sees. Since LS-10074 they arrive as
+ * DraftRules from loadDraftRules rather than a leagues SELECT, so makeDb()
+ * sets this and the mocked loader returns it.
+ */
+let currentLeague: Record<string, unknown> = {};
+
 async function captureResolver(): Promise<
   (...args: unknown[]) => Promise<unknown>
 > {
@@ -103,6 +110,37 @@ async function captureResolver(): Promise<
     isCommissionerOrOwner: jest.fn(),
     requireEntitlement: jest.fn(),
     verifyLeagueMembership,
+    verifyLeagueReadAccess: jest.fn(),
+  }));
+
+  // The board guards on the draft since LS-10074. authorizeDraft's
+  // 'participate' branch *is* verifyLeagueMembership, so the stub delegates to
+  // the same mock the tests below drive — membership drives the caller's team,
+  // exactly as before.
+  jest.doMock('./authorize-draft', () => ({
+    authorizeDraft: jest.fn(async () => ({
+      draft: { id: 100, leagueId: 7, kind: 'league' },
+      seat: null,
+      role: 'participant',
+      membership: (await verifyLeagueMembership()) as unknown,
+    })),
+    authorizeLoadedDraft: jest.fn(),
+  }));
+
+  // Player-pool / eligibility settings now come from DraftRules (LS-10074).
+  jest.doMock('./draft-rules', () => ({
+    loadDraftRules: jest.fn(async () => ({
+      draftId: 100,
+      kind: 'league',
+      leagueId: 7,
+      ...currentLeague,
+      rosterPositions: ['C'],
+    })),
+  }));
+
+  jest.doMock('./participants', () => ({
+    getSeatForTeam: jest.fn(),
+    getDraftSeats: jest.fn(),
   }));
 
   jest.doMock('../entitlements', () => ({
@@ -144,6 +182,7 @@ const LEAGUE_ROW = {
  * the league row; `.execute` records the SQL it receives and returns no rows.
  */
 function makeDb(league: Record<string, unknown> = LEAGUE_ROW) {
+  currentLeague = league;
   const executed: unknown[] = [];
   let limitCall = 0;
   const chain: Record<string, unknown> = {};
@@ -188,12 +227,13 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     // Unfilled positions are computed for the caller's own team, sport-aware
     // (LS-9479).
+    // Positional requirements route through DraftRules since LS-10074 /
+    // LS-10086 — the rules carry both the roster and the sport.
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
       db,
       100,
       11,
-      7,
-      'baseball',
+      expect.objectContaining({ sport: 'baseball', rosterPositions: ['C'] }),
     );
     expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(
       ['SP'],
@@ -242,12 +282,13 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
+    // Positional requirements route through DraftRules since LS-10074 /
+    // LS-10086 — the rules carry both the roster and the sport.
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
       db,
       100,
       11,
-      7,
-      'baseball',
+      expect.objectContaining({ sport: 'baseball', rosterPositions: ['C'] }),
     );
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
@@ -270,8 +311,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
       db,
       100,
       11,
-      7,
-      'football',
+      expect.objectContaining({ sport: 'football' }),
     );
     expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(
       ['QB'],

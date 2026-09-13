@@ -19,6 +19,9 @@ import {
   getDefaultRosterPositions,
 } from '@legacy-sports/utils';
 
+const reseatLeagueDraft = jest.fn(async () => undefined);
+const setLeagueDraftStatus = jest.fn(async () => undefined);
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -126,6 +129,12 @@ async function captureInitializeMockDraftResolver(opts?: {
     countRecentMockDrafts: jest.fn().mockResolvedValue(0),
     MOCK_DRAFT_FREE_WEEKLY_LIMIT: 2,
   }));
+
+  // Seating and the status dual-write moved into their own modules in
+  // LS-10074, each with its own coverage. Stubbing them keeps this suite's
+  // tx mock focused on the inserts it actually asserts on.
+  jest.doMock('../participants', () => ({ reseatLeagueDraft }));
+  jest.doMock('../draft-status', () => ({ setLeagueDraftStatus }));
 
   await import('./initialize-mock-draft');
   if (!capturedFn)
@@ -801,13 +810,25 @@ describe('initializeMockDraft Control All Teams (LS-9253)', () => {
       autoPickDisabled: true,
     });
 
-    // draft_teams insert: every team seated autoPick:false, including the
-    // human's own slot — no CPU auto-picker anywhere on the board.
-    const draftTeamInserts = chain.values.mock.calls[5][0] as Array<{
-      autoPick: boolean;
-    }>;
-    expect(draftTeamInserts).toHaveLength(4);
-    expect(draftTeamInserts.every((dt) => dt.autoPick === false)).toBe(true);
+    // Seating: every team seated autoPick:false, including the human's own
+    // slot — no CPU auto-picker anywhere on the board.
+    //
+    // Merge note (LS-10074 x LS-10128): LS-10128 fixed this assertion by
+    // correcting the positional index of the draft_teams insert to
+    // `values()` call 5, after LS-10086's league_positions seed shifted it.
+    // This slice removes that write altogether — seats live in
+    // draft_participants and are written by reseatLeagueDraft — so there is
+    // no call 5 to index. The index fix is superseded rather than dropped:
+    // the assertion moves to the call that now does the seating.
+    expect(reseatLeagueDraft).toHaveBeenCalledWith(
+      mockTx,
+      expect.objectContaining({
+        draftId: 100,
+        leagueId: 1,
+        orderedTeamIds: [10, 11, 12, 13],
+        autoPickTeamIds: [],
+      }),
+    );
   });
 
   // LS-9369: the human's own seat isn't always draft position 1. Before this

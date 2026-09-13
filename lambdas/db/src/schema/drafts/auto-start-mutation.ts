@@ -12,7 +12,7 @@
  * When invoked, finds all live drafts with `scheduled_at <= now` and
  * `draft_status = 'not-started'`, then initializes them exactly as
  * `initializeDraft` would for live mode:
- *  1. Shuffle & insert draft_teams rows
+ *  1. Shuffle & seat the draft (draft_participants)
  *  2. Set draftStartedAt, initial pick deadline
  *  3. Update league draft_status → 'in-progress'
  *  4. Send DRAFT_STARTED WebSocket notification
@@ -35,6 +35,8 @@ import {
   enableAutoPickForUnmanagedTeams,
   resolveDraftTeamsOrder,
 } from './helpers';
+import { setLeagueDraftStatus } from './draft-status';
+import { reseatLeagueDraft } from './participants';
 import { cancelPendingDraftSlotTradesForLeague } from '../draft-slot-trades/helpers';
 import { builder } from '../builder';
 
@@ -204,7 +206,7 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
               continue;
             }
 
-            // LS-8742: preserve any draft_teams order already seeded by an
+            // LS-8742: preserve any seat order already seeded by an
             // approved draft slot trade (LS-8676) instead of unconditionally
             // reshuffling it away at draft start. When a fresh order is
             // needed, Reverse Standings (keeper leagues only, LS-8929)
@@ -218,21 +220,6 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
                 previousLeagueId: draft.previousLeagueId,
               });
 
-            // LS-545 / LS-480: Enable auto-pick for teams without a general manager
-            const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
-              context.db,
-              leagueId,
-              draftId,
-              orderedTeamIds,
-            );
-
-            if (autoPickTeamIds.length > 0) {
-              LOGGER.info(
-                '[autoStartScheduledDrafts] Auto-pick enabled for unmanaged teams',
-                { leagueId, draftId, teamIds: autoPickTeamIds },
-              );
-            }
-
             const startedAt = new Date();
             const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
             const initialDeadline = new Date(
@@ -241,28 +228,33 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
 
             // Wrap the multi-step write sequence in a transaction so a
             // mid-flight failure cannot leave draft state inconsistent.
-            await context.db.transaction(async (tx) => {
-              if (needsInsert) {
-                // Clear any stale draft_teams from a previous run and insert
-                // the freshly resolved (randomized) order.
-                await tx
-                  .delete(PublicSchema.draftTeams)
-                  .where(eq(PublicSchema.draftTeams.draftId, draftId));
-
-                await tx.insert(PublicSchema.draftTeams).values(
-                  orderedTeamIds.map((teamId, index) => ({
-                    draftId,
-                    teamId,
-                    leagueId,
-                    draftOrder: index + 1,
-                  })),
-                );
-              }
-
-              // Clear any stale draft_picks from a previous run
+            const autoPickTeamIds = await context.db.transaction(async (tx) => {
+              // Clear any stale draft_picks from a previous run first —
+              // draft_picks.participant_id cascades, so reseating below
+              // would otherwise take them with it.
               await tx
                 .delete(PublicSchema.draftPicks)
                 .where(eq(PublicSchema.draftPicks.draftId, draftId));
+
+              if (needsInsert) {
+                // Replace any stale seats from a previous run with the
+                // freshly resolved (randomized) order.
+                await reseatLeagueDraft(tx, {
+                  draftId,
+                  leagueId,
+                  orderedTeamIds,
+                });
+              }
+
+              // LS-545 / LS-480: Enable auto-pick for teams without a
+              // general manager. Runs inside the transaction, after the
+              // seats it writes to exist (LS-10074).
+              const unmanagedTeamIds = await enableAutoPickForUnmanagedTeams(
+                tx,
+                leagueId,
+                draftId,
+                orderedTeamIds,
+              );
 
               // Update the draft record with started timestamps + first pick deadline
               await tx
@@ -275,17 +267,28 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
                 })
                 .where(eq(PublicSchema.drafts.id, draftId));
 
-              // Update league status
-              await tx
-                .update(PublicSchema.leagues)
-                .set({ draftStatus: 'in-progress' })
-                .where(eq(PublicSchema.leagues.id, leagueId));
+              // Draft status — dual-written onto the league in the same
+              // transaction (LS-10074).
+              await setLeagueDraftStatus(tx, {
+                draftId,
+                leagueId,
+                status: 'in-progress',
+              });
 
               // The draft is now starting — any still-pending draft slot
               // trades (proposed/accepted/approved) can never execute
               // (LS-8676 AC4).
               await cancelPendingDraftSlotTradesForLeague(tx, leagueId);
+
+              return unmanagedTeamIds;
             });
+
+            if (autoPickTeamIds.length > 0) {
+              LOGGER.info(
+                '[autoStartScheduledDrafts] Auto-pick enabled for unmanaged teams',
+                { leagueId, draftId, teamIds: autoPickTeamIds },
+              );
+            }
 
             // Send WebSocket notification
             if (notificationService) {

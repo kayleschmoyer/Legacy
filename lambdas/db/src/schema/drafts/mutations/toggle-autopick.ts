@@ -7,6 +7,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo } from '../helpers';
+import { getSeatForTeam, setSeatAutoPick } from '../participants';
 import { builder } from '../../builder';
 import { UserInputError } from '../../graphql-errors';
 
@@ -50,6 +51,7 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           .select({
             id: PublicSchema.drafts.id,
             leagueId: PublicSchema.drafts.leagueId,
+            status: PublicSchema.drafts.status,
             autoPickDisabled: PublicSchema.drafts.autoPickDisabled,
           })
           .from(PublicSchema.drafts)
@@ -67,14 +69,9 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           );
         }
 
-        // Verify league is in-progress
-        const [league] = await context.db
-          .select({ draftStatus: PublicSchema.leagues.draftStatus })
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draft.leagueId))
-          .limit(1);
-
-        if (!league || league.draftStatus !== 'in-progress') {
+        // Verify the draft is in-progress. Reads drafts.status (LS-10074)
+        // rather than leagues.draft_status — the row is already loaded.
+        if (draft.status !== 'in-progress') {
           throw new Error(
             'Auto-pick can only be toggled while a draft is in progress',
           );
@@ -100,32 +97,20 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
 
         const teamId = membership.teamId;
 
-        // Verify team is in this draft
-        const [draftTeamEntry] = await context.db
-          .select({ draftOrder: PublicSchema.draftTeams.draftOrder })
-          .from(PublicSchema.draftTeams)
-          .where(
-            and(
-              eq(PublicSchema.draftTeams.draftId, draftId),
-              eq(PublicSchema.draftTeams.teamId, teamId),
-            ),
-          )
-          .limit(1);
+        // Verify the team holds a seat in this draft
+        const seat = await getSeatForTeam(context.db, draftId, teamId);
 
-        if (!draftTeamEntry) {
+        if (!seat) {
           throw new Error('Your team is not participating in this draft');
         }
 
         // Update auto-pick preference
-        await context.db
-          .update(PublicSchema.draftTeams)
-          .set({ autoPick: enable })
-          .where(
-            and(
-              eq(PublicSchema.draftTeams.draftId, draftId),
-              eq(PublicSchema.draftTeams.teamId, teamId),
-            ),
-          );
+        await setSeatAutoPick(context.db, {
+          draftId,
+          leagueId: draft.leagueId,
+          teamIds: [teamId],
+          autoPick: enable,
+        });
 
         LOGGER.info('[toggleDraftAutoPick] Auto-pick toggled', {
           draftId,

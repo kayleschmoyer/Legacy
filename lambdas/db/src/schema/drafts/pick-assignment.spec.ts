@@ -21,7 +21,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake,
           forfeited: new Set(),
         }),
@@ -37,7 +37,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 1,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: false,
           forfeited,
         }),
@@ -46,7 +46,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 2,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: false,
           forfeited,
         }),
@@ -56,7 +56,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 3,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: false,
           forfeited,
         }),
@@ -71,7 +71,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 3,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: true,
           forfeited,
         }),
@@ -81,7 +81,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 4,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: true,
           forfeited,
         }),
@@ -90,7 +90,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 5,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: true,
           forfeited,
         }),
@@ -101,7 +101,7 @@ describe('resolvePickAssignment', () => {
       expect(
         resolvePickAssignment({
           overallPick: 6,
-          draftTeams: TEAMS,
+          seats: TEAMS,
           isSnake: true,
           forfeited,
         }),
@@ -115,7 +115,7 @@ describe('resolvePickAssignment', () => {
         picks.push(
           resolvePickAssignment({
             overallPick,
-            draftTeams: TEAMS,
+            seats: TEAMS,
             isSnake: false,
             forfeited,
           }),

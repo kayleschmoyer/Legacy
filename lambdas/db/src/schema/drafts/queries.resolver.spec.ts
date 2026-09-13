@@ -51,7 +51,25 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
         getDraftStatus: jest.fn(),
       })),
       PublicSchema: {
-        drafts: { id: 'id', leagueId: 'leagueId' },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          kind: 'kind',
+          status: 'status',
+        },
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
+          draftId: 'draftId',
+          slot: 'slot',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
+        },
+
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
@@ -148,6 +166,11 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockDb.orderBy.mockResolvedValueOnce(queueRows);
 
@@ -255,17 +278,30 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
         getDraftStatus: jest.fn(),
       })),
       PublicSchema: {
-        drafts: { id: 'id', leagueId: 'leagueId' },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          kind: 'kind',
+          status: 'status',
+        },
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
+          draftId: 'draftId',
+          slot: 'slot',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
+        },
+
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
           teamId: 'teamId',
           permissionLevel: 'permissionLevel',
-        },
-        draftTeams: {
-          draftId: 'draftId',
-          teamId: 'teamId',
-          autoPick: 'autoPick',
         },
       },
       InternalSchema: {
@@ -318,8 +354,11 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       { teamId: 11, autoPick: true },
       { teamId: 12, autoPick: false },
     ];
-    // draft lookup where → chain; membership where → chain; rows where → terminal.
+    // draft lookup where → chain; membership where → chain; seat where →
+    // chain (authorizeDraft resolves the caller's seat since LS-10074);
+    // rows where → terminal.
     mockDb.where
+      .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockResolvedValueOnce(rows);
@@ -327,6 +366,9 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
 
     const resolve = getResolver();
@@ -343,9 +385,11 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
 
   it('retries a transient DB error and recovers without surfacing an error', async () => {
     const rows = [{ teamId: 11, autoPick: true }];
-    // draft where → chain; membership where → chain; rows where attempt 1 →
-    // deadlock (40P01, retryable); rows where attempt 2 → success.
+    // draft where → chain; membership where → chain; seat where → chain;
+    // rows where attempt 1 → deadlock (40P01, retryable); rows where
+    // attempt 2 → success.
     mockDb.where
+      .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockRejectedValueOnce(pgError('deadlock detected', '40P01'))
@@ -354,6 +398,9 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
 
     const resolve = getResolver();
@@ -367,12 +414,13 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
 
     expect(result).toEqual(rows);
     // The rows read was attempted twice: initial failure + successful retry.
-    expect(mockDb.where).toHaveBeenCalledTimes(4);
+    expect(mockDb.where).toHaveBeenCalledTimes(5);
   });
 
   it('re-throws a non-transient DB error with a diagnosable client-facing code (no mask)', async () => {
     // rows read fails with a statement timeout (57014) — not retryable.
     mockDb.where
+      .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockReturnValueOnce(mockDb)
       .mockRejectedValueOnce(
@@ -382,6 +430,9 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
 
     const resolve = getResolver();
@@ -393,7 +444,7 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       extensions: { code: 'DRAFT_AUTO_PICK_STATUS_FAILED' },
     });
     // Non-transient error must NOT be retried.
-    expect(mockDb.where).toHaveBeenCalledTimes(3);
+    expect(mockDb.where).toHaveBeenCalledTimes(4);
   });
 
   it('rejects unauthenticated callers with UNAUTHENTICATED', async () => {
@@ -494,7 +545,25 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
         getDraftStatus: jest.fn(),
       })),
       PublicSchema: {
-        drafts: { id: 'id', leagueId: 'leagueId' },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          kind: 'kind',
+          status: 'status',
+        },
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
+          draftId: 'draftId',
+          slot: 'slot',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
+        },
+
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
@@ -552,6 +621,11 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 11 },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockGetCurrentDraftPickInfo.mockRejectedValueOnce(
       new Error('No teams configured for this draft'),
@@ -572,6 +646,11 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 11 },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockGetCurrentDraftPickInfo.mockRejectedValueOnce(
       new Error('Could not determine team for current pick'),
@@ -599,6 +678,11 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { permissionLevel: 'general_manager', teamId: 11 },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockGetCurrentDraftPickInfo.mockResolvedValueOnce(pickInfo);
 
@@ -672,7 +756,25 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
         getDraftStatus: jest.fn(),
       })),
       PublicSchema: {
-        drafts: { id: 'id', leagueId: 'leagueId' },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          kind: 'kind',
+          status: 'status',
+        },
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
+          draftId: 'draftId',
+          slot: 'slot',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
+        },
+
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
@@ -747,6 +849,11 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockDb.orderBy.mockResolvedValueOnce(rows);
 
@@ -775,6 +882,11 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockDb.orderBy
       .mockRejectedValueOnce(pgError('deadlock detected', '40P01'))
@@ -804,6 +916,11 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       .mockResolvedValueOnce([{ leagueId: 7 }])
       .mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
+      ])
+      // authorizeDraft resolves the caller's seat once membership is
+      // known (LS-10074).
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
       ]);
     mockDb.orderBy.mockRejectedValueOnce(
       pgError('canceling statement due to statement timeout', '57014'),
@@ -935,7 +1052,26 @@ describe('spectator read access — LS-8939 access matrix', () => {
         getDraftStatus: jest.fn(),
       })),
       PublicSchema: {
-        drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          kind: 'kind',
+          status: 'status',
+          createdAt: 'createdAt',
+        },
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
+          draftId: 'draftId',
+          slot: 'slot',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
+        },
+
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
@@ -949,12 +1085,6 @@ describe('spectator read access — LS-8939 access matrix', () => {
           overallPick: 'overallPick',
           playerId: 'playerId',
           teamId: 'teamId',
-        },
-        draftTeams: {
-          draftId: 'draftId',
-          teamId: 'teamId',
-          draftOrder: 'draftOrder',
-          autoPick: 'autoPick',
         },
         teams: {
           id: 'id',
@@ -1052,6 +1182,19 @@ describe('spectator read access — LS-8939 access matrix', () => {
    * - `primeData`: queues the post-guard data-read results.
    * - `expected`: resolver result on the success paths.
    */
+  /**
+   * Fields whose guard is authorizeDraft (LS-10074), which resolves the
+   * caller's seat after membership — one extra `.limit` read. getLeagueDraft
+   * still guards on the league (it must answer null when a league has no
+   * draft yet), and leagueTeams is not a draft resolver at all.
+   */
+  const SEAT_READING_FIELDS = new Set([
+    'getDraft',
+    'getCurrentDraftPick',
+    'getDraftPicks',
+    'getDraftTeamOrder',
+  ]);
+
   const READ_SET: Array<{
     field: string;
     args: Record<string, unknown>;
@@ -1184,6 +1327,14 @@ describe('spectator read access — LS-8939 access matrix', () => {
       mockDb.limit.mockResolvedValueOnce([
         { teamId: 11, permissionLevel: 'general_manager' },
       ]);
+      // authorizeDraft then resolves the member's seat (LS-10074). Queue
+      // fields still guard on membership alone and take no seat read.
+      const seatLimits = SEAT_READING_FIELDS.has(field) ? 1 : 0;
+      if (seatLimits > 0) {
+        mockDb.limit.mockResolvedValueOnce([
+          { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
+        ]);
+      }
       primeData();
 
       const resolve = queryResolver(field);
@@ -1193,7 +1344,7 @@ describe('spectator read access — LS-8939 access matrix', () => {
       // Exactly the pre-guard lookups + one membership read (+ any post-guard
       // data reads that terminate in .limit) — no extra leagues query.
       expect(mockDb.limit).toHaveBeenCalledTimes(
-        preGuardLimits.length + 1 + postGuardLimits,
+        preGuardLimits.length + 1 + seatLimits + postGuardLimits,
       );
     },
   );

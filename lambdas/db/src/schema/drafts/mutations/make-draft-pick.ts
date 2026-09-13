@@ -14,6 +14,7 @@ import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
+import { getSeatForTeam } from '../participants';
 import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
@@ -476,21 +477,13 @@ builder.mutationField('makeDraftPick', (t) =>
           result.nextPickInfo
         ) {
           try {
-            const [upcomingTeamEntry] = await context.db
-              .select({ autoPick: PublicSchema.draftTeams.autoPick })
-              .from(PublicSchema.draftTeams)
-              .where(
-                and(
-                  eq(PublicSchema.draftTeams.draftId, draftId),
-                  eq(
-                    PublicSchema.draftTeams.teamId,
-                    result.nextPickInfo.teamId,
-                  ),
-                ),
-              )
-              .limit(1);
+            const upcomingSeat = await getSeatForTeam(
+              context.db,
+              draftId,
+              result.nextPickInfo.teamId,
+            );
 
-            if (upcomingTeamEntry?.autoPick) {
+            if (upcomingSeat?.autoPick) {
               // Expire the next team's deadline so autoProcessDraftPicks treats
               // it as due immediately (mirrors LS-3643 / LS-427).
               await context.db

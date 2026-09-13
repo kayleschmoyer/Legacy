@@ -15,7 +15,7 @@
  *     1. Create a temporary league (isMockDraft=true, draftStatus='in-progress')
  *     2. Create numTeams teams – one human team at userPickPosition, rest CPU
  *     3. Register the human as a commissioner member of the league
- *     4. Create the draft + draft_teams rows (CPU teams: autoPick=true)
+ *     4. Create the draft + its seats (CPU teams: autoPick=true)
  *     5. Set an initial pick deadline
  *
  *  - Shared (isOffline=false, LS-9181): a real multiplayer lobby other users
@@ -26,7 +26,7 @@
  *        userPickPosition, the rest left open ("Open Slot N") for joiners
  *     3. Register the creator as a commissioner member of the league
  *     4. Create the draft record with the chosen settings, but no
- *        draft_teams rows yet — `initializeDraft` (the same generic mutation
+ *        seats yet — `initializeDraft` (the same generic mutation
  *        real leagues use to start their draft, reused here unmodified)
  *        creates those when the commissioner starts the draft, seating any
  *        still-open slots with AI auto-pick teams.
@@ -57,6 +57,8 @@ import {
   countRecentMockDrafts,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from '../helpers';
+import { setLeagueDraftStatus } from '../draft-status';
+import { reseatLeagueDraft } from '../participants';
 
 // ── Allowed values ───────────────────────────────────────────────────────────
 
@@ -375,7 +377,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         // ── Steps 1-6: single atomic transaction ─────────────────────────────
         // All DB writes are wrapped in one transaction so a failure at any step
         // rolls everything back, preventing orphaned draft records without
-        // draft_teams (which would cause getCurrentDraftPickInfo to throw
+        // seats (which would cause getCurrentDraftPickInfo to throw
         // "No teams configured for this draft" — LS-4853).
         interface TxResult {
           leagueId: number;
@@ -462,8 +464,8 @@ builder.mutationField('initializeMockDraft', (t) =>
               // existing enforcement path (this query, toggleDraftAutoPick's
               // reject-if-disabled check) already respects it with no new code.
               // Only meaningful for Offline drafts — Control All Teams always
-              // implies isOffline, so a Shared-lobby draft_teams row (created
-              // later by initializeDraft) is never affected by this value.
+              // implies isOffline, so a Shared-lobby seat (created later by
+              // initializeDraft) is never affected by this value.
               autoPickDisabled: controlAllTeams,
             })
             .returning();
@@ -473,7 +475,7 @@ builder.mutationField('initializeMockDraft', (t) =>
             // 'not-started' with open slots so other real users can join via
             // joinMockDraft; the commissioner starts the draft later via the
             // same generic `initializeDraft` mutation real leagues use (it
-            // creates draft_teams and auto-picks any still-open slots).
+            // seats the draft and auto-picks any still-open slots).
             return {
               leagueId: league.id,
               draftId: draft.id,
@@ -482,19 +484,21 @@ builder.mutationField('initializeMockDraft', (t) =>
             };
           }
 
-          // ── 5. Create draft_teams rows ───────────────────────────────────
+          // ── 5. Seat the draft ────────────────────────────────────────────
           // Maintains the requested draft order; CPU teams get autoPick=true.
           // Control All Teams mode seats every team with autoPick=false —
-          // there are no CPU teams at all in this mode.
-          await tx.insert(PublicSchema.draftTeams).values(
-            teams.map((team, i) => ({
-              draftId: draft.id,
-              teamId: team.id,
-              leagueId: league.id,
-              draftOrder: i + 1,
-              autoPick: controlAllTeams ? false : team.id !== humanTeamId,
-            })),
-          );
+          // there are no CPU teams at all in this mode. Writes
+          // draft_participants since LS-10074.
+          await reseatLeagueDraft(tx, {
+            draftId: draft.id,
+            leagueId: league.id,
+            orderedTeamIds: teams.map((team) => team.id),
+            autoPickTeamIds: controlAllTeams
+              ? []
+              : teams
+                  .filter((team) => team.id !== humanTeamId)
+                  .map((team) => team.id),
+          });
 
           // ── 6. Set league status to in-progress and initial pick deadline ─
           // If the first pick belongs to a CPU team (human is not in slot 1),
@@ -515,10 +519,11 @@ builder.mutationField('initializeMockDraft', (t) =>
             .set({ currentPickDeadline: initialDeadline })
             .where(eq(PublicSchema.drafts.id, draft.id));
 
-          await tx
-            .update(PublicSchema.leagues)
-            .set({ draftStatus: 'in-progress' })
-            .where(eq(PublicSchema.leagues.id, league.id));
+          await setLeagueDraftStatus(tx, {
+            draftId: draft.id,
+            leagueId: league.id,
+            status: 'in-progress',
+          });
 
           return {
             leagueId: league.id,

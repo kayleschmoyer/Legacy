@@ -460,6 +460,10 @@ describe('autoProcessDraftPicks expired-drafts query (LS-9253)', () => {
 
     const sqlText = flattenSqlChunks(capturedQuery);
     expect(sqlText).toContain('auto_pick_disabled = FALSE');
-    expect(sqlText).toContain("draft_status = 'in-progress'");
+    // The scan reads drafts.status directly since LS-10074 — the
+    // `INNER JOIN leagues ... l.draft_status` it replaced is gone, so a
+    // league-less draft-first mock draft is picked up by the same sweep.
+    expect(sqlText).toContain("d.status = 'in-progress'");
+    expect(sqlText).not.toContain('INNER JOIN leagues');
   });
 });

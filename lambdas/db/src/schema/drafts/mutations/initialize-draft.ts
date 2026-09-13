@@ -16,6 +16,8 @@ import {
   enableAutoPickForUnmanagedTeams,
   resolveDraftTeamsOrder,
 } from '../helpers';
+import { setLeagueDraftStatus } from '../draft-status';
+import { reseatLeagueDraft } from '../participants';
 import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
 import { applyKeeperDesignationsForDraft } from '../keeper-application';
 import { builder } from '../../builder';
@@ -27,7 +29,7 @@ import {
 
 /**
  * Mutation: Initialize a draft (live or automated)
- * Creates the drafts record, randomizes team order into draft_teams, and
+ * Creates the drafts record, randomizes the seat order (draft_participants), and
  * either starts a live pick-by-pick session or queues an automated draft to SQS.
  *
  * For live drafts: sets draftStatus to 'in-progress', sets pick deadline,
@@ -181,7 +183,7 @@ builder.mutationField('initializeDraft', (t) =>
         const txResult: TxResult = await context.db.transaction(async (tx) => {
           let txDraft: typeof PublicSchema.drafts.$inferSelect;
 
-          // LS-8742: preserve any draft_teams order already seeded by an
+          // LS-8742: preserve any seat order already seeded by an
           // approved draft slot trade (LS-8676) instead of unconditionally
           // reshuffling it away at draft start. When a fresh order is
           // needed, Reverse Standings (keeper leagues only, LS-8929) orders
@@ -200,14 +202,9 @@ builder.mutationField('initializeDraft', (t) =>
           );
 
           if (existingDraft) {
-            if (needsInsert) {
-              // Clear any leftover draft_teams from a previous initialization
-              await tx
-                .delete(PublicSchema.draftTeams)
-                .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
-            }
-
             // Clear any leftover draft_picks from a previous initialization
+            // first: draft_picks.participant_id cascades, so reseating below
+            // would otherwise take them with it (LS-10074).
             await tx
               .delete(PublicSchema.draftPicks)
               .where(eq(PublicSchema.draftPicks.draftId, existingDraft.id));
@@ -242,15 +239,12 @@ builder.mutationField('initializeDraft', (t) =>
           }
 
           if (needsInsert) {
-            // Insert draft_teams with the resolved order (1-indexed)
-            await tx.insert(PublicSchema.draftTeams).values(
-              orderedTeamIds.map((teamId, index) => ({
-                draftId: txDraft.id,
-                teamId,
-                leagueId,
-                draftOrder: index + 1,
-              })),
-            );
+            // Seat the draft in the resolved order (slot is 1-indexed).
+            await reseatLeagueDraft(tx, {
+              draftId: txDraft.id,
+              leagueId,
+              orderedTeamIds,
+            });
           }
 
           // The draft is now starting — any still-pending draft slot trades
@@ -259,7 +253,7 @@ builder.mutationField('initializeDraft', (t) =>
 
           // LS-8674: keeper leagues auto-assign locked keeper designations
           // to their teams (with cost applied) before the first pick. Must
-          // run after draft_teams exists (forfeited-pick rows reference this
+          // run after the seats exist (forfeited-pick rows reference this
           // draftId) and before any pick/bid can happen.
           if (league.rosterContinuity === 'keeper' && league.keeperSettings) {
             await applyKeeperDesignationsForDraft(tx, {
@@ -275,11 +269,13 @@ builder.mutationField('initializeDraft', (t) =>
 
           // ── Branch: Live vs Automated ───────────────────────────────
           if (draftMode === 'live') {
-            // Update league status to in-progress
-            await tx
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'in-progress' })
-              .where(eq(PublicSchema.leagues.id, leagueId));
+            // Draft status — dual-written onto the league in the same
+            // transaction (LS-10074).
+            await setLeagueDraftStatus(tx, {
+              draftId: txDraft.id,
+              leagueId,
+              status: 'in-progress',
+            });
 
             // LS-480 / LS-545: Enable auto-pick for any teams without a general manager
             const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
@@ -399,15 +395,14 @@ builder.mutationField('initializeDraft', (t) =>
           // Conditional on draftStatus='not-started' so we don't clobber an
           // 'in-progress'/'completed' state if the draft-processor has
           // already started consuming the message we just sent.
-          await context.db
-            .update(PublicSchema.leagues)
-            .set({ draftStatus: 'queued' })
-            .where(
-              and(
-                eq(PublicSchema.leagues.id, leagueId),
-                eq(PublicSchema.leagues.draftStatus, 'not-started'),
-              ),
-            );
+          await context.db.transaction(async (tx) => {
+            await setLeagueDraftStatus(tx, {
+              draftId: draft.id,
+              leagueId,
+              status: 'queued',
+              expectedLeagueStatus: 'not-started',
+            });
+          });
 
           LOGGER.info('Automated draft queued', {
             leagueId,

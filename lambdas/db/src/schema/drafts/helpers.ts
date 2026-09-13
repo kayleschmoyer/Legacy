@@ -15,7 +15,9 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { SportKind } from './strategies';
-import { ForbiddenError } from '../graphql-errors';
+import type { DraftRules } from './draft-rules';
+import { setLeagueDraftStatus } from './draft-status';
+import { getDraftSeats, setSeatAutoPick } from './participants';
 import { addPlayerToRoster } from '../../services/roster-service';
 
 // ── Mock draft weekly-limit gating (LS-470 / LS-5178) ────────────────────────
@@ -69,6 +71,8 @@ export interface CommitDraftPickParams {
   /** Current pick slot being filled, as returned by getCurrentDraftPickInfo. */
   pickInfo: {
     teamId: number;
+    /** Seat filling this pick (`draft_participants.id`) — LS-10074. */
+    participantId?: number | null;
     round: number;
     pickNumber: number;
     overallPick: number;
@@ -114,43 +118,48 @@ export interface CommitDraftPickResult {
 export const ALLOWED_POSITIONS_FOR_AUTO_PICK = ALLOWED_POSITIONS;
 
 /**
- * Determine which league-defined position slot types still need a player
- * on the given team for this draft. Works inside any transaction (tx: PublicDb).
+ * The slice of {@link DraftRules} this helper needs: the roster it is filling
+ * and the sport whose eligibility relation to read.
  *
- * Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
- * makeDraftPick auto-pick chain (mutations.ts).
+ * Taking rules rather than a `leagueId` is what lets a draft-first mock draft
+ * (LS-10076) reuse this unchanged: its roster comes from
+ * `getDefaultRosterPositions`, not from `league_positions` (LS-10086).
+ */
+export type DraftPositionRules = Pick<DraftRules, 'sport' | 'rosterPositions'>;
+
+/**
+ * Determine which of the draft's roster slot types still need a player on the
+ * given team. Works inside any transaction (tx: PublicDb).
  *
- * `sport` defaults to 'baseball' for backward compatibility with any caller
- * that hasn't been updated to pass it — scheduled-mutations.ts (LS-9523) now
- * does. Football reads eligibility from
- * `football_player_eligible_positions` (LS-9479) — the baseball-only
- * `playerEligiblePositions` table has zero football rows (LS-9474
- * postmortem), so without this branch a football team's drafted players
- * were never detected as filling any slot, and every slot type stayed
- * "unfilled" for the whole draft regardless of what was actually picked.
+ * Shared by autoProcessDraftPicks (scheduled-mutations.ts), the makeDraftPick
+ * auto-pick chain, and the draft board's pickability filter.
+ *
+ * The slot list arrives via {@link DraftRules.rosterPositions} rather than a
+ * `league_positions` query of its own (LS-10074) — `league_positions` is
+ * league-scoped, and a draft-first mock draft has no league to scope to.
+ *
+ * Football reads eligibility from `football_player_eligible_positions`
+ * (LS-9479) — the baseball-only `playerEligiblePositions` table has zero
+ * football rows (LS-9474 postmortem), so without this branch a football team's
+ * drafted players were never detected as filling any slot, and every slot type
+ * stayed "unfilled" for the whole draft regardless of what was actually picked.
  */
 export async function getUnfilledPositionTypes(
   tx: PublicDb,
   draftId: number,
   teamId: number,
-  leagueId: number,
-  sport: SportKind = 'baseball',
+  rules: DraftPositionRules,
 ): Promise<string[]> {
-  // 1. League position requirements
-  const leaguePositions = await tx
-    .select({ positionType: PublicSchema.leaguePosition.positionType })
-    .from(PublicSchema.leaguePosition)
-    .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
+  // 1. The draft's roster slot requirements
+  const rosterPositions = rules.rosterPositions;
+  const sport: SportKind = rules.sport;
 
-  if (leaguePositions.length === 0) return [];
+  if (rosterPositions.length === 0) return [];
 
   // Count slots needed per position type
   const slotsNeeded = new Map<string, number>();
-  for (const lp of leaguePositions) {
-    slotsNeeded.set(
-      lp.positionType,
-      (slotsNeeded.get(lp.positionType) ?? 0) + 1,
-    );
+  for (const positionType of rosterPositions) {
+    slotsNeeded.set(positionType, (slotsNeeded.get(positionType) ?? 0) + 1);
   }
 
   // 2. Team's already-drafted player IDs in this draft
@@ -160,8 +169,8 @@ export async function getUnfilledPositionTypes(
   const teamPlayerIds = teamPicksResult.rows.map((r) => r.player_id as number);
 
   if (teamPlayerIds.length === 0) {
-    // No picks yet â€” all position types are still needed
-    return [...new Set(leaguePositions.map((lp) => lp.positionType))];
+    // No picks yet — all position types are still needed
+    return [...new Set(rosterPositions)];
   }
 
   // 3. Position eligibility for already-drafted players from the mat view
@@ -424,26 +433,41 @@ export async function resolveReverseStandingsSeedOrder(
  */
 export function resolvePickAssignment(params: {
   overallPick: number;
-  draftTeams: { teamId: number }[];
+  /**
+   * Seats in slot order (LS-10074 — previously the draft's `draft_teams` rows,
+   * now `draft_participants`). `id` is the seat's `participant_id`; it is
+   * optional so the pure-arithmetic tests can pass team ids alone.
+   */
+  seats: { teamId: number; id?: number }[];
   isSnake: boolean;
   forfeited: Set<string>;
-}): { teamId: number; round: number; pickNumber: number } | null {
-  const { overallPick, draftTeams, isSnake, forfeited } = params;
+}): {
+  teamId: number;
+  participantId: number | undefined;
+  round: number;
+  pickNumber: number;
+} | null {
+  const { overallPick, seats, isSnake, forfeited } = params;
   let cumulative = 0;
 
   for (let round = 1; round <= MAX_ROUND_SEARCH; round++) {
     const isReverseRound = isSnake && round % 2 === 0;
-    const ordered = isReverseRound ? [...draftTeams].reverse() : draftTeams;
+    const ordered = isReverseRound ? [...seats].reverse() : seats;
     const active =
       forfeited.size === 0
         ? ordered
-        : ordered.filter((t) => !forfeited.has(`${t.teamId}:${round}`));
+        : ordered.filter((s) => !forfeited.has(`${s.teamId}:${round}`));
 
     if (overallPick <= cumulative + active.length) {
       const idxInRound = overallPick - cumulative - 1;
-      const team = active[idxInRound];
-      if (!team) return null;
-      return { teamId: team.teamId, round, pickNumber: idxInRound + 1 };
+      const seat = active[idxInRound];
+      if (!seat) return null;
+      return {
+        teamId: seat.teamId,
+        participantId: seat.id,
+        round,
+        pickNumber: idxInRound + 1,
+      };
     }
     cumulative += active.length;
   }
@@ -477,12 +501,14 @@ export async function getCurrentDraftPickInfo(
 ): Promise<{
   draftId: number;
   teamId: number;
+  /** Seat filling this pick (`draft_participants.id`) — LS-10074. */
+  participantId: number | undefined;
   round: number;
   pickNumber: number;
   overallPick: number;
   isComplete: boolean;
 } | null> {
-  // Get draft and draft teams
+  // Get draft and its seats
   const [draft] = await db
     .select()
     .from(PublicSchema.drafts)
@@ -493,15 +519,20 @@ export async function getCurrentDraftPickInfo(
     return null;
   }
 
-  const draftTeams = await db
-    .select()
-    .from(PublicSchema.draftTeams)
-    .where(eq(PublicSchema.draftTeams.draftId, draftId))
-    .orderBy(asc(PublicSchema.draftTeams.draftOrder));
+  const allSeats = await getDraftSeats(db, draftId);
 
-  if (draftTeams.length === 0) {
+  if (allSeats.length === 0) {
+    // Message preserved verbatim: isDraftNotYetInitialized (scheduled-mutations)
+    // and the DRAFT_TEAMS_NOT_CONFIGURED mapping in the getCurrentDraftPick
+    // resolver both match on it (LS-4853).
     throw new Error('No teams configured for this draft');
   }
+
+  // League seats always hold a team. A seat without one belongs to an unclaimed
+  // mock-draft lobby slot (slice 4) and cannot be assigned a pick.
+  const seats = allSeats.filter(
+    (s): s is typeof s & { teamId: number } => s.teamId !== null,
+  );
 
   const currentOverallPick = draft.currentPick + 1;
   const isSnake =
@@ -518,7 +549,7 @@ export async function getCurrentDraftPickInfo(
 
   const assignment = resolvePickAssignment({
     overallPick: currentOverallPick,
-    draftTeams,
+    seats,
     isSnake,
     forfeited,
   });
@@ -530,6 +561,7 @@ export async function getCurrentDraftPickInfo(
   return {
     draftId,
     teamId: assignment.teamId,
+    participantId: assignment.participantId,
     round: assignment.round,
     pickNumber: assignment.pickNumber,
     overallPick: currentOverallPick,
@@ -539,30 +571,6 @@ export async function getCurrentDraftPickInfo(
     // (LS-4191).
     isComplete: draft.draftCompletedAt != null,
   };
-}
-
-/**
- * Verify that a user is a member of a league. Throws if not.
- */
-export async function verifyLeagueMembership(
-  db: PublicDb,
-  leagueId: number,
-  userId: number,
-): Promise<void> {
-  const [membership] = await db
-    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
-    .from(PublicSchema.leagueMembers)
-    .where(
-      and(
-        eq(PublicSchema.leagueMembers.leagueId, leagueId),
-        eq(PublicSchema.leagueMembers.userId, userId),
-      ),
-    )
-    .limit(1);
-
-  if (!membership) {
-    throw ForbiddenError('You are not a member of this league');
-  }
 }
 
 /**
@@ -595,12 +603,18 @@ export async function commitDraftPick(
 
   const now = new Date();
 
-  // Insert the draft pick record
+  // Insert the draft pick record. `team_id` is still written for league
+  // drafts — roster and pick-history readers join on it (LS-10074) — and
+  // `participant_id` now names the seat directly rather than leaving the
+  // LS-10073 bridge trigger to resolve it from the team.
   const [draftPick] = await tx
     .insert(PublicSchema.draftPicks)
     .values({
       draftId,
       teamId: pickInfo.teamId,
+      ...(pickInfo.participantId != null
+        ? { participantId: pickInfo.participantId }
+        : {}),
       playerId,
       round: pickInfo.round,
       pickNumber: pickInfo.pickNumber,
@@ -610,11 +624,8 @@ export async function commitDraftPick(
     .returning();
 
   // Determine whether the draft is now complete
-  const draftTeamRows = await tx
-    .select()
-    .from(PublicSchema.draftTeams)
-    .where(eq(PublicSchema.draftTeams.draftId, draftId));
-  const numTeams = draftTeamRows.length;
+  const seats = await getDraftSeats(tx, draftId);
+  const numTeams = seats.length;
   // Forfeited rounds (LS-8674 keeper round-penalty) mean fewer total picks
   // than a plain numTeams * maxRosterSize — the forfeiting team's slot was
   // already filled by the keeper at draft init, not by a pick.
@@ -646,12 +657,16 @@ export async function commitDraftPick(
     })
     .where(eq(PublicSchema.drafts.id, draftId));
 
-  // Mark the league draft as completed when the last pick is made
+  // Mark the draft completed when the last pick is made. Dual-writes
+  // drafts.status and leagues.draft_status (+ league_phase, as before) in this
+  // same transaction — LS-10074.
   if (isDraftComplete) {
-    await tx
-      .update(PublicSchema.leagues)
-      .set({ draftStatus: 'completed', leaguePhase: 'active' })
-      .where(eq(PublicSchema.leagues.id, leagueId));
+    await setLeagueDraftStatus(tx, {
+      draftId,
+      leagueId,
+      status: 'completed',
+      leaguePhase: 'active',
+    });
   }
 
   // Add the drafted player to the team's roster.
@@ -733,10 +748,11 @@ export async function getFirstQueuedPlayerForTeam(
 // ── enableAutoPickForUnmanagedTeams ──────────────────────────────────────────
 
 /**
- * LS-480 / LS-545: Enable auto-pick for any draft_teams rows whose associated
+ * LS-480 / LS-545: Enable auto-pick for any seat whose associated
  * league_member has no user (unmanaged / bot teams).
  *
- * Must be called **after** draft_teams rows have been inserted for the draft.
+ * Writes `draft_participants` since LS-10074 (previously `draft_teams`), so it
+ * must be called **after** the draft's seats exist.
  *
  * Shared by `initializeDraft` (initialize-draft.ts) and
  * `autoStartScheduledDrafts` (scheduled-mutations.ts) so neither path can
@@ -777,15 +793,12 @@ export async function enableAutoPickForUnmanagedTeams(
   const teamIdsWithoutGM = teamIds.filter((id) => !teamIdsWithGM.has(id));
 
   if (teamIdsWithoutGM.length > 0) {
-    await db
-      .update(PublicSchema.draftTeams)
-      .set({ autoPick: true })
-      .where(
-        and(
-          eq(PublicSchema.draftTeams.draftId, draftId),
-          inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
-        ),
-      );
+    await setSeatAutoPick(db, {
+      draftId,
+      leagueId,
+      teamIds: teamIdsWithoutGM,
+      autoPick: true,
+    });
   }
 
   return teamIdsWithoutGM;
@@ -796,31 +809,33 @@ export async function enableAutoPickForUnmanagedTeams(
 export interface ResolveDraftTeamsOrderResult {
   /** Team ids in final draft-pick order (1-indexed positionally by array index). */
   orderedTeamIds: number[];
-  /** True when draft_teams rows must be (re)inserted for this draft — no rows
-   *  existed yet, or the existing rows no longer match the league's current
-   *  team set. False means the existing rows should be left untouched. */
+  /** True when the draft's seats must be (re)created — none existed yet, or
+   *  the existing seats no longer match the league's current team set. False
+   *  means the existing seats should be left untouched. */
   needsInsert: boolean;
 }
 
 /**
- * Decide the draft_teams order to use when a draft actually starts.
+ * Decide the seat order to use when a draft actually starts.
  *
- * `approveDraftSlotTrade` (LS-8676) lazily seeds draft_teams pre-draft and
- * atomically swaps two teams' draftOrder when a trade executes. Both
+ * `approveDraftSlotTrade` (LS-8676) lazily seeds the draft order pre-draft and
+ * atomically swaps two teams' slots when a trade executes. Both
  * initializeDraft and autoStartScheduledDrafts previously deleted + reshuffled
- * draft_teams unconditionally at draft start, silently discarding any
+ * that order unconditionally at draft start, silently discarding any
  * commissioner-approved slot trade the instant the draft began (LS-8742).
  *
- * If rows already exist for this draft and their team set still matches the
+ * Reads `draft_participants` since LS-10074 (previously `draft_teams`).
+ *
+ * If seats already exist for this draft and their team set still matches the
  * league's current teams, preserve them as-is. Only randomize a fresh order
- * when no rows exist yet, or when the seeded team set has drifted from the
+ * when no seats exist yet, or when the seeded team set has drifted from the
  * league's current teams (e.g. a team was added/removed after seeding) —
  * in that case the stale seed can no longer be trusted, so fall back to the
  * original reshuffle behavior.
  *
  * `draftId` is `null` when the drafts row itself doesn't exist yet
- * (initializeDraft's first-ever call for a league) — no draft_teams rows can
- * exist in that case either, so this always resolves a fresh order.
+ * (initializeDraft's first-ever call for a league) — no seats can exist in
+ * that case either, so this always resolves a fresh order.
  *
  * When a fresh order is needed, `freshOrderOptions` (LS-8929) determines
  * whether it comes from Reverse Standings (keeper leagues only) or the
@@ -841,29 +856,31 @@ export async function resolveDraftTeamsOrder(
   const existingRows = draftId
     ? await db
         .select({
-          teamId: PublicSchema.draftTeams.teamId,
+          teamId: PublicSchema.draftParticipants.teamId,
         })
-        .from(PublicSchema.draftTeams)
-        .where(eq(PublicSchema.draftTeams.draftId, draftId))
-        .orderBy(asc(PublicSchema.draftTeams.draftOrder))
+        .from(PublicSchema.draftParticipants)
+        .where(eq(PublicSchema.draftParticipants.draftId, draftId))
+        .orderBy(asc(PublicSchema.draftParticipants.slot))
     : [];
 
   if (existingRows.length > 0) {
+    // A league seat always holds a team; an unseated lobby slot (slice 4)
+    // cannot take part in a league draft order.
+    const existingSeatTeamIds = existingRows
+      .map((r) => r.teamId)
+      .filter((id): id is number => id !== null);
     const currentTeamIds = new Set(currentTeams.map((t) => t.id));
-    const existingTeamIds = new Set(existingRows.map((r) => r.teamId));
+    const existingTeamIds = new Set(existingSeatTeamIds);
     const sameTeamSet =
-      existingRows.length === currentTeamIds.size &&
+      existingSeatTeamIds.length === currentTeamIds.size &&
       [...currentTeamIds].every((id) => existingTeamIds.has(id));
 
     if (sameTeamSet) {
-      return {
-        orderedTeamIds: existingRows.map((r) => r.teamId),
-        needsInsert: false,
-      };
+      return { orderedTeamIds: existingSeatTeamIds, needsInsert: false };
     }
 
     LOGGER.warn(
-      'draft_teams team set no longer matches league teams — reshuffling instead of preserving seeded order',
+      'draft seat team set no longer matches league teams — reshuffling instead of preserving seeded order',
       { draftId },
     );
   }

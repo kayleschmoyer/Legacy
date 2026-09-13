@@ -9,6 +9,8 @@
  */
 
 const enableAutoPickForUnmanagedTeams = jest.fn();
+const reseatLeagueDraft = jest.fn(async () => undefined);
+const setLeagueDraftStatus = jest.fn(async () => undefined);
 const shuffleArray = jest.fn((arr: unknown[]) => arr);
 const resolveDraftTeamsOrder = jest.fn(
   async (_db: unknown, _draftId: unknown, teams: { id: number }[]) => ({
@@ -58,9 +60,11 @@ function makeMockDb({
   teamsRowsInOrder?: Array<Array<{ id: number }>>;
 }) {
   let selectCallCount = 0;
-  const transaction = jest.fn(async (cb: (tx: unknown) => unknown) =>
-    cb(makeTxMock()),
-  );
+  // One tx instance per db, so assertions can name the exact object the
+  // resolver's transaction body was handed (LS-10074 moved
+  // enableAutoPickForUnmanagedTeams inside the transaction).
+  const tx = makeTxMock();
+  const transaction = jest.fn(async (cb: (tx: unknown) => unknown) => cb(tx));
   const insert = jest.fn(() => ({
     values: jest.fn(() => ({
       returning: jest.fn(() => Promise.resolve([{ id: 1, timestamp: null }])),
@@ -88,7 +92,7 @@ function makeMockDb({
     };
   });
 
-  return { select, transaction, insert };
+  return { select, transaction, insert, tx };
 }
 
 function makeNotificationService() {
@@ -150,12 +154,6 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
         id: 'teams.id',
         leagueId: 'teams.league_id',
       },
-      draftTeams: {
-        draftId: 'draft_teams.draft_id',
-        teamId: 'draft_teams.team_id',
-        leagueId: 'draft_teams.league_id',
-        draftOrder: 'draft_teams.draft_order',
-      },
       draftPicks: {
         draftId: 'draft_picks.draft_id',
       },
@@ -179,6 +177,12 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
     resolveDraftTeamsOrder,
   }));
 
+  // Seating and the status dual-write live in their own modules since
+  // LS-10074, each with its own coverage; this suite is about the resolver's
+  // scan, staleness cutoff and per-draft orchestration.
+  jest.doMock('./participants', () => ({ reseatLeagueDraft }));
+  jest.doMock('./draft-status', () => ({ setLeagueDraftStatus }));
+
   await import('./auto-start-mutation');
   const resolve = captured.autoStartScheduledDrafts;
   if (!resolve) {
@@ -195,6 +199,8 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
   beforeEach(() => {
     enableAutoPickForUnmanagedTeams.mockReset();
     enableAutoPickForUnmanagedTeams.mockResolvedValue([]);
+    reseatLeagueDraft.mockClear();
+    setLeagueDraftStatus.mockClear();
     shuffleArray.mockClear();
     resolveDraftTeamsOrder.mockClear();
     resolveDraftTeamsOrder.mockImplementation(
@@ -302,7 +308,7 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
     );
 
     expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
-      db,
+      db.tx,
       30,
       3,
       [300, 301, 302],
@@ -355,16 +361,16 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
       },
     );
     expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
-      db,
+      txMock,
       80,
       8,
       [501, 500],
     );
-    // needsInsert: false ⇒ the seeded draft_teams rows must be left
-    // untouched: only the (unconditional) draft_picks cleanup delete runs,
-    // and nothing is (re)inserted into draft_teams.
+    // needsInsert: false ⇒ the seeded seat order must be left untouched:
+    // only the (unconditional) draft_picks cleanup delete runs, and the
+    // draft is never reseated.
     expect(txMock?.delete).toHaveBeenCalledTimes(1);
-    expect(txMock?.insert).not.toHaveBeenCalled();
+    expect(reseatLeagueDraft).not.toHaveBeenCalled();
   });
 
   describe('Reverse Standings seeding (LS-8929)', () => {
@@ -409,7 +415,7 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
         },
       );
       expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
-        db,
+        db.tx,
         40,
         4,
         [402, 401, 400],
@@ -457,7 +463,7 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
         },
       );
       expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
-        db,
+        db.tx,
         50,
         5,
         [500, 501],

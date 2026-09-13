@@ -16,6 +16,10 @@ describe('draft-slot-trades helpers', () => {
       returning: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
+      // Seats (LS-10074): reseatLeagueDraft clears before inserting, and the
+      // slot swap is a single UPDATE ... FROM (VALUES ...) statement.
+      delete: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ rows: [] }),
       then: jest.fn((resolve: (v: unknown[]) => unknown) => resolve([])),
     };
 
@@ -48,11 +52,16 @@ describe('draft-slot-trades helpers', () => {
           name: 'name',
         },
         drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
-        draftTeams: {
+        draftParticipants: {
+          id: 'id',
           draftId: 'draftId',
+          slot: 'slot',
           teamId: 'teamId',
           leagueId: 'leagueId',
-          draftOrder: 'draftOrder',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
         },
         draftSlotTrades: {
           id: 'id',
@@ -167,14 +176,17 @@ describe('draft-slot-trades helpers', () => {
 
   // ── ensureDraftTeamsSeeded ──────────────────────────────────────────────────
 
+  // Seats live in draft_participants since LS-10074; these assert the same
+  // seeding rule against the seat rows that replaced draft_teams.
   describe('ensureDraftTeamsSeeded', () => {
-    it('is a no-op when draft_teams rows already exist', async () => {
-      mockDb.limit.mockResolvedValueOnce([{ teamId: 1 }]);
+    it('is a no-op when the draft already has seats', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]);
       await helpers.ensureDraftTeamsSeeded(mockDb, 10, 1);
       expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(mockDb.delete).not.toHaveBeenCalled();
     });
 
-    it('seeds one row per team, 1-indexed by team id ascending, when none exist', async () => {
+    it('seats one row per team, slot 1-indexed by team id ascending, when none exist', async () => {
       mockDb.limit.mockResolvedValueOnce([]); // existing check: empty
       mockDb.orderBy.mockResolvedValueOnce([
         { id: 30 },
@@ -185,10 +197,36 @@ describe('draft-slot-trades helpers', () => {
       await helpers.ensureDraftTeamsSeeded(mockDb, 10, 1);
 
       expect(mockDb.insert).toHaveBeenCalledTimes(1);
+      // No team-name rows and no league members in this stub, so every seat
+      // falls back to its "Team <id>" name and to the 'user' controller.
       expect(mockDb.values).toHaveBeenCalledWith([
-        { draftId: 10, teamId: 30, leagueId: 1, draftOrder: 1 },
-        { draftId: 10, teamId: 10, leagueId: 1, draftOrder: 2 },
-        { draftId: 10, teamId: 20, leagueId: 1, draftOrder: 3 },
+        {
+          draftId: 10,
+          slot: 1,
+          teamId: 30,
+          leagueId: 1,
+          controller: 'user',
+          seatName: 'Team 30',
+          autoPick: false,
+        },
+        {
+          draftId: 10,
+          slot: 2,
+          teamId: 10,
+          leagueId: 1,
+          controller: 'user',
+          seatName: 'Team 10',
+          autoPick: false,
+        },
+        {
+          draftId: 10,
+          slot: 3,
+          teamId: 20,
+          leagueId: 1,
+          controller: 'user',
+          seatName: 'Team 20',
+          autoPick: false,
+        },
       ]);
     });
 
@@ -204,38 +242,35 @@ describe('draft-slot-trades helpers', () => {
   // ── swapDraftOrder (atomic swap) ────────────────────────────────────────────
 
   describe('swapDraftOrder', () => {
-    it('swaps two teams via a sentinel value in 3 ordered updates (avoids the unique-constraint collision)', async () => {
+    it('swaps two seats in a single statement (no sentinel needed — the slot constraint is deferrable)', async () => {
       mockDb.where.mockResolvedValueOnce([
-        { teamId: 1, draftOrder: 3 },
-        { teamId: 2, draftOrder: 7 },
+        { teamId: 1, slot: 3 },
+        { teamId: 2, slot: 7 },
       ]);
 
       const result = await helpers.swapDraftOrder(mockDb, 10, 1, 2);
 
       expect(result).toEqual({ teamAOrder: 7, teamBOrder: 3 });
 
-      const setCalls = mockDb.set.mock.calls.map((c: unknown[]) => c[0]);
-      // 1st update: team A parked on an out-of-range sentinel (never a real order)
-      expect(setCalls[0].draftOrder).toBeLessThan(0);
-      // 2nd update: team B takes team A's original order (3)
-      expect(setCalls[1]).toEqual({ draftOrder: 3 });
-      // 3rd update: team A takes team B's original order (7)
-      expect(setCalls[2]).toEqual({ draftOrder: 7 });
-      expect(mockDb.update).toHaveBeenCalledTimes(3);
-    });
-
-    it('is a no-op when the two teams already hold the same order (defensive)', async () => {
-      mockDb.where.mockResolvedValueOnce([
-        { teamId: 1, draftOrder: 4 },
-        { teamId: 2, draftOrder: 4 },
-      ]);
-      const result = await helpers.swapDraftOrder(mockDb, 10, 1, 2);
-      expect(result).toEqual({ teamAOrder: 4, teamBOrder: 4 });
+      // draft_participants_uk_draft_slot is DEFERRABLE INITIALLY IMMEDIATE, so
+      // both rows are permuted by one UPDATE ... FROM (VALUES ...) — the old
+      // 3-statement sentinel dance draft_teams needed is gone (LS-10074).
+      expect(mockDb.execute).toHaveBeenCalledTimes(1);
       expect(mockDb.update).not.toHaveBeenCalled();
     });
 
+    it('is a no-op when the two teams already hold the same slot (defensive)', async () => {
+      mockDb.where.mockResolvedValueOnce([
+        { teamId: 1, slot: 4 },
+        { teamId: 2, slot: 4 },
+      ]);
+      const result = await helpers.swapDraftOrder(mockDb, 10, 1, 2);
+      expect(result).toEqual({ teamAOrder: 4, teamBOrder: 4 });
+      expect(mockDb.execute).not.toHaveBeenCalled();
+    });
+
     it('throws when one of the teams is not part of this draft', async () => {
-      mockDb.where.mockResolvedValueOnce([{ teamId: 1, draftOrder: 3 }]);
+      mockDb.where.mockResolvedValueOnce([{ teamId: 1, slot: 3 }]);
       await expect(helpers.swapDraftOrder(mockDb, 10, 1, 2)).rejects.toThrow(
         'not part of this draft order',
       );

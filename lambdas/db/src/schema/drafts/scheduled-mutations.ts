@@ -31,6 +31,7 @@ import {
   getUnfilledPositionTypes,
 } from './helpers';
 import { type CandidatePool, fetchCandidatePool } from './candidate-pool';
+import { getSeatForTeam } from './participants';
 import { guardConcurrentPick, selectAutoPickPlayer } from './auto-pick-scorer';
 import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
@@ -144,8 +145,7 @@ export async function predictAutoPick(
       db,
       draftId,
       currentPickInfo.teamId,
-      draftLeagueId,
-      candidatePool.league.sport,
+      candidatePool.rules,
     );
 
     const { playerId: autoPlayerId, reason: autoPickReason } =
@@ -239,12 +239,13 @@ export async function runAutoPickLockedTransaction(params: {
     // serializes concurrent pick writers without blocking
     // FK-referencing draft_picks INSERTs from other transactions.
     const draftRows = await tx.execute(
-      sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
+      sql`SELECT id, league_id, status, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
     );
     const draft = draftRows.rows[0] as
       | {
           id: number;
           league_id: number;
+          status: string;
           current_pick: number;
           current_pick_deadline: Date | null;
         }
@@ -275,16 +276,13 @@ export async function runAutoPickLockedTransaction(params: {
     // Capture the expired deadline for chaining
     const expiredDeadline = new Date(draft.current_pick_deadline);
 
-    // Re-validate league status inside the transaction
-    const [txLeague] = await tx
-      .select()
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, draftLeagueId))
-      .limit(1);
-
-    if (!txLeague || txLeague.draftStatus !== 'in-progress') {
+    // Re-validate the draft's status inside the transaction, off the row we
+    // just locked. Previously read leagues.draft_status via a second query —
+    // drafts.status is the same value (dual-written by every transition since
+    // LS-10074) and comes free with the lock read.
+    if (draft.status !== 'in-progress') {
       LOGGER.info(
-        `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+        `[autoProcessDraftPicks] Draft ${draftId} is not in-progress, skipping`,
       );
       return null;
     }
@@ -355,8 +353,7 @@ export async function runAutoPickLockedTransaction(params: {
         tx,
         draftId,
         currentPickInfo.teamId,
-        draftLeagueId,
-        league.sport,
+        candidatePool.rules,
       );
 
       LOGGER.info('[autoProcessDraftPicks] Unfilled position types for team', {
@@ -400,7 +397,10 @@ export async function runAutoPickLockedTransaction(params: {
         ),
       );
 
-    if (rosterCount && Number(rosterCount.count) >= league.maxRosterSize) {
+    if (
+      rosterCount &&
+      Number(rosterCount.count) >= candidatePool.rules.maxRosterSize
+    ) {
       throw new Error(
         `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
       );
@@ -419,10 +419,10 @@ export async function runAutoPickLockedTransaction(params: {
       leagueId: draftLeagueId,
       pickInfo: currentPickInfo,
       playerId: autoPlayerId,
-      maxRosterSize: league.maxRosterSize,
+      maxRosterSize: candidatePool.rules.maxRosterSize,
       pickTimeLimitSeconds,
       deadlineBaseTime: expiredDeadline,
-      isMockDraft: league.isMockDraft,
+      isMockDraft: candidatePool.rules.isMock,
     });
 
     // Mark this team as auto-pick going forward, but only if
@@ -436,17 +436,8 @@ export async function runAutoPickLockedTransaction(params: {
     // their deadline so the inner loop chains right away (LS-427).
     let effectiveNextDeadline = nextDeadline;
     if (nextPickInfo && !isDraftComplete) {
-      const [nextTeamEntry] = await tx
-        .select({ autoPick: PublicSchema.draftTeams.autoPick })
-        .from(PublicSchema.draftTeams)
-        .where(
-          and(
-            eq(PublicSchema.draftTeams.draftId, draftId),
-            eq(PublicSchema.draftTeams.teamId, nextPickInfo.teamId),
-          ),
-        )
-        .limit(1);
-      if (nextTeamEntry?.autoPick) {
+      const nextSeat = await getSeatForTeam(tx, draftId, nextPickInfo.teamId);
+      if (nextSeat?.autoPick) {
         effectiveNextDeadline = new Date(pickNow.getTime() - 1);
         await tx
           .update(PublicSchema.drafts)
@@ -612,12 +603,14 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
       try {
         // Find all in-progress drafts with expired deadlines
         const now = new Date();
+        // Scans drafts.status directly (LS-10074) — the INNER JOIN leagues
+        // this used to need is gone, so a draft-first mock draft with no
+        // league row is picked up by the same sweep from slice 4 on.
         const expiredDraftsQuery = sql`
           SELECT d.id AS draft_id, d.league_id, d.current_pick,
                  d.draft_order, d.selection_method, d.pick_time_limit_seconds
           FROM drafts d
-          INNER JOIN leagues l ON l.id = d.league_id
-          WHERE l.draft_status = 'in-progress'
+          WHERE d.status = 'in-progress'
             AND d.current_pick_deadline IS NOT NULL
             AND d.current_pick_deadline <= ${now}
             AND d.auto_pick_disabled = FALSE
@@ -635,9 +628,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
           // auto_pick_disabled set) from "no draft exists" cases.
           if (leagueId) {
             const draftDiag = await context.db.execute(sql`
-              SELECT d.id, d.current_pick_deadline, d.auto_pick_disabled, l.draft_status
+              SELECT d.id, d.current_pick_deadline, d.auto_pick_disabled, d.status
               FROM drafts d
-              INNER JOIN leagues l ON l.id = d.league_id
               WHERE d.league_id = ${leagueId}
             `);
             LOGGER.info('[autoProcessDraftPicks] Draft state diagnostic', {

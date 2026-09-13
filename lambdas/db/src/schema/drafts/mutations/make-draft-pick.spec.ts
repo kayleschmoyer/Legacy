@@ -247,11 +247,6 @@ function setupResolver(options: {
         teamId: 'teamId',
         overallPick: 'overallPick',
       },
-      draftTeams: {
-        draftId: 'draftId',
-        teamId: 'teamId',
-        autoPick: 'autoPick',
-      },
       drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
       players: { id: 'id' },
       playerEligiblePositions: { playerId: 'playerId', position: 'position' },
@@ -259,6 +254,15 @@ function setupResolver(options: {
   }));
 
   jest.doMock('../types', () => ({ DraftPick: {} }));
+
+  // LS-8107's offload looks up whether the next team's seat auto-picks. Seats
+  // live in draft_participants since LS-10074 and are read through this
+  // module, which has its own coverage.
+  jest.doMock('../participants', () => ({
+    getSeatForTeam: jest
+      .fn()
+      .mockResolvedValue({ autoPick: options.nextTeamAutoPick ?? false }),
+  }));
 
   jest.doMock('../helpers', () => ({
     ALLOWED_POSITIONS_FOR_AUTO_PICK: {},
@@ -385,11 +389,8 @@ function setupResolver(options: {
         if (call === 1) return Promise.resolve([leagueRow]);
         if (call === 2) return Promise.resolve([memberRow]);
         if (call === 3) return Promise.resolve([playerRow]);
-        // Call 4 = LS-8107 offload: look up whether the next team has auto-pick.
-        if (call === 4)
-          return Promise.resolve([
-            { autoPick: options.nextTeamAutoPick ?? false },
-          ]);
+        // The LS-8107 offload's next-team auto-pick lookup no longer runs
+        // here — it goes through the mocked participants module (LS-10074).
         return Promise.resolve([]);
       }),
       orderBy: jest.fn().mockResolvedValue([]),

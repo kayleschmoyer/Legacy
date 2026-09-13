@@ -12,6 +12,7 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 
+import { getSeatForTeam, setSeatAutoPick } from '../participants';
 import { builder } from '../../builder';
 import {
   AuthenticationError,
@@ -47,6 +48,7 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
         .select({
           id: PublicSchema.drafts.id,
           leagueId: PublicSchema.drafts.leagueId,
+          status: PublicSchema.drafts.status,
         })
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
@@ -74,45 +76,28 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
         );
       }
 
-      // Verify draft is currently in-progress
-      const [league] = await context.db
-        .select({ draftStatus: PublicSchema.leagues.draftStatus })
-        .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draft.leagueId))
-        .limit(1);
-
-      if (!league || league.draftStatus !== 'in-progress') {
+      // Verify the draft is currently in-progress. Reads drafts.status
+      // (LS-10074) rather than leagues.draft_status.
+      if (draft.status !== 'in-progress') {
         throw UserInputError(
           'Auto-pick can only be toggled while a draft is in progress',
         );
       }
 
-      // Verify target team participates in this draft
-      const [draftTeamEntry] = await context.db
-        .select({ draftOrder: PublicSchema.draftTeams.draftOrder })
-        .from(PublicSchema.draftTeams)
-        .where(
-          and(
-            eq(PublicSchema.draftTeams.draftId, draftId),
-            eq(PublicSchema.draftTeams.teamId, teamId),
-          ),
-        )
-        .limit(1);
+      // Verify the target team holds a seat in this draft
+      const seat = await getSeatForTeam(context.db, draftId, teamId);
 
-      if (!draftTeamEntry) {
+      if (!seat) {
         throw UserInputError('Team is not participating in this draft');
       }
 
       // Apply the change
-      await context.db
-        .update(PublicSchema.draftTeams)
-        .set({ autoPick: enable })
-        .where(
-          and(
-            eq(PublicSchema.draftTeams.draftId, draftId),
-            eq(PublicSchema.draftTeams.teamId, teamId),
-          ),
-        );
+      await setSeatAutoPick(context.db, {
+        draftId,
+        leagueId: draft.leagueId,
+        teamIds: [teamId],
+        autoPick: enable,
+      });
 
       LOGGER.info('[commissionerToggleUserAutoPick] Auto-pick toggled', {
         draftId,

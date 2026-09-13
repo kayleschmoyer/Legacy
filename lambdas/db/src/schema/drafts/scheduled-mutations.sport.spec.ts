@@ -25,12 +25,14 @@ jest.mock('@legacy-sports/db-client', () => ({
       teamId: 'team_members.team_id',
       leagueId: 'team_members.league_id',
     },
-    draftTeams: {
-      draftId: 'draft_teams.draft_id',
-      teamId: 'draft_teams.team_id',
-    },
     drafts: { id: 'drafts.id' },
   },
+}));
+
+const getSeatForTeamMock = jest.fn().mockResolvedValue(null);
+
+jest.mock('./participants', () => ({
+  getSeatForTeam: (...args: unknown[]) => getSeatForTeamMock(...args),
 }));
 
 const getCurrentDraftPickInfoMock = jest.fn();
@@ -99,6 +101,15 @@ function makeFootballCandidatePool(): CandidatePool {
       sport: 'football',
       maxRosterSize: 25,
     } as unknown as CandidatePool['league'],
+    rules: {
+      draftId: 100,
+      kind: 'league',
+      leagueId: 10,
+      sport: 'football',
+      maxRosterSize: 25,
+      isMock: false,
+      rosterPositions: ['QB', 'RB'],
+    } as unknown as CandidatePool['rules'],
   };
 }
 
@@ -119,12 +130,13 @@ describe('predictAutoPick — sport threading (LS-9523)', () => {
 
     const result = await predictAutoPick(db, 100, 10, candidatePool);
 
+    // Positional awareness routes through DraftRules rather than a leagueId +
+    // sport pair (LS-10074 / LS-10086) — the rules carry the sport.
     expect(getUnfilledPositionTypesMock).toHaveBeenCalledWith(
       db,
       100,
       5,
-      10,
-      'football',
+      candidatePool.rules,
     );
     expect(selectAutoPickPlayerMock).toHaveBeenCalledWith(
       expect.objectContaining({ sport: 'football' }),
@@ -158,6 +170,9 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
             {
               id: 100,
               league_id: 10,
+              // The locked draft row now carries the status the transaction
+              // re-validates against (LS-10074).
+              status: 'in-progress',
               current_pick: 1,
               current_pick_deadline: new Date(Date.now() - 1000),
             },
@@ -173,19 +188,15 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
       const thisCall = selectCall;
       const result = (): unknown => {
         if (thisCall === 1) {
-          // txLeague re-validation
-          return [{ id: 10, draftStatus: 'in-progress', sport: 'football' }];
-        }
-        if (thisCall === 2) {
-          // roster count check
+          // roster count check — the league re-validation select is gone:
+          // status now comes off the locked drafts row (LS-10074).
           return [{ count: 0 }];
         }
         throw new Error(`Unexpected tx.select call #${thisCall}`);
       };
       // Thenable chain — mirrors drizzle's fluent builder, resolving
       // regardless of whether the real call site ends the chain with
-      // `.limit()` (txLeague) or `.where()` (the roster count check, which
-      // has no `.limit()`).
+      // `.limit()` or `.where()` (the roster count check has no `.limit()`).
       const chain: Record<string, unknown> = {};
       chain.from = jest.fn(() => chain);
       chain.where = jest.fn(() => chain);
@@ -216,8 +227,7 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
       tx,
       100,
       5,
-      10,
-      'football',
+      candidatePool.rules,
     );
     expect(selectAutoPickPlayerMock).toHaveBeenCalledWith(
       expect.objectContaining({ sport: 'football' }),

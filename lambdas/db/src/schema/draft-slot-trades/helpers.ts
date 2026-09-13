@@ -1,17 +1,22 @@
 /**
  * Draft slot trades domain — shared helpers
  *
- * Draft pick order lives in `draft_teams` (leagueId/draftId/teamId/draftOrder,
- * 1-indexed, unique per (draftId, draftOrder) — see draft-order.ts /
- * initialize-draft.ts). Slot trading operates on this table, not on the
+ * Draft pick order lives in `draft_participants` (draftId/teamId/leagueId/slot,
+ * 1-indexed, unique per (draftId, slot) — see drafts/participants.ts,
+ * draft-order.ts / initialize-draft.ts). Slot trading operates on this table,
+ * via drafts/participants.ts, not on the
  * unrelated `season_draft_players` model from the standalone Season Draft
  * Game trivia mode (see PR description for why the ticket's file reference
  * was corrected).
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
+import {
+  ensureLeagueDraftSeated,
+  swapLeagueDraftSeats,
+} from '../drafts/participants';
 import type { Context } from '../builder';
 import { ForbiddenError, UserInputError } from '../graphql-errors';
 
@@ -133,7 +138,7 @@ export async function assertDraftSlotTradingOpen(
   return league;
 }
 
-// ── draft_teams seeding + atomic swap ───────────────────────────────────────
+// ── seat seeding + atomic swap ──────────────────────────────────────────────
 
 /**
  * Returns the league's current draft id (one `drafts` row is always created
@@ -159,7 +164,7 @@ export async function getActiveDraftId(
 }
 
 /**
- * `draft_teams` rows are normally created by `initializeDraft` when the
+ * Seats are normally created by `initializeDraft` when the
  * commissioner actually starts the draft. Slot trading happens earlier —
  * before the draft starts — so on first use this seeds one row per current
  * league team in team-id order (a stable, deterministic default order).
@@ -170,41 +175,18 @@ export async function ensureDraftTeamsSeeded(
   draftId: number,
   leagueId: number,
 ): Promise<void> {
-  const existing = await tx
-    .select({ teamId: PublicSchema.draftTeams.teamId })
-    .from(PublicSchema.draftTeams)
-    .where(eq(PublicSchema.draftTeams.draftId, draftId))
-    .limit(1);
-
-  if (existing.length > 0) return;
-
-  const teams = await tx
-    .select({ id: PublicSchema.teams.id })
-    .from(PublicSchema.teams)
-    .where(eq(PublicSchema.teams.leagueId, leagueId))
-    .orderBy(asc(PublicSchema.teams.id));
-
-  if (teams.length === 0) {
-    const message = `League ${String(leagueId)} has no teams to seed a draft order for`;
-    LOGGER.error(message);
-    throw new Error(message);
-  }
-
-  await tx.insert(PublicSchema.draftTeams).values(
-    teams.map((team, index) => ({
-      draftId,
-      teamId: team.id,
-      leagueId,
-      draftOrder: index + 1,
-    })),
-  );
+  // Seats live in draft_participants since LS-10074; ensureLeagueDraftSeated
+  // owns the same "seed in team-id order only if nothing is seated yet" rule
+  // this function used to implement against draft_teams.
+  await ensureLeagueDraftSeated(tx, draftId, leagueId);
 }
 
 /**
- * Atomically swap the draft_teams.draftOrder of two teams within a draft.
- * `draft_teams_uk_order` is a NOT DEFERRABLE unique constraint on
- * (draftId, draftOrder), so a direct two-statement swap can transiently
- * collide; route one team through a temporary out-of-range sentinel first.
+ * Atomically swap the slots of two teams' seats within a draft.
+ *
+ * Delegates to {@link swapLeagueDraftSeats} (LS-10074). The sentinel dance this
+ * used to need is gone with `draft_teams`: `draft_participants_uk_draft_slot`
+ * is DEFERRABLE INITIALLY IMMEDIATE, so one statement may permute both rows.
  * Must run inside the caller's transaction.
  */
 export async function swapDraftOrder(
@@ -213,63 +195,7 @@ export async function swapDraftOrder(
   teamAId: number,
   teamBId: number,
 ): Promise<{ teamAOrder: number; teamBOrder: number }> {
-  const rows = await tx
-    .select({
-      teamId: PublicSchema.draftTeams.teamId,
-      draftOrder: PublicSchema.draftTeams.draftOrder,
-    })
-    .from(PublicSchema.draftTeams)
-    .where(
-      and(
-        eq(PublicSchema.draftTeams.draftId, draftId),
-        inArray(PublicSchema.draftTeams.teamId, [teamAId, teamBId]),
-      ),
-    );
-
-  const teamAOrder = rows.find((r) => r.teamId === teamAId)?.draftOrder;
-  const teamBOrder = rows.find((r) => r.teamId === teamBId)?.draftOrder;
-
-  if (teamAOrder == null || teamBOrder == null) {
-    throw new Error('One or both teams are not part of this draft order');
-  }
-  if (teamAOrder === teamBOrder) {
-    return { teamAOrder, teamBOrder };
-  }
-
-  // Sentinel guaranteed distinct from any real draftOrder (which starts at 1).
-  const sentinel = -(teamAOrder + teamBOrder + 1_000_000);
-
-  await tx
-    .update(PublicSchema.draftTeams)
-    .set({ draftOrder: sentinel })
-    .where(
-      and(
-        eq(PublicSchema.draftTeams.draftId, draftId),
-        eq(PublicSchema.draftTeams.teamId, teamAId),
-      ),
-    );
-
-  await tx
-    .update(PublicSchema.draftTeams)
-    .set({ draftOrder: teamAOrder })
-    .where(
-      and(
-        eq(PublicSchema.draftTeams.draftId, draftId),
-        eq(PublicSchema.draftTeams.teamId, teamBId),
-      ),
-    );
-
-  await tx
-    .update(PublicSchema.draftTeams)
-    .set({ draftOrder: teamBOrder })
-    .where(
-      and(
-        eq(PublicSchema.draftTeams.draftId, draftId),
-        eq(PublicSchema.draftTeams.teamId, teamAId),
-      ),
-    );
-
-  return { teamAOrder: teamBOrder, teamBOrder: teamAOrder };
+  return swapLeagueDraftSeats(tx, draftId, teamAId, teamBId);
 }
 
 // ── Auto-cancel on draft start (AC4) ────────────────────────────────────────

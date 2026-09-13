@@ -33,6 +33,7 @@ jest.mock('../services/activity-log', () => ({
 const {
   drafts,
   draftTeams,
+  draftParticipants,
   draftPicks,
   leagues,
   matchups,
@@ -1038,10 +1039,15 @@ describe('Draft Picks - DB Integration Tests', () => {
       // Commissioner's team must NOT be marked
       expect(markedIds).not.toContain(teamFix[0].id);
 
+      // enableAutoPickForUnmanagedTeams writes draft_participants since
+      // LS-10074 — draft_teams is no longer touched by any writer.
       const rows = await db
-        .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id));
+        .select({
+          teamId: draftParticipants.teamId,
+          autoPick: draftParticipants.autoPick,
+        })
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id));
 
       const byTeam = Object.fromEntries(
         rows.map((r) => [r.teamId, r.autoPick]),
@@ -1087,10 +1093,15 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(markedIds).not.toContain(teamFix[1].id);
       expect(markedIds).toContain(teamFix[2].id); // no member → auto-pick
 
+      // enableAutoPickForUnmanagedTeams writes draft_participants since
+      // LS-10074 — draft_teams is no longer touched by any writer.
       const rows = await db
-        .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id));
+        .select({
+          teamId: draftParticipants.teamId,
+          autoPick: draftParticipants.autoPick,
+        })
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id));
 
       const byTeam = Object.fromEntries(
         rows.map((r) => [r.teamId, r.autoPick]),
@@ -1115,9 +1126,9 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(markedIds).toEqual(expect.arrayContaining(allTeamIds));
 
       const rows = await db
-        .select({ autoPick: draftTeams.autoPick })
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id));
+        .select({ autoPick: draftParticipants.autoPick })
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id));
 
       expect(rows.every((r) => r.autoPick)).toBe(true);
     });
@@ -1154,9 +1165,9 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(marked).not.toContain(teamFix[0].id);
 
       const [row] = await db
-        .select({ autoPick: draftTeams.autoPick })
-        .from(draftTeams)
-        .where(eq(draftTeams.teamId, teamFix[0].id));
+        .select({ autoPick: draftParticipants.autoPick })
+        .from(draftParticipants)
+        .where(eq(draftParticipants.teamId, teamFix[0].id));
       expect(row.autoPick).toBe(false);
     });
 
@@ -1174,9 +1185,9 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(marked).toContain(teamFix[1].id);
 
       const [row] = await db
-        .select({ autoPick: draftTeams.autoPick })
-        .from(draftTeams)
-        .where(eq(draftTeams.teamId, teamFix[1].id));
+        .select({ autoPick: draftParticipants.autoPick })
+        .from(draftParticipants)
+        .where(eq(draftParticipants.teamId, teamFix[1].id));
       expect(row.autoPick).toBe(true);
     });
 
@@ -1207,9 +1218,12 @@ describe('Draft Picks - DB Integration Tests', () => {
 
         // Verify neither team has been incorrectly marked autoPick
         const dtRows = await db
-          .select({ teamId: draftTeams.teamId, autoPick: draftTeams.autoPick })
-          .from(draftTeams)
-          .where(eq(draftTeams.draftId, draft.id));
+          .select({
+            teamId: draftParticipants.teamId,
+            autoPick: draftParticipants.autoPick,
+          })
+          .from(draftParticipants)
+          .where(eq(draftParticipants.draftId, draft.id));
         for (const row of dtRows) {
           expect(row.autoPick).toBe(false);
         }

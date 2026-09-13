@@ -2,7 +2,7 @@
  * Draft domain — candidate pool pre-computation for auto-pick.
  *
  * Extracts Phase 1 logic from scheduled-mutations: deadline pre-check,
- * league status validation, undrafted candidate query, eligibility filtering,
+ * draft status validation, undrafted candidate query, eligibility filtering,
  * stats + positions pre-computation, and bench versatility scoring.
  *
  * All queries run outside the row lock to reduce contention during live drafts.
@@ -16,6 +16,8 @@ import {
 import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq, inArray, sql } from 'drizzle-orm';
+
+import { type DraftRules, loadDraftRules } from './draft-rules';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,11 @@ export interface CandidatePool {
   bestBenchPick: BestBenchPick | undefined;
   /** League settings snapshot (needed for position mapping in scorer). */
   league: typeof PublicSchema.leagues.$inferSelect;
+  /**
+   * The draft's rules — the league-independent view of the same settings, plus
+   * the roster slot list auto-pick's positional awareness needs (LS-10074).
+   */
+  rules: DraftRules;
 }
 
 /** League settings needed for candidate pool queries. */
@@ -77,12 +84,13 @@ export async function fetchCandidatePool(
 ): Promise<CandidatePool | null> {
   // Fast bail-out: check deadline without acquiring any lock
   const preCheckRows = await db.execute(
-    sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId}`,
+    sql`SELECT id, league_id, status, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId}`,
   );
   const preCheckDraft = preCheckRows.rows[0] as
     | {
         id: number;
         league_id: number;
+        status: string;
         current_pick: number;
         current_pick_deadline: Date | null;
       }
@@ -106,16 +114,25 @@ export async function fetchCandidatePool(
     return null;
   }
 
-  // League status check outside transaction — fail fast without holding the row lock
+  // Draft status check outside transaction — fail fast without holding the row
+  // lock. Reads drafts.status rather than leagues.draft_status (LS-10074); the
+  // two are dual-written by every league-draft transition.
+  if (preCheckDraft.status !== 'in-progress') {
+    LOGGER.info(
+      `[autoProcessDraftPicks] Draft ${draftId} is not in-progress, skipping`,
+    );
+    return null;
+  }
+
   const [league] = await db
     .select()
     .from(PublicSchema.leagues)
     .where(eq(PublicSchema.leagues.id, draftLeagueId))
     .limit(1);
 
-  if (!league || league.draftStatus !== 'in-progress') {
+  if (!league) {
     LOGGER.info(
-      `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+      `[autoProcessDraftPicks] League ${draftLeagueId} not found, skipping draft ${draftId}`,
     );
     return null;
   }
@@ -135,6 +152,8 @@ export async function fetchCandidatePool(
     gamesPerMatchup: league.gamesPerMatchup ?? 5,
     pitcherStartsPerMatchup: league.pitcherStartsPerMatchup ?? 1,
   };
+
+  const rules = await loadDraftRules(db, draftId);
 
   // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected FPG
   const eligibleIds = await fetchUndraftedCandidates(
@@ -171,6 +190,7 @@ export async function fetchCandidatePool(
     rankedEligibleIds,
     bestBenchPick,
     league,
+    rules,
   };
 }
 

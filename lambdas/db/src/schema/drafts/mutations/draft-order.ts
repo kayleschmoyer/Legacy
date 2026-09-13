@@ -5,12 +5,13 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import { Draft } from '../types';
+import { getDraftSeats, setLeagueDraftSeatOrder } from '../participants';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
 import { requireEntitlement } from '../../authorization';
@@ -162,59 +163,33 @@ builder.mutationField('setDraftOrder', (t) =>
             );
           }
 
-          // Fetch current draft_teams to validate the provided teamIds
-          // (preserve autoPick/leagueId).
-          const currentTeams = await tx
-            .select({
-              teamId: PublicSchema.draftTeams.teamId,
-              leagueId: PublicSchema.draftTeams.leagueId,
-              autoPick: PublicSchema.draftTeams.autoPick,
-            })
-            .from(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId));
-
-          const currentTeamMap = new Map(
-            currentTeams.map((t) => [
-              t.teamId,
-              { leagueId: t.leagueId, autoPick: t.autoPick },
-            ]),
+          // Fetch the draft's current seats to validate the provided teamIds.
+          const seats = await getDraftSeats(tx, draftId);
+          const seatedTeamIds = new Set(
+            seats
+              .map((seat) => seat.teamId)
+              .filter((id): id is number => id !== null),
           );
 
-          if (teamIds.length !== currentTeamMap.size) {
+          if (teamIds.length !== seatedTeamIds.size) {
             throw UserInputError(
-              `Expected ${String(currentTeamMap.size)} team IDs but received ${String(teamIds.length)}`,
+              `Expected ${String(seatedTeamIds.size)} team IDs but received ${String(teamIds.length)}`,
             );
           }
           for (const id of teamIds) {
-            if (!currentTeamMap.has(id)) {
+            if (!seatedTeamIds.has(id)) {
               throw UserInputError(
                 `Team ${String(id)} is not part of this draft`,
               );
             }
           }
 
-          // Delete and re-insert to avoid unique constraint violation on
-          // (draftId, draftOrder) when the reorder conflicts with existing
-          // orders during per-row updates.
-          await tx
-            .delete(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId));
-          await tx.insert(PublicSchema.draftTeams).values(
-            teamIds.map((teamId, index) => {
-              const meta = currentTeamMap.get(teamId);
-              if (!meta)
-                throw UserInputError(
-                  `Team ${String(teamId)} not found in draft`,
-                );
-              return {
-                draftId,
-                teamId,
-                leagueId: meta.leagueId,
-                draftOrder: index + 1,
-                autoPick: meta.autoPick,
-              };
-            }),
-          );
+          // Permute the seats in place (LS-10074). Each seat keeps its id,
+          // auto-pick flag and controller, so anything referencing the seat
+          // follows its team to the new slot — the delete-and-reinsert this
+          // replaces existed only to dodge draft_teams' NOT DEFERRABLE unique
+          // constraint on (draft_id, draft_order).
+          await setLeagueDraftSeatOrder(tx, draftId, teamIds);
 
           return draft.leagueId;
         });
@@ -265,7 +240,7 @@ builder.mutationField('setDraftOrder', (t) =>
 /**
  * Mutation: Randomize the draft order
  *
- * Shuffles the existing draft_teams positions using a Fisher-Yates shuffle.
+ * Shuffles the draft's existing seat order using a Fisher-Yates shuffle.
  * Only permitted when the draft is 'in-progress' and no picks have been made
  * (currentPick === 0).
  *
@@ -357,15 +332,9 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           }
 
           // Fetch current team IDs in this draft (preserve autoPick and leagueId).
-          const currentTeams = await tx
-            .select({
-              teamId: PublicSchema.draftTeams.teamId,
-              leagueId: PublicSchema.draftTeams.leagueId,
-              autoPick: PublicSchema.draftTeams.autoPick,
-            })
-            .from(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId))
-            .orderBy(asc(PublicSchema.draftTeams.draftOrder));
+          const currentTeams = (await getDraftSeats(tx, draftId))
+            .map((seat) => seat.teamId)
+            .filter((id): id is number => id !== null);
 
           if (currentTeams.length === 0) {
             throw UserInputError('No teams found for this draft');
@@ -378,21 +347,8 @@ builder.mutationField('randomizeDraftOrder', (t) =>
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
 
-          // Delete and re-insert to avoid unique constraint violation on
-          // (draftId, draftOrder) when the shuffled order conflicts with
-          // existing orders during per-row updates.
-          await tx
-            .delete(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId));
-          await tx.insert(PublicSchema.draftTeams).values(
-            shuffled.map((team, index) => ({
-              draftId,
-              teamId: team.teamId,
-              leagueId: team.leagueId,
-              draftOrder: index + 1,
-              autoPick: team.autoPick,
-            })),
-          );
+          // Permute the seats in place — see setDraftOrder above (LS-10074).
+          await setLeagueDraftSeatOrder(tx, draftId, shuffled);
 
           return draft.leagueId;
         });

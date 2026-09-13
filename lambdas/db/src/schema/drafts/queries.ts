@@ -15,6 +15,8 @@ import {
   type DraftRecommendationSignal,
   findTierBreakCandidateIds,
 } from './draft-recommendation-signals';
+import { authorizeDraft, authorizeLoadedDraft } from './authorize-draft';
+import { loadDraftRules } from './draft-rules';
 import {
   countRecentMockDrafts,
   eligibleStatPositionsForUnfilledSlots,
@@ -22,6 +24,7 @@ import {
   getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
+import { getSeatForTeam } from './participants';
 import { effectiveFootballFpg } from './strategies/football';
 import {
   CurrentDraftPick,
@@ -43,9 +46,7 @@ import {
 import {
   hasEntitlement,
   isCommissionerOrOwner,
-  type LeagueMembership,
   requireEntitlement,
-  verifyLeagueMembership,
   verifyLeagueReadAccess,
 } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
@@ -101,15 +102,13 @@ builder.queryField('getDraft', (t) =>
         .where(eq(PublicSchema.drafts.id, args.draftId))
         .limit(1);
 
+      // This field is nullable-on-missing rather than erroring, so the row is
+      // loaded here and authorized via authorizeLoadedDraft (LS-10074) rather
+      // than letting authorizeDraft's 'Draft not found' escape.
       if (!draft) return null;
 
       // Members, spectators of public leagues, and admins may read (LS-8939)
-      await verifyLeagueReadAccess(
-        context.db,
-        draft.leagueId,
-        context.user.id,
-        context.user.isAdmin,
-      );
+      await authorizeLoadedDraft(context, draft, 'read');
 
       return draft;
     },
@@ -131,7 +130,9 @@ builder.queryField('getLeagueDraft', (t) =>
         throw AuthenticationError();
       }
 
-      // Members, spectators of public leagues, and admins may read (LS-8939)
+      // Members, spectators of public leagues, and admins may read (LS-8939).
+      // Guarded on the league, not the draft: this resolver is asked for "the
+      // league's draft" and must answer null when the league has none yet.
       await verifyLeagueReadAccess(
         context.db,
         args.leagueId,
@@ -166,9 +167,8 @@ builder.queryField('getCurrentDraftPick', (t) =>
         throw AuthenticationError();
       }
 
-      // Verify user is a member of the league owning this draft
       const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .select()
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, args.draftId))
         .limit(1);
@@ -176,12 +176,7 @@ builder.queryField('getCurrentDraftPick', (t) =>
       if (!draft) return null;
 
       // Members, spectators of public leagues, and admins may read (LS-8939)
-      await verifyLeagueReadAccess(
-        context.db,
-        draft.leagueId,
-        context.user.id,
-        context.user.isAdmin,
-      );
+      await authorizeLoadedDraft(context, draft, 'read');
 
       try {
         return await getCurrentDraftPickInfo(context.db, args.draftId);
@@ -237,7 +232,7 @@ builder.queryField('getDraftPicks', (t) =>
         const [draft] = await withTransientRetry(
           () =>
             context.db
-              .select({ leagueId: PublicSchema.drafts.leagueId })
+              .select()
               .from(PublicSchema.drafts)
               .where(eq(PublicSchema.drafts.id, draftId))
               .limit(1),
@@ -256,12 +251,7 @@ builder.queryField('getDraftPicks', (t) =>
         }
 
         // Members, spectators of public leagues, and admins may read (LS-8939)
-        await verifyLeagueReadAccess(
-          context.db,
-          draft.leagueId,
-          userId,
-          context.user.isAdmin,
-        );
+        await authorizeLoadedDraft(context, draft, 'read');
 
         const picks = await withTransientRetry(
           () =>
@@ -341,46 +331,20 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         offset: resultOffset,
       } = args;
 
-      // Verify draft exists and get league info for player pool filtering
-      const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, draftId))
-        .limit(1);
-
-      if (!draft) {
-        throw UserInputError('Draft not found');
-      }
-
-      // Verify user is a member of this league (and capture the caller's team
-      // so we can filter the board by their remaining roster requirements).
-      // The explicit LeagueMembership annotation pins the contract to the
-      // authorization helper (which returns the membership incl. teamId) so the
-      // build fails if this is ever swapped for a void-returning namesake.
-      const membership: LeagueMembership = await verifyLeagueMembership(
-        context.db,
-        draft.leagueId,
-        context.user.id,
+      // Verify the caller may draft here, and capture their seat/team so the
+      // board can be filtered by the team's remaining roster requirements.
+      // 'participate' reproduces verifyLeagueMembership exactly — spectators
+      // of a public league are refused, as they were before (LS-10074).
+      const { draft, membership } = await authorizeDraft(
+        context,
+        draftId,
+        'participate',
       );
 
-      // Get league's player pool setting, career minimums, eligibility filters,
-      // and matchup schedule
-      const [league] = await context.db
-        .select({
-          sport: PublicSchema.leagues.sport,
-          playerPool: PublicSchema.leagues.playerPool,
-          minCareerGames: PublicSchema.leagues.minCareerGames,
-          minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
-          gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-          pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
-          baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
-          baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
-          customEraStartYear: PublicSchema.leagues.customEraStartYear,
-          customEraEndYear: PublicSchema.leagues.customEraEndYear,
-        })
-        .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draft.leagueId))
-        .limit(1);
+      // Player pool, career minimums, eligibility filters and the matchup
+      // schedule now arrive as DraftRules rather than a direct leagues read,
+      // so slice 4's mock drafts reach the same board query (LS-10074).
+      const rules = await loadDraftRules(context.db, draftId);
 
       // ---- Build raw SQL conditions (all reference table alias 'p') ----
       const sqlConditions: ReturnType<typeof sql>[] = [];
@@ -392,7 +356,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // — so without this a football draft would list every MLB player as
       // draftable. Baseball leagues are unaffected: every baseball player
       // carries sport='baseball'.
-      const leagueSport = league?.sport ?? 'baseball';
+      const leagueSport = rules.sport;
       const isFootball = leagueSport === 'football';
 
       // The pool-defining predicates — sport, the rostered-player exclusion
@@ -415,8 +379,9 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         draftId,
         leagueId: draft.leagueId,
         leagueSport,
-        league,
+        league: rules,
       });
+
       sqlConditions.push(...poolConditions);
 
       // Exclude already-drafted players via NOT EXISTS (avoids growing literal list)
@@ -492,8 +457,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           context.db,
           draftId,
           membership.teamId,
-          draft.leagueId,
-          leagueSport,
+          rules,
         );
         const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
           unfilledPositionTypes,
@@ -530,8 +494,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // ---- Build SELECT fragments ----
       // Matchup schedule settings for projected points calculation.
       // sql.raw is safe: gpm and spm are integers sourced from our own DB, not user input.
-      const gpm = league?.gamesPerMatchup ?? 5;
-      const spm = league?.pitcherStartsPerMatchup ?? 1;
+      const gpm = rules.gamesPerMatchup ?? 5;
+      const spm = rules.pitcherStartsPerMatchup ?? 1;
       const projMatchupExpr = sql.raw(
         `COALESCE(cs.hitter_avg_ppg, 0) * ${gpm} + COALESCE(cs.pitching_avg_ppg, 0) * ${spm}`,
       );
@@ -844,45 +808,39 @@ builder.queryField('getDraftTeamOrder', (t) =>
 
       const { draftId } = args;
 
-      // Verify draft exists and user is a league member
-      const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, draftId))
-        .limit(1);
-
-      if (!draft) {
-        throw UserInputError('Draft not found');
-      }
-
       // Members, spectators of public leagues, and admins may read (LS-8939)
-      await verifyLeagueReadAccess(
-        context.db,
-        draft.leagueId,
-        context.user.id,
-        context.user.isAdmin,
-      );
+      await authorizeDraft(context, draftId, 'read');
 
-      // Fetch draft_teams joined with team name, sorted by draftOrder
+      // Seats joined with team name, in slot order. `seat_name` is not used:
+      // it snapshots the team name at seat creation, and this field has always
+      // reported the team's current name (LS-10074).
       const rows = await context.db
         .select({
-          teamId: PublicSchema.draftTeams.teamId,
-          draftOrder: PublicSchema.draftTeams.draftOrder,
+          teamId: PublicSchema.draftParticipants.teamId,
+          draftOrder: PublicSchema.draftParticipants.slot,
           teamName: PublicSchema.teams.name,
         })
-        .from(PublicSchema.draftTeams)
+        .from(PublicSchema.draftParticipants)
         .innerJoin(
           PublicSchema.teams,
-          eq(PublicSchema.draftTeams.teamId, PublicSchema.teams.id),
+          eq(PublicSchema.draftParticipants.teamId, PublicSchema.teams.id),
         )
-        .where(eq(PublicSchema.draftTeams.draftId, draftId))
-        .orderBy(asc(PublicSchema.draftTeams.draftOrder));
+        .where(eq(PublicSchema.draftParticipants.draftId, draftId))
+        .orderBy(asc(PublicSchema.draftParticipants.slot));
 
-      return rows.map((row) => ({
-        teamId: row.teamId,
-        teamName: row.teamName,
-        draftOrder: row.draftOrder,
-      }));
+      // The inner join to `teams` already excludes unseated slots; the filter
+      // narrows the nullable seat column for the GraphQL non-null field.
+      return rows.flatMap((row) =>
+        row.teamId === null
+          ? []
+          : [
+              {
+                teamId: row.teamId,
+                teamName: row.teamName,
+                draftOrder: row.draftOrder,
+              },
+            ],
+      );
     },
   }),
 );
@@ -909,16 +867,17 @@ builder.queryField('getMyDraftTeamAutoPick', (t) =>
 
       const { draftId } = args;
 
-      // Get the draft to resolve leagueId
       const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .select()
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
 
       if (!draft) return null;
 
-      // Resolve the user's team in this league
+      // This field answers "does MY seat auto-pick", and has always returned
+      // null — never Forbidden — for a caller with no team here, including a
+      // non-member. Resolve the seat without a guard to preserve that.
       const [membership] = await context.db
         .select({ teamId: PublicSchema.leagueMembers.teamId })
         .from(PublicSchema.leagueMembers)
@@ -932,19 +891,9 @@ builder.queryField('getMyDraftTeamAutoPick', (t) =>
 
       if (!membership?.teamId) return null;
 
-      // Fetch auto-pick flag from draft_teams
-      const [draftTeamEntry] = await context.db
-        .select({ autoPick: PublicSchema.draftTeams.autoPick })
-        .from(PublicSchema.draftTeams)
-        .where(
-          and(
-            eq(PublicSchema.draftTeams.draftId, draftId),
-            eq(PublicSchema.draftTeams.teamId, membership.teamId),
-          ),
-        )
-        .limit(1);
+      const seat = await getSeatForTeam(context.db, draftId, membership.teamId);
 
-      return draftTeamEntry?.autoPick ?? null;
+      return seat?.autoPick ?? null;
     },
   }),
 );
@@ -982,7 +931,7 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
         const [draft] = await withTransientRetry(
           () =>
             context.db
-              .select({ leagueId: PublicSchema.drafts.leagueId })
+              .select()
               .from(PublicSchema.drafts)
               .where(eq(PublicSchema.drafts.id, draftId))
               .limit(1),
@@ -1000,17 +949,17 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
           throw UserInputError('Draft not found');
         }
 
-        await verifyLeagueMembership(context.db, draft.leagueId, userId);
+        await authorizeLoadedDraft(context, draft, 'participate');
 
         const rows = await withTransientRetry(
           () =>
             context.db
               .select({
-                teamId: PublicSchema.draftTeams.teamId,
-                autoPick: PublicSchema.draftTeams.autoPick,
+                teamId: PublicSchema.draftParticipants.teamId,
+                autoPick: PublicSchema.draftParticipants.autoPick,
               })
-              .from(PublicSchema.draftTeams)
-              .where(eq(PublicSchema.draftTeams.draftId, draftId)),
+              .from(PublicSchema.draftParticipants)
+              .where(eq(PublicSchema.draftParticipants.draftId, draftId)),
           {
             onRetry: (attempt, detail) =>
               LOGGER.warn(
@@ -1020,10 +969,13 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
           },
         );
 
-        return rows.map((row) => ({
-          teamId: row.teamId,
-          autoPick: row.autoPick,
-        }));
+        // Seats without a team belong to an unclaimed mock-draft lobby slot
+        // (slice 4) and have no team-keyed auto-pick status to report.
+        return rows.flatMap((row) =>
+          row.teamId === null
+            ? []
+            : [{ teamId: row.teamId, autoPick: row.autoPick }],
+        );
       } catch (error) {
         // Preserve typed client-facing errors (UNAUTHENTICATED / BAD_USER_INPUT
         // / FORBIDDEN) so the client still receives the intended code.
@@ -1302,17 +1254,11 @@ builder.queryField('getDraftRecommendations', (t) =>
       await requireEntitlement(context, ENTITLEMENTS.draft_recommendations);
       const { draftId, teamId } = args;
 
-      // Verify draft exists and caller is a league member
-      const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, draftId))
-        .limit(1);
-      if (!draft) throw UserInputError('Draft not found');
-      const membership = await verifyLeagueMembership(
-        context.db,
-        draft.leagueId,
-        context.user.id,
+      // Verify the draft exists and the caller may draft in it.
+      const { draft, membership } = await authorizeDraft(
+        context,
+        draftId,
+        'participate',
       );
 
       // Recommendations expose a team's projected draft strategy and positional

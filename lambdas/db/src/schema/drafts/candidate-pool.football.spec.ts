@@ -50,6 +50,21 @@ async function loadCandidatePoolModule(): Promise<
     ),
   }));
 
+  // fetchCandidatePool attaches the draft's DraftRules (LS-10074). Those
+  // come from their own loader with its own coverage; stub it so this suite
+  // keeps asserting only the candidate-pool queries it is about.
+  jest.doMock('./draft-rules', () => ({
+    loadDraftRules: jest.fn(async () => ({
+      draftId: DRAFT_ID,
+      kind: 'league',
+      leagueId: LEAGUE_ID,
+      sport: 'football',
+      maxRosterSize: 25,
+      isMock: false,
+      rosterPositions: ['QB', 'RB'],
+    })),
+  }));
+
   // Real @legacy-sports/utils — this test genuinely exercises
   // ALLOWED_POSITIONS_BY_SPORT.football's DL/LB/DB entries (LS-9475).
   return import('./candidate-pool');
@@ -118,6 +133,9 @@ function makeFootballDb(opts: {
             {
               id: DRAFT_ID,
               league_id: LEAGUE_ID,
+              // The pre-check reads drafts.status since LS-10074 — the
+              // separate leagues.draft_status read it replaced is gone.
+              status: 'in-progress',
               current_pick: 1,
               current_pick_deadline: new Date('2020-01-01T00:00:00Z'),
             },

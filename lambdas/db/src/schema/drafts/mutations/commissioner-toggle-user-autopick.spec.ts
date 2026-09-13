@@ -6,8 +6,8 @@
  *  2. Draft not found → BAD_USER_INPUT
  *  3. Non-commissioner membership → FORBIDDEN
  *  4. No membership row → FORBIDDEN
- *  5. League not found / draft not in-progress → BAD_USER_INPUT
- *  6. Team not participating in draft → BAD_USER_INPUT
+ *  5. Draft not in-progress → BAD_USER_INPUT
+ *  6. Team has no seat in the draft → BAD_USER_INPUT
  *  7. Successful enable → true, DB updated, chat message inserted, WS notified
  *  8. Successful disable → false, chat message says "disabled"
  */
@@ -70,9 +70,26 @@ function buildDb(overrides: {
   };
 }
 
+const getSeatForTeamMock = jest.fn();
+const setSeatAutoPickMock = jest.fn().mockResolvedValue(undefined);
+
 function captureResolver(): Resolver {
   jest.resetModules();
   let capturedFn: Resolver | undefined;
+
+  // Default: the target team holds a seat. The "not participating" case
+  // overrides this with null.
+  getSeatForTeamMock
+    .mockReset()
+    .mockResolvedValue({ id: 500, slot: 2, teamId: 2 });
+  setSeatAutoPickMock.mockReset().mockResolvedValue(undefined);
+
+  // Seat reads/writes go through drafts/participants (LS-10074), which has
+  // its own coverage; stub it so this suite stays on the resolver's guards.
+  jest.doMock('../participants', () => ({
+    getSeatForTeam: (...args: unknown[]) => getSeatForTeamMock(...args),
+    setSeatAutoPick: (...args: unknown[]) => setSeatAutoPickMock(...args),
+  }));
 
   jest.doMock('../../builder', () => ({
     builder: {
@@ -92,19 +109,17 @@ function captureResolver(): Resolver {
 
   jest.doMock('@legacy-sports/db-client', () => ({
     PublicSchema: {
-      drafts: { id: 'drafts.id', leagueId: 'drafts.leagueId' },
+      drafts: {
+        id: 'drafts.id',
+        leagueId: 'drafts.leagueId',
+        status: 'drafts.status',
+      },
       leagueMembers: {
         leagueId: 'leagueMembers.leagueId',
         userId: 'leagueMembers.userId',
         permissionLevel: 'leagueMembers.permissionLevel',
       },
       leagues: { id: 'leagues.id', draftStatus: 'leagues.draftStatus' },
-      draftTeams: {
-        draftId: 'draftTeams.draftId',
-        teamId: 'draftTeams.teamId',
-        draftOrder: 'draftTeams.draftOrder',
-        autoPick: 'draftTeams.autoPick',
-      },
       teams: { id: 'teams.id', name: 'teams.name' },
       leagueMessages: {
         leagueId: 'leagueMessages.leagueId',
@@ -121,21 +136,22 @@ function captureResolver(): Resolver {
   return capturedFn;
 }
 
-// Default happy-path DB result sequence:
-//   1st limit → draft row
+// Default happy-path DB result sequence. Since LS-10074 the draft row carries
+// the status the resolver gates on (no separate leagues read) and the seat
+// lookup goes through the mocked participants module (no draft_teams read).
+//   1st limit → draft row (incl. status)
 //   2nd limit → commissioner membership
-//   3rd limit → league in-progress
-//   4th limit → draftTeam entry
-//   5th limit → team name
+//   3rd limit → team name
 function happyPathLimits() {
   return [
-    [{ id: 1, leagueId: 10 }],
+    [{ id: 1, leagueId: 10, status: 'in-progress' }],
     [{ permissionLevel: 'commissioner' }],
-    [{ draftStatus: 'in-progress' }],
-    [{ draftOrder: 2 }],
     [{ name: 'Team Rocket' }],
   ];
 }
+
+/** Index of the team-name lookup inside happyPathLimits(). */
+const TEAM_NAME_LIMIT_INDEX = 2;
 
 // ── UNAUTHENTICATED ───────────────────────────────────────────────────────────
 
@@ -180,7 +196,7 @@ describe('commissionerToggleUserAutoPick error paths', () => {
   it('throws FORBIDDEN when caller has no membership', async () => {
     const { db } = buildDb({
       limitResults: [
-        [{ id: 1, leagueId: 10 }], // draft found
+        [{ id: 1, leagueId: 10, status: 'in-progress' }], // draft found
         [], // no membership row
       ],
     });
@@ -197,7 +213,7 @@ describe('commissionerToggleUserAutoPick error paths', () => {
   it('throws FORBIDDEN when caller is not commissioner', async () => {
     const { db } = buildDb({
       limitResults: [
-        [{ id: 1, leagueId: 10 }],
+        [{ id: 1, leagueId: 10, status: 'in-progress' }],
         [{ permissionLevel: 'member' }],
       ],
     });
@@ -211,12 +227,11 @@ describe('commissionerToggleUserAutoPick error paths', () => {
     ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
   });
 
-  it('throws BAD_USER_INPUT when league not found', async () => {
+  it('throws BAD_USER_INPUT when the draft row carries no in-progress status', async () => {
     const { db } = buildDb({
       limitResults: [
-        [{ id: 1, leagueId: 10 }],
+        [{ id: 1, leagueId: 10, status: 'not-started' }],
         [{ permissionLevel: 'commissioner' }],
-        [], // no league row
       ],
     });
     const ctx = {
@@ -235,9 +250,8 @@ describe('commissionerToggleUserAutoPick error paths', () => {
   it('throws BAD_USER_INPUT when draft is not in-progress', async () => {
     const { db } = buildDb({
       limitResults: [
-        [{ id: 1, leagueId: 10 }],
+        [{ id: 1, leagueId: 10, status: 'completed' }],
         [{ permissionLevel: 'commissioner' }],
-        [{ draftStatus: 'completed' }],
       ],
     });
     const ctx = {
@@ -256,12 +270,11 @@ describe('commissionerToggleUserAutoPick error paths', () => {
   it('throws BAD_USER_INPUT when team is not participating in draft', async () => {
     const { db } = buildDb({
       limitResults: [
-        [{ id: 1, leagueId: 10 }],
+        [{ id: 1, leagueId: 10, status: 'in-progress' }],
         [{ permissionLevel: 'commissioner' }],
-        [{ draftStatus: 'in-progress' }],
-        [], // no draftTeam row
       ],
     });
+    getSeatForTeamMock.mockResolvedValue(null); // team holds no seat
     const ctx = {
       user: { id: 5, username: 'alice' },
       db,
@@ -285,7 +298,7 @@ describe('commissionerToggleUserAutoPick success paths', () => {
   });
 
   it('enables auto-pick: returns true, updates DB, inserts chat message, notifies WS', async () => {
-    const { db, mockUpdate, mockInsert } = buildDb({
+    const { db, mockInsert } = buildDb({
       limitResults: happyPathLimits(),
       insertReturning: [{ id: 55, timestamp: '2024-06-01T12:00:00Z' }],
     });
@@ -307,8 +320,13 @@ describe('commissionerToggleUserAutoPick success paths', () => {
 
     expect(result).toBe(true);
 
-    // DB update was called
-    expect(mockUpdate).toHaveBeenCalled();
+    // The seat's auto-pick flag was written
+    expect(setSeatAutoPickMock).toHaveBeenCalledWith(db, {
+      draftId: 1,
+      leagueId: 10,
+      teamIds: [2],
+      autoPick: true,
+    });
 
     // Chat message was inserted
     expect(mockInsert).toHaveBeenCalled();
@@ -376,7 +394,7 @@ describe('commissionerToggleUserAutoPick success paths', () => {
 
   it('uses fallback team name when team row is missing', async () => {
     const limits = happyPathLimits();
-    limits[4] = []; // team lookup returns nothing
+    limits[TEAM_NAME_LIMIT_INDEX] = []; // team lookup returns nothing
     const { db, mockInsert } = buildDb({ limitResults: limits });
 
     const notifyMock = jest.fn().mockResolvedValue(undefined);

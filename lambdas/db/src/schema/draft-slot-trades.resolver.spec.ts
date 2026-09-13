@@ -59,11 +59,17 @@ describe('Draft Slot Trades Resolver', () => {
           createdAt: 'createdAt',
           updatedAt: 'updatedAt',
         },
-        draftTeams: {
+        // Seats replaced draft_teams for the draft domain (LS-10074).
+        draftParticipants: {
+          id: 'id',
           draftId: 'draftId',
+          slot: 'slot',
           teamId: 'teamId',
           leagueId: 'leagueId',
-          draftOrder: 'draftOrder',
+          userId: 'userId',
+          controller: 'controller',
+          seatName: 'seatName',
+          autoPick: 'autoPick',
         },
         drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
         teams: {
@@ -628,23 +634,24 @@ describe('Draft Slot Trades Resolver', () => {
         values: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        // The slot swap is one UPDATE ... FROM (VALUES ...) statement since
+        // LS-10074 — draft_participants_uk_draft_slot is deferrable, so the
+        // old 3-statement sentinel dance is gone.
+        execute: jest.fn().mockResolvedValue({ rows: [] }),
       };
       mockTx.where
         .mockResolvedValueOnce({ rowCount: 1 }) // 1. claim: accepted -> approved
         .mockReturnValueOnce(mockTx) // 2. getActiveDraftId chain (-> orderBy().limit())
-        .mockReturnValueOnce(mockTx) // 3. ensureDraftTeamsSeeded existing-check chain (-> limit())
+        .mockReturnValueOnce(mockTx) // 3. seat existing-check chain (-> limit())
         .mockResolvedValueOnce([
-          // 4. swapDraftOrder: current draft_teams rows for both sides
-          { teamId: 5, draftOrder: 3 },
-          { teamId: 9, draftOrder: 7 },
+          // 4. swapLeagueDraftSeats: current seats for both sides
+          { teamId: 5, slot: 3 },
+          { teamId: 9, slot: 7 },
         ])
-        .mockResolvedValueOnce(undefined) // 5. sentinel update
-        .mockResolvedValueOnce(undefined) // 6. counterpart <- proposer's order
-        .mockResolvedValueOnce(undefined) // 7. proposer <- counterpart's order
-        .mockResolvedValueOnce(undefined); // 8. final status -> executed
+        .mockResolvedValueOnce(undefined); // 5. final status -> executed
       mockTx.limit
         .mockResolvedValueOnce([{ id: 77 }]) // getActiveDraftId
-        .mockResolvedValueOnce([{ teamId: 1 }]); // ensureDraftTeamsSeeded: rows already exist
+        .mockResolvedValueOnce([{ id: 1 }]); // seats already exist
 
       mockDb.transaction = jest.fn(
         async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
