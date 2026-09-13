@@ -3,17 +3,24 @@ import { describe, expect, it, jest } from '@jest/globals';
 jest.mock('./run-target.js', () => ({ runTarget: jest.fn() }));
 jest.mock('./resolve-test-target.js', () => ({
   resolveTestTargetPlan: jest.fn(),
+  targetShellJoinsArgs: jest.fn(),
 }));
 jest.mock('../run-command.js', () => ({ getRepoRoot: jest.fn(() => '/repo') }));
 
 import { runTest } from './run-test.js';
 import { runTarget } from './run-target.js';
-import { resolveTestTargetPlan } from './resolve-test-target.js';
+import {
+  resolveTestTargetPlan,
+  targetShellJoinsArgs,
+} from './resolve-test-target.js';
 import type { ToolResult } from '../types.js';
 
 const mockRunTarget = runTarget as jest.MockedFunction<typeof runTarget>;
 const mockResolveTestTargetPlan = resolveTestTargetPlan as jest.MockedFunction<
   typeof resolveTestTargetPlan
+>;
+const mockTargetShellJoinsArgs = targetShellJoinsArgs as jest.MockedFunction<
+  typeof targetShellJoinsArgs
 >;
 
 function stubResult(): ToolResult {
@@ -27,7 +34,9 @@ describe('runTest', () => {
     mockResolveTestTargetPlan.mockResolvedValue({
       kind: 'single',
       target: 'test',
+      shellJoinsArgs: false,
     });
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
   });
 
   it('maps config to a colon-suffixed target without consulting the target plan', async () => {
@@ -241,7 +250,9 @@ describe('runTest testPathPatterns validation (ReDoS mitigation)', () => {
     mockResolveTestTargetPlan.mockResolvedValue({
       kind: 'single',
       target: 'test',
+      shellJoinsArgs: false,
     });
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
   });
 
   it('rejects a testPathPatterns value over the length cap without calling runTarget', async () => {
@@ -353,7 +364,9 @@ describe('runTest report mode (LS-10092)', () => {
     mockResolveTestTargetPlan.mockResolvedValue({
       kind: 'single',
       target: 'test',
+      shellJoinsArgs: false,
     });
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
   });
 
   it('does not pass jestReport when report is omitted', async () => {
@@ -488,5 +501,164 @@ describe('runTest report mode (LS-10092)', () => {
     const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
     expect(body.failures).toBeUndefined();
     expect(body.numFailedTests).toBeUndefined();
+  });
+});
+
+describe('runTest multi-word pattern quoting (LS-10153)', () => {
+  const MULTI_WORD =
+    'createLeagueAndTeams mutation — keeper entitlement gate (LS-8385)';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRunTarget.mockResolvedValue(stubResult());
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'single',
+      target: 'test',
+      shellJoinsArgs: false,
+    });
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
+  });
+
+  function argsOf(): string[] {
+    return mockRunTarget.mock.calls[0][0].args as string[];
+  }
+
+  it('quotes a multi-word testNamePattern for an nx:run-script target so it stays one argument', async () => {
+    mockTargetShellJoinsArgs.mockResolvedValue(true);
+
+    await runTest({
+      project: 'db',
+      config: 'all-files',
+      testPathPatterns: 'leagues.resolver',
+      testNamePattern: MULTI_WORD,
+    });
+
+    expect(mockTargetShellJoinsArgs).toHaveBeenCalledWith(
+      'db',
+      'test:all-files',
+      '/repo',
+    );
+    expect(argsOf()).toEqual([
+      '--testPathPatterns',
+      'leagues.resolver',
+      '--testNamePattern',
+      `'${MULTI_WORD}'`,
+    ]);
+  });
+
+  it('leaves no bare word after the flag that Jest could read as an extra path pattern', async () => {
+    mockTargetShellJoinsArgs.mockResolvedValue(true);
+
+    await runTest({
+      project: 'db',
+      config: 'all-files',
+      testPathPatterns: 'leagues.resolver',
+      testNamePattern: 'keeper entitlement gate',
+    });
+
+    // The pre-fix bug: "entitlement" and "gate" survived the shell re-split
+    // as positionals and joined the path-pattern set.
+    const args = argsOf();
+    expect(args).toHaveLength(4);
+    expect(args).not.toContain('entitlement');
+    expect(args).not.toContain('gate');
+  });
+
+  it('quotes a testPathPatterns value containing spaces too', async () => {
+    mockTargetShellJoinsArgs.mockResolvedValue(true);
+
+    await runTest({
+      project: 'db',
+      config: 'all-files',
+      testPathPatterns: 'my specs/leagues.resolver',
+    });
+
+    expect(argsOf()).toEqual([
+      '--testPathPatterns',
+      "'my specs/leagues.resolver'",
+    ]);
+  });
+
+  it('negative control: single-word patterns are unquoted and skip the executor lookup', async () => {
+    mockTargetShellJoinsArgs.mockResolvedValue(true);
+
+    await runTest({
+      project: 'db',
+      config: 'all-files',
+      testPathPatterns: 'leagues.resolver',
+      testNamePattern: 'keeper',
+    });
+
+    // Nothing can be word-split, so the `nx show project` spawn is skipped.
+    expect(mockTargetShellJoinsArgs).not.toHaveBeenCalled();
+    expect(argsOf()).toEqual([
+      '--testPathPatterns',
+      'leagues.resolver',
+      '--testNamePattern',
+      'keeper',
+    ]);
+  });
+
+  it('negative control: a jest-executor target gets the raw value, quotes would enter the regex', async () => {
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
+
+    await runTest({
+      project: 'shared-components',
+      config: 'web',
+      testPathPatterns: 'LeagueListRow',
+      testNamePattern: MULTI_WORD,
+    });
+
+    expect(argsOf()).toEqual([
+      '--testPathPatterns',
+      'LeagueListRow',
+      '--testNamePattern',
+      MULTI_WORD,
+    ]);
+  });
+
+  it('quotes for a plain "test" target the plan reports as shell-joining', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'single',
+      target: 'test',
+      shellJoinsArgs: true,
+    });
+
+    await runTest({
+      project: 'db',
+      testPathPatterns: 'leagues.resolver',
+      testNamePattern: MULTI_WORD,
+    });
+
+    expect(mockTargetShellJoinsArgs).not.toHaveBeenCalled();
+    expect(argsOf()).toEqual([
+      '--testPathPatterns',
+      'leagues.resolver',
+      '--testNamePattern',
+      `'${MULTI_WORD}'`,
+    ]);
+  });
+
+  it('does not quote fanned-out jest targets, which receive argv untouched', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'fanout',
+      targets: ['test:web', 'test:mobile'],
+      skipped: [],
+    });
+
+    await runTest({
+      project: 'shared-components',
+      testPathPatterns: 'LeagueListRow',
+      testNamePattern: MULTI_WORD,
+    });
+
+    for (const call of mockRunTarget.mock.calls) {
+      expect(call[0].args).toEqual([
+        '--testPathPatterns',
+        'LeagueListRow',
+        '--testNamePattern',
+        MULTI_WORD,
+      ]);
+    }
   });
 });

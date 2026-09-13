@@ -1,10 +1,14 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { newJestReportFile } from './jest-report-result.js';
 import type { JestReportMode } from './jest-report-result.js';
-import { resolveTestTargetPlan } from './resolve-test-target.js';
+import {
+  resolveTestTargetPlan,
+  targetShellJoinsArgs,
+} from './resolve-test-target.js';
 import { runTarget } from './run-target.js';
 import { MAX_FAILURES } from '../jest-report.js';
 import { getRepoRoot } from '../run-command.js';
+import { quoteForShellJoin } from '../shell-join-quote.js';
 import type { ToolResult } from '../types.js';
 
 export interface RunTestParams {
@@ -47,13 +51,35 @@ function validatePattern(paramName: string, value: string): string | null {
   return null;
 }
 
+/** Whether either pattern value could be split by a shell word-split. */
+function hasWhitespaceValue(params: RunTestParams): boolean {
+  return (
+    /\s/.test(params.testPathPatterns) ||
+    /\s/.test(params.testNamePattern ?? '')
+  );
+}
+
+/**
+ * `shellJoinsArgs` is set when the resolved target runs through
+ * `nx:run-script`, which joins the `--` passthrough into a single shell
+ * command string. Multi-word pattern values then re-split into separate
+ * shell words — the first word survives as the flag's value and the rest
+ * reach Jest as bare positionals, i.e. extra test path patterns (LS-10153).
+ * Pre-quoting the values keeps each one a single word; on every other
+ * executor the values are passed through verbatim, since quote characters
+ * would otherwise land inside the Jest regex.
+ */
 function runJestTarget(
   params: RunTestParams,
   target: string,
+  shellJoinsArgs: boolean,
 ): Promise<ToolResult> {
-  const args = ['--testPathPatterns', params.testPathPatterns];
+  const quote = (value: string) =>
+    shellJoinsArgs ? quoteForShellJoin(value) : value;
+
+  const args = ['--testPathPatterns', quote(params.testPathPatterns)];
   if (params.testNamePattern) {
-    args.push('--testNamePattern', params.testNamePattern);
+    args.push('--testNamePattern', quote(params.testNamePattern));
   }
   return runTarget({
     project: params.project,
@@ -208,11 +234,21 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
     };
   }
 
+  const cwd = params.worktreePath || getRepoRoot();
+
   if (params.config) {
-    return runJestTarget(params, `test:${params.config}`);
+    const target = `test:${params.config}`;
+    // The executor lookup costs an `nx show project --json` spawn, which on a
+    // cold project graph is seconds the caller's sync budget has to absorb.
+    // Only a value with whitespace in it can be split by a shell-joining
+    // executor, so single-word patterns — the common case — skip the lookup
+    // and keep this path as fast as it was before LS-10153.
+    const shellJoinsArgs =
+      hasWhitespaceValue(params) &&
+      (await targetShellJoinsArgs(params.project, target, cwd));
+    return runJestTarget(params, target, shellJoinsArgs);
   }
 
-  const cwd = params.worktreePath || getRepoRoot();
   const plan = await resolveTestTargetPlan(params.project, cwd);
 
   if (plan.kind === 'error') {
@@ -223,13 +259,15 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
   }
 
   if (plan.kind === 'single') {
-    return runJestTarget(params, plan.target);
+    return runJestTarget(params, plan.target, plan.shellJoinsArgs);
   }
 
   const perTarget = await Promise.all(
     plan.targets.map(async (target) => ({
       target,
-      result: await runJestTarget(params, target),
+      // Fan-out targets are jest-executor deps only — argv is forwarded
+      // untouched, so no shell-join quoting applies.
+      result: await runJestTarget(params, target, false),
     })),
   );
 
