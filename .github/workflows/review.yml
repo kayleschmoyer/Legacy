@@ -177,18 +177,25 @@ jobs:
     # (LS-8299 / LS-9209) — the failure mode the budget exists to avoid.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 22
+      # Minted FIRST, before checkout, so the dead-letter step at the end of
+      # this job still has working credentials when the job is cancelled
+      # (LS-10122). It previously sat after checkout, which is exactly where
+      # the observed cancellation landed — so the terminal-status guard ran
+      # with an EMPTY GH_TOKEN and its status read silently returned nothing.
+      # An installation token is valid for an hour, comfortably longer than
+      # this job's 30m timeout.
       - name: Generate reviewer app token
         id: reviewer-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
       - name: Configure AWS credentials
         continue-on-error: true # telemetry is best-effort; don't block review on auth failure
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
@@ -234,15 +241,95 @@ jobs:
           else
             echo "Skipping reviewer: .github/scripts/reviewer/index.mjs not found."
           fi
-      - name: Fail visibly on unrecovered reviewer crash
+      # Dead-letter for a review cycle that never adjudicated this SHA
+      # (LS-10122). LS-8299 made a *crashed* reviewer fail visibly, but its
+      # condition is `run-reviewer.outcome == 'failure'` — and a CANCELLED job
+      # never runs that step at all, so its outcome is `skipped` and the guard
+      # reported "invariant holds" while bot-review was left sitting on the
+      # LS-9209 pending footprint. Observed on PR #7961: the review job was
+      # cancelled 7s after it started on the runner, this step passed, and
+      # bot-review stayed pending "Review cycle starting — awaiting Reviewer
+      # (W1)" for 45 minutes as the PR's sole merge blocker. Nothing recovers
+      # that on its own: merge-queue-processor.js's remediateStaleBotReview is
+      # the designed healer, but merge-queue.yml has no schedule trigger by
+      # design (LS-8289), so on a quiet repo nothing ever wakes it and the
+      # stall is unbounded rather than the ~45min that was observed.
+      #
+      # So: whenever this run ends without a terminal bot-review status on the
+      # SHA it was dispatched for, write one. A loud failure is recoverable by
+      # every path that already exists (the author agent's label cycle, the
+      # merge queue, human arbitration); a silent pending is recoverable by
+      # none of them.
+      #
+      # Two stand-down conditions keep this from stealing a live cycle:
+      #   1. Another Reviewer (W1) run is still in flight for this same SHA —
+      #      i.e. this run was cancelled by a newer run in the same
+      #      `reviewer-<pr>-active` concurrency group. The successor owns the
+      #      status; posting a failure here would clobber a working cycle.
+      #   2. The PR head has moved past this SHA — the status no longer gates
+      #      anything, so failing it is pure noise.
+      # Anything that prevents us from confirming those (no token, an API
+      # error) also stands down: a missed dead-letter is the pre-existing
+      # behaviour, but a wrong one breaks a healthy review.
+      - name: Ensure a terminal bot-review status
         if: always()
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+          REVIEWER_OUTCOME: ${{ steps.run-reviewer.outcome }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          sha="${{ github.event.pull_request.head.sha }}"
-          state=$(gh api "repos/${{ github.repository }}/commits/$sha/status" --jq '.statuses[]? | select(.context=="bot-review") | .state' | head -1)
-          if [ "${{ steps.run-reviewer.outcome }}" = "failure" ] && { [ -z "$state" ] || [ "$state" = "pending" ]; }; then
-            echo "::error::Reviewer crashed on $sha and left bot-review as '${state:-<none>}' instead of a terminal status (LS-8299 invariant broken)"
+          set -uo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::No app token available - cannot verify or repair bot-review on ${SHA}"
+            exit 0
+          fi
+
+          state=$(gh api "repos/${REPO}/commits/${SHA}/status" \
+            --jq '[.statuses[]? | select(.context=="bot-review")] | sort_by(.created_at) | last | .state // empty' 2>/dev/null)
+          echo "bot-review=${state:-<none>}, run-reviewer outcome=${REVIEWER_OUTCOME:-<none>}, job status=${JOB_STATUS}"
+
+          case "${state}" in
+            success | failure | error)
+              echo "Terminal bot-review status already present - invariant holds."
+              exit 0
+              ;;
+          esac
+
+          # Stand-down 1: a successor run owns this SHA.
+          in_flight=$(gh api \
+            "repos/${REPO}/actions/workflows/review.yml/runs?head_sha=${SHA}&per_page=100" \
+            --jq "[.workflow_runs[]? | select(.id != ${RUN_ID}) | select(.status != \"completed\")] | length" 2>/dev/null)
+          if [ -z "${in_flight}" ]; then
+            echo "::warning::Could not list Reviewer runs for ${SHA} - standing down (a successor may be in flight)"
+            exit 0
+          fi
+          if [ "${in_flight}" -gt 0 ]; then
+            echo "${in_flight} Reviewer (W1) run(s) still in flight for ${SHA} - they own the status; standing down."
+            exit 0
+          fi
+
+          # Stand-down 2: the PR has moved on from this SHA.
+          head_now=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null)
+          if [ -n "${head_now}" ] && [ "${head_now}" != "${SHA}" ]; then
+            echo "PR head is now ${head_now} - ${SHA} is superseded; standing down."
+            exit 0
+          fi
+
+          echo "::warning::Reviewer (W1) run ${RUN_ID} ended as '${JOB_STATUS}' leaving bot-review='${state:-<none>}' on ${SHA} - posting a terminal failure (LS-10122)"
+          gh api -X POST "repos/${REPO}/statuses/${SHA}" \
+            -f state=failure \
+            -f context=bot-review \
+            -f "description=Reviewer (W1) ended as ${JOB_STATUS} without reviewing - re-cycle bot:ready-for-review (LS-10122)" \
+            -f "target_url=https://github.com/${REPO}/actions/runs/${RUN_ID}" > /dev/null
+
+          # Preserve the LS-8299 signal: a reviewer that ran and crashed still
+          # fails the job visibly, on top of the terminal status just posted.
+          if [ "${REVIEWER_OUTCOME}" = "failure" ]; then
+            echo "::error::Reviewer crashed on ${SHA} and left bot-review as '${state:-<none>}' instead of a terminal status (LS-8299 invariant broken)"
             exit 1
           fi
-          echo "bot-review=${state:-<none>}, run-reviewer outcome=${{ steps.run-reviewer.outcome }} - invariant holds"
