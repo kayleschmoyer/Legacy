@@ -736,18 +736,20 @@ export function EliteDraftBoardScreen({
   // value below is only consumed by the wide-viewport branch's `.d-layout`
   // div — see `layoutGridStyle` near that JSX.
   //
-  // `$md`/`$lg` derive from `@legacy-sports/design-tokens` `breakpoints`
-  // (LS-9885/9896), the same scale `styles.ts`'s `BP_TABLET_MAX`/`BP_LAND_MAX`
-  // already use (`breakpoints.lg - 1` / `breakpoints.xl - 1`), so this
-  // reproduces the exact same 979px/1119px boundaries as the CSS it replaces
-  // — not the 1034px figure that appears in some ticket descriptions of this
-  // work, which doesn't match any breakpoint actually defined in this file.
+  // `$md`/`$lg`/`$xxl` derive from `@legacy-sports/design-tokens`
+  // `breakpoints` (LS-9885/9896), the same scale `styles.ts`'s
+  // `BP_TABLET_MAX`/`BP_LAND_MAX` already use (`breakpoints.lg - 1` /
+  // `breakpoints.xl - 1`), so this reproduces the exact same 979px/1119px
+  // boundaries as the CSS it replaces — not the 1034px figure that appears
+  // in some ticket descriptions of this work, which doesn't match any
+  // breakpoint actually defined in this file. `$xxl` (LS-10162) is the
+  // ≥1280px wide-desktop band (a `minWidth` query — see tamagui-config.ts).
   //
   // Bound through an explicit signature so the call/result stay type-safe
   // under this project's typed ESLint rules (same pattern as PreDraftLobby's
   // `readMedia`/`iconFontSize`).
   const readMedia = useMedia as
-    | (() => { md?: boolean; lg?: boolean })
+    | (() => { md?: boolean; lg?: boolean; xxl?: boolean })
     | undefined;
   const media = readMedia?.() ?? {};
 
@@ -1361,27 +1363,42 @@ export function EliteDraftBoardScreen({
 
   // ---- Main Live Draft UI: wide-viewport branch ----
   //
-  // `.d-layout`'s three responsive states (LS-10067), reproducing
-  // styles.ts's `BP_TABLET_MAX`/`BP_LAND_MAX` media queries via `media` from
-  // `useMedia()` above rather than raw CSS:
-  //   - `media.md` (≤979, the tablet tier `isCompact` doesn't already cover
-  //     as `phone`): rail stacks above main as a single column.
-  //   - `media.lg && !media.md` (980–1119): side rail, narrowed to 280px.
-  //   - neither (≥1120): side rail at its full 320px.
+  // `.d-layout`'s responsive states (LS-10067), reproducing styles.ts's
+  // `BP_TABLET_MAX`/`BP_LAND_MAX` media queries via `media` from
+  // `useMedia()` above rather than raw CSS, matched against the design
+  // bundle's adaptive.css (docs/design/.../legacy-sports-draft-board):
+  //   - `media.md` (≤979): rail becomes a shelf BELOW main, not above it
+  //     (adaptive.css:175 — LS-10162 fixed the area order here, which had
+  //     the rail on top).
+  //   - `media.lg && !media.md` (980–1119): side rail at 300px
+  //     (adaptive.css:216).
+  //   - `media.xl && !media.lg` (1120–1279): side rail at its full 320px
+  //     (adaptive.css:223 — unchanged, already correct).
+  //   - `media.xxl` (≥1280): side rail at 340px (adaptive.css:230). The
+  //     design has a further split to 360px at ≥1400 (adaptive.css:243),
+  //     but the design-token scale (breakpoints.ts) tops out at `xxl`
+  //     (1280+) with no 1400 band, so that split is a deliberate,
+  //     recorded deviation rather than implemented here.
   // The base `.d-layout` class (styles.ts) still supplies everything this
   // doesn't touch — position, height, overflow, z-index — this only
   // overrides the grid template, the same `gridArea`-needs-a-`style`-escape-
   // hatch tradeoff DraftRail.tsx/DraftTopBand.tsx/DraftPlayerBoard.tsx
   // already make for their own placement within this grid.
   const isNarrowDesktopRail = Boolean(media.lg) && !media.md;
+  const isWideDesktopRail = Boolean(media.xxl);
+  const desktopRailWidth = isNarrowDesktopRail
+    ? 300
+    : isWideDesktopRail
+      ? 340
+      : 320;
   const layoutGridStyle: React.CSSProperties = media.md
     ? {
         gridTemplateColumns: '1fr',
         gridTemplateRows: 'auto auto 1fr',
-        gridTemplateAreas: '"topband" "rail" "main"',
+        gridTemplateAreas: '"topband" "main" "rail"',
       }
     : {
-        gridTemplateColumns: isNarrowDesktopRail ? '1fr 280px' : '1fr 320px',
+        gridTemplateColumns: `1fr ${desktopRailWidth}px`,
         gridTemplateRows: 'auto 1fr',
         gridTemplateAreas: '"topband topband" "main rail"',
       };

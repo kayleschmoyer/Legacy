@@ -1036,21 +1036,25 @@ export const CSS = `
    overrides the rules it sets. The side rail is still a column here, but
    narrower, and the depth chart drops to three. Was \`max-width: 1200px\`:
    moved onto the token boundary so 1120–1199 keeps the wide-desktop rail the
-   mock specifies for its $xl band rather than the narrow one (LS-9860). */
+   mock specifies for its $xl band rather than the narrow one (LS-9860).
+   Width matches the design bundle's adaptive.css:216 (300px) — LS-10162
+   fixed this from 280px. */
 @media (max-width: ${BP_LAND_MAX}px) {
-  .d-layout { grid-template-columns: 1fr 280px; }
+  .d-layout { grid-template-columns: 1fr 300px; }
   .d-depth-grid { grid-template-columns: repeat(3, 1fr); }
 }
 /* $sm/$md — tablet (800–979). The rail stops being a column and becomes a
-   collapsible shelf above the player pool. Was \`max-width: 900px\`, which
-   left 901–979 rendering the desktop side-rail layout where the mock's
-   \`@container vp (max-width: 979px)\` block specifies the stacked
-   treatment — the defect LS-9860 exists to fix. */
+   collapsible shelf BELOW the player pool (adaptive.css:175). Was
+   \`max-width: 900px\`, which left 901–979 rendering the desktop side-rail
+   layout where the mock's \`@container vp (max-width: 979px)\` block
+   specifies the stacked treatment — the defect LS-9860 exists to fix.
+   The area order itself ("topband" "rail" "main") also had the rail
+   stacked ABOVE main rather than below as a shelf — fixed by LS-10162. */
 @media (max-width: ${BP_TABLET_MAX}px) {
   .d-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
-    grid-template-areas: "topband" "rail" "main";
+    grid-template-areas: "topband" "main" "rail";
   }
   .d-rail {
     border-left: none;
@@ -1081,6 +1085,15 @@ export const CSS = `
   .d-rail.collapsed .d-rail-content { display: none; }
   .d-depth-grid { grid-template-columns: repeat(2, 1fr); }
   .d-topband { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
+}
+/* $xxl — wide desktop (≥1280). The base \`.d-layout\` rule (320px, above)
+   covers the $xl band (1120–1279); this widens the rail to match
+   adaptive.css:230. The design further widens to 360px at ≥1400
+   (adaptive.css:243), but the design-token scale (breakpoints.ts) has no
+   band past $xxl (1280+) — recorded as a deliberate deviation (LS-10162)
+   rather than introducing a one-off breakpoint outside that scale. */
+@media (min-width: ${breakpoints.xxl}px) {
+  .d-layout { grid-template-columns: 1fr 340px; }
 }
 /* $xxs/$xs — phone (≤799). \`EliteDraftBoardScreen\` swaps the whole board
    for \`CompactLiveDraftBoard\` at this tier, so these rules only bite for
