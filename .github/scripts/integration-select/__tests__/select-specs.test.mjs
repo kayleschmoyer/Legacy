@@ -173,6 +173,36 @@ describe('matchesAny', () => {
 
 // Keeps the manifest honest: every integration spec on disk must be mapped,
 // and the manifest must not reference specs that no longer exist.
+describe('integration-surface-map.json shared-setup selection (LS-10138)', () => {
+  const manifestPath = path.join(
+    REPO_ROOT,
+    'apps/web-e2e/src/integration/integration-surface-map.json',
+  );
+
+  // Playwright runs globalSetup/globalTeardown before and after EVERY
+  // integration spec, and both import test-league-cleanup. A change to any of
+  // them can break the whole suite, so they must select every spec — the
+  // under-selection the selector explicitly designs against.
+  //
+  // They previously matched nothing: `runAllWhenChanged` covered
+  // `integration/helpers/**` and `integration/fixtures/**`, but these three sit
+  // directly in `integration/`. A PR editing only them selected zero specs, so
+  // the integration job skipped and the PR could not obtain integration
+  // evidence for the very files that gate every run.
+  for (const file of [
+    'apps/web-e2e/src/integration/global-setup.ts',
+    'apps/web-e2e/src/integration/global-teardown.ts',
+    'apps/web-e2e/src/integration/test-league-cleanup.ts',
+  ]) {
+    it(`runs ALL specs when ${path.basename(file)} changes`, () => {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const r = selectSpecs({ changedFiles: [file], manifest });
+      assert.equal(r.runAll, true);
+      assert.equal(r.specs.length, Object.keys(manifest.specs).length);
+    });
+  }
+});
+
 describe('integration-surface-map.json coverage', () => {
   const manifestPath = path.join(
     REPO_ROOT,

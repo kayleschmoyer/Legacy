@@ -26,6 +26,18 @@ const TEST_LEAGUE_PATTERNS = [
   // Including it here is safe because cleanup is scoped to the commissioner
   // test user only — never touches other users' practice drafts.
   'Mock Draft Practice',
+  // Dual-mode seeded leagues (`fixtures/test-data.ts`) are the two live-backend
+  // names that carry no `E2E` marker, so they matched none of the patterns
+  // above and were never cleanup candidates (LS-10138 — the same silent-leak
+  // failure mode this docblock warns about, and LS-4539 before it).
+  //
+  // `Dual QR Invite` is the one that bites hardest: a *premium* manager persona
+  // joins it via `joinLeagueByCode` (`TestData.inviteJoin` → `loginAs('premium',
+  // 1)` → MANAGER_2), so each leaked league permanently consumes one of that
+  // shared persona's membership slots. Two of them had accrued over 2+ days and
+  // pinned MANAGER_2 at 3/3.
+  'Dual QR Invite',
+  'Dual Scoring Editor',
   // All UI integration tests use "<Label> E2E <timestamp>" naming
   /\bE2E\b/,
 ];

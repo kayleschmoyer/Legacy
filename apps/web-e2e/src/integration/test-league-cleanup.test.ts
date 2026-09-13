@@ -40,6 +40,15 @@ void test('isTestLeague matches every spec-produced name pattern', () => {
   assert.equal(isTestLeague('Trade Flow E2E 1715731200000'), true);
 });
 
+// LS-10138: the two dual-mode seeded league names carry no `E2E` marker, so
+// they matched no pattern and silently accumulated on the shared personas.
+// `Dual QR Invite` is joined by premium MANAGER_2, so each leak consumed one of
+// that persona's 3 membership slots until the pre-flight aborted every run.
+void test('isTestLeague matches the dual-mode seeded league names', () => {
+  assert.equal(isTestLeague('Dual QR Invite 1715731200000'), true);
+  assert.equal(isTestLeague('Dual Scoring Editor 1715731200000'), true);
+});
+
 void test('isTestLeague rejects user-created leagues', () => {
   assert.equal(isTestLeague('My Real League'), false);
   assert.equal(isTestLeague('The 2024 Champs'), false);

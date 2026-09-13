@@ -472,12 +472,53 @@ async function sweepStaleLeaguesByManagerMembership(
  * unrelated-looking UI assertion (the sweep skipping "young leagues likely in
  * active use" under heavy concurrent-run overlap is the usual cause — see
  * LS-9831 for the orphaned-run source of those young leagues).
+ *
+ * The cap only binds personas *without* the `unlimited_leagues` entitlement
+ * (LS-10138). MANAGER_2 and COMMISSIONER were promoted to premium under
+ * LS-8057 (`TIER_SEATS.premium` in `utils/test-user-auth.ts`), so applying the
+ * free-tier cap to every persona unconditionally hard-failed `globalSetup` —
+ * and therefore every `run:integration` on every PR — for a persona that was
+ * never actually capped.
  */
 const FREE_TIER_LEAGUE_CAP = 3;
+
+/**
+ * Entitlement lookup key that lifts the active-league cap. Mirrors
+ * `ENTITLEMENTS.unlimited_leagues` (`lib/utils/src/lib/entitlements.ts`), which
+ * is what `requireJoinLeagueCapacity` in `lambdas/db/src/schema/leagues/
+ * mutations.ts` actually gates on — the entitlement, not the `subscriptionTier`
+ * string. Predicting the real failure means asking the same question the
+ * mutation asks (LS-10138).
+ */
+const UNLIMITED_LEAGUES_ENTITLEMENT = 'unlimited_leagues';
 
 interface ManagerQuotaOverCap {
   persona: string;
   total: number;
+}
+
+/**
+ * Pure predicate: would `joinLeagueByCode` reject this persona's next join?
+ *
+ * Mirrors `requireJoinLeagueCapacity`: entitled personas are uncapped, and an
+ * unentitled persona is rejected at `count >= 3` (not `> 3`) — being *at* the
+ * cap already means the next join would be the disallowed 4th league. Unit
+ * tested independently of the network calls around it.
+ *
+ * Fails open: a persona whose entitlements could not be read (`undefined`,
+ * e.g. the query failed or the token's claim was stale) is treated as
+ * *uncapped* rather than capped. A missed warning costs one confusing spec
+ * failure; a false positive aborts the entire suite before a single spec runs,
+ * which is the regression this predicate exists to prevent (LS-10138).
+ */
+export function isPersonaOverJoinCap(params: {
+  entitlements: string[] | undefined;
+  total: number | undefined;
+}): boolean {
+  const { entitlements, total } = params;
+  if (!entitlements) return false;
+  if (entitlements.includes(UNLIMITED_LEAGUES_ENTITLEMENT)) return false;
+  return typeof total === 'number' && total >= FREE_TIER_LEAGUE_CAP;
 }
 
 /** Pure formatter, unit-tested independently of the network calls above it. */
@@ -508,12 +549,15 @@ async function preflightCheckManagerQuota(): Promise<void> {
     try {
       const managerJwt = await getTestUserJwt(creds);
       if (isJwtExpired(managerJwt)) continue;
-      const data = await gqlFetch<{ userLeagueCount: number }>(
-        managerJwt,
-        'query { userLeagueCount }',
-      );
+      const data = await gqlFetch<{
+        userLeagueCount: number;
+        myEntitlements: string[];
+      }>(managerJwt, 'query { userLeagueCount myEntitlements }');
       const total = data?.userLeagueCount;
-      if (typeof total === 'number' && total >= FREE_TIER_LEAGUE_CAP) {
+      if (
+        typeof total === 'number' &&
+        isPersonaOverJoinCap({ entitlements: data?.myEntitlements, total })
+      ) {
         overCap.push({ persona, total });
       }
     } catch (err) {
