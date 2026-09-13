@@ -127,7 +127,7 @@ Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint 
 
 ### `nx_run_pc_chunk`
 
-Prefer this over `make pc-<chunk>` via shell for cloud agents. Run a single pre-commit validation chunk. Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build. Fast chunks return structured pass/fail output in one call. A chunk still running after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — the chunk keeps running in the background; call nx_job_wait({ jobId }) to continue waiting. Do NOT re-run the chunk: re-invoking while it runs joins the in-flight job.
+Prefer this over `make pc-<chunk>` via shell for cloud agents. Run a single pre-commit validation chunk. Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-lint → pc-format → pc-workflows → pc-test → pc-build. Fast chunks return structured pass/fail output in one call. A chunk still running after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — the chunk keeps running in the background; call nx_job_wait({ jobId }) to continue waiting. Do NOT re-run the chunk: re-invoking while it runs joins the in-flight job.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

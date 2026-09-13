@@ -188,8 +188,8 @@ describe('validatePR', () => {
       expect(payload.pc.chunks.map((c) => c.target)).toEqual([
         'pc-db-prep',
         'pc-typecheck',
-        'pc-format',
         'pc-lint',
+        'pc-format',
         'pc-workflows',
         'pc-test',
         'pc-build',

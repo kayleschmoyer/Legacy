@@ -16,7 +16,7 @@
 	fix-windows-locks diagnose kill-stale \
 	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
-	pc-db-prep pc-typecheck pc-format pc-lint pc-workflows pc-test pc-build \
+	pc-db-prep pc-typecheck pc-lint pc-format pc-workflows pc-test pc-build \
 	wt-setup modules-link modules-gc lockfile \
 	stabilize-after-rebase lint-review-patterns lint-touch-map ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
 	ship-pr
@@ -1091,10 +1091,10 @@ pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_plain,2/9 Schema generation...) && $(_PC_SCHEMA_CMD)
 	@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
-	@$(call echo_plain,5/9 Formatting...)
+	@$(call echo_plain,5/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,5/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,5/9 Linting (affected projects)... SKIPPED (docs-only changes)))
+	@$(call echo_plain,6/9 Formatting...)
 	$(_PC_FORMAT_RECIPE)
-	@$(call echo_plain,6/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting (affected projects)... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
 	$(if $(findstring PC_HAS_GH_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_GH_SCRIPTS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
@@ -1108,7 +1108,7 @@ pc: pre-commit ## Alias for pre-commit
 # The same nine steps as `make pc`, runnable one target at a time so ephemeral/cloud
 # agent sessions can checkpoint progress between steps instead of holding a single
 # 10+ minute process. Equivalent to `make pc` ONLY when ALL steps run in order:
-#   pc-db-prep -> pc-typecheck -> pc-format -> pc-lint -> pc-workflows -> pc-test -> pc-build
+#   pc-db-prep -> pc-typecheck -> pc-lint -> pc-format -> pc-workflows -> pc-test -> pc-build
 # Each target applies the same change-classification gating as the full pipeline.
 
 pc-db-prep: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
@@ -1131,14 +1131,14 @@ pc-typecheck: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_
 pc-typecheck: ## pc step 4: typecheck affected projects
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 
-pc-format: ## pc step 5: prettier + auto-commit formatter rewrites (new commit, LS-8367)
-	@$(call echo_plain,5/9 Formatting...)
-	$(_PC_FORMAT_RECIPE)
-
 pc-lint: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-lint: ## pc step 6: lint affected projects + skill content (always). Pass PARALLEL=N to cap nx project parallelism (avoids OOM on memory-constrained machines)
-	@$(call echo_plain,6/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
-	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting (affected projects)... SKIPPED (docs-only changes)))
+pc-lint: ## pc step 5: lint affected projects + skill content (always). Pass PARALLEL=N to cap nx project parallelism (avoids OOM on memory-constrained machines)
+	@$(call echo_plain,5/9 Linting (skill content)...) && $(_PC_LINT_SKILLS_CMD)
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,5/9 Linting (affected projects)...) && $(_PC_LINT_CMD),@$(call echo_yellow,5/9 Linting (affected projects)... SKIPPED (docs-only changes)))
+
+pc-format: ## pc step 6: prettier + auto-commit formatter rewrites (new commit, LS-8367). Runs after pc-lint so eslint --fix rewrites (pc-lint step 5) ship formatted (LS-10145)
+	@$(call echo_plain,6/9 Formatting...)
+	$(_PC_FORMAT_RECIPE)
 
 pc-workflows: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-workflows: ## pc step 7: GitHub workflow validation + .github/scripts unit tests

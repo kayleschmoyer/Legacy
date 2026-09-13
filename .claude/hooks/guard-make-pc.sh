@@ -4,7 +4,7 @@
 #
 # In cloud sessions, `make pc` / make_run(target:"pc") runs for ~3-10 min and
 # exceeds the ~60s MCP transport timeout — the container is reaped mid-run.
-# The 7-chunk form (pc-db-prep → pc-typecheck → pc-format → pc-lint →
+# The 7-chunk form (pc-db-prep → pc-typecheck → pc-lint → pc-format →
 # pc-workflows → pc-test → pc-build) keeps each call inside the window and
 # lets you checkpoint after each step (LS-7906).
 #
@@ -41,7 +41,7 @@ emit_block() {
 In cloud sessions this exceeds the ~60s MCP transport timeout — the container is reaped mid-run.
 
 Use the 7 pc-* chunks IN ORDER instead, one per call:
-  Sequence: pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build
+  Sequence: pc-db-prep → pc-typecheck → pc-lint → pc-format → pc-workflows → pc-test → pc-build
 
   Preferred (whenever the nx MCP server is loaded):
     nx_run_pc_chunk({ chunk: "pc-db-prep" })  ...  nx_run_pc_chunk({ chunk: "pc-build" })

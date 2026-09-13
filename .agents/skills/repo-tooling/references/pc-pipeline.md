@@ -12,13 +12,13 @@
 | 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                                                      | `pc-db-prep`   | always               |
 | 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen`                                 | `pc-db-prep`   | always               |
 | 4   | Typecheck                       | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                                                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
-| 5   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                                                         | `pc-format`    | always               |
-| 6   | Lint (scoped fix + check)       | `node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE)` | `pc-lint`      | `PC_DOCS_ONLY=0`     |
+| 5   | Lint (scoped fix + check)       | `node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE)` | `pc-lint`      | `PC_DOCS_ONLY=0`     |
+| 6   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                                                         | `pc-format`    | always               |
 | 7   | Workflow validation             | `node scripts/validate-workflows.js`                                                                    | `pc-workflows` | `PC_HAS_WORKFLOWS=1` |
 | 8   | Test                            | `pnpm exec nx affected -t test --base=$(NX_BASE)`                                                       | `pc-test`      | `PC_DOCS_ONLY=0`     |
 | 9   | Build                           | `pnpm exec nx affected -t build --base=$(NX_BASE)`                                                      | `pc-build`     | `PC_DOCS_ONLY=0`     |
 
-Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
+Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-lint` → `pc-format` → `pc-workflows` → `pc-test` → `pc-build`. Lint runs before format (LS-10145) so `eslint --fix` rewrites (step 5) still get a formatting pass (step 6) before being committed — the reverse order let unformatted `--fix` output ship and fail CI's lint & format check.
 
 As of 2026-07-02, lambda unit suites run under `nx affected -t test` like every other project (the `jest --onlyChanged` gap was closed by adding `project.json` jest targets; `lambdas/db` joined 2026-09-13 once its red suites were fixed) — so step 8 and CI both gate lambda tests. Which suites gate merge overall: see [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge).
 
@@ -62,7 +62,7 @@ Each pc invocation runs `node scripts/classify-changes.js --base $(NX_BASE)`, wh
 
 ### pc-format: auto-commit and recovery
 
-Step 5 runs `pnpm exec prettier --write --ignore-unknown .`, then:
+Step 6 runs `pnpm exec prettier --write --ignore-unknown .`, then:
 
 - **Clean working tree + formatter rewrote files** → `git add -A && git commit -m 'style: apply formatting'`: the fixes land in a **new commit** on top of your tip commit. Deliberately does **not** amend the tip (LS-8367) — the ticket-to-merge spine mandates commit → push → draft PR before validation runs, so the tip commit is always already on the remote by the time this step runs; amending it would rewrite pushed history and require a force-push, which Claude Code's auto-mode permission classifier blocks. A new commit reaches the remote with a normal push.
 - **Dirty working tree + formatter rewrote files** → **exit 1** with "Commit or stash them first, then re-run make pc."

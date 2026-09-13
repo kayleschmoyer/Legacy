@@ -36,8 +36,8 @@ const SYNC_BUDGET_MS = 45_000;
 export const PC_CHUNKS = [
   'pc-db-prep',
   'pc-typecheck',
-  'pc-format',
   'pc-lint',
+  'pc-format',
   'pc-workflows',
   'pc-test',
   'pc-build',

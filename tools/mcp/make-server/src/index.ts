@@ -35,7 +35,7 @@ server.tool(
   'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target (pc, build, test, lint, ' +
     'typecheck, format, codegen, install, kill-stale, ...). A target still running after ~45s returns ' +
     '{ status: "running", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. ' +
-    'The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, ' +
+    'The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-lint, pc-format, pc-workflows, ' +
     'pc-test, pc-build) — equivalent to `pc` only when all run in that order. ' +
     'runner-apply prompts interactively: always pass variables="NO_CONFIRM=1". ' +
     'Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.',
@@ -800,7 +800,7 @@ server.tool(
     'The default runs make pc as a background job with a ~45s bounded wait: if pc is still running the result is ' +
     '{ pc: { status: "running", jobId } } — poll with make_run_wait({ jobId }), never re-invoke while it runs. ' +
     'runPcInBackground: true skips the bounded wait and returns the jobId immediately. ' +
-    'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build); ' +
+    'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-lint → pc-format → pc-workflows → pc-test → pc-build); ' +
     'each call is budgeted to ~45s and may return { pc: { status: "in_progress", ... } } with resume instructions ' +
     '(re-invoke with startAtChunk, or make_run_wait a still-running chunk job) — never restart validation from scratch.',
   {
@@ -821,8 +821,8 @@ server.tool(
       .enum([
         'pc-db-prep',
         'pc-typecheck',
-        'pc-format',
         'pc-lint',
+        'pc-format',
         'pc-workflows',
         'pc-test',
         'pc-build',

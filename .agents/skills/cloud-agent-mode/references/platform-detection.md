@@ -33,7 +33,7 @@ Secondary confirmation for default CC web: `jira_*` tools absent, `Glob`/`Grep` 
 
 ## Validation binding (safety-critical — read before running anything)
 
-The seven `pc-*` chunks in canonical order — `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build` — are the only validation path in cloud. They are the same nine steps as `make pc`, and equivalent to it **only if all seven run in order** (LS-7906). The chunk list's source of truth is `PC_CHUNKS` in `tools/mcp/nx-server/src/tools/run-pc-chunk.ts` and the `pc-*` targets in the Makefile.
+The seven `pc-*` chunks in canonical order — `pc-db-prep` → `pc-typecheck` → `pc-lint` → `pc-format` → `pc-workflows` → `pc-test` → `pc-build` — are the only validation path in cloud. They are the same nine steps as `make pc`, and equivalent to it **only if all seven run in order** (LS-7906). The chunk list's source of truth is `PC_CHUNKS` in `tools/mcp/nx-server/src/tools/run-pc-chunk.ts` and the `pc-*` targets in the Makefile.
 
 **`pc-test` and `scripts/*.ps1` changes (LS-8729)**: `pc-test`'s underlying `_PC_TEST_CMD` (`pnpm exec nx affected -t test --base=$NX_BASE`) never touches root-level `scripts/`, since it is not an Nx project. `classify-changes.js` sets `PC_HAS_PS1=1` whenever a changed file matches `scripts/**/*.ps1`; when that flag is set, `pc-test` additionally runs `pnpm run test:scripts:ps` if `pwsh` is on `PATH`, or prints an explicit `SKIPPED (pwsh not installed)` line otherwise — see [Quirk 11](known-quirks.md#quirk-11-pwsh-is-not-preinstalled-pnpm-run-testscriptsps-fails-outright-ls-8729) for installing `pwsh` in this environment so the step actually runs instead of being skipped.
 

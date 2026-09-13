@@ -62,11 +62,11 @@ const ALLOWED_TARGETS = new Set([
 
   // Stepwise pre-commit (timeout-resilient validation for cloud/ephemeral
   // sessions, LS-7906). Equivalent to `pc` only when ALL steps run in order:
-  // pc-db-prep -> pc-typecheck -> pc-format -> pc-lint -> pc-workflows -> pc-test -> pc-build
+  // pc-db-prep -> pc-typecheck -> pc-lint -> pc-format -> pc-workflows -> pc-test -> pc-build
   'pc-db-prep',
   'pc-typecheck',
-  'pc-format',
   'pc-lint',
+  'pc-format',
   'pc-workflows',
   'pc-test',
   'pc-build',

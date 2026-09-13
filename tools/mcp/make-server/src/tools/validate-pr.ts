@@ -142,8 +142,8 @@ async function applyMigrations(
 const PC_CHUNKS = [
   'pc-db-prep',
   'pc-typecheck',
-  'pc-format',
   'pc-lint',
+  'pc-format',
   'pc-workflows',
   'pc-test',
   'pc-build',
