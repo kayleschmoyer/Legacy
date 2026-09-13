@@ -220,7 +220,7 @@ Or rely on the existing `build:lambda` extends pattern if the default `tsconfig.
     {
       "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": ["tsconfig.*?.json"]
+        "project": ["lambdas/<name>/tsconfig.*?.json"]
       },
       "rules": {}
     }
@@ -229,6 +229,14 @@ Or rely on the existing `build:lambda` extends pattern if the default `tsconfig.
 ```
 
 > Always include `"dist"` in ignorePatterns for lambdas (they have build output).
+>
+> **Anchor the `project` glob to `lambdas/<name>/`** — do not leave it as the
+> bare `["tsconfig.*?.json"]` that Nx's generator emits. The root config pins
+> `parserOptions.tsconfigRootDir` to the workspace root, so an unanchored glob
+> resolves against the root tsconfigs instead of this lambda's own and the
+> type-aware rules silently lint against the wrong TypeScript program — lint
+> still passes, it just checks nothing meaningful (LS-8700 / LS-10062).
+> `scripts/check-eslint-tsconfig-anchored.mjs` fails CI if this is wrong.
 
 #### `jest.config.ts`
 

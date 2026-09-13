@@ -135,13 +135,21 @@ lib/<name>/
     {
       "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": ["tsconfig.*?.json"]
+        "project": ["lib/<name>/tsconfig.*?.json"]
       },
       "rules": {}
     }
   ]
 }
 ```
+
+> **Anchor the `project` glob to `lib/<name>/`** — do not leave it as the bare
+> `["tsconfig.*?.json"]` that Nx's generator emits. The root config pins
+> `parserOptions.tsconfigRootDir` to the workspace root, so an unanchored glob
+> resolves against the root tsconfigs instead of this library's own and the
+> type-aware rules silently lint against the wrong TypeScript program — lint
+> still passes, it just checks nothing meaningful (LS-8700 / LS-10062).
+> `scripts/check-eslint-tsconfig-anchored.mjs` fails CI if this is wrong.
 
 #### `jest.config.ts`
 

@@ -54,13 +54,28 @@ These provide executor, caching, and options for targets that **exist** on a pro
     {
       "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": ["tsconfig.*?.json"]
+        "project": ["<project-root>/tsconfig.*?.json"]
       },
       "rules": {}
     }
   ]
 }
 ```
+
+### The `project` glob must be project-anchored
+
+`<project-root>` above is the project's own repo-relative directory — e.g.
+`lib/scoring/tsconfig.*?.json`, `apps/web/tsconfig.*?.json`. Never leave it as
+the bare `["tsconfig.*?.json"]` that Nx's project generator emits.
+
+The root config pins `parserOptions.tsconfigRootDir` to the workspace root, so
+an unanchored glob resolves against the **root** tsconfigs rather than the
+project's own. The type-aware rules then run against the wrong TypeScript
+program, and nothing errors — lint still reports green, it just checks nothing
+meaningful. This was fixed across every existing project by LS-8700 and
+LS-10062; `scripts/check-eslint-tsconfig-anchored.mjs` (wired into the
+`custom-checks` CI job, and `make lint-eslint-tsconfig-anchored` locally) now
+fails the build if a project regresses.
 
 ### Required ignorePatterns
 
