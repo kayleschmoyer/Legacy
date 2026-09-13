@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runMultiPass } from '../multi-pass.mjs';
+import { runMultiPass, createResumeState } from '../multi-pass.mjs';
 import { CostCap } from '../cost-cap.mjs';
 
 function makeProvider(results) {
@@ -206,5 +206,96 @@ describe('runMultiPass with cost cap', () => {
     ]);
     const { passes } = await runMultiPass(provider, 'sys', 'user');
     assert.strictEqual(passes.length, 4);
+  });
+});
+
+describe('runMultiPass resume (LS-9983)', () => {
+  /**
+   * Provider that throws on the Nth call (1-indexed) and otherwise returns a
+   * body naming the call index, so a test can tell re-spent calls apart from
+   * fresh ones.
+   */
+  function makeFlakyProvider(throwOnCall) {
+    const seen = [];
+    return {
+      calls: seen,
+      review: async ({ user }) => {
+        seen.push(user);
+        if (seen.length === throwOnCall) {
+          throw Object.assign(new Error('429 per-minute quota'), {
+            kind: 'rate-limit',
+            retryable: true,
+          });
+        }
+        return { text: `out-${seen.length}`, usage: null };
+      },
+    };
+  }
+
+  it('does not re-spend completed passes when a later pass throws', async () => {
+    const provider = makeFlakyProvider(4);
+    const resumeState = createResumeState();
+
+    await assert.rejects(
+      () => runMultiPass(provider, 'sys', 'user', { resumeState }),
+      (err) => err.kind === 'rate-limit',
+    );
+    assert.strictEqual(provider.calls.length, 4, 'three ok, one throttled');
+    assert.strictEqual(resumeState.passes.length, 3, 'three passes banked');
+
+    // Second attempt: only the outstanding pass may consume quota.
+    const { passes } = await runMultiPass(provider, 'sys', 'user', {
+      resumeState,
+    });
+    assert.strictEqual(
+      provider.calls.length,
+      5,
+      'retry must issue exactly one more request, not four',
+    );
+    assert.deepStrictEqual(
+      passes.map((p) => p.passName),
+      ['correctness', 'security', 'contract', 'docs'],
+      'resumed run still returns all four passes in order',
+    );
+  });
+
+  it('accumulates usage across a resumed run instead of losing the earlier passes', async () => {
+    const usage = {
+      inputTokens: 10,
+      cachedInputTokens: 0,
+      outputTokens: 5,
+      costUsd: 0.001,
+    };
+    let call = 0;
+    const provider = {
+      review: async () => {
+        call++;
+        if (call === 3) {
+          throw Object.assign(new Error('429'), {
+            kind: 'rate-limit',
+            retryable: true,
+          });
+        }
+        return { text: 't', usage };
+      },
+    };
+    const resumeState = createResumeState();
+    await assert.rejects(() =>
+      runMultiPass(provider, 'sys', 'user', { resumeState }),
+    );
+    const result = await runMultiPass(provider, 'sys', 'user', { resumeState });
+    assert.strictEqual(
+      result.usage.inputTokens,
+      40,
+      'usage from the pre-throttle passes must survive the retry',
+    );
+    assert.strictEqual(result.passes.length, 4);
+  });
+
+  it('is unchanged when no resumeState is passed', async () => {
+    const provider = makeFlakyProvider(0);
+    const { passes } = await runMultiPass(provider, 'sys', 'user');
+    assert.strictEqual(passes.length, 4);
+    assert.strictEqual(provider.calls.length, 4);
   });
 });

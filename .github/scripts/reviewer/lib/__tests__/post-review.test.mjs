@@ -366,7 +366,7 @@ describe('buildKnownFailureBody — billing (LS-9812)', () => {
   it('billing body does NOT tell the reader to wait (the rate-limit remedy)', () => {
     const { body } = buildKnownFailureBody('billing');
     assert.ok(
-      !/wait a minute/i.test(body),
+      !/wait for the queue to drain/i.test(body),
       'billing notice must not repeat the per-minute-throttle advice',
     );
   });
@@ -379,14 +379,44 @@ describe('buildKnownFailureBody — billing (LS-9812)', () => {
     assert.notStrictEqual(billing, rateLimit);
   });
 
-  // LS-9568 guard: the retryable path must keep saying "wait, then re-apply".
-  it('rate-limit body still tells the author to wait and re-apply the label', () => {
+  // LS-9568 guard: the retryable path must keep presenting a retry as useful,
+  // unlike billing. LS-9983 reworded the remedy — the run now auto-waits the
+  // throttle out, so this comment is only reached once that budget is spent —
+  // but the retryable-vs-terminal distinction it guards is unchanged.
+  it('rate-limit body still tells the author waiting/retrying is worthwhile', () => {
     const { body } = buildKnownFailureBody('rate-limit');
-    assert.match(body, /wait a minute/i);
+    assert.match(body, /wait/i);
     assert.match(body, /bot:ready-for-review/);
     assert.ok(
       !/will not help/i.test(body),
       'rate-limit notice must keep advertising the retry as useful',
+    );
+  });
+
+  // LS-9983: under repo-wide saturation, "just re-apply the label" is actively
+  // harmful — every author who follows it spends quota the rest of the queue
+  // is waiting on. The body must say so rather than presenting the re-apply as
+  // an unconditional remedy.
+  it('rate-limit body warns against re-applying the label when several PRs are throttled', () => {
+    const { body } = buildKnownFailureBody('rate-limit');
+    assert.match(body, /repo-wide/i);
+    assert.match(body, /deepens the contention/i);
+  });
+
+  it('rate-limit body says the run already auto-waited its retry budget', () => {
+    const { body } = buildKnownFailureBody('rate-limit');
+    assert.match(body, /auto-waited/i);
+    assert.match(body, /retry budget/i);
+  });
+
+  // The pre-LS-9983 body claimed W1 ignores plain pushes. It has fired on
+  // `synchronize` (while bot:ready-for-review is present) since LS-4678, so
+  // that sentence sent authors to cycle a label they did not need to touch.
+  it('rate-limit body does not claim the reviewer ignores pushes', () => {
+    const { body } = buildKnownFailureBody('rate-limit');
+    assert.ok(
+      !/does not fire on plain pushes/i.test(body),
+      'stale claim: W1 fires on synchronize while bot:ready-for-review is present',
     );
   });
 });

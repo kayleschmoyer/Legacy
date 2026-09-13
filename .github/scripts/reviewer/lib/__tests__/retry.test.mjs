@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { withRetry } from '../retry.mjs';
+import { withRetry, DEFAULT_DELAYS, RATE_LIMIT_DELAYS } from '../retry.mjs';
+import { createResumeState } from '../multi-pass.mjs';
 import { classifyHttpError } from '../providers/gemini.mjs';
 
 describe('withRetry', () => {
@@ -237,22 +238,349 @@ describe('withRetry + Gemini 429 classification (LS-9812)', () => {
     assert.strictEqual(calls, 1, 'billing 429 must not enter the retry ladder');
   });
 
-  it('still exhausts the ladder for a throttle 429 (LS-9568 path unchanged)', async () => {
+  it('exhausts the extended rate-limit ladder for a throttle 429, ignoring the default delays (LS-9983)', async () => {
     let calls = 0;
     const origWrite = process.stderr.write;
     process.stderr.write = () => true;
     try {
       await assert.rejects(
         () =>
-          withRetry(async () => {
-            calls++;
-            throw classifyHttpError(429, throttleBody);
-          }, [0, 0, 0]),
+          withRetry(
+            async () => {
+              calls++;
+              throw classifyHttpError(429, throttleBody);
+            },
+            // The default ladder has three entries; a throttle must use the
+            // longer RATE_LIMIT_DELAYS ladder instead of this one.
+            [0, 0, 0],
+            { rateLimitDelays: [0, 0, 0, 0, 0] },
+          ),
         (err) => err.kind === 'rate-limit',
       );
     } finally {
       process.stderr.write = origWrite;
     }
-    assert.strictEqual(calls, 4, '1 initial + 3 retries');
+    assert.strictEqual(calls, 6, '1 initial + 5 rate-limit retries');
+  });
+
+  it('uses the real RATE_LIMIT_DELAYS ladder by default and it outlasts the default ladder', () => {
+    const defaultTotal = DEFAULT_DELAYS.reduce((a, b) => a + b, 0);
+    const rateLimitTotal = RATE_LIMIT_DELAYS.reduce((a, b) => a + b, 0);
+    assert.ok(
+      rateLimitTotal > defaultTotal,
+      `rate-limit ladder (${rateLimitTotal}ms) must outlast the default (${defaultTotal}ms)`,
+    );
+    assert.ok(
+      RATE_LIMIT_DELAYS.length > DEFAULT_DELAYS.length,
+      'rate-limit ladder must allow more attempts than the default',
+    );
+  });
+});
+
+describe('withRetry retry budget (LS-9983)', () => {
+  const throttle = () =>
+    Object.assign(new Error('429 per-minute quota'), {
+      kind: 'rate-limit',
+      retryable: true,
+    });
+
+  function silenceStderr() {
+    const orig = process.stderr.write;
+    process.stderr.write = () => true;
+    return () => {
+      process.stderr.write = orig;
+    };
+  }
+
+  it('stops the ladder early when the next wait would run past the deadline', async () => {
+    let calls = 0;
+    const restore = silenceStderr();
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(
+            async () => {
+              calls++;
+              throw throttle();
+            },
+            undefined,
+            {
+              // Already past the deadline: no wait can fit.
+              deadlineMs: Date.now() - 1,
+              rateLimitDelays: [60_000, 60_000, 60_000],
+            },
+          ),
+        (err) => err.kind === 'rate-limit' && err.budgetExhausted === true,
+      );
+    } finally {
+      restore();
+    }
+    assert.strictEqual(
+      calls,
+      1,
+      'must not sleep past the deadline — one attempt, then give up so a terminal status can be written',
+    );
+  });
+
+  it('marks the thrown error with budgetExhausted only when the deadline stopped it', async () => {
+    const restore = silenceStderr();
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(
+            async () => {
+              throw throttle();
+            },
+            undefined,
+            { rateLimitDelays: [0, 0] },
+          ),
+        (err) => err.budgetExhausted === undefined,
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it('reports each wait through onWait so the caller can publish a queued status', async () => {
+    const waits = [];
+    const restore = silenceStderr();
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(
+            async () => {
+              throw throttle();
+            },
+            undefined,
+            {
+              rateLimitDelays: [0, 0],
+              onWait: (info) => waits.push(info),
+            },
+          ),
+        (err) => err.kind === 'rate-limit',
+      );
+    } finally {
+      restore();
+    }
+    assert.strictEqual(waits.length, 2, 'one onWait per sleep');
+    assert.deepStrictEqual(
+      waits.map((w) => w.attempt),
+      [1, 2],
+    );
+    assert.strictEqual(waits[0].kind, 'rate-limit');
+    assert.strictEqual(
+      waits[0].maxAttempts,
+      3,
+      'maxAttempts counts the initial attempt plus the ladder',
+    );
+  });
+
+  it('does not let an onWait failure break the retry ladder', async () => {
+    let calls = 0;
+    const restore = silenceStderr();
+    try {
+      const result = await withRetry(
+        async () => {
+          calls++;
+          if (calls < 2) throw throttle();
+          return 'recovered';
+        },
+        undefined,
+        {
+          rateLimitDelays: [0, 0],
+          onWait: () => {
+            throw new Error('status write failed');
+          },
+        },
+      );
+      assert.strictEqual(result, 'recovered');
+    } finally {
+      restore();
+    }
+    assert.strictEqual(calls, 2);
+  });
+
+  it('leaves non-rate-limit errors on the default ladder and the default jitter', async () => {
+    let calls = 0;
+    const restore = silenceStderr();
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(
+            async () => {
+              calls++;
+              throw new Error('generic transient');
+            },
+            [0, 0],
+            { rateLimitDelays: [0, 0, 0, 0, 0, 0, 0] },
+          ),
+        { message: 'generic transient' },
+      );
+    } finally {
+      restore();
+    }
+    assert.strictEqual(
+      calls,
+      3,
+      'a non-throttle error must not borrow the long rate-limit ladder',
+    );
+  });
+});
+
+describe('rate-limit contention simulation (LS-9983 AC3)', () => {
+  /**
+   * Discrete-event scheduler over a virtual clock. `sleep` parks a caller
+   * until the clock reaches its wake time; `run` repeatedly flushes the
+   * microtask queue and then jumps the clock to the earliest parked waiter.
+   * This lets a whole fleet of reviewers contend for one shared quota
+   * concurrently, in milliseconds of real time, using withRetry's real
+   * backoff arithmetic.
+   */
+  function makeScheduler() {
+    let now = 0;
+    const parked = [];
+    return {
+      now: () => now,
+      sleep: (ms) =>
+        new Promise((resolve) => {
+          parked.push({ at: now + ms, resolve });
+        }),
+      async run(promise) {
+        // Capture the outcome rather than re-throwing inside the tracker, so
+        // there is never a floating rejected promise while the clock advances.
+        let outcome = null;
+        const tracked = promise.then(
+          (value) => {
+            outcome = { ok: true, value };
+          },
+          (error) => {
+            outcome = { ok: false, error };
+          },
+        );
+        for (;;) {
+          await new Promise((r) => setImmediate(r));
+          if (outcome || parked.length === 0) break;
+          parked.sort((a, b) => a.at - b.at);
+          const next = parked.shift();
+          now = Math.max(now, next.at);
+          next.resolve();
+        }
+        await tracked;
+        if (!outcome.ok) throw outcome.error;
+        return outcome.value;
+      },
+    };
+  }
+
+  /**
+   * The provider's per-minute quota: at most `limit` successful calls per
+   * rolling window, the rest throw a typed rate-limit error.
+   */
+  function makeQuota({ limit, windowMs, clock }) {
+    let windowStart = 0;
+    let used = 0;
+    return {
+      take() {
+        const now = clock.now();
+        if (now - windowStart >= windowMs) {
+          windowStart = now;
+          used = 0;
+        }
+        if (used >= limit) {
+          throw Object.assign(new Error('429 per-minute quota exceeded'), {
+            kind: 'rate-limit',
+            retryable: true,
+          });
+        }
+        used++;
+      },
+    };
+  }
+
+  const QUOTA_PER_MINUTE = 10;
+  const WINDOW_MS = 60_000;
+  const REVIEWERS = 20;
+  const PASSES = 4;
+
+  function silenceStderr() {
+    const orig = process.stderr.write;
+    process.stderr.write = () => true;
+    return () => {
+      process.stderr.write = orig;
+    };
+  }
+
+  /**
+   * Run `REVIEWERS` reviewers concurrently against one quota and report how
+   * many ended terminally (i.e. would carry review-bot-degraded).
+   *
+   * @param {{ ladder: readonly number[], resume: boolean }} opts
+   */
+  async function runBurst({ ladder, resume }) {
+    const scheduler = makeScheduler();
+    const quota = makeQuota({
+      limit: QUOTA_PER_MINUTE,
+      windowMs: WINDOW_MS,
+      clock: scheduler,
+    });
+
+    const reviewers = Array.from({ length: REVIEWERS }, () => {
+      const resumeState = createResumeState();
+      return withRetry(
+        async () => {
+          // With resume, only the passes not yet banked consume quota on a
+          // retry; without it, every attempt re-spends all four.
+          const banked = resume ? resumeState.passes : [];
+          let done = banked.length;
+          while (done < PASSES) {
+            quota.take();
+            done++;
+            if (resume) {
+              resumeState.passes.push({ passName: `p${done}`, text: '' });
+            }
+          }
+        },
+        undefined,
+        { rateLimitDelays: ladder, sleep: scheduler.sleep },
+      ).then(
+        () => null,
+        (err) => err,
+      );
+    });
+
+    const results = await scheduler.run(Promise.all(reviewers));
+    return {
+      stranded: results.filter(Boolean).length,
+      elapsedMs: scheduler.now(),
+    };
+  }
+
+  it('drains a burst of 20 concurrent reviewers with none left on review-bot-degraded', async () => {
+    const restore = silenceStderr();
+    let outcome;
+    try {
+      outcome = await runBurst({ ladder: RATE_LIMIT_DELAYS, resume: true });
+    } finally {
+      restore();
+    }
+    assert.strictEqual(
+      outcome.stranded,
+      0,
+      `no reviewer may end degraded purely from contention (stranded ${outcome.stranded}/${REVIEWERS} after ${Math.round(outcome.elapsedMs / 60_000)}m)`,
+    );
+  });
+
+  it('control: the pre-fix ladder without resume strands reviewers under the same burst', async () => {
+    const restore = silenceStderr();
+    let outcome;
+    try {
+      outcome = await runBurst({ ladder: DEFAULT_DELAYS, resume: false });
+    } finally {
+      restore();
+    }
+    assert.ok(
+      outcome.stranded > 0,
+      'control must strand at least one reviewer, otherwise the test above proves nothing',
+    );
   });
 });

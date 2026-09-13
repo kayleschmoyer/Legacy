@@ -165,7 +165,17 @@ jobs:
     needs: [check-runner-access]
     if: needs.check-runner-access.outputs.should-review == 'true'
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
-    timeout-minutes: 15
+    # Rate-limit wait budget (LS-9983): the reviewer now waits out a per-minute
+    # throttle in-job (bot-review stays `pending` — "Queued behind reviewer
+    # rate limit") instead of failing and handing the retry to the PR author,
+    # whose label re-apply spent quota the rest of a saturated queue was
+    # already waiting on. REVIEWER_RETRY_BUDGET_MS below caps that waiting;
+    # this timeout must stay comfortably above it so a run that spends the
+    # whole budget still has time to post its review, labels and a terminal
+    # bot-review status. A run killed by this timeout writes no terminal
+    # status at all and strands the PR on a stale-pending footprint
+    # (LS-8299 / LS-9209) — the failure mode the budget exists to avoid.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -196,6 +206,10 @@ jobs:
           LLM_PROVIDER: gemini
           REVIEWER_MODEL: gemini-2.5-flash
           REVIEWER_FALLBACK_MODEL: ${{ vars.REVIEWER_FALLBACK_MODEL || 'gemini-2.5-flash-lite' }}
+          # Wall-clock budget for waiting out provider throttles, measured from
+          # process start. Must stay well under the job's timeout-minutes above
+          # (see the comment there). Default in index.mjs is the same 20m.
+          REVIEWER_RETRY_BUDGET_MS: ${{ vars.REVIEWER_RETRY_BUDGET_MS || '1200000' }}
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}

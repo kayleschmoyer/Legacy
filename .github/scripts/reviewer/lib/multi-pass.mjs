@@ -75,11 +75,36 @@ const PASSES = [
 ];
 
 /**
+ * Create the accumulator a caller passes as `opts.resumeState` to make
+ * `runMultiPass` resumable across `withRetry` attempts.
+ *
+ * @returns {{passes: Array<{passName: string, text: string}>, usage: import('./providers/provider.mjs').ProviderUsage}}
+ */
+export function createResumeState() {
+  return {
+    passes: [],
+    usage: {
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+    },
+  };
+}
+
+/**
  * Run four sequential review passes (correctness → security → contract → docs).
  *
  * Each pass receives the same `system` and base `user` prompt so prompt caching
  * is effective on the Anthropic provider; only the focus instruction appended to
  * `user` differs per pass.
+ *
+ * **Resumability (LS-9983).** Without `resumeState` a retry re-runs all four
+ * passes from scratch, so a throttle on the last pass re-spends three
+ * already-successful requests against the same per-minute quota the retry is
+ * waiting on — a 4× quota amplifier at exactly the moment the quota is the
+ * scarce resource. Pass a caller-owned `resumeState` (see `createResumeState`)
+ * and each attempt picks up at the first pass that has not completed yet.
  *
  * @param {object} provider  LLMProvider instance
  * @param {string} system    Shared system prompt
@@ -87,22 +112,22 @@ const PASSES = [
  * @param {object} [opts]
  * @param {import('./cost-cap.mjs').CostCap} [opts.costCap]  Cost cap instance; throws CostCapExceededError if limit is hit
  * @param {string} [opts.providerName]  Provider name passed to costCap.estimateCost (default: 'anthropic')
+ * @param {{passes: Array<{passName: string, text: string}>, usage: import('./providers/provider.mjs').ProviderUsage}} [opts.resumeState]
+ *   Caller-owned accumulator shared across retry attempts. Omit for a
+ *   self-contained single run.
  * @returns {Promise<{passes: Array<{passName: string, text: string}>, usage: import('./providers/provider.mjs').ProviderUsage}>}
  */
 export async function runMultiPass(
   provider,
   system,
   user,
-  { costCap, providerName = 'anthropic' } = {},
+  { costCap, providerName = 'anthropic', resumeState } = {},
 ) {
-  const passes = [];
-  const usage = {
-    inputTokens: 0,
-    cachedInputTokens: 0,
-    outputTokens: 0,
-    costUsd: 0,
-  };
+  const state = resumeState ?? createResumeState();
+  const { passes, usage } = state;
+  const completed = new Set(passes.map((p) => p.passName));
   for (const pass of PASSES) {
+    if (completed.has(pass.name)) continue;
     const focusedUser = `${user}\n\n---\n\n**Review focus for this pass**: ${pass.focus}`;
     if (costCap) {
       const estimate = costCap.estimateCost(

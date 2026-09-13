@@ -18,7 +18,11 @@ import {
   formatShadowBody,
 } from './lib/findings.mjs';
 import { buildSystemPrompt, buildUserPrompt } from './lib/prompts/system.mjs';
-import { isTrivialPR, runMultiPass } from './lib/multi-pass.mjs';
+import {
+  isTrivialPR,
+  runMultiPass,
+  createResumeState,
+} from './lib/multi-pass.mjs';
 import { consolidate } from './lib/consolidator.mjs';
 import {
   postRealReview,
@@ -153,6 +157,68 @@ const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
 // the run log. Deliberately NOT a trigger label in review.yml — re-applying it
 // must not re-fire a run that cannot succeed.
 const REVIEW_BOT_BILLING_LABEL = 'review-bot-billing';
+
+/**
+ * Wall-clock budget the run may spend *waiting out* provider retries, measured
+ * from process start (LS-9983).
+ *
+ * The reviewer job's `timeout-minutes` is the hard ceiling: a run killed by it
+ * writes no terminal `bot-review` status and leaves the PR stranded on a
+ * stale-pending footprint for the merge-queue processor to heal (LS-8299 /
+ * LS-9209). So the retry ladder is bounded by this budget rather than by the
+ * ladder's own length, and `review.yml` sets `timeout-minutes` comfortably
+ * above it so posting the review, labels and terminal status always fits in
+ * the remainder. Keep the two in sync when changing either.
+ */
+const DEFAULT_RETRY_BUDGET_MS = 20 * 60 * 1000;
+
+function resolveRetryBudgetMs() {
+  const raw = Number(process.env.REVIEWER_RETRY_BUDGET_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RETRY_BUDGET_MS;
+}
+
+const RETRY_DEADLINE_MS = Date.now() + resolveRetryBudgetMs();
+
+/**
+ * Render a wait as a short human duration for the commit-status description
+ * (GitHub caps descriptions at 140 characters).
+ *
+ * @param {number} ms
+ * @returns {string}
+ */
+function formatWait(ms) {
+  const seconds = Math.round(ms / 1000);
+  return seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds}s`;
+}
+
+/**
+ * Build the `withRetry` options for this run: the shared retry deadline plus a
+ * progress publisher that keeps `bot-review` on **pending** while the reviewer
+ * is waiting out a per-minute throttle.
+ *
+ * This is the AC2 distinction (LS-9983). A throttled cycle used to jump
+ * straight to a `failure` status telling the author to re-apply
+ * `bot:ready-for-review` — which, under repo-wide saturation, sent every
+ * Author Agent to spend quota the rest of the queue was already waiting on.
+ * "Queued behind quota, no action needed" is a pending state; only an
+ * exhausted budget is a failure.
+ *
+ * @param {string} sha
+ * @returns {{ deadlineMs: number, onWait: (info: object) => void }}
+ */
+function buildRetryOpts(sha) {
+  return {
+    deadlineMs: RETRY_DEADLINE_MS,
+    onWait({ attempt, maxAttempts, waitMs, kind }) {
+      if (kind !== 'rate-limit' || !sha) return;
+      setCommitStatus(
+        sha,
+        'pending',
+        `Queued behind reviewer rate limit — auto-retry in ~${formatWait(waitMs)} (attempt ${attempt}/${maxAttempts}); no action needed`,
+      );
+    },
+  };
+}
 
 /**
  * Write a failure bot-review status UNLESS a human maintainer APPROVE now
@@ -899,6 +965,7 @@ async function main() {
   };
   let latencyMs = 0;
   let usedFallbackModel = null;
+  const retryOpts = buildRetryOpts(sha);
 
   if (trivial) {
     process.stdout.write(
@@ -906,15 +973,19 @@ async function main() {
     );
     try {
       const t0 = Date.now();
-      const result = await withRetry(() => {
-        maybeThrowForceFailError();
-        const estimate = costCap.estimateCost(
-          systemPrompt.length + userPrompt.length,
-          providerName,
-        );
-        costCap.checkBefore(estimate);
-        return provider.review({ system: systemPrompt, user: userPrompt });
-      });
+      const result = await withRetry(
+        () => {
+          maybeThrowForceFailError();
+          const estimate = costCap.estimateCost(
+            systemPrompt.length + userPrompt.length,
+            providerName,
+          );
+          costCap.checkBefore(estimate);
+          return provider.review({ system: systemPrompt, user: userPrompt });
+        },
+        undefined,
+        retryOpts,
+      );
       latencyMs = Date.now() - t0;
       reviewText = result.text;
       reviewUsage = result.usage ?? reviewUsage;
@@ -932,17 +1003,21 @@ async function main() {
         );
         try {
           const t0 = Date.now();
-          const result = await withRetry(() => {
-            const estimate = costCap.estimateCost(
-              systemPrompt.length + userPrompt.length,
-              fallbackProvider.model,
-            );
-            costCap.checkBefore(estimate);
-            return fallbackProvider.review({
-              system: systemPrompt,
-              user: userPrompt,
-            });
-          }, [30_000]);
+          const result = await withRetry(
+            () => {
+              const estimate = costCap.estimateCost(
+                systemPrompt.length + userPrompt.length,
+                fallbackProvider.model,
+              );
+              costCap.checkBefore(estimate);
+              return fallbackProvider.review({
+                system: systemPrompt,
+                user: userPrompt,
+              });
+            },
+            [30_000],
+            retryOpts,
+          );
           latencyMs = Date.now() - t0;
           reviewText = result.text;
           reviewUsage = result.usage ?? reviewUsage;
@@ -978,15 +1053,24 @@ async function main() {
     process.stdout.write(
       '[reviewer] Non-trivial PR — running multi-pass review (correctness → security → contract → docs)\n',
     );
+    // Shared across retry attempts — and across the primary→fallback model
+    // handover — so a throttled pass resumes instead of re-spending quota on
+    // the passes that already succeeded (LS-9983).
+    const resumeState = createResumeState();
     try {
       const t0 = Date.now();
-      const { passes, usage: multiPassUsage } = await withRetry(() => {
-        maybeThrowForceFailError();
-        return runMultiPass(provider, systemPrompt, userPrompt, {
-          costCap,
-          providerName,
-        });
-      });
+      const { passes, usage: multiPassUsage } = await withRetry(
+        () => {
+          maybeThrowForceFailError();
+          return runMultiPass(provider, systemPrompt, userPrompt, {
+            costCap,
+            providerName,
+            resumeState,
+          });
+        },
+        undefined,
+        retryOpts,
+      );
       latencyMs = Date.now() - t0;
       reviewText = consolidate(passes);
       reviewUsage = multiPassUsage;
@@ -1002,12 +1086,17 @@ async function main() {
         );
         try {
           const t0 = Date.now();
-          const { passes, usage: multiPassUsage } = await withRetry(() => {
-            return runMultiPass(fallbackProvider, systemPrompt, userPrompt, {
-              costCap,
-              providerName: fallbackProvider.model,
-            });
-          }, [30_000]);
+          const { passes, usage: multiPassUsage } = await withRetry(
+            () => {
+              return runMultiPass(fallbackProvider, systemPrompt, userPrompt, {
+                costCap,
+                providerName: fallbackProvider.model,
+                resumeState,
+              });
+            },
+            [30_000],
+            retryOpts,
+          );
           latencyMs = Date.now() - t0;
           reviewText = consolidate(passes);
           reviewUsage = multiPassUsage;
@@ -1627,8 +1716,12 @@ function classifyProviderError(err) {
  */
 function statusDescriptionForFailure(kind) {
   switch (kind) {
+    // Reached only after the run has already auto-waited its full retry
+    // budget (LS-9983) — the "queued behind quota, no action needed" pending
+    // status covers the waiting. Word it as the retry-required half of that
+    // distinction so an agent can tell the two apart from the status alone.
     case 'rate-limit':
-      return 'Reviewer rate-limited (per-minute quota); re-apply bot:ready-for-review to retry';
+      return 'Reviewer quota still saturated after auto-waiting the full retry budget; retry required';
     case 'billing':
       return 'Reviewer billing credits depleted — account owner must top up; retrying will not help';
     case 'quota':

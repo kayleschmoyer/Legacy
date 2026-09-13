@@ -743,7 +743,7 @@ export function buildKnownFailureBody(kind, details = {}) {
     case 'rate-limit': {
       const wait = details.retryAfterSeconds
         ? `~${Math.ceil(details.retryAfterSeconds)}s`
-        : 'a minute';
+        : 'a few minutes';
       return {
         // COMMENT, not REQUEST_CHANGES: nothing was read, so this must not
         // set reviewDecision or block the merge gate (LS-9568).
@@ -751,7 +751,17 @@ export function buildKnownFailureBody(kind, details = {}) {
         body:
           '## Reviewer rate-limited\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
-          `The Gemini API per-minute rate limit was hit on this run after exhausting in-job retries with backoff. Wait ${wait}, then re-apply the \`bot:ready-for-review\` label (remove and add it again) to retry. The reviewer workflow does not fire on plain pushes — only on \`opened\` / \`ready_for_review\` / \`labeled\` events.\n\n` +
+          // LS-9983: the run now waits out the throttle itself (bot-review
+          // stays pending, "Queued behind reviewer rate limit"), so reaching
+          // this comment means the whole retry budget was spent and the quota
+          // is still saturated. The old text told every author to re-apply
+          // the label immediately — under repo-wide saturation that spends
+          // quota the rest of the queue is already waiting on, so the advice
+          // now leads with waiting. It also no longer claims the workflow
+          // ignores pushes: W1 fires on `synchronize` whenever
+          // `bot:ready-for-review` is present.
+          `The Gemini API per-minute quota was still saturated after this run auto-waited its full retry budget, backing off between attempts (last hint: wait ${wait}).\n\n` +
+          'If other PRs are reviewing normally, push a commit or re-apply the `bot:ready-for-review` label to start a fresh cycle. **If several PRs are showing this at once the limiter is repo-wide** — re-applying the label on each one only deepens the contention. Wait for the queue to drain and let the next push trigger the review instead; W1 fires on pushes on its own while `bot:ready-for-review` is present.\n\n' +
           '_This is not a code issue — no review was posted because the LLM API throttled the request._',
       };
     }
