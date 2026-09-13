@@ -158,16 +158,38 @@ export function extractBashCalls(
 }
 
 /**
- * Marker text from the harness's "Auto Mode Active" system-reminder (see
- * AGENTS.md § Tool Usage / .agents/skills/mcp-first/SKILL.md — LS-9755).
- * When this directive is present in a transcript, the session was told to
- * bias toward Bash for plain file read/search operations, so `find`/`grep`/
- * `sed -n`/`tail`/`wc -l` calls are sanctioned behavior for that session,
- * not a tool-awareness gap. Matched as plain substring — the reminder text
- * is stable harness boilerplate, not user-authored content that would need
- * fuzzy matching.
+ * Marker phrases for the harness's auto-mode directive (see AGENTS.md
+ * § Tool Usage / .agents/skills/mcp-first/SKILL.md — LS-9755). When the
+ * directive is present in a transcript, the session was told to bias toward
+ * Bash for plain file read/search operations, so `find`/`grep`/`sed -n`/
+ * `tail`/`wc -l` calls are sanctioned behavior for that session, not a
+ * tool-awareness gap.
+ *
+ * Matched case-insensitively, and more than one phrasing is listed on
+ * purpose (LS-10135). The original single marker was the title-case banner
+ * `'Auto Mode Active'` compared with a case-sensitive `includes`, but the
+ * directive the harness actually emits is sentence-case prose — `"While auto
+ * mode is active: Do your work through the Bash tool ..."` — which contains
+ * that banner nowhere. Detection therefore returned false in every session
+ * where auto mode was genuinely on, making the whole LS-9755 carve-out dead
+ * code and re-inflating each audit with the false positives it exists to
+ * suppress.
+ *
+ * `\s+` between words keeps the match working when the phrase wraps across
+ * lines in the transcript. These are regexes rather than lowercased
+ * substring compares so matching allocates nothing: this runs over every
+ * text block of a transcript that can be several MB.
+ *
+ * Keep the phrases short and distinctive so a future reword of the
+ * directive's surrounding prose degrades to a miss rather than silently
+ * reintroducing a regression of the same shape.
  */
-const AUTO_MODE_MARKER = 'Auto Mode Active';
+const AUTO_MODE_MARKERS: readonly RegExp[] = [
+  // Prose directive: "While auto mode is active: ..." (the live wording).
+  /auto\s+mode\s+is\s+active/i,
+  // Banner/system-reminder heading form: "## Auto Mode Active".
+  /auto\s+mode\s+active/i,
+];
 
 /**
  * Scan already-loaded JSONL text for the auto-mode directive. Checks every
@@ -181,7 +203,9 @@ export function detectAutoModeFromContent(rawContent: string): boolean {
     if (!blocks) continue;
     for (const block of blocks) {
       if (!isRecord(block)) continue;
-      if (asString(block['text']).includes(AUTO_MODE_MARKER)) return true;
+      const text = asString(block['text']);
+      if (!text) continue;
+      if (AUTO_MODE_MARKERS.some((marker) => marker.test(text))) return true;
     }
   }
   return false;

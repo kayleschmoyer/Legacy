@@ -7,6 +7,7 @@ import {
   classifyCommand,
   classifyGapType,
   commandPattern,
+  detectAutoMode,
   detectAutoModeFromContent,
   extractBashCalls,
   extractBashCallsFromContent,
@@ -67,6 +68,30 @@ function synthBashCall(
     tool_use_id: 'toolu_1',
     line: 1,
     ...overrides,
+  };
+}
+
+/**
+ * The harness auto-mode directive EXACTLY as it appears in a real transcript
+ * (captured from a CCR session, 2026-09-13). Kept verbatim on purpose.
+ *
+ * LS-10135: the LS-9755 carve-out shipped dead because the only spec covering
+ * detection asserted against a hand-written title-case approximation
+ * ("## Auto Mode Active") that the harness never actually emits, while the
+ * real directive is sentence-case prose. Any future edit to the marker set
+ * must keep this string passing untouched — do not "tidy" its casing,
+ * punctuation, or wording to match the implementation.
+ */
+const VERBATIM_AUTO_MODE_DIRECTIVE = `While auto mode is active:
+
+Do your work through the Bash tool wherever it can accomplish the job: read files with cat, head, or sed -n, search with grep and find, and make file changes with sed, heredocs, or short scripts, rather than using the dedicated Read, Edit, or Write tools. Fall back to a dedicated tool only when Bash genuinely cannot do the job.`;
+
+/** A transcript record carrying `text` in a single content block. */
+function textRecord(text: string): unknown {
+  return {
+    timestamp: '2026-07-26T12:00:00.000Z',
+    sessionId: 'session-1',
+    message: { content: [{ type: 'text', text }] },
   };
 }
 
@@ -966,9 +991,133 @@ describe('audit-session-bash-parse', () => {
       expect(detectAutoModeFromContent(raw)).toBe(true);
     });
 
+    it('returns true for the VERBATIM directive text as it appears in a real transcript (LS-10135)', () => {
+      const raw = toJsonl([textRecord(VERBATIM_AUTO_MODE_DIRECTIVE)]);
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
+    it('returns true when the verbatim directive is embedded in a larger system-reminder block (LS-10135)', () => {
+      const raw = toJsonl([
+        bashUseRecord('ls -la'),
+        textRecord(
+          `<system-reminder>\n${VERBATIM_AUTO_MODE_DIRECTIVE}\n</system-reminder>`,
+        ),
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
+    it('matches the directive regardless of casing (LS-10135)', () => {
+      const raw = toJsonl([
+        textRecord(VERBATIM_AUTO_MODE_DIRECTIVE.toUpperCase()),
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
+    it('tolerates the directive phrase wrapping across lines or extra spacing (LS-10135)', () => {
+      const raw = toJsonl([
+        textRecord(
+          'While auto mode\n  is   active:\n\nDo your work through the Bash tool...',
+        ),
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(true);
+    });
+
     it('returns false when no transcript block mentions auto mode', () => {
       const raw = toJsonl([bashUseRecord('ls -la')]);
       expect(detectAutoModeFromContent(raw)).toBe(false);
+    });
+
+    it('does not match incidental prose that merely mentions auto mode (LS-10135)', () => {
+      const raw = toJsonl([
+        textRecord(
+          'The user turned auto mode off earlier, so Read/Grep remain mandatory here.',
+        ),
+      ]);
+      expect(detectAutoModeFromContent(raw)).toBe(false);
+    });
+  });
+
+  describe('detectAutoMode', () => {
+    it('detects the verbatim directive in a JSONL transcript on disk (LS-10135)', () => {
+      const jsonlPath = join(fixtureDir, 'transcript.jsonl');
+      writeFileSync(
+        jsonlPath,
+        toJsonl([
+          bashUseRecord('cat AGENTS.md'),
+          textRecord(VERBATIM_AUTO_MODE_DIRECTIVE),
+        ]),
+      );
+
+      expect(detectAutoMode(jsonlPath)).toBe(true);
+    });
+
+    it('returns false for a transcript without the directive', () => {
+      const jsonlPath = join(fixtureDir, 'plain.jsonl');
+      writeFileSync(jsonlPath, toJsonl([bashUseRecord('ls -la')]));
+
+      expect(detectAutoMode(jsonlPath)).toBe(false);
+    });
+
+    it('returns false when the transcript file does not exist', () => {
+      expect(detectAutoMode(join(fixtureDir, 'missing.jsonl'))).toBe(false);
+    });
+  });
+
+  describe('auto-mode carve-out, end to end from the real directive (LS-10135)', () => {
+    it('moves the four FILE-READ/GREP carve-out families into informational.auto_mode_excluded', () => {
+      // Detection and classification are wired together here deliberately:
+      // LS-10135 was invisible to both halves' own specs because each passed
+      // in isolation while the seam between them never fired in practice.
+      const autoModeActive = detectAutoModeFromContent(
+        toJsonl([textRecord(VERBATIM_AUTO_MODE_DIRECTIVE)]),
+      );
+      expect(autoModeActive).toBe(true);
+
+      const calls = [
+        synthBashCall('find . -type f -name "*.ts"'),
+        synthBashCall('grep -r "foo" src/'),
+        synthBashCall("sed -n '10,50p' foo.txt"),
+        synthBashCall('wc -l foo.txt'),
+        synthBashCall('docker ps'),
+      ];
+
+      const report = JSON.parse(
+        formatAudit(calls, [], 'session-1', null, undefined, autoModeActive),
+      ) as {
+        summary: Record<string, number | boolean>;
+        action_required: {
+          gaps_to_review: Array<Record<string, unknown>>;
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+        informational: { auto_mode_excluded: Array<Record<string, unknown>> };
+      };
+
+      expect(report.summary.auto_mode_active).toBe(true);
+      expect(report.summary.auto_mode_excluded).toBe(4);
+
+      const excluded = report.informational.auto_mode_excluded.map(
+        (g) => g['pattern'],
+      );
+      expect(excluded).toEqual(
+        expect.arrayContaining([
+          'find . -type',
+          'grep -r "foo"',
+          "sed -n '<range>' <file>",
+          'wc -l <file>',
+        ]),
+      );
+
+      // None of the four leak into action_required...
+      const actionable = [
+        ...report.action_required.gaps_to_review,
+        ...report.action_required.gaps_auto_classified,
+      ].map((g) => g['pattern']);
+      for (const pattern of excluded) {
+        expect(actionable).not.toContain(pattern);
+      }
+
+      // ...while a genuine non-file-read gap still surfaces.
+      expect(actionable).toContain('docker ps');
     });
   });
 
