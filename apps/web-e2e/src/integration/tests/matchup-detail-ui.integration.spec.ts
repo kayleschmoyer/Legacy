@@ -56,6 +56,76 @@ let state: MatchupDetailState;
 // Helpers
 // ---------------------------------------------------------------------------
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll the backend until `Matchup.winProbability` is non-null (LS-8684).
+ *
+ * Phase 6's panel has a *data* precondition the spec never waited on.
+ * `Matchup.winProbability` is computed server-side and returns null whenever
+ * every rostered player's projected+actual total is still 0
+ * (`lambdas/db/src/schema/matchups/winProbability.ts` —
+ * `if (team1Total === 0 && team2Total === 0) return null`). Those totals come
+ * from per-player season stats, which are downloaded from Baseball Reference
+ * under a 15-req/min single-concurrency throttle and cached globally per
+ * player-season. This spec runs an *automated random* draft, so which players
+ * it lands on — and therefore how much of that data is already cached — varies
+ * run to run.
+ *
+ * When the field is null the client renders nothing at all for a non-Scheduled
+ * matchup (`MatchupWinProbabilityPanel`'s `if (!winProb) ... return null`), so
+ * "WIN PROBABILITY" is simply absent from the DOM. No amount of browser
+ * reloading changes that, which is why Phase 6 flaked on a cold run and passed
+ * on the failed-only rerun once the same players were cached.
+ *
+ * Gating on the field itself — rather than on a proxy like the matchup's
+ * `statsLoadingStatus`, which only advances when the scheduled `autoSelectGames`
+ * mutation runs and this spec never invokes it — keeps the wait tied to exactly
+ * the precondition the assertion needs. On timeout it fails naming the real
+ * cause instead of surfacing as an opaque UI visibility timeout.
+ */
+async function waitForWinProbability(
+  jwt: string,
+  matchupId: number,
+  timeoutMs: number,
+): Promise<void> {
+  const start = Date.now();
+  let lastSeen = 'never queried';
+
+  while (Date.now() - start < timeoutMs) {
+    const data = await gqlFetch<{
+      getMatchupById: {
+        status: string;
+        winProbability: { team1ProjectedScore: number } | null;
+      } | null;
+    }>(
+      jwt,
+      `query WinProbabilityReady($id: Int!) {
+         getMatchupById(id: $id) {
+           status
+           winProbability { team1ProjectedScore }
+         }
+       }`,
+      { id: matchupId },
+    ).catch(() => null);
+
+    if (data?.getMatchupById?.winProbability != null) return;
+    lastSeen = data?.getMatchupById
+      ? `status=${data.getMatchupById.status}, winProbability=null`
+      : 'getMatchupById returned null';
+    await delay(5_000);
+  }
+
+  throw new Error(
+    `[matchup-detail] Matchup.winProbability never became available for matchup ` +
+      `${matchupId} within ${timeoutMs}ms (last seen: ${lastSeen}). The panel ` +
+      `cannot render without it — see waitForWinProbability above. This is a ` +
+      `backend/data-availability failure, not a UI timing one.`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Serial test suite
 // ---------------------------------------------------------------------------
@@ -305,18 +375,40 @@ test.describe
 
   test('Phase 6: Win probability panel renders', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
+    // Budgeted for the data gate below, which owns most of this phase's wall
+    // time when the drafted players' season stats are not yet cached.
+    test.setTimeout(180_000);
+
+    await test.step('Wait for win probability to be computable', async () => {
+      // Deterministic backend gate for the panel's data precondition — see
+      // waitForWinProbability's docstring for why this is the right signal and
+      // why reloading the browser cannot substitute for it (LS-8684).
+      await waitForWinProbability(commissionerJwt, state.matchupId, 120_000);
+    });
+
     await page.goto(
       `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`,
     );
     await page.waitForLoadState('load');
 
     await test.step('WIN PROBABILITY label is visible', async () => {
-      // The win-probability panel renders only after the browser-side matchup
-      // query resolves; under nightly load that first request can be throttled
-      // (429), leaving the panel unmounted. Reload to re-fire it before
-      // asserting (LS-8138 — backend 429s now retry in apollo-client; this is
-      // the belt-and-suspenders UI gate).
+      // The panel's *data* precondition — a non-null server-computed
+      // Matchup.winProbability — is guaranteed by the gate above (LS-8684).
+      // What remains here is the ordinary browser-side
+      // race: the panel mounts only once this page's Apollo query resolves, and
+      // under nightly load that first request can be throttled (429), leaving
+      // it unmounted (LS-8138 — backend 429s now retry in apollo-client; this
+      // is the belt-and-suspenders UI gate).
+      //
+      // The defaults are deliberate now that `pollTimeoutMs` is honoured
+      // (LS-8684): three genuine 5s waits with a reload between them, then the
+      // closing 15s assertion. Previously the poll was an ignored-timeout
+      // `isVisible()` check, so this call reloaded three times in quick
+      // succession — cancelling the very query it was waiting on — and the
+      // panel had only that final 15s window to appear. "not visible after 15s"
+      // in the LS-8684 report is exactly that window expiring.
       await reloadUntilVisible(page, page.getByText('WIN PROBABILITY').first());
     });
 

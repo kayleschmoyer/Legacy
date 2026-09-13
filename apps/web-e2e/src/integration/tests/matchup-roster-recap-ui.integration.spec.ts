@@ -176,10 +176,20 @@ test.describe
       // Budget-aware gate (LS-8211): keep re-firing the throttled query across
       // most of this 60s phase budget instead of exhausting a fixed 3 reloads
       // early and then walking the residual one-shot timeout.
+      //
+      // `pollTimeoutMs` is explicit (LS-8684). MatchupRosterComparison renders
+      // this heading in *every* branch it has — loading skeleton, error, and
+      // populated alike — so the only way it is missing is that
+      // MatchupDetailPage itself is still on `MatchupDetailSkeleton`, i.e. the
+      // page-level GetMatchupById query has not come back yet. Reloading
+      // restarts that query rather than helping it, so the gate has to give
+      // each attempt longer than the query takes (~5-20s on the dev stack) or
+      // it just aborts it repeatedly. The total 45s budget is unchanged — it is
+      // reallocated from reload churn to actually waiting.
       await reloadUntilVisible(
         page,
         page.getByRole('heading', { name: /Player Matchups/i }),
-        { finalTimeoutMs: 20_000, budgetMs: 45_000 },
+        { pollTimeoutMs: 15_000, finalTimeoutMs: 20_000, budgetMs: 45_000 },
       );
     });
 
@@ -249,7 +259,11 @@ test.describe
       // Budget-aware gate (LS-8211): the concrete 429-exhaustion instance this
       // ticket targets — Phase 2 BATTERS exhausted 3 reloads + a 20s assert
       // under nightly load. Keep re-firing across most of the 60s phase budget.
+      // `pollTimeoutMs` explicit for the same reason as Phase 1 (LS-8684): a
+      // reload restarts the matchup query, so each attempt must outlast the
+      // query rather than cut it off. Total budget unchanged.
       await reloadUntilVisible(page, page.getByText('BATTERS').first(), {
+        pollTimeoutMs: 15_000,
         finalTimeoutMs: 20_000,
         budgetMs: 45_000,
       });

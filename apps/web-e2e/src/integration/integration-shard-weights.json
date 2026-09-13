@@ -5,7 +5,7 @@
     "live-draft-ui.integration.spec.ts": 1400,
     "mock-draft-simulator-ui.integration.spec.ts": 600,
     "full-season-ui.integration.spec.ts": 480,
-    "matchup-detail-ui.integration.spec.ts": 360,
+    "matchup-detail-ui.integration.spec.ts": 480,
     "matchup-roster-editor-ui.integration.spec.ts": 300,
     "matchup-roster-recap-ui.integration.spec.ts": 300,
     "roster-management-ui.integration.spec.ts": 300,
@@ -25,6 +25,7 @@
     "subscription-gating.integration.spec.ts": 90,
     "google-oauth.integration.spec.ts": 60,
     "tiered-auth.integration.spec.ts": 30,
+    "reload-until-visible.contract.spec.ts": 15,
     "wait-for-join-page-helpers.contract.spec.ts": 5
   }
 }

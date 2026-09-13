@@ -5,6 +5,40 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Wait up to `timeoutMs` for `locator` to become visible; resolve `true` if it
+ * did, `false` if the wait expired.
+ *
+ * **This must not be `locator.isVisible({ timeout })` (LS-8684).** Playwright
+ * documents `isVisible`'s `timeout` as deprecated *and ignored* —
+ * `locator.isVisible()` "does not wait for the element to become visible and
+ * returns immediately". The gate below previously polled with `isVisible`, so
+ * `pollTimeoutMs` was dead: every attempt was an instantaneous check followed
+ * by a `page.reload()`.
+ *
+ * Against the live backend that inverted the helper's purpose. These pages
+ * render the awaited content only after a browser-side Apollo query resolves
+ * (5-20s on the dev stack), and `waitForLoadState('load')` fires long before
+ * that. So the loop reloaded roughly every `cooldownMs`, **aborting the very
+ * in-flight query it was waiting on** — the content could only ever appear
+ * during the closing `toBeVisible` window, when the page was finally left
+ * alone. Whether a spec passed came down to whether one backend round-trip fit
+ * inside that single window, which is exactly the rotating same-SHA flake
+ * LS-8684 tracked (matchup-detail Phase 6 reported "not visible after 15s" —
+ * its default `finalTimeoutMs` — and matchup-roster-recap Phase 1 walked its
+ * whole test budget).
+ *
+ * `locator.waitFor` returns as soon as the element is visible and throws on
+ * expiry, so the gate now spends its budget *waiting* for the query and
+ * reloads only when an attempt genuinely failed.
+ */
+function pollVisible(locator: Locator, timeoutMs: number): Promise<boolean> {
+  return locator
+    .waitFor({ state: 'visible', timeout: Math.max(1, timeoutMs) })
+    .then(() => true)
+    .catch(() => false);
+}
+
 interface ReloadUntilVisibleOptions {
   /**
    * Maximum number of reload attempts before letting the final assertion run.
@@ -40,6 +74,15 @@ interface ReloadUntilVisibleOptions {
    * it breaks immediately on the first successful poll (so a healthy page pays
    * no extra cost) and only ever adds reload attempts within the test's own
    * timeout — it cannot turn a passing spec into a failing one.
+   *
+   * That last claim only became true with the LS-8684 fix to `pollVisible`.
+   * While the poll was a no-op `isVisible()` check, *every* extra attempt this
+   * mode bought was an extra `page.reload()` that cancelled the in-flight query
+   * without ever waiting on it, so budget-aware mode strictly reduced the
+   * uninterrupted time a page got and made the specs it was applied to flakier,
+   * not steadier. Keep `pollTimeoutMs` at or above the page's expected
+   * query latency: that is what decides whether a reload is a genuine retry or
+   * just an abort.
    */
   budgetMs?: number;
 }
@@ -77,10 +120,10 @@ export async function reloadUntilVisible(
     const remaining = () => budgetMs - (Date.now() - start);
     // Keep reloading while there is room for at least one more poll+reload
     // cycle on top of the reserved closing assertion window.
+    // The guard reserves a full `pollTimeoutMs` on top of the closing window,
+    // so the wait below can run to expiry without eating into it.
     while (remaining() > finalTimeoutMs + pollTimeoutMs + cooldownMs) {
-      if (
-        await locator.isVisible({ timeout: pollTimeoutMs }).catch(() => false)
-      ) {
+      if (await pollVisible(locator, pollTimeoutMs)) {
         break;
       }
       // Bound the reload itself to the remaining budget (minus the reserved
@@ -114,9 +157,7 @@ export async function reloadUntilVisible(
   }
 
   for (let i = 0; i < attempts; i++) {
-    if (
-      await locator.isVisible({ timeout: pollTimeoutMs }).catch(() => false)
-    ) {
+    if (await pollVisible(locator, pollTimeoutMs)) {
       break;
     }
     await page.reload();
