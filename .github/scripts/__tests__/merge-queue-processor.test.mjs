@@ -165,6 +165,24 @@ function makeGithub({
       if (fn === github.rest.pulls.listReviews) return reviews;
       if (fn === github.rest.pulls.list) return sweepPRs;
       if (fn === github.rest.pulls.listFiles) return prListFiles;
+      if (fn === github.rest.issues.listComments) {
+        // Delegate to the endpoint (like the checks/statuses branches below)
+        // rather than returning the seed array directly: tests that override
+        // github.rest.issues.listComments must still be honoured, and walking
+        // the pages is what makes the mock a faithful stand-in for paginate.
+        const perPage = args?.per_page ?? 30;
+        const all = [];
+        for (let page = 1; ; page++) {
+          const res = await github.rest.issues.listComments({
+            ...args,
+            per_page: perPage,
+            page,
+          });
+          all.push(...res.data);
+          if (res.data.length < perPage) break;
+        }
+        return all;
+      }
       if (fn === github.rest.checks.listForRef) {
         const res = await github.rest.checks.listForRef(args);
         return res.data.check_runs;
@@ -262,7 +280,18 @@ function makeGithub({
         listForRef: async () => ({ data: { check_runs: checkRuns } }),
       },
       issues: {
-        listComments: async () => ({ data: issueComments }),
+        // LS-10123: GitHub serves issue comments one page at a time
+        // (per_page defaults to 30), so the mock must too. Returning the whole
+        // list unconditionally hid a real first-page-only read in the
+        // production code — the paginated-read regression tests below depend
+        // on this staying faithful.
+        listComments: async (args = {}) => {
+          const perPage = args.per_page ?? 30;
+          const page = args.page ?? 1;
+          return {
+            data: issueComments.slice((page - 1) * perPage, page * perPage),
+          };
+        },
         createComment: async (args) => {
           calls.comments.push(args);
           return { data: { id: 1 } };
@@ -3346,12 +3375,14 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
     }),
   );
 
-  // ── LS-9753: cap retriggers to a maximum per hour ───────────────────────────
+  // ── LS-9753 / LS-10123: cap retriggers within a rolling window ──────────────
 
   it(
-    'fails open once the hourly retrigger cap is reached instead of retriggering again',
+    'fails open once the retrigger cap is reached instead of retriggering again',
     withGuardWorkspace(async () => {
-      const recentHistory = Array.from({ length: 4 }, (_, i) =>
+      // Exactly at the cap (LS-10123 lowered it to 2), so this also pins the
+      // boundary: the Nth retrigger is the last one allowed.
+      const recentHistory = Array.from({ length: 2 }, (_, i) =>
         new Date(Date.now() - (i + 1) * 60 * 1000).toISOString(),
       );
       const { github, calls } = makeGuardGithub({
@@ -3387,10 +3418,12 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
   );
 
   it(
-    'ignores retrigger history older than the one-hour window',
+    'ignores retrigger history older than the rolling window',
     withGuardWorkspace(async () => {
+      // Older than the LS-10123 window (4h), so a long-lived PR is never
+      // permanently exempt from the guard on the strength of ancient history.
       const staleHistory = Array.from({ length: 4 }, (_, i) =>
-        new Date(Date.now() - (2 * 60 + i) * 60 * 1000).toISOString(),
+        new Date(Date.now() - (5 * 60 + i) * 60 * 1000).toISOString(),
       );
       const { github, calls } = makeGuardGithub({
         pr: makePR({ mergeable_state: 'behind' }),
@@ -3431,6 +3464,217 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
     }),
   );
 
+  // ── LS-10123: the counter must be durable and the cap reachable ─────────────
+  //
+  // Root cause: the two issues.listComments reads backing the retrigger marker
+  // were the only unpaginated list calls in the processor. The merge-queue
+  // status comment is rewritten in place, so it keeps its original position;
+  // once a PR accumulates more than one page of comments the first-page read
+  // stops finding it. The counter then reset every cycle and the cap could
+  // never engage — PR #7961 was retriggered 3 times in 1h45m, the third
+  // landing 53s after approval.
+
+  // 30+ comments of unrelated traffic (review cycles, bots) ahead of the queue
+  // status comment, which is what a real long-running PR looks like.
+  const commentNoise = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: 1000 + i,
+      body: `unrelated comment ${i}`,
+    }));
+
+  it(
+    'reads the retrigger history from a status comment beyond the first page',
+    withGuardWorkspace(async () => {
+      const recentHistory = Array.from({ length: 2 }, (_, i) =>
+        new Date(Date.now() - (i + 1) * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0013mmm')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          ...commentNoise(40),
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(recentHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        0,
+        'history on page 2 must still count against the cap — an unpaginated ' +
+          'read reports "no history" and retriggers forever (LS-10123)',
+      );
+      assert.strictEqual(calls.merges.length, 1);
+      assert.match(logs, /verdict=fail-open:retrigger-cap-reached/);
+    }),
+  );
+
+  it(
+    'updates the existing status comment beyond the first page instead of duplicating it',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0014nnn')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          ...commentNoise(40),
+          { id: 42, body: '<!-- MERGE-QUEUE-STATUS -->\nprior status' },
+        ],
+      });
+
+      await runCapturingLogs(github);
+
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.ok(blocker, 'the revalidation blocker comment must be written');
+      assert.strictEqual(
+        blocker.comment_id,
+        42,
+        'must UPDATE the existing status comment; a first-page-only lookup ' +
+          'creates a duplicate queue comment every cycle (LS-10123)',
+      );
+    }),
+  );
+
+  it(
+    'counts retriggers spanning more than an hour (the PR #7961 starvation pattern)',
+    withGuardWorkspace(async () => {
+      // The real incident: retriggers at 17:10, 17:35 and 18:54 — 1h45m apart
+      // end to end. Under the original one-hour window each evaluation saw an
+      // empty window, so the cap never engaged and the PR had no progress
+      // guarantee at all.
+      const spreadHistory = [95, 70].map((minutesAgo) =>
+        new Date(Date.now() - minutesAgo * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0015ooo')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(spreadHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        0,
+        'two retriggers 95 and 70 minutes ago must reach the cap — a window ' +
+          'shorter than the ~25min validation cycle is unreachable (LS-10123)',
+      );
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'at the cap the PR merges on the validation it already passed',
+      );
+      assert.match(logs, /verdict=fail-open:retrigger-cap-reached/);
+    }),
+  );
+
+  it(
+    'names the retrigger count and cap in the revalidation comment',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0016ppp')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      await runCapturingLogs(github);
+
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.match(
+        blocker.body,
+        /Revalidation 1 of 2 for this PR in the last 4h/,
+        'repeat starvation must be visible on the PR, not only in queue logs',
+      );
+    }),
+  );
+
+  it(
+    'reports the would-be revalidation ordinal on a dry run without advancing it',
+    withGuardWorkspace(async () => {
+      const priorHistory = [
+        new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      ];
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0017qqq')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(priorHistory)} -->`,
+          },
+        ],
+      });
+
+      await runCapturingLogs(github, { isDryRun: true });
+
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.match(
+        blocker.body,
+        /Revalidation 2 of 2 for this PR in the last 4h/,
+        'the ordinal counts this revalidation, so it cannot be read off the ' +
+          'marker array — a dry run deliberately does not advance that',
+      );
+      assert.match(
+        blocker.body,
+        /<!-- LS-9662-RETRIGGERS:\["[^"]+"\] -->/,
+        'the persisted marker must still hold exactly the one prior entry',
+      );
+    }),
+  );
+
   it(
     'dry run does not advance the retrigger history',
     withGuardWorkspace(async () => {
@@ -3454,7 +3698,7 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
       assert.match(
         blocker.body,
         /<!-- LS-9662-RETRIGGERS:\[\] -->/,
-        'a dry run must not record a real retrigger against the hourly cap',
+        'a dry run must not record a real retrigger against the cap',
       );
     }),
   );

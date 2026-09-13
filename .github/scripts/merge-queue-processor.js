@@ -232,8 +232,31 @@ function specHasProximateOverlap(
 // with the guard's fail-open contract elsewhere. History is tracked via a
 // hidden marker in the merge-queue status comment (no new storage), the same
 // approach LS-9209 uses for its self-heal attempt counter.
-const MAX_STALENESS_RETRIGGERS_PER_HOUR = 4;
-const STALENESS_RETRIGGER_WINDOW_MS = 60 * 60 * 1000;
+//
+// LS-10123 — the cap must be REACHABLE to be a progress guarantee. As first
+// shipped (4 per rolling hour) it was unreachable by construction: one
+// revalidation costs a full CI run (~22-27 min), so at most two can even
+// begin inside a one-hour window and a fourth can never occur within it. PR
+// #7961 was retriggered 3 times in 1h45m — the third landing 53s after the
+// Reviewer Bot approved — and every one of those evaluations saw a window
+// containing zero prior retriggers. The cap therefore never engaged and the
+// PR had no progress guarantee at all; it merged after ~2h on timing luck.
+//
+// Calibrated against the cost of the thing being capped rather than against
+// wall-clock convenience: the window spans several validation cycles so
+// consecutive retriggers actually accumulate, and N is the point where the
+// PR has already spent ~50+ min purely revalidating through no fault of its
+// own. A PR that trips this merges on the validation it already passed, which
+// is exactly the trade LS-9753 chose (merge over an unbounded retrigger loop)
+// — this only makes that choice take effect. The window still forgets old
+// history, so a long-lived PR is never permanently exempt from the guard.
+const MAX_STALENESS_RETRIGGERS = 2;
+const STALENESS_RETRIGGER_WINDOW_MS = 4 * 60 * 60 * 1000;
+// Derived, never hand-maintained: a label that can drift from the window it
+// describes turns every log line and PR comment below into a quiet lie.
+const STALENESS_RETRIGGER_WINDOW_LABEL = `${
+  STALENESS_RETRIGGER_WINDOW_MS / (60 * 60 * 1000)
+}h`;
 const STALENESS_RETRIGGER_MARKER_RE =
   /<!-- LS-9662-RETRIGGERS:(\[[^\]]*\]) -->/;
 
@@ -1125,12 +1148,13 @@ module.exports = async ({
       const retriggerHistory = (await getStalenessRetriggerHistory(pr)).filter(
         (ts) => now - new Date(ts).getTime() < STALENESS_RETRIGGER_WINDOW_MS,
       );
-      if (retriggerHistory.length >= MAX_STALENESS_RETRIGGERS_PER_HOUR) {
+      if (retriggerHistory.length >= MAX_STALENESS_RETRIGGERS) {
         logVerdict(
           'fail-open:retrigger-cap-reached',
           `${retriggerHistory.length} revalidation(s) already triggered on this PR in the last ` +
-            `hour (cap ${MAX_STALENESS_RETRIGGERS_PER_HOUR}) — merging as today rather than ` +
-            `retriggering again (LS-9753)`,
+            `${STALENESS_RETRIGGER_WINDOW_LABEL} (cap ${MAX_STALENESS_RETRIGGERS}) — merging on ` +
+            `the validation this PR already passed rather than retriggering again ` +
+            `(LS-9753, recalibrated in LS-10123)`,
         );
         return { verdict: 'fail-open:retrigger-cap-reached', block: false };
       }
@@ -1143,6 +1167,10 @@ module.exports = async ({
         gapCommits,
         totalGapCommits,
         validatedBase,
+        // Which revalidation this one is (1-based). Reported separately from
+        // retriggerHistory because a dry run deliberately does NOT advance
+        // that array, so its length would under-report by one there.
+        retriggerOrdinal: retriggerHistory.length + 1,
       };
 
       if (isDryRun) {
@@ -1658,12 +1686,20 @@ module.exports = async ({
   // must never block the guard's fail-open contract.
   async function getStalenessRetriggerHistory(pr) {
     try {
-      const comments = await github.rest.issues.listComments({
+      // LS-10123: MUST paginate. The status comment is rewritten in place and
+      // therefore keeps its original position in the comment list, so on a PR
+      // that accumulates more than one page of comments (review cycles, bot
+      // traffic) an unpaginated first-page read silently misses it and reports
+      // "no history" — which reset the retrigger counter on every cycle and
+      // made the LS-9753 cap unreachable (see the block comment at
+      // MAX_STALENESS_RETRIGGERS).
+      const comments = await github.paginate(github.rest.issues.listComments, {
         owner,
         repo,
         issue_number: pr.number,
+        per_page: 100,
       });
-      const statusComment = comments.data.find(
+      const statusComment = comments.find(
         (c) => c.body && c.body.includes('<!-- MERGE-QUEUE-STATUS -->'),
       );
       const match = statusComment?.body?.match(STALENESS_RETRIGGER_MARKER_RE);
@@ -1687,12 +1723,18 @@ module.exports = async ({
       commentBody = commentMarker + '\n' + commentBody;
     }
 
-    const comments = await github.rest.issues.listComments({
+    // LS-10123: MUST paginate — see getStalenessRetriggerHistory. An
+    // unpaginated read that misses the existing status comment does not just
+    // lose the retrigger marker: it CREATES A DUPLICATE status comment, so the
+    // carry-forward below never runs and the PR accumulates one orphaned queue
+    // comment per cycle.
+    const comments = await github.paginate(github.rest.issues.listComments, {
       owner,
       repo,
       issue_number: pr.number,
+      per_page: 100,
     });
-    const existingComment = comments.data.find(
+    const existingComment = comments.find(
       (c) => c.body && c.body.includes(commentMarker),
     );
 
@@ -2259,7 +2301,17 @@ module.exports = async ({
         pr.base.ref +
         '` since this PR was last validated: ' +
         commitList.join(', ') +
-        (extraCommits > 0 ? ` …and ${extraCommits} more` : '');
+        (extraCommits > 0 ? ` …and ${extraCommits} more` : '') +
+        // LS-10123: surface the durable retrigger counter so repeat starvation
+        // is visible on the PR itself, not only in the queue run logs.
+        '\n\nRevalidation ' +
+        guard.retriggerOrdinal +
+        ' of ' +
+        MAX_STALENESS_RETRIGGERS +
+        ' for this PR in the last ' +
+        STALENESS_RETRIGGER_WINDOW_LABEL +
+        '. At the cap the queue stops retriggering and merges on the validation ' +
+        'this PR has already passed.';
     } else if (validation.unresolvedThreads) {
       comment +=
         '\n1. Resolve all open review comment threads on the PR\n' +
