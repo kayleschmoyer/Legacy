@@ -21,6 +21,7 @@ import {
   type UserListNotification,
   WebSocketClient,
   type WebSocketMessage,
+  type WebSocketViewContext,
 } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 
@@ -85,7 +86,12 @@ interface UseWebSocketOptions {
   token?: string;
   leagueId?: number;
   matchupId?: number;
-  viewContext?: 'general' | 'league' | 'matchup' | 'roster';
+  /**
+   * Joins the draft-keyed realtime channel (LS-10075). Pair with a `'draft'`
+   * or `'draft-preview'` viewContext; replaces `leagueId` for draft rooms.
+   */
+  draftId?: number;
+  viewContext?: WebSocketViewContext;
   autoConnect?: boolean;
   /**
    * Overrides `WebSocketClient`'s default heartbeat cadence (see
@@ -149,6 +155,7 @@ export function useWebSocket({
   token,
   leagueId,
   matchupId,
+  draftId,
   viewContext = 'general',
   autoConnect = true,
   heartbeatMs,
@@ -216,10 +223,11 @@ export function useWebSocket({
       hasToken: !!token,
       leagueId,
       matchupId,
+      draftId,
       viewContext,
       autoConnect,
     });
-  }, [wsUrl, token, leagueId, matchupId, viewContext, autoConnect]);
+  }, [wsUrl, token, leagueId, matchupId, draftId, viewContext, autoConnect]);
 
   const connect = useCallback(() => {
     if (!wsUrl) {
@@ -258,7 +266,8 @@ export function useWebSocket({
     (newContext: {
       matchupId?: number;
       leagueId?: number;
-      viewContext?: 'general' | 'league' | 'matchup' | 'roster';
+      draftId?: number;
+      viewContext?: WebSocketViewContext;
     }) => {
       if (clientRef.current) {
         clientRef.current.updateContext(newContext);
@@ -288,6 +297,7 @@ export function useWebSocket({
       url: `${wsUrl.substring(0, 30)}...`,
       hasToken: !!token,
       leagueId,
+      draftId,
       viewContext,
       autoConnect,
     });
@@ -300,6 +310,7 @@ export function useWebSocket({
       token,
       leagueId,
       matchupId,
+      draftId,
       viewContext,
       autoConnect: false,
     });
@@ -557,6 +568,7 @@ export function useWebSocket({
     token,
     leagueId,
     matchupId,
+    draftId,
     viewContext,
     autoConnect,
     heartbeatMs,

@@ -439,9 +439,18 @@ export function useDraftWebSocket({
   );
 
   // Whether a live socket is expected at all. Auction drafts and the
-  // signed-out / league-less states never open one, so "not connected" is
+  // signed-out / draft-less states never open one, so "not connected" is
   // their correct resting state and must not read as an outage (LS-9856).
-  const socketExpected = !!leagueId && isAuthenticated && !isAuctionDraft;
+  // A draftId alone is enough: the draft channel needs no league (LS-10160).
+  const socketExpected =
+    (!!draftId || !!leagueId) && isAuthenticated && !isAuctionDraft;
+
+  // Join the draft-keyed channel whenever the draftId is known (LS-10160).
+  // The server dual-broadcasts every draft event to the draft and league
+  // channels (LS-10075), so callers without a draftId keep the league channel.
+  const channel = draftId
+    ? { draftId, viewContext: 'draft' as const }
+    : { leagueId: leagueId ?? undefined, viewContext: 'league' as const };
 
   const {
     connected: wsConnected,
@@ -451,8 +460,7 @@ export function useDraftWebSocket({
   } = useWebSocket({
     url: websocketUrl,
     token,
-    leagueId: leagueId ?? undefined,
-    viewContext: 'league',
+    ...channel,
     autoConnect: socketExpected,
     heartbeatMs: DRAFT_HEARTBEAT_MS,
     onDraftStarted: handleDraftStarted,
@@ -598,8 +606,8 @@ export function useDraftWebSocket({
     // connection, but that push is best-effort, so explicitly re-request one
     // here too: userJoined/userLeft events missed while disconnected would
     // otherwise leave presence stale until the next full page mount
-    // (LDB-028).
-    if (leagueId) sendMessage({ type: 'requestUserList', leagueId });
+    // (LDB-028). Scoped to whichever channel the socket joined (LS-10160).
+    sendMessage({ type: 'requestUserList', draftId });
 
     void refetchWithRetry('current pick', () =>
       refetchCurrentPick({ draftId }),

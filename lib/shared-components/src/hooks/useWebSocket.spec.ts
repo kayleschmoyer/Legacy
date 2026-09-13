@@ -116,6 +116,21 @@ describe('useWebSocket', () => {
     });
   });
 
+  it('passes draftId through to the client for the draft channel (LS-10160)', () => {
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        draftId: 99,
+        viewContext: 'draft',
+      }),
+    );
+
+    expect(getConstructor()).toHaveBeenCalledWith(
+      expect.objectContaining({ draftId: 99, viewContext: 'draft' }),
+    );
+  });
+
   it('does not create client when url prop is omitted (callers must pass url)', () => {
     renderHook(() => useWebSocket({ token: 'jwt-token' }));
     expect(getConstructor()).not.toHaveBeenCalled();

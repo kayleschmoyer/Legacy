@@ -826,7 +826,7 @@ describe('useDraftWebSocket — presence re-sync on reconnect (LDB-028)', () => 
     );
   });
 
-  it('sends a requestUserList message on a genuine reconnect', () => {
+  it('sends a draft-scoped requestUserList message on a genuine reconnect (LS-10160)', () => {
     const params = makeDefaultParams();
     renderHook(() => useDraftWebSocket(params));
 
@@ -834,7 +834,79 @@ describe('useDraftWebSocket — presence re-sync on reconnect (LDB-028)', () => 
 
     expect(mockInstance.send).toHaveBeenCalledWith({
       type: 'requestUserList',
-      leagueId: params.leagueId,
+      draftId: params.draftId,
     });
+  });
+});
+
+// ── Draft-keyed realtime channel (LS-10160) ────────────────────────────────
+
+/**
+ * LS-10075 shipped the server-side draft channel (DraftIdIndex GSI, per-draft
+ * presence, dual broadcast). The draft room must now join it by draftId rather
+ * than riding the league channel, while callers with no draftId yet keep the
+ * league channel and auction drafts stay socket-less.
+ */
+describe('useDraftWebSocket — draft-keyed channel (LS-10160)', () => {
+  function getConstructor(): jest.Mock {
+    return jest.requireMock<{ WebSocketClient: jest.Mock }>(
+      '@legacy-sports/websocket-client',
+    ).WebSocketClient;
+  }
+
+  async function flushDeferredConnect() {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('opens the socket with draftId + viewContext "draft" when a draftId is available', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    await flushDeferredConnect();
+
+    expect(getConstructor()).toHaveBeenCalledTimes(1);
+    const options = (
+      getConstructor().mock.calls as unknown[][]
+    )[0][0] as Record<string, unknown>;
+    expect(options).toMatchObject({ draftId: 42, viewContext: 'draft' });
+    expect(options.leagueId).toBeUndefined();
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the draft socket even when no leagueId is present', async () => {
+    const params = { ...makeDefaultParams(), leagueId: null };
+    renderHook(() => useDraftWebSocket(params));
+    await flushDeferredConnect();
+
+    expect(getConstructor()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ draftId: 42, viewContext: 'draft' }),
+    );
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the league channel for a caller without a draftId', async () => {
+    const params = { ...makeDefaultParams(), draftId: null };
+    renderHook(() => useDraftWebSocket(params));
+    await flushDeferredConnect();
+
+    const options = (
+      getConstructor().mock.calls as unknown[][]
+    )[0][0] as Record<string, unknown>;
+    expect(options).toMatchObject({ leagueId: 1, viewContext: 'league' });
+    expect(options.draftId).toBeUndefined();
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps auction drafts socket-less even with a draftId', async () => {
+    const params = { ...makeDefaultParams(), isAuctionDraft: true };
+    renderHook(() => useDraftWebSocket(params));
+    await flushDeferredConnect();
+
+    expect(mockInstance.connect).not.toHaveBeenCalled();
   });
 });
