@@ -80,6 +80,16 @@ describe('listChildren', () => {
     expect(out).toBe('No children found for LS-1.');
   });
 
+  it("clamps maxResults to 100 when limit exceeds Jira's per-request cap", async () => {
+    mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+    await listChildren({ key: 'LS-1', limit: 500 });
+
+    expect(mockSearchJql).toHaveBeenCalledWith(
+      expect.objectContaining({ maxResults: 100 }),
+    );
+  });
+
   it('rejects malformed keys before calling the API', async () => {
     const result = await listChildren({ key: 'bad-key' });
 

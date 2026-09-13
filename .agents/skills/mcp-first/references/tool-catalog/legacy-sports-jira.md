@@ -145,13 +145,13 @@ Create a link between two tickets. For "Blocks": inwardKey is blocked by outward
 
 ### `jira_list_children`
 
-List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit` (cap 500).
+List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit`.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `key` | string | **required** | — | Parent ticket key |
 | `status` | string |  | — | Filter by status (e.g. "To Do", "Done") |
-| `limit` | number |  | coerced, integer, > 0, max 100 | Max per page (default 25, max 100); also bounds the total with paginate: true. |
+| `limit` | number |  | coerced, integer, > 0, max 500 | Page size (clamped to 100), or total cap with paginate: true (default 25, max 500). |
 | `pageToken` | string |  | — | Cursor from a previous response to fetch the next page |
 | `paginate` | boolean |  | — | Fetch all pages up to `limit` (cap 500) as { parent, total, children: [{key, summary, status}], truncated? }. |
 | `includeBlockers` | boolean |  | — | Annotate every child with blocker state, no extra Jira request, instead of looping jira_check_blockers. |

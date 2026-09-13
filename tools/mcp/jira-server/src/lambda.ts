@@ -235,11 +235,11 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_list_children',
-    'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit` (cap 500).',
+    'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit`.',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       status: z.string().optional(),
-      limit: z.coerce.number().int().positive().max(100).default(25),
+      limit: z.coerce.number().int().positive().max(500).default(25),
       pageToken: z.string().optional(),
       paginate: z.boolean().optional(),
       includeBlockers: z.boolean().default(false),

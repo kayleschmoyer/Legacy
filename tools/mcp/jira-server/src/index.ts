@@ -439,7 +439,7 @@ server.tool(
 // --- jira_list_children ---
 server.tool(
   'jira_list_children',
-  'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit` (cap 500).',
+  'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit`.',
   {
     key: z
       .string()
@@ -456,10 +456,10 @@ server.tool(
       .number()
       .int()
       .positive()
-      .max(100)
+      .max(500)
       .default(25)
       .describe(
-        'Max per page (default 25, max 100); also bounds the total with paginate: true.',
+        'Page size (clamped to 100), or total cap with paginate: true (default 25, max 500).',
       ),
     pageToken: z
       .string()

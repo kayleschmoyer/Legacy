@@ -88,7 +88,9 @@ export async function listChildren(
     const result = await searchJql<ChildFields>({
       jql,
       fields,
-      maxResults: limit,
+      // Jira's search/jql endpoint rejects maxResults above 100 per request;
+      // `limit` may be up to 500 (the paginate: true total cap), so clamp here.
+      maxResults: Math.min(limit, PAGINATE_PAGE_SIZE),
       pageToken,
     });
 
