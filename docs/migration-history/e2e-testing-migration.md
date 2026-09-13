@@ -1,5 +1,22 @@
 # E2E Testing Migration: Detox → Appium + WebDriverIO
 
+> **Archived — the scaffold this document describes no longer exists.**
+> `apps/app-e2e` (the WebdriverIO/Mocha scaffold set up by this migration) was
+> deleted in **LS-8697**. It was never wired into a CI workflow, drove generic
+> Android widget-class selectors rather than the Tamagui `testID` vocabulary
+> ADR-0016 requires, and its Jest specs only string-matched config and route
+> files. Every `apps/app-e2e/…` path and `nx run app-e2e:…` command below is
+> therefore **historical** and will not resolve.
+>
+> The native E2E path today is the shared Playwright suite in **`apps/web-e2e`**
+> driven through `AppiumNativeDriver` (`apps/web-e2e/src/driver/`), executed by
+> `.github/workflows/e2e-native-android.yml`. See
+> [ADR-0018](../decisions/0018-appium-native-driver.md) for the scoping decision,
+> [ADR-0016](../decisions/0016-test-dependency-injection.md) for the driver
+> seams, and `apps/web-e2e/src/driver/native-emulator-ci.md` for the emulator
+> job. Mobile session-lifecycle coverage is documented in
+> [Native session-lifecycle E2E](../mobile/session-lifecycle-e2e.md).
+
 ## Migration Summary
 
 Successfully migrated from Detox to Appium + WebDriverIO for React Native E2E testing. This provides a pure Node.js solution that avoids native installation requirements and Expo SDK compatibility issues.

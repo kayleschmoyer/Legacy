@@ -11,6 +11,10 @@ This directory contains mobile development documentation, focusing on React Nati
 - **[Android Build Caching](android-build-caching.md)** - Build performance optimization with multi-layer caching
 - **[Mobile Build Automation](mobile-build-automation.md)** - CI/CD for mobile builds
 
+### Testing
+
+- **[Native session-lifecycle E2E](session-lifecycle-e2e.md)** - What native auth session coverage is automated, what is deferred, and why
+
 ## 🎯 Quick Start
 
 ### Setting Up Android Development

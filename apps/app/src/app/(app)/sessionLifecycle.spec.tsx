@@ -13,7 +13,7 @@
 // A fresh `render(<Layout />)` models a cold app launch; the module-scoped store
 // persists across renders exactly like the on-device Keychain/Keystore persists
 // across process restarts. Emulator-driven variants of these flows are deferred to
-// the AppiumNativeDriver (LS-8447) — see apps/app-e2e/SESSION-LIFECYCLE-E2E.md.
+// the AppiumNativeDriver (LS-8447) — see docs/mobile/session-lifecycle-e2e.md.
 
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';

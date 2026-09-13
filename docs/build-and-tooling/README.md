@@ -18,8 +18,13 @@ This directory contains documentation for build systems, development tools, and 
 ### Testing Infrastructure
 
 - **[Jest Changed Files Config](jest-changed-files-config.md)** - Test only changed code
-- **[E2E Testing Migration](e2e-testing-migration.md)** - End-to-end test setup
 - **[E2E Test Maintenance](e2e-test-maintenance.md)** - Test skip policies and maintenance guidelines
+
+> The Detox → Appium/WebDriverIO migration record moved to
+> [migration-history/e2e-testing-migration.md](../migration-history/e2e-testing-migration.md)
+> when the `apps/app-e2e` scaffold it set up was retired (LS-8697). Native E2E
+> now runs through `apps/web-e2e`'s `AppiumNativeDriver` — see
+> [ADR-0018](../decisions/0018-appium-native-driver.md).
 
 ### Build Standards
 
@@ -36,7 +41,7 @@ This directory contains documentation for build systems, development tools, and 
 ### Setting Up Testing
 
 1. Configure Jest: [Jest Changed Files Config](jest-changed-files-config.md)
-2. Set up E2E: [E2E Testing Migration](e2e-testing-migration.md)
+2. Review E2E policy: [E2E Test Maintenance](e2e-test-maintenance.md)
 3. Follow testing patterns in [Nx Best Practices](nx-best-practices-assessment.md)
 
 ### Managing Nx Cloud
@@ -75,7 +80,7 @@ This directory contains documentation for build systems, development tools, and 
 ### Run Tests Efficiently
 
 1. Use [Jest Changed Files Config](jest-changed-files-config.md) for speed
-2. Configure E2E per [E2E Testing Migration](e2e-testing-migration.md)
+2. Keep E2E suites healthy per [E2E Test Maintenance](e2e-test-maintenance.md)
 3. Follow [Nx Best Practices](nx-best-practices-assessment.md)
 
 ---

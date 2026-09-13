@@ -25,10 +25,11 @@ export interface AndroidSessionConfig {
 }
 
 /**
- * Environment variables that configure a local native run. Mirrors the wdio
- * config in `apps/app-e2e` so a developer can point either at the same
- * emulator. Presence of {@link AppEnv.app} (the APK path) is the signal that a
- * native harness is available.
+ * Environment variables that configure a local native run. These are the ONLY
+ * native-session configuration surface — the parallel `apps/app-e2e` wdio config
+ * they used to mirror was retired in LS-8697 (ADR-0018). Presence of
+ * {@link AppEnv.app} (the APK path) is the signal that a native harness is
+ * available.
  */
 export const NATIVE_ENV = {
   /** Absolute path to the built debug APK — the presence signal. */

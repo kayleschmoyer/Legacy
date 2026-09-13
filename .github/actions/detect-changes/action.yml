@@ -248,7 +248,6 @@ runs:
             - lambdas/*/package.json
           e2e:
             - apps/web-e2e/**
-            - apps/app-e2e/**
           api-surface:
             - lambdas/db/schema.graphql
             - lambdas/db/src/schema/**

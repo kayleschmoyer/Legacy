@@ -20,7 +20,7 @@ import { Secret } from '../AuthHooks';
  *    call `injectTestSession` over a dev-only build seam to reach an authenticated
  *    state without a full OAuth round-trip. The build-path design and the emulator
  *    biometric-simulation approach are documented in
- *    `apps/app-e2e/SESSION-LIFECYCLE-E2E.md`.
+ *    `docs/mobile/session-lifecycle-e2e.md`.
  *
  * Safety: injecting a forged session must be impossible in a shipped build, so
  * every entry point throws when `NODE_ENV === 'production'` — the same guard

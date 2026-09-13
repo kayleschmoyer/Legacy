@@ -11,16 +11,15 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 
 ## Apps (`apps/`)
 
-| App                            | Nx project         | Root path                | Notes                                                                                                                                      |
-| ------------------------------ | ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Web (Vite + React)             | `web`              | `apps/web/src/`          | `react-router-dom` BrowserRouter; dev server port 4200. NOT Next.js.                                                                       |
-| Mobile (React Native / Expo)   | `app`              | `apps/app/src/`          |                                                                                                                                            |
-| CLI                            | `cli`              | `apps/cli/src/`          | Admin/ops commands — see [dev-environment](../dev-environment/SKILL.md) + its [CLI catalog](../dev-environment/references/cli-commands.md) |
-| GraphQL explorer (dev tool)    | `graphql-explorer` | `apps/graphql-explorer/` | Vite app for browsing the GraphQL API                                                                                                      |
-| Video (Remotion)               | —                  | `apps/video/`            | `@legacy-sports/video`; no `project.json` — not an Nx project                                                                              |
-| Web E2E tests (Playwright)     | `web-e2e`          | `apps/web-e2e/`          | Hermetic suite in `src/tests/`; live-backend suite in `src/integration/tests/`; dual-mode in `src/tests/shared/`                           |
-| Mobile E2E tests (WebdriverIO) | `app-e2e`          | `apps/app-e2e/`          | Skeletal WDIO + Appium scaffold — the runtime stack for the future `AppiumNativeDriver` (ADR-0016), not a parallel spec suite              |
-| CLI E2E tests                  | `cli-e2e`          | `apps/cli-e2e/`          |                                                                                                                                            |
+| App                          | Nx project         | Root path                | Notes                                                                                                                                                                                                                  |
+| ---------------------------- | ------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web (Vite + React)           | `web`              | `apps/web/src/`          | `react-router-dom` BrowserRouter; dev server port 4200. NOT Next.js.                                                                                                                                                   |
+| Mobile (React Native / Expo) | `app`              | `apps/app/src/`          |                                                                                                                                                                                                                        |
+| CLI                          | `cli`              | `apps/cli/src/`          | Admin/ops commands — see [dev-environment](../dev-environment/SKILL.md) + its [CLI catalog](../dev-environment/references/cli-commands.md)                                                                             |
+| GraphQL explorer (dev tool)  | `graphql-explorer` | `apps/graphql-explorer/` | Vite app for browsing the GraphQL API                                                                                                                                                                                  |
+| Video (Remotion)             | —                  | `apps/video/`            | `@legacy-sports/video`; no `project.json` — not an Nx project                                                                                                                                                          |
+| Web E2E tests (Playwright)   | `web-e2e`          | `apps/web-e2e/`          | Hermetic suite in `src/tests/`; live-backend suite in `src/integration/tests/`; dual-mode in `src/tests/shared/`; `src/driver/` is the WDIO/Appium `AppiumNativeDriver` that runs the shared suite natively (ADR-0018) |
+| CLI E2E tests                | `cli-e2e`          | `apps/cli-e2e/`          |                                                                                                                                                                                                                        |
 
 ## Lambdas (`lambdas/`)
 

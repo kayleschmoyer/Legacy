@@ -5,7 +5,7 @@
 // cover the *real* logic that produces that flag — in particular that a stored
 // session only counts when its JWT is present and unexpired. The emulator-level
 // fingerprint assertion (adb emu finger touch) is deferred to the AppiumNativeDriver
-// (LS-8447); see apps/app-e2e/SESSION-LIFECYCLE-E2E.md.
+// (LS-8447); see docs/mobile/session-lifecycle-e2e.md.
 
 import {
   BIOMETRIC_JWT_KEY,

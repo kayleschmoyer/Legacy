@@ -3,8 +3,15 @@
 Coverage for native auth's session lifecycle: secure-store JWT persistence,
 logout, and the biometric gate. This document records **what is automated today**
 and **what is deferred, why, and how** — per the phased approach the sibling
-ticket LS-8453 established (unit coverage now; driver/emulator specs after the
-`AppiumNativeDriver` lands in LS-8447).
+ticket LS-8453 established (unit coverage now; driver/emulator specs once the
+`AppiumNativeDriver` is wired to a booted emulator).
+
+> Previously `apps/app-e2e/SESSION-LIFECYCLE-E2E.md`. It moved here in LS-8697
+> when the `apps/app-e2e` WebdriverIO/Mocha scaffold was retired: the
+> `AppiumNativeDriver` this document defers to landed under **`apps/web-e2e`**
+> (the shared Playwright suite's native driver, ADR-0016/ADR-0017), not under
+> `apps/app-e2e`. Everything it describes is coverage of **`apps/app`**, so it
+> belongs with the rest of the mobile docs.
 
 ## Background
 
@@ -54,20 +61,28 @@ Every entry point throws when `NODE_ENV === 'production'`, mirroring the
 `EXPO_PUBLIC_BYPASS_AUTH` guard, and nothing in the app runtime imports the
 module, so it is never bundled into a shipped build.
 
-### Extending the harness to the emulator build path (deferred → LS-8447 / LS-8450)
+### Extending the harness to the emulator build path
 
-The unit specs call the harness in-process. The emulator-driven specs will call
-the **same** functions over a dev-only build seam once the driver exists:
+The unit specs call the harness in-process. The emulator-driven specs would call
+the **same** functions over a dev-only build seam:
 
-1. `AppiumNativeDriver` (LS-8447) `open()`s the app, then reaches an authenticated
-   state by invoking `injectTestSession` through a dev-menu action or a
-   `legacysports-dev://inject-session?jwt=…` deep link that is compiled **only**
+1. `AppiumNativeDriver` — landed in LS-8447 under
+   `apps/web-e2e/src/driver/` — `open()`s the app, then would reach an
+   authenticated state by invoking `injectTestSession` through a dev-menu action
+   or a `legacysports-dev://inject-session?jwt=…` deep link compiled **only**
    into non-production builds (guarded by the same `NODE_ENV`/build-flag check).
-2. The scheduled emulator job (LS-8450) — whose open AC is exactly "auth strategy:
-   bypass build vs. test session injection" — owns wiring that dev seam into CI.
-   This ticket implements the injection primitive and its unit exercise; it does
-   **not** add the dev-build route/menu, to stay inside scope and avoid
-   duplicating LS-8450.
+2. The emulator job landed in LS-8450 as
+   `.github/workflows/e2e-native-android.yml`. It resolved its "auth strategy"
+   AC the **other** way: rather than the dev-link session seam, it builds a
+   release APK with `EXPO_PUBLIC_BYPASS_AUTH=true`, so the app cold-launches
+   already authenticated as `LOCAL_USER`. That is enough to prove a surface
+   renders, but — as the "Background" section above notes — bypass never touches
+   secure storage or `getJwt`, so it cannot exercise anything on this page.
+
+**Still open, therefore:** the dev-only injection seam (dev-menu action or deep
+link) is the remaining piece needed before any of this document's concerns can
+be asserted on a real device. Until it exists, the unit layer below is the whole
+of the automated coverage, by design.
 
 ## Emulator biometric simulation (AC3) — deferred with rationale
 
@@ -76,9 +91,12 @@ enrolled fingerprint, **or** to record why that is out of scope. The button's
 visibility logic is fully covered at the unit layer (`BiometricAuth.spec.ts` +
 `login.spec.tsx`). The _emulator_ assertion is **deferred**, because:
 
-- There is no functional native test runner yet — the `AppiumNativeDriver`
-  (LS-8447) is the gate, and `apps/app-e2e` is still a skeletal WDIO/Appium
-  scaffold. An emulator biometric spec written now would be dead weight (per
+- The native runner now exists (`AppiumNativeDriver` under
+  `apps/web-e2e/src/driver/`, executed by
+  `.github/workflows/e2e-native-android.yml`), but it runs on a
+  `EXPO_PUBLIC_BYPASS_AUTH=true` APK that bypasses secure storage entirely — so
+  it cannot host a biometric spec until the dev-only injection seam above
+  lands. Writing one against the bypass build would assert nothing (per
   ADR-0016's "an unexercised second driver is dead weight").
 - The mechanics are settled and ready to wire once the driver lands. On an
   Android emulator with a registered fingerprint:
@@ -91,12 +109,15 @@ visibility logic is fully covered at the unit layer (`BiometricAuth.spec.ts` +
 
   The driver flow will be: `injectTestSession(validJwt)` → relaunch → assert
   `biometric-login-button` visible → tap it → `adb emu finger touch 1` → assert
-  the app lands authenticated. This rides the LS-8450 scheduled emulator job
-  rather than PR CI (biometric/emulator runs are too slow and flaky for per-PR
-  gating).
+  the app lands authenticated. This rides the gated
+  `e2e-native-android.yml` emulator job rather than PR CI (biometric/emulator
+  runs are too slow and flaky for per-PR gating).
 
 ## Related
 
 - Epic: LS-8444 (E2E coverage gaps — native & web)
-- ADR-0015 (semantic page objects), ADR-0016 (test dependency injection)
-- Precedent: LS-8453 (deep-link routing — unit tests now, driver specs after LS-8447)
+- ADR-0015 (semantic page objects), ADR-0016 (test dependency injection),
+  ADR-0018 (Appium native driver — scopes the native path to `apps/web-e2e`)
+- The native emulator job: `.github/workflows/e2e-native-android.yml`, documented
+  in `apps/web-e2e/src/driver/native-emulator-ci.md`
+- Precedent: LS-8453 (deep-link routing — unit tests now, driver specs later)

@@ -35,7 +35,7 @@
  * config instead of the project's. Invoking the binary directly keeps the
  * real cwd we set and avoids both failure modes, for every project — this
  * is why LS-9869's `usesRootRelativeLintExecutor` special-casing (routing
- * apps/web-e2e, apps/app, apps/app-e2e, lambdas/websocket, lib/scheduling,
+ * apps/web-e2e, apps/app, lambdas/websocket, lib/scheduling,
  * and lib/ui-abstractions through a different cwd/path convention based on
  * their `project.json` lint executor) was removed here rather than kept
  * alongside this fix: that executor field only matters when Nx itself

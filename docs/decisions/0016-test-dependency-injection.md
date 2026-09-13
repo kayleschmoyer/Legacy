@@ -15,8 +15,9 @@ live integration suite. Two couplings remain:
 
 1. **Page objects are welded to Playwright's `Page`.** Every object takes a
    `Page` and builds `Locator`s, so nothing in the test stack can ever drive
-   the native app (`apps/app`), whose skeletal e2e suite
-   (`apps/app-e2e`, WebdriverIO + Appium + Mocha) shares no vocabulary with
+   the native app (`apps/app`), whose skeletal e2e suite at the time
+   (`apps/app-e2e`, WebdriverIO + Appium + Mocha — deleted in LS-8697 once
+   this ADR's own driver seams superseded it) shared no vocabulary with
    the web suite. Meanwhile the app itself is built once in
    `lib/shared-components` (Tamagui, ADR-0003): the same `testID` renders as
    `data-testid` on web and the accessibility id on native, and the mobile app

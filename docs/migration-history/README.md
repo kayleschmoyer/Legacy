@@ -15,6 +15,7 @@ Archived records of completed migrations, refactors, and one-time changes. These
 ### Build & Tooling
 
 - [Config Deduplication](CONFIG_DEDUPLICATION.md)
+- [E2E Testing Migration: Detox → Appium + WebDriverIO](e2e-testing-migration.md)
 - [Nx Cloud Migration Complete](NX_CLOUD_MIGRATION_COMPLETE.md)
 - [Optimization Package.json](optimization-package-json.md)
 - [Repository Improvements](REPOSITORY_IMPROVEMENTS.md)

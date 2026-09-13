@@ -23,7 +23,6 @@ const PROJECT_TAGS = {
 
   // E2E Test Applications
   'web-e2e': ['scope:e2e', 'platform:web', 'type:test'],
-  'app-e2e': ['scope:e2e', 'platform:mobile', 'type:test'],
   'cli-e2e': ['scope:e2e', 'platform:node', 'type:test'],
 
   // Libraries - Core

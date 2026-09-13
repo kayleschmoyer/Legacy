@@ -298,7 +298,7 @@ grep -r "SKIP-REASON" tests/ apps/
 
 ## Related Documentation
 
-- [E2E Testing Migration](./e2e-testing-migration.md) - E2E test setup
+- [E2E Testing Migration](../migration-history/e2e-testing-migration.md) - archived Detox → Appium/WebDriverIO record (the `apps/app-e2e` scaffold it describes was retired in LS-8697)
 - [Jest Configuration](./jest-changed-files-config.md) - Unit test configuration
 - [CI Troubleshooting](../ci-cd/ci-troubleshooting-guide.md) - CI issues
 

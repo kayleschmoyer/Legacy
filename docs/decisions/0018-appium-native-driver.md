@@ -43,7 +43,9 @@ phrase and they must not be conflated:
   (`app.e2e.js`) drives generic Android widget-class selectors, not the
   Tamagui `testID` vocabulary ADR-0016 requires; the other five specs only
   assert that config files exist. This scaffold never became the committed
-  suite and remains orphaned scaffolding predating ADR-0016.
+  suite and remained orphaned scaffolding predating ADR-0016. **Update
+  (LS-8697): `apps/app-e2e` has since been deleted** — the follow-up named
+  under "Now constrained" below was carried out.
 - **The shared Playwright suite driven through `AppiumNativeDriver`**
   (`apps/web-e2e`) — this is what actually became the committed, watched
   suite: `.github/workflows/e2e-native-android.yml` runs on
@@ -145,11 +147,14 @@ backend })` (`fixtures/native-mock.ts`) with `REALTIME_LIVE_ONLY_REASON` —
 
 ### Now constrained
 
-- `apps/app-e2e` must not be extended as if it were the native e2e path; new
-  native coverage goes through the shared-suite + `AppiumNativeDriver` path
-  this ADR documents. Retiring `apps/app-e2e` is filed as a follow-up
+- New native coverage goes through the shared-suite + `AppiumNativeDriver`
+  path this ADR documents. Retiring `apps/app-e2e` was filed as a follow-up
   cleanup ticket rather than done here, since deleting a whole app directory
-  is not a documentation change.
+  is not a documentation change; **LS-8697 has since deleted it**, porting its
+  only two uncovered assertions (the five-tab navigator and the `(app)` index
+  redirect) into `apps/app` RTL specs and archiving its migration record to
+  `docs/migration-history/e2e-testing-migration.md`. There is consequently no
+  longer a second native test stack for anyone to mistake for this one.
 - `playwright.native.config.ts`'s docblock, which said native execution "is
   not wired yet" (stale as of LS-8450 merging), is corrected in the same PR
   as this ADR to point here instead of asserting an already-false

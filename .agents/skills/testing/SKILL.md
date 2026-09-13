@@ -2,7 +2,7 @@
 name: testing
 description: 'Jest unit and DB tests, Playwright hermetic E2E and live-backend integration specs, which suites gate merge, the tiered test-user convention, surface-map registration, and the cross-platform test architecture (ADR-0015 semantic page objects, ADR-0016 AppDriver/dual-mode seams). Load when: writing or modifying any spec, running tests before committing, debugging a test failure locally or in CI, choosing a test layer, or planning E2E strategy / auditing coverage.'
 metadata:
-  scope: 'apps/web-e2e/**, apps/app-e2e/**, maestro/**, lib/shared-components/**'
+  scope: 'apps/web-e2e/**, maestro/**, lib/shared-components/**'
 ---
 
 # Skill: Testing
@@ -26,9 +26,9 @@ The UI is built once in `lib/shared-components` and rendered on web and native; 
 - `src/integration/tests/` — live-backend specs; nightly backstop plus the opt-in `run:integration` label. Never blocks merge.
 - `src/tests/shared/*.dual.spec.ts` — ONE spec body running both mocked (PR CI) and live (`shared-live`) via the ADR-0016 backend seam.
 - `maestro/` — **visual/AI-judging QA sweep only** (`/mobile-qa`, see [mobile-qa](../mobile-qa/SKILL.md)). Not functional native regression; do not build assertion-heavy Maestro suites.
-- `apps/app-e2e/` — the WDIO/Appium runtime stack the future `AppiumNativeDriver` builds on, not a parallel spec suite.
+- `apps/web-e2e/src/driver/` — `AppiumNativeDriver`'s WDIO/Appium runtime, which runs the shared suite natively via `e2e-native-android.yml`; not a parallel spec suite. (`apps/app-e2e` was retired in LS-8697.)
 
-**The native principle:** functional native E2E coverage comes from running the **same shared Playwright suite** through a native `AppDriver` implementation (ADR-0016 §Native rollout blueprint; epic LS-8444) — not from new Maestro suites or a separate native spec tree. Ticket `BaseScreen` page-object migration + driver enablement, never per-feature Maestro functional flows. Authoring rules and the full dual-mode contract: [references/test-architecture.md](references/test-architecture.md).
+**The native principle:** functional native E2E coverage comes from running the **same shared Playwright suite** through a native `AppDriver` implementation (ADR-0016 §Native rollout blueprint; the driver has landed — see ADR-0018; enablement under epic LS-8444) — not from new Maestro suites or a separate native spec tree. Ticket `BaseScreen` page-object migration + driver enablement, never per-feature Maestro functional flows. Authoring rules and the full dual-mode contract: [references/test-architecture.md](references/test-architecture.md).
 
 ## Critical Rules
 
