@@ -97,6 +97,7 @@ export async function executePickEffects(
       try {
         await notificationService.notifyDraftCompleted(
           draftLeagueId,
+          draftId,
           selectionMethod,
         );
       } catch (err) {

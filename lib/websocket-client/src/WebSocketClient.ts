@@ -101,6 +101,7 @@ export class WebSocketClient {
       token: options.token,
       leagueId: options.leagueId,
       matchupId: options.matchupId,
+      draftId: options.draftId,
       viewContext: options.viewContext || 'general',
       autoConnect: options.autoConnect ?? true,
       reconnect: options.reconnect ?? true,
@@ -289,13 +290,17 @@ export class WebSocketClient {
   public updateContext(context: {
     leagueId?: number;
     matchupId?: number;
-    viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
+    draftId?: number;
+    viewContext?: RequiredWebSocketClientOptions['viewContext'];
   }): void {
     if (context.leagueId !== undefined) {
       this.options.leagueId = context.leagueId;
     }
     if (context.matchupId !== undefined) {
       this.options.matchupId = context.matchupId;
+    }
+    if (context.draftId !== undefined) {
+      this.options.draftId = context.draftId;
     }
     if (context.viewContext !== undefined) {
       this.options.viewContext = context.viewContext;
@@ -386,6 +391,9 @@ export class WebSocketClient {
     }
     if (this.options.matchupId) {
       url.searchParams.set('matchupId', String(this.options.matchupId));
+    }
+    if (this.options.draftId) {
+      url.searchParams.set('draftId', String(this.options.draftId));
     }
     url.searchParams.set('viewContext', this.options.viewContext);
 

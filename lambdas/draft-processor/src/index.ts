@@ -73,6 +73,8 @@ const SqsDraftMessageSchema = z.object({
   messageType: z.literal('START_DRAFT'),
   payload: z.object({
     leagueId: z.number().int().positive(),
+    // Optional: messages queued before LS-10075 carry only leagueId.
+    draftId: z.number().int().positive().optional(),
     draftMode: z.enum(['live', 'automated']),
     selectionMethod: z.enum(['standard', 'auction', 'random']),
     draftOrder: z.enum(['snake', 'linear', 'reverse_standings']),
@@ -1522,6 +1524,7 @@ async function processDraftMessage(
 ): Promise<DraftProcessingResult> {
   const {
     leagueId,
+    draftId,
     draftMode,
     selectionMethod,
     draftOrder,
@@ -1612,6 +1615,7 @@ async function processDraftMessage(
       if (notificationService) {
         await notificationService.notifyDraftCompleted(
           leagueId,
+          draftId ?? null,
           selectionMethod,
         );
         addBreadcrumb('WebSocket notification sent', {

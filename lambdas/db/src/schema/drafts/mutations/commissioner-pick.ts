@@ -342,6 +342,7 @@ builder.mutationField('commissionerPick', (t) =>
           if (result.isDraftComplete) {
             await context.notificationService.notifyDraftCompleted(
               result.leagueId,
+              draftId,
               result.selectionMethod,
             );
           }

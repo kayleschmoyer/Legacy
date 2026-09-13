@@ -35,7 +35,7 @@ Events → Lambda → WebSocket API → Connected Clients
    - Filters connections by leagueId or matchupId using GSI queries
    - Handles stale connections automatically (410 Gone errors)
    - Methods:
-     - `notifyDraftCompleted(leagueId, draftType)`
+     - `notifyDraftCompleted(leagueId, draftId, selectionMethod)` — like every `notifyDraft*`, broadcasts on the draft channel (`DraftIdIndex`) **and** the league channel (LS-10075)
      - `notifyPlayerStatsLoading(matchupId, leagueId, completedCount, totalPlayers)`
      - `notifyPlayerStatsUpdated(playerId, matchupId, leagueId, playerStats)`
      - `notifyMatchupStatsComplete(matchupId, leagueId, totalPlayers)`
@@ -51,8 +51,9 @@ Events → Lambda → WebSocket API → Connected Clients
    - API Gateway WebSocket API with production stage
    - DynamoDB table (`websocket_connections`) with:
      - Primary key: `connectionId`
-     - Attributes: `userId`, `leagueId`, `matchupId`, `viewContext`, `connectedAt`
+     - Attributes: `userId`, `leagueId`, `matchupId`, `draftId`, `draftLeagueId`, `viewContext`, `connectedAt`
      - GSI: `LeagueIdIndex` (queries by leagueId)
+     - GSI: `DraftIdIndex` (queries by draftId — draft channel, LS-10075; `viewContext` `'draft'`, or `'draft-preview'` for lobby previews, which get no pick/lifecycle events or presence)
      - GSI: `MatchupIdIndex` (queries by matchupId)
    - IAM permissions for game-selection and stats lambdas to send notifications
 
@@ -126,7 +127,11 @@ const notificationService = createNotificationService();
 
 // After draft completion — ALWAYS await + try/catch
 try {
-  await notificationService.notifyDraftCompleted(leagueId, draftType);
+  await notificationService.notifyDraftCompleted(
+    leagueId,
+    draftId,
+    selectionMethod,
+  );
 } catch (err) {
   LOGGER.warn('Draft notification failed (non-fatal)', { err });
 }

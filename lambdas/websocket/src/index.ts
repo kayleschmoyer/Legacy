@@ -16,7 +16,10 @@ import {
   PostToConnectionCommand,
 } from '@aws-sdk/client-apigatewaymanagementapi';
 import { verify } from 'jsonwebtoken';
-import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import {
+  DRAFT_PREVIEW_VIEW_CONTEXT,
+  retrieveSecretParameterValue,
+} from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
@@ -251,42 +254,101 @@ async function validateToken(
  */
 
 /**
- * Validate user has access to a league.
+ * Whether a user may read a league's realtime channel, within the caller's
+ * DB session (avoids nested runWithPublicClient).
  *
  * Members always have access. Signed-in non-members are allowed as
- * spectators when the league is public (LS-8940) — this covers both the
- * `$connect` check and the `updateContext` revalidation, which both route
- * through here.
+ * spectators when the league is public (LS-8940).
+ */
+async function hasLeagueReadAccess(
+  db: PublicDb,
+  userId: number,
+  leagueId: number,
+): Promise<boolean> {
+  const membership = await db
+    .select()
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (membership.length > 0) {
+    return true;
+  }
+
+  // Public-league spectator fallback.
+  const league = await db
+    .select({ isPublic: PublicSchema.leagues.isPublic })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, leagueId))
+    .limit(1);
+
+  return league.length > 0 && league[0].isPublic;
+}
+
+/**
+ * Validate user has access to a league — covers both the `$connect` check
+ * and the `updateContext` revalidation, which both route through here.
  */
 async function validateLeagueAccess(
   userId: number,
   leagueId: number,
 ): Promise<boolean> {
+  return runWithPublicClient(getDbOptions(), (db: PublicDb) =>
+    hasLeagueReadAccess(db, userId, leagueId),
+  );
+}
+
+/** `viewContext` of a connection in a draft's room (LS-10075). */
+const DRAFT_VIEW_CONTEXT = 'draft';
+
+/** Whether `viewContext` names one of the draft channel's connection kinds. */
+function isDraftViewContext(viewContext: string | undefined): boolean {
+  return (
+    viewContext === DRAFT_VIEW_CONTEXT ||
+    viewContext === DRAFT_PREVIEW_VIEW_CONTEXT
+  );
+}
+
+/**
+ * Validate user may open a draft's realtime channel (LS-10075).
+ *
+ * This is `authorizeDraft(ctx, draftId, 'read')` — or `'preview'` for a
+ * lobby-preview connection, which resolves identically today — from
+ * `lambdas/db/src/schema/drafts/authorize-draft.ts`. That guard is bound to
+ * the GraphQL `Context` inside the db lambda, so it can't be called from
+ * here; its league branch is the league channel's read check, which is
+ * reused rather than restated. Mock drafts are refused, as `authorizeDraft`
+ * refuses them, until LS-10076 lands the mock branch in both places.
+ *
+ * @returns the draft's league, which presence payloads carry.
+ */
+async function validateDraftAccess(
+  userId: number,
+  draftId: number,
+): Promise<{ hasAccess: boolean; leagueId: number | null }> {
   return runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
-    const membership = await db
-      .select()
-      .from(PublicSchema.leagueMembers)
-      .where(
-        and(
-          eq(PublicSchema.leagueMembers.leagueId, leagueId),
-          eq(PublicSchema.leagueMembers.userId, userId),
-        ),
-      )
+    const [draft] = await db
+      .select({
+        leagueId: PublicSchema.drafts.leagueId,
+        kind: PublicSchema.drafts.kind,
+      })
+      .from(PublicSchema.drafts)
+      .where(eq(PublicSchema.drafts.id, draftId))
       .limit(1);
 
-    if (membership.length > 0) {
-      return true;
+    if (!draft || draft.kind === 'mock') {
+      return { hasAccess: false, leagueId: null };
     }
 
-    // Public-league spectator fallback — same DB session (avoids nested
-    // runWithPublicClient).
-    const league = await db
-      .select({ isPublic: PublicSchema.leagues.isPublic })
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, leagueId))
-      .limit(1);
-
-    return league.length > 0 && league[0].isPublic;
+    return {
+      hasAccess: await hasLeagueReadAccess(db, userId, draft.leagueId),
+      leagueId: draft.leagueId,
+    };
   });
 }
 
@@ -391,7 +453,10 @@ async function handleConnect(
 
     const leagueIdStr = queryParams?.['leagueId'];
     const matchupIdStr = queryParams?.['matchupId'];
-    const viewContext = queryParams?.['viewContext'] || 'general';
+    const draftIdStr = queryParams?.['draftId'];
+    const viewContext =
+      queryParams?.['viewContext'] ||
+      (draftIdStr ? DRAFT_VIEW_CONTEXT : 'general');
 
     // Validate numeric parameters
     let leagueId: number | undefined;
@@ -459,10 +524,59 @@ async function handleConnect(
       }
     }
 
+    // Draft channel (LS-10075). Exclusive of league/matchup context: a
+    // connection on both would hear league chat on a draft board.
+    let draftId: number | undefined;
+    let draftLeagueId: number | null = null;
+
+    if (draftIdStr) {
+      draftId = parseInt(draftIdStr, 10);
+      if (!Number.isFinite(draftId)) {
+        LOGGER.warn('Invalid draftId parameter', { draftIdStr });
+        return { statusCode: 400, body: 'Bad Request: Invalid draftId' };
+      }
+
+      if (leagueId || matchupId) {
+        LOGGER.warn('draftId combined with league or matchup context', {
+          userId,
+          draftId,
+          leagueId,
+          matchupId,
+        });
+        return {
+          statusCode: 400,
+          body: 'Bad Request: draftId cannot be combined with leagueId or matchupId',
+        };
+      }
+
+      if (!isDraftViewContext(viewContext)) {
+        LOGGER.warn('draftId sent without a draft viewContext', {
+          userId,
+          draftId,
+          viewContext,
+        });
+        return {
+          statusCode: 400,
+          body: 'Bad Request: draftId requires a draft viewContext',
+        };
+      }
+
+      const access = await validateDraftAccess(userId, draftId);
+      if (!access.hasAccess) {
+        LOGGER.warn('User does not have access to draft', { userId, draftId });
+        return {
+          statusCode: 403,
+          body: 'Forbidden: No access to this draft',
+        };
+      }
+      draftLeagueId = access.leagueId;
+    }
+
     LOGGER.info('Validated WebSocket connection', {
       userId,
       leagueId: leagueId ?? null,
       matchupId: matchupId ?? null,
+      draftId: draftId ?? null,
       viewContext,
     });
 
@@ -486,6 +600,13 @@ async function handleConnect(
       item.matchupId = { N: matchupId.toString() };
     }
 
+    if (draftId) {
+      item.draftId = { N: draftId.toString() };
+      if (draftLeagueId) {
+        item.draftLeagueId = { N: draftLeagueId.toString() };
+      }
+    }
+
     await dynamoClient.send(
       new PutItemCommand({
         TableName: connectionsTable,
@@ -498,22 +619,24 @@ async function handleConnect(
       userId,
       leagueId: leagueId ?? null,
       matchupId: matchupId ?? null,
+      draftId: draftId ?? null,
       viewContext,
       ttl,
     });
 
-    // ── Presence: broadcast USER_JOINED to league peers, send USER_LIST back ──
-    if (leagueId) {
+    // ── Presence: broadcast USER_JOINED to channel peers, send USER_LIST back ──
+    const presenceChannel = presenceChannelFromRow(item);
+    if (presenceChannel) {
       const endpoint = buildApiGatewayEndpoint(event);
       try {
-        const peers = await getLeagueConnections(leagueId, connectionId);
+        const peers = await getPresencePeers(presenceChannel, connectionId);
 
         // Notify existing peers that this user joined
         const joinedMsg = {
           type: 'notification',
           data: {
             type: WireNotificationType.USER_JOINED,
-            leagueId,
+            ...presenceScope(presenceChannel),
             userId,
             username,
           },
@@ -531,7 +654,7 @@ async function handleConnect(
           type: 'notification',
           data: {
             type: WireNotificationType.USER_LIST,
-            leagueId,
+            ...presenceScope(presenceChannel),
             users: [
               ...peers.map((p) => ({
                 userId: p.userId,
@@ -546,7 +669,7 @@ async function handleConnect(
         // Non-fatal — presence is best-effort
         LOGGER.warn('Presence broadcast failed on connect', {
           connectionId,
-          leagueId,
+          ...presenceScope(presenceChannel),
           error:
             presenceErr instanceof Error
               ? presenceErr.message
@@ -573,22 +696,72 @@ function buildApiGatewayEndpoint(
 }
 
 /**
- * Query DynamoDB for all connections in a league, optionally excluding one.
- * Returns connectionId, userId, and username for each connection.
+ * A presence channel: the league channel, or a draft's room (LS-10075).
+ * Lobby-preview draft connections belong to neither — they never see or
+ * show presence.
  */
-async function getLeagueConnections(
-  leagueId: number,
+type PresenceChannel =
+  | { kind: 'league'; leagueId: number }
+  | { kind: 'draft'; draftId: number; leagueId: number | null };
+
+/** The presence channel a connections-table row belongs to, if any. */
+function presenceChannelFromRow(
+  row: Record<string, { S?: string; N?: string }> | undefined,
+): PresenceChannel | null {
+  const draftIdStr = row?.['draftId']?.N;
+  if (draftIdStr) {
+    if (row?.['viewContext']?.S !== DRAFT_VIEW_CONTEXT) return null;
+    const draftLeagueIdStr = row['draftLeagueId']?.N;
+    return {
+      kind: 'draft',
+      draftId: parseInt(draftIdStr, 10),
+      leagueId: draftLeagueIdStr ? parseInt(draftLeagueIdStr, 10) : null,
+    };
+  }
+
+  const leagueIdStr = row?.['leagueId']?.N;
+  return leagueIdStr
+    ? { kind: 'league', leagueId: parseInt(leagueIdStr, 10) }
+    : null;
+}
+
+/** The ids a presence payload is scoped by. */
+function presenceScope(channel: PresenceChannel): {
+  leagueId: number | null;
+  draftId?: number;
+} {
+  return channel.kind === 'draft'
+    ? { leagueId: channel.leagueId, draftId: channel.draftId }
+    : { leagueId: channel.leagueId };
+}
+
+/**
+ * Query DynamoDB for all connections on a presence channel, optionally
+ * excluding one. Returns connectionId, userId, and username for each.
+ */
+async function getPresencePeers(
+  channel: PresenceChannel,
   excludeConnectionId?: string,
 ): Promise<Array<{ connectionId: string; userId: number; username: string }>> {
   const result = await dynamoClient.send(
     new QueryCommand({
       TableName: connectionsTable,
-      IndexName: 'LeagueIdIndex',
-      KeyConditionExpression: 'leagueId = :leagueId',
-      ExpressionAttributeValues: {
-        ':leagueId': { N: leagueId.toString() },
-      },
-      ProjectionExpression: 'connectionId, userId, username',
+      ...(channel.kind === 'draft'
+        ? {
+            IndexName: 'DraftIdIndex',
+            KeyConditionExpression: 'draftId = :draftId',
+            ExpressionAttributeValues: {
+              ':draftId': { N: channel.draftId.toString() },
+            },
+          }
+        : {
+            IndexName: 'LeagueIdIndex',
+            KeyConditionExpression: 'leagueId = :leagueId',
+            ExpressionAttributeValues: {
+              ':leagueId': { N: channel.leagueId.toString() },
+            },
+          }),
+      ProjectionExpression: 'connectionId, userId, username, viewContext',
     }),
   );
 
@@ -596,6 +769,10 @@ async function getLeagueConnections(
     const connId = item.connectionId?.S;
     // Skip items with missing connectionId or the excluded connection
     if (!connId || (excludeConnectionId && connId === excludeConnectionId)) {
+      return [];
+    }
+    // Lobby previews share the draft's index but are not in its room.
+    if (item.viewContext?.S === DRAFT_PREVIEW_VIEW_CONTEXT) {
       return [];
     }
     return [
@@ -630,9 +807,9 @@ async function handleRequestUserList(
       }),
     );
 
-    const leagueIdStr = existing.Item?.['leagueId']?.N;
-    if (!leagueIdStr) {
-      // No league context on this connection — nothing to refresh.
+    const channel = presenceChannelFromRow(existing.Item);
+    if (!channel) {
+      // No presence context on this connection — nothing to refresh.
       return { statusCode: 200, body: 'No league context' };
     }
 
@@ -642,15 +819,14 @@ async function handleRequestUserList(
       return { statusCode: 500, body: 'Invalid connection state' };
     }
 
-    const leagueId = parseInt(leagueIdStr, 10);
     const userId = parseInt(userIdStr, 10);
     const username = existing.Item?.['username']?.S ?? '';
 
-    const peers = await getLeagueConnections(leagueId, connectionId);
+    const peers = await getPresencePeers(channel, connectionId);
     const endpoint = buildApiGatewayEndpoint(event);
     const userListMsg = {
       type: 'USER_LIST',
-      leagueId,
+      ...presenceScope(channel),
       users: [
         ...peers.map((p) => ({ userId: p.userId, username: p.username })),
         { userId, username },
@@ -669,7 +845,7 @@ async function handleRequestUserList(
 
 /**
  * Handle disconnection event - remove connection ID from DynamoDB
- * and broadcast USER_LEFT to remaining league peers.
+ * and broadcast USER_LEFT to remaining presence-channel peers.
  */
 async function handleDisconnect(
   connectionId: string,
@@ -680,7 +856,7 @@ async function handleDisconnect(
   try {
     // Read connection data before deleting (needed for presence broadcast)
     let disconnectingUserId: number | null = null;
-    let disconnectingLeagueId: number | null = null;
+    let disconnectingChannel: PresenceChannel | null = null;
 
     try {
       const existing = await dynamoClient.send(
@@ -691,8 +867,7 @@ async function handleDisconnect(
       );
       if (existing.Item) {
         disconnectingUserId = parseInt(existing.Item['userId']?.N ?? '0', 10);
-        const leagueIdStr = existing.Item['leagueId']?.N;
-        if (leagueIdStr) disconnectingLeagueId = parseInt(leagueIdStr, 10);
+        disconnectingChannel = presenceChannelFromRow(existing.Item);
       }
     } catch (readError) {
       // Non-fatal — we still proceed with the delete, but log for visibility
@@ -726,18 +901,17 @@ async function handleDisconnect(
 
     LOGGER.info('WebSocket connection closed', { connectionId });
 
-    // ── Presence: broadcast USER_LEFT to remaining league peers ──
-    if (disconnectingUserId && disconnectingLeagueId) {
+    // ── Presence: broadcast USER_LEFT to remaining channel peers ──
+    if (disconnectingUserId && disconnectingChannel) {
+      const channel = disconnectingChannel;
       const endpoint = buildApiGatewayEndpoint(event);
       try {
-        const remainingPeers = await getLeagueConnections(
-          disconnectingLeagueId,
-        );
+        const remainingPeers = await getPresencePeers(channel);
         const leftMsg = {
           type: 'notification',
           data: {
             type: WireNotificationType.USER_LEFT,
-            leagueId: disconnectingLeagueId,
+            ...presenceScope(channel),
             userId: disconnectingUserId,
           },
         };
@@ -750,7 +924,7 @@ async function handleDisconnect(
         // Non-fatal
         LOGGER.warn('Presence broadcast failed on disconnect', {
           connectionId,
-          leagueId: disconnectingLeagueId,
+          ...presenceScope(channel),
           error:
             presenceErr instanceof Error
               ? presenceErr.message
@@ -776,6 +950,7 @@ async function handleUpdateContext(
   data: {
     matchupId?: number | null;
     leagueId?: number | null;
+    draftId?: number | null;
     viewContext?: string;
   },
 ): Promise<APIGatewayProxyResultV2> {
@@ -848,6 +1023,54 @@ async function handleUpdateContext(
       matchupLeagueId = leagueId;
     }
 
+    // Draft channel (LS-10075) — exclusive of league/matchup context, as on
+    // $connect.
+    let draftLeagueId: number | null = null;
+    if (data.draftId !== undefined && data.draftId !== null) {
+      if (
+        (data.leagueId ?? null) !== null ||
+        (data.matchupId ?? null) !== null
+      ) {
+        LOGGER.warn('draftId combined with league or matchup context', {
+          userId,
+          connectionId,
+          data,
+        });
+        return {
+          statusCode: 400,
+          body: 'Bad Request: draftId cannot be combined with leagueId or matchupId',
+        };
+      }
+
+      const effectiveViewContext =
+        data.viewContext ?? existingConnection.Item['viewContext']?.S;
+      if (!isDraftViewContext(effectiveViewContext)) {
+        LOGGER.warn('draftId sent without a draft viewContext', {
+          userId,
+          connectionId,
+          viewContext: effectiveViewContext,
+        });
+        return {
+          statusCode: 400,
+          body: 'Bad Request: draftId requires a draft viewContext',
+        };
+      }
+
+      const access = await validateDraftAccess(userId, data.draftId);
+      if (!access.hasAccess) {
+        LOGGER.warn('User does not have access to draft in updateContext', {
+          userId,
+          draftId: data.draftId,
+          connectionId,
+        });
+        return {
+          statusCode: 403,
+          body: 'Forbidden: No access to this draft',
+        };
+      }
+      draftLeagueId = access.leagueId;
+    }
+
     // Consistency check: ensure matchup belongs to the league if both are provided
     if (
       data.leagueId !== undefined &&
@@ -898,6 +1121,27 @@ async function handleUpdateContext(
       }
     }
 
+    // Handle draftId: moving onto a draft channel drops league/matchup
+    // context; clearing it, or moving onto a league/matchup, drops the draft.
+    if (data.draftId !== undefined && data.draftId !== null) {
+      setExpressions.push('draftId = :draftId');
+      attributeValues[':draftId'] = { N: data.draftId.toString() };
+      removeExpressions.push('leagueId', 'matchupId');
+      if (draftLeagueId !== null) {
+        setExpressions.push('draftLeagueId = :draftLeagueId');
+        attributeValues[':draftLeagueId'] = { N: draftLeagueId.toString() };
+      } else {
+        removeExpressions.push('draftLeagueId');
+      }
+    } else if (
+      existingConnection.Item['draftId'] &&
+      (data.draftId === null ||
+        (data.leagueId ?? null) !== null ||
+        (data.matchupId ?? null) !== null)
+    ) {
+      removeExpressions.push('draftId', 'draftLeagueId');
+    }
+
     if (data.viewContext) {
       setExpressions.push('viewContext = :viewContext');
       attributeValues[':viewContext'] = { S: data.viewContext };
@@ -917,7 +1161,11 @@ async function handleUpdateContext(
         updateParts.push(`SET ${setExpressions.join(', ')}`);
       }
       if (removeExpressions.length > 0) {
-        updateParts.push(`REMOVE ${removeExpressions.join(', ')}`);
+        // De-duplicated: DynamoDB rejects overlapping document paths, and a
+        // draft move can name leagueId/matchupId that are also being cleared.
+        updateParts.push(
+          `REMOVE ${[...new Set(removeExpressions)].join(', ')}`,
+        );
       }
 
       await dynamoClient.send(
@@ -968,7 +1216,12 @@ async function handleDefault(
     interface WebSocketMessage {
       action?: string;
       type?: string;
-      data?: { matchupId?: number; leagueId?: number; viewContext?: string };
+      data?: {
+        matchupId?: number;
+        leagueId?: number;
+        draftId?: number;
+        viewContext?: string;
+      };
     }
 
     let message: WebSocketMessage;

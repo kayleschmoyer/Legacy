@@ -46,6 +46,7 @@ jest.mock('jsonwebtoken', () => ({
 }));
 
 jest.mock('@legacy-sports/aws-utils', () => ({
+  DRAFT_PREVIEW_VIEW_CONTEXT: 'draft-preview',
   retrieveSecretParameterValue: jest.fn().mockResolvedValue('test-jwt-secret'),
 }));
 

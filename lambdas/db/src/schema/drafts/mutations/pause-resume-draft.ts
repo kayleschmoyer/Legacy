@@ -102,7 +102,10 @@ builder.mutationField('pauseDraft', (t) =>
 
       // Notify all league connections
       if (context.notificationService) {
-        await context.notificationService.notifyDraftPaused(leagueId);
+        await context.notificationService.notifyDraftPaused(
+          leagueId,
+          draft?.id ?? null,
+        );
       }
 
       return draft;
@@ -198,6 +201,7 @@ builder.mutationField('resumeDraft', (t) =>
         if (context.notificationService) {
           await context.notificationService.notifyDraftResumed(
             leagueId,
+            draft.id,
             resumeDeadline.toISOString(),
           );
         }

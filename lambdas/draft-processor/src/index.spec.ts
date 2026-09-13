@@ -368,6 +368,20 @@ describe('draft-processor handler', () => {
       // for the published-envelope contract) has correct inputs to work from.
       expect(mockNotifyDraftCompleted).toHaveBeenCalledWith(
         msg.payload.leagueId,
+        null,
+        msg.payload.selectionMethod,
+      );
+    });
+
+    it('passes the message draftId through to notifyDraftCompleted so the draft channel is reached (LS-10075)', async () => {
+      mockRunWithPublicClient.mockResolvedValue(undefined);
+
+      const msg = makeValidStartDraftMessage({ draftId: 77 });
+      await handler(makeSqsEvent([makeSqsRecord(msg)]));
+
+      expect(mockNotifyDraftCompleted).toHaveBeenCalledWith(
+        msg.payload.leagueId,
+        77,
         msg.payload.selectionMethod,
       );
     });

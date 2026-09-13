@@ -14,6 +14,13 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { WireNotificationType } from '@legacy-sports/utils';
 
+/**
+ * `viewContext` of a draft-channel connection opened from the pre-join lobby
+ * (LS-10075). Authorized at `preview` rather than `read`, so it must only ever
+ * receive seat-count/lobby events — never picks, chat, or presence.
+ */
+export const DRAFT_PREVIEW_VIEW_CONTEXT = 'draft-preview';
+
 // Type for DynamoDB attribute values
 interface DynamoDBItem {
   [key: string]: {
@@ -27,6 +34,8 @@ interface DynamoDBItem {
 export interface DraftCompletedNotification {
   type: typeof WireNotificationType.DRAFT_COMPLETED;
   leagueId: number;
+  /** `null` only for automated-draft SQS messages queued before LS-10075. */
+  draftId: number | null;
   selectionMethod: string;
   completedAt: string;
 }
@@ -67,6 +76,8 @@ export interface DraftPickNotification {
 export interface DraftPausedNotification {
   type: typeof WireNotificationType.DRAFT_PAUSED;
   leagueId: number;
+  /** `null` when the league has no draft row to pause (LS-10075). */
+  draftId: number | null;
   pausedAt: string;
 }
 
@@ -86,6 +97,7 @@ export interface DraftPickUndoneNotification {
 export interface DraftResumedNotification {
   type: typeof WireNotificationType.DRAFT_RESUMED;
   leagueId: number;
+  draftId: number;
   currentPickDeadline: string;
   resumedAt: string;
 }
@@ -545,6 +557,107 @@ export class WebSocketNotificationService {
   }
 
   /**
+   * Get the connections on a draft's own channel (LS-10075), excluding
+   * lobby-preview connections — those receive seat-count/lobby events only,
+   * never picks or draft lifecycle events.
+   */
+  private async getDraftConnections(draftId: number): Promise<string[]> {
+    const items = await this.queryAllPages({
+      TableName: this.connectionsTableName,
+      IndexName: 'DraftIdIndex',
+      KeyConditionExpression: 'draftId = :draftId',
+      FilterExpression:
+        'attribute_not_exists(viewContext) OR viewContext <> :excludeViewContext',
+      ExpressionAttributeValues: {
+        ':draftId': { N: draftId.toString() },
+        ':excludeViewContext': { S: DRAFT_PREVIEW_VIEW_CONTEXT },
+      },
+      ProjectionExpression: 'connectionId',
+    });
+
+    return items
+      .map((item: DynamoDBItem) => item['connectionId']?.S)
+      .filter((id: string | undefined): id is string => !!id);
+  }
+
+  /**
+   * Broadcast a draft event on both of the draft's channels (LS-10075): the
+   * draft channel (`draftId`) and, for a league draft, the league channel.
+   *
+   * The league channel stays because installed mobile builds only know how to
+   * connect by leagueId and there is no force-update gate. Recipients are
+   * unioned by connectionId, so a connection that matches both channels gets
+   * the event once.
+   *
+   * The draft-channel lookup is best-effort: the `DraftIdIndex` GSI is created
+   * by a terraform apply that can land hours after this code deploys, and a
+   * Query against a missing index throws. Until it exists, league-channel
+   * delivery must carry on exactly as before.
+   */
+  private async broadcastToDraft(
+    message: NotificationMessage,
+    leagueId: number,
+    draftId: number | null,
+  ): Promise<{ sent: number; failed: number }> {
+    if (!this.websocketEndpoint) {
+      LOGGER.warn('WebSocket endpoint not configured, skipping broadcast');
+      return { sent: 0, failed: 0 };
+    }
+
+    const connectionIds = new Set(await this.getConnections(leagueId));
+
+    if (draftId !== null) {
+      try {
+        for (const id of await this.getDraftConnections(draftId)) {
+          connectionIds.add(id);
+        }
+      } catch (error) {
+        LOGGER.warn(
+          'Draft-channel lookup failed; delivering on the league channel only',
+          { draftId, leagueId, error },
+        );
+      }
+    }
+
+    return this.sendToConnections([...connectionIds], message, {
+      leagueId,
+      draftId,
+    });
+  }
+
+  /** Send one message to each connection, counting deliveries. */
+  private async sendToConnections(
+    connectionIds: string[],
+    message: NotificationMessage,
+    logContext: Record<string, unknown>,
+  ): Promise<{ sent: number; failed: number }> {
+    if (connectionIds.length === 0) {
+      LOGGER.info('No connections to broadcast to', logContext);
+      return { sent: 0, failed: 0 };
+    }
+
+    const results = await Promise.allSettled(
+      connectionIds.map((connectionId) =>
+        this.sendToConnection(connectionId, message),
+      ),
+    );
+
+    const sent = results.filter(
+      (r) => r.status === 'fulfilled' && r.value === true,
+    ).length;
+    const failed = results.length - sent;
+
+    LOGGER.info('Broadcast complete', {
+      total: connectionIds.length,
+      sent,
+      failed,
+      ...logContext,
+    });
+
+    return { sent, failed };
+  }
+
+  /**
    * Broadcast a message to all connections or filtered by leagueId.
    *
    * @param excludeViewContext - Skip connections whose `viewContext` matches
@@ -569,30 +682,9 @@ export class WebSocketNotificationService {
         excludeViewContext,
       );
 
-      if (connectionIds.length === 0) {
-        LOGGER.info('No connections to broadcast to', { filterLeagueId });
-        return { sent: 0, failed: 0 };
-      }
-
-      const results = await Promise.allSettled(
-        connectionIds.map((connectionId) =>
-          this.sendToConnection(connectionId, message),
-        ),
-      );
-
-      const sent = results.filter(
-        (r) => r.status === 'fulfilled' && r.value === true,
-      ).length;
-      const failed = results.length - sent;
-
-      LOGGER.info('Broadcast complete', {
-        total: connectionIds.length,
-        sent,
-        failed,
+      return await this.sendToConnections(connectionIds, message, {
         filterLeagueId,
       });
-
-      return { sent, failed };
     } catch (error) {
       LOGGER.error('Error broadcasting message', { error, filterLeagueId });
       throw error;
@@ -600,35 +692,42 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Send draft completed notification to all connections for a specific league
+   * Send draft completed notification on the draft's channels.
+   *
+   * @param draftId - `null` only when the caller cannot know it (an automated
+   *   draft queued before LS-10075); the event then reaches the league only.
    */
   async notifyDraftCompleted(
     leagueId: number,
+    draftId: number | null,
     selectionMethod: string,
   ): Promise<void> {
     const notification: DraftCompletedNotification = {
       type: WireNotificationType.DRAFT_COMPLETED,
       leagueId,
+      draftId,
       selectionMethod,
       completedAt: new Date().toISOString(),
     };
 
     LOGGER.info('Sending draft completion notification', {
       leagueId,
+      draftId,
       selectionMethod,
     });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       {
         type: 'notification',
         data: notification,
       },
       leagueId,
+      draftId,
     );
   }
 
   /**
-   * Send draft started notification to all connections for a specific league
+   * Send draft started notification on the draft's channels
    */
   async notifyDraftStarted(
     leagueId: number,
@@ -657,17 +756,18 @@ export class WebSocketNotificationService {
       pickTimeLimitSeconds,
     });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       {
         type: 'notification',
         data: notification,
       },
       leagueId,
+      draftId,
     );
   }
 
   /**
-   * Send draft pick notification to all connections for a specific league
+   * Send draft pick notification on the draft's channels
    */
   async notifyDraftPickMade(
     leagueId: number,
@@ -717,35 +817,41 @@ export class WebSocketNotificationService {
       overallPick,
     });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       {
         type: 'notification',
         data: notification,
       },
       leagueId,
+      draftId,
     );
   }
 
   /**
-   * Send draft paused notification to all connections for a specific league
+   * Send draft paused notification on the draft's channels
    */
-  async notifyDraftPaused(leagueId: number): Promise<void> {
+  async notifyDraftPaused(
+    leagueId: number,
+    draftId: number | null,
+  ): Promise<void> {
     const notification: DraftPausedNotification = {
       type: WireNotificationType.DRAFT_PAUSED,
       leagueId,
+      draftId,
       pausedAt: new Date().toISOString(),
     };
 
-    LOGGER.info('Sending draft paused notification', { leagueId });
+    LOGGER.info('Sending draft paused notification', { leagueId, draftId });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       { type: 'notification', data: notification },
       leagueId,
+      draftId,
     );
   }
 
   /**
-   * Send draft pick undone notification to all connections for a specific league.
+   * Send draft pick undone notification on the draft's channels.
    * Informs all clients that the last pick has been rolled back.
    */
   async notifyDraftPickUndone(
@@ -780,34 +886,39 @@ export class WebSocketNotificationService {
       overallPick,
     });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       { type: 'notification', data: notification },
       leagueId,
+      draftId,
     );
   }
 
   /**
-   * Send draft resumed notification to all connections for a specific league
+   * Send draft resumed notification on the draft's channels
    */
   async notifyDraftResumed(
     leagueId: number,
+    draftId: number,
     currentPickDeadline: string,
   ): Promise<void> {
     const notification: DraftResumedNotification = {
       type: WireNotificationType.DRAFT_RESUMED,
       leagueId,
+      draftId,
       currentPickDeadline,
       resumedAt: new Date().toISOString(),
     };
 
     LOGGER.info('Sending draft resumed notification', {
       leagueId,
+      draftId,
       currentPickDeadline,
     });
 
-    await this.broadcast(
+    await this.broadcastToDraft(
       { type: 'notification', data: notification },
       leagueId,
+      draftId,
     );
   }
 

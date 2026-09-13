@@ -369,6 +369,7 @@ builder.mutationField('initializeDraft', (t) =>
             const sqsService = new DraftSqsService(queueUrl);
             const message: StartDraftMessage = {
               leagueId,
+              draftId: draft.id,
               draftMode,
               selectionMethod,
               draftOrder,

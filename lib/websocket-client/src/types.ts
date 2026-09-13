@@ -11,6 +11,8 @@ import { ClientNotificationType } from '@legacy-sports/utils';
 export interface DraftCompletedNotification {
   type: typeof ClientNotificationType.DRAFT_COMPLETED;
   leagueId: number;
+  /** Absent from servers before LS-10075; `null` for a legacy queued draft. */
+  draftId?: number | null;
   selectionMethod: string;
   completedAt: string;
 }
@@ -51,6 +53,8 @@ export interface DraftPickNotification {
 export interface DraftPausedNotification {
   type: typeof ClientNotificationType.DRAFT_PAUSED;
   leagueId: number;
+  /** Absent from servers before LS-10075. */
+  draftId?: number | null;
   pausedAt: string;
 }
 
@@ -70,6 +74,8 @@ export interface DraftPickUndoneNotification {
 export interface DraftResumedNotification {
   type: typeof ClientNotificationType.DRAFT_RESUMED;
   leagueId: number;
+  /** Absent from servers before LS-10075. */
+  draftId?: number;
   currentPickDeadline: string;
   resumedAt: string;
 }
@@ -312,6 +318,21 @@ export type ConnectionState =
   | 'error';
 
 /**
+ * What a connection is looking at. `'draft'` / `'draft-preview'` put the
+ * connection on a draft's own channel (keyed by `draftId`, LS-10075); a
+ * preview connection receives lobby events only.
+ */
+export type WebSocketViewContext =
+  | 'general'
+  | 'league'
+  | 'matchup'
+  | 'roster'
+  | 'chat'
+  | 'dm'
+  | 'draft'
+  | 'draft-preview';
+
+/**
  * WebSocket client configuration options
  */
 export interface WebSocketClientOptions {
@@ -323,8 +344,14 @@ export interface WebSocketClientOptions {
   leagueId?: number;
   /** Matchup ID for context */
   matchupId?: number;
+  /**
+   * Draft ID for a draft-channel connection (LS-10075). Exclusive of
+   * `leagueId`/`matchupId`; pair with a `'draft'` or `'draft-preview'`
+   * viewContext.
+   */
+  draftId?: number;
   /** View context for notifications */
-  viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
+  viewContext?: WebSocketViewContext;
   /** Auto-connect on instantiation */
   autoConnect?: boolean;
   /** Enable auto-reconnect on disconnect */
@@ -346,7 +373,8 @@ export interface RequiredWebSocketClientOptions {
   token?: string;
   leagueId?: number;
   matchupId?: number;
-  viewContext: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
+  draftId?: number;
+  viewContext: WebSocketViewContext;
   autoConnect: boolean;
   reconnect: boolean;
   maxReconnectAttempts: number;

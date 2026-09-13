@@ -28,12 +28,31 @@ resource "aws_dynamodb_table" "websocket_connections" {
     type = "N"
   }
 
+  attribute {
+    name = "draftId"
+    type = "N"
+  }
+
   global_secondary_index {
     name            = "LeagueIdIndex"
     projection_type = "ALL"
 
     key_schema {
       attribute_name = "leagueId"
+      key_type       = "HASH"
+    }
+  }
+
+  # DraftIdIndex — the draft-keyed realtime channel (LS-10075). A draft-first
+  # mock draft has no league, so draft events and presence fan out by draftId.
+  # ALL projection: the $connect/$disconnect presence path reads userId,
+  # username and viewContext straight off the index.
+  global_secondary_index {
+    name            = "DraftIdIndex"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "draftId"
       key_type       = "HASH"
     }
   }

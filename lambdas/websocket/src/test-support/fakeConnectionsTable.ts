@@ -18,7 +18,7 @@ export class ConditionalCheckFailedError extends Error {
  * only the operations `lambdas/websocket/src/index.ts` and
  * `WebSocketNotificationService` actually issue against it: Put/Get/Delete/
  * Update by `connectionId` key, Query against the `LeagueIdIndex` /
- * `MatchupIdIndex` / `UserIdIndex` GSIs, and Scan.
+ * `DraftIdIndex` / `MatchupIdIndex` / `UserIdIndex` GSIs, and Scan.
  *
  * Unlike a one-shot `mockResolvedValue({})`, this fake carries real state
  * across calls — a broadcast triggered after two independent `$connect`
@@ -111,6 +111,15 @@ export class FakeConnectionsTable {
     ) {
       updated['matchupId'] = values[':matchupId'];
     }
+    if (updateExpression.includes('draftId = :draftId') && values[':draftId']) {
+      updated['draftId'] = values[':draftId'];
+    }
+    if (
+      updateExpression.includes('draftLeagueId = :draftLeagueId') &&
+      values[':draftLeagueId']
+    ) {
+      updated['draftLeagueId'] = values[':draftLeagueId'];
+    }
     if (
       updateExpression.includes('viewContext = :viewContext') &&
       values[':viewContext']
@@ -132,6 +141,19 @@ export class FakeConnectionsTable {
       (row) =>
         !this.isExpired(row) &&
         row['leagueId']?.N === String(leagueId) &&
+        (!excludeViewContext || row['viewContext']?.S !== excludeViewContext),
+    );
+  }
+
+  /**
+   * `DraftIdIndex` (LS-10075). `excludeViewContext` mirrors the notification
+   * service's lobby-preview FilterExpression, as for `queryByLeagueId`.
+   */
+  queryByDraftId(draftId: number, excludeViewContext?: string): AttrItem[] {
+    return [...this.rows.values()].filter(
+      (row) =>
+        !this.isExpired(row) &&
+        row['draftId']?.N === String(draftId) &&
         (!excludeViewContext || row['viewContext']?.S !== excludeViewContext),
     );
   }

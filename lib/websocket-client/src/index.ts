@@ -11,6 +11,7 @@ import './polyfill';
 export { WebSocketClient } from './WebSocketClient';
 export type {
   WebSocketClientOptions,
+  WebSocketViewContext,
   WebSocketMessage,
   ConnectionState,
   EventHandler,

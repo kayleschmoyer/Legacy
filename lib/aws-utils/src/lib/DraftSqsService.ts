@@ -4,6 +4,12 @@ import { LOGGER } from '@legacy-sports/logging';
 // Draft processing message types for SQS queue
 export interface StartDraftMessage {
   leagueId: number;
+  /**
+   * The draft being processed, so its completion broadcast can reach the
+   * draft channel (LS-10075). Optional: messages already in flight when this
+   * shipped carry only leagueId, and those still broadcast to the league.
+   */
+  draftId?: number;
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
   draftOrder: 'snake' | 'linear' | 'reverse_standings';

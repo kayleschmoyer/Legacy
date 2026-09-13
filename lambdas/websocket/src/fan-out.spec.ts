@@ -58,7 +58,10 @@
 // ── Mocks (must be declared before importing the module under test) ──
 
 import { WebSocketNotificationService } from '@legacy-sports/aws-utils';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
+import {
+  WebSocketClient,
+  type WebSocketViewContext,
+} from '@legacy-sports/websocket-client';
 import type { AttrItem } from './test-support/fakeConnectionsTable';
 import { FakeConnectionsTable } from './test-support/fakeConnectionsTable';
 import { LocalWsBridge } from './test-support/localWsBridge';
@@ -144,6 +147,14 @@ jest.mock('@aws-sdk/client-dynamodb', () => ({
             return Promise.resolve({
               Items: mockConnectionsTable.queryByLeagueId(
                 Number(values[':leagueId']?.N ?? '0'),
+                values[':excludeViewContext']?.S,
+              ),
+            });
+          }
+          if (input.IndexName === 'DraftIdIndex') {
+            return Promise.resolve({
+              Items: mockConnectionsTable.queryByDraftId(
+                Number(values[':draftId']?.N ?? '0'),
                 values[':excludeViewContext']?.S,
               ),
             });
@@ -252,7 +263,14 @@ const mockPublicSchema = {
   leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
   matchups: { id: 'id', leagueId: 'leagueId' },
   leagues: { id: 'id', isPublic: 'isPublic' },
+  drafts: { id: 'id', leagueId: 'leagueId', kind: 'kind' },
 };
+
+/** draftId -> its row, for the LS-10075 draft-channel access lookup. */
+const mockDrafts = new Map<
+  number,
+  { leagueId: number; kind: 'league' | 'mock' }
+>();
 
 /** `${userId}:${leagueId}` pairs treated as league members by the fake DB. */
 const mockLeagueMembers = new Set<string>();
@@ -295,6 +313,10 @@ const mockRunWithPublicClient = jest.fn(
                 return Promise.resolve(
                   isPublic !== undefined ? [{ isPublic }] : [],
                 );
+              }
+              if (table === mockPublicSchema.drafts) {
+                const draft = mockDrafts.get(values['id'] as number);
+                return Promise.resolve(draft ? [draft] : []);
               }
               return Promise.resolve([]);
             },
@@ -388,7 +410,8 @@ interface TestClientOptions {
   token?: string;
   leagueId?: number;
   matchupId?: number;
-  viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
+  draftId?: number;
+  viewContext?: WebSocketViewContext;
   reconnect?: boolean;
   reconnectDelay?: number;
   maxReconnectDelay?: number;
@@ -404,6 +427,7 @@ function makeClient(
     token: opts.token,
     leagueId: opts.leagueId,
     matchupId: opts.matchupId,
+    draftId: opts.draftId,
     viewContext: opts.viewContext ?? (opts.leagueId ? 'league' : 'general'),
     autoConnect: true,
     reconnect: opts.reconnect ?? false,
@@ -424,6 +448,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     mockLeagueMembers.clear();
     mockMatchupLeague.clear();
     mockLeagueVisibility.clear();
+    mockDrafts.clear();
     mockJwtUsers.clear();
     nextUserId = 1;
 
@@ -1162,6 +1187,296 @@ describe('WebSocket fan-out (LS-8856)', () => {
     } as unknown as Parameters<typeof handler>[0];
     const result = (await handler(connectEvent)) as { statusCode?: number };
     expect(result.statusCode).toBe(403);
+  });
+
+  // ── LS-10075: the draft channel (connect by draftId) ──
+
+  /** Invoke $connect directly and return its status code. */
+  async function connectStatus(
+    connectionId: string,
+    queryStringParameters: Record<string, string>,
+  ): Promise<number | undefined> {
+    const connectEvent = {
+      requestContext: {
+        routeKey: '$connect',
+        connectionId,
+        domainName: bridge.domainName,
+        stage: bridge.stage,
+      },
+      headers: {},
+      queryStringParameters,
+      body: null,
+      isBase64Encoded: false,
+    } as unknown as Parameters<typeof handler>[0];
+    const result = (await handler(connectEvent)) as { statusCode?: number };
+    return result.statusCode;
+  }
+
+  it('delivers every draft event to both an old league-channel client and a new draft-channel client (LS-10075 AC1)', async () => {
+    const leagueId = 900;
+    const draftId = 90;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
+    const oldApp = registerUser('old-app-olive');
+    const newApp = registerUser('new-app-nate');
+    grantLeagueMembership(oldApp.userId, leagueId);
+    grantLeagueMembership(newApp.userId, leagueId);
+
+    // The installed mobile build only knows the league channel.
+    const oldClient = client({ token: oldApp.token, leagueId });
+    const newClient = client({
+      token: newApp.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    await Promise.all([
+      waitForEvent(oldClient, 'connected'),
+      waitForEvent(newClient, 'connected'),
+    ]);
+
+    const draftEvents = [
+      'draft-started',
+      'draft-pick-made',
+      'draft-pick-undone',
+      'draft-paused',
+      'draft-resumed',
+      'draft-completed',
+    ];
+    const received = [oldClient, newClient].flatMap((c) =>
+      draftEvents.map((event) =>
+        waitForEvent<{ leagueId: number; draftId?: number | null }>(c, event),
+      ),
+    );
+
+    const service = notificationService();
+    await service.notifyDraftStarted(
+      leagueId,
+      draftId,
+      'snake',
+      2,
+      60,
+      '2026-09-13T00:01:00.000Z',
+    );
+    await service.notifyDraftPickMade(
+      leagueId,
+      draftId,
+      /* pickId */ 1,
+      oldApp.userId,
+      /* playerId */ 4242,
+      1,
+      1,
+      1,
+    );
+    await service.notifyDraftPickUndone(
+      leagueId,
+      draftId,
+      /* undonePickId */ 1,
+      /* playerId */ 4242,
+      oldApp.userId,
+      /* overallPick */ 1,
+      /* newCurrentPick */ 1,
+      '2026-09-13T00:02:00.000Z',
+    );
+    await service.notifyDraftPaused(leagueId, draftId);
+    await service.notifyDraftResumed(
+      leagueId,
+      draftId,
+      '2026-09-13T00:03:00.000Z',
+    );
+    await service.notifyDraftCompleted(leagueId, draftId, 'standard');
+
+    for (const notification of await Promise.all(received)) {
+      expect(notification).toMatchObject({ leagueId, draftId });
+    }
+  });
+
+  it('lets a public-league non-member open the draft channel as a spectator (LS-10075 AC2)', async () => {
+    const leagueId = 901;
+    const draftId = 91;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
+    setLeagueVisibility(leagueId, true);
+    const spectator = registerUser('draft-spectator-sid');
+
+    const spectatorClient = client({
+      token: spectator.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    await waitForEvent(spectatorClient, 'connected');
+
+    const received = waitForEvent<{ playerId: number }>(
+      spectatorClient,
+      'draft-pick-made',
+    );
+    await notificationService().notifyDraftPickMade(
+      leagueId,
+      draftId,
+      1,
+      1,
+      /* playerId */ 5151,
+      1,
+      1,
+      1,
+    );
+
+    await expect(received).resolves.toMatchObject({ playerId: 5151 });
+  });
+
+  it("refuses a non-member opening a private league draft's channel at $connect with 403, and admits a member (LS-10075 AC2)", async () => {
+    const leagueId = 902;
+    const draftId = 92;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
+    setLeagueVisibility(leagueId, false);
+    const outsider = registerUser('draft-outsider-otto');
+    const member = registerUser('draft-member-meg');
+    grantLeagueMembership(member.userId, leagueId);
+
+    const refused = client({
+      token: outsider.token,
+      draftId,
+      viewContext: 'draft',
+      reconnect: false,
+    });
+    await expect(waitForEvent(refused, 'connected', 500)).rejects.toThrow();
+
+    expect(
+      await connectStatus('ls-10075-outsider', {
+        token: outsider.token,
+        draftId: String(draftId),
+      }),
+    ).toBe(403);
+    expect(
+      await connectStatus('ls-10075-member', {
+        token: member.token,
+        draftId: String(draftId),
+      }),
+    ).toBe(200);
+  });
+
+  it('refuses a mock draft, an unknown draft, and a draftId mixed with league context (LS-10075)', async () => {
+    const leagueId = 903;
+    const user = registerUser('draft-edge-eve');
+    grantLeagueMembership(user.userId, leagueId);
+    mockDrafts.set(93, { leagueId, kind: 'mock' });
+    mockDrafts.set(94, { leagueId, kind: 'league' });
+
+    // Mock drafts wait for LS-10076's authorizeDraft mock branch.
+    expect(
+      await connectStatus('ls-10075-mock', {
+        token: user.token,
+        draftId: '93',
+      }),
+    ).toBe(403);
+    expect(
+      await connectStatus('ls-10075-unknown', {
+        token: user.token,
+        draftId: '999',
+      }),
+    ).toBe(403);
+    expect(
+      await connectStatus('ls-10075-mixed', {
+        token: user.token,
+        draftId: '94',
+        leagueId: String(leagueId),
+      }),
+    ).toBe(400);
+    expect(
+      await connectStatus('ls-10075-wrong-context', {
+        token: user.token,
+        draftId: '94',
+        viewContext: 'league',
+      }),
+    ).toBe(400);
+  });
+
+  it('keeps pick events from a lobby-preview connection while the draft room receives them (LS-10075)', async () => {
+    const leagueId = 904;
+    const draftId = 95;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
+    const drafter = registerUser('room-rita');
+    const previewer = registerUser('preview-pete');
+    grantLeagueMembership(drafter.userId, leagueId);
+    grantLeagueMembership(previewer.userId, leagueId);
+
+    const roomClient = client({
+      token: drafter.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    const previewClient = client({
+      token: previewer.token,
+      draftId,
+      viewContext: 'draft-preview',
+    });
+    await Promise.all([
+      waitForEvent(roomClient, 'connected'),
+      waitForEvent(previewClient, 'connected'),
+    ]);
+
+    let previewPicks = 0;
+    previewClient.on('draft-pick-made' as never, () => {
+      previewPicks++;
+    });
+
+    const roomReceived = waitForEvent(roomClient, 'draft-pick-made');
+    await notificationService().notifyDraftPickMade(
+      leagueId,
+      draftId,
+      1,
+      drafter.userId,
+      6262,
+      1,
+      1,
+      1,
+    );
+    await roomReceived;
+    await sleep(100);
+
+    expect(previewPicks).toBe(0);
+  });
+
+  it('scopes presence to the draft room: USER_JOINED and USER_LEFT carry the draftId (LS-10075)', async () => {
+    const leagueId = 905;
+    const draftId = 96;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
+    const existing = registerUser('draft-presence-pam');
+    const joining = registerUser('draft-presence-quinn');
+    grantLeagueMembership(existing.userId, leagueId);
+    grantLeagueMembership(joining.userId, leagueId);
+
+    const existingClient = client({
+      token: existing.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    await waitForEvent(existingClient, 'connected');
+
+    const joinedReceived = waitForEvent<{ userId: number; draftId: number }>(
+      existingClient,
+      'user-joined',
+    );
+    const joiningClient = client({
+      token: joining.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    await waitForEvent(joiningClient, 'connected');
+
+    await expect(joinedReceived).resolves.toMatchObject({
+      userId: joining.userId,
+      leagueId,
+      draftId,
+    });
+
+    const leftReceived = waitForEvent<{ userId: number; draftId: number }>(
+      existingClient,
+      'user-left',
+    );
+    joiningClient.dispose();
+
+    await expect(leftReceived).resolves.toMatchObject({
+      userId: joining.userId,
+      draftId,
+    });
   });
 
   // ── LS-6355: matchup-scoped connections don't receive league chat/roster

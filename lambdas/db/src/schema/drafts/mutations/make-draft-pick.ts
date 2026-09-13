@@ -559,6 +559,7 @@ builder.mutationField('makeDraftPick', (t) =>
         if (result.isDraftComplete && context.notificationService) {
           await context.notificationService.notifyDraftCompleted(
             result.leagueId,
+            draftId,
             result.selectionMethod,
           );
         }
