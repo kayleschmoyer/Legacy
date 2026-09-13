@@ -1,4 +1,4 @@
-import { execute } from './execute';
+import { execute } from './execute.js';
 import { getWriteSql } from '../db.js';
 import type { McpCaller } from '../audit.js';
 

@@ -151,9 +151,7 @@ export function MatchupCard({
           backgroundColor={LIVE_RED}
           marginRight={6}
           // web-only CSS animation; React Native ignores unknown style keys
-          style={
-            { animation: 'ls-dot-pulse 1.4s ease-in-out infinite' } as never
-          }
+          style={{ animation: 'ls-dot-pulse 1.4s ease-in-out infinite' }}
         />
         <Text {...EYEBROW_PROPS} color={LIVE_RED}>
           {`LIVE${weekLabel}`}

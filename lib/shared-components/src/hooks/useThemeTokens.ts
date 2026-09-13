@@ -31,7 +31,6 @@ export interface ThemeTokens {
  * a reverse dependency from `lib/shared-components` onto `apps/*`.
  */
 export function useThemeTokens(): ThemeTokens {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- useThemeName's ThemeName return type resolves through tamagui's generic config typing, same known leakage as tamaguiConfig in apps/app/src/app/_layout.tsx; the runtime value is always a plain theme-name string.
   const themeName: string = useThemeName();
   const resolvedTheme: 'light' | 'dark' = themeName.includes('dark')
     ? 'dark'

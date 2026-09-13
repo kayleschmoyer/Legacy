@@ -7,7 +7,7 @@ import {
   pollMigrateJob,
   postMigrations,
   transpileMigrationSource,
-} from './migrate-client';
+} from './migrate-client.js';
 
 interface RpcToolCallBody {
   method: string;

@@ -288,11 +288,7 @@ export function RosterScoreboard({
   dateRange,
   actions,
 }: RosterScoreboardProps): React.JSX.Element {
-  // Tamagui's useMedia is any-typed under the strict lint config; bind it
-  // through an explicit signature so the call and result stay typed (same
-  // pattern as LeagueDetailShell / HomeScreen).
-  const readMedia = useMedia as () => { md?: boolean };
-  const media = readMedia();
+  const media = useMedia();
   const condensed = media.md === true;
   const isCurrent = week === currentWeek;
   const atFirst = week <= 1;

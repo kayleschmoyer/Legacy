@@ -100,7 +100,7 @@ export function LeagueCard({
         animation="quick"
         hoverStyle={{ borderColor: '$glassBorderHover' }}
         pressStyle={{ scale: 0.99 }}
-        style={{ animationDelay: `${animationDelay}ms` } as never}
+        style={{ animationDelay: `${animationDelay}ms` }}
       >
         <YStack space="$5" padding="$5">
           <YStack space="$3">

@@ -15,6 +15,7 @@ import {
 } from '@legacy-sports/pfr-client';
 import { InvalidArgumentError } from 'commander';
 import { EnvironmentVariable } from '../EnvironmentVariable';
+import { toError } from '../utils/errors';
 
 export type Sport = 'baseball' | 'football';
 
@@ -294,8 +295,8 @@ async function queueFootballPlayers(
       try {
         const eligible = await processFootballLetter(db, l);
         allEligible.push(...eligible);
-      } catch (err) {
-        LOGGER.error(`Failed to process letter ${l}`, err);
+      } catch (err: unknown) {
+        LOGGER.error(`Failed to process letter ${l}`, toError(err));
       }
     }
 

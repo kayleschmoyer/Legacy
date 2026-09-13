@@ -6,6 +6,7 @@ import {
 } from '@legacy-sports/utils';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
+import { toError } from '../utils/errors';
 
 export interface TestWorkflowArgs extends CommandArgs {
   user?: string;
@@ -163,8 +164,8 @@ async function waitForEvent(
             `❌ Message doesn't match: type="${message.type}" vs eventType="${eventType}"`,
           );
         }
-      } catch (error) {
-        LOGGER.warn('Failed to parse WebSocket message:', error);
+      } catch (error: unknown) {
+        LOGGER.warn('Failed to parse WebSocket message:', toError(error));
       }
     });
   });

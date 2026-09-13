@@ -219,11 +219,11 @@ export async function handleIngestNflverseFootball(
         seasonPlayerObjects++;
         continue;
       }
-      if (!args.force && (await objectExists(s3, bucket as string, key))) {
+      if (!args.force && (await objectExists(s3, bucket, key))) {
         seasonSkipped++;
         continue;
       }
-      await putGzippedJson(s3, bucket as string, key, payload);
+      await putGzippedJson(s3, bucket, key, payload);
       seasonPlayerObjects++;
     }
 
@@ -241,11 +241,11 @@ export async function handleIngestNflverseFootball(
         seasonTeamObjects++;
         continue;
       }
-      if (!args.force && (await objectExists(s3, bucket as string, key))) {
+      if (!args.force && (await objectExists(s3, bucket, key))) {
         seasonSkipped++;
         continue;
       }
-      await putGzippedJson(s3, bucket as string, key, payload);
+      await putGzippedJson(s3, bucket, key, payload);
       seasonTeamObjects++;
     }
 

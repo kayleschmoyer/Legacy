@@ -30,6 +30,7 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { sql } from 'drizzle-orm';
+import { errorMessage } from '../utils/errors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -215,8 +216,7 @@ export async function handleLoadOnThisDayEvents(
                 `);
                 totalInserted++;
               } catch (err: unknown) {
-                const message =
-                  err instanceof Error ? err.message : String(err);
+                const message = errorMessage(err);
                 if (
                   message.includes('duplicate key') ||
                   message.includes('unique constraint')
@@ -229,7 +229,7 @@ export async function handleLoadOnThisDayEvents(
             }
           }
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorMessage(err);
           LOGGER.warn(`Skipping ${dateStr}: ${message}`);
         }
       }

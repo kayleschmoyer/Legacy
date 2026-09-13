@@ -136,7 +136,7 @@ export const ColumnCustomizer: React.FC<ColumnCustomizerProps> = ({
       // off-screen for a 30-column stat payload.
       {...(isWeb
         ? {
-            style: { maxHeight: 360, overflowY: 'auto' } as React.CSSProperties,
+            style: { maxHeight: 360, overflowY: 'auto' },
           }
         : {})}
     >

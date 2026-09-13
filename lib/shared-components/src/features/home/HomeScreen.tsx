@@ -1739,12 +1739,10 @@ export function LeagueListRow({
       shadowColor={OVERLAY_BLACK_40}
       shadowOffset={{ width: 0, height: 8 }}
       shadowRadius={22}
-      style={
-        {
-          backdropFilter: 'blur(12px) saturate(1.1)',
-          WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
-        } as never
-      }
+      style={{
+        backdropFilter: 'blur(12px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
+      }}
       hoverStyle={{
         backgroundColor: '$glassSurface',
         borderColor: '$glassBorderHover',
@@ -1882,12 +1880,10 @@ function QuickActionPill({
       flexGrow={1}
       flexBasis="45%"
       $gtSm={{ flexGrow: 0, flexBasis: 'auto' }}
-      style={
-        {
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        } as never
-      }
+      style={{
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
       hoverStyle={
         disabled
           ? undefined
@@ -2896,11 +2892,8 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   // Read explicitly rather than as `!gtXs` so the Tamagui jest mock's base
   // tier (every breakpoint false/undefined) resolves to the wide branch by
   // default, matching the "base = desktop" convention the rest of this
-  // codebase's tests rely on. Bind `useMedia` through an explicit signature
-  // so the call/result stay type-safe under this project's typed ESLint
-  // rules (same pattern as `LeagueDetailShell.tsx`).
-  const readMedia = useMedia as () => { xs?: boolean };
-  const isNarrow = Boolean(readMedia().xs);
+  // codebase's tests rely on.
+  const isNarrow = Boolean(useMedia().xs);
 
   const orderedSports = useMemo(
     () =>

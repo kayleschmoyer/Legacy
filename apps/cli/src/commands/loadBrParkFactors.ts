@@ -224,7 +224,7 @@ export async function handleLoadBrParkFactors(options: {
         const result = await db.execute(sql);
         const rowsAffected =
           typeof result === 'object' && result !== null && 'rowCount' in result
-            ? (result.rowCount as number)
+            ? result.rowCount
             : rows.length;
 
         totalInserted += rowsAffected;

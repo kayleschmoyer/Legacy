@@ -40,7 +40,7 @@ export function Sheet({
       <TamaguiSheet.Overlay
         animation={animation}
         backgroundColor="rgba(8, 12, 20, 0.55)"
-        style={{ backdropFilter: 'blur(4px)' } as never}
+        style={{ backdropFilter: 'blur(4px)' }}
         enterStyle={{ opacity: 0 }}
         exitStyle={{ opacity: 0 }}
       />

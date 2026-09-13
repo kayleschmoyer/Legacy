@@ -43,11 +43,7 @@ export interface ResolvedThemeColors {
  * on theme change because it subscribes to the active theme name.
  */
 export function useThemeColors(): ResolvedThemeColors {
-  // Tamagui's `useThemeName` resolves to a loose type under this project's
-  // ESLint type program; bind it through an explicit signature so the call and
-  // its result are type-safe rather than suppressing the lint rule.
-  const readThemeName = useThemeName as () => string;
-  const themeName = readThemeName();
+  const themeName = useThemeName();
   const isLight = themeName.includes('light');
   const palette = isLight ? colors.light : colors.dark;
   const { surface, text, glass } = palette;

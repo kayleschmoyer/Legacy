@@ -40,7 +40,7 @@ const HCell = ({
 }) => (
   <Text
     width={width as never}
-    flex={flex as never}
+    flex={flex}
     fontFamily="$heading"
     fontWeight="700"
     fontSize={10}
@@ -68,7 +68,7 @@ const DCell = ({
 }) => (
   <Text
     width={width as never}
-    flex={flex as never}
+    flex={flex}
     fontFamily="$mono"
     fontSize={13}
     color={color as never}

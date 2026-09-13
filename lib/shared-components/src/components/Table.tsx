@@ -89,7 +89,7 @@ function DataCell({
       fontSize={13}
       color={lead ? '$brandGoldLight' : '$color'}
       textAlign={column.numeric ? 'right' : 'left'}
-      style={{ fontVariantNumeric: 'tabular-nums' } as never}
+      style={{ fontVariantNumeric: 'tabular-nums' }}
     >
       {raw === null ? '—' : String(raw)}
     </Text>

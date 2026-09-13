@@ -2,11 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
-    "module": "commonjs",
-    "moduleResolution": "nodenext",
     "allowJs": true,
     "types": ["jest", "node"]
   },
+  "exclude": [],
   "include": [
     "jest.config.ts",
     "src/**/*.spec.ts",

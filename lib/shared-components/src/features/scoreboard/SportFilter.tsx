@@ -155,7 +155,7 @@ function SportButton({
     <XStack
       tag="button"
       role="radio"
-      ref={buttonRef as never}
+      ref={buttonRef}
       data-testid={`scoreboard-sport-${sportKey}`}
       aria-checked={active}
       aria-disabled={disabled}

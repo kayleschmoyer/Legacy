@@ -53,10 +53,7 @@ export function DateTimePicker({
   inputStyle,
   onClear,
 }: DateTimePickerProps) {
-  // Tamagui's useMedia is any-typed under the strict lint config; bind it
-  // through an explicit signature the same way RosterBoard/HomeScreen do.
-  const readMedia = useMedia as () => { sm?: boolean; short?: boolean };
-  const media = readMedia();
+  const media = useMedia();
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const base = value ?? new Date();

@@ -17,7 +17,6 @@ import {
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const NavCard = styled(Card, {
   overflow: 'hidden',
   borderRadius: '$6',
@@ -27,7 +26,6 @@ const NavCard = styled(Card, {
   width: '100%',
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const WeekStepperRow = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -37,7 +35,6 @@ const WeekStepperRow = styled(XStack, {
   borderBottomColor: '$surfacePanelBorder',
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const StepperButton = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',
@@ -59,7 +56,6 @@ const StepperButton = styled(XStack, {
   } as const,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const WeekBadge = styled(XStack, {
   alignItems: 'center',
   gap: '$1.5',
@@ -69,7 +65,6 @@ const WeekBadge = styled(XStack, {
   borderWidth: 1,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const MatchupCardButton = styled(YStack, {
   borderRadius: '$5',
   borderWidth: 1.5,
@@ -98,7 +93,6 @@ const MatchupCardButton = styled(YStack, {
   } as const,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const UserBadge = styled(XStack, {
   alignItems: 'center',
   paddingHorizontal: '$2',
@@ -109,7 +103,6 @@ const UserBadge = styled(XStack, {
   borderColor: '$green7',
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const BackToCurrentButton = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',

@@ -6,7 +6,10 @@ export default [
     files: ['**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: [
+          'tools/mcp/github-server/tsconfig.json',
+          'tools/mcp/github-server/tsconfig.spec.json',
+        ],
       },
     },
   },

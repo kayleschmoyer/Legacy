@@ -229,7 +229,7 @@ export function MatchupControl({
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
                 hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                onPress={handleConfirm}
+                onPress={() => void handleConfirm()}
               >
                 Confirm
               </Button>

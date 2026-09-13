@@ -58,7 +58,7 @@ export function ErrorState({
           color="$red9"
           fontWeight="400"
           testID="error-state-diag"
-          style={{ fontFamily: 'monospace' } as React.CSSProperties}
+          style={{ fontFamily: 'monospace' }}
         >
           {diagLine}
         </Text>

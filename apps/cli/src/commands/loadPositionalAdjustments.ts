@@ -2,6 +2,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { sql } from 'drizzle-orm';
+import { errorMessage } from '../utils/errors';
 
 /**
  * Baseball Reference year-specific positional adjustments.
@@ -232,7 +233,7 @@ export async function handleLoadPositionalAdjustments(options: {
           `);
           inserted++;
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorMessage(err);
           if (message.includes('duplicate key')) {
             skipped++;
           } else {

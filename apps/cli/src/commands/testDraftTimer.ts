@@ -285,13 +285,13 @@ async function processExpiredPicks(
         if (availablePlayers.rows.length > 0) {
           const top = availablePlayers.rows[0];
           LOGGER.info(
-            `    [DRY RUN] Would auto-pick player ${String(top.id)} (${String(top.first_name)} ${String(top.last_name)})`,
+            `    [DRY RUN] Would auto-pick player ${top.id as number} (${top.first_name as string} ${top.last_name as string})`,
           );
           LOGGER.info(
             `    [DRY RUN] Top 3 available: ${availablePlayers.rows
               .map(
                 (p) =>
-                  `${String(p.id)} (${String(p.first_name)} ${String(p.last_name)})`,
+                  `${p.id as number} (${p.first_name as string} ${p.last_name as string})`,
               )
               .join(', ')}`,
           );
@@ -469,7 +469,7 @@ async function processExpiredPicks(
 
           return {
             autoPlayerId,
-            playerName: `${String(autoPlayer.first_name)} ${String(autoPlayer.last_name)}`,
+            playerName: `${autoPlayer.first_name as string} ${autoPlayer.last_name as string}`,
             teamId: currentTeamId,
             round,
             pickNumber: pickInRound,

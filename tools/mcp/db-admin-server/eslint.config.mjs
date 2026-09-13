@@ -8,7 +8,10 @@ export default [
     rules: {},
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.*?.json'],
+        project: [
+          'tools/mcp/db-admin-server/tsconfig.json',
+          'tools/mcp/db-admin-server/tsconfig.spec.json',
+        ],
       },
     },
   },

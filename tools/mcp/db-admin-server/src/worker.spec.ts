@@ -1,4 +1,4 @@
-import { runDbMigrateWorker } from './worker';
+import { runDbMigrateWorker } from './worker.js';
 import { getMigrationSql } from './db.js';
 import { finishJob, heartbeatJob, loadJob } from './jobs.js';
 import { applyMigrationBatch } from './tools/migrate.js';

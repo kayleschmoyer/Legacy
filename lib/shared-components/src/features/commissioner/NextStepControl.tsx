@@ -666,7 +666,7 @@ export function NextStepControl({
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
                 hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                onPress={handleConfirm}
+                onPress={() => void handleConfirm()}
               >
                 Confirm
               </Button>
@@ -767,7 +767,7 @@ export function NextStepControl({
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
                 hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                onPress={handleRenewalConfirm}
+                onPress={() => void handleRenewalConfirm()}
                 disabled={renewalLoading}
                 icon={renewalLoading ? <Spinner /> : undefined}
               >

@@ -176,7 +176,7 @@ export function GameSelectionControl({
                   color="white"
                   pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
                   hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                  onPress={handleTriggerSelection}
+                  onPress={() => void handleTriggerSelection()}
                   disabled={loading}
                 >
                   {loading ? 'Selecting...' : 'Confirm'}

@@ -1,5 +1,5 @@
 import type postgres from 'postgres';
-import { insertJob, isJobStale, jobStaleMs } from './jobs';
+import { insertJob, isJobStale, jobStaleMs } from './jobs.js';
 
 describe('jobStaleMs', () => {
   const original = process.env['DB_MIGRATE_JOB_STALE_MS'];

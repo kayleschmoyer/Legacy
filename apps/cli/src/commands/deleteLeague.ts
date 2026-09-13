@@ -3,6 +3,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq } from 'drizzle-orm';
 import { CommandArgs } from '../utils/loadEnvFile';
+import { toError } from '../utils/errors';
 
 export interface DeleteLeagueArgs extends CommandArgs {
   /** ID of the league to delete. */
@@ -87,8 +88,8 @@ export async function handleDeleteLeague(
 
   try {
     await deleteLeagueById(leagueId);
-  } catch (error) {
-    LOGGER.error(`❌ Failed to delete league ${leagueId}:`, error);
+  } catch (error: unknown) {
+    LOGGER.error(`❌ Failed to delete league ${leagueId}:`, toError(error));
     process.exit(1);
   }
 }

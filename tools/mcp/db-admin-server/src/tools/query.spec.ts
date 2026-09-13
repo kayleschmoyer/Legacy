@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { query } from './query';
+import { query } from './query.js';
 import { getReadonlyConnectionInfo, getReadonlySql } from '../db.js';
 
 jest.mock('../db.js');

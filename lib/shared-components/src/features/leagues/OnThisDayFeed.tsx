@@ -34,7 +34,6 @@ import {
 
 // ─── Styled components ───────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const FeedContainer = styled(YStack, {
   borderRadius: '$7',
   borderWidth: 1,
@@ -44,7 +43,6 @@ const FeedContainer = styled(YStack, {
   hoverStyle: { borderColor: '$glassBorderHover' },
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const FeedHeader = styled(XStack, {
   alignItems: 'center',
   gap: '$3',
@@ -54,7 +52,6 @@ const FeedHeader = styled(XStack, {
   borderBottomColor: '$glassBorder',
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const EntryRow = styled(XStack, {
   alignItems: 'center',
   paddingHorizontal: '$5',
@@ -71,7 +68,6 @@ const EntryRow = styled(XStack, {
   },
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const StatBadge = styled(XStack, {
   alignItems: 'center',
   gap: '$1',

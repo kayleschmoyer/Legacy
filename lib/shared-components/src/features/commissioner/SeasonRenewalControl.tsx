@@ -216,7 +216,7 @@ export function SeasonRenewalControl({
                 backgroundColor="$brandNavyLight"
                 hoverStyle={{ backgroundColor: '$brandNavy' }}
                 pressStyle={{ backgroundColor: '$brandNavyDark' }}
-                onPress={handleConfirm}
+                onPress={() => void handleConfirm()}
                 disabled={loading}
                 icon={loading ? <Spinner /> : undefined}
               >

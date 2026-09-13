@@ -6,7 +6,7 @@ import {
   migrationRequire,
   type NormalizedMigrationItem,
   transpileTsSource,
-} from './migrate';
+} from './migrate.js';
 import { getMigrationSql } from '../db.js';
 import {
   ensureJobsTable,

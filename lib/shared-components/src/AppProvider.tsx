@@ -31,11 +31,7 @@ const NativeLayout = ({
 
   try {
     return (
-      <TamaguiProvider
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui's config prop resolves as error type; createTamagui() return is always correct at runtime
-        config={tamaguiConfig}
-        defaultTheme={colorScheme}
-      >
+      <TamaguiProvider config={tamaguiConfig} defaultTheme={colorScheme}>
         {/* Theme wrapper ensures live re-renders pick up the active theme */}
         <Theme name={colorScheme}>
           <ConditionalProviders>
@@ -64,11 +60,7 @@ const WebLayout = ({
 
   try {
     return (
-      <TamaguiProvider
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui's config prop resolves as error type; createTamagui() return is always correct at runtime
-        config={tamaguiConfig}
-        defaultTheme={colorScheme}
-      >
+      <TamaguiProvider config={tamaguiConfig} defaultTheme={colorScheme}>
         {/* Theme wrapper ensures live re-renders pick up the active theme */}
         <Theme name={colorScheme}>
           <div

@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { JWTPayload, User } from '../types/cli-types';
+import { toError } from '../utils/errors';
 
 interface AuthToken {
   jwt: string;
@@ -360,8 +361,10 @@ export class CLIAuthService {
         const expiresInHours = (expiresAt - Date.now()) / (60 * 60 * 1000);
         LOGGER.debug(`Token expires in ${expiresInHours.toFixed(2)} hours`);
       }
-    } catch (error) {
-      LOGGER.debug('Could not decode JWT expiration, using default', { error });
+    } catch (error: unknown) {
+      LOGGER.debug('Could not decode JWT expiration, using default', {
+        error: toError(error),
+      });
     }
 
     // Store token for this user

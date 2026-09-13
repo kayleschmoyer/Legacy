@@ -72,6 +72,7 @@ import { handleGetPlayerFootballKicking } from './commands/getPlayerFootballKick
 import { handleGetPlayerFootballDefense } from './commands/getPlayerFootballDefense';
 import { handleFindDuplicateAccounts } from './commands/findDuplicateAccounts';
 import { handleMergeAccounts } from './commands/mergeAccounts';
+import { toError } from './utils/errors';
 
 // Initialize Rollbar for CLI
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -1022,7 +1023,7 @@ if (require.main === module) {
       LOGGER.info('CLI application ran successfully');
     })
     .catch((err: unknown) => {
-      const error = err instanceof Error ? err : new Error(String(err));
+      const error = toError(err);
       logError(error);
       captureError(error, { context: 'cli-application' });
       process.exit(1);

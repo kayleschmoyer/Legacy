@@ -940,11 +940,7 @@ export function RosterBoard<
   );
   /** Position id whose overflow (kebab) menu is open. */
   const [morePositionId, setMorePositionId] = useState<number | null>(null);
-  // Tamagui's useMedia is any-typed under the strict lint config; bind it
-  // through an explicit signature so the call and result stay typed (same
-  // pattern as LeagueDetailShell / HomeScreen).
-  const readMedia = useMedia as () => { gtMd?: boolean };
-  const media = readMedia();
+  const media = useMedia();
   const isFootball = sport === 'football';
 
   const { hitterSlots, pitcherSlots } = useMemo(() => {

@@ -194,8 +194,9 @@ export function PlayerListRow({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '800',
                 fontSize: 17,
-                lineHeight:
-                  Platform.OS === 'web' ? ('1.1' as unknown as number) : 19,
+                // Web-only unit-less string; native MUST stay a number —
+                // a string hard-crashes RCTText (LS-8624/LS-8630).
+                lineHeight: Platform.OS === 'web' ? '1.1' : 19,
                 color: goldHighlight ? BRAND_GOLD_LIGHT : TEXT_PRIMARY,
                 fontVariantNumeric: 'tabular-nums',
               }}

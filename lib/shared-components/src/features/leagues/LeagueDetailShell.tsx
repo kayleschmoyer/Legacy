@@ -224,11 +224,7 @@ export function LeagueDetailHero({
   // tablet showing a shrunken crest, which is what the design asks for.
   // The crest icon `size` is a component prop (not a
   // style), so it can't take media props — resolve it via useMedia instead.
-  // Bind useMedia through an explicit signature so the call/result stay
-  // type-safe under this project's typed ESLint rules (same pattern as the tab
-  // bar below and useThemeColors in utils/themeColors.ts).
-  const readMedia = useMedia as () => { sm?: boolean };
-  const crestIconSize = readMedia().sm ? 26 : 48;
+  const crestIconSize = useMedia().sm ? 26 : 48;
 
   return (
     <YStack
@@ -663,11 +659,11 @@ export function LeagueRoleBar({
       // Sticky-below-nav treatment is web-only; native renders it inline.
       style={
         Platform.OS === 'web'
-          ? ({
+          ? {
               position: 'sticky',
               top: 105,
               backdropFilter: 'blur(14px)',
-            } as React.CSSProperties)
+            }
           : undefined
       }
     >
@@ -860,12 +856,7 @@ export function LeagueTabBar({
   pendingTradeCount?: number;
   onAnalytics?: () => void;
 }): React.JSX.Element {
-  // Tamagui's `useMedia` resolves to a loose type under this project's ESLint
-  // type program; bind it through an explicit signature so the call and its
-  // result are type-safe rather than suppressing the lint rule (see useThemeColors
-  // in utils/themeColors.ts for the same pattern applied to useThemeName).
-  const readMedia = useMedia as () => { xs?: boolean };
-  const media = readMedia();
+  const media = useMedia();
   const visible = tabs.filter(
     (t) => (!t.memberOnly || isMember) && (!t.commishOnly || isCommissioner),
   );

@@ -129,7 +129,7 @@ export function WaiverProcessControl({
                 theme="active"
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
-                onPress={handleConfirm}
+                onPress={() => void handleConfirm()}
                 disabled={loading}
                 icon={loading ? <Spinner size="small" /> : undefined}
               >

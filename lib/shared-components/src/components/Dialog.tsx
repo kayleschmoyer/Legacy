@@ -54,7 +54,7 @@ export function Dialog({
           enterStyle={{ opacity: 0 }}
           exitStyle={{ opacity: 0 }}
           backgroundColor="rgba(8, 12, 20, 0.7)"
-          style={{ backdropFilter: 'blur(6px)' } as never}
+          style={{ backdropFilter: 'blur(6px)' }}
         />
         <TamaguiDialog.Content
           key="content"

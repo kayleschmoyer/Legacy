@@ -254,7 +254,7 @@ export async function handleLoadWobaWeights(options: {
       const result = await db.execute(sql);
       const rowsAffected =
         typeof result === 'object' && result !== null && 'rowCount' in result
-          ? (result.rowCount as number)
+          ? result.rowCount
           : batch.length;
 
       inserted += rowsAffected;

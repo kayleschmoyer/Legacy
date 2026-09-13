@@ -1,4 +1,4 @@
-import { extractCaller, extractCallerFromAuthHeader } from './audit';
+import { extractCaller, extractCallerFromAuthHeader } from './audit.js';
 
 /** Build a JWT-shaped string with the given payload claims (no real signing). */
 function jwt(claims: Record<string, unknown>): string {

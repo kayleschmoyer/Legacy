@@ -49,7 +49,7 @@ export function NavBar({
       backgroundColor="$background075"
       borderBottomWidth={1}
       borderColor="$glassBorder"
-      style={{ backdropFilter: 'blur(14px)' } as never}
+      style={{ backdropFilter: 'blur(14px)' }}
       position="sticky"
       top={0}
       zIndex={100}
@@ -158,7 +158,7 @@ function NavPill({ link }: { link: NavLink }) {
         letterSpacing={0.78}
         textTransform="uppercase"
         color={textColorToken}
-        style={{ transition: 'color 120ms ease-out' } as never}
+        style={{ transition: 'color 120ms ease-out' }}
       >
         {link.label}
       </Text>

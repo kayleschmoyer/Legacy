@@ -1,4 +1,4 @@
-import { migrationStatus } from './migration-status';
+import { migrationStatus } from './migration-status.js';
 import { getReadonlySql } from '../db.js';
 import type { DbMigrateJobRow } from '../jobs.js';
 
