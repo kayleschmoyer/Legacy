@@ -85,13 +85,26 @@ Scripts must **NEVER** contain:
    pnpm run db:up
    ```
 
-5. **Verify changes**:
+5. **Verify against an ephemeral Postgres before touching the shared database**:
+
+   ```bash
+   make verify-migration MIGRATION=lib/db-client/migrations/<file>.ts
+   ```
+
+   There is only one database — `db:up` and `db_migrate` both write straight to
+   the shared dev RDS, and that write is irreversible. This target replays the
+   real migration chain into an in-process PGlite Postgres (no Docker, no AWS,
+   no network), then asserts the candidate applies cleanly, re-runs cleanly, and
+   round-trips through `down()`/`up()`. Run it on anything with a backfill, a
+   `NOT NULL` flip, or a trigger.
+
+6. **Verify changes**:
 
    ```bash
    pnpm run db:status
    ```
 
-6. **Commit migration** with schema changes in same PR
+7. **Commit migration** with schema changes in same PR
 
 ### Migration File Naming Convention
 

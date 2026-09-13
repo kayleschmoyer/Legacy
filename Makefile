@@ -8,7 +8,7 @@
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios app-dev build-android build-ios maestro \
-	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
+	db-migrate verify-migration db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars rebuild-tfvars tfvars-from-aws \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
 	sync-env check-services graph affected list-projects workspace-lint pr \
@@ -539,6 +539,10 @@ build-ios: ## Build iOS application
 db-migrate: ## Run database migrations
 	@$(call echo_blue,Running database migrations...)
 	cd lib$(PATH_SEP)db-client && pnpm run db:migrate
+
+verify-migration: ## Verify a candidate migration against an ephemeral PGlite Postgres (LS-10088); usage: make verify-migration MIGRATION=lib/db-client/migrations/<file>.ts
+	@$(call echo_blue,Verifying migration against ephemeral Postgres...)
+	@node scripts/db/verify-migration.mjs "$(MIGRATION)"
 
 db-studio: ## Open database studio
 	@$(call echo_blue,Opening database studio...)
