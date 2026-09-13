@@ -251,6 +251,16 @@ describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {
     );
   });
 
+  it('covers the premium SFLEX and KP slot types (LS-6337, LS-9107)', () => {
+    expect(ALLOWED_POSITIONS_FOOTBALL['SFLEX']).toEqual([
+      'QB',
+      'RB',
+      'WR',
+      'TE',
+    ]);
+    expect(ALLOWED_POSITIONS_FOOTBALL['KP']).toEqual(['K']);
+  });
+
   it('has no DEF key — the real roster slot type is DST, never DEF (LS-9475)', () => {
     expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toBeUndefined();
   });
@@ -266,6 +276,71 @@ describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {
     expect(flex).not.toContain('DL');
     expect(flex).not.toContain('LB');
     expect(flex).not.toContain('DB');
+  });
+});
+
+// ── Premium slots: auto-pick must actually fill SFLEX and KP ───────────────
+// These slot types were missing from the strategy's former local map, so
+// pickBestForSlot fell back to ['SFLEX'] / ['KP'] — a stat position no player
+// has — and the slots were never filled.
+
+describe('premium roster slots (SFLEX, KP)', () => {
+  it('fills a lone SFLEX slot with an eligible player', () => {
+    const pool: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 0, positions: ['QB'] }],
+    ]);
+    const result = footballStrategy.scoreForUnfilledPositions(pool, ['SFLEX']);
+    expect(result.playerId).toBe(1);
+    expect(result.reason).toMatch(/^Best available for SFLEX —/);
+  });
+
+  it('fills a lone KP slot with a kicker, and never with a non-kicker', () => {
+    const pool: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 0, positions: ['QB'] }],
+      [2, { fpg: 0, positions: ['K'] }],
+    ]);
+    const result = footballStrategy.scoreForUnfilledPositions(pool, ['KP']);
+    expect(result.playerId).toBe(2);
+
+    const noKicker: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 0, positions: ['QB'] }],
+    ]);
+    expect(
+      footballStrategy.scoreForUnfilledPositions(noKicker, ['KP']).playerId,
+    ).toBeUndefined();
+  });
+
+  it('drafts a complete Superflex + KP starting lineup', () => {
+    const startingSlots = [
+      'QB',
+      'SFLEX',
+      'RB',
+      'RB',
+      'WR',
+      'WR',
+      'TE',
+      'FLEX',
+      'KP',
+      'DST',
+    ];
+    const picks = simulateDraft(buildMockFootballPool(), [...startingSlots]);
+
+    expect(picks).toHaveLength(startingSlots.length);
+    const filled = picks.map((p) => p.slot).sort();
+    expect(filled).toEqual([...startingSlots].sort());
+    for (const pick of picks) {
+      const allowed = ALLOWED_POSITIONS_FOOTBALL[pick.slot] ?? [pick.slot];
+      expect(allowed.some((sp) => pick.positions.includes(sp))).toBe(true);
+    }
+  });
+
+  it('fills SFLEX after FLEX (most-restrictive slot first)', () => {
+    const pool = buildMockFootballPool();
+    const result = footballStrategy.scoreForUnfilledPositions(pool, [
+      'SFLEX',
+      'FLEX',
+    ]);
+    expect(result.reason).toMatch(/^Best available for FLEX —/);
   });
 });
 

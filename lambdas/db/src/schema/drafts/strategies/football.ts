@@ -8,21 +8,28 @@
  * archetype + playerId) here, so the strategy always produces sensible,
  * stable rosters even for thin data.
  *
- * Roster fill priority per the ADR-0011 §5 spec: QB → RB → WR → TE → K → DEF
- * → FLEX → BENCH. The strategy walks the unfilled slot types in this canonical
- * order and selects the highest-FPG candidate for the first slot type with an
- * eligible player.
+ * Roster fill priority (ADR-0011 §5, extended): QB → RB → WR → TE → K → KP
+ * → DST | DL/LB/DB → FLEX → SFLEX → BENCH. The strategy walks the unfilled
+ * slot types in this canonical order and selects the highest-FPG candidate
+ * for the first slot type with an eligible player.
  */
 
+import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils';
 import type { AutoPickScore, AutoPickStrategy } from './types';
 import type { PlayerDraftInfo } from '../candidate-pool';
 
 /**
- * Football slot type → eligible stat positions. Mirrors
- * `ALLOWED_POSITIONS_BY_SPORT['football']` (@legacy-sports/utils).
- * Kept local to this strategy for historical reasons (slice [3/10]) but must
- * stay in sync with that shared map — see strategies/football.spec.ts's
- * LS-4763 parity test.
+ * Football slot type → eligible stat positions. **Derived** from
+ * `ALLOWED_POSITIONS_BY_SPORT['football']` (@legacy-sports/utils) rather than
+ * re-declared here: a hand-maintained local copy was the whole defect class.
+ * It silently fell behind the shared map by two premium slot types — SFLEX
+ * (Superflex, LS-6337) and KP (combined kicker/punter, LS-9107) — so
+ * `pickBestForSlot` fell through to its `[slotType]` fallback for both, no
+ * player's stat positions ever contained the literal 'SFLEX'/'KP', and
+ * auto-pick skipped those slots entirely in the premium leagues that
+ * configure them. The LS-4763 parity test in strategies/football.spec.ts was
+ * red on `main` the whole time but never ran — `lambdas/db`'s unit suite is
+ * not gated in CI (testing skill "Lambda unit gate hole", LS-8247).
  *
  * DST (team defense) and DL/LB/DB (individual defensive players) are two
  * mutually-exclusive slot vocabularies selected by a league's
@@ -35,25 +42,20 @@ import type { PlayerDraftInfo } from '../candidate-pool';
  */
 export const ALLOWED_POSITIONS_FOOTBALL: Readonly<
   Record<string, readonly string[]>
-> = Object.freeze({
-  QB: ['QB'],
-  RB: ['RB'],
-  WR: ['WR'],
-  TE: ['TE'],
-  K: ['K'],
-  DST: ['DST'],
-  DL: ['DL'],
-  LB: ['LB'],
-  DB: ['DB'],
-  FLEX: ['RB', 'WR', 'TE'],
-  BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST', 'DL', 'LB', 'DB'],
-});
+> = ALLOWED_POSITIONS_BY_SPORT['football'];
 
 /**
  * Canonical fill order for unfilled slots — earlier entries are higher
  * priority. Includes both defensive-format vocabularies (see comment above);
  * only the slot types present in a given league's unfilled set are ever
  * walked, so an idp league never reaches 'DST' and vice versa.
+ *
+ * Ordered most-restrictive-first so a flex slot never consumes a player that
+ * a dedicated slot still needs: KP accepts exactly what K does and sits
+ * beside it, and SFLEX (QB/RB/WR/TE) is strictly wider than FLEX (RB/WR/TE)
+ * so it fills last. A slot type absent from this list still gets picked — it
+ * is appended after the canonical entries by `scoreForUnfilledPositions` —
+ * but only the shared map gives it real eligibility, so keep the two in step.
  */
 const FOOTBALL_FILL_ORDER: readonly string[] = [
   'QB',
@@ -61,11 +63,13 @@ const FOOTBALL_FILL_ORDER: readonly string[] = [
   'WR',
   'TE',
   'K',
+  'KP',
   'DST',
   'DL',
   'LB',
   'DB',
   'FLEX',
+  'SFLEX',
 ];
 
 /**
