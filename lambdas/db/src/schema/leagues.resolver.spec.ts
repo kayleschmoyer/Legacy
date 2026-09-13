@@ -1541,6 +1541,175 @@ describe('League Mutations', () => {
     });
   });
 
+  describe('createLeagueAndTeams mutation — keeper entitlement gate (LS-8385)', () => {
+    // Keeper config must be valid for the request to reach the entitlement
+    // gate at all — validateKeeperConfig (LS-8671) runs first, and
+    // 'round-penalty' is the cost model legal for a standard selection method.
+    const baseInput = {
+      leagueName: 'Keeper League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      selectionMethod: 'standard',
+      rosterContinuity: 'keeper',
+      keeperSettings: {
+        keeperCount: 3,
+        costModel: 'round-penalty',
+      },
+    };
+
+    it('blocks a free user from creating a keeper league', async () => {
+      // getSubscriptionTier reads the tier via .limit(1) → free tier, and the
+      // row carries no stripeCustomerId → empty live entitlements → gate fires.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // requireFreshEntitlement → getStripeCustomerId orders the subscriptions
+      // lookup (LS-5201 tiebreaker); the shared mockDb has no orderBy.
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: baseInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Keeper leagues require a premium subscription');
+
+      // The gate must fire before any league is created.
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to create a keeper league', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 1,
+          name: 'Keeper League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: baseInput },
+        adminContext,
+        undefined as never,
+      );
+
+      // Admins are treated as premium, so the keeper gate passes and the
+      // league is created with the keeper continuity + normalized settings.
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rosterContinuity: 'keeper',
+          keeperSettings: expect.objectContaining({
+            keeperCount: 3,
+            costModel: 'round-penalty',
+          }),
+        }),
+      );
+    });
+
+    it('gates a free user before keeper config validation, not after', async () => {
+      // 'auction-budget' is illegal for a standard selection method, so this
+      // input would fail validateKeeperConfig. The entitlement gate runs first
+      // (LS-5159 ordering), so a free caller gets the upgrade prompt rather
+      // than a config-shape error that leaks the rules to a non-entitled user.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          {
+            input: {
+              ...baseInput,
+              keeperSettings: { keeperCount: 3, costModel: 'auction-budget' },
+            },
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Keeper leagues require a premium subscription');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a free user to create a redraft league', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 2,
+          name: 'Redraft League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        {
+          input: {
+            leagueName: 'Redraft League',
+            numberOfTeams: 10,
+            playerPool: 'all',
+            selectionMethod: 'standard',
+          },
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ rosterContinuity: 'redraft' }),
+      );
+    });
+  });
+
   describe('createLeagueAndTeams mutation — Hall of Fame Only entitlement gate (LS-6080)', () => {
     const baseInput = {
       leagueName: 'HOF League',

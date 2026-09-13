@@ -819,6 +819,24 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         validatedSelectionMethod,
       );
 
+      // Keeper mode is a premium league setting (LS-8385). The creation UI
+      // hard-disables the toggle for free users (RosterContinuityField's
+      // `isPremium` + PremiumGate), but that is a client-side control only —
+      // without this gate a direct API call still creates a keeper league on a
+      // free account. Checked BEFORE validateKeeperConfig so a free caller gets
+      // the upgrade prompt rather than a config-shape error, matching the
+      // auction_draft / draft_slot_trading gates above (LS-5159). Note:
+      // 'dynasty' is deliberately NOT gated — the mode is unimplemented
+      // (LS-8386) and grants nothing today; LS-8386 owns minting and gating its
+      // own entitlement key when it ships.
+      if (inputRosterContinuity === 'keeper') {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.keeper_leagues,
+          'Keeper leagues require a premium subscription. Upgrade to carry players over between seasons.',
+        );
+      }
+
       // ── Roster continuity / keeper settings validation (LS-8671) ────────
       const validatedCostModel = validateKeeperConfig(
         inputRosterContinuity,
