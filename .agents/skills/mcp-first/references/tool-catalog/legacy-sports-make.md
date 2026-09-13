@@ -77,11 +77,12 @@ Prefer this over `make worktree` via shell. Create a new git worktree for a Jira
 
 ### `make_wt_setup`
 
-Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.
+Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modules, copy .env, configure .twig, install hooks. Run after worktree creation. A step still running after ~45s returns { status: "running", jobId } — poll with make_run_wait({ jobId }), never re-run. A cold modules-pool slot means a full pnpm install: raise timeoutMs rather than retrying.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `worktreePath` | string | **required** | — | Absolute worktree path |
+| `timeoutMs` | number |  | integer, > 0 | Per-step process timeout in ms (default: 1800000) |
 | `removeSymlink` | boolean |  | — | Remove symlink and install independent node_modules |
 | `noFrozenLockfile` | boolean |  | — | Run pnpm install --no-frozen-lockfile first (for new workspace packages) |
 

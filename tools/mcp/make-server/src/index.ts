@@ -163,12 +163,24 @@ server.tool(
 // --- make_wt_setup ---
 server.tool(
   'make_wt_setup',
-  'Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
+  // Kept deliberately tight: tool definitions are always-resident token cost.
+  // The recovery detail (link.mjs --check, half-materialized node_modules) lives
+  // in the tool's own failure payloads, where an agent reads it exactly when it
+  // is relevant, instead of billing every session for it (LS-10087).
+  'Prefer this over `make wt-setup` via shell. Set up a worktree: symlink node_modules, copy .env, configure .twig, install hooks. Run after worktree creation. ' +
+    'A step still running after ~45s returns { status: "running", jobId } — poll with make_run_wait({ jobId }), never re-run. ' +
+    'A cold modules-pool slot means a full pnpm install: raise timeoutMs rather than retrying.',
   {
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .describe('Absolute worktree path'),
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Per-step process timeout in ms (default: 1800000)'),
     removeSymlink: z
       .boolean()
       .default(false)

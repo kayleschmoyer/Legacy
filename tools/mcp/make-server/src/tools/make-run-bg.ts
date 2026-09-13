@@ -67,13 +67,63 @@ export function startMakeInBackground(
   timeoutMs: number,
   verbose = false,
 ): { jobId: string; logPath: string } {
-  const { jobId, logPath } = runner.startJob({
+  return startCommandInBackground({
     command: 'make',
     args,
-    cwd: workDir,
     label: `make ${target}`,
+    target,
+    workDir,
     timeoutMs,
-    meta: { target, workDir, verbose },
+    verbose,
+  });
+}
+
+export interface StartCommandOptions {
+  /** Executable to run, e.g. 'make' or 'pnpm'. */
+  command: string;
+  args: string[];
+  /** Short human-readable label for the job, e.g. 'make wt-setup'. */
+  label: string;
+  /**
+   * Value surfaced as `target` by make_run_status / make_run_wait. Tools that
+   * are not make-target-shaped (e.g. make_wt_setup) pass a descriptive phase
+   * name so a polled snapshot still says what is running.
+   */
+  target: string;
+  workDir: string;
+  timeoutMs: number;
+  verbose?: boolean;
+  /**
+   * Run through the platform shell. Required on Windows for npm wrapper
+   * commands (pnpm/npm/npx) and for bare `make`, which are resolved via
+   * .cmd/.bat shims that execFile cannot launch directly (LS-9153).
+   */
+  shell?: boolean;
+}
+
+/**
+ * Start an arbitrary command as a background job on make-server's shared
+ * runner. Every job started here — whatever the executable — is pollable with
+ * the existing make_run_status / make_run_wait tools, because they read the
+ * same namespaced runner (LS-10087). Prefer startMakeInBackground for plain
+ * make targets.
+ */
+export function startCommandInBackground(opts: StartCommandOptions): {
+  jobId: string;
+  logPath: string;
+} {
+  const { jobId, logPath } = runner.startJob({
+    command: opts.command,
+    args: opts.args,
+    cwd: opts.workDir,
+    label: opts.label,
+    timeoutMs: opts.timeoutMs,
+    shell: opts.shell,
+    meta: {
+      target: opts.target,
+      workDir: opts.workDir,
+      verbose: opts.verbose ?? false,
+    },
   });
   return { jobId, logPath };
 }
