@@ -90,6 +90,12 @@ import { resolveMainRepoPath } from './resolve-main-repo';
 import { resolveResetTarget } from './resolve-reset-target';
 import { runOnRef } from './run-on-ref';
 import {
+  buildStabilizeCommand,
+  buildStabilizeSteps,
+  STABILIZE_NEXT_STEP_HINT,
+  STABILIZE_POOL_LINK_NOTE,
+} from './stabilize-steps';
+import {
   type BranchEntry,
   formatBranchList,
   formatCommitLog,
@@ -7537,31 +7543,19 @@ const handleCallTool = async (
       }
 
       // Restore node_modules symlink if it was removed during a preceding rebase.
-      // This runs before the isSymlink check so the skip-install path fires correctly.
+      // This runs before the isSymlink check so that check sees the restored link
+      // and picks the pool-linker branch rather than `make install`.
       restoreNodeModulesSymlink(cwd, log);
 
-      // Check if node_modules is a symlink — skip install if so
+      // Check if node_modules is a symlink. A symlink means a shared modules-pool
+      // slot, which `make install` must not mutate — the pool linker runs instead.
       const nodeModulesPath = join(cwd, 'node_modules');
       const nodeModulesIsSymlink = isSymlink(nodeModulesPath);
 
-      const steps = [
-        ...(nodeModulesIsSymlink
-          ? []
-          : [{ label: 'make install', cmd: 'make install' }]),
-        {
-          label: 'pnpm exec nx run db:print-schema',
-          cmd: 'pnpm exec nx run db:print-schema',
-        },
-        {
-          label: 'pnpm exec nx affected -t codegen --base=origin/main',
-          cmd: 'pnpm exec nx affected -t codegen --base=origin/main',
-        },
-      ];
+      const steps = buildStabilizeSteps(nodeModulesIsSymlink);
 
       if (nodeModulesIsSymlink) {
-        log.push(
-          '⚠ node_modules is a symlink — skipping make install to avoid mutating shared deps',
-        );
+        log.push(STABILIZE_POOL_LINK_NOTE);
       }
 
       // Run the whole sequence as a single job-backed shell command (LS-9957)
@@ -7573,14 +7567,7 @@ const handleCallTool = async (
       // the old loop, and each step still echoes its own label/success
       // marker into the job log so a caller polling via worktree_job_status
       // sees the same progress shape as before.
-      const shellSteps = steps.map(
-        (step) =>
-          `echo '$ ${step.label}' && ${step.cmd} && echo '✓ ${step.label} succeeded'`,
-      );
-      shellSteps.push(
-        `echo && echo 'Stabilization complete. Next: worktree_run(command: "make pc") to validate.'`,
-      );
-      const command = shellSteps.join(' && ');
+      const command = buildStabilizeCommand(steps);
 
       const shell =
         process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
@@ -7604,12 +7591,18 @@ const handleCallTool = async (
 
       const preamble = log.join('\n');
       const result = formatWorktreeRunSnapshot(snapshot);
+      // The next-step hint is appended here rather than echoed from the shell:
+      // interpolating prose into the `sh -c` string is what aborted this tool
+      // on its own message (LS-10109). Only shown once the job actually
+      // succeeded, so a failed run doesn't advertise the next step.
+      const postamble =
+        snapshot.exitCode === 0 ? `\n\n${STABILIZE_NEXT_STEP_HINT}` : '';
       return {
         ...result,
         content: [
           {
             type: 'text',
-            text: `${preamble}\n${result.content[0]?.text ?? ''}`,
+            text: `${preamble}\n${result.content[0]?.text ?? ''}${postamble}`,
           },
         ],
       };
