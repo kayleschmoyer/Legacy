@@ -1,5 +1,8 @@
 # Sync report — Mobile Draft Room v2
 
+> [!WARNING]
+> **Partly superseded (LS-10161).** The Board grid, Players tab and Team tab were replaced by the September Draft Board bundle (LS-10000 / LS-10002 / LS-10001). Before implementing anything from this bundle, read the notice at the top of [`legacy-sports-draft-room-v2/README.md`](legacy-sports-draft-room-v2/README.md). It lists what was replaced and what still ships.
+
 **Date:** 2026-08-12
 **Jira ticket:** LS-9395
 **Source:** manual-local-sync (no Claude Design project URL — this is a manually-exported design handoff, not a `/pull-design` pull)
