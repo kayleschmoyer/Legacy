@@ -375,15 +375,16 @@ jobs:
             const failed = process.env.MIGRATION_OUTCOME === 'failure';
             const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
 
+            const headSha = process.env.HEAD_SHA || context.sha;
+
             if (!failed) {
-              await applySection({ github, context, prNumber, key: 'migrations', content: null, producer: 'check-migrations' });
+              await applySection({ github, context, prNumber, key: 'migrations', content: null, producer: 'check-migrations', headSha });
               return;
             }
 
             let log = '';
             try { log = fs.readFileSync(process.env.MIGRATION_LOG, 'utf8'); } catch {}
             const { excerpt } = distill({ tool: 'generic', text: log, runUrl });
-            const headSha = process.env.HEAD_SHA || context.sha;
 
             // LS-9599: only claim "unapplied migrations" when the script actually
             // connected, compared applied-vs-disk state, and found a gap
@@ -434,4 +435,5 @@ jobs:
               key: 'migrations',
               content,
               producer: 'check-migrations',
+              headSha,
             });

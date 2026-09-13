@@ -17,6 +17,8 @@
 
 'use strict';
 
+const { markStale } = require('./render.js');
+
 const MARKER = '<!-- CI-PIPELINE-STATUS -->';
 const REGION_START = '<!-- ci-sections-start -->';
 const REGION_END = '<!-- ci-sections-end -->';
@@ -137,6 +139,26 @@ function removeSection(body, key, producer) {
   return rebuild(body, next, producer);
 }
 
+/**
+ * Re-run every section's staleness check against the PR's current head SHA
+ * (LS-10100). Applied on every write, not just to the section the caller is
+ * updating, so a producer touching its own section (e.g. `check-migrations`)
+ * also corrects — or flags — a sibling section (e.g. `pipeline`) that still
+ * names a commit the PR has since moved past.
+ */
+function reannotateBody(body, currentHeadSha) {
+  if (!currentHeadSha) return body;
+  const sections = parseSections(body);
+  if (!sections) return body;
+  const annotated = sections.map((s) => ({
+    key: s.key,
+    content: markStale(s.content, currentHeadSha),
+  }));
+  const startIdx = body.indexOf(REGION_START);
+  const endIdx = body.indexOf(REGION_END) + REGION_END.length;
+  return body.slice(0, startIdx) + renderRegion(annotated) + body.slice(endIdx);
+}
+
 async function withRetry(fn, retries = 4) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -178,6 +200,9 @@ async function findComment(github, owner, repo, prNumber) {
  * @param {string} p.key      section key (e.g. 'pipeline')
  * @param {string|null} p.content  section markdown, or null/'' to remove it
  * @param {string} [p.producer]  short label for the footer (e.g. 'ci-pipeline')
+ * @param {string} [p.headSha]  PR's head SHA as of this write (LS-10100) —
+ *   when provided, every section (not just `key`) is re-checked against it
+ *   and flagged stale if its heading names an older commit.
  * @returns {Promise<number|null>} the comment id, or null if nothing to do
  */
 async function applySection({
@@ -187,6 +212,7 @@ async function applySection({
   key,
   content,
   producer,
+  headSha,
 }) {
   const { owner, repo } = context.repo;
   const remove = content === null || content === undefined || content === '';
@@ -200,9 +226,10 @@ async function applySection({
     if (remove && !existing) return null;
 
     const base = existing ? existing.body : emptyBody(producer);
-    const nextBody = remove
+    let nextBody = remove
       ? removeSection(base, key, producer)
       : upsertSection(base, key, content, producer);
+    nextBody = reannotateBody(nextBody, headSha);
 
     let commentId;
     if (existing) {
@@ -253,6 +280,7 @@ module.exports = {
   parseSections,
   upsertSection,
   removeSection,
+  reannotateBody,
   applySection,
   withRetry,
 };

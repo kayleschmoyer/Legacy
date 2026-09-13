@@ -17,12 +17,16 @@ const sticky = require(
     '../sticky-comment.js',
   ),
 );
+const { statusHeading, shortSha } = require(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '../render.js'),
+);
 const {
   MARKER,
   emptyBody,
   parseSections,
   upsertSection,
   removeSection,
+  reannotateBody,
   applySection,
   withRetry,
 } = sticky;
@@ -322,5 +326,130 @@ describe('applySection', () => {
     assert.ok(id);
     assert.equal(calls.create, 1);
     assert.match(comments[0].body, /schema drift detail/);
+  });
+
+  // ── staleness marking (LS-10100) ──────────────────────────────────────────
+  // Reproduces the ticket's PR #7954 shape: a non-pipeline producer
+  // (check-migrations) edits its own section after the head has moved past
+  // the commit the pipeline section still names. Previously the pipeline
+  // section was left carrying that superseded result with no marker at all.
+
+  const OLD_SHA = 'c20e4850000000000000000000000000000000';
+  const NEW_SHA = 'e26ffc50000000000000000000000000000000';
+
+  it('flags a sibling section as stale when a different producer writes with a newer head', async () => {
+    const { github } = makeGithub();
+
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'pipeline',
+      content: statusHeading('CI Pipeline', 'fail', '1 check failed', OLD_SHA),
+      producer: 'ci-pipeline',
+      headSha: OLD_SHA,
+    });
+
+    // check-migrations updates only its own section, but the head has since
+    // moved on — this write should still surface the pipeline section as
+    // superseded rather than leaving it silently stale.
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'migrations',
+      content: 'migrations ok',
+      producer: 'check-migrations',
+      headSha: NEW_SHA,
+    });
+
+    const stored = await github.paginate(github.rest.issues.listComments, {});
+    const body = stored.find((c) => c.body.includes(MARKER)).body;
+    const pipeline = parseSections(body).find((s) => s.key === 'pipeline');
+    assert.match(pipeline.content, /Superseded/);
+    assert.match(pipeline.content, new RegExp('`' + shortSha(OLD_SHA) + '`'));
+    assert.match(pipeline.content, new RegExp('`' + shortSha(NEW_SHA) + '`'));
+  });
+
+  it('does not mark sections stale when the head has not moved', async () => {
+    const { github } = makeGithub();
+
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'pipeline',
+      content: statusHeading('CI Pipeline', 'pass', undefined, OLD_SHA),
+      producer: 'ci-pipeline',
+      headSha: OLD_SHA,
+    });
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'migrations',
+      content: 'migrations ok',
+      producer: 'check-migrations',
+      headSha: OLD_SHA,
+    });
+
+    const stored = await github.paginate(github.rest.issues.listComments, {});
+    const body = stored.find((c) => c.body.includes(MARKER)).body;
+    const pipeline = parseSections(body).find((s) => s.key === 'pipeline');
+    assert.doesNotMatch(pipeline.content, /Superseded/);
+  });
+
+  it('clears a stale marker once the section itself catches up to the head', async () => {
+    const { github } = makeGithub();
+
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'pipeline',
+      content: statusHeading('CI Pipeline', 'fail', '1 check failed', OLD_SHA),
+      producer: 'ci-pipeline',
+      headSha: OLD_SHA,
+    });
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'migrations',
+      content: 'migrations ok',
+      producer: 'check-migrations',
+      headSha: NEW_SHA,
+    });
+    // ci-pipeline re-runs on the new head and reports green.
+    await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'pipeline',
+      content: statusHeading('CI Pipeline', 'pass', undefined, NEW_SHA),
+      producer: 'ci-pipeline',
+      headSha: NEW_SHA,
+    });
+
+    const stored = await github.paginate(github.rest.issues.listComments, {});
+    const body = stored.find((c) => c.body.includes(MARKER)).body;
+    const pipeline = parseSections(body).find((s) => s.key === 'pipeline');
+    assert.doesNotMatch(pipeline.content, /Superseded/);
+    assert.match(pipeline.content, new RegExp('commit ' + shortSha(NEW_SHA)));
+  });
+
+  it('reannotateBody is a no-op without a headSha and leaves bodies without a region untouched', () => {
+    const flat = `${MARKER}\nlegacy flat body`;
+    assert.equal(reannotateBody(flat, NEW_SHA), flat);
+
+    let body = emptyBody('x');
+    body = upsertSection(
+      body,
+      'pipeline',
+      statusHeading('CI Pipeline', 'fail', '1 check failed', OLD_SHA),
+      'ci-pipeline',
+    );
+    assert.equal(reannotateBody(body, ''), body);
+    assert.equal(reannotateBody(body, undefined), body);
   });
 });

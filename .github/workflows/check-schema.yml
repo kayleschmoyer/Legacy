@@ -402,15 +402,15 @@ jobs:
             const drift = process.env.DRIFT === 'true';
             const codegenFailed = process.env.CODEGEN_OUTCOME === 'failure';
             const runUrl = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
+            const headSha = context.payload.pull_request?.head?.sha || context.sha;
 
             // Both green → clear the schema section (heals a previously-failing PR).
             if (!drift && !codegenFailed) {
-              await applySection({ github, context, prNumber, key: 'schema', content: null, producer: 'check-schema' });
+              await applySection({ github, context, prNumber, key: 'schema', content: null, producer: 'check-schema', headSha });
               return;
             }
 
             const summary = drift ? 'schema.graphql out of sync' : 'codegen failed';
-            const headSha = context.payload.pull_request?.head?.sha || context.sha;
             const parts = [statusHeading('GraphQL Schema', 'fail', summary, headSha), ''];
 
             if (drift) {
@@ -447,4 +447,5 @@ jobs:
               key: 'schema',
               content: parts.join('\n').trim(),
               producer: 'check-schema',
+              headSha,
             });

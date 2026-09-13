@@ -41,6 +41,7 @@ module.exports = async ({ github, context, core }) => {
     key: 'pipeline',
     content,
     producer: 'ci-pipeline',
+    headSha,
   });
 
   if (core && commentId) core.setOutput('comment_id', commentId);
