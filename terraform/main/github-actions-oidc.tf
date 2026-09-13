@@ -1024,6 +1024,50 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-private-key*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-preview-app-token*"
         ]
+      },
+      # Glue Data Catalog permissions for the CloudTrail Athena forensics setup
+      # (cloudtrail.tf, LS-8922) — added on LS-10172. github_actions_additional
+      # never granted glue:* at all, so every apply touching
+      # aws_glue_catalog_database.cloudtrail / aws_glue_crawler.cloudtrail failed
+      # with AccessDenied, which in turn blocked the whole Apply Lambda
+      # Infrastructure job (and therefore deploy-web) on every push touching
+      # lambdas/** or lib/**. Database actions need both the catalog ARN and
+      # the database ARN (Glue databases are sub-resources of the catalog).
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:CreateDatabase",
+          "glue:GetDatabase",
+          "glue:UpdateDatabase",
+          "glue:DeleteDatabase",
+          "glue:CreateCrawler",
+          "glue:GetCrawler",
+          "glue:UpdateCrawler",
+          "glue:DeleteCrawler",
+          "glue:TagResource",
+          "glue:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:catalog",
+          # Glue database names can't contain hyphens (cloudtrail.tf replaces
+          # them with underscores), so name_prefix's own "-" wildcard pattern
+          # doesn't apply here — match on the fixed "_cloudtrail" suffix instead.
+          "arn:aws:glue:${local.region}:${local.account_id}:database/*_cloudtrail",
+          "arn:aws:glue:${local.region}:${local.account_id}:crawler/${local.name_prefix}-cloudtrail-crawler"
+        ]
+      },
+      # Glue classifier actions do not support resource-level permissions —
+      # must use Resource "*" (same pattern as sqs:ListQueues / cloudtrail:ListTrails above).
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:CreateClassifier",
+          "glue:GetClassifier",
+          "glue:GetClassifiers",
+          "glue:UpdateClassifier",
+          "glue:DeleteClassifier"
+        ]
+        Resource = "*"
       }
     ]
   })
