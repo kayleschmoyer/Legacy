@@ -1438,6 +1438,7 @@ jobs:
             --state-out /tmp/derived-audit-state.json \
             --k 3 \
             --report-md derived-coverage-audit.md \
+            --json derived-coverage-audit.json \
             --github-output | sed 's/^\([a-z-]*=\)/derived-\1/' \
             || { echo "::warning::LS-9661 derived-map shadow audit failed"; exit 0; }
           {
@@ -1446,6 +1447,58 @@ jobs:
             echo ""
             cat derived-coverage-audit.md
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # LS-10056: until now the shadow pass emitted only COUNTS to the log
+          # (`derived-under-selection-count=N`); the findings themselves went
+          # solely to the job summary, which is neither greppable from the logs
+          # nor retained anywhere afterwards. An agent triaging a dirty run
+          # therefore had no way to see WHICH specs and files the N findings
+          # were — and the only findings detail the logs did carry belonged to
+          # the LIVE hand-map audit above, whose numbers are unrelated. That is
+          # how LS-10056 came to be filed against the wrong root cause. Emit a
+          # compact, greppable digest (and keep the structured findings as an
+          # artifact below) so the next dirty run is diagnosable from the log.
+          node -e '
+            const { readFileSync } = require("node:fs");
+            const { underSelection = [] } = JSON.parse(
+              readFileSync("derived-coverage-audit.json", "utf8"),
+            );
+            // console.log, not LOGGER: this runs as a bare `node -e` inside a
+            // CI step with no repo install, so @legacy-sports/logging is not
+            // resolvable — the same reason derive-surface-map.mjs is stdlib-only.
+            // Writing to stdout IS the deliverable here (the greppable log line).
+            //
+            // A `mapped:false` finding carries the whole observed set for that
+            // spec, so cap the inline list; the artifact below has them all.
+            // Keep this script free of apostrophes — it is inside `node -e ...`.
+            const CAP = 25;
+            for (const f of underSelection) {
+              const shown = f.files.slice(0, CAP).join(",");
+              const more =
+                f.files.length > CAP ? ` +${f.files.length - CAP} more` : "";
+              console.log(
+                `derived-finding spec=${f.spec} mapped=${f.mapped} ` +
+                  `unmatched=${f.files.length} files=${shown}${more}`,
+              );
+            }
+          ' || echo "::warning::LS-10056 derived-findings digest failed"
+
+      # LS-10056: structured shadow findings, so a dirty derived audit can be
+      # triaged from the artifact rather than re-derived by hand. Uploaded
+      # unconditionally (unlike the live audit's findings artifact, which is
+      # gated on under-selection) because a CLEAN shadow run is itself the
+      # evidence LS-9996's flip gate banks. Never fails the job.
+      - name: "Shadow: Upload DERIVED Audit Findings (LS-9661)"
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: derived-coverage-audit
+          path: |
+            derived-coverage-audit.json
+            derived-coverage-audit.md
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: "Build Discord Description"
         id: discord

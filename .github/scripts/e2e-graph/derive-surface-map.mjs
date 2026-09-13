@@ -38,10 +38,12 @@
  *   - Build/config/harness files that sit outside the module graph keep a
  *     hand-written runAllWhenChanged core (AC3), including this generator's
  *     own directory.
- *   - A pure re-export barrel (`export … from`) is followed in full whenever
+ *   - A module's `export … from` re-exports are followed in full whenever
  *     ANY one of its names is demanded — narrowing to just the matching edge
  *     assumes sibling re-exports stay unloaded, which real ESM module
  *     linking does not do (LS-9689 shadow-audit finding; see buildClosure).
+ *     This holds for a MIXED barrel (local code alongside re-exports) too,
+ *     not only a pure one (LS-10056).
  *
  * Zero dependencies (node stdlib only) so it can run in the detect-changes CI
  * job, which deliberately skips pnpm install. Output is deterministic: no
@@ -403,18 +405,31 @@ export function buildClosure(entries, moduleOf, { followDynamic }) {
         }
       }
     }
-    // A PURE barrel's `export … from` statements are ESM re-exports, not
-    // lazy accessors: loading the barrel for ANY one of its names still
-    // requires the module linker to resolve and evaluate every re-export
-    // target, independent of which name the demand narrowed to (LS-9689 —
-    // the shadow audit's dominant under-selection cause was this narrowing
-    // assuming sibling barrel exports stay unreached when a real, unbundled
-    // Playwright run touches them regardless). So a pure barrel additionally
-    // queues every reexport target at ALL, without perturbing
-    // `matchedReexport` above — that flag still means "did the narrowed
-    // demand resolve via a reexport edge", and gates the imports-fallback
-    // below exactly as before.
-    if (name !== ALL && mod.isPureBarrel) {
+    // An `export … from` statement is an ESM re-export, not a lazy accessor:
+    // loading the module for ANY one of its names still requires the module
+    // linker to resolve and evaluate every re-export target, independent of
+    // which name the demand narrowed to (LS-9689 — the shadow audit's
+    // dominant under-selection cause was this narrowing assuming sibling
+    // re-exports stay unreached when a real, unbundled Playwright run
+    // touches them regardless).
+    //
+    // That is module-linking semantics, so it holds for EVERY module with
+    // re-export statements — not only a module whose body is nothing but
+    // re-exports. LS-9689 gated this on `isPureBarrel`, which left a MIXED
+    // barrel (local code + `export … from`) still narrowing: demanding a
+    // locally-declared name matches no re-export pair, so none of the
+    // re-export targets were ever queued. `lib/logging/src/index.ts` is
+    // exactly that shape — `export const LOGGER = createConsoleLogger()`
+    // alongside `export { DeviceFileOutputDestination } from './lib/…'` —
+    // and `import { LOGGER } from '@legacy-sports/logging'` (the repo-wide
+    // logging idiom) therefore never reached the re-exported destination
+    // stub, the one and only module in the instrumented web bundle that no
+    // derived spec set accounted for (LS-10056).
+    //
+    // The push deliberately does NOT perturb `matchedReexport` above — that
+    // flag still means "did the narrowed demand resolve via a re-export
+    // edge", and gates the imports-fallback below exactly as before.
+    if (name !== ALL) {
       for (const r of mod.reexports) queue.push([r.file, ALL]);
     }
 

@@ -163,6 +163,34 @@ describe('buildClosure (demand-driven narrowing)', () => {
     assert.ok(closure.has('lib/mini-lib/src/draft-internals.ts'));
   });
 
+  it('demanding a LOCAL name from a mixed barrel still pulls its re-export targets (LS-10056)', () => {
+    // A MIXED barrel has local code AND `export … from` statements. LS-9689
+    // gated the "re-exports always evaluate" rule on `isPureBarrel`, so
+    // demanding a locally-declared name here matched no re-export pair and
+    // the re-export targets were never queued at all. Real ESM linking
+    // evaluates them regardless of which name the consumer wants.
+    //
+    // This is the exact shape of lib/logging/src/index.ts (a local `LOGGER`
+    // const next to a re-exported platform stub): the repo-wide
+    // `import { LOGGER } from '@legacy-sports/logging'` idiom left the stub
+    // as the only module in the instrumented web bundle that no derived
+    // spec set accounted for.
+    const moduleOf = createResolver(MINI, aliases);
+    const closure = buildClosure(
+      [['lib/mini-logging/src/index.ts', 'LOGGER']],
+      moduleOf,
+      { followDynamic: true },
+    );
+    assert.ok(
+      closure.has('lib/mini-logging/src/factories.ts'),
+      'the local name must still reach the import edge that defines it',
+    );
+    assert.ok(
+      closure.has('lib/mini-logging/src/device-file-stub.ts'),
+      're-export targets of a mixed barrel must be reached even when the demanded name is local',
+    );
+  });
+
   it('a non-barrel module still narrows its own import edges to the demanded name', () => {
     // Precision is preserved where it's actually safe: a module with LOCAL
     // CODE (not a pure re-export barrel) only activates the import edges its

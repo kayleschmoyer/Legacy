@@ -4,6 +4,7 @@
     "paths": {
       "@mini/lib": ["lib/mini-lib/src/index.ts"],
       "@mini/lib/*": ["lib/mini-lib/src/*"],
+      "@mini/logging": ["lib/mini-logging/src/index.ts"],
       "@external/thing": ["node_modules/@external/thing/index.ts"]
     }
   }
