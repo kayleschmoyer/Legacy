@@ -5,8 +5,8 @@
  * guard-make-pc, enforce-background) with a general safety net.
  *
  * Matched tools (see .claude/settings.json matcher):
- *   Bash, Edit, Write, NotebookEdit, the db_query MCP tools, and
- *   mcp__github__actions_list.
+ *   Bash, Edit, Write, NotebookEdit, the db_query MCP tools,
+ *   mcp__github__actions_list, and mcp__github__get_job_logs.
  *
  * Four severity tiers:
  *   CATASTROPHIC — blocked, no bypass (exit 2). rm -rf on root/home/.git,
@@ -68,13 +68,14 @@ let callArgs = ''; // serialised MCP arguments (structured-input tools)
 // serialised arguments stand in as `raw` purely for the audit log and the
 // block message.
 const isActionsList = tool === 'mcp__github__actions_list';
+const isGetJobLogs = tool === 'mcp__github__get_job_logs';
 
 if (tool === 'Bash') command = String(ti.command ?? '');
 else if (tool === 'Edit') content = String(ti.new_string ?? '');
 else if (tool === 'Write') content = String(ti.content ?? '');
 else if (tool === 'NotebookEdit') content = String(ti.new_source ?? '');
 else if (/__db_query$/.test(tool)) sql = String(ti.sql ?? ti.query ?? '');
-else if (isActionsList) {
+else if (isActionsList || isGetJobLogs) {
   try {
     callArgs = JSON.stringify(ti);
   } catch {
@@ -470,9 +471,72 @@ function actionsListFindings(args) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// mcp__github__get_job_logs — unbounded return_content default (LS-9201, LS-10101)
+//
+// This tool belongs to the officially-hosted GitHub MCP server; it is not
+// vendored under tools/mcp/, so its schema (and its bad default) cannot be
+// patched from this repo — same constraint as actions_list above. A PreToolUse
+// guard is the only layer we control.
+//
+// `return_content: true` fetches actual log text, bounded only by `tail_lines`
+// (schema default 500 lines). That bound is line COUNT, not byte size, and
+// this repo's CI output (pnpm/nx/Playwright) routinely emits multi-KB lines
+// (ANSI escape codes, JSON blobs, stack traces) — LS-9201 measured 200K+
+// characters at tail_lines values from 150 to 1500, and LS-10101 reproduced it
+// at the unmodified 500-line schema default, on a SINGLE job's failure log
+// (69,072 chars), forcing a save-to-file + Bash grep/python3 slice workaround.
+// There is no max_chars/strip_ansi-equivalent param on this tool at all, so no
+// tail_lines value is guaranteed safe — the fix is steering the call toward a
+// smaller default and, better, the two alternatives that enforce a real hard
+// character cap (see GET_JOB_LOGS_HINT below).
+// ---------------------------------------------------------------------------
+
+/** Largest tail_lines this repo has seen stay comfortably under the
+ * tool-result cap on a scoped single-job failure log. Not a guarantee — see
+ * above — just the ceiling the documented guidance already recommends. */
+const GET_JOB_LOGS_SANE_TAIL_LINES = 100;
+
+function getJobLogsFindings(args) {
+  if (args.return_content !== true) return [];
+  const tailLines = args.tail_lines;
+  if (
+    typeof tailLines === 'number' &&
+    tailLines <= GET_JOB_LOGS_SANE_TAIL_LINES
+  ) {
+    return [];
+  }
+  return [
+    {
+      severity: 'CORRECTABLE',
+      rule: 'get-job-logs-unbounded-tail',
+      message:
+        (tailLines === undefined
+          ? "`tail_lines` is unset, so this call uses the tool's schema default of 500 lines. "
+          : `\`tail_lines: ${tailLines}\` exceeds the ${GET_JOB_LOGS_SANE_TAIL_LINES}-line ceiling this repo has seen stay under the tool-result cap. `) +
+        "This repo's CI output (pnpm/nx/Playwright) routinely emits multi-KB lines (ANSI escape codes, " +
+        'JSON blobs, stack traces), so `tail_lines` bounds line COUNT, not byte size — LS-9201 measured ' +
+        '200K+ characters at tail_lines values from 150 to 1500, and this exact 500-line default ' +
+        "overflowed on a single job's failure log (69,072 chars, LS-10101). There is no max_chars-" +
+        'equivalent param on this tool, so no tail_lines value is guaranteed safe.\n\n' +
+        `Pass \`tail_lines: ${GET_JOB_LOGS_SANE_TAIL_LINES}\` or fewer, or prefer a tool with a real hard ` +
+        'character cap (see below).',
+    },
+  ];
+}
+
+const GET_JOB_LOGS_HINT =
+  'Prefer `ci_get_logs({ runId or jobId, ... })` (legacy-sports-ci) — it enforces `maxChars`/' +
+  '`truncateLineLength` as hard caps regardless of line length. When only the `legacy-sports-github` ' +
+  'hosted connector is available, its own `get_job_logs({ job_id, max_chars, tail_lines, ' +
+  'truncate_line_length, error_summary, grep_pattern })` supports the same character-cap controls this ' +
+  'built-in lacks. Both servers are known to attach late in CCR sessions (LS-9576/LS-9370) — re-run ' +
+  'ToolSearch for them before concluding this built-in is the only path.';
+
 const findings = [];
 
 if (isActionsList) findings.push(...actionsListFindings(ti));
+if (isGetJobLogs) findings.push(...getJobLogsFindings(ti));
 
 // --- Secret scan (raw text, all tools) ---
 for (const [re, label] of SECRET_PATTERNS) {
@@ -688,9 +752,14 @@ const ESCAPE = {
 // are cheap to fix together — showing only the top one would send the agent
 // round the loop once per rule. The risk tiers keep their single-message form:
 // there the first finding is the one that decides whether to proceed at all.
+const correctableHint = isActionsList
+  ? CI_LIST_RUNS_HINT
+  : isGetJobLogs
+    ? GET_JOB_LOGS_HINT
+    : '';
 const body =
   top.severity === 'CORRECTABLE'
-    ? `${findings.map((f) => f.message).join('\n\n')}\n\n${CI_LIST_RUNS_HINT}`
+    ? `${findings.map((f) => f.message).join('\n\n')}\n\n${correctableHint}`
     : top.message;
 
 const header =

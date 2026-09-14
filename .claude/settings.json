@@ -241,7 +241,7 @@
         ]
       },
       {
-        "matcher": "^(Bash|Edit|Write|NotebookEdit|mcp__legacy-sports-db__db_query|mcp__legacy-sports-db-admin__db_query|mcp__github__actions_list)$",
+        "matcher": "^(Bash|Edit|Write|NotebookEdit|mcp__legacy-sports-db__db_query|mcp__legacy-sports-db-admin__db_query|mcp__github__actions_list|mcp__github__get_job_logs)$",
         "hooks": [
           {
             "type": "command",

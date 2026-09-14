@@ -774,3 +774,124 @@ test('a prototype-chain key name is reported as a real phantom param', () => {
   assert.match(stderr, /`toString` — not a parameter of this tool/);
   assert.doesNotMatch(stderr, /function toString/);
 });
+
+// ---------------------------------------------------------------------------
+// mcp__github__get_job_logs — unbounded return_content default (LS-9201, LS-10101)
+//
+// This tool belongs to the officially-hosted GitHub MCP server (no `github`
+// entry in .mcp.json, not vendored under tools/mcp/), so its bad default
+// cannot be fixed at the tool level from this repo. `return_content: true`
+// is bounded only by `tail_lines` (schema default 500), and that bound is
+// line COUNT, not byte size — this repo's CI output routinely has multi-KB
+// lines, so the 500-line default (and even much smaller values, per LS-9201)
+// can still overflow the tool-result cap. These tests pin the mechanical
+// enforcement added in LS-10101, mirroring the actions_list precedent above.
+// ---------------------------------------------------------------------------
+
+/** Run the hook against an mcp__github__get_job_logs call. */
+function runGetJobLogs(toolInput) {
+  const root = mkdtempSync(join(tmpdir(), 'grt-gjl-'));
+  try {
+    const res = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({
+        tool_name: 'mcp__github__get_job_logs',
+        tool_input: toolInput,
+        cwd: root,
+        session_id: 'guard-risky-tools-test',
+      }),
+      encoding: 'utf-8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? '' };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('allows a call with return_content unset (URL-only mode)', () => {
+  const { code } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    job_id: 12345,
+  });
+  assert.equal(code, 0);
+});
+
+test('blocks the exact LS-10101 repro — return_content:true at the schema default', () => {
+  const { code, stderr } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    run_id: 987654321,
+    failed_only: true,
+    return_content: true,
+  });
+  assert.equal(code, 2, 'expected a block');
+  assert.match(stderr, /get-job-logs-unbounded-tail/);
+  assert.match(stderr, /`tail_lines` is unset/);
+  assert.match(stderr, /69,072/, 'cite the measured overflow, not a guess');
+});
+
+test('blocks an explicitly oversized tail_lines', () => {
+  const { code, stderr } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    job_id: 12345,
+    return_content: true,
+    tail_lines: 500,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /get-job-logs-unbounded-tail/);
+  assert.match(stderr, /`tail_lines: 500` exceeds the 100-line ceiling/);
+});
+
+test('allows tail_lines at the sane-default ceiling', () => {
+  const { code } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    job_id: 12345,
+    return_content: true,
+    tail_lines: 100,
+  });
+  assert.equal(code, 0, 'the recommended ceiling itself must not be blocked');
+});
+
+test('points at ci_get_logs and legacy-sports-github as the real fix', () => {
+  const { stderr } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    job_id: 12345,
+    return_content: true,
+  });
+  assert.match(stderr, /ci_get_logs/);
+  assert.match(stderr, /legacy-sports-github/);
+});
+
+test('a risk-ok marker cannot bypass this CORRECTABLE block', () => {
+  const { code } = runGetJobLogs({
+    owner: 'bkrupa',
+    repo: 'legacy-sports',
+    job_id: 12345,
+    return_content: true,
+    grep_pattern: '# risk-ok: I checked',
+  });
+  assert.equal(code, 2, 'CORRECTABLE must not honour the bypass marker');
+});
+
+test('settings.json actually routes get_job_logs at this hook', () => {
+  const settings = JSON.parse(
+    readFileSync(
+      resolve(import.meta.dirname, '..', '..', '.claude', 'settings.json'),
+      'utf-8',
+    ),
+  );
+  const entries = (settings.hooks?.PreToolUse ?? []).filter((e) =>
+    (e.hooks ?? []).some((h) => h.command?.includes('guard-risky-tools.mjs')),
+  );
+  assert.ok(entries.length > 0, 'guard-risky-tools.mjs is not registered');
+  assert.ok(
+    entries.some((e) =>
+      new RegExp(e.matcher).test('mcp__github__get_job_logs'),
+    ),
+    'no PreToolUse matcher routes mcp__github__get_job_logs to guard-risky-tools.mjs',
+  );
+});
