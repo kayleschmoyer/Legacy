@@ -8,7 +8,8 @@ import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
 import { binJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
-import { getRepoRoot } from '../run-command.js';
+import { buildProjectNotFoundHint } from '../project-resolution.js';
+import { getRepoRoot, runNx } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
@@ -54,8 +55,58 @@ const ESLINT_CONFIG_FILENAMES = [
 
 export interface RunESLintParams {
   files: string[];
+  project?: string;
   mode?: 'check' | 'fix';
+  maxWarnings?: number;
   worktreePath?: string;
+}
+
+/** Same shape nx uses for project names (matches show-project.ts's validator). */
+const NX_PROJECT_NAME_REGEX = /^[a-z0-9-._]+$/i;
+
+interface NxProjectRootConfig {
+  root?: unknown;
+}
+
+/**
+ * Resolve an nx project name to its root directory (relative to `cwd`), so
+ * `files` can be given relative to that project instead of only repo-root-
+ * relative (LS-10143) — every other project-scoped tool in this server
+ * accepts project-relative paths, and repeating the full repo-root-relative
+ * path when `project` already names the root is the first thing a caller
+ * tries and gets wrong.
+ *
+ * Returns the root on success, or an actionable error message (reusing the
+ * same "Did you mean...?" suggestion logic run-target.ts uses for nx's own
+ * "Cannot find project" failures) on failure.
+ */
+async function resolveProjectRoot(
+  project: string,
+  cwd: string,
+): Promise<{ root: string } | { errorText: string }> {
+  if (!NX_PROJECT_NAME_REGEX.test(project)) {
+    return {
+      errorText: `Invalid project name: "${project}". Only alphanumeric characters, hyphens, underscores, and dots are allowed.`,
+    };
+  }
+
+  try {
+    const output = await runNx(['show', 'project', project, '--json'], cwd);
+    const config = JSON.parse(output) as NxProjectRootConfig;
+    if (typeof config.root !== 'string') {
+      return {
+        errorText: `nx show project "${project}" did not return a root path.`,
+      };
+    }
+    return { root: config.root };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const hint = await buildProjectNotFoundHint(message, cwd);
+    return {
+      errorText:
+        hint ?? `Failed to resolve nx project "${project}": ${message}`,
+    };
+  }
 }
 
 function errorResult(text: string): ToolResult {
@@ -125,6 +176,29 @@ export function describeFailure(message: string, timedOut: boolean): string {
   );
 }
 
+// Matches ESLint stylish's summary footer, e.g.
+// "✖ 21 problems (0 errors, 21 warnings)" — the only place a plain-text
+// eslint run states error/warning counts separately. Absent when the run
+// found nothing to report.
+const SUMMARY_LINE_REGEX = /(\d+) problems? \((\d+) errors?, (\d+) warnings?\)/;
+
+/**
+ * Extract the error/warning counts ESLint's stylish formatter prints in its
+ * summary line, so callers can act on the error/warning split (LS-10143)
+ * without parsing `output` themselves. Returns zeros when the line is absent
+ * (a clean run, or output truncated before the summary).
+ *
+ * Exported for unit testing.
+ */
+export function parseEslintCounts(output: string): {
+  errorCount: number;
+  warningCount: number;
+} {
+  const match = SUMMARY_LINE_REGEX.exec(output);
+  if (!match) return { errorCount: 0, warningCount: 0 };
+  return { errorCount: Number(match[2]), warningCount: Number(match[3]) };
+}
+
 /** True when `absPath` is `baseCwd` itself or nested inside it. */
 function isInside(baseCwd: string, absPath: string): boolean {
   const rel = relative(baseCwd, absPath);
@@ -162,6 +236,7 @@ function buildESLintResult(snapshot: JobSnapshot): FormattedJobResult {
   // the caller still sees something actionable instead of a blank string.
   const rawOutput = snapshot.log || snapshot.error || '';
   const output = describeFailure(rawOutput, timedOut);
+  const { errorCount, warningCount } = parseEslintCounts(rawOutput);
 
   return {
     body: {
@@ -169,6 +244,8 @@ function buildESLintResult(snapshot: JobSnapshot): FormattedJobResult {
       files: filesCount,
       projectRoot,
       passed,
+      errorCount,
+      warningCount,
       output: truncateOutput(output, MAX_OUTPUT_CHARS),
     },
     isError: !passed,
@@ -215,20 +292,48 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
     }
   }
 
+  // When `project` is supplied, resolve it once up front — every file below
+  // is tried against this project's root before falling back to repo-root-
+  // relative (LS-10143).
+  let projectRootAbs: string | undefined;
+  if (params.project) {
+    const resolved = await resolveProjectRoot(params.project, cwd);
+    if ('errorText' in resolved) return errorResult(resolved.errorText);
+    projectRootAbs = resolve(cwd, resolved.root);
+  }
+
   // Group the files by the flat config that governs them. ESLint applies one
   // config per invocation (resolved from cwd), so a list spanning two projects
   // cannot be linted correctly in a single run.
   const byConfigDir = new Map<string, string[]>();
   for (const file of params.files) {
-    const absFile = resolve(cwd, file);
+    let absFile: string;
+    if (projectRootAbs) {
+      const projectRelative = resolve(projectRootAbs, file);
+      if (existsSync(projectRelative)) {
+        absFile = projectRelative;
+      } else {
+        const repoRootRelative = resolve(cwd, file);
+        if (!existsSync(repoRootRelative)) {
+          return errorResult(
+            `File "${file}" not found under the "${params.project}" project root (${projectRootAbs}) or repo root ` +
+              `(${cwd}). Pass a path relative to the project root, or repo-root-relative as ` +
+              `"${toPosix(relative(cwd, projectRootAbs))}/${toPosix(file)}".`,
+          );
+        }
+        absFile = repoRootRelative;
+      }
+    } else {
+      absFile = resolve(cwd, file);
+      const missingFileResult = checkFileExists(file, cwd, params.worktreePath);
+      if (missingFileResult) return missingFileResult;
+    }
+
     if (!isInside(cwd, absFile)) {
       return errorResult(
         `Invalid file "${file}": resolves outside the working directory (${cwd}).`,
       );
     }
-
-    const missingFileResult = checkFileExists(file, cwd, params.worktreePath);
-    if (missingFileResult) return missingFileResult;
 
     const configDir = resolveConfigDir(absFile, cwd);
     const relFile = toPosix(relative(configDir, absFile));
@@ -265,10 +370,19 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   const [configDir, files] = [...byConfigDir.entries()][0];
   const projectRoot = toPosix(relative(cwd, configDir)) || '.';
 
-  // --max-warnings=0 matches the nx lint targetDefault ("eslint . --max-warnings=0",
-  // nx.json), so this tool's verdict agrees with pc-lint's.
+  // Default (-1, i.e. no --max-warnings flag) matches pc-lint's actual
+  // verdict — errors fail the run, warnings alone don't (LS-10143). Passing
+  // --max-warnings=0 unconditionally used to make this tool disagree with
+  // pc-lint on warnings-only files. A caller that wants the old strict
+  // behavior opts in explicitly with maxWarnings: 0.
+  const maxWarnings = params.maxWarnings ?? -1;
+  if (!Number.isInteger(maxWarnings) || maxWarnings < -1) {
+    return errorResult(
+      `Invalid maxWarnings "${params.maxWarnings}": must be a non-negative integer, or omitted for unlimited.`,
+    );
+  }
   const args = [
-    '--max-warnings=0',
+    ...(maxWarnings >= 0 ? [`--max-warnings=${maxWarnings}`] : []),
     ...(mode === 'fix' ? ['--fix'] : []),
     ...files,
   ];

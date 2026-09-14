@@ -117,12 +117,14 @@ Prefer this over raw `npx playwright test` shell commands. Hermetic mode (defaul
 
 ### `nx_run_eslint`
 
-Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint a small, explicit file list. Runs eslint --max-warnings=0 — the same threshold as the nx lint target — against exactly the given files, and from the nearest directory owning an eslint.config.* so the project's flat config actually applies (ESLint 9 resolves flat config from its cwd, not per file). A file list spanning two config roots is rejected — split it into one call per root. Capped at ${ESLINT_MAX_FILES} files. IMPORTANT — NOT a fast path in this repo: type-aware parserOptions.project rules force a full TypeScript program build even for one file (~280s, measured in lambdas/db), and that cost is per-run not per-file. Use this for a narrow report; use nx_run({ project, target: "lint" }) for a whole (Nx-cached) project and nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. Typecheck cannot be file-scoped (tsc rejects source files combined with -p) — use nx_run({ target: "typecheck" }) instead. Works on any file in the repo, including files outside every Nx project (e.g. top-level scripts/) — the config-root walk above is filesystem-based, not the Nx project graph, so it falls back to the repo-root eslint.config.* when no nearer one exists. A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait to continue waiting; do NOT re-run (re-invoking joins the in-flight run).
+Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint a small, explicit file list. Runs eslint against exactly the given files, and from the nearest directory owning an eslint.config.* so the project's flat config actually applies (ESLint 9 resolves flat config from its cwd, not per file). A file list spanning two config roots is rejected — split it into one call per root. Capped at ${ESLINT_MAX_FILES} files. Verdict agrees with pc-lint by default: errors fail, warnings alone don't; pass maxWarnings to opt into a stricter threshold. Result has errorCount/warningCount fields. IMPORTANT — NOT a fast path here: type-aware rules force a full TypeScript program build per run (~280s in lambdas/db), regardless of file count. Use for a narrow report; use nx_run({ project, target: "lint" }) for a whole (cached) project, nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait to continue; do NOT re-run.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `files` | string[] | **required** | min 1 | File paths (relative to worktreePath/repo root, or absolute) to lint. All files must live under the same eslint.config.* root. |
-| `mode` | enum |  | — | "check" reports lint errors without modifying files (default); "fix" applies eslint --fix in place. |
+| `files` | string[] | **required** | min 1 | Paths to lint: relative to `project` root if given (falling back to repo-root), else repo-root/worktreePath-relative or absolute. Must share one eslint.config.* root. |
+| `project` | string |  | — | Nx project name to resolve `files` against. |
+| `mode` | enum |  | — | "check" reports lint errors (default); "fix" applies --fix. |
+| `maxWarnings` | number |  | integer, min 0 | eslint --max-warnings. Omit for unlimited (matches pc-lint: only errors fail); pass 0 for strict. |
 | `worktreePath` | string |  | — | Worktree path (default: repo root) |
 
 ### `nx_run_pc_chunk`

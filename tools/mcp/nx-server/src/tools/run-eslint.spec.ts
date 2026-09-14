@@ -3,6 +3,11 @@ import { resolve } from 'node:path';
 
 jest.mock('../run-command.js', () => ({
   getRepoRoot: jest.fn(() => '/repo'),
+  runNx: jest.fn(),
+}));
+
+jest.mock('../project-resolution.js', () => ({
+  buildProjectNotFoundHint: jest.fn(() => Promise.resolve(undefined)),
 }));
 
 jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
@@ -15,10 +20,12 @@ import { existsSync } from 'node:fs';
 import {
   describeFailure,
   MAX_FILES,
+  parseEslintCounts,
   resolveConfigDir,
   runESLint,
 } from './run-eslint.js';
-import { getRepoRoot } from '../run-command.js';
+import { getRepoRoot, runNx } from '../run-command.js';
+import { buildProjectNotFoundHint } from '../project-resolution.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 
@@ -26,6 +33,11 @@ const mockRunJob = runJobWithBudget as jest.MockedFunction<
   typeof runJobWithBudget
 >;
 const mockGetRepoRoot = getRepoRoot as jest.MockedFunction<typeof getRepoRoot>;
+const mockRunNx = runNx as jest.MockedFunction<typeof runNx>;
+const mockBuildProjectNotFoundHint =
+  buildProjectNotFoundHint as jest.MockedFunction<
+    typeof buildProjectNotFoundHint
+  >;
 const mockExistsSync = existsSync as jest.MockedFunction<typeof existsSync>;
 
 // `resolve` normalises the POSIX-style fixtures below to whatever the host
@@ -84,6 +96,11 @@ function setMissingFiles(paths: string[]): void {
   refreshExistsSyncMock();
 }
 
+/** Make `nx show project <name> --json` resolve to a project rooted at `root`. */
+function setProjectRoot(root: string): void {
+  mockRunNx.mockResolvedValue(JSON.stringify({ root }));
+}
+
 /** Configure runJobWithBudget to resolve with a terminal "done" snapshot. */
 function setupDoneJob(log = ''): void {
   mockRunJob.mockImplementation((jobOpts: StartJobOptions) => {
@@ -116,17 +133,18 @@ describe('runESLint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/repo');
+    mockBuildProjectNotFoundHint.mockResolvedValue(undefined);
     missingFiles = new Set();
     // Default: only the workspace root owns a flat config.
     setConfigRoots([ROOT]);
   });
 
-  it('defaults to check mode and passes --max-warnings=0 with the given files', async () => {
+  it('defaults to check mode and omits --max-warnings (unlimited, matching pc-lint)', async () => {
     setupDoneJob('');
 
     const result = await runESLint({ files: ['tools/a.ts'] });
 
-    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'tools/a.ts']);
+    expect(jobCallArgs()).toEqual(['tools/a.ts']);
     expect(jobCallOpts().cwd).toBe(ROOT);
     // LS-10021: invoked as the local .bin shim directly, never via
     // `pnpm exec` — see localBinJobSpec's doc comment for why.
@@ -145,12 +163,50 @@ describe('runESLint', () => {
 
     await runESLint({ files: ['tools/a.ts', 'tools/b.ts'], mode: 'fix' });
 
-    expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
-      '--fix',
-      'tools/a.ts',
-      'tools/b.ts',
-    ]);
+    expect(jobCallArgs()).toEqual(['--fix', 'tools/a.ts', 'tools/b.ts']);
+  });
+
+  it('passes --max-warnings=<n> when maxWarnings is given explicitly', async () => {
+    setupDoneJob('');
+
+    await runESLint({ files: ['tools/a.ts'], maxWarnings: 0 });
+
+    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'tools/a.ts']);
+  });
+
+  it('rejects a negative maxWarnings without calling eslint', async () => {
+    const result = await runESLint({ files: ['tools/a.ts'], maxWarnings: -5 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Invalid maxWarnings/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-integer maxWarnings without calling eslint', async () => {
+    const result = await runESLint({
+      files: ['tools/a.ts'],
+      maxWarnings: 1.5,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Invalid maxWarnings/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('passes on a warnings-only run when maxWarnings is not given, agreeing with pc-lint', async () => {
+    setupDoneJob(
+      '/repo/tools/a.ts\n  1:1  warning  Unexpected non-null assertion\n\n' +
+        '✖ 21 problems (0 errors, 21 warnings)',
+    );
+
+    const result = await runESLint({ files: ['tools/a.ts'] });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      passed: true,
+      errorCount: 0,
+      warningCount: 21,
+    });
   });
 
   it('uses worktreePath as cwd when provided', async () => {
@@ -163,7 +219,7 @@ describe('runESLint', () => {
     expect(jobCallOpts().cwd).toBe(worktree);
   });
 
-  it('returns passed:false and isError when eslint exits non-zero', async () => {
+  it('returns passed:false and isError when eslint exits non-zero, with the error count parsed out', async () => {
     mockRunJob.mockResolvedValue({
       jobId: 'eslint-fail',
       status: 'failed',
@@ -173,7 +229,9 @@ describe('runESLint', () => {
       exitCode: 1,
       error: 'eslint (1 file) exited with code 1',
       meta: { kind: 'eslint', mode: 'check', filesCount: 1, projectRoot: '.' },
-      log: '/repo/tools/a.ts\n  1:1  error  Unexpected console statement',
+      log:
+        '/repo/tools/a.ts\n  1:1  error  Unexpected console statement\n\n' +
+        '✖ 1 problem (1 error, 0 warnings)',
     } satisfies JobSnapshot);
 
     const result = await runESLint({ files: ['tools/a.ts'] });
@@ -183,6 +241,8 @@ describe('runESLint', () => {
       mode: 'check',
       files: 1,
       passed: false,
+      errorCount: 1,
+      warningCount: 0,
       output: expect.stringContaining('Unexpected console statement'),
     });
   });
@@ -279,7 +339,6 @@ describe('runESLint', () => {
     expect(result.isError).toBeUndefined();
     expect(jobCallOpts().cwd).toBe(worktree);
     expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
       'apps/web-e2e/src/tests/zz-force-rule-probe.spec.ts',
     ]);
   });
@@ -302,7 +361,6 @@ describe('runESLint', () => {
     // the ticket's repro is eslint reporting this exact pattern as
     // unmatched when cwd/args disagree on which root it's relative to.
     expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
       'src/tests/football-free-agents-waivers.spec.ts',
     ]);
     // Resolved from the *repo* root's node_modules/.bin (hoisted), not a
@@ -327,7 +385,6 @@ describe('runESLint', () => {
     expect(result.isError).toBeUndefined();
     expect(jobCallOpts().cwd).toBe(WEB_E2E);
     expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
       'src/tests/football-free-agents-waivers.spec.ts',
     ]);
   });
@@ -357,7 +414,7 @@ describe('runESLint', () => {
     const result = await runESLint({ files: ['..foo/bar.ts'] });
 
     expect(result.isError).toBeUndefined();
-    expect(jobCallArgs()).toEqual(['--max-warnings=0', '..foo/bar.ts']);
+    expect(jobCallArgs()).toEqual(['..foo/bar.ts']);
   });
 
   it('rejects a path that only becomes hyphen-leading after relativisation', async () => {
@@ -449,9 +506,7 @@ describe('runESLint', () => {
 
     await runESLint({ files: ['tools/a.ts'] });
 
-    expect(jobCallOpts().idempotencyKey).toBe(
-      `eslint:${ROOT}:--max-warnings=0 tools/a.ts`,
-    );
+    expect(jobCallOpts().idempotencyKey).toBe(`eslint:${ROOT}:tools/a.ts`);
   });
 
   // --- project-local flat config resolution (the deviation from prettier) ---
@@ -463,7 +518,7 @@ describe('runESLint', () => {
     const result = await runESLint({ files: ['lambdas/db/src/queries.ts'] });
 
     // cwd is lambdas/db — NOT the repo root — and the file is relativised to it.
-    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'src/queries.ts']);
+    expect(jobCallArgs()).toEqual(['src/queries.ts']);
     expect(jobCallOpts().cwd).toBe(DB);
     expect(JSON.parse(result.content[0].text)).toMatchObject({
       projectRoot: 'lambdas/db',
@@ -476,7 +531,7 @@ describe('runESLint', () => {
 
     await runESLint({ files: ['apps/web/src/App.tsx'] });
 
-    expect(jobCallArgs()).toEqual(['--max-warnings=0', 'src/App.tsx']);
+    expect(jobCallArgs()).toEqual(['src/App.tsx']);
     expect(jobCallOpts().cwd).toBe(WEB);
   });
 
@@ -502,10 +557,7 @@ describe('runESLint', () => {
 
     await runESLint({ files: ['lambdas/db/src/queries.ts'] });
 
-    expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
-      'lambdas/db/src/queries.ts',
-    ]);
+    expect(jobCallArgs()).toEqual(['lambdas/db/src/queries.ts']);
     expect(jobCallOpts().cwd).toBe(ROOT);
   });
 
@@ -518,11 +570,92 @@ describe('runESLint', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(jobCallArgs()).toEqual([
-      '--max-warnings=0',
-      'scripts/modules-pool/link.mjs',
-    ]);
+    expect(jobCallArgs()).toEqual(['scripts/modules-pool/link.mjs']);
     expect(jobCallOpts().cwd).toBe(ROOT);
+  });
+
+  // --- `project`-relative file resolution (LS-10143) ---
+
+  it('resolves files relative to the given nx project root', async () => {
+    setProjectRoot('lambdas/db');
+    setConfigRoots([ROOT, DB]);
+    setupDoneJob('');
+
+    const result = await runESLint({
+      project: 'db',
+      files: ['src/schema/matchups/matchupScores.resolver.spec.ts'],
+    });
+
+    expect(mockRunNx).toHaveBeenCalledWith(
+      ['show', 'project', 'db', '--json'],
+      ROOT,
+    );
+    expect(result.isError).toBeUndefined();
+    expect(jobCallOpts().cwd).toBe(DB);
+    expect(jobCallArgs()).toEqual([
+      'src/schema/matchups/matchupScores.resolver.spec.ts',
+    ]);
+  });
+
+  it('falls back to repo-root-relative when a project-relative path does not exist', async () => {
+    setProjectRoot('lambdas/db');
+    setConfigRoots([ROOT, DB]);
+    setupDoneJob('');
+    // Only the repo-root-relative form of this path exists.
+    setMissingFiles([resolve(DB, 'lambdas/db/src/queries.ts')]);
+
+    const result = await runESLint({
+      project: 'db',
+      files: ['lambdas/db/src/queries.ts'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallOpts().cwd).toBe(DB);
+    expect(jobCallArgs()).toEqual(['src/queries.ts']);
+  });
+
+  it('reports both attempted resolutions when a file is not found under the project root or repo root', async () => {
+    setProjectRoot('lambdas/db');
+    setConfigRoots([ROOT, DB]);
+    setMissingFiles([
+      resolve(DB, 'src/missing.ts'),
+      resolve(ROOT, 'src/missing.ts'),
+    ]);
+
+    const result = await runESLint({
+      project: 'db',
+      files: ['src/missing.ts'],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/"db" project root/);
+    expect(result.content[0].text).toMatch(/repo root/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid project name without calling nx', async () => {
+    const result = await runESLint({
+      project: 'db; rm -rf /',
+      files: ['src/queries.ts'],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Invalid project name/);
+    expect(mockRunNx).not.toHaveBeenCalled();
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a 'Did you mean?' hint when the named project cannot be resolved", async () => {
+    mockRunNx.mockRejectedValue(new Error("Cannot find project 'dbz'"));
+    mockBuildProjectNotFoundHint.mockResolvedValue(
+      'No nx project named "dbz" exists. Did you mean one of these? "db"',
+    );
+
+    const result = await runESLint({ project: 'dbz', files: ['a.ts'] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Did you mean one of these\? "db"/);
+    expect(mockRunJob).not.toHaveBeenCalled();
   });
 });
 
@@ -539,6 +672,26 @@ describe('describeFailure', () => {
     expect(out).toMatch(/Timed out after 600s/);
     expect(out).toMatch(/killed run, not a lint failure/);
     expect(out).toMatch(/target: "lint"/);
+  });
+});
+
+describe('parseEslintCounts', () => {
+  it('extracts the error and warning counts from the stylish summary line', () => {
+    expect(parseEslintCounts('✖ 21 problems (0 errors, 21 warnings)')).toEqual({
+      errorCount: 0,
+      warningCount: 21,
+    });
+  });
+
+  it('handles the singular form for exactly one problem', () => {
+    expect(parseEslintCounts('✖ 1 problem (1 error, 0 warnings)')).toEqual({
+      errorCount: 1,
+      warningCount: 0,
+    });
+  });
+
+  it('returns zeros when there is no summary line (a clean run)', () => {
+    expect(parseEslintCounts('')).toEqual({ errorCount: 0, warningCount: 0 });
   });
 });
 
