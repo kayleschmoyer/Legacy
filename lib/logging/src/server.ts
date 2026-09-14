@@ -9,6 +9,7 @@ export { createConsoleLogger, createCustomLogger } from './lib/factories';
 export { createServerLogger } from './lib/factories.server';
 export { ConsoleOutputDestination } from './lib/destinations';
 export { FileOutputDestination } from './lib/destinations/server';
+export { emitMetric } from './lib/metrics';
 export type {
   ILogger,
   LoggerConfig,
@@ -17,6 +18,11 @@ export type {
   LogArgs,
   OutputDestination,
 } from './lib/types';
+export type {
+  EmitMetricOptions,
+  MetricDimensions,
+  MetricUnit,
+} from './lib/metrics';
 
 // Global error handlers (only in Node.js environment).
 // LOGGER.error() automatically forwards to Rollbar via RollbarOutputDestination

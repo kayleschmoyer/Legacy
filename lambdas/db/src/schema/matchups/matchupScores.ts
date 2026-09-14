@@ -15,6 +15,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { emitMetric } from '@legacy-sports/logging/server';
 import {
   aggregatePlayerStats,
   calculatePlayerScore,
@@ -276,12 +277,9 @@ export function worseDataQuality(
 }
 
 /**
- * Log a WARN and emit a `missing_stats` metric line for a scheduled game that
- * produced no stat rows (LS-6394).
- *
- * The repo has no metrics client, so the metric is emitted as a structured
- * log field (`metric: 'missing_stats'`) that a CloudWatch metric filter can
- * key on. Keep the field names stable — they are the metric's contract.
+ * Log a WARN and emit a `missing_stats` CloudWatch metric for a scheduled
+ * game that produced no stat rows (LS-6394, metric migrated onto the shared
+ * EMF helper in LS-10129).
  */
 function warnMissingGameStats(
   leagueId: number,
@@ -303,6 +301,12 @@ function warnMissingGameStats(
       gameIdentifier: game.gameIdentifier,
     },
   );
+  emitMetric({
+    name: 'missing_stats',
+    value: 1,
+    unit: 'Count',
+    dimensions: { dataQuality: game.dataQuality, sport: 'football' },
+  });
 }
 
 // ─── Football resolver ───────────────────────────────────────────────────────
