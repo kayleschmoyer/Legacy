@@ -44,7 +44,9 @@ const SHELL_JOINING_EXECUTOR = 'nx:run-script';
 // Mirrors the NX_NAME_REGEX check in run-target.ts / show-project.ts: this
 // module calls `runNx` directly (not through runTarget), so it needs its own
 // guard against passing an unvalidated project name to a spawned process.
-const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+// Allows an optional npm-style scope prefix (e.g. "@legacy-sports/video")
+// (LS-10119).
+const NX_NAME_REGEX = /^(@[a-z0-9-._]+\/)?[a-z0-9-._]+$/i;
 
 function isJestTarget(cfg: NxTargetConfig | undefined): boolean {
   return cfg?.executor === JEST_EXECUTOR || cfg?.options?.jestConfig != null;

@@ -170,6 +170,28 @@ describe('resolveTestTargetPlan', () => {
     });
   });
 
+  it('introspects a scoped project name instead of falling back (LS-10119)', async () => {
+    mockRunNx.mockResolvedValue(
+      JSON.stringify({
+        targets: {
+          test: { executor: '@nx/jest:jest', options: { jestConfig: 'x' } },
+        },
+      }),
+    );
+
+    const plan = await resolveTestTargetPlan('@legacy-sports/video', '/repo');
+
+    expect(plan).toEqual({
+      kind: 'single',
+      target: 'test',
+      shellJoinsArgs: false,
+    });
+    expect(mockRunNx).toHaveBeenCalledWith(
+      ['show', 'project', '@legacy-sports/video', '--json'],
+      '/repo',
+    );
+  });
+
   it('falls back to "single" without spawning nx for an invalid project name', async () => {
     const plan = await resolveTestTargetPlan(
       'shared-components; rm -rf /',

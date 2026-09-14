@@ -10,7 +10,9 @@ interface DepGraphParams {
   worktreePath?: string;
 }
 
-const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+// Allows an optional npm-style scope prefix (e.g. "@legacy-sports/video"),
+// mirroring the NX_NAME_REGEX fix in run-target.ts (LS-10119).
+const NX_NAME_REGEX = /^(@[a-z0-9-._]+\/)?[a-z0-9-._]+$/i;
 
 export async function depGraph(params: DepGraphParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
