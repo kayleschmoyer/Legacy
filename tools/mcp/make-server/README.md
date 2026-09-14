@@ -25,6 +25,7 @@ Exposes Makefile targets as structured MCP tools for AI agents. Prevents agents 
 **Database:** db-migrate, db-check-connections
 **Clean:** clean-safe, clean-cache, reset
 **Troubleshooting:** kill-stale, diagnose
+**Rebase:** stabilize-after-rebase
 **Composite:** full-check, dev-setup
 
 ## Usage

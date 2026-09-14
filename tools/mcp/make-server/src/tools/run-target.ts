@@ -141,6 +141,11 @@ const ALLOWED_TARGETS = new Set([
   'kill-stale',
   'diagnose',
 
+  // Post-rebase stabilization (LS-10181) — install -> schema -> codegen -> pc,
+  // mandated by the rebase skill's own step 4; read-mostly composite, no
+  // destructive semantics.
+  'stabilize-after-rebase',
+
   // Validation
   'validate',
 
@@ -241,6 +246,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     // It also has an interactive confirmation prompt — always pass NO_CONFIRM=1
     // via the variables parameter to avoid blocking on stdin (execFile has no tty).
     'runner-apply',
+    // Post-rebase stabilization runs install -> schema -> codegen -> pc in
+    // sequence — the same multi-minute budget as `pc` itself, plus install.
+    'stabilize-after-rebase',
   ]);
   // `nx run-many` (build-all/test-all) runs every project in the workspace,
   // not just the affected set, and `install`/`install-force` runs a

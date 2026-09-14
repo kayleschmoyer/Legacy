@@ -21,7 +21,7 @@ The routing target for the `/rebase` slash command. This file binds the rebase w
 1. **Rebase**: `worktree_rebase` (fetches origin and rebases onto the worktree's parent, injecting a no-op Git editor).
 2. **If conflicts**: `worktree_conflict_info()` for the structured conflict list, then resolve per the [decision tree](../worktree-workflow/references/rebase.md#decision-tree) — generated files/lockfiles/migrations regenerate rather than hand-merge; source files synthesize both sides.
 3. **Continue**: `worktree_rebase_continue()` after each resolved conflict set (suppresses the editor prompt internally).
-4. **Stabilize**: `make stabilize-after-rebase` (auto-detects what's needed), then the environment's validation path.
+4. **Stabilize**: `make_run({ target: "stabilize-after-rebase" })` (auto-detects what's needed), then the environment's validation path.
 5. **Push**: `worktree_push` / `git push --force-with-lease origin HEAD` — only after validation passes.
 
 ## Environment binding

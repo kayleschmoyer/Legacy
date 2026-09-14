@@ -94,10 +94,11 @@ If `worktree_conflict_info` returns no conflicts, all merge conflicts are resolv
 >
 > **Why**: rebasing can silently break type compatibility, schema alignment, and lock file integrity even when no conflicts are reported. The stabilization step catches these invisible breakages before they become CI failures that cost 40-60 minutes each.
 
-**Automated (preferred):** Run the stabilization script, which auto-detects your node_modules mode and only runs the steps needed:
+**Automated (preferred):** Run the stabilization script via `make_run`, which auto-detects your node_modules mode and only runs the steps needed:
 
-```bash
-make stabilize-after-rebase
+```
+make_run({ target: "stabilize-after-rebase" })
+# shell fallback: make stabilize-after-rebase
 # or: node scripts/stabilize-after-rebase.js
 ```
 
