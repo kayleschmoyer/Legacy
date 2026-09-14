@@ -2474,7 +2474,7 @@ export function createServer(): McpServer {
       'Replaces the six-step worktree_push → create-draft-PR → github_mark_pr_ready → github_manage_labels(add: bot:ready-for-review) sequence. ' +
       'The jira-link marker is auto-inserted when jiraKey is provided. ' +
       'Pass draft: true to leave the PR in draft state (skips mark-ready and label). ' +
-      'Pass push: false if the branch is already pushed. ' +
+      'Pass push: false if the branch is already pushed. Lambda: push no-ops, bodyFile rejected. ' +
       'Budgeted to ~45s of synchronous work: a slow git push returns { jobId, status: "running" } — poll with github_job_wait until it returns the final result. Do NOT re-run the command while the job is in progress.',
     {
       title: z.string().trim().min(1).describe('PR title'),
@@ -2523,7 +2523,7 @@ export function createServer(): McpServer {
         .boolean()
         .optional()
         .describe(
-          'Push branch before creating PR (default: true). Pass false if already pushed.',
+          'Push branch before creating PR (default: true). Pass false if already pushed. No-op in Lambda.',
         ),
     },
     async (params) => openPR(params),

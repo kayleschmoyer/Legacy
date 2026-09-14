@@ -332,12 +332,15 @@ async function openPRWorker(
     return err(e instanceof Error ? e.message : String(e));
   }
 
-  // In Lambda mode `shouldPush` never actually pushes (see the push section
-  // above — the server has no local git checkout to push from). If the
-  // branch doesn't already exist on the remote, the PR-create call below
-  // will 422 with an opaque `{"field":"head","code":"invalid"}` and no hint
-  // that a push was ever expected. Fail clearly here instead (LS-9290).
-  if (lambda && shouldPush) {
+  // In Lambda mode `push` is always a no-op (the server has no local git
+  // checkout to push from), regardless of what the caller passed — so check
+  // remote existence unconditionally here, not just when shouldPush is true.
+  // Otherwise a caller who (correctly, per the tool description) passes
+  // `push: false` for an unpushed branch sails through to the PR-create call
+  // below, which 422s with an opaque `{"field":"head","code":"invalid"}` and
+  // no hint that a push was ever expected. Fail clearly here instead
+  // (LS-9290, broadened for LS-10141).
+  if (lambda) {
     let existsRemotely: boolean;
     try {
       existsRemotely = await branchExistsOnRemote(repo.owner, repo.name, head);

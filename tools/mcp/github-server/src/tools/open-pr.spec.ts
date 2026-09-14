@@ -486,8 +486,33 @@ describe('openPR', () => {
       expect(result.content[0].text).toMatch(/Failed to check whether branch/);
     });
 
-    it('does not perform the remote-existence check when push:false is passed', async () => {
+    it('still performs the remote-existence check when push:false is passed (LS-10141) — push is always a no-op in Lambda mode regardless of the flag', async () => {
       mockIsLambda.mockReturnValue(true);
+      mockGithubRest.mockRejectedValueOnce(
+        new Error(
+          'GitHub API GET /repos/bkrupa/legacy-sports/git/ref/heads/feature-branch failed (404): Not Found',
+        ),
+      );
+      const result = await openPR({
+        title: 'LS-9290 test',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/does not exist on the remote/);
+      // Never reaches the PR-create call.
+      expect(mockGithubRest).toHaveBeenCalledTimes(1);
+    });
+
+    it('proceeds with push:false when the branch already exists on the remote', async () => {
+      mockIsLambda.mockReturnValue(true);
+      mockGithubRest.mockImplementation((req: { path: string }) =>
+        req.path === '/repos/bkrupa/legacy-sports/git/ref/heads/feature-branch'
+          ? Promise.resolve({})
+          : Promise.resolve({ number: 99, html_url: 'https://example/pr/99' }),
+      );
       const result = await openPR({
         title: 'LS-9290 test',
         body: 'body',
@@ -496,12 +521,6 @@ describe('openPR', () => {
         push: false,
       });
       expect(result.isError).toBeFalsy();
-      const paths = (
-        mockGithubRest.mock.calls as unknown as Array<[{ path: string }]>
-      ).map(([req]) => req.path);
-      expect(paths).not.toContain(
-        '/repos/bkrupa/legacy-sports/git/ref/heads/feature-branch',
-      );
     });
   });
 
