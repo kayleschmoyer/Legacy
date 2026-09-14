@@ -49,9 +49,10 @@ So the tool walks up from each file to the nearest directory owning an `eslint.c
 
 1. **Symlink detection** — refuses to install if `node_modules` is a symlink into a shared pool slot (it would mutate a slot other worktrees may be running)
 2. **Immutable pool slots** — the content-addressable `node_modules` pool (`scripts/modules-pool/link.mjs`) makes concurrent installs safe by construction: a new lockfile builds a separate immutable slot, so installs never corrupt another worktree's `node_modules`
-3. **Workspace root** — always installs with `-w` flag (all deps are hoisted to the root)
-4. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication
-5. **Types detection** — reports whether the package bundles types or needs an `@types/` companion
+3. **Workspace root** — always declares the dependency in root `package.json` (all deps are hoisted to the root)
+4. **Minimal lockfile churn** (LS-10189) — declares the dependency in `package.json` directly and installs via `pnpm install` rather than `pnpm add`. `pnpm add` re-resolves the whole peer-dependency graph when it rewrites the lockfile, which on this workspace's react-native/expo tree can rewrite thousands of unrelated lines for a single new dependency; letting `pnpm install` patch the lockfile against its existing resolutions instead keeps the diff to what the new package actually needs. The result reports `lockfileDiffLines` and adds a warning above 100 changed lines so any residual unrelated churn is surfaced instead of silently riding along in a PR diff.
+5. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication
+6. **Types detection** — reports whether the package bundles types or needs an `@types/` companion
 
 ### Structured test failures
 

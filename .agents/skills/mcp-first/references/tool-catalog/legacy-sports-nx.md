@@ -44,7 +44,7 @@ Query dependency graph: what a project depends on or what depends on it.
 
 ### `nx_install_package`
 
-Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a symlink. Checks for @types/ companion. Install an npm package at workspace root. Fast installs return in one call; an install still running after ~45s returns { status: "running", jobId } — poll nx_job_wait({ jobId }), do NOT re-run (re-invoking joins the in-flight install).
+Prefer this over `pnpm add -w`/`-Dw` via shell to install an npm package at workspace root. Refuses if node_modules is a symlink; checks for @types/ companion. Edits package.json + `pnpm install`, avoiding peer-graph re-resolution; reports `lockfileDiffLines`. Fast installs return in one call; a slow one returns { status: "running", jobId } — poll nx_job_wait({ jobId }), do NOT re-run.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

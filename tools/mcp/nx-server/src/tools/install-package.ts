@@ -1,14 +1,19 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { access, readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile, writeFile } from 'node:fs/promises';
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { registerJobFormatter } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
 import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
-import { getRepoRoot, runPnpm } from '../run-command.js';
+import { getRepoRoot, runCommand, runPnpm } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
+
+// Above this many changed lockfile lines, a one-package install is almost
+// certainly dragging in unrelated peer-graph re-resolution rather than just
+// the requested package's own entries (see LS-10189).
+const LOCKFILE_CHURN_WARNING_THRESHOLD = 100;
 
 // Runaway backstop only — transport safety comes from the sync budget +
 // bounded nx_job_wait calls. Cold installs with lock contention can be slow.
@@ -106,6 +111,87 @@ async function findNestedNodeModules(cwd: string): Promise<string[]> {
 const PACKAGE_NAME_REGEX = /^(?:@[a-z0-9-._]+\/)?[a-z0-9-._]+$/i;
 const PACKAGE_VERSION_REGEX = /^[0-9a-z.*+_~^-]+$/i;
 
+/**
+ * Resolve the range to write into package.json for a new dependency.
+ *
+ * Mirrors `pnpm add`'s default `^` save-prefix for a bare semver version
+ * (e.g. "1.2.3" -> "^1.2.3"). A caller-supplied range/operator/dist-tag
+ * (e.g. "^1.2.3", "~1.2.3", "latest") is used verbatim. When no version is
+ * given, resolves the registry's `latest` dist-tag the same way `pnpm add
+ * <name>` would.
+ */
+async function resolveVersionRange(
+  name: string,
+  version: string | undefined,
+  cwd: string,
+): Promise<string> {
+  if (version != null) {
+    return /^\d/.test(version) ? `^${version}` : version;
+  }
+  const latest = await runPnpm(['info', name, 'version'], cwd, 15_000);
+  return `^${latest.trim()}`;
+}
+
+/**
+ * Declare a new dependency in root package.json directly, without invoking
+ * `pnpm add`. `pnpm add` re-resolves the entire peer-dependency graph when it
+ * rewrites the lockfile, which on this workspace's react-native/expo tree
+ * produces thousands of lines of unrelated churn for a single new dependency
+ * (LS-10189). Editing package.json ourselves and letting a plain `pnpm
+ * install` patch the lockfile against its existing resolutions reproduces
+ * pnpm's minimal-diff path instead.
+ *
+ * Inserts the entry in alphabetical position to match this repo's existing
+ * (pnpm-maintained) sort order in both dependency maps, and re-serializes
+ * with the file's existing 2-space indent + trailing newline.
+ */
+async function declareDependency(
+  cwd: string,
+  name: string,
+  versionRange: string,
+  dev: boolean,
+): Promise<string> {
+  const pkgPath = join(cwd, 'package.json');
+  const raw = await readFile(pkgPath, 'utf-8');
+  const pkgJson = JSON.parse(raw) as RootPackageJson;
+  const field = dev ? 'devDependencies' : 'dependencies';
+  const existing = pkgJson[field] ?? {};
+  const sortedEntries = Object.entries({
+    ...existing,
+    [name]: versionRange,
+  }).sort(([a], [b]) => a.localeCompare(b));
+  pkgJson[field] = Object.fromEntries(sortedEntries);
+  await writeFile(pkgPath, `${JSON.stringify(pkgJson, null, 2)}\n`, 'utf-8');
+  return raw;
+}
+
+/**
+ * Count how many lines `pnpm-lock.yaml` changed relative to the working
+ * tree's current HEAD (insertions + deletions from `git diff --numstat`).
+ * Returns `undefined` when the count can't be determined (e.g. not a git
+ * checkout) rather than failing the whole install.
+ */
+async function getLockfileDiffLineCount(
+  cwd: string,
+): Promise<number | undefined> {
+  try {
+    const output = await runCommand(
+      'git',
+      ['diff', '--numstat', '--', 'pnpm-lock.yaml'],
+      cwd,
+      15_000,
+    );
+    if (!output.trim()) return 0;
+    const [insertions, deletions] = output.trim().split('\t');
+    const ins = Number.parseInt(insertions, 10);
+    const del = Number.parseInt(deletions, 10);
+    if (Number.isNaN(ins) || Number.isNaN(del)) return undefined;
+    return ins + del;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function installPackage(
   params: InstallPackageParams,
 ): Promise<ToolResult> {
@@ -131,10 +217,6 @@ export async function installPackage(
     };
   }
 
-  const spec = params.version
-    ? `${params.name}@${params.version}`
-    : params.name;
-
   // --- Safety: detect symlinked node_modules ---
   const linked = await isSymlink(cwd);
   if (linked) {
@@ -145,8 +227,8 @@ export async function installPackage(
           text: minifiedJson({
             error: 'SYMLINK_DETECTED',
             message:
-              'node_modules is a symlink into a shared, immutable content-addressable pool slot. Running pnpm add here would mutate a slot other worktrees may be running. ' +
-              'To add a package: remove the symlink first (`rm node_modules` in Git Bash — no -r, and NEVER a trailing slash, which deletes through the link into the shared slot), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot. The risk guard allows `pnpm add` once the symlink is gone, so no `# risk-ok` marker is needed.',
+              'node_modules is a symlink into a shared, immutable content-addressable pool slot. Installing here would mutate a slot other worktrees may be running. ' +
+              'To add a package: remove the symlink first (`rm node_modules` in Git Bash — no -r, and NEVER a trailing slash, which deletes through the link into the shared slot), add the dependency to package.json and run `pnpm install` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot. The risk guard allows this once the symlink is gone, so no `# risk-ok` marker is needed.',
             cwd,
           }),
         },
@@ -155,21 +237,44 @@ export async function installPackage(
     };
   }
 
-  // --- Install via pnpm add (cross-platform) ---
-  // Symlink guard already ran above, so it's safe to call pnpm directly.
-  const addArgs = ['add', '-w', ...(params.dev ? ['-D'] : []), spec];
+  // --- Declare + install (avoids `pnpm add`'s peer-graph re-resolution churn — LS-10189) ---
+  // Symlink guard already ran above, so it's safe to touch package.json/pnpm directly.
+  let versionRange: string;
+  try {
+    versionRange = await resolveVersionRange(params.name, params.version, cwd);
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            error: 'VERSION_RESOLUTION_FAILED',
+            package: params.name,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+  const originalPackageJson = await declareDependency(
+    cwd,
+    params.name,
+    versionRange,
+    params.dev ?? false,
+  );
 
   // Background job + bounded sync wait — see run-target.ts for rationale.
-  const jobSpec = pnpmJobSpec(addArgs);
+  const jobSpec = pnpmJobSpec(['install']);
   const snapshot = await runJobWithBudget(
     {
       command: jobSpec.command,
       args: jobSpec.args,
       shell: jobSpec.shell,
       cwd,
-      label: `pnpm add ${spec}`,
+      label: `pnpm install (${params.name}@${versionRange})`,
       timeoutMs: INSTALL_TIMEOUT,
-      idempotencyKey: `pnpm-add:${cwd}:${spec}:${params.dev ? 'dev' : 'prod'}`,
+      idempotencyKey: `pnpm-install:${cwd}:${params.name}:${versionRange}:${params.dev ? 'dev' : 'prod'}`,
       meta: {
         kind: 'install',
         name: params.name,
@@ -200,6 +305,11 @@ export async function installPackage(
   }
 
   if (snapshot.status === 'failed') {
+    // Roll back the package.json edit — the install itself never completed,
+    // so leaving a declared-but-unresolved dependency behind would be worse
+    // than the previous `pnpm add` failure mode (which never touched
+    // package.json without also updating the lockfile).
+    await writeFile(join(cwd, 'package.json'), originalPackageJson, 'utf-8');
     return {
       content: [
         {
@@ -207,7 +317,9 @@ export async function installPackage(
           text: minifiedJson({
             error: 'INSTALL_FAILED',
             package: params.name,
-            message: snapshot.error ?? `pnpm add ${spec} failed`,
+            message:
+              snapshot.error ??
+              `pnpm install failed for ${params.name}@${versionRange}`,
             output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
           }),
         },
@@ -247,6 +359,22 @@ export async function installPackage(
   // 3. Read installed version from root package.json
   const installedVersion = await readInstalledVersion(cwd, params.name);
 
+  // 4. Report lockfile churn so the caller can sanity-check it against the
+  // one-package expectation (LS-10189) — the declare-then-install flow above
+  // keeps this small in practice, but a warning still catches any residual
+  // unrelated re-resolution rather than relying on the agent to notice.
+  const lockfileDiffLines = await getLockfileDiffLineCount(cwd);
+  if (
+    lockfileDiffLines != null &&
+    lockfileDiffLines > LOCKFILE_CHURN_WARNING_THRESHOLD
+  ) {
+    warnings.push(
+      `pnpm-lock.yaml changed ${lockfileDiffLines} lines for a single-package install — ` +
+        'this is far more than one package usually needs and may indicate unrelated ' +
+        'peer-dependency re-resolution. Review the lockfile diff before committing.',
+    );
+  }
+
   return {
     content: [
       {
@@ -256,6 +384,7 @@ export async function installPackage(
           installedVersion,
           dev: params.dev ?? false,
           typesStatus,
+          ...(lockfileDiffLines != null && { lockfileDiffLines }),
           ...(warnings.length > 0 && { warnings }),
           output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
         }),
@@ -301,7 +430,7 @@ registerJobFormatter('install', async (snapshot: JobSnapshot) => {
       body: {
         error: 'INSTALL_FAILED',
         package: name,
-        message: snapshot.error ?? `pnpm add ${name} failed`,
+        message: snapshot.error ?? `pnpm install failed for ${name}`,
         output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
       },
       isError: true,
@@ -316,12 +445,26 @@ registerJobFormatter('install', async (snapshot: JobSnapshot) => {
         'Consider adding pnpm.overrides in root package.json to pin the version.',
     );
   }
+
+  const lockfileDiffLines = await getLockfileDiffLineCount(cwd);
+  if (
+    lockfileDiffLines != null &&
+    lockfileDiffLines > LOCKFILE_CHURN_WARNING_THRESHOLD
+  ) {
+    warnings.push(
+      `pnpm-lock.yaml changed ${lockfileDiffLines} lines for a single-package install — ` +
+        'this is far more than one package usually needs and may indicate unrelated ' +
+        'peer-dependency re-resolution. Review the lockfile diff before committing.',
+    );
+  }
+
   return {
     body: {
       package: name,
       installedVersion: await readInstalledVersion(cwd, name),
       dev: meta?.dev === true,
       typesStatus: 'not_checked',
+      ...(lockfileDiffLines != null && { lockfileDiffLines }),
       ...(warnings.length > 0 && { warnings }),
       output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
     },
