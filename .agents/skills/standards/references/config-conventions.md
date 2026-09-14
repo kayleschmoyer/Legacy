@@ -6,10 +6,10 @@ Reference guide for all project configuration file conventions in the Legacy Spo
 
 ### Auto-inferred targets (no project.json entry needed)
 
-| Target | Inferred by         | Trigger file             |
-| ------ | ------------------- | ------------------------ |
-| `test` | `@nx/jest/plugin`   | `jest.config.ts` present |
-| `lint` | `@nx/eslint/plugin` | `.eslintrc.json` present |
+| Target | Inferred by         | Trigger file                |
+| ------ | ------------------- | --------------------------- |
+| `test` | `@nx/jest/plugin`   | `jest.config.ts` present    |
+| `lint` | `@nx/eslint/plugin` | `eslint.config.mjs` present |
 
 ### Target defaults (from `nx.json`)
 
@@ -34,32 +34,37 @@ These provide executor, caching, and options for targets that **exist** on a pro
 
 ---
 
-## ESLint Config (`.eslintrc.json`)
+## ESLint Config (`eslint.config.mjs`)
 
 ### Inheritance chain
 
 ```
-.eslintrc.json (root, root: true)
-  └── project .eslintrc.json (extends ../../.eslintrc.json)
+eslint.config.mjs (root)
+  └── project eslint.config.mjs (spreads ...baseConfig from ../../eslint.config.mjs)
         └── (optional) plugin:@nx/react for React/RN projects
 ```
 
 ### Canonical structure
 
-```json
-{
-  "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts"],
-  "overrides": [
-    {
-      "files": ["*.ts", "*.tsx"],
-      "parserOptions": {
-        "project": ["<project-root>/tsconfig.*?.json"]
+```javascript
+import baseConfig from '../../eslint.config.mjs';
+
+export default [
+  ...baseConfig,
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    // Override or add rules here
+    rules: {},
+    languageOptions: {
+      parserOptions: {
+        project: ['<project-root>/tsconfig.*?.json'],
       },
-      "rules": {}
-    }
-  ]
-}
+    },
+  },
+  {
+    ignores: ['**/jest.config.ts'],
+  },
+];
 ```
 
 ### The `project` glob must be project-anchored
@@ -77,36 +82,31 @@ LS-10062; `scripts/check-eslint-tsconfig-anchored.mjs` (wired into the
 `custom-checks` CI job, and `make lint-eslint-tsconfig-anchored` locally) now
 fails the build if a project regresses.
 
-### Required ignorePatterns
+### Required `ignores`
 
-| Pattern                             | When                               | Why                                           |
-| ----------------------------------- | ---------------------------------- | --------------------------------------------- |
-| `"!**/*"`                           | Always                             | Overrides root's `"**/*"` ignore-all pattern  |
-| `"jest.config.ts"`                  | Always (when file exists)          | Avoids lint errors from `require()` in config |
-| `"dist"`                            | Lambdas and apps with build output | Don't lint compiled output                    |
-| `".expo"`, `"web-build"`, `"cache"` | Expo/React Native apps             | Expo build artifacts                          |
-| `".next"`                           | Next.js apps                       | Next build output                             |
+| Pattern                                      | When                               | Why                                           |
+| -------------------------------------------- | ---------------------------------- | --------------------------------------------- |
+| `"**/jest.config.ts"`                        | Always (when file exists)          | Avoids lint errors from `require()` in config |
+| `"**/dist"`                                  | Lambdas and apps with build output | Don't lint compiled output                    |
+| `"**/.expo"`, `"**/web-build"`, `"**/cache"` | Expo/React Native apps             | Expo build artifacts                          |
+| `"**/.next"`                                 | Next.js apps                       | Next build output                             |
 
 ### React/RN projects
 
-Add `"plugin:@nx/react"` as the **first** extends entry:
-
-```json
-"extends": ["plugin:@nx/react", "../../.eslintrc.json"]
-```
+Spread the project's React-specific config entries **before** `baseConfig` in the exported array (mirrors the old `extends` ordering, where `plugin:@nx/react` had to come first).
 
 ### Rules
 
-- Keep `"rules": {}` in overrides -- don't delete the empty object
+- Keep `rules: {}` in the project override -- don't delete the empty object
 - Add project-specific rules only when the root config is insufficient
 - **Never** use `eslint-disable` comments -- fix the root cause
 
 ### Anti-patterns (DO NOT)
 
-- Do not use `.eslintrc.cjs` proxy files (removed during cleanup)
-- Do not set `"root": true"` in project configs (blocks inheritance)
+- Do not use `.eslintrc.json` / `.eslintrc.cjs` legacy-config files (removed during the ESLint 9 flat-config migration)
+- Do not spread the root config more than once, and never add a second `root: true`-equivalent entry
 - Do not add redundant Expo patterns to non-Expo projects
-- Do not add `node_modules` to ignorePatterns (handled by root)
+- Do not add `node_modules` to `ignores` (handled by root)
 
 ---
 
@@ -311,7 +311,7 @@ export default {
 - [ ] `tsconfig.json` extends `../../tsconfig.base.json` -- no redundant options
 - [ ] `tsconfig.lib.json` / `tsconfig.app.json` extends `./tsconfig.json`
 - [ ] `tsconfig.spec.json` includes `"jest"` in types
-- [ ] `.eslintrc.json` ignorePatterns includes `"jest.config.ts"`
+- [ ] `eslint.config.mjs` ignores includes `"**/jest.config.ts"`
 - [ ] `jest.config.ts` uses `createNodeJestConfig()` factory (for node projects)
 - [ ] `package.json` has correct `name`, `main`, `private: true`
 - [ ] Path alias registered in `tsconfig.base.json` (libraries only)

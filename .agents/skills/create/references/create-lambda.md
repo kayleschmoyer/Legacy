@@ -27,7 +27,7 @@ lambdas/<name>/
 │   ├── index.spec.ts     # Unit tests (required — the test target fails with zero tests)
 │   ├── dev.ts            # Local development server (optional)
 │   └── setup-tests.ts    # Jest setup (if env vars needed)
-├── .eslintrc.json
+├── eslint.config.mjs
 ├── jest.config.ts
 ├── package.json
 ├── project.json
@@ -210,28 +210,33 @@ Or rely on the existing `build:lambda` extends pattern if the default `tsconfig.
 }
 ```
 
-#### `.eslintrc.json`
+#### `eslint.config.mjs`
 
-```json
-{
-  "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts", "dist"],
-  "overrides": [
-    {
-      "files": ["*.ts", "*.tsx"],
-      "parserOptions": {
-        "project": ["lambdas/<name>/tsconfig.*?.json"]
+```javascript
+import baseConfig from '../../eslint.config.mjs';
+
+export default [
+  ...baseConfig,
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    // Override or add rules here
+    rules: {},
+    languageOptions: {
+      parserOptions: {
+        project: ['lambdas/<name>/tsconfig.*?.json'],
       },
-      "rules": {}
-    }
-  ]
-}
+    },
+  },
+  {
+    ignores: ['**/jest.config.ts', '**/dist'],
+  },
+];
 ```
 
-> Always include `"dist"` in ignorePatterns for lambdas (they have build output).
+> Always include `dist` in the `ignores` entry for lambdas (they have build output).
 >
 > **Anchor the `project` glob to `lambdas/<name>/`** — do not leave it as the
-> bare `["tsconfig.*?.json"]` that Nx's generator emits. The root config pins
+> bare `['tsconfig.*?.json']` that Nx's generator emits. The root config pins
 > `parserOptions.tsconfigRootDir` to the workspace root, so an unanchored glob
 > resolves against the root tsconfigs instead of this lambda's own and the
 > type-aware rules silently lint against the wrong TypeScript program — lint
@@ -323,7 +328,7 @@ Define the Lambda's AWS infrastructure in `terraform/`. See [terraform](../../te
 | tsconfig reference          | `tsconfig.lib.json` | `tsconfig.app.json`                                                                                 |
 | Has `build` target          | No                  | Yes (`build:lambda` extends)                                                                        |
 | Has `deploy` target         | No                  | Yes                                                                                                 |
-| ESLint ignorePatterns       | No `dist`           | Includes `dist`                                                                                     |
+| ESLint `ignores`            | No `dist`           | Includes `dist`                                                                                     |
 | package.json `main`         | `./src/index.ts`    | `dist/index.js`                                                                                     |
 | package.json `scripts`      | None                | `dev`, `build`, `test:watch`, `test:all-files` (no bare `test` — the `project.json` target owns it) |
 | Path alias in tsconfig.base | Required            | Not needed                                                                                          |
@@ -334,7 +339,7 @@ Define the Lambda's AWS infrastructure in `terraform/`. See [terraform](../../te
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Missing `vite.config.ts`                                                       | `build` target fails                                                                                                                                                                                                                                                                                                                                                    |
 | Using `tsconfig.lib.json` in typecheck command                                 | Lambda uses `tsconfig.app.json`                                                                                                                                                                                                                                                                                                                                         |
-| Forgetting `"dist"` in eslintrc ignorePatterns                                 | Lint tries to check build output                                                                                                                                                                                                                                                                                                                                        |
+| Forgetting `dist` in `eslint.config.mjs` ignores                               | Lint tries to check build output                                                                                                                                                                                                                                                                                                                                        |
 | Not running `pnpm install` after adding package.json                           | Missing workspace link                                                                                                                                                                                                                                                                                                                                                  |
 | Adding `"type": "module"` to package.json                                      | Breaks `require()` in jest config                                                                                                                                                                                                                                                                                                                                       |
 | package.json `"test": "jest --onlyChanged"` with no `project.json` test target | The package.json script becomes the merged Nx target; on CI's clean tree `--onlyChanged` runs **zero tests** and passes via `passWithNoTests: true` — the unit suite never gates merge (LS-8247). Use the explicit `@nx/jest:jest` target with `"passWithNoTests": false` from the template. See [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge). |

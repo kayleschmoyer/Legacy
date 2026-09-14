@@ -23,7 +23,7 @@ Replace `<name>` with the kebab-case library name (e.g. `my-feature`).
 lib/<name>/
 ├── src/
 │   └── index.ts          # Public barrel export
-├── .eslintrc.json
+├── eslint.config.mjs
 ├── jest.config.ts
 ├── package.json
 ├── project.json
@@ -57,7 +57,7 @@ lib/<name>/
 | `scope`    | `lib` (always for libraries)                                                                 |
 | `type`     | `util` · `data-access` · `feature` · `ui`                                                    |
 
-**Why `"typecheck": {}`?** — This empty stub is required so the `typecheck` target default in `nx.json` applies. Without it, `nx affected -t typecheck` skips this project. The `test` and `lint` targets are auto-inferred by `@nx/jest/plugin` and `@nx/eslint/plugin` from the presence of `jest.config.ts` and `.eslintrc.json`.
+**Why `"typecheck": {}`?** — This empty stub is required so the `typecheck` target default in `nx.json` applies. Without it, `nx affected -t typecheck` skips this project. The `test` and `lint` targets are auto-inferred by `@nx/jest/plugin` and `@nx/eslint/plugin` from the presence of `jest.config.ts` and `eslint.config.mjs`.
 
 #### `package.json`
 
@@ -125,26 +125,31 @@ lib/<name>/
 }
 ```
 
-#### `.eslintrc.json`
+#### `eslint.config.mjs`
 
-```json
-{
-  "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts"],
-  "overrides": [
-    {
-      "files": ["*.ts", "*.tsx"],
-      "parserOptions": {
-        "project": ["lib/<name>/tsconfig.*?.json"]
+```javascript
+import baseConfig from '../../eslint.config.mjs';
+
+export default [
+  ...baseConfig,
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    // Override or add rules here
+    rules: {},
+    languageOptions: {
+      parserOptions: {
+        project: ['lib/<name>/tsconfig.*?.json'],
       },
-      "rules": {}
-    }
-  ]
-}
+    },
+  },
+  {
+    ignores: ['**/jest.config.ts'],
+  },
+];
 ```
 
 > **Anchor the `project` glob to `lib/<name>/`** — do not leave it as the bare
-> `["tsconfig.*?.json"]` that Nx's generator emits. The root config pins
+> `['tsconfig.*?.json']` that Nx's generator emits. The root config pins
 > `parserOptions.tsconfigRootDir` to the workspace root, so an unanchored glob
 > resolves against the root tsconfigs instead of this library's own and the
 > type-aware rules silently lint against the wrong TypeScript program — lint
@@ -195,7 +200,7 @@ All three must pass before committing.
 | Using `"type": "module"` in package.json                                      | Breaks `require()` in jest configs; only `lib/api` uses ESM |
 | Adding `"test"` or `"lint"` targets to project.json                           | Redundant — these are auto-inferred by Nx plugins           |
 | tsconfig.lib.json extending `tsconfig.base.json` instead of `./tsconfig.json` | Bypasses project-level compiler options                     |
-| Missing `jest.config.ts` in `.eslintrc.json` ignorePatterns                   | Lint errors on the config file itself                       |
+| Missing `jest.config.ts` in `eslint.config.mjs` ignores                       | Lint errors on the config file itself                       |
 
 ## Related Skills
 
