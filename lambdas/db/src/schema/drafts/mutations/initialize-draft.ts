@@ -183,6 +183,30 @@ builder.mutationField('initializeDraft', (t) =>
         const txResult: TxResult = await context.db.transaction(async (tx) => {
           let txDraft: typeof PublicSchema.drafts.$inferSelect;
 
+          // LS-10147: re-check draftStatus under a row lock before touching
+          // seats. The pre-transaction check above is TOCTOU-vulnerable — two
+          // concurrent initializeDraft calls (e.g. a double-clicked "start
+          // draft" button) can both read 'not-started' and both reach the
+          // reseat below, racing each other's delete+insert into the same
+          // (draft_id, team_id) seats and crashing on a unique-constraint
+          // violation instead of failing cleanly. Locking here serializes the
+          // two calls: the second blocks until the first commits, then sees
+          // the now-advanced status and bails out with a normal user-facing
+          // rejection (caught below and skipped from Rollbar, same as any
+          // other state-machine conflict).
+          const [lockedLeague] = await tx
+            .select({ draftStatus: PublicSchema.leagues.draftStatus })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .limit(1)
+            .for('update');
+
+          if (lockedLeague.draftStatus !== 'not-started') {
+            throw UserInputError(
+              `Cannot initialize draft: current status is '${lockedLeague.draftStatus}'`,
+            );
+          }
+
           // LS-8742: preserve any seat order already seeded by an
           // approved draft slot trade (LS-8676) instead of unconditionally
           // reshuffling it away at draft start. When a fresh order is

@@ -187,6 +187,39 @@ describe('initializeDraft resolver', () => {
     });
   });
 
+  it('rejects a concurrent double-initialize once it acquires the league row lock (LS-10147)', async () => {
+    const initializeDraft = captureInitializeDraftResolver();
+    const forLockedLeague = jest
+      .fn()
+      .mockResolvedValue([{ draftStatus: 'in-progress' }]);
+    const tx = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      for: forLockedLeague,
+    };
+    const { db } = makeDb([
+      [], // saved draft settings lookup
+      [{ id: 1, draftStatus: 'not-started', rosterContinuity: 'redraft' }], // league lookup (pre-tx, passes)
+      [{ permissionLevel: 'commissioner' }], // membership lookup
+      [], // existingDraft lookup
+    ]);
+    (db as { transaction: jest.Mock }).transaction = jest.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
+    );
+    const ctx = { user: { id: 99 }, db };
+
+    await expect(
+      initializeDraft({}, { leagueId: 1 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message: "Cannot initialize draft: current status is 'in-progress'",
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(forLockedLeague).toHaveBeenCalledWith('update');
+    expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
   it('still logs an unexpected error at error level', async () => {
     const initializeDraft = captureInitializeDraftResolver();
     const db = {
