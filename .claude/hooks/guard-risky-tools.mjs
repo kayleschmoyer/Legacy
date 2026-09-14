@@ -354,6 +354,16 @@ const ACTIONS_LIST_PHANTOM_KEYS = {
  * tool-result cap). Five is the largest page observed to come back under the
  * cap on this repo.
  */
+// LS-10188 re-measured this on `run-playwright-tests.yml`: a correctly
+// scoped-and-filtered call (resource_id + workflow_runs_filter both set, so
+// neither the phantom-param nor the unscoped-runs rule above fires) still
+// overflowed at perPage: 15 — 81,763 characters, at ~5.4 KB/run, higher than
+// the ~4.4 KB/run LS-9987 measured on ci-orchestrator.yml. Confirmed this is
+// not a regression of that fix: this rule already blocks perPage: 15 (> 5)
+// regardless of scope, since a workflow/branch filter narrows which runs come
+// back, not how much each one weighs. The 5-run ceiling holds a comfortable
+// margin even at the higher observed rate (5 * 5.4 KB ≈ 27 KB, well under the
+// cap that 81,763 chars at 15 runs exceeded).
 const ACTIONS_LIST_RUNS_PAGE_MAX = 5;
 const ACTIONS_LIST_RUNS_PAGE_DEFAULT = 30;
 

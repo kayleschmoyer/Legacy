@@ -590,6 +590,40 @@ test('allows perPage at the ceiling', () => {
   assert.equal(code, 0);
 });
 
+test('blocks the exact LS-10188 repro — a correctly scoped call still overflows above the ceiling', () => {
+  // LS-10188: this call gets resource_id and workflow_runs_filter right (the
+  // branch filter did narrow the results), yet still overflowed at
+  // perPage: 15 — 81,763 characters, over the cap, at ~5.4 KB/run on this
+  // workflow (higher than the ~4.4 KB/run average LS-9987 measured
+  // elsewhere). The rule must fire on page size regardless of whether the
+  // call is otherwise well-scoped — a correct workflow/branch filter narrows
+  // *which* runs come back, not how much each one weighs.
+  const { code, stderr } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'run-playwright-tests.yml',
+    workflow_runs_filter: { branch: 'main' },
+    perPage: 15,
+  });
+  assert.equal(
+    code,
+    2,
+    'a correctly-scoped call must still be capped by page size',
+  );
+  assert.match(stderr, /actions-list-verbose-runs/);
+});
+
+test('the LS-10188 shape is allowed at the ceiling', () => {
+  const { code } = runActionsList({
+    method: 'list_workflow_runs',
+    ...REPO,
+    resource_id: 'run-playwright-tests.yml',
+    workflow_runs_filter: { branch: 'main' },
+    perPage: 5,
+  });
+  assert.equal(code, 0, 'the fix must not over-block a well-scoped call');
+});
+
 test('page-size rule does not fire on non-run methods', () => {
   // Only list_workflow_runs embeds head_commit.message per item; list_workflows
   // is small at any page size and must not be gratuitously blocked.
