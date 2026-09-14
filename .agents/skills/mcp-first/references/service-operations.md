@@ -118,6 +118,40 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 > **Opaque `{"message":"Internal Server Error"}` 500s from `ci_get_logs`/`get_job_logs` (and any other hosted `legacy-sports-*` MCP tool) were a Lambda-handler gap, fixed at the transport layer (LS-9583)**: every hosted MCP Lambda (`ci`, `github`, `jira`, `rollbar`, `db-admin`) previously called `transport.handleRequest()` with no `try/catch` — an unhandled exception there (a transient upstream blip, an SDK bug, etc.) escaped the Lambda entirely and API Gateway/the Function URL returned its own generic 500 with zero diagnostic detail, forcing a `gh` CLI shell fallback. All five now route through a shared `runMcpTransport()` helper (`lib/mcp-bearer-auth`) that converts any such exception into a well-formed JSON-RPC 500 carrying the real error message. If a hosted tool call still returns a bare, detail-free 500 after this fix, treat it as a new bug (file a gap ticket) rather than assuming a `gh` CLI fallback is required — the tool should now say what actually failed.
 
+> **`mcp__github__actions_run_trigger`/`mcp__github__actions_get` — inconsistent id param naming, and an invalid `method` produces a misleading error (LS-10090)**: both tools belong to the officially-hosted GitHub MCP server (same constraint as every other entry in this section — no `github` entry in this repo's `.mcp.json`, not vendored under `tools/mcp/`), so neither the naming split nor the validation ordering below can be fixed at the schema level from this repo.
+>
+> - **`actions_run_trigger` uses `run_id`; `actions_get` uses `resource_id` for the identical concept** (a workflow run's numeric ID). Calling either with the other's name is accepted (neither schema sets `additionalProperties: false`) and then fails on a "missing required parameter" naming the name it actually wanted — the same trial-and-error shape as the `actions_list` phantom-key hazard above, just on a single field. There is no plan to unify the names (both tools are outside this repo's control); know the split instead: **`actions_run_trigger` → `run_id`**, **`actions_get` → `resource_id`**.
+> - **An invalid `method` on `actions_run_trigger` does not validate against its enum before the handler's own parameter-presence checks run.** The natural-but-wrong guess is `method: "workflow_dispatch"` (GitHub's own REST API event name for this operation) — the tool has no such method; the equivalent is `run_workflow`. Passing `"workflow_dispatch"` reaches `run_workflow`'s adjacent presence check and fails with `missing required parameter: run_id`, which is actively misleading: `run_workflow`'s real required params are `workflow_id`/`ref`, not `run_id` at all (`run_id` is required for every _other_ method — `rerun_workflow_run`, `rerun_failed_jobs`, `cancel_workflow_run`, `delete_workflow_run_logs`).
+>
+> **Mechanically enforced, not just documented**: `.claude/hooks/guard-risky-tools.mjs` inspects every `mcp__github__actions_run_trigger`/`mcp__github__actions_get` call before it runs. It blocks (CORRECTABLE, no `# risk-ok` bypass — same tier as the `actions_list` rules above) an invalid `method` value with a clear message naming the invalid value and listing valid options (`actions-run-trigger-invalid-method` / `actions-get-invalid-method` — the `workflow_dispatch` guess gets an explicit pointer to `run_workflow`), and a wrong-tool id param name (`actions-run-trigger-wrong-id-param` / `actions-get-wrong-id-param`).
+>
+> **Worked example — dispatch a `workflow_dispatch` run, then poll it to completion:**
+>
+> ```
+> // 1. Dispatch. method is run_workflow; workflow_id + ref are required (not run_id).
+> actions_run_trigger({
+>   method: "run_workflow",
+>   owner: "bkrupa", repo: "legacy-sports",
+>   workflow_id: "native-e2e.yml", ref: "main",
+>   inputs: { /* workflow-specific inputs, if any */ },
+> })
+> // GitHub's workflow-dispatch endpoint does not return a run id — find the
+> // run it just created via ci_list_runs (or list_workflow_runs) filtered to
+> // the workflow + ref, taking the newest result:
+> ci_list_runs({ workflow: "native-e2e.yml", branch: "main", limit: 1 })
+> // → { id: 123456789, status: "queued" | "in_progress", ... }
+>
+> // 2. Poll. method is get_workflow_run; the run id goes in resource_id (not run_id).
+> actions_get({
+>   method: "get_workflow_run",
+>   owner: "bkrupa", repo: "legacy-sports",
+>   resource_id: "123456789",
+> })
+> // → { status: "completed", conclusion: "success" | "failure", ... } once finished
+> ```
+>
+> Prefer `ci_dispatch_workflow({ workflow, ref, waitForCompletion: true })` (`legacy-sports-ci`, see [Waiting on CI](auth-and-routing.md#waiting-on-ci-no-polling-no-sleep) and the CI Operations table below) when it's available — it dispatches and polls in one call/tool pair without ever touching `run_id`/`resource_id` naming. The two-call sequence above is for when only the hosted GitHub MCP server is reachable.
+
 ## CI Operations
 
 Use `ci_list_runs`, `ci_view_run`, `ci_view_run_jobs`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, `ci_retry_runner_flake`, and `ci_cancel_run` instead of `gh run` commands via Bash. `ci_list_runs` accepts `limit` up to 100 (default 10). These tools parse and structure log output for agent consumption. For a "which jobs failed / are still running" triage query specifically, prefer `ci_view_run_jobs({ runId, filter? })` over `ci_view_run` or any raw GitHub Actions API/tool — it defaults `includeSteps` to `false` (per-job summary only: `databaseId`/`name`/`status`/`conclusion`/`startedAt`/`completedAt`, plus a `{ total, passed, failed, skipped, inProgress, allPassed }` rollup), so it stays compact even on orchestrator-style runs with 20+ jobs where the per-step detail would otherwise overflow the result (see the `list_workflow_jobs` callout below).

@@ -5,8 +5,8 @@
  * guard-make-pc, enforce-background) with a general safety net.
  *
  * Matched tools (see .claude/settings.json matcher):
- *   Bash, Edit, Write, NotebookEdit, the db_query MCP tools,
- *   mcp__github__actions_list, and mcp__github__get_job_logs.
+ *   Bash, Edit, Write, NotebookEdit, the db_query MCP tools, and
+ *   mcp__github__actions_list / actions_run_trigger / actions_get / get_job_logs.
  *
  * Four severity tiers:
  *   CATASTROPHIC — blocked, no bypass (exit 2). rm -rf on root/home/.git,
@@ -64,10 +64,12 @@ let content = ''; // file content being written (Edit/Write/NotebookEdit)
 let callArgs = ''; // serialised MCP arguments (structured-input tools)
 
 // Structured-input MCP tools carry no free text to pattern-match. They are
-// judged on their argument SHAPE instead (see `actionsListFindings`), so the
-// serialised arguments stand in as `raw` purely for the audit log and the
-// block message.
+// judged on their argument SHAPE instead (see `actionsListFindings` and
+// `actionsRunTriggerOrGetFindings`), so the serialised arguments stand in as
+// `raw` purely for the audit log and the block message.
 const isActionsList = tool === 'mcp__github__actions_list';
+const isActionsRunTrigger = tool === 'mcp__github__actions_run_trigger';
+const isActionsGet = tool === 'mcp__github__actions_get';
 const isGetJobLogs = tool === 'mcp__github__get_job_logs';
 
 if (tool === 'Bash') command = String(ti.command ?? '');
@@ -75,7 +77,7 @@ else if (tool === 'Edit') content = String(ti.new_string ?? '');
 else if (tool === 'Write') content = String(ti.content ?? '');
 else if (tool === 'NotebookEdit') content = String(ti.new_source ?? '');
 else if (/__db_query$/.test(tool)) sql = String(ti.sql ?? ti.query ?? '');
-else if (isActionsList || isGetJobLogs) {
+else if (isActionsList || isActionsRunTrigger || isActionsGet || isGetJobLogs) {
   try {
     callArgs = JSON.stringify(ti);
   } catch {
@@ -472,6 +474,117 @@ function actionsListFindings(args) {
 }
 
 // ---------------------------------------------------------------------------
+// mcp__github__actions_run_trigger / mcp__github__actions_get (LS-10090)
+//
+// Same "not our tool" constraint as actions_list above — both belong to the
+// officially-hosted GitHub MCP server, not tools/mcp/, so neither the method
+// enum's silent fallthrough nor the run_id/resource_id naming split can be
+// fixed at the schema level from this repo. Two independently-observed
+// failure modes, both reproduced dispatching a real workflow_dispatch run
+// (LS-10033 verification):
+//
+//   1. actions_run_trigger's `method` is a real JSON-Schema enum
+//      (run_workflow / rerun_workflow_run / rerun_failed_jobs /
+//      cancel_workflow_run / delete_workflow_run_logs), but an invalid value
+//      is not rejected against that enum before the handler's own
+//      parameter-presence checks run. Passing `method: "workflow_dispatch"`
+//      (GitHub's own REST API event name, and the natural guess) reaches the
+//      run_workflow-adjacent presence check and fails with
+//      "missing required parameter: run_id" — actively misleading, since
+//      run_workflow's real required params are workflow_id/ref, not run_id
+//      at all.
+//   2. actions_run_trigger identifies a run via `run_id`; the sibling
+//      actions_get tool uses `resource_id` for the identical concept. Each
+//      tool accepts extra unrecognized keys silently (no
+//      `additionalProperties: false`), so passing the other tool's name is
+//      accepted and then fails on a "missing required parameter" for the
+//      name it actually wanted — same trial-and-error shape as the
+//      actions_list phantom-key hazard above, just on a single field.
+// ---------------------------------------------------------------------------
+
+const ACTIONS_RUN_TRIGGER_METHODS = [
+  'run_workflow',
+  'rerun_workflow_run',
+  'rerun_failed_jobs',
+  'cancel_workflow_run',
+  'delete_workflow_run_logs',
+];
+
+const ACTIONS_GET_METHODS = [
+  'get_workflow',
+  'get_workflow_run',
+  'get_workflow_job',
+  'download_workflow_run_artifact',
+  'get_workflow_run_usage',
+  'get_workflow_run_logs_url',
+];
+
+function actionsRunTriggerFindings(args) {
+  const out = [];
+  const method = typeof args.method === 'string' ? args.method : '';
+
+  if (method && !ACTIONS_RUN_TRIGGER_METHODS.includes(method)) {
+    const guessHint =
+      method === 'workflow_dispatch'
+        ? ' "workflow_dispatch" is the GitHub REST API\'s event name for this operation, not a method ' +
+          'of this tool — the equivalent method here is `run_workflow` (required params for ' +
+          'run_workflow: `workflow_id`, `ref` — not `run_id`).'
+        : '';
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-run-trigger-invalid-method',
+      message:
+        `mcp__github__actions_run_trigger's \`method\` is "${method}", which is not a valid value ` +
+        `and would otherwise fall through to a misleading "missing required parameter" error instead ` +
+        `of a clear invalid-method one (LS-10090).${guessHint} Valid \`method\` values: ` +
+        `${ACTIONS_RUN_TRIGGER_METHODS.join(', ')}.`,
+    });
+  }
+
+  if ('resource_id' in args) {
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-run-trigger-wrong-id-param',
+      message:
+        'mcp__github__actions_run_trigger identifies a workflow run via `run_id` — `resource_id` is ' +
+        "the sibling tool mcp__github__actions_get's param name for the same concept (LS-10090). " +
+        'Rename this argument to `run_id`.',
+    });
+  }
+
+  return out;
+}
+
+function actionsGetFindings(args) {
+  const out = [];
+  const method = typeof args.method === 'string' ? args.method : '';
+
+  if (method && !ACTIONS_GET_METHODS.includes(method)) {
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-get-invalid-method',
+      message:
+        `mcp__github__actions_get's \`method\` is "${method}", which is not a valid value. Valid ` +
+        `\`method\` values: ${ACTIONS_GET_METHODS.join(', ')}.`,
+    });
+  }
+
+  if ('run_id' in args) {
+    out.push({
+      severity: 'CORRECTABLE',
+      rule: 'actions-get-wrong-id-param',
+      message:
+        'mcp__github__actions_get identifies its target resource (a run, job, artifact, or workflow, ' +
+        'depending on `method`) via `resource_id` — `run_id` is the sibling tool ' +
+        "mcp__github__actions_run_trigger's param name for a workflow run specifically (LS-10090). " +
+        'Rename this argument to `resource_id`.',
+    });
+  }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // mcp__github__get_job_logs — unbounded return_content default (LS-9201, LS-10101)
 //
 // This tool belongs to the officially-hosted GitHub MCP server; it is not
@@ -536,6 +649,8 @@ const GET_JOB_LOGS_HINT =
 const findings = [];
 
 if (isActionsList) findings.push(...actionsListFindings(ti));
+if (isActionsRunTrigger) findings.push(...actionsRunTriggerFindings(ti));
+if (isActionsGet) findings.push(...actionsGetFindings(ti));
 if (isGetJobLogs) findings.push(...getJobLogsFindings(ti));
 
 // --- Secret scan (raw text, all tools) ---
@@ -759,7 +874,7 @@ const correctableHint = isActionsList
     : '';
 const body =
   top.severity === 'CORRECTABLE'
-    ? `${findings.map((f) => f.message).join('\n\n')}\n\n${correctableHint}`
+    ? `${findings.map((f) => f.message).join('\n\n')}${correctableHint ? `\n\n${correctableHint}` : ''}`
     : top.message;
 
 const header =

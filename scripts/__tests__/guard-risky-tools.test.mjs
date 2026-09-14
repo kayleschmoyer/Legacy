@@ -776,6 +776,138 @@ test('a prototype-chain key name is reported as a real phantom param', () => {
 });
 
 // ---------------------------------------------------------------------------
+// mcp__github__actions_run_trigger / mcp__github__actions_get (LS-10090)
+//
+// Both tools belong to the officially-hosted GitHub MCP server, same
+// not-our-schema constraint as actions_list above. Two independently observed
+// hazards, reproduced dispatching a real workflow_dispatch run (LS-10033
+// verification): an invalid `method` on actions_run_trigger falls through to
+// a misleading "missing required parameter: run_id" instead of a clear
+// invalid-enum error, and the two tools use different param names (`run_id`
+// vs `resource_id`) for the identical "which workflow run" concept.
+// ---------------------------------------------------------------------------
+
+/** Run the hook against an mcp__github__actions_run_trigger or actions_get call. */
+function runActionsTool(toolName, toolInput) {
+  const root = mkdtempSync(join(tmpdir(), 'grt-art-'));
+  try {
+    const res = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({
+        tool_name: toolName,
+        tool_input: toolInput,
+        cwd: root,
+        session_id: 'guard-risky-tools-test',
+      }),
+      encoding: 'utf-8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? '' };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('blocks the exact LS-10090 repro — method: "workflow_dispatch"', () => {
+  const { code, stderr } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: 'workflow_dispatch',
+    ...REPO,
+    ref: 'main',
+  });
+  assert.equal(code, 2, 'expected a block');
+  assert.match(stderr, /actions-run-trigger-invalid-method/);
+  // The message must name the invalid value, list the real options, and point
+  // at the actual equivalent — not just say "invalid".
+  assert.match(stderr, /"workflow_dispatch"/);
+  assert.match(
+    stderr,
+    /run_workflow, rerun_workflow_run, rerun_failed_jobs, cancel_workflow_run, delete_workflow_run_logs/,
+  );
+  assert.match(stderr, /equivalent method here is `run_workflow`/);
+});
+
+test('allows a valid actions_run_trigger run_workflow call', () => {
+  const { code } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: 'run_workflow',
+    ...REPO,
+    workflow_id: 'ci.yml',
+    ref: 'main',
+  });
+  assert.equal(code, 0);
+});
+
+test('allows a valid actions_run_trigger call identifying a run by run_id', () => {
+  const { code } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: 'cancel_workflow_run',
+    ...REPO,
+    run_id: 123,
+  });
+  assert.equal(code, 0);
+});
+
+test('blocks actions_run_trigger called with resource_id instead of run_id', () => {
+  const { code, stderr } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: 'cancel_workflow_run',
+    ...REPO,
+    resource_id: 123,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-run-trigger-wrong-id-param/);
+  assert.match(stderr, /Rename this argument to `run_id`/);
+});
+
+test('blocks an invalid method on actions_get', () => {
+  const { code, stderr } = runActionsTool('mcp__github__actions_get', {
+    method: 'get_run',
+    ...REPO,
+    resource_id: '123',
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-get-invalid-method/);
+  assert.match(
+    stderr,
+    /get_workflow, get_workflow_run, get_workflow_job, download_workflow_run_artifact, get_workflow_run_usage, get_workflow_run_logs_url/,
+  );
+});
+
+test('allows a valid actions_get call identifying a run by resource_id', () => {
+  const { code } = runActionsTool('mcp__github__actions_get', {
+    method: 'get_workflow_run',
+    ...REPO,
+    resource_id: '123',
+  });
+  assert.equal(code, 0);
+});
+
+test('blocks the exact LS-10090 repro — actions_get called with run_id instead of resource_id', () => {
+  const { code, stderr } = runActionsTool('mcp__github__actions_get', {
+    method: 'get_workflow_run',
+    ...REPO,
+    run_id: 123,
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /actions-get-wrong-id-param/);
+  assert.match(stderr, /Rename this argument to `resource_id`/);
+});
+
+test('a risk-ok marker cannot bypass an actions_run_trigger CORRECTABLE block', () => {
+  const { code } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: '# risk-ok: I checked',
+    ...REPO,
+  });
+  assert.equal(code, 2, 'CORRECTABLE must not honour the bypass marker');
+});
+
+test('the actions_list ci_list_runs hint is not appended to actions_run_trigger/actions_get findings', () => {
+  // CI_LIST_RUNS_HINT is actions_list-specific guidance; it would be
+  // nonsensical appended to a run_trigger/get finding.
+  const { stderr } = runActionsTool('mcp__github__actions_run_trigger', {
+    method: 'workflow_dispatch',
+    ...REPO,
+  });
+  assert.doesNotMatch(stderr, /Prefer `ci_list_runs/);
+});
+
+// ---------------------------------------------------------------------------
 // mcp__github__get_job_logs — unbounded return_content default (LS-9201, LS-10101)
 //
 // This tool belongs to the officially-hosted GitHub MCP server (no `github`
@@ -877,7 +1009,7 @@ test('a risk-ok marker cannot bypass this CORRECTABLE block', () => {
   assert.equal(code, 2, 'CORRECTABLE must not honour the bypass marker');
 });
 
-test('settings.json actually routes get_job_logs at this hook', () => {
+test('settings.json routes actions_run_trigger, actions_get, and get_job_logs at this hook', () => {
   const settings = JSON.parse(
     readFileSync(
       resolve(import.meta.dirname, '..', '..', '.claude', 'settings.json'),
@@ -888,10 +1020,14 @@ test('settings.json actually routes get_job_logs at this hook', () => {
     (e.hooks ?? []).some((h) => h.command?.includes('guard-risky-tools.mjs')),
   );
   assert.ok(entries.length > 0, 'guard-risky-tools.mjs is not registered');
-  assert.ok(
-    entries.some((e) =>
-      new RegExp(e.matcher).test('mcp__github__get_job_logs'),
-    ),
-    'no PreToolUse matcher routes mcp__github__get_job_logs to guard-risky-tools.mjs',
-  );
+  for (const toolName of [
+    'mcp__github__actions_run_trigger',
+    'mcp__github__actions_get',
+    'mcp__github__get_job_logs',
+  ]) {
+    assert.ok(
+      entries.some((e) => new RegExp(e.matcher).test(toolName)),
+      `no PreToolUse matcher routes ${toolName} to guard-risky-tools.mjs`,
+    );
+  }
 });
