@@ -250,6 +250,76 @@ test('classify() leaves hasGithubScripts false for .github/workflows-only change
   }
 });
 
+/**
+ * PC_HAS_ROOT_SCRIPTS flag (LS-10178): scripts/ has no nx project.json
+ * either, so `nx affected -t test` (make pc-test) is just as blind to
+ * scripts/__tests__/*.test.mjs as it is to .github/scripts/'s suites —
+ * a change confined to scripts/ yielded a green pc-test that never ran
+ * the suite CI's custom-checks job gates on via test:scripts. classify()
+ * must flag those changes so pc-test can run test:scripts directly.
+ */
+test('classify() sets hasRootScripts when a scripts/ file changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, 'scripts', '__tests__'), { recursive: true });
+    writeFileSync(
+      join(root, 'scripts', '__tests__', 'new-thing.test.mjs'),
+      '// test',
+    );
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'add root script test']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasRootScripts, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() leaves hasRootScripts false when no scripts/ files changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    writeFileSync(join(root, 'unrelated.ts'), 'export const x = 1;');
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'unrelated change']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasRootScripts, false);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() leaves hasRootScripts false for .github/scripts-only changes', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, '.github', 'scripts', '__tests__'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(root, '.github', 'scripts', '__tests__', 'thing.test.mjs'),
+      '// test',
+    );
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'github script change only']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasRootScripts, false);
+    assert.equal(result.hasGithubScripts, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('refreshBaseRef does not throw when the fetch fails (offline fail-safe)', () => {
   const root = mkdtempSync(join(tmpdir(), 'classify-changes-noremote-'));
   const originalCwd = process.cwd();

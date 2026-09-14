@@ -9,19 +9,23 @@
  * Usage: node scripts/classify-changes.js [--print-summary] [--base <ref>]
  *
  * Output (stdout): space-separated KEY=VALUE pairs, e.g.:
- *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_GH_SCRIPTS=0 PC_HAS_PS1=0 PC_DOCS_ONLY=0
+ *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_GH_SCRIPTS=0 PC_HAS_PS1=0 PC_HAS_ROOT_SCRIPTS=0 PC_DOCS_ONLY=0
  *
  * Flags:
- *   PC_HAS_DB         — files in lib/db-client/ or lambdas/db/. Gates only the
- *                        migration immutability check (pc step 1) — schema
- *                        generation and codegen (steps 2-3) always run
- *                        regardless of this flag (LS-9276), so generated-file
- *                        staleness is caught independent of what the current
- *                        branch's diff touches.
- *   PC_HAS_WORKFLOWS  — files in .github/workflows/
- *   PC_HAS_GH_SCRIPTS — files in .github/scripts/ (LS-9964)
- *   PC_HAS_PS1        — files matching scripts/**\/*.ps1 (LS-8729)
- *   PC_DOCS_ONLY      — ALL changed files are docs (.md, .agents/skills/, docs/)
+ *   PC_HAS_DB          — files in lib/db-client/ or lambdas/db/. Gates only the
+ *                         migration immutability check (pc step 1) — schema
+ *                         generation and codegen (steps 2-3) always run
+ *                         regardless of this flag (LS-9276), so generated-file
+ *                         staleness is caught independent of what the current
+ *                         branch's diff touches.
+ *   PC_HAS_WORKFLOWS   — files in .github/workflows/
+ *   PC_HAS_GH_SCRIPTS  — files in .github/scripts/ (LS-9964)
+ *   PC_HAS_PS1         — files matching scripts/**\/*.ps1 (LS-8729)
+ *   PC_HAS_ROOT_SCRIPTS — files in scripts/ (LS-10178). scripts/ has no nx
+ *                         project.json either, so `nx affected -t test` is
+ *                         just as blind to scripts/__tests__/*.test.mjs as it
+ *                         is to .github/scripts/'s suites.
+ *   PC_DOCS_ONLY       — ALL changed files are docs (.md, .agents/skills/, docs/)
  *
  * Fail-safe: if git diff fails or no changes detected, all flags default to
  * "run everything" so nothing is accidentally skipped.
@@ -66,6 +70,7 @@ function classify(baseRef) {
     hasWorkflows: true,
     hasGithubScripts: true,
     hasPs1: true,
+    hasRootScripts: true,
     docsOnly: false,
     reason: null,
   };
@@ -96,6 +101,7 @@ function classify(baseRef) {
   let hasWorkflows = false;
   let hasGithubScripts = false;
   let hasPs1 = false;
+  let hasRootScripts = false;
   let allDocs = true;
 
   for (const file of files) {
@@ -126,6 +132,13 @@ function classify(baseRef) {
       hasPs1 = true;
     }
 
+    // Root script changes (LS-10178) — scripts/ has no nx project.json, so
+    // `nx affected -t test` can never reach scripts/__tests__/*.test.mjs.
+    // Flag it so pc-test can run that suite directly.
+    if (normalized.startsWith('scripts/')) {
+      hasRootScripts = true;
+    }
+
     // Docs-only detection: file must be in a docs area OR be a markdown file
     const isDocsArea =
       normalized.startsWith('docs/') ||
@@ -145,6 +158,7 @@ function classify(baseRef) {
     hasWorkflows,
     hasGithubScripts,
     hasPs1,
+    hasRootScripts,
     docsOnly: allDocs,
     reason: null,
   };
@@ -158,6 +172,7 @@ function main() {
     PC_HAS_WORKFLOWS: result.hasWorkflows ? '1' : '0',
     PC_HAS_GH_SCRIPTS: result.hasGithubScripts ? '1' : '0',
     PC_HAS_PS1: result.hasPs1 ? '1' : '0',
+    PC_HAS_ROOT_SCRIPTS: result.hasRootScripts ? '1' : '0',
     PC_DOCS_ONLY: result.docsOnly ? '1' : '0',
   };
 
@@ -200,6 +215,9 @@ function main() {
         skips.push(
           'no scripts/*.ps1 changes — skipping PowerShell script tests',
         );
+      }
+      if (flags.PC_HAS_ROOT_SCRIPTS === '0') {
+        skips.push('no scripts/ changes — skipping root script unit tests');
       }
       if (skips.length === 0) {
         process.stdout.write(

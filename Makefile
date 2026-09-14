@@ -1065,6 +1065,14 @@ endif
 # leave node matching nothing and exiting 0).
 _PC_TEST_GH_SCRIPTS_CMD = echo "  Running GitHub script unit tests (test:github-scripts)..." && pnpm run test:github-scripts
 
+# LS-10178: scripts/ has no nx project.json either, so `nx affected -t test`
+# is just as blind to scripts/__tests__/*.test.mjs as it is to
+# .github/scripts/'s suites above — a change confined to scripts/ let pc-test
+# report green while never running the 240+ tests CI's custom-checks job
+# gates on via test:scripts. Run them directly, gated on PC_HAS_ROOT_SCRIPTS
+# so untouched branches don't pay for it.
+_PC_TEST_ROOT_SCRIPTS_CMD = echo "  Running root script unit tests (test:scripts)..." && pnpm run test:scripts
+
 # Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
 # Canned recipe so the `pre-commit` pipeline and the standalone `pc-format` target
 # share one implementation.
@@ -1107,6 +1115,7 @@ pre-commit: ## Run all pre-commit validation checks
 	$(if $(findstring PC_HAS_GH_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_GH_SCRIPTS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),)
+	$(if $(findstring PC_HAS_ROOT_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_ROOT_SCRIPTS_CMD),)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && $(_PC_BUILD_CMD),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
@@ -1157,6 +1166,7 @@ pc-test: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE)
 pc-test: ## pc step 8: test affected projects. Pass MAXWORKERS=N to cap Jest worker parallelism (avoids OOM on memory-constrained machines)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),)
+	$(if $(findstring PC_HAS_ROOT_SCRIPTS=1,$(_PC_FLAGS)),@$(_PC_TEST_ROOT_SCRIPTS_CMD),)
 
 pc-build: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-build: ## pc step 9: build affected projects
