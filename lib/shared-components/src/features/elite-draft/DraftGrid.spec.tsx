@@ -1,8 +1,13 @@
 import React from 'react';
 import { DraftGrid } from './DraftGrid';
 import { getPositionColor } from './utils';
-import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
-import { render, screen } from '../../test-utils';
+import type {
+  CurrentDraftPickInfo,
+  DraftPickRecord,
+  DraftPlayer,
+  LeagueTeam,
+} from './types';
+import { fireEvent, render, screen } from '../../test-utils';
 
 // jsdom normalizes inline hex colors to `rgb(r, g, b)` when read back from
 // the DOM, so assertions compare against this normalized form rather than
@@ -208,5 +213,100 @@ describe('DraftGrid — value heat (LS-10096)', () => {
     expect(text).toContain('6–13 slots early');
     expect(text).toContain('14+ slots early');
     expect(text).not.toContain('8+');
+  });
+});
+
+describe('DraftGrid — pick inspector (LS-10163)', () => {
+  const player = (id: number, name: string, position: string): DraftPlayer =>
+    ({ id, name, position }) as DraftPlayer;
+
+  it('opens the made variant when a filled cell is tapped', () => {
+    render(
+      <DraftGrid
+        teams={[team('1'), team('2')]}
+        picks={[pick({ teamId: 1, playerId: 1, round: 1, pickNumber: 1 })]}
+        currentPickInfo={null}
+        myTeamId={2}
+        statsLookup={new Map([[1, player(1, 'Ty Cobb', 'OF')]])}
+        maxRounds={1}
+        sport="baseball"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('draft-grid-cell-1-1'));
+
+    expect(
+      screen.getByTestId('draft-grid-pick-inspector-title').textContent,
+    ).toBe('Ty Cobb');
+  });
+
+  it('opens the on-the-clock variant for the current cell', () => {
+    const currentPickInfo: CurrentDraftPickInfo = {
+      draftId: 1,
+      teamId: 1,
+      round: 1,
+      pickNumber: 1,
+      overallPick: 1,
+      isComplete: false,
+    };
+    render(
+      <DraftGrid
+        teams={[team('1'), team('2')]}
+        picks={[]}
+        currentPickInfo={currentPickInfo}
+        myTeamId={2}
+        statsLookup={new Map()}
+        maxRounds={1}
+        sport="baseball"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('draft-grid-cell-1-1'));
+
+    expect(
+      screen.getByTestId('draft-grid-pick-inspector-title').textContent,
+    ).toBe('On the clock');
+  });
+
+  it('opens the upcoming variant for an empty, non-current cell', () => {
+    render(
+      <DraftGrid
+        teams={[team('1'), team('2')]}
+        picks={[]}
+        currentPickInfo={null}
+        myTeamId={2}
+        statsLookup={new Map()}
+        maxRounds={1}
+        sport="baseball"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('draft-grid-cell-1-2'));
+
+    expect(
+      screen.getByTestId('draft-grid-pick-inspector-title').textContent,
+    ).toBe('Not yet made');
+    expect(
+      screen.getByTestId('draft-grid-pick-inspector-empty').textContent,
+    ).toContain('is on the board at');
+  });
+
+  it('closes on Escape', () => {
+    render(
+      <DraftGrid
+        teams={[team('1'), team('2')]}
+        picks={[pick({ teamId: 1, playerId: 1, round: 1, pickNumber: 1 })]}
+        currentPickInfo={null}
+        myTeamId={2}
+        statsLookup={new Map([[1, player(1, 'Ty Cobb', 'OF')]])}
+        maxRounds={1}
+        sport="baseball"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('draft-grid-cell-1-1'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByTestId('draft-grid-pick-inspector')).toBeNull();
   });
 });

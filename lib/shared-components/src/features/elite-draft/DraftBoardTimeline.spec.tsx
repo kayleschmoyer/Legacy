@@ -233,3 +233,56 @@ describe('DraftBoardTimeline — pick rows (LS-10003)', () => {
     expect(container.querySelector('.d-tl-view')).toBeNull();
   });
 });
+
+describe('DraftBoardTimeline — pick inspector (LS-10163)', () => {
+  it('opens the made variant when a made row is tapped', () => {
+    const { getByTestId } = renderTimeline();
+
+    fireEvent.click(getByTestId('draft-timeline-pick-2-3'));
+
+    expect(getByTestId('draft-timeline-pick-inspector-title').textContent).toBe(
+      'Rod Carew',
+    );
+  });
+
+  it('opens the on-the-clock variant when the now row is tapped', () => {
+    const { getByTestId } = renderTimeline();
+
+    fireEvent.click(getByTestId('draft-timeline-pick-2-2'));
+
+    expect(getByTestId('draft-timeline-pick-inspector-title').textContent).toBe(
+      'On the clock',
+    );
+  });
+
+  it('opens the upcoming variant when an up row is tapped', () => {
+    const { getByTestId } = renderTimeline();
+
+    fireEvent.click(getByTestId('draft-timeline-pick-2-1'));
+
+    expect(getByTestId('draft-timeline-pick-inspector-title').textContent).toBe(
+      'Not yet made',
+    );
+  });
+
+  it('closes on a backdrop tap', () => {
+    const { getByTestId, queryByTestId } = renderTimeline();
+
+    fireEvent.click(getByTestId('draft-timeline-pick-2-3'));
+    fireEvent.click(getByTestId('draft-timeline-pick-inspector-overlay'));
+
+    expect(queryByTestId('draft-timeline-pick-inspector')).toBeNull();
+  });
+
+  it('activates from the keyboard', () => {
+    const { getByTestId } = renderTimeline();
+
+    fireEvent.keyDown(getByTestId('draft-timeline-pick-2-3'), {
+      key: 'Enter',
+    });
+
+    expect(getByTestId('draft-timeline-pick-inspector-title').textContent).toBe(
+      'Rod Carew',
+    );
+  });
+});

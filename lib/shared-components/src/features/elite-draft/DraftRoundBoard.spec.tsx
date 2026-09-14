@@ -307,6 +307,78 @@ describe('DraftRoundBoard', () => {
     expect(onMakePick).not.toHaveBeenCalled();
   });
 
+  // -------------------------------------------------------------------------
+  // Pick inspector (LS-10163)
+  // -------------------------------------------------------------------------
+
+  it("opens the pick inspector for another team's on-the-clock tile instead of firing onMakePick", () => {
+    renderBoard({
+      myTeamId: 5,
+      currentPickInfo: currentPick({ round: 1, teamId: 2 }),
+    });
+
+    fireEvent.click(screen.getByLabelText('Team 2, pick 1.02, on the clock'));
+
+    expect(
+      screen.getByTestId('draft-round-board-pick-inspector-title').textContent,
+    ).toBe('On the clock');
+  });
+
+  it('opens the pick inspector for an upcoming tile', () => {
+    renderBoard({
+      myTeamId: 5,
+      currentPickInfo: currentPick({ round: 1, teamId: 2 }),
+    });
+
+    fireEvent.click(screen.getByLabelText('Team 4, pick 1.04, upcoming'));
+
+    expect(
+      screen.getByTestId('draft-round-board-pick-inspector-title').textContent,
+    ).toBe('Not yet made');
+  });
+
+  it('opens the pick inspector for a made tile, not onMakePick', () => {
+    const onMakePick = jest.fn();
+    renderBoard({
+      myTeamId: 5,
+      picks: [makePick({ round: 1, teamId: 1, playerId: 1 })],
+      onMakePick,
+    });
+
+    fireEvent.click(screen.getByTestId('draft-round-board-tile-1'));
+
+    expect(onMakePick).not.toHaveBeenCalled();
+    expect(screen.getByTestId('draft-round-board-pick-inspector')).toBeTruthy();
+  });
+
+  it('still fires onMakePick — not the inspector — for the viewer’s own on-the-clock tile', () => {
+    const onMakePick = jest.fn();
+    renderBoard({
+      myTeamId: 1,
+      currentPickInfo: currentPick({ round: 1, teamId: 1 }),
+      onMakePick,
+    });
+
+    fireEvent.click(screen.getByTestId('draft-round-board-tile-1'));
+
+    expect(onMakePick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('draft-round-board-pick-inspector')).toBeNull();
+  });
+
+  it('closes the inspector via the close control', () => {
+    renderBoard({
+      myTeamId: 5,
+      currentPickInfo: currentPick({ round: 1, teamId: 2 }),
+    });
+
+    fireEvent.click(screen.getByLabelText('Team 2, pick 1.02, on the clock'));
+    fireEvent.click(
+      screen.getByTestId('draft-round-board-pick-inspector-close'),
+    );
+
+    expect(screen.queryByTestId('draft-round-board-pick-inspector')).toBeNull();
+  });
+
   it('activates a round tab from the keyboard', () => {
     renderBoard({ currentPickInfo: currentPick({ round: 1 }) });
 
@@ -336,7 +408,7 @@ describe('DraftRoundBoard', () => {
     expect(onMakePick).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves non-actionable tiles out of the tab order', () => {
+  it('keeps every tile in the tab order — non-actionable ones open the pick inspector (LS-10163)', () => {
     renderBoard({
       myTeamId: 5,
       currentPickInfo: currentPick({ round: 1, teamId: 2 }),
@@ -346,12 +418,12 @@ describe('DraftRoundBoard', () => {
       screen
         .getByLabelText('Team 2, pick 1.02, on the clock')
         .getAttribute('tabindex'),
-    ).toBeNull();
+    ).toBe('0');
     expect(
       screen
         .getByLabelText('Team 4, pick 1.04, upcoming')
         .getAttribute('tabindex'),
-    ).toBeNull();
+    ).toBe('0');
   });
 
   // -------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Text, YStack } from 'tamagui';
 import {
   type CurrentDraftPickInfo,
@@ -6,6 +6,12 @@ import {
   type DraftPlayer,
   type LeagueTeam,
 } from './types';
+import { DraftPickInspector } from './DraftPickInspector';
+import {
+  buildPickInspectorData,
+  type PickInspectorData,
+} from './draftPickInspector';
+import { snakePickInRound } from './nativeDraftBoard';
 import { getPositionColor, normalizeTeamId } from './utils';
 import {
   formatDelta,
@@ -36,6 +42,7 @@ import {
 } from '../../utils/colors';
 import { FONT_DISPLAY } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 
 // ---------------------------------------------------------------------------
 // Draft Grid Sub-component (team columns view) — ported 1:1 from styles.ts's
@@ -388,6 +395,12 @@ export function DraftGrid({
   const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
   const currentTeamId = normalizeTeamId(currentPickInfo?.teamId);
 
+  // Pick inspector (LS-10163): every cell — made, on the clock, or still
+  // upcoming — opens the same shared popup on tap.
+  const [inspectorData, setInspectorData] = useState<PickInspectorData | null>(
+    null,
+  );
+
   return (
     <GridView>
       <GridTable
@@ -460,7 +473,7 @@ export function DraftGrid({
                 {`R${round}`}
               </Text>
             </RoundLabelCell>
-            {teams.map((team) => {
+            {teams.map((team, columnIndex) => {
               const key = `${round}-${team.id}`;
               const pick = pickGrid[key];
               const isCurrent =
@@ -468,6 +481,7 @@ export function DraftGrid({
                 currentPickInfo.round === round &&
                 currentTeamId !== null &&
                 String(team.id) === String(currentTeamId);
+              const isMyTeam = String(team.id) === String(myTeamId);
 
               if (pick) {
                 const player = statsLookup.get(pick.playerId);
@@ -480,7 +494,6 @@ export function DraftGrid({
                 const posColor = position
                   ? getPositionColor(sport, position)
                   : undefined;
-                const isMyTeam = pick.teamId === myTeamId;
                 const club = player?.club ?? pick.player?.club ?? null;
                 const stat = signatureStat(player, sport);
 
@@ -494,6 +507,19 @@ export function DraftGrid({
                 // leaves the position tint alone.
                 const ground = TINT_GROUND[band];
                 const edge = TINT_BORDER[band];
+                const pickLabel = `${round}.${String(pick.pickNumber).padStart(2, '0')}`;
+                const openInspector = (): void =>
+                  setInspectorData(
+                    buildPickInspectorData({
+                      round,
+                      pickLabel,
+                      teamName: team.name,
+                      state: 'made',
+                      playerName,
+                      position: position ?? null,
+                      isMine: isMyTeam,
+                    }),
+                  );
 
                 return (
                   <Cell
@@ -503,6 +529,7 @@ export function DraftGrid({
                     className={isMyTeam ? 'me-team' : undefined}
                     data-pos={position ?? undefined}
                     data-v={band}
+                    data-testid={`draft-grid-cell-${round}-${team.id}`}
                     title={`Pick #${pick.overallPick}: ${playerName}${
                       position ? ` (${position})` : ''
                     } — ${
@@ -510,6 +537,13 @@ export function DraftGrid({
                         ? 'no consensus rank on file'
                         : `consensus #${pick.adp}, ${delta}`
                     }`}
+                    onPress={openInspector}
+                    cursor="pointer"
+                    role="button"
+                    accessibilityRole="button"
+                    tabIndex={0}
+                    onKeyDown={handleKeyActivate(openInspector)}
+                    aria-label={`Pick ${pickLabel}: ${playerName}`}
                     style={{
                       ...(posColor
                         ? {
@@ -565,8 +599,40 @@ export function DraftGrid({
                 );
               }
 
+              const pickInRound = snakePickInRound({
+                round,
+                columnIndex,
+                teamCount: teams.length,
+              });
+              const pickLabel = `${round}.${String(pickInRound).padStart(2, '0')}`;
+              const openInspector = (): void =>
+                setInspectorData(
+                  buildPickInspectorData({
+                    round,
+                    pickLabel,
+                    teamName: team.name,
+                    state: isCurrent ? 'on-the-clock' : 'upcoming',
+                    isMine: isMyTeam,
+                  }),
+                );
+
               return (
-                <Cell key={team.id} current={Boolean(isCurrent)}>
+                <Cell
+                  key={team.id}
+                  current={Boolean(isCurrent)}
+                  data-testid={`draft-grid-cell-${round}-${team.id}`}
+                  onPress={openInspector}
+                  cursor="pointer"
+                  role="button"
+                  accessibilityRole="button"
+                  tabIndex={0}
+                  onKeyDown={handleKeyActivate(openInspector)}
+                  aria-label={
+                    isCurrent
+                      ? `Pick ${pickLabel}: on the clock`
+                      : `Pick ${pickLabel}: not yet made`
+                  }
+                >
                   <CellName color={TEXT_MUTED_DIM}>
                     {isCurrent ? '🎯' : '—'}
                   </CellName>
@@ -653,6 +719,12 @@ export function DraftGrid({
           tint and is left out of its team&rsquo;s net value.
         </Text>
       </LegendRow>
+
+      <DraftPickInspector
+        data={inspectorData}
+        onClose={() => setInspectorData(null)}
+        testID="draft-grid-pick-inspector"
+      />
     </GridView>
   );
 }

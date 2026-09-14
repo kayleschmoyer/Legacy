@@ -26,6 +26,12 @@ import { ScrollView, Text, XStack, YStack } from 'tamagui';
 
 import { buildBoardCells } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
+import { DraftPickInspector } from './DraftPickInspector';
+import {
+  buildPickInspectorData,
+  type PickInspectorData,
+  type PickInspectorState,
+} from './draftPickInspector';
 import {
   buildRoundSummary,
   buildRoundTiles,
@@ -51,6 +57,16 @@ const TILE_MIN_HEIGHT = 62;
 const TAB_MIN_WIDTH = 38;
 /** Touch-target floor — the design's own `min-height: 44px` on `.rtabs button`. */
 const TAB_MIN_HEIGHT = 44;
+
+/** `RoundTile.state` distinguishes `mine` from `drafted`; the shared
+ *  inspector only needs to know whether the pick is made, so both collapse
+ *  to `made` there (the `isMine` flag carries the "your pick" distinction
+ *  through separately). */
+function inspectorStateFor(state: RoundTile['state']): PickInspectorState {
+  if (state === 'on-the-clock') return 'on-the-clock';
+  if (state === 'upcoming') return 'upcoming';
+  return 'made';
+}
 
 export interface DraftRoundBoardProps {
   teams: LeagueTeam[];
@@ -338,16 +354,21 @@ function RoundTileView({
   tile,
   sport,
   onMakePick,
+  onOpenInspector,
 }: {
   tile: RoundTile;
   sport: SportKind;
   onMakePick: () => void;
+  /** Opens the shared pick inspector (LS-10163) for this tile. */
+  onOpenInspector: (tile: RoundTile) => void;
 }): React.JSX.Element {
   const palette = useDraftPalette();
   const theme = useTileTheme(tile, sport);
-  // Only the viewer's own turn is actionable — everyone else's on-the-clock
-  // tile is status, not a control.
+  // The viewer's own on-the-clock tile routes straight to making the pick —
+  // that shortcut predates this ticket and stays; every other tile (including
+  // everyone else's on-the-clock tile) opens the read-only inspector instead.
   const actionable = tile.state === 'on-the-clock' && tile.isMine;
+  const onTap = actionable ? onMakePick : () => onOpenInspector(tile);
 
   const teamLabel = `${tile.isMine ? '★ ' : ''}${tile.teamName}`;
   const bodyLabel =
@@ -381,13 +402,14 @@ function RoundTileView({
       borderColor={theme.borderColor}
       borderTopColor={theme.topColor}
       backgroundColor={theme.backgroundColor}
-      onPress={actionable ? onMakePick : undefined}
-      pressStyle={actionable ? { opacity: 0.85 } : undefined}
-      cursor={actionable ? 'pointer' : undefined}
-      role={actionable ? 'button' : undefined}
-      accessibilityRole={actionable ? 'button' : undefined}
-      tabIndex={actionable ? 0 : undefined}
-      onKeyDown={actionable ? handleKeyActivate(onMakePick) : undefined}
+      onPress={onTap}
+      pressStyle={{ opacity: 0.85 }}
+      cursor="pointer"
+      role="button"
+      accessibilityRole="button"
+      tabIndex={0}
+      onKeyDown={handleKeyActivate(onTap)}
+      aria-haspopup={actionable ? undefined : 'dialog'}
       aria-label={a11yLabel}
       accessibilityLabel={a11yLabel}
     >
@@ -539,6 +561,26 @@ export function DraftRoundBoard({
     [roundCells, teams, selectedRound, statsLookup],
   );
 
+  // Pick inspector (LS-10163): every tile — made, on the clock, or still
+  // upcoming — opens the same shared popup on tap, except the viewer's own
+  // on-the-clock tile, which keeps its existing route straight to
+  // `onMakePick` (see `RoundTileView`).
+  const [inspectorData, setInspectorData] = useState<PickInspectorData | null>(
+    null,
+  );
+  const openInspector = (tile: RoundTile): void =>
+    setInspectorData(
+      buildPickInspectorData({
+        round: selectedRound,
+        pickLabel: tile.pickLabel,
+        teamName: tile.teamName,
+        state: inspectorStateFor(tile.state),
+        playerName: tile.playerName,
+        position: tile.position,
+        isMine: tile.isMine,
+      }),
+    );
+
   if (teamCount === 0) return null;
 
   return (
@@ -576,11 +618,18 @@ export function DraftRoundBoard({
                 tile={tile}
                 sport={sport}
                 onMakePick={onMakePick}
+                onOpenInspector={openInspector}
               />
             </YStack>
           ))}
         </XStack>
       </YStack>
+
+      <DraftPickInspector
+        data={inspectorData}
+        onClose={() => setInspectorData(null)}
+        testID="draft-round-board-pick-inspector"
+      />
     </YStack>
   );
 }

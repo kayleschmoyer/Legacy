@@ -34,9 +34,24 @@ import {
   type TimelinePick,
   timelinePickMeta,
 } from './draftTimeline';
+import { DraftPickInspector } from './DraftPickInspector';
+import {
+  buildPickInspectorData,
+  type PickInspectorData,
+  type PickInspectorState,
+} from './draftPickInspector';
 import { formatClock } from './nativeDraftBoard';
 import { getPositionColor } from './utils';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 import type { SportKind } from '../../config/sports';
+
+/** `TimelinePick.state` uses `made`/`now`/`up`; the shared inspector's
+ *  vocabulary is `made`/`on-the-clock`/`upcoming`. */
+function inspectorStateFor(state: TimelinePick['state']): PickInspectorState {
+  if (state === 'now') return 'on-the-clock';
+  if (state === 'up') return 'upcoming';
+  return 'made';
+}
 
 const RING_SIZE = 46;
 const RING_RADIUS = 19;
@@ -125,13 +140,16 @@ function TimelineClockRing({
 function TimelinePickRow({
   pick,
   sport,
+  onOpenInspector,
 }: {
   pick: TimelinePick;
   sport: SportKind;
+  onOpenInspector: (pick: TimelinePick) => void;
 }): React.JSX.Element {
   const posColor = pick.position
     ? getPositionColor(sport, pick.position)
     : undefined;
+  const open = (): void => onOpenInspector(pick);
 
   const className = [
     'd-tl-pick',
@@ -165,6 +183,11 @@ function TimelinePickRow({
           ? { borderLeftColor: posColor }
           : undefined
       }
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={handleKeyActivate(open)}
+      aria-label={`Pick #${pick.overallPick}, ${pick.teamName}`}
     >
       <span className="d-tl-pick-num">{`#${pick.overallPick}`}</span>
       <span className="d-tl-pick-team" title={pick.teamName}>
@@ -214,6 +237,24 @@ export function DraftBoardTimeline({
 
   const initialOpen = defaultOpenRound(rounds);
   const [openRound, setOpenRound] = useState<number | null>(initialOpen);
+
+  // Pick inspector (LS-10163): every row — made, on the clock, or still
+  // upcoming — opens the same shared popup on tap.
+  const [inspectorData, setInspectorData] = useState<PickInspectorData | null>(
+    null,
+  );
+  const openInspector = (pick: TimelinePick): void =>
+    setInspectorData(
+      buildPickInspectorData({
+        round: pick.round,
+        pickLabel: `${pick.round}.${String(pick.pickInRound).padStart(2, '0')}`,
+        teamName: pick.teamName,
+        state: inspectorStateFor(pick.state),
+        playerName: pick.playerName,
+        position: pick.position,
+        isMine: pick.isMine,
+      }),
+    );
 
   // Follow the draft as it advances into a new round, but only while the user
   // has not taken over: once they open a different round by hand, that choice
@@ -293,13 +334,24 @@ export function DraftBoardTimeline({
             {open && (
               <div className="d-tl-picks" id={sectionId}>
                 {round.picks.map((pick) => (
-                  <TimelinePickRow key={pick.key} pick={pick} sport={sport} />
+                  <TimelinePickRow
+                    key={pick.key}
+                    pick={pick}
+                    sport={sport}
+                    onOpenInspector={openInspector}
+                  />
                 ))}
               </div>
             )}
           </div>
         );
       })}
+
+      <DraftPickInspector
+        data={inspectorData}
+        onClose={() => setInspectorData(null)}
+        testID="draft-timeline-pick-inspector"
+      />
     </div>
   );
 }
