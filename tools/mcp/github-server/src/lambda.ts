@@ -1,6 +1,7 @@
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
+  Context,
 } from 'aws-lambda';
 import {
   GetSecretValueCommand,
@@ -18,6 +19,7 @@ import {
   CSP as DOCS_CSP,
   PAGE as DOCS_PAGE,
 } from '@legacy-sports/mcp-docs/pages/github';
+import { setLambdaContext } from './lambda-budget.js';
 import { createServer } from './index.js';
 
 const sm = new SecretsManagerClient({});
@@ -60,7 +62,15 @@ async function ensureCredentials(): Promise<void> {
 
 export const handler = async (
   event: APIGatewayProxyEventV2,
+  context: Context,
 ): Promise<APIGatewayProxyResultV2> => {
+  // Record the real remaining execution time before any pre-handler work
+  // (auth, credential fetch) runs, so github_retrigger_check's
+  // waitForCompletion can size its internal poll window against what's
+  // actually left rather than a hardcoded guess (LS-9988, same pattern as
+  // ci-server's LS-8429 fix).
+  setLambdaContext(context);
+
   // Public OAuth discovery endpoint — served before auth so a tokenless client
   // can fetch it (MCP Authorization spec / RFC 9728).
   const metadataResponse = handleOAuthMetadataRequest(event, {

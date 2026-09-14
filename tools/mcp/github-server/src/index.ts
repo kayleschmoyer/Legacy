@@ -1880,7 +1880,8 @@ export function createServer(): McpServer {
   // --- github_retrigger_check ---
   server.tool(
     'github_retrigger_check',
-    'Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.',
+    'Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. ' +
+      'waitForCompletion bridges "not_yet_reschedulable" (bounded, like ci_dispatch_workflow).',
     {
       number: z.coerce
         .number()
@@ -1906,6 +1907,15 @@ export function createServer(): McpServer {
       allFailed: coercedBoolean
         .default(false)
         .describe('Retrigger checks failing on head SHA.'),
+      waitForCompletion: coercedBoolean
+        .default(false)
+        .describe('Wait out an in-flight owning run, then retry once.'),
+      timeoutSeconds: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Max wait per call, seconds (default/ceiling ~20s).'),
     },
     async (params) => {
       const resolvedNumber = params.number ?? params.prNumber;
@@ -1925,6 +1935,8 @@ export function createServer(): McpServer {
         checkName: params.checkName,
         checkNames: params.checkNames,
         allFailed: params.allFailed,
+        waitForCompletion: params.waitForCompletion,
+        timeoutSeconds: params.timeoutSeconds,
       });
     },
   );

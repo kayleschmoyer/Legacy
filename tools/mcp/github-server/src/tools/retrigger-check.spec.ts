@@ -253,6 +253,159 @@ describe('retriggerCheck — Actions API fallback (LS-9881)', () => {
   });
 });
 
+describe('retriggerCheck — waitForCompletion bridges "not_yet_reschedulable" (LS-9988)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('retries and succeeds once the owning workflow run settles within the bounded wait', async () => {
+    let getRunCalls = 0;
+    mockGithubRest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.path.includes('/check-runs') && opts.method === 'GET') {
+          return Promise.resolve({
+            total_count: 1,
+            check_runs: [makeCheckRun('Verify All Migrations Applied')],
+          });
+        }
+        if (opts.path.endsWith('/check-runs/99/rerequest')) {
+          return Promise.reject(
+            new Error(
+              'GitHub API POST /repos/bkrupa/legacy-sports/check-runs/99/rerequest failed (403): {"message":"Invalid check_run_id `99`"}',
+            ),
+          );
+        }
+        if (
+          opts.path ===
+          `/repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}`
+        ) {
+          getRunCalls++;
+          return Promise.resolve({
+            status: getRunCalls >= 2 ? 'completed' : 'in_progress',
+          });
+        }
+        if (
+          opts.path ===
+            `/repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs` &&
+          getRunCalls === 0
+        ) {
+          return Promise.reject(
+            new Error(
+              `GitHub API POST /repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs failed (403): {"message":"This workflow is already running"}`,
+            ),
+          );
+        }
+        if (
+          opts.path ===
+          `/repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs`
+        ) {
+          return Promise.resolve(undefined);
+        }
+        return Promise.reject(new Error(`unexpected call: ${opts.path}`));
+      },
+    );
+
+    jest.useFakeTimers();
+    const resultPromise = retriggerCheck({
+      number: 5113,
+      checkName: 'Verify All Migrations Applied',
+      waitForCompletion: true,
+    });
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    expect(body.retriggered).toBe(1);
+    expect(body.failed).toBe(0);
+    const [entry] = body.results as Array<Record<string, unknown>>;
+    expect(entry.retriggered).toBe(true);
+  });
+
+  it('still reports not_yet_reschedulable, with a re-arm hint, if the run never settles within the bounded wait', async () => {
+    mockGithubRest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.path.includes('/check-runs') && opts.method === 'GET') {
+          return Promise.resolve({
+            total_count: 1,
+            check_runs: [makeCheckRun('Verify All Migrations Applied')],
+          });
+        }
+        if (opts.path.endsWith('/check-runs/99/rerequest')) {
+          return Promise.reject(
+            new Error(
+              'GitHub API POST /repos/bkrupa/legacy-sports/check-runs/99/rerequest failed (403): {"message":"Invalid check_run_id `99`"}',
+            ),
+          );
+        }
+        if (
+          opts.path ===
+          `/repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}`
+        ) {
+          return Promise.resolve({ status: 'in_progress' });
+        }
+        if (
+          opts.path ===
+          `/repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs`
+        ) {
+          return Promise.reject(
+            new Error(
+              `GitHub API POST /repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs failed (403): {"message":"This workflow is already running"}`,
+            ),
+          );
+        }
+        return Promise.reject(new Error(`unexpected call: ${opts.path}`));
+      },
+    );
+
+    jest.useFakeTimers();
+    const resultPromise = retriggerCheck({
+      number: 5113,
+      checkName: 'Verify All Migrations Applied',
+      waitForCompletion: true,
+    });
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.isError).toBeUndefined();
+    const body = parseMcpText(result);
+    const [entry] = body.results as Array<Record<string, unknown>>;
+    expect(entry.retriggered).toBe(false);
+    expect(entry.status).toBe('not_yet_reschedulable');
+    expect(String(entry.error)).toMatch(/Call github_retrigger_check again/);
+  });
+
+  it('does not change default (no waitForCompletion) behavior', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        total_count: 1,
+        check_runs: [makeCheckRun('Verify All Migrations Applied')],
+      })
+      .mockRejectedValueOnce(
+        new Error(
+          'GitHub API POST /repos/bkrupa/legacy-sports/check-runs/99/rerequest failed (403): {"message":"Invalid check_run_id `99`"}',
+        ),
+      )
+      .mockRejectedValueOnce(
+        new Error(
+          `GitHub API POST /repos/bkrupa/legacy-sports/actions/runs/${ACTIONS_RUN_ID}/rerun-failed-jobs failed (403): {"message":"This workflow is already running"}`,
+        ),
+      );
+
+    const result = await retriggerCheck({
+      number: 5113,
+      checkName: 'Verify All Migrations Applied',
+    });
+
+    const body = parseMcpText(result);
+    const [entry] = body.results as Array<Record<string, unknown>>;
+    expect(entry.status).toBe('not_yet_reschedulable');
+    expect(String(entry.error)).toMatch(
+      /wait for the run to finish, then retry github_retrigger_check\./,
+    );
+  });
+});
+
 describe('retriggerCheck — checkName matching on names containing "&" (LS-9884)', () => {
   it('matches a check name containing "&" via local substring filtering', async () => {
     mockGithubRest

@@ -6320,7 +6320,7 @@
         },
         {
           "name": "github_retrigger_check",
-          "description": "Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.",
+          "description": "Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. waitForCompletion bridges \"not_yet_reschedulable\" (bounded, like ci_dispatch_workflow).",
           "inputs": {
             "number": {
               "type": "number",
@@ -6364,6 +6364,22 @@
               "optional": true,
               "default": false,
               "description": "Retrigger checks failing on head SHA."
+            },
+            "waitForCompletion": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "Wait out an in-flight owning run, then retry once."
+            },
+            "timeoutSeconds": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "Max wait per call, seconds (default/ceiling ~20s)."
             }
           },
           "transports": [

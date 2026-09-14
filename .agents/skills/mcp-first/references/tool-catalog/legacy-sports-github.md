@@ -512,7 +512,7 @@ Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from
 
 ### `github_retrigger_check`
 
-Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API.
+Re-request failed status checks on a PR, no empty commit needed; falls back to the Actions API. waitForCompletion bridges "not_yet_reschedulable" (bounded, like ci_dispatch_workflow).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -521,6 +521,8 @@ Re-request failed status checks on a PR, no empty commit needed; falls back to t
 | `checkName` | string |  | min 1 | Check name to re-request (substring match) |
 | `checkNames` | string[] |  | — | Multiple check names |
 | `allFailed` | boolean |  | — | Retrigger checks failing on head SHA. |
+| `waitForCompletion` | boolean |  | — | Wait out an in-flight owning run, then retry once. |
+| `timeoutSeconds` | number |  | coerced, integer, > 0 | Max wait per call, seconds (default/ceiling ~20s). |
 
 ### `github_secret_delete`
 

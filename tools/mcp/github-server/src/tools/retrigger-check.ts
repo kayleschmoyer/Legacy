@@ -2,6 +2,7 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { filterRunsByName, parseRunIds } from './get-check-runs.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
+import { getRemainingLambdaMs } from '../lambda-budget.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
 import { FAILED_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
@@ -11,6 +12,57 @@ interface RetriggerCheckParams {
   checkName?: string;
   checkNames?: string[];
   allFailed?: boolean;
+  waitForCompletion?: boolean;
+  timeoutSeconds?: number;
+}
+
+// User-facing per-call ceiling for waitForCompletion, mirroring ci-server's
+// ci_dispatch_workflow/ci_wait_run (LS-8429 pattern). This server runs on the
+// same 30s-timeout Lambda (terraform/main/lambda-mcp-github.tf ->
+// var.lambda_timeout) — a wait longer than that gets the whole invocation
+// SIGKILLed before it can return a response, surfacing as a raw transport
+// error instead of a clean not_yet_reschedulable snapshot. A caller that
+// needs longer just calls github_retrigger_check again (LS-9988) rather than
+// this call blocking past what the Lambda can safely wait.
+const TRANSPORT_SAFE_WAIT_MS = 20_000;
+// Reserved for response serialization + the Streamable HTTP write once
+// polling stops; see dispatch-workflow.ts / wait-run.ts for the full
+// rationale (LS-8429).
+const RESPONSE_MARGIN_MS = 5000;
+const RUN_POLL_INTERVAL_MS = 5000;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll an Actions workflow run until it reports `completed` or `deadlineMs`
+ * passes. Used to bridge the "not_yet_reschedulable" transient state
+ * (GitHub 403s rerun-failed-jobs while a previous run of the same workflow
+ * is still in flight) so a caller opting into `waitForCompletion` gets one
+ * call that waits-then-retries instead of N manual round-trips (LS-9988).
+ */
+async function waitForRunToSettle(
+  repo: { owner: string; name: string },
+  runId: number,
+  deadlineMs: number,
+): Promise<boolean> {
+  while (Date.now() < deadlineMs) {
+    await sleep(
+      Math.min(RUN_POLL_INTERVAL_MS, Math.max(deadlineMs - Date.now(), 0)),
+    );
+    if (Date.now() >= deadlineMs) break;
+    try {
+      const run = await githubRest<{ status: string }>({
+        method: 'GET',
+        path: `/repos/${repo.owner}/${repo.name}/actions/runs/${runId}`,
+      });
+      if (run.status === 'completed') return true;
+    } catch {
+      // Transient polling error — keep trying until the deadline.
+    }
+  }
+  return false;
 }
 
 interface CheckRun {
@@ -42,6 +94,23 @@ export async function retriggerCheck(
   params: RetriggerCheckParams,
 ): Promise<ToolResult> {
   const repo = await getRepoOwnerName();
+
+  // Shared deadline for the optional waitForCompletion bridge below — sized
+  // off both the caller's requested budget and this Lambda's actual
+  // remaining time (LS-9988, same clamp as ci-server's dispatch-workflow.ts).
+  // Computed once up front and reused across every check in the retrigger
+  // loop rather than per-check, since they all share the same 30s Lambda
+  // budget. A no-op when waitForCompletion isn't set.
+  const requestedWaitMs = Math.min(
+    (params.timeoutSeconds ?? TRANSPORT_SAFE_WAIT_MS / 1000) * 1000,
+    TRANSPORT_SAFE_WAIT_MS,
+  );
+  const lambdaSafeWaitMs = Math.max(
+    getRemainingLambdaMs() - RESPONSE_MARGIN_MS,
+    0,
+  );
+  const waitDeadlineMs =
+    Date.now() + Math.min(requestedWaitMs, lambdaSafeWaitMs);
 
   // 1. Get head commit SHA
   const sha = await resolveHeadShaFromPrNumber(params.number);
@@ -225,6 +294,44 @@ export async function retriggerCheck(
               ? actionsError.message
               : String(actionsError);
           if (isActionsAlreadyRunningError(actionsMessage)) {
+            // Bridge the transient "still running" state internally instead
+            // of forcing the caller to manually poll-and-retry (LS-9988):
+            // wait (bounded by waitDeadlineMs, transport/Lambda-safe) for the
+            // owning workflow run to settle, then retry the rerun-failed-jobs
+            // call once. If it settles and the retry succeeds, this reports
+            // as a normal success with no behavior change for callers that
+            // don't opt in.
+            const settled =
+              params.waitForCompletion &&
+              (await waitForRunToSettle(
+                repo,
+                ids.workflowRunId,
+                waitDeadlineMs,
+              ));
+            if (settled) {
+              try {
+                await githubRest<undefined>({
+                  method: 'POST',
+                  path: `/repos/${repo.owner}/${repo.name}/actions/runs/${ids.workflowRunId}/rerun-failed-jobs`,
+                });
+                results.push({ name: run.name, id: run.id, retriggered: true });
+                continue;
+              } catch (retryError) {
+                const retryMessage =
+                  retryError instanceof Error
+                    ? retryError.message
+                    : String(retryError);
+                results.push({
+                  name: run.name,
+                  id: run.id,
+                  retriggered: false,
+                  error:
+                    `Workflow run ${ids.workflowRunId} finished, but the retry of rerun-failed-jobs ` +
+                    `still failed: ${retryMessage}`,
+                });
+                continue;
+              }
+            }
             results.push({
               name: run.name,
               id: run.id,
@@ -233,7 +340,12 @@ export async function retriggerCheck(
               error:
                 `Workflow run ${ids.workflowRunId} is still running — GitHub rejects a rerun-failed-jobs ` +
                 'request while a previous run of the same workflow is in flight. This is not a hard ' +
-                'failure: wait for the run to finish, then retry github_retrigger_check.',
+                'failure: ' +
+                (params.waitForCompletion
+                  ? `waited up to ${Math.round(TRANSPORT_SAFE_WAIT_MS / 1000)}s for it to finish and it ` +
+                    'is still in flight. Call github_retrigger_check again with waitForCompletion: true ' +
+                    'to keep waiting — do not switch to a different retrigger strategy.'
+                  : 'wait for the run to finish, then retry github_retrigger_check.'),
             });
           } else {
             results.push({
