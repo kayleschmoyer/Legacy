@@ -88,7 +88,11 @@ import { resolveCommitish } from './resolve-commitish';
 import { validateRef } from './validate-ref';
 import { resolveMainRepoPath } from './resolve-main-repo';
 import { resolveResetTarget } from './resolve-reset-target';
-import { runOnRef } from './run-on-ref';
+import {
+  formatRunOnRefSnapshot,
+  RUN_ON_REF_JOB_KIND,
+  runOnRef,
+} from './run-on-ref';
 import {
   buildStabilizeCommand,
   buildStabilizeSteps,
@@ -1073,6 +1077,22 @@ function formatJobSnapshotResult(snapshot: JobSnapshot): ToolResult {
     return formatWorktreeRunSnapshot(snapshot);
   }
 
+  if (snapshot.meta?.['kind'] === RUN_ON_REF_JOB_KIND) {
+    const meta = snapshot.meta;
+    return formatRunOnRefSnapshot(snapshot, {
+      ref: typeof meta['ref'] === 'string' ? meta['ref'] : 'origin/main',
+      command:
+        typeof meta['command'] === 'string' ? meta['command'] : snapshot.label,
+      modulesLinkSucceeded:
+        (meta['modulesLinkSucceeded'] as boolean | null | undefined) ?? null,
+      modulesLinkOutput:
+        typeof meta['modulesLinkOutput'] === 'string'
+          ? meta['modulesLinkOutput']
+          : undefined,
+      setupLog: typeof meta['setupLog'] === 'string' ? meta['setupLog'] : '',
+    });
+  }
+
   const body: Record<string, unknown> = {
     jobId: snapshot.jobId,
     status: snapshot.status,
@@ -1810,9 +1830,9 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_run_on_ref',
       description:
         'Run a command against a throwaway detached checkout of a ref (default origin/main), ' +
-        'auto-linking node_modules and auto-cleaning up. Use to check whether a failure is ' +
-        "pre-existing on the base branch, independent of this PR's diff. Not for ticket " +
-        'development — prefer worktree_run/worktree_attach for that.',
+        'auto-linking node_modules and auto-cleaning up. Use to check whether a failure ' +
+        'predates this PR. Not for ticket work — use worktree_run/worktree_attach instead. ' +
+        'Job-backed: a slow command returns a pollable jobId.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -6897,8 +6917,9 @@ const handleCallTool = async (
               shell.toLowerCase().endsWith('cmd.exe');
             return {
               shell,
-              buildArgs: (cmd) =>
-                isCmdShell ? ['/d', '/s', '/c', cmd] : ['-c', cmd],
+              buildArgs: (script) =>
+                isCmdShell ? ['/d', '/s', '/c', script] : ['-c', script],
+              isCmdShell,
             };
           },
           mainRepo: MAIN_REPO,
@@ -6907,7 +6928,8 @@ const handleCallTool = async (
               tmpdir(),
               `legacy-sports-ref-check-${Date.now()}-${randomUUID().slice(0, 8)}`,
             ),
-          rmSync,
+          runJobWithBudget,
+          jobSyncBudgetMs: JOB_SYNC_BUDGET_MS,
         },
       );
     }

@@ -508,7 +508,7 @@ Run an ad-hoc command in a specific worktree without the 120s process-level cap 
 
 ### `worktree_run_on_ref`
 
-Run a command against a throwaway detached checkout of a ref (default origin/main), auto-linking node_modules and auto-cleaning up. Use to check whether a failure is pre-existing on the base branch, independent of this PR's diff. Not for ticket development — prefer worktree_run/worktree_attach for that.
+Run a command against a throwaway detached checkout of a ref (default origin/main), auto-linking node_modules and auto-cleaning up. Use to check whether a failure predates this PR. Not for ticket work — use worktree_run/worktree_attach instead. Job-backed: a slow command returns a pollable jobId.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

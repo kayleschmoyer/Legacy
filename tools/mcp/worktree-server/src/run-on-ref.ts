@@ -1,4 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  buildRunOnRefScript,
+  RUN_ON_REF_CLEANED_UP_MARKER,
+  RUN_ON_REF_CLEANUP_FAILED_MARKER,
+} from './run-on-ref-script';
 import { validateRef } from './validate-ref';
 
 /**
@@ -30,6 +35,31 @@ export interface ExecError {
   message?: string;
 }
 
+/**
+ * Minimal subset of `@legacy-sports/mcp-jobs`'s `JobSnapshot` this module
+ * needs — kept local (rather than importing the real type) so this file has
+ * no dependency on the jobs package beyond the one function it's handed.
+ */
+export interface RunOnRefJobSnapshot {
+  jobId: string;
+  status: 'running' | 'done' | 'failed' | 'orphaned';
+  exitCode: number | null;
+  error: string | null;
+  elapsedSec: number;
+  log?: string;
+  logTail?: string;
+  hint?: string;
+}
+
+export interface RunOnRefStartJobOptions {
+  command: string;
+  args: string[];
+  cwd: string;
+  label: string;
+  timeoutMs: number;
+  meta?: Record<string, unknown>;
+}
+
 export interface RunOnRefDeps {
   runGit: (args: string[], cwd: string, opts?: { timeout?: number }) => string;
   /** Runs `file` with `args` in `cwd`, returns stdout, throws an ExecError-shaped object on failure. */
@@ -43,14 +73,29 @@ export interface RunOnRefDeps {
   linkScriptPath: string;
   /** Path to the Node executable used to run link.mjs. */
   execPath: string;
-  /** Shell (and its argv-building) to run `command` with — mirrors worktree_run/worktree_run_long. */
+  /** Shell (and its argv-building) to run the generated script with — mirrors worktree_run/worktree_run_long. */
   resolveShell: () => {
     shell: string;
-    buildArgs: (command: string) => string[];
+    buildArgs: (script: string) => string[];
+    isCmdShell?: boolean;
   };
   mainRepo: string;
   tmpWorktreePath: () => string;
-  rmSync: (path: string, opts: { recursive: boolean; force: boolean }) => void;
+  /**
+   * Start the command as a background job and wait up to `jobSyncBudgetMs`
+   * for it to finish, exactly like `worktree_run`/`worktree_run_long`'s use
+   * of `@legacy-sports/mcp-jobs`'s `runJobWithBudget` (LS-10108) — a fast
+   * command returns its terminal snapshot inline; a slow one hands back a
+   * `{ status: "running", jobId }` snapshot to poll via
+   * `worktree_job_wait`/`worktree_job_status` instead of blocking this MCP
+   * call past the ~60s cloud transport timeout (LS-8559).
+   */
+  runJobWithBudget: (
+    opts: RunOnRefStartJobOptions,
+    syncBudgetMs: number,
+  ) => Promise<RunOnRefJobSnapshot>;
+  /** Sync budget before handing back a pollable jobId — shared with worktree_run/worktree_run_long. */
+  jobSyncBudgetMs: number;
 }
 
 interface ToolContent {
@@ -65,6 +110,9 @@ export interface ToolResult {
 
 const DEFAULT_TIMEOUT_MS = 180_000;
 const MAX_TIMEOUT_MS = 300_000;
+
+/** kind tag stamped into job meta so worktree_job_status/worktree_job_wait can find this formatter. */
+export const RUN_ON_REF_JOB_KIND = 'worktree_run_on_ref';
 
 function errorResult(text: string): ToolResult {
   return { content: [{ type: 'text', text }], isError: true };
@@ -81,16 +129,116 @@ function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function truncateChars(s: string, max = 10_000): string {
+  return s.length > max ? `…(truncated)\n${s.slice(-max)}` : s;
+}
+
+/** Strip the internal cleanup markers out of output shown back to the caller. */
+function stripCleanupMarkers(output: string): string {
+  return output
+    .split('\n')
+    .filter(
+      (line) =>
+        line !== RUN_ON_REF_CLEANED_UP_MARKER &&
+        line !== RUN_ON_REF_CLEANUP_FAILED_MARKER,
+    )
+    .join('\n');
+}
+
 /**
- * Core orchestration for the `worktree_run_on_ref` MCP tool (LS-9636): check
- * out `ref` into a throwaway detached worktree, best-effort link node_modules
- * via the modules-pool, run `command` in it, and always clean up afterward —
- * regardless of whether any step above failed. Pulled out of index.ts's
- * switch-case (which has no direct test coverage) into an injectable-deps
- * module so the orchestration and cleanup-guarantee logic can be unit tested
- * without shelling out to real git/node processes.
+ * Rebuild the worktree_run_on_ref result from a job snapshot — used both
+ * inline (within the sync budget) and when completion is observed later via
+ * worktree_job_wait / worktree_job_status, so both paths return the same
+ * shape. `meta` is the job's persisted metadata (ref, command,
+ * modulesLinkSucceeded, and the pre-job setup log), read back by the caller
+ * from `JobSnapshot.meta` — passed in already-narrowed since this module has
+ * no dependency on the real JobSnapshot type (see RunOnRefJobSnapshot above).
  */
-export function runOnRef(args: RunOnRefArgs, deps: RunOnRefDeps): ToolResult {
+export function formatRunOnRefSnapshot(
+  snapshot: RunOnRefJobSnapshot,
+  meta: {
+    ref: string;
+    command: string;
+    modulesLinkSucceeded: boolean | null;
+    modulesLinkOutput?: string;
+    setupLog: string;
+  },
+): ToolResult {
+  if (snapshot.status === 'done' || snapshot.status === 'failed') {
+    const rawLog = snapshot.log ?? '';
+    const cleanedUp = rawLog.includes(RUN_ON_REF_CLEANED_UP_MARKER);
+    const output = stripCleanupMarkers(rawLog);
+    const success = snapshot.status === 'done';
+    const log = [meta.setupLog, `$ ${meta.command}`, output]
+      .filter(Boolean)
+      .join('\n');
+
+    return jsonResult(
+      {
+        success,
+        ref: meta.ref,
+        command: meta.command,
+        exitCode: snapshot.exitCode,
+        output,
+        modulesLinkSucceeded: meta.modulesLinkSucceeded,
+        ...(meta.modulesLinkSucceeded === false
+          ? { modulesLinkOutput: (meta.modulesLinkOutput ?? '').slice(0, 2000) }
+          : {}),
+        cleanedUp,
+        log,
+        ...(!cleanedUp
+          ? {
+              cleanupWarning:
+                'Every cleanup fallback failed — a stray git worktree may remain ' +
+                'at the throwaway checkout path. Run `git worktree prune` manually.',
+            }
+          : {}),
+      },
+      !success,
+    );
+  }
+
+  // running / orphaned — structured snapshot with a re-arm hint.
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            jobId: snapshot.jobId,
+            status: snapshot.status,
+            ref: meta.ref,
+            command: meta.command,
+            elapsedSec: snapshot.elapsedSec,
+            logTail: truncateChars(stripCleanupMarkers(snapshot.logTail ?? '')),
+            ...(snapshot.hint ? { hint: snapshot.hint } : {}),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
+/**
+ * Core orchestration for the `worktree_run_on_ref` MCP tool (LS-9636,
+ * job-backed since LS-10108): check out `ref` into a throwaway detached
+ * worktree, best-effort link node_modules, then run `command` as a
+ * background job that self-cleans the worktree on its own exit — pulled out
+ * of index.ts's switch-case (which has no direct test coverage) into an
+ * injectable-deps module so the orchestration can be unit tested without
+ * shelling out to real git/node processes.
+ *
+ * The checkout and modules-link steps stay synchronous here (they're fast
+ * and were never the reported problem — see LS-10108's ticket body); only
+ * the command execution + cleanup moved to a job, since that's the part that
+ * legitimately runs past the ~60s cloud MCP transport timeout.
+ */
+export async function runOnRef(
+  args: RunOnRefArgs,
+  deps: RunOnRefDeps,
+): Promise<ToolResult> {
   const { command, skipModulesLink = false, timeoutSeconds } = args;
 
   if (!command || !command.trim()) {
@@ -182,77 +330,40 @@ export function runOnRef(args: RunOnRefArgs, deps: RunOnRefDeps): ToolResult {
     }
   }
 
+  const { shell, buildArgs, isCmdShell } = deps.resolveShell();
+  const script = buildRunOnRefScript({
+    tmpWorktreePath,
+    mainRepo,
+    command,
+    isCmdShell,
+  });
+  const shellArgs = buildArgs(script);
+
+  const meta = {
+    ref,
+    command,
+    modulesLinkSucceeded,
+    modulesLinkOutput,
+    setupLog: log.join('\n'),
+  };
+
   // Intentional shell execution, not an injection vector — see the
   // RunOnRefArgs doc comment above: `command` is by-design arbitrary,
   // trusted-agent input, identical in contract to worktree_run's own exec.
-  const { shell, buildArgs } = deps.resolveShell();
-  const shellArgs = buildArgs(command);
-
-  let exitCode: number;
-  let output: string;
-  try {
-    output = exec(shell, shellArgs, {
-      cwd: tmpWorktreePath,
-      timeout: timeoutMs,
-    });
-    exitCode = 0;
-  } catch (cmdErr) {
-    const e = cmdErr as ExecError;
-    output =
-      [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-      String(e.message ?? cmdErr);
-    if (e.signal) {
-      output += `\n(process terminated by signal ${e.signal}${
-        e.signal === 'SIGTERM' ? ' — likely the timeout' : ''
-      })`;
-    }
-    exitCode = typeof e.status === 'number' ? e.status : 1;
-  }
-
-  // Cleanup — best-effort, always attempted regardless of the command's
-  // outcome above, so no run ever leaves a stray `git worktree` entry or
-  // temp directory behind (AC2).
-  let cleanedUp = false;
-  try {
-    runGit(['worktree', 'remove', '--force', tmpWorktreePath], mainRepo, {
-      timeout: 30_000,
-    });
-    cleanedUp = true;
-    log.push('git worktree removed.');
-  } catch (removeErr) {
-    log.push(
-      'git worktree remove --force failed (continuing to clean up ' +
-        `manually): ${messageOf(removeErr)}`,
-    );
-    try {
-      deps.rmSync(tmpWorktreePath, { recursive: true, force: true });
-      log.push('Temp directory removed manually.');
-    } catch (rmErr) {
-      log.push(`Could not remove temp directory manually: ${messageOf(rmErr)}`);
-    }
-    try {
-      runGit(['worktree', 'prune'], mainRepo, { timeout: 30_000 });
-      cleanedUp = true;
-      log.push('git worktree entry pruned.');
-    } catch (pruneErr) {
-      log.push(`git worktree prune failed: ${messageOf(pruneErr)}`);
-    }
-  }
-
-  return jsonResult(
+  // Job-backed (LS-10108): cleanup is embedded in the script itself (see
+  // run-on-ref-script.ts) so it still runs even if the job is killed for
+  // exceeding timeoutMs.
+  const snapshot = await deps.runJobWithBudget(
     {
-      success: exitCode === 0,
-      ref,
-      command,
-      exitCode,
-      output,
-      modulesLinkSucceeded,
-      ...(modulesLinkSucceeded === false
-        ? { modulesLinkOutput: modulesLinkOutput.slice(0, 2000) }
-        : {}),
-      cleanedUp,
-      log: log.join('\n'),
+      command: shell,
+      args: shellArgs,
+      cwd: mainRepo,
+      label: command.length > 80 ? `${command.slice(0, 77)}...` : command,
+      timeoutMs,
+      meta: { kind: RUN_ON_REF_JOB_KIND, ...meta },
     },
-    exitCode !== 0,
+    deps.jobSyncBudgetMs,
   );
+
+  return formatRunOnRefSnapshot(snapshot, meta);
 }
