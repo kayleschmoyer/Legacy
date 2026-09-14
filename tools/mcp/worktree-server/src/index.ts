@@ -8150,6 +8150,31 @@ const handleCallTool = async (
         outputPath?: string;
       };
 
+      // `path` is declared required in the tool's JSON schema, but the SDK
+      // does not enforce that at the boundary — validate it explicitly so a
+      // caller who passes the wrong param name (e.g. `filePath`, a name
+      // several sibling worktree_* tools do use) gets an actionable error
+      // instead of a TypeError from dereferencing `undefined` below.
+      if (typeof filePath !== 'string' || filePath.length === 0) {
+        const rawArgs = args ?? {};
+        const hints: string[] = [];
+        if ('filePath' in rawArgs) hints.push('`filePath` -> `path`');
+        if ('worktreePath' in rawArgs)
+          hints.push('`worktreePath` -> `worktree`');
+        const hintText = hints.length
+          ? ` (did you mean ${hints.join(', ')}?)`
+          : '';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Missing required parameter: \`path\`${hintText}.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       // grep is mutually exclusive with line ranges
       if (
         grepPattern !== undefined &&
