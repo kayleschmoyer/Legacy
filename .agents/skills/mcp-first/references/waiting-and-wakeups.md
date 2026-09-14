@@ -74,7 +74,7 @@ For legitimately cloud-shaped work (a nightly sweep, anything that must run with
 
 Issue both in a single turn:
 
-1. `github_pr_batch_status({ numbers: [N], compact: true })` — `mergeable`, `ciSummary`, `failedJobs`, `unresolvedThreads` in one call. The compact `ciSummary` is authoritative: since LS-10116 it counts only genuine failures (FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED/STARTUP_FAILURE), so a CANCELLED merge-queue attempt no longer reads as `fail` and there is no need to re-call the full form to check `ciJobs`. Superseded jobs appear in `cancelledJobs` when you need them.
+1. `github_pr_batch_status({ prs: [N], compact: true })` — `mergeable`, `ciSummary`, `failedJobs`, `unresolvedThreads` in one call. The compact `ciSummary` is authoritative: since LS-10116 it counts only genuine failures (FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED/STARTUP_FAILURE), so a CANCELLED merge-queue attempt no longer reads as `fail` and there is no need to re-call the full form to check `ciJobs`. Superseded jobs appear in `cancelledJobs` when you need them.
 2. `Read` `.claude/.pr-state-<N>.json` — `{ sha, mergeable, ciSummary, unresolvedThreads, idleCount, cycleCount, lastCheckedAt }`
 
 The **state file is the memory, not the transcript** — it survives compaction and keeps every wake cheap.

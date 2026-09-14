@@ -80,7 +80,7 @@ Use `runId` first. Switch to `jobId` when you need to isolate output from a sing
 ci_list_runs(branch: "BRANCH_NAME", limit: 5)
 
 # Or check PR status (when you have a PR number)
-github_pr_batch_status(prNumbers: [PR_NUMBER])
+github_pr_batch_status(prs: [PR_NUMBER])
 ```
 
 **Shell fallback:**

@@ -162,6 +162,43 @@ function prNumberField(fieldName: string) {
 }
 
 /**
+ * Shared preprocessing for "the PR(s) to act on" arrays on batch/bulk
+ * github_* tools. Accepts a real array, a JSON-encoded array string, or a
+ * bare scalar (wrapped to a single-element array) — same coercion "prs"
+ * already used on github_manage_labels/github_request_review before this
+ * helper existed.
+ *
+ * "prs" is now the canonical param name across these tools (LS-10148):
+ * github_pr_files, github_pr_batch_status, and github_bulk_rebase gained
+ * "prs" as an added alias alongside the array param they already shipped
+ * ("prNumbers"/"numbers", kept working); github_manage_labels — the tool
+ * whose rejection of "prNumbers" prompted this ticket — gained that one
+ * extra alias. github_request_review already matched the canonical name
+ * and needed no change.
+ *
+ * Deliberately just the preprocessing step, not a full field-builder with a
+ * parameterized max — the mcp-api-reference generator statically evaluates
+ * zod `.max(N)` calls to build the docs' "constraints" column, and cannot
+ * resolve a max threaded through a shared function's parameter (it rendered
+ * literally as "max max" when tried — LS-10148 bot review, PR #8025). Each
+ * call site below chains `.min(1).max(<literal>)` itself so the generator
+ * sees a real number.
+ */
+function coercePrsInput(v: unknown): unknown {
+  if (v === undefined || v === null) return undefined;
+  if (isUnknownArray(v)) return v;
+  if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+    try {
+      const parsed: unknown = JSON.parse(v);
+      if (isUnknownArray(parsed)) return parsed;
+    } catch {
+      // Not valid JSON — fall through to wrap as single element
+    }
+  }
+  return [v];
+}
+
+/**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
  * string "true"/"false"/"1"/"0" (MCP callers sometimes serialise booleans to
  * strings). Use in place of z.boolean() for all tool schema parameters.
@@ -941,24 +978,18 @@ export function createServer(): McpServer {
     {
       prs: z
         .preprocess(
-          (v) => {
-            if (v === undefined || v === null) return undefined;
-            if (isUnknownArray(v)) return v;
-            if (typeof v === 'string' && v.trimStart().startsWith('[')) {
-              try {
-                const parsed: unknown = JSON.parse(v);
-                if (isUnknownArray(parsed)) return parsed;
-              } catch {
-                // Not valid JSON — fall through to wrap as single element
-              }
-            }
-            return [v];
-          },
+          coercePrsInput,
           z.array(prNumberField('prs[]')).min(1).max(100).optional(),
         )
         .describe(
-          'PR number or array of PR numbers (use "prNumber" for a single PR)',
+          'PR number or array of PR numbers (use "prNumber" for a single PR). Alias: "prNumbers".',
         ),
+      prNumbers: z
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prNumbers[]')).min(1).max(100).optional(),
+        )
+        .describe('Alias for "prs".'),
       prNumber: prNumberField('prNumber')
         .optional()
         .describe(
@@ -981,6 +1012,7 @@ export function createServer(): McpServer {
     async (params) => {
       const prs =
         params.prs ??
+        params.prNumbers ??
         (params.prNumber !== undefined ? [params.prNumber] : undefined);
       if (!prs?.length) {
         return {
@@ -988,7 +1020,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: 'text',
-              text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers).',
+              text: 'Missing required parameter: provide "prNumber" (single PR) or "prs" (one or more PR numbers; "prNumbers" also accepted).',
             },
           ],
         };
@@ -1161,18 +1193,39 @@ export function createServer(): McpServer {
     'github_pr_batch_status',
     'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
     {
+      prs: z
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prs[]')).min(1).max(50).optional(),
+        )
+        .describe('PR numbers. Alias: "numbers".'),
       numbers: z
-        .array(z.coerce.number().int().positive())
-        .min(1)
-        .max(50)
-        .describe('PR numbers'),
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('numbers[]')).min(1).max(50).optional(),
+        )
+        .describe('Alias for "prs".'),
       compact: coercedBoolean
         .default(false)
         .describe(
           'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads)',
         ),
     },
-    async (params) => prBatchStatus(params),
+    async (params) => {
+      const numbers = params.prs ?? params.numbers;
+      if (!numbers?.length) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prs" (preferred; "numbers" also accepted) with one or more PR numbers.',
+            },
+          ],
+        };
+      }
+      return prBatchStatus({ numbers, compact: params.compact });
+    },
   );
 
   // --- github_pr_files ---
@@ -1180,11 +1233,18 @@ export function createServer(): McpServer {
     'github_pr_files',
     'Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: string[] } for format:"names" (default), or with additions/deletions/changeType per file for format:"full". Use instead of a per-PR github_pr_diff fan-out or a shell `gh api .../files` loop.',
     {
+      prs: z
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prs[]')).min(1).max(50).optional(),
+        )
+        .describe('PR numbers (1-50). Alias: "prNumbers".'),
       prNumbers: z
-        .array(z.coerce.number().int().positive())
-        .min(1)
-        .max(50)
-        .describe('PR numbers (1-50)'),
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prNumbers[]')).min(1).max(50).optional(),
+        )
+        .describe('Alias for "prs".'),
       format: z
         .enum(['names', 'full'])
         .default('names')
@@ -1192,7 +1252,21 @@ export function createServer(): McpServer {
           '"names": file paths only. "full": also additions/deletions/changeType.',
         ),
     },
-    async (params) => prFiles(params),
+    async (params) => {
+      const prNumbers = params.prs ?? params.prNumbers;
+      if (!prNumbers?.length) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prs" (preferred; "prNumbers" also accepted) with one or more PR numbers (1-50).',
+            },
+          ],
+        };
+      }
+      return prFiles({ prNumbers, format: params.format });
+    },
   );
 
   // --- github_pr_why_blocked ---
@@ -1296,13 +1370,36 @@ export function createServer(): McpServer {
     'github_bulk_rebase',
     'Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR\'s rebase conflict does not abort the rest. Conflict details are captured in the per-PR error. Budgeted to ~45s of synchronous work: larger batches return { jobId, status: "running" } — poll with github_job_wait (per-PR progress in logTail) until it returns the final batch result. Do NOT re-run the command while the job is in progress.',
     {
+      prs: z
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prs[]')).min(1).max(50).optional(),
+        )
+        .describe(
+          'PR numbers to rebase (1-50). Processed in order. Alias: "numbers".',
+        ),
       numbers: z
-        .array(prNumberField('numbers[]'))
-        .min(1)
-        .max(50)
-        .describe('PR numbers to rebase (1-50). Processed in order.'),
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('numbers[]')).min(1).max(50).optional(),
+        )
+        .describe('Alias for "prs".'),
     },
-    async (params) => bulkRebase(params),
+    async (params) => {
+      const numbers = params.prs ?? params.numbers;
+      if (!numbers?.length) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prs" (preferred; "numbers" also accepted) with one or more PR numbers (1-50).',
+            },
+          ],
+        };
+      }
+      return bulkRebase({ numbers });
+    },
   );
 
   // --- github_request_review ---
@@ -1311,19 +1408,10 @@ export function createServer(): McpServer {
     'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests only the reviewers passed in "reviewers" unless "copilot: true" is explicitly set.',
     {
       prs: z
-        .preprocess((v) => {
-          if (v === undefined || v === null) return undefined;
-          if (isUnknownArray(v)) return v;
-          if (typeof v === 'string' && v.trimStart().startsWith('[')) {
-            try {
-              const parsed: unknown = JSON.parse(v);
-              if (isUnknownArray(parsed)) return parsed;
-            } catch {
-              // Not valid JSON — fall through to wrap as single element
-            }
-          }
-          return [v];
-        }, z.array(z.coerce.number().int().positive()).min(1).max(100).optional())
+        .preprocess(
+          coercePrsInput,
+          z.array(prNumberField('prs[]')).min(1).max(100).optional(),
+        )
         .describe(
           'PR number or array of PR numbers (use "prNumber" for a single PR)',
         ),
@@ -1360,7 +1448,11 @@ export function createServer(): McpServer {
           ],
         };
       }
-      return requestReview({ ...params, prs });
+      return requestReview({
+        prs,
+        reviewers: params.reviewers,
+        copilot: params.copilot,
+      });
     },
   );
 

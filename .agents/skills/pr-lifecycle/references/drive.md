@@ -105,7 +105,7 @@ Use the ticket context as a guardrail for review fixes (don't apply suggestions 
 ### Step 3c: Get detailed PR status
 
 ```
-github_pr_batch_status(numbers: [<PR#>])
+github_pr_batch_status(prs: [<PR#>])
 ```
 
 This returns `mergeable`, `ciSummary`, `reviewDecision`, and `unresolvedThreadCount` in one call.

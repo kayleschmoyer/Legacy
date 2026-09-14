@@ -40,7 +40,7 @@ Parse GitHub Actions logs to diagnose CI failures. The core workflow is: find th
 ci_list_runs(branch: "BRANCH_NAME", limit: 5)
 
 # Or check PR status (when you have a PR number)
-github_pr_batch_status(prNumbers: [PR_NUMBER])
+github_pr_batch_status(prs: [PR_NUMBER])
 ```
 
 **Shell fallback:**
@@ -151,7 +151,7 @@ Repeat until CI passes. Do NOT push without `make pc` passing first.
 | Find type errors   | `ci_search_logs(runId: RUN_ID, pattern: "error TS")`        | `gh run view RUN_ID --log \| Select-String "error TS"`              |
 | Find failed tasks  | `ci_search_logs(runId: RUN_ID, pattern: "Failed tasks")`    | `gh run view RUN_ID --log \| Select-String "Failed tasks"`          |
 | Rerun failed jobs  | `ci_rerun(runId: RUN_ID)`                                   | `gh run rerun RUN_ID --failed`                                      |
-| Check PR status    | `github_pr_batch_status(prNumbers: [PR_NUMBER])`            | `gh pr checks`                                                      |
+| Check PR status    | `github_pr_batch_status(prs: [PR_NUMBER])`                  | `gh pr checks`                                                      |
 
 ### Workflow-Specific Runs
 

@@ -43,7 +43,7 @@ Prefer one batched call over N single calls:
 
 | Batch tool                                                                                                               | Replaces                        |
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| `github_pr_batch_status({ numbers: [...] })`                                                                             | N × `github_view_pr`            |
+| `github_pr_batch_status({ prs: [...] })`                                                                                 | N × `github_view_pr`            |
 | `ci_view_run_batch`, `ci_rerun_batch`                                                                                    | N × `ci_view_run` / `ci_rerun`  |
 | `worktree_status_batch`, `worktree_commit_batch`, `worktree_push_batch`                                                  | N × the single-worktree variant |
 | `github_bulk_comment`, `github_bulk_edit`, `github_bulk_merge`, `github_bulk_rebase`, `github_bulk_reply_to_review`      | N × the single-PR variant       |

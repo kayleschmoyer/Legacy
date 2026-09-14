@@ -140,10 +140,10 @@ Print a summary table:
 
 Prefer MCP tools; use `gh pr view --json` only when MCP is unavailable or the user explicitly confirms a CLI fallback:
 
-| Instead of                           | Use                                                                                             |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `gh pr view N --json state,mergedAt` | `github_view_pr({ number: N })` — returns `state` + `mergedAt`                                  |
-| `gh pr view N --json mergeable`      | `github_pr_batch_status({ numbers: [N] })` — returns `mergeable`, `ciSummary`, `reviewDecision` |
+| Instead of                           | Use                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `gh pr view N --json state,mergedAt` | `github_view_pr({ number: N })` — returns `state` + `mergedAt`                              |
+| `gh pr view N --json mergeable`      | `github_pr_batch_status({ prs: [N] })` — returns `mergeable`, `ciSummary`, `reviewDecision` |
 
 **`mergeable: UNKNOWN` does not mean blocked** — it can mean GitHub is still computing mergeability, and it can also appear for PRs that are already merged or closed. Do not treat `UNKNOWN` as a merge-queue signal by itself. To confirm the actual PR outcome, call `github_view_pr({ number: N })` and check `state` plus `mergedAt`/`closedAt`: `state: "MERGED"` or a populated `mergedAt` means it merged successfully; a closed PR with `closedAt` and no `mergedAt` means it was closed without merging.
 

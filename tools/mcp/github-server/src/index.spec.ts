@@ -15,6 +15,11 @@ import { resolveThreads } from './tools/resolve-threads';
 import { prDiff } from './tools/pr-diff';
 import { diagnose } from './tools/diagnose';
 import { getJobLogs } from './tools/get-job-logs';
+import { manageLabels } from './tools/manage-labels';
+import { prBatchStatus } from './tools/pr-batch-status';
+import { prFiles } from './tools/pr-files';
+import { bulkRebase } from './tools/bulk-rebase';
+import { requestReview } from './tools/request-review';
 import type { ToolResult } from './types';
 
 jest.mock('./tools/mark-pr-ready');
@@ -31,6 +36,11 @@ jest.mock('./tools/resolve-threads');
 jest.mock('./tools/pr-diff');
 jest.mock('./tools/diagnose');
 jest.mock('./tools/get-job-logs');
+jest.mock('./tools/manage-labels');
+jest.mock('./tools/pr-batch-status');
+jest.mock('./tools/pr-files');
+jest.mock('./tools/bulk-rebase');
+jest.mock('./tools/request-review');
 
 // getRepoRoot lives in ./repo-root and uses import.meta.url, which cannot be
 // compiled under the CommonJS tsconfig the Jest preset uses — mock it with a
@@ -95,6 +105,11 @@ describe('index tool registration — prNumber alias resolution', () => {
     jest.mocked(prDiff).mockResolvedValue(okResult);
     jest.mocked(diagnose).mockResolvedValue(okResult);
     jest.mocked(getJobLogs).mockResolvedValue(okResult);
+    jest.mocked(manageLabels).mockResolvedValue(okResult);
+    jest.mocked(prBatchStatus).mockResolvedValue(okResult);
+    jest.mocked(prFiles).mockResolvedValue(okResult);
+    jest.mocked(bulkRebase).mockResolvedValue(okResult);
+    jest.mocked(requestReview).mockResolvedValue(okResult);
   });
 
   describe('github_mark_pr_ready', () => {
@@ -761,6 +776,140 @@ describe('index tool registration — prNumber alias resolution', () => {
       expect(getJobLogs).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: 123, tailLines: undefined }),
       );
+    });
+  });
+
+  /**
+   * "the PR(s) to act on" alias resolution across the batch/bulk github_*
+   * tools (LS-10148): a caller that reaches for "prNumbers" or "numbers" —
+   * the spelling used by a sibling tool — must not be rejected. "prs" is
+   * canonical; the other spellings are accepted aliases, "prs" wins when
+   * more than one is supplied.
+   */
+  describe('github_manage_labels — "prs" alias resolution', () => {
+    it('accepts the canonical "prs" array', async () => {
+      const result = await client.callTool({
+        name: 'github_manage_labels',
+        arguments: { prs: [1, 2], add: ['x'] },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(manageLabels).toHaveBeenCalledWith(
+        expect.objectContaining({ prs: [1, 2] }),
+      );
+    });
+
+    it('accepts the "prNumbers" alias', async () => {
+      await client.callTool({
+        name: 'github_manage_labels',
+        arguments: { prNumbers: [7971], add: ['bot:ready-for-review'] },
+      });
+
+      expect(manageLabels).toHaveBeenCalledWith(
+        expect.objectContaining({ prs: [7971] }),
+      );
+    });
+
+    it('returns the named missing-parameter error when none are provided', async () => {
+      const result = await client.callTool({
+        name: 'github_manage_labels',
+        arguments: { add: ['x'] },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(manageLabels).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('github_pr_batch_status — "prs" alias resolution', () => {
+    it('accepts the canonical "prs" array', async () => {
+      await client.callTool({
+        name: 'github_pr_batch_status',
+        arguments: { prs: [1, 2] },
+      });
+
+      expect(prBatchStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ numbers: [1, 2] }),
+      );
+    });
+
+    it('accepts the legacy "numbers" name', async () => {
+      await client.callTool({
+        name: 'github_pr_batch_status',
+        arguments: { numbers: [1, 2] },
+      });
+
+      expect(prBatchStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ numbers: [1, 2] }),
+      );
+    });
+
+    it('returns a missing-parameter error when none are provided', async () => {
+      const result = await client.callTool({
+        name: 'github_pr_batch_status',
+        arguments: {},
+      });
+
+      expect(result.isError).toBe(true);
+      expect(prBatchStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('github_pr_files — "prs" alias resolution', () => {
+    it('accepts the canonical "prs" array', async () => {
+      await client.callTool({
+        name: 'github_pr_files',
+        arguments: { prs: [1, 2] },
+      });
+
+      expect(prFiles).toHaveBeenCalledWith(
+        expect.objectContaining({ prNumbers: [1, 2] }),
+      );
+    });
+
+    it('accepts the legacy "prNumbers" name', async () => {
+      await client.callTool({
+        name: 'github_pr_files',
+        arguments: { prNumbers: [1, 2] },
+      });
+
+      expect(prFiles).toHaveBeenCalledWith(
+        expect.objectContaining({ prNumbers: [1, 2] }),
+      );
+    });
+  });
+
+  describe('github_bulk_rebase — "prs" alias resolution', () => {
+    it('accepts the canonical "prs" array', async () => {
+      await client.callTool({
+        name: 'github_bulk_rebase',
+        arguments: { prs: [1, 2] },
+      });
+
+      expect(bulkRebase).toHaveBeenCalledWith(
+        expect.objectContaining({ numbers: [1, 2] }),
+      );
+    });
+
+    it('accepts the legacy "numbers" name', async () => {
+      await client.callTool({
+        name: 'github_bulk_rebase',
+        arguments: { numbers: [1, 2] },
+      });
+
+      expect(bulkRebase).toHaveBeenCalledWith(
+        expect.objectContaining({ numbers: [1, 2] }),
+      );
+    });
+
+    it('returns a missing-parameter error when none are provided', async () => {
+      const result = await client.callTool({
+        name: 'github_bulk_rebase',
+        arguments: {},
+      });
+
+      expect(result.isError).toBe(true);
+      expect(bulkRebase).not.toHaveBeenCalled();
     });
   });
 });

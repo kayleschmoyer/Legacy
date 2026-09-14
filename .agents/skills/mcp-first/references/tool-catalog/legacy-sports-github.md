@@ -82,7 +82,8 @@ Rebase many PR branches onto base and force-push (1-50). Runs sequentially becau
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `numbers` | number[] | **required** | min 1, max 50, coerced | PR numbers to rebase (1-50). Processed in order. |
+| `prs` | number[] |  | min 1, max 50, coerced | PR numbers to rebase (1-50). Processed in order. Alias: "numbers". |
+| `numbers` | number[] |  | min 1, max 50, coerced | Alias for "prs". |
 
 ### `github_bulk_reply_to_review`
 
@@ -311,7 +312,8 @@ Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `prs` | number[] |  | min 1, max 100, coerced | PR number or array of PR numbers (use "prNumber" for a single PR) |
+| `prs` | number[] |  | min 1, max 100, coerced | PR number or array of PR numbers (use "prNumber" for a single PR). Alias: "prNumbers". |
+| `prNumbers` | number[] |  | min 1, max 100, coerced | Alias for "prs". |
 | `prNumber` | number |  | coerced | Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both. |
 | `add` | string[] |  | min 1 | Labels to add |
 | `remove` | string[] |  | min 1 | Labels to remove |
@@ -360,7 +362,8 @@ Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved thread
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `numbers` | number[] | **required** | min 1, max 50, coerced, integer, > 0 | PR numbers |
+| `prs` | number[] |  | min 1, max 50, coerced | PR numbers. Alias: "numbers". |
+| `numbers` | number[] |  | min 1, max 50, coerced | Alias for "prs". |
 | `compact` | boolean |  | — | Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads) |
 
 ### `github_pr_commits`
@@ -421,7 +424,8 @@ Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: str
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `prNumbers` | number[] | **required** | min 1, max 50, coerced, integer, > 0 | PR numbers (1-50) |
+| `prs` | number[] |  | min 1, max 50, coerced | PR numbers (1-50). Alias: "prNumbers". |
+| `prNumbers` | number[] |  | min 1, max 50, coerced | Alias for "prs". |
 | `format` | enum |  | — | "names": file paths only. "full": also additions/deletions/changeType. |
 
 ### `github_pr_scan`
@@ -471,7 +475,7 @@ Request reviewers on one or more PRs. Accepts a single PR number or array via "p
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `prs` | number[] |  | min 1, max 100, coerced, integer, > 0 | PR number or array of PR numbers (use "prNumber" for a single PR) |
+| `prs` | number[] |  | min 1, max 100, coerced | PR number or array of PR numbers (use "prNumber" for a single PR) |
 | `prNumber` | number |  | coerced, integer, > 0 | Single PR number — alias for prs:[n]. Use either "prNumber" or "prs", not both. |
 | `reviewers` | string[] |  | — | Human reviewer usernames |
 | `copilot` | boolean |  | — | Opt-in: also request copilot-pull-request-reviewer[bot] (default: false — not requested unless explicitly set) |

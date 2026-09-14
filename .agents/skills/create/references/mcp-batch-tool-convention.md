@@ -40,6 +40,8 @@ Pick one of two equivalent forms and stay consistent within a server:
 
 The batch tool accepts an **array** parameter named for the item it operates on: `keys: [...]`, `numbers: [...]`, `items: [...]`, `tickets: [...]`. Existing servers already mix both forms; either is fine — match the neighbors in the server you're editing.
 
+> **PR-number arrays specifically**: sibling `github_*` tools drifted into three different names for "the PR(s) to act on" (`prs`, `prNumbers`, `numbers`) before this was caught (LS-10148) — a caller that had just used one tool's spelling got rejected by the next. `prs` is now the canonical name across the github server's batch/bulk tools; each tool that had already shipped a different name (`prNumbers` on `github_pr_files`, `numbers` on `github_pr_batch_status`/`github_bulk_rebase`) kept that name as a back-compat alias — not every tool accepts every spelling, to keep the always-resident tool-definition budget in check. When adding a new `github_*` tool that takes an array of PR numbers, use `prs` — do not introduce a fourth spelling.
+
 > **Naming applies only to separate batch tools.** The preferred shape — one tool accepting either a scalar or an array (see `jira_transition`, which takes `key: string | string[]` and dispatches to `bulkTransition` internally, or `jira_view`'s `key`/`keys`) — needs no new name at all. Reach for a `bulk_*` / `*_batch` name only when you have established the batch path genuinely cannot share the single-item tool's schema.
 
 ## Result shape (partial failure)

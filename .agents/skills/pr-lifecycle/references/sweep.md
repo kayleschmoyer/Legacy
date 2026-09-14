@@ -47,7 +47,7 @@ github_pr_dashboard(state: "open", limit: 100, excludeDrafts: false, format: "js
   - **≥ 90 min** → **stalled agent session** — route to Step 2b. Do not skip it: the owning session is dead and nothing else will ever pick this PR up.
   - **Exception — `blocked:e2e-on-main` present** → the PR is deliberately held on an external E2E blocker and is quiet by design, not stalled. The staleness rule does **not** apply. Instead: parse the blocker key from the PR's `<!-- e2e-hold -->` marker comment (`github_list_pr_comments`) and `jira_view` it. Blocker still open → skip, count as "held" in the report (do not strip `agent-in-progress`). Blocker Done/Closed → dispatch a **resume chip** running Phase E of [e2e-hold.md](e2e-hold.md) (rebase → un-hold → `bot:ready-for-review` → drive to merge). No parseable marker → malformed hold; treat as a normal stalled PR (Step 2b).
 - Drafts with **no** agent claim are human/WIP drafts: settled, count them for the report.
-- **Dashboard `ciStatus` can be stale** (checks latched on an old SHA). Before classifying a PR as CI-failing or clean, confirm job-level state with `github_pr_batch_status(numbers: [...])` — max 50 numbers per call, chunk larger lists.
+- **Dashboard `ciStatus` can be stale** (checks latched on an old SHA). Before classifying a PR as CI-failing or clean, confirm job-level state with `github_pr_batch_status(prs: [...])` — max 50 numbers per call, chunk larger lists.
 
 ## Step 2: API-fast triage (inline — no worktree)
 

@@ -18,7 +18,7 @@ If `configured: false`, stop and prompt the user.
 github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true, format: "json")
 ```
 
-Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`), and a top-level `draftsExcluded` count (omitted when 0) — log it in the report. Post-filter out PRs labeled `agent-in-progress` or `sweep-claimed` (owned by other agents; the dashboard does not filter these server-side). For job-level detail on specific PRs use `github_pr_batch_status(numbers: [...])` (≤50 numbers per call) — dashboard `ciStatus` can be stale on old SHAs.
+Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`), and a top-level `draftsExcluded` count (omitted when 0) — log it in the report. Post-filter out PRs labeled `agent-in-progress` or `sweep-claimed` (owned by other agents; the dashboard does not filter these server-side). For job-level detail on specific PRs use `github_pr_batch_status(prs: [...])` (≤50 numbers per call) — dashboard `ciStatus` can be stale on old SHAs.
 
 > For a **scan-only** request, stop here and report.
 

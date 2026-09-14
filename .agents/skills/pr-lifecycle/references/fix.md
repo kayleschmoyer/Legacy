@@ -31,7 +31,7 @@ Gather all signals in parallel:
 ```
 github_view_pr({ number: <PR#> })              # state, title, headRefName, mergeable
 github_get_review_threads({ number: <PR#> })  # unresolved threads
-github_pr_batch_status({ numbers: [<PR#>] })   # mergeable, ciSummary, reviewDecision
+github_pr_batch_status({ prs: [<PR#>] })       # mergeable, ciSummary, reviewDecision
 ```
 
 Build a triage list:
@@ -93,7 +93,7 @@ If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number:
 1. **Route `bot-review` correctly before reading logs**: if the failing check is `bot-review`, or otherwise looks review-related by name/context, this is **not** a CI-logs-first problem. First inspect the status/check details — for example via `github_list_commit_statuses({ prNumber: <PR#> })` or by opening the failed check URL — to confirm it is actually reporting unresolved comments, review threads, or `Copilot review blocked`. Once confirmed, re-evaluate unresolved review threads now — whether Step 2 was skipped earlier because none existed yet, or new threads appeared after a prior push — and fold any current review fixes into this remediation round before reading Actions logs for the remaining non-review failures.
 2. **Get the PR branch**: `github_view_pr({ number: <PR#> })` and capture `headRefName`.
 3. **Resolve the latest CI run**: `ci_list_runs({ branch: "<headRefName>", limit: 1 })` and capture the returned `runId`.
-4. **Inspect failure details**: `ci_view_run({ runId })` to identify failing jobs; `github_pr_batch_status({ numbers: [<PR#>] })` is fine for high-level check status but does not provide a CI `runId`.
+4. **Inspect failure details**: `ci_view_run({ runId })` to identify failing jobs; `github_pr_batch_status({ prs: [<PR#>] })` is fine for high-level check status but does not provide a CI `runId`.
 5. **Read logs**: `ci_get_logs({ runId, failedOnly: true })` to pull failing-job logs, or after `ci_view_run({ runId })` identify a failing `jobId` and use `ci_get_logs({ jobId })` — find the actual error, not just the job name.
 6. **Fix the code** based on the error evidence. If you already collected unresolved review threads in the current round, batch those fixes into the same working pass rather than pushing twice.
 7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
@@ -105,7 +105,7 @@ If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number:
 
 After all fixes are applied and pushed:
 
-1. Re-check PR status: `github_pr_batch_status({ numbers: [<PR#>] })`
+1. Re-check PR status: `github_pr_batch_status({ prs: [<PR#>] })`
 2. Confirm: `mergeable != CONFLICTING`, `CI: Conflicts` label gone (it clears automatically once the re-run check passes — never remove it yourself), no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
 4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](label-ownership.md#label-ownership)).

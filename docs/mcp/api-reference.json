@@ -4575,9 +4575,9 @@
           "name": "github_bulk_rebase",
           "description": "Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR's rebase conflict does not abort the rest. Conflict details are captured in the per-PR error. Budgeted to ~45s of synchronous work: larger batches return { jobId, status: \"running\" } — poll with github_job_wait (per-PR progress in logTail) until it returns the final batch result. Do NOT re-run the command while the job is in progress.",
           "inputs": {
-            "numbers": {
+            "prs": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "min 1",
                 "max 50"
@@ -4589,7 +4589,23 @@
                   "coerced"
                 ]
               },
-              "description": "PR numbers to rebase (1-50). Processed in order."
+              "description": "PR numbers to rebase (1-50). Processed in order. Alias: \"numbers\"."
+            },
+            "numbers": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1",
+                "max 50"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced"
+                ]
+              },
+              "description": "Alias for \"prs\"."
             }
           },
           "transports": [
@@ -5472,7 +5488,23 @@
                   "coerced"
                 ]
               },
-              "description": "PR number or array of PR numbers (use \"prNumber\" for a single PR)"
+              "description": "PR number or array of PR numbers (use \"prNumber\" for a single PR). Alias: \"prNumbers\"."
+            },
+            "prNumbers": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1",
+                "max 100"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced"
+                ]
+              },
+              "description": "Alias for \"prs\"."
             },
             "prNumber": {
               "type": "number",
@@ -5655,9 +5687,9 @@
           "name": "github_pr_batch_status",
           "description": "Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.",
           "inputs": {
-            "numbers": {
+            "prs": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "min 1",
                 "max 50"
@@ -5666,12 +5698,26 @@
                 "type": "number",
                 "optional": false,
                 "constraints": [
-                  "coerced",
-                  "integer",
-                  "> 0"
+                  "coerced"
                 ]
               },
-              "description": "PR numbers"
+              "description": "PR numbers. Alias: \"numbers\"."
+            },
+            "numbers": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1",
+                "max 50"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced"
+                ]
+              },
+              "description": "Alias for \"prs\"."
             },
             "compact": {
               "type": "boolean",
@@ -5884,9 +5930,9 @@
           "name": "github_pr_files",
           "description": "Changed filenames for many PRs in one batched GraphQL call — { [prNumber]: string[] } for format:\"names\" (default), or with additions/deletions/changeType per file for format:\"full\". Use instead of a per-PR github_pr_diff fan-out or a shell `gh api .../files` loop.",
           "inputs": {
-            "prNumbers": {
+            "prs": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "min 1",
                 "max 50"
@@ -5895,12 +5941,26 @@
                 "type": "number",
                 "optional": false,
                 "constraints": [
-                  "coerced",
-                  "integer",
-                  "> 0"
+                  "coerced"
                 ]
               },
-              "description": "PR numbers (1-50)"
+              "description": "PR numbers (1-50). Alias: \"prNumbers\"."
+            },
+            "prNumbers": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1",
+                "max 50"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced"
+                ]
+              },
+              "description": "Alias for \"prs\"."
             },
             "format": {
               "type": "enum",
@@ -6081,9 +6141,7 @@
                 "type": "number",
                 "optional": false,
                 "constraints": [
-                  "coerced",
-                  "integer",
-                  "> 0"
+                  "coerced"
                 ]
               },
               "description": "PR number or array of PR numbers (use \"prNumber\" for a single PR)"
