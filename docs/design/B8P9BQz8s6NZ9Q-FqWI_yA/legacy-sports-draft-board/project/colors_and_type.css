@@ -19,16 +19,16 @@
   --bg-elevated: #16223A;
   --bg-raised:   #1C2A47;  /* one step above elevated for hover */
   --gold:        #C5A55A;
-  --gold-dim:    #A8894A;
+  --gold-dim:    #A68B3E;
   --seam:        #C41E3A;
   --seam-bright: #E63950;
   --navy:        #1B3A5C;
   --navy-light:  #2C4A7C;
-  --text:        #E8EDF5;
-  --text-sec:    #8A9BB5;
-  --text-mute:   #5E6E87;
-  --border:      #1E2D45;
-  --border-hov:  #2F4062;
+  --text:        #F8FAFC;
+  --text-sec:    #9CAAC5;
+  --text-mute:   rgba(248, 250, 252, 0.45);
+  --border:      rgba(255, 255, 255, 0.08);
+  --border-hov:  rgba(255, 255, 255, 0.14);
 
   /* Position accents (1px edge only — never wider per brief).
      On-palette only: reuse brand.md's approved accent/neutral tokens —
