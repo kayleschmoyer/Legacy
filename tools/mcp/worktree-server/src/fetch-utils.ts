@@ -11,7 +11,17 @@ export interface FetchResult {
   remote: string;
   branch: string | null;
   upToDate: boolean;
+  /** Commits on the local branch not yet on the remote-tracking ref, or `null` if it couldn't be determined (e.g. detached HEAD, branch not yet tracked). */
+  ahead: number | null;
+  /** Commits on the remote-tracking ref not yet on the local branch, or `null` if it couldn't be determined. */
+  behind: number | null;
   output: string;
+}
+
+/** Real ahead/behind divergence between a local branch and its remote-tracking ref. */
+export interface RemoteDivergence {
+  ahead: number;
+  behind: number;
 }
 
 /**
@@ -78,22 +88,103 @@ export function buildFetchArgs(
 /**
  * Shape the raw `git fetch` stdout/stderr into the tool result.
  *
- * git prints nothing when the remote is already up to date, so empty output is
- * treated as `upToDate: true`. The human-readable `output` field falls back to
- * a fixed string in that case.
+ * `upToDate`/`ahead`/`behind` come from an actual comparison of the local
+ * branch against its remote-tracking ref (`divergence`) whenever one could be
+ * computed. git's own fetch-summary lines ("abc123..def456  branch ->
+ * origin/branch") are written to stderr, which `execFileSync` does not
+ * surface to callers that only capture stdout (LS-10084) — so `rawOutput`
+ * being empty is *not* reliable evidence that nothing changed. It is kept
+ * only as a last-resort fallback for the rare case a real divergence check
+ * isn't possible (detached HEAD with no `branch` argument, a branch with no
+ * remote-tracking ref yet, etc).
  */
 export function buildFetchResult(
   remote: string,
   branch: string | undefined,
   rawOutput: string,
+  divergence: RemoteDivergence | null,
 ): FetchResult {
   const trimmed = rawOutput.trim();
+  const upToDate = divergence
+    ? divergence.ahead === 0 && divergence.behind === 0
+    : trimmed.length === 0;
   return {
     success: true,
     remote,
     branch: branch ?? null,
-    upToDate: trimmed.length === 0,
+    upToDate,
+    ahead: divergence?.ahead ?? null,
+    behind: divergence?.behind ?? null,
     output: trimmed || '(already up to date)',
+  };
+}
+
+/**
+ * Run a git command and return its trimmed stdout, or `null` on any failure.
+ * Used for the best-effort divergence probes below, where a resolution
+ * failure (no such ref, detached HEAD, etc.) should fall back gracefully
+ * rather than blow up the whole `worktree_fetch` call.
+ */
+function safeGit(
+  runGit: (args: string[], cwd: string, opts?: { timeout?: number }) => string,
+  args: string[],
+  cwd: string,
+): string | null {
+  try {
+    return runGit(args, cwd, { timeout: 10_000 }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compute real ahead/behind divergence between a local branch and its
+ * remote-tracking ref (`<remote>/<branch>`) via `git rev-list --count`,
+ * instead of guessing from `git fetch`'s captured output text (LS-10084 —
+ * see {@link buildFetchResult}). Returns `null` when the branch or its
+ * remote-tracking ref can't be resolved, so the caller can fall back.
+ *
+ * Call this *after* `git fetch` has run so the remote-tracking ref reflects
+ * whatever the remote holds now — including commits pushed directly to the
+ * branch (e.g. by a merge-queue bot) rather than merged locally.
+ */
+export function computeRemoteDivergence(
+  runGit: (args: string[], cwd: string, opts?: { timeout?: number }) => string,
+  cwd: string,
+  remote: string,
+  branch: string | undefined,
+): RemoteDivergence | null {
+  const branchName =
+    branch && branch.trim()
+      ? branch.trim()
+      : safeGit(runGit, ['rev-parse', '--abbrev-ref', 'HEAD'], cwd);
+  if (!branchName || branchName === 'HEAD') {
+    return null;
+  }
+
+  const remoteRef = `${remote}/${branchName}`;
+  const localSha = safeGit(runGit, ['rev-parse', '--verify', branchName], cwd);
+  const remoteSha = safeGit(runGit, ['rev-parse', '--verify', remoteRef], cwd);
+  if (!localSha || !remoteSha) {
+    return null;
+  }
+  if (localSha === remoteSha) {
+    return { ahead: 0, behind: 0 };
+  }
+
+  const aheadRaw = safeGit(
+    runGit,
+    ['rev-list', '--count', `${remoteRef}..${branchName}`],
+    cwd,
+  );
+  const behindRaw = safeGit(
+    runGit,
+    ['rev-list', '--count', `${branchName}..${remoteRef}`],
+    cwd,
+  );
+  return {
+    ahead: aheadRaw ? parseInt(aheadRaw, 10) : 0,
+    behind: behindRaw ? parseInt(behindRaw, 10) : 0,
   };
 }
 
@@ -147,12 +238,18 @@ export function executeWorktreeFetch(
       buildFetchArgs(remote, branch, deepen),
       target.path,
     );
+    const divergence = computeRemoteDivergence(
+      deps.runGit,
+      target.path,
+      remote,
+      branch,
+    );
     return {
       content: [
         {
           type: 'text',
           text: JSON.stringify(
-            buildFetchResult(remote, branch, output),
+            buildFetchResult(remote, branch, output, divergence),
             null,
             2,
           ),

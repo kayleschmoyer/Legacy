@@ -462,7 +462,7 @@
         },
         {
           "name": "worktree_fetch",
-          "description": "Fetch from a remote (git fetch [remote] [branch]). Returns the list of updated refs and whether the remote was already up to date. Use this instead of worktree_run(command: \"git fetch origin\") when you need up-to-date remote refs before a merge-base check, ancestor comparison, or any operation that reads origin/* refs. Typical use: fetch before worktree_status() to get accurate ahead/behind counts, or before worktree_run(command: \"git merge-base --is-ancestor origin/main HEAD\"). If a merge-base check fails with \"unrelated histories\" or comes back empty, the worktree is likely a shallow clone — pass `deepen` (e.g. 200) instead of falling back to a raw `git fetch --deepen`/`git rev-parse --is-shallow-repository` via Bash.",
+          "description": "Fetch from a remote (git fetch [remote] [branch]). Returns updated refs plus real `upToDate`/`ahead`/`behind` (not fetch's stdout). Use this instead of worktree_run(command: \"git fetch origin\") for up-to-date remote refs before a merge-base check, ancestor comparison, or any origin/* read. Typical use: fetch before worktree_status() to get accurate ahead/behind counts, or before worktree_run(command: \"git merge-base --is-ancestor origin/main HEAD\"). If a merge-base check fails with \"unrelated histories\" or comes back empty, the worktree is likely a shallow clone — pass `deepen` (e.g. 200) instead of falling back to a raw `git fetch --deepen`/`git rev-parse --is-shallow-repository` via Bash.",
           "inputs": {
             "remote": {
               "type": "string",
