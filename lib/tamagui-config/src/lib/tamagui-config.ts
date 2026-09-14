@@ -487,14 +487,48 @@ const tokens = createTokens({
 // even when no `xxl` media key existed, which is exactly how the old no-op
 // trap (LS-9416) went unnoticed. Types are therefore NOT the guard here;
 // `tamagui-config.spec.ts` asserts the runtime scale instead.
+//
+// ⚠️ KEY ORDER IS PRECEDENCE, NOT DECORATION (LS-10095). Tamagui derives a
+// media key's importance from its POSITION in this object, never from the
+// query widths:
+//
+//   getMediaKeyImportance = (key) => getConfig().settings.mediaPropOrder
+//     ? defaultMediaImportance
+//     : mediaKeysOrdered.indexOf(key) + 100;  // mediaKeysOrdered = Object.keys(media)
+//   // node_modules/@tamagui/web/dist/cjs/hooks/useMedia.js
+//
+// Later key = higher index = wins. `settings.mediaPropOrder` is not set
+// anywhere in this workspace, so that index path is the live one.
+//
+// The `maxWidth` bands are strictly NESTED (xxs ⊂ xs ⊂ sm ⊂ md ⊂ lg ⊂ xl), so
+// at any phone width several of them match at once and only order decides the
+// winner. They are therefore listed DESCENDING (xl → xxs) so the NARROWER band
+// sits later and out-ranks the wider one — the mobile-first cascade every call
+// site already assumes. This file originally listed them ascending (LS-9895),
+// which inverted that: `$sm` out-ranked `$xs`, so the small-phone type and
+// spacing step-down in `LeagueDetailShell` was inert at every width.
+//
+// The `gt*` keys stay ASCENDING, and that is not an inconsistency: they are
+// `minWidth` queries, so the nesting runs the other way (gtXl ⊂ gtLg ⊂ … ⊂
+// gtXs) and the WIDER band is the more specific one that should win. Both
+// halves match stock `@tamagui/config`'s own shape exactly.
+//
+// So: adding a key means choosing its position deliberately. Appending a new
+// `maxWidth` band to the end silently makes it out-rank every narrower band.
+// `tamagui-config.spec.ts` pins the relative order so this cannot regress
+// behind a comment.
 const designTokenMedia = {
-  xxs: { maxWidth: breakpoints.xs - 1 }, // ≤659
-  xs: { maxWidth: breakpoints.sm - 1 }, // ≤799
-  sm: { maxWidth: breakpoints.md - 1 }, // ≤859
-  md: { maxWidth: breakpoints.lg - 1 }, // ≤979
-  lg: { maxWidth: breakpoints.xl - 1 }, // ≤1119
+  // maxWidth bands — descending, so narrower out-ranks wider.
   xl: { maxWidth: breakpoints.xxl - 1 }, // ≤1279
+  lg: { maxWidth: breakpoints.xl - 1 }, // ≤1119
+  md: { maxWidth: breakpoints.lg - 1 }, // ≤979
+  sm: { maxWidth: breakpoints.md - 1 }, // ≤859
+  xs: { maxWidth: breakpoints.sm - 1 }, // ≤799
+  xxs: { maxWidth: breakpoints.xs - 1 }, // ≤659
+  // Top band — a minWidth query with no upper bound, so it sits outside the
+  // maxWidth block and ahead of the `gt*` keys, where it has always been.
   xxl: { minWidth: breakpoints.xxl }, // ≥1280
+  // minWidth bands — ascending, so wider out-ranks narrower.
   gtXs: { minWidth: breakpoints.sm }, // ≥800
   gtSm: { minWidth: breakpoints.md }, // ≥860
   gtMd: { minWidth: breakpoints.lg }, // ≥980
@@ -513,12 +547,19 @@ const designTokenMedia = {
 //   LS-9898 — sm, gtSm                       202 sites (the bulk, landed last)
 //
 // `designTokenMedia` above is now spread unmodified: there are no stock
-// holdouts left, and no `config.media` key is read any more. Two invariants
-// governed every step and still hold as assertions in `tamagui-config.spec.ts`:
+// holdouts left, and no `config.media` key is read any more. Three invariants
+// govern the scale and all hold as assertions in `tamagui-config.spec.ts`:
 //   1. `$X` and `$gtX` always move together. Moving `$sm` to 859 while `$gtSm`
 //      stayed at 801 would have made 801–859 match BOTH keys.
-//   2. Band order stays monotonic — each key's `maxWidth` is below the next's:
+//   2. The band scale stays monotonic — reading the bands narrow-to-wide,
+//      each `maxWidth` is below the next:
 //      xxs 659 < xs 799 < sm 859 < md 979 < lg 1119 < xl 1279 < xxl 1280+.
+//      (That is the scale's order, NOT this object's key order — see
+//      invariant 3.)
+//   3. Key order is precedence (LS-10095): `maxWidth` keys are listed
+//      descending so narrower wins, `gt*` keys ascending so wider wins. See
+//      the block above `designTokenMedia` for why, and never append a new
+//      `maxWidth` band to the end of the object.
 //
 // Do NOT reintroduce a `sm: config.media.sm`-style override to "fix" a
 // surface that looks wrong at a new width — that re-opens the drift this

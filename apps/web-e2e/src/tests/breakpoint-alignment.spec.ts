@@ -35,6 +35,10 @@
  * which is the point: every band's flip is asserted in a browser, not just in
  * the config object.
  *
+ * A final block (LS-10095) covers the orthogonal question those probes are
+ * each designed to avoid: which band wins when two of them overlap and set the
+ * same property. See its own comment at the bottom of this file.
+ *
  * Page-object convention (ADR-0015): locators live on `leaguePage`/
  * `standingsPage`, so this spec is selector-free. Viewport is the spec's to
  * own.
@@ -372,5 +376,70 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
 
     await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
     await leaguePage.standingsColumnHeader(/^PF$/).expectHidden();
+  });
+});
+
+/**
+ * LS-10095. The bands above each read ONE media key, deliberately, so that a
+ * flip reads that band's width rather than the resolution of two overlapping
+ * keys. This block covers the complementary question: when two nested maxWidth
+ * bands both match and both set the same property, WHICH ONE WINS.
+ *
+ * Tamagui answers that from the key's position in the media config object, not
+ * from the query widths, so `lib/tamagui-config` lists its maxWidth keys
+ * descending to make the narrower band win. The unit spec pins that key order;
+ * only a real browser proves the resulting cascade actually renders the
+ * narrower band's value.
+ *
+ * Probe: `LeagueDetailShell`'s league title, which sets `fontSize`/`lineHeight`
+ * under BOTH `$sm` (24/28) and `$xs` (22/26). At 799px both bands match and the
+ * `$xs` step-down must win; at 830px only `$sm` matches. Line height is read
+ * off the title's laid-out height via `boundingBox()` — the same mechanism the
+ * `$lg` probe at the top of this file uses — so no computed-style escape hatch
+ * is needed. Before this fix the title measured 28px at BOTH widths: `$sm`
+ * out-ranked `$xs` and the small-phone step-down was inert at every width.
+ */
+const XS_TITLE_LINE_HEIGHT = 26; // $xs — the small-phone step-down
+const SM_TITLE_LINE_HEIGHT = 28; // $sm — the compact-tier value
+
+async function titleLineHeight(leaguePage: {
+  leagueTitle: { boundingBox(): Promise<{ height: number } | null> };
+}): Promise<number> {
+  const box = await leaguePage.leagueTitle.boundingBox();
+  expect(box).not.toBeNull();
+  return Math.round(box?.height ?? 0);
+}
+
+test.describe('Media key precedence — the narrower band wins @regression', () => {
+  test(`title takes its $xs size where $xs and $sm overlap (${XS_BOUNDARY - 1}px)`, async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.setViewportSize({
+      width: XS_BOUNDARY - 1,
+      height: VIEWPORT_HEIGHT,
+    });
+    await mockLeagueForXsBoundary(page);
+    await leaguePage.gotoDetail(1, 'overview');
+    await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
+
+    // Both `$xs` (≤799) and `$sm` (≤859) match here. This is the assertion
+    // that fails against the pre-LS-10095 key order, where `$sm` won.
+    expect(await titleLineHeight(leaguePage)).toBe(XS_TITLE_LINE_HEIGHT);
+  });
+
+  test('title takes its $sm size just above the $xs band (830px)', async ({
+    page,
+    leaguePage,
+  }) => {
+    // The control for the case above: 830 is inside `sm` but outside `xs`, so
+    // `$sm` wins on width alone. Without this, a config that dropped `$sm`
+    // entirely would still pass the assertion above.
+    await page.setViewportSize({ width: 830, height: VIEWPORT_HEIGHT });
+    await mockLeagueForXsBoundary(page);
+    await leaguePage.gotoDetail(1, 'overview');
+    await leaguePage.leagueTitle.expectVisible({ timeout: 30000 });
+
+    expect(await titleLineHeight(leaguePage)).toBe(SM_TITLE_LINE_HEIGHT);
   });
 });

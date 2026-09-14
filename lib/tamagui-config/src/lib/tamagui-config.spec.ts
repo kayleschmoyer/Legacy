@@ -143,16 +143,68 @@ describe('media config (design-token breakpoint alignment)', () => {
   });
 
   it('keeps the band order monotonic', () => {
-    // Each maxWidth band must stay strictly below the next, or a narrower
-    // token would out-rank a wider one and the mobile-first cascade would
-    // invert. Now that every key is derived this also pins the full scale:
-    // 659 < 799 < 859 < 979 < 1119 < 1279 < 1280+.
+    // Each maxWidth band must stay strictly below the next, so the bands nest
+    // cleanly (xxs ⊂ xs ⊂ sm ⊂ md ⊂ lg ⊂ xl) and every band has a distinct
+    // boundary. Now that every key is derived this also pins the full scale:
+    // 659 < 799 < 859 < 979 < 1119 < 1279 < 1280+. Which of several matching
+    // bands actually WINS is a separate question, decided by key order rather
+    // than by these widths — see the key-order test below (LS-10095).
     const ascending = ['xxs', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
     const widths = ascending.map((key) => media[key].maxWidth as number);
     expect(widths).toEqual([...widths].sort((a, b) => a - b));
     expect(new Set(widths).size).toBe(widths.length);
     // …and the top band starts immediately above the last maxWidth band.
     expect(media.xxl.minWidth).toBe((media.xl.maxWidth as number) + 1);
+  });
+
+  it('orders the keys so the narrower maxWidth band out-ranks the wider (LS-10095)', () => {
+    // Tamagui takes a media key's importance from its POSITION in the config
+    // object, never from the query widths:
+    //   getMediaKeyImportance = (key) => settings.mediaPropOrder
+    //     ? defaultMediaImportance
+    //     : Object.keys(media).indexOf(key) + 100;
+    // Later key = higher importance = wins. The maxWidth bands are strictly
+    // nested, so on a phone several match at once and ONLY this order decides
+    // which value renders. Listing them ascending (the LS-9895 shape) made
+    // `$sm` out-rank `$xs`, leaving every small-phone `$xs` step-down inert.
+    const keys = Object.keys(media);
+    const at = (key: string) => {
+      const index = keys.indexOf(key);
+      expect(index).toBeGreaterThanOrEqual(0); // key must exist to be ordered
+      return index;
+    };
+
+    // Premise guard: with `mediaPropOrder` set, importance stops coming from
+    // key order and this whole assertion would be measuring nothing.
+    const settings = (
+      tamaguiConfig as unknown as {
+        settings: { mediaPropOrder?: unknown };
+      }
+    ).settings;
+    expect(settings.mediaPropOrder).toBeFalsy();
+
+    // maxWidth bands, widest → narrowest: each must appear LATER than the one
+    // before it, so the narrower band wins the mobile-first cascade.
+    const widestToNarrowest = ['xl', 'lg', 'md', 'sm', 'xs', 'xxs'] as const;
+    const maxWidthIndexes = widestToNarrowest.map(at);
+    expect(maxWidthIndexes).toEqual([...maxWidthIndexes].sort((a, b) => a - b));
+    // The exact regression LS-10095 fixes, pinned on its own so the failure
+    // message names it directly.
+    expect(at('xs')).toBeGreaterThan(at('sm'));
+
+    // `gt*` keys are minWidth queries, so their nesting runs the other way
+    // (gtXl ⊂ gtLg ⊂ … ⊂ gtXs) and the WIDER band is the specific one that
+    // should win — ascending is correct for them, and is NOT an inconsistency.
+    const narrowestToWidest = ['gtXs', 'gtSm', 'gtMd', 'gtLg', 'gtXl'] as const;
+    const gtIndexes = narrowestToWidest.map(at);
+    expect(gtIndexes).toEqual([...gtIndexes].sort((a, b) => a - b));
+
+    // Every `gt*` key stays after every maxWidth band, so a `$gtX` still beats
+    // a `$X` on the same property. Unchanged by LS-10095 — pinned so the
+    // reorder cannot quietly alter it either.
+    expect(Math.min(...gtIndexes)).toBeGreaterThan(
+      Math.max(...maxWidthIndexes),
+    );
   });
 
   it('makes $X and $gtX exact complements for every migrated pair', () => {
