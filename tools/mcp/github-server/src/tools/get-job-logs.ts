@@ -9,6 +9,11 @@ export interface GetJobLogsParams {
   jobId?: number;
   runId?: number;
   failedOnly?: boolean;
+  conclusions?: string[];
+  jobNameContains?: string;
+  listOnly?: boolean;
+  limit?: number;
+  offset?: number;
   tailLines?: number;
   maxChars?: number;
   errorSummary?: boolean;
@@ -57,7 +62,10 @@ interface GitHubJobStep {
 interface GitHubJob {
   id: number;
   name: string;
+  status: string;
   conclusion: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
   /**
    * Present on both the "list jobs for a workflow run" and "get a job for a
    * workflow run" REST responses. Used (LS-9644) to scope a job's log down
@@ -68,6 +76,32 @@ interface GitHubJob {
    */
   steps?: GitHubJobStep[];
 }
+
+/** Minimal per-job projection returned by `list_only` mode (LS-10144) —
+ * id/name/status/conclusion/timestamps only, no log bytes, so a full sharded
+ * run's job list fits well under the tool-result token cap. */
+interface JobSummary {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+function toJobSummary(job: GitHubJob): JobSummary {
+  return {
+    id: job.id,
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion,
+    startedAt: job.started_at ?? null,
+    completedAt: job.completed_at ?? null,
+  };
+}
+
+/** Default page size for `list_only` mode's limit/offset pagination. */
+const DEFAULT_LIST_LIMIT = 100;
 
 interface GitHubJobsResponse {
   total_count: number;
@@ -277,14 +311,13 @@ async function fetchScopedJobLog(
 }
 
 /**
- * Fetch all jobs for a run, optionally filtering to failed ones.
- * Handles pagination (GitHub returns ≤100 per page).
+ * Fetch every job for a run, unfiltered. Handles pagination (GitHub returns
+ * ≤100 per page) — a sharded run's ~24+ jobs need at most one extra page.
  */
-async function fetchJobs(
+async function fetchAllJobs(
   owner: string,
   repo: string,
   runId: number,
-  failedOnly: boolean,
 ): Promise<GitHubJob[]> {
   const allJobs: GitHubJob[] = [];
   let page = 1;
@@ -300,9 +333,49 @@ async function fetchJobs(
     page++;
   }
 
-  return failedOnly
-    ? allJobs.filter((j) => j.conclusion !== 'success')
-    : allJobs;
+  return allJobs;
+}
+
+export interface JobFilterOptions {
+  failedOnly: boolean;
+  /**
+   * REST job conclusions (lowercase, e.g. "cancelled", "failure",
+   * "timed_out") to keep. Supersedes `failedOnly` when non-empty (LS-10144)
+   * — this is the only way to reach a specific non-success conclusion such
+   * as `cancelled` without also pulling in every other non-success job.
+   */
+  conclusions?: string[];
+  /** Case-insensitive substring match against job.name. */
+  nameContains?: string;
+}
+
+/**
+ * Apply conclusion/name filters to a job list (LS-10144). `conclusions`
+ * (when given) replaces the `failedOnly` conclusion check entirely rather
+ * than narrowing it further, since a caller who explicitly asks for
+ * `["cancelled"]` wants exactly that, not "cancelled AND not-success".
+ */
+function filterJobs(
+  jobs: GitHubJob[],
+  { failedOnly, conclusions, nameContains }: JobFilterOptions,
+): GitHubJob[] {
+  let filtered = jobs;
+
+  if (conclusions && conclusions.length > 0) {
+    const wanted = new Set(conclusions.map((c) => c.toLowerCase()));
+    filtered = filtered.filter(
+      (j) => j.conclusion !== null && wanted.has(j.conclusion.toLowerCase()),
+    );
+  } else if (failedOnly) {
+    filtered = filtered.filter((j) => j.conclusion !== 'success');
+  }
+
+  if (nameContains) {
+    const needle = nameContains.toLowerCase();
+    filtered = filtered.filter((j) => j.name.toLowerCase().includes(needle));
+  }
+
+  return filtered;
 }
 
 /** Error-line patterns that indicate a CI failure worth surfacing. */
@@ -522,12 +595,61 @@ export async function getJobLogs(
     }
   }
 
+  if (params.listOnly && !params.runId) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: "list_only requires run_id — it lists a run's jobs, there is nothing to list for a single job_id.",
+        },
+      ],
+    };
+  }
+
   const { owner, name } = await getRepoOwnerName();
   const tailLines = params.tailLines ?? DEFAULT_TAIL_LINES;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
   const failedOnly = params.failedOnly !== false;
+  const filterOptions: JobFilterOptions = {
+    failedOnly,
+    conclusions: params.conclusions,
+    nameContains: params.jobNameContains,
+  };
 
   try {
+    if (params.listOnly && params.runId) {
+      const allJobs = await fetchAllJobs(owner, name, params.runId);
+      const matched = filterJobs(allJobs, filterOptions);
+      const offset = params.offset ?? 0;
+      const limit = params.limit ?? DEFAULT_LIST_LIMIT;
+      const page = matched.slice(offset, offset + limit);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                jobLabel: `run ${params.runId}`,
+                totalJobs: allJobs.length,
+                matchedJobs: matched.length,
+                returnedJobs: page.length,
+                offset,
+                limit,
+                ...(offset + page.length < matched.length
+                  ? { nextOffset: offset + page.length }
+                  : {}),
+                jobs: page.map(toJobSummary),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
     let rawText: string;
     let jobLabel: string;
     let scopedToFailingStep = false;
@@ -554,7 +676,8 @@ export async function getJobLogs(
       if (!params.runId) {
         throw new Error('runId is required when jobId is not provided');
       }
-      const jobs = await fetchJobs(owner, name, params.runId, failedOnly);
+      const allJobs = await fetchAllJobs(owner, name, params.runId);
+      const jobs = filterJobs(allJobs, filterOptions);
       if (jobs.length === 0) {
         return {
           content: [

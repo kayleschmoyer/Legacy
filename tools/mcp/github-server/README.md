@@ -68,6 +68,7 @@ The git-heavy tools (`github_bulk_rebase`, `github_open_pr`'s push phase) run un
 - **github_pr_batch_status** — Detailed status for multiple PRs (mergeable, CI, reviews, threads). `ciSummary`/`failedJobs` count only genuine failures; CANCELLED/STALE jobs (e.g. a superseded merge-queue attempt) are reported in `cancelledJobs` instead (LS-10116)
 - **github_pr_scan** — Scan all open PRs for CI and review state
 - **github_pr_dashboard** — Dashboard view of all open PRs
+- **get_job_logs** — Fetch Actions job logs for a `job_id` or all matching jobs in a `run_id`. `failed_only` (default true) already reaches non-success jobs, including `cancelled`; pass `conclusions` (e.g. `["cancelled"]`) for an exact set. Pass `list_only: true` to list a run's jobs (id/name/status/conclusion/timestamps, no log bytes) instead of fetching logs — paginate with `limit`/`offset` — so a sharded run's cancelled shards are reachable without overflowing the token cap (LS-10144)
 
 ### Repo & Infrastructure
 

@@ -531,6 +531,208 @@ describe('getJobLogs', () => {
     });
   });
 
+  describe('conclusions filter (LS-10144)', () => {
+    function makeJobsResponse(
+      jobs: Array<{ id: number; name: string; conclusion: string | null }>,
+    ) {
+      return { total_count: jobs.length, jobs };
+    }
+
+    it('reaches cancelled jobs that conclusion:"failure" alone would miss', async () => {
+      mockRest.mockResolvedValue(
+        makeJobsResponse([
+          { id: 10, name: 'e2e-shard-1', conclusion: 'cancelled' },
+          { id: 11, name: 'e2e-shard-2', conclusion: 'cancelled' },
+          { id: 12, name: 'Summarize & Report', conclusion: 'failure' },
+          { id: 13, name: 'lint', conclusion: 'success' },
+        ]),
+      );
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer('log'));
+
+      const result = await getJobLogs({
+        runId: 34722318458,
+        conclusions: ['cancelled'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGetArrayBuffer).toHaveBeenCalledTimes(2);
+      expect(mockGetArrayBuffer).toHaveBeenCalledWith(
+        'bkrupa',
+        'legacy-sports',
+        '/actions/jobs/10/logs',
+      );
+      expect(mockGetArrayBuffer).toHaveBeenCalledWith(
+        'bkrupa',
+        'legacy-sports',
+        '/actions/jobs/11/logs',
+      );
+    });
+
+    it('is case-insensitive and supersedes failed_only entirely', async () => {
+      mockRest.mockResolvedValue(
+        makeJobsResponse([
+          { id: 10, name: 'build', conclusion: 'failure' },
+          { id: 11, name: 'e2e-shard-1', conclusion: 'cancelled' },
+        ]),
+      );
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer('log'));
+
+      const result = await getJobLogs({
+        runId: 1,
+        failedOnly: true,
+        conclusions: ['CANCELLED'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGetArrayBuffer).toHaveBeenCalledTimes(1);
+      expect(mockGetArrayBuffer).toHaveBeenCalledWith(
+        'bkrupa',
+        'legacy-sports',
+        '/actions/jobs/11/logs',
+      );
+    });
+
+    it('failed_only alone (no conclusions) already reaches cancelled jobs', async () => {
+      mockRest.mockResolvedValue(
+        makeJobsResponse([
+          { id: 10, name: 'e2e-shard-1', conclusion: 'cancelled' },
+          { id: 11, name: 'lint', conclusion: 'success' },
+        ]),
+      );
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer('log'));
+
+      const result = await getJobLogs({ runId: 1, failedOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGetArrayBuffer).toHaveBeenCalledTimes(1);
+      expect(mockGetArrayBuffer).toHaveBeenCalledWith(
+        'bkrupa',
+        'legacy-sports',
+        '/actions/jobs/10/logs',
+      );
+    });
+  });
+
+  describe('job_name_contains (LS-10144)', () => {
+    it('filters jobs by case-insensitive name substring', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 2,
+        jobs: [
+          { id: 10, name: 'e2e-shard-1', conclusion: 'cancelled' },
+          { id: 11, name: 'unit-shard-1', conclusion: 'cancelled' },
+        ],
+      });
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer('log'));
+
+      const result = await getJobLogs({
+        runId: 1,
+        jobNameContains: 'E2E',
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGetArrayBuffer).toHaveBeenCalledTimes(1);
+      expect(mockGetArrayBuffer).toHaveBeenCalledWith(
+        'bkrupa',
+        'legacy-sports',
+        '/actions/jobs/10/logs',
+      );
+    });
+  });
+
+  describe('list_only mode (LS-10144)', () => {
+    it('returns minimal job fields without fetching any logs', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 3,
+        jobs: [
+          {
+            id: 10,
+            name: 'e2e-shard-1',
+            status: 'completed',
+            conclusion: 'cancelled',
+            started_at: '2026-01-01T00:00:00Z',
+            completed_at: '2026-01-01T00:05:00Z',
+          },
+          {
+            id: 11,
+            name: 'e2e-shard-2',
+            status: 'completed',
+            conclusion: 'cancelled',
+            started_at: '2026-01-01T00:00:00Z',
+            completed_at: '2026-01-01T00:05:00Z',
+          },
+          {
+            id: 12,
+            name: 'lint',
+            status: 'completed',
+            conclusion: 'success',
+            started_at: '2026-01-01T00:00:00Z',
+            completed_at: '2026-01-01T00:02:00Z',
+          },
+        ],
+      });
+
+      const result = await getJobLogs({ runId: 1, listOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockGetArrayBuffer).not.toHaveBeenCalled();
+      const payload = parse(result.content[0].text);
+      expect(payload.totalJobs).toBe(3);
+      expect(payload.matchedJobs).toBe(2);
+      expect(payload.returnedJobs).toBe(2);
+      expect(payload.jobs).toEqual([
+        {
+          id: 10,
+          name: 'e2e-shard-1',
+          status: 'completed',
+          conclusion: 'cancelled',
+          startedAt: '2026-01-01T00:00:00Z',
+          completedAt: '2026-01-01T00:05:00Z',
+        },
+        {
+          id: 11,
+          name: 'e2e-shard-2',
+          status: 'completed',
+          conclusion: 'cancelled',
+          startedAt: '2026-01-01T00:00:00Z',
+          completedAt: '2026-01-01T00:05:00Z',
+        },
+      ]);
+    });
+
+    it('paginates with limit/offset and surfaces nextOffset', async () => {
+      const jobs = Array.from({ length: 5 }, (_, i) => ({
+        id: i,
+        name: `job-${i}`,
+        status: 'completed',
+        conclusion: 'failure',
+      }));
+      mockRest.mockResolvedValue({ total_count: 5, jobs });
+
+      const result = await getJobLogs({
+        runId: 1,
+        listOnly: true,
+        failedOnly: false,
+        limit: 2,
+        offset: 1,
+      });
+
+      const payload = parse(result.content[0].text);
+      expect(payload.matchedJobs).toBe(5);
+      expect(payload.returnedJobs).toBe(2);
+      expect(payload.offset).toBe(1);
+      expect(payload.nextOffset).toBe(3);
+      expect((payload.jobs as unknown[]).length).toBe(2);
+    });
+
+    it('rejects list_only without run_id', async () => {
+      const result = await getJobLogs({ jobId: 1, listOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('list_only requires run_id');
+      expect(mockRest).not.toHaveBeenCalled();
+    });
+  });
+
   describe('error handling', () => {
     it('wraps fetch errors as isError response', async () => {
       mockGetArrayBuffer.mockRejectedValue(

@@ -2248,7 +2248,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'get_job_logs',
-    'Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only, or grep_pattern for a substring search. Provide job_id for a single job or run_id (with optional failed_only) for all jobs.',
+    'Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only, or grep_pattern for a substring search. Provide job_id for a single job, or run_id for matching jobs (failed_only/conclusions/job_name_contains/list_only).',
     {
       job_id: z.coerce
         .number()
@@ -2268,8 +2268,40 @@ export function createServer(): McpServer {
         .boolean()
         .default(true)
         .describe(
-          'When using run_id, only fetch logs for failed jobs (default: true).',
+          'With run_id, keep non-success jobs (default true, incl. cancelled).',
         ),
+      conclusions: z
+        .array(z.string().trim().min(1))
+        .optional()
+        .describe(
+          'Exact conclusions to keep, e.g. ["cancelled"]; supersedes failed_only.',
+        ),
+      job_name_contains: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Substring filter on job name.'),
+      list_only: z
+        .boolean()
+        .default(false)
+        .describe(
+          'Requires run_id. List matching jobs, no logs (see limit/offset).',
+        ),
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(500)
+        .optional()
+        .describe('list_only page size (default 100).'),
+      offset: z.coerce
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('list_only offset (default 0).'),
       tail_lines: z.coerce
         .number()
         .int()
@@ -2321,6 +2353,11 @@ export function createServer(): McpServer {
         jobId: params.job_id,
         runId: params.run_id,
         failedOnly: params.failed_only,
+        conclusions: params.conclusions,
+        jobNameContains: params.job_name_contains,
+        listOnly: params.list_only,
+        limit: params.limit,
+        offset: params.offset,
         tailLines: params.tail_lines ?? params.tailLines,
         maxChars: params.max_chars,
         errorSummary: params.error_summary,

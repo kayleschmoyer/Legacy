@@ -16,13 +16,18 @@ Available both locally (stdio) and via the hosted connector. 61 tools.
 
 ### `get_job_logs`
 
-Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only, or grep_pattern for a substring search. Provide job_id for a single job or run_id (with optional failed_only) for all jobs.
+Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only, or grep_pattern for a substring search. Provide job_id for a single job, or run_id for matching jobs (failed_only/conclusions/job_name_contains/list_only).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `job_id` | number |  | coerced, integer, > 0 | Specific job ID. Required when run_id is not provided. |
 | `run_id` | number |  | coerced, integer, > 0 | Workflow run ID. Fetches logs for all jobs in the run (filtered by failed_only). Required when job_id is not provided. |
-| `failed_only` | boolean |  | — | When using run_id, only fetch logs for failed jobs (default: true). |
+| `failed_only` | boolean |  | — | With run_id, keep non-success jobs (default true, incl. cancelled). |
+| `conclusions` | string[] |  | min 1 | Exact conclusions to keep, e.g. ["cancelled"]; supersedes failed_only. |
+| `job_name_contains` | string |  | min 1, max 200 | Substring filter on job name. |
+| `list_only` | boolean |  | — | Requires run_id. List matching jobs, no logs (see limit/offset). |
+| `limit` | number |  | coerced, integer, > 0, max 500 | list_only page size (default 100). |
+| `offset` | number |  | coerced, integer, >= 0 | list_only offset (default 0). |
 | `tail_lines` | number |  | coerced, integer, > 0 | Max lines from the end of the log (default 200). |
 | `tailLines` | number |  | coerced, integer, > 0 | camelCase alias for tail_lines; tail_lines wins if both set. |
 | `max_chars` | number |  | coerced, integer, > 0 | Hard cap on output characters (default: 10 000); truncated output is suffixed with the total byte count. |
