@@ -42,6 +42,17 @@ const BASEBALL_COLUMNS: StatColumn[] = [
   },
 ];
 
+/**
+ * Deliberate deviation from the draft-board design (LS-10164): the design's
+ * Data Table shows YDS/TD/PB/AP/AV for football, but Pro Bowl selections
+ * (PB), All-Pro selections (AP), and Approximate Value (AV) aren't collected
+ * anywhere in the data model — only the four career_football_* tables
+ * (passing/rushing/receiving/kicking) referenced by DraftPlayer's football
+ * fields (LS-9478) are. Substituting PASS YDS/RUSH YDS/REC/TD/FG keeps every
+ * column backed by real, measured stats rather than a fabricated PB/AP/AV
+ * (the LS-9473 postmortem this feature exists to avoid repeating). Revisit
+ * if/when award data is ever ingested.
+ */
 const FOOTBALL_COLUMNS: StatColumn[] = [
   {
     label: 'PASS YDS',

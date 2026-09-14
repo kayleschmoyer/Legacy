@@ -336,6 +336,104 @@ const TEXT_SECONDARY = 'var(--d-text-secondary)';
 const TEXT_MUTED = 'var(--d-text-muted)';
 const PANEL = 'var(--d-panel)';
 
+/** Data Table column header that's clickable to sort (Rank/Pos/Player/ADP and
+ * the per-sport stat columns). */
+function SortableColumnHeader({
+  label,
+  sortKeyValue,
+  sortKey,
+  sortDir,
+  onPress,
+  width,
+  align = 'left',
+}: {
+  label: string;
+  sortKeyValue: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onPress: (key: SortKey) => void;
+  width?: number;
+  align?: 'left' | 'right';
+}) {
+  const active = sortKey === sortKeyValue;
+  return (
+    <XStack
+      role="columnheader"
+      accessibilityRole="button"
+      aria-sort={
+        active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+      }
+      onPress={() => onPress(sortKeyValue)}
+      cursor="pointer"
+      flex={width ? undefined : 1}
+      width={width}
+      justifyContent={align === 'right' ? 'flex-end' : 'flex-start'}
+      paddingVertical={9}
+      paddingHorizontal={12}
+      style={csp({
+        background: PANEL,
+        borderBottom: `1px solid ${BORDER}`,
+      })}
+    >
+      <Text
+        fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+        fontWeight="700"
+        fontSize={10}
+        letterSpacing={1.4}
+        textTransform="uppercase"
+        color={active ? ACCENT : TEXT_SECONDARY}
+        whiteSpace="nowrap"
+      >
+        {label}
+        {active && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Data Table column header that's plain, non-sortable text (LS-10164:
+ * Team/Career — the design's Data Table doesn't mark these with a sort
+ * indicator, unlike ADP and the stat columns). */
+function PlainColumnHeader({ label, width }: { label: string; width: number }) {
+  return (
+    <XStack
+      width={width}
+      justifyContent="flex-start"
+      paddingVertical={9}
+      paddingHorizontal={12}
+      style={csp({
+        background: PANEL,
+        borderBottom: `1px solid ${BORDER}`,
+      })}
+    >
+      <Text
+        fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+        fontWeight="700"
+        fontSize={10}
+        letterSpacing={1.4}
+        textTransform="uppercase"
+        color={TEXT_SECONDARY}
+        whiteSpace="nowrap"
+      >
+        {label}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Data Table "Career" cell text (LS-10164), e.g. "1914–1935". Em-dash when
+ * no start year is on file — mirrors PlayerCard/BaseballCard's
+ * formatCareerSpan, but this table only needs the label, not the season
+ * count those cards also render. */
+function formatCareerSpanLabel(
+  startYear: number | null | undefined,
+  endYear: number | null | undefined,
+): string {
+  if (startYear == null) return '—';
+  const end = endYear ?? startYear;
+  return end === startYear ? `${startYear}` : `${startYear}–${end}`;
+}
+
 /**
  * Search field + position-filter pills — the player browser's filter
  * control. One component, two hosts: the Cards / Data Table views' controls
@@ -928,63 +1026,46 @@ export function DraftPlayerBoard({
           >
             <YStack role="table" minWidth="100%">
               <XStack role="row">
-                {(
-                  [
-                    { key: 'rank', label: 'Rank', width: 64, align: 'right' },
-                    {
-                      key: 'name',
-                      label: 'Player',
-                      width: undefined,
-                      align: 'left',
-                    },
-                    { key: 'position', label: 'Pos', width: 60, align: 'left' },
-                    { key: 'adp', label: 'ADP', width: 70, align: 'right' },
-                  ] as Array<{
-                    key: string;
-                    label: string;
-                    width: number | undefined;
-                    align: 'left' | 'right';
-                  }>
-                ).map(({ key, label, width, align }) => (
-                  <XStack
-                    key={key}
-                    role="columnheader"
-                    accessibilityRole="button"
-                    aria-sort={
-                      sortKey === key
-                        ? sortDir === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                    onPress={() => handleHeaderClick(key)}
-                    cursor="pointer"
-                    flex={width ? undefined : 1}
-                    width={width}
-                    justifyContent={
-                      align === 'right' ? 'flex-end' : 'flex-start'
-                    }
-                    paddingVertical={9}
-                    paddingHorizontal={12}
-                    style={csp({
-                      background: PANEL,
-                      borderBottom: `1px solid ${BORDER}`,
-                    })}
-                  >
-                    <Text
-                      fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
-                      fontWeight="700"
-                      fontSize={10}
-                      letterSpacing={1.4}
-                      textTransform="uppercase"
-                      color={sortKey === key ? ACCENT : TEXT_SECONDARY}
-                      whiteSpace="nowrap"
-                    >
-                      {label}
-                      {sortKey === key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
-                    </Text>
-                  </XStack>
-                ))}
+                <SortableColumnHeader
+                  label="Rank"
+                  sortKeyValue="rank"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onPress={handleHeaderClick}
+                  width={64}
+                  align="right"
+                />
+                <SortableColumnHeader
+                  label="Pos"
+                  sortKeyValue="position"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onPress={handleHeaderClick}
+                  width={60}
+                  align="left"
+                />
+                <SortableColumnHeader
+                  label="Player"
+                  sortKeyValue="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onPress={handleHeaderClick}
+                  align="left"
+                />
+                {/* Team and Career (LS-10164): the design's Data Table places
+                    these between Player and ADP, and doesn't mark them with a
+                    sort indicator the way ADP and the stat columns are. */}
+                <PlainColumnHeader label="Team" width={64} />
+                <PlainColumnHeader label="Career" width={100} />
+                <SortableColumnHeader
+                  label="ADP"
+                  sortKeyValue="adp"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onPress={handleHeaderClick}
+                  width={70}
+                  align="right"
+                />
                 {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
                   <XStack
                     key={col.label}
@@ -1045,11 +1126,6 @@ export function DraftPlayerBoard({
                         {rankMap.get(player.id) ?? idx + 1}
                       </Text>
                     </XStack>
-                    <XStack flex={1} padding={8}>
-                      <Text fontWeight="600" fontSize={13} color={TEXT}>
-                        {player.name}
-                      </Text>
-                    </XStack>
                     <XStack width={60} padding={8}>
                       <XStack
                         paddingHorizontal={5}
@@ -1067,6 +1143,24 @@ export function DraftPlayerBoard({
                           {player.position ?? '?'}
                         </Text>
                       </XStack>
+                    </XStack>
+                    <XStack flex={1} padding={8}>
+                      <Text fontWeight="600" fontSize={13} color={TEXT}>
+                        {player.name}
+                      </Text>
+                    </XStack>
+                    <XStack width={64} padding={8}>
+                      <Text fontSize={12} color={TEXT}>
+                        {player.club ?? '—'}
+                      </Text>
+                    </XStack>
+                    <XStack width={100} padding={8}>
+                      <Text fontSize={12} color={TEXT}>
+                        {formatCareerSpanLabel(
+                          player.careerStartYear,
+                          player.careerEndYear,
+                        )}
+                      </Text>
                     </XStack>
                     <XStack width={70} justifyContent="flex-end" padding={8}>
                       <Text fontSize={12} color={TEXT}>
