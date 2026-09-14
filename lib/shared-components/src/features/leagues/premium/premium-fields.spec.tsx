@@ -591,12 +591,13 @@ describe('premium league-create fields (LS-5174)', () => {
 
     beforeEach(() => jest.clearAllMocks());
 
-    it('renders the Redraft/Keeper toggle', () => {
+    it('renders all three roster-continuity modes', () => {
       const { getByText } = render(
         <RosterContinuityField {...baseProps} isPremium={false} />,
       );
       expect(getByText('Redraft')).toBeTruthy();
       expect(getByText('Keeper')).toBeTruthy();
+      expect(getByText('Dynasty')).toBeTruthy();
     });
 
     it('does not render keeper sub-fields when rosterContinuity is redraft', () => {
@@ -676,6 +677,89 @@ describe('premium league-create fields (LS-5174)', () => {
         />,
       );
       expect(queryByPlaceholderText('e.g. 3')).toBeNull();
+    });
+
+    // ── Dynasty (LS-8386) ────────────────────────────────────────────────
+    it('enables Dynasty mode for premium users', () => {
+      const onRosterContinuityChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Dynasty'));
+      expect(onRosterContinuityChange).toHaveBeenCalledWith('dynasty');
+    });
+
+    it('routes a free user to onUpgrade instead of enabling Dynasty', () => {
+      const onRosterContinuityChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+          // `disabled` is what PremiumGate's caller leaves off; isPremium
+          // alone must still hard-disable the control, so neither callback
+          // fires. Matches the Keeper case above.
+        />,
+      );
+      fireEvent.click(getByText('Dynasty'));
+      expect(onRosterContinuityChange).not.toHaveBeenCalled();
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
+
+    it('hides every keeper sub-field when Dynasty is selected', () => {
+      // Dynasty persists full rosters at no cost, so there is no keeper
+      // count, cost model, consecutive-keeps limit or rookie exemption to
+      // configure — and the server rejects keeperSettings sent with it.
+      const { queryByPlaceholderText, queryByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="dynasty"
+          isPremium
+        />,
+      );
+      expect(queryByPlaceholderText('e.g. 3')).toBeNull();
+      expect(queryByPlaceholderText('Unlimited')).toBeNull();
+      expect(queryByText('Keeper Cost Model')).toBeNull();
+      expect(queryByText('Rookie Exempt')).toBeNull();
+    });
+
+    it('allows Dynasty under a random selection method, unlike Keeper', () => {
+      // Keeper needs a cost model and 'random' has none (LS-8671); dynasty
+      // costs nothing, so the constraint does not apply to it.
+      const onRosterContinuityChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          selectionMethod="random"
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Dynasty'));
+      expect(onRosterContinuityChange).toHaveBeenCalledWith('dynasty');
+    });
+
+    it('turns Dynasty back off to Redraft without routing through onUpgrade', () => {
+      const onRosterContinuityChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="dynasty"
+          onRosterContinuityChange={onRosterContinuityChange}
+          onUpgrade={onUpgrade}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Redraft'));
+      expect(onRosterContinuityChange).toHaveBeenCalledWith('redraft');
+      expect(onUpgrade).not.toHaveBeenCalled();
     });
 
     it('turns Keeper mode back off without routing through onUpgrade', () => {

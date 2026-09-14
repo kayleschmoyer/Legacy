@@ -224,9 +224,11 @@ export interface CreateLeagueFormData {
   // pre-draft (LS-8675). Hidden and coerced false for auction leagues.
   allowDraftSlotTrading: boolean;
   pickTimeLimitSeconds: number;
-  // Keeper draft mode (LS-8672). rosterContinuity gates the fields below —
-  // only meaningful (and sent to the server) when 'keeper'.
-  rosterContinuity: 'redraft' | 'keeper';
+  // Roster continuity (LS-8672 keeper, LS-8386 dynasty). rosterContinuity
+  // gates the fields below — they are only meaningful (and only sent to the
+  // server) when 'keeper'. Dynasty persists full rosters at no cost, so it
+  // carries no configuration of its own.
+  rosterContinuity: 'redraft' | 'keeper' | 'dynasty';
   keeperCount?: number;
   keeperCostModel?: KeeperCostModel;
   maxConsecutiveKeeps?: number;
@@ -571,7 +573,9 @@ export function applyImportedSettings(
     apply(
       'rosterContinuity',
       s.rosterContinuity as CreateLeagueFormData['rosterContinuity'],
-      s.rosterContinuity === 'redraft' || s.rosterContinuity === 'keeper',
+      s.rosterContinuity === 'redraft' ||
+        s.rosterContinuity === 'keeper' ||
+        s.rosterContinuity === 'dynasty',
     );
   }
   if (typeof s.keeperCount === 'number') {
@@ -1676,6 +1680,9 @@ function SummarySidePanel({
               gold
             />
           )}
+          {f.rosterContinuity === 'dynasty' && (
+            <SummaryRow label="Dynasty" value="Full rosters persist" gold />
+          )}
         </YStack>
       </Card>
 
@@ -2201,8 +2208,13 @@ export function LeagueCreatePage(): React.JSX.Element {
         );
       } else if (
         field === 'rosterContinuity' &&
-        next.rosterContinuity === 'redraft'
+        (next.rosterContinuity === 'redraft' ||
+          next.rosterContinuity === 'dynasty')
       ) {
+        // Neither mode takes keeper configuration: redraft keeps nobody, and
+        // dynasty keeps everybody at no cost. Clearing the fields here is what
+        // keeps the submission valid — the server rejects keeperSettings sent
+        // with any rosterContinuity other than 'keeper' (LS-8671).
         next.keeperCount = undefined;
         next.keeperCostModel = undefined;
         next.maxConsecutiveKeeps = undefined;
@@ -2597,7 +2609,9 @@ export function LeagueCreatePage(): React.JSX.Element {
             rosterContinuity:
               formData.rosterContinuity === 'keeper'
                 ? GqlRosterContinuity.Keeper
-                : undefined,
+                : formData.rosterContinuity === 'dynasty'
+                  ? GqlRosterContinuity.Dynasty
+                  : undefined,
             keeperSettings:
               formData.rosterContinuity === 'keeper' &&
               formData.keeperCount !== undefined &&
@@ -3771,7 +3785,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                       })()}
                     {formData.rosterContinuity === 'keeper'
                       ? ` · Keeper (${formData.keeperCount ?? '?'})`
-                      : ''}
+                      : formData.rosterContinuity === 'dynasty'
+                        ? ' · Dynasty'
+                        : ''}
                   </span>
                 }
                 open={openSections.has('draft')}
@@ -4117,7 +4133,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <PremiumGate
                       isPremium={isPremium}
                       featureName="Roster Continuity"
-                      featureDescription="Run a keeper league — commissioners choose how many players each team retains season-over-season, and how kept players are costed."
+                      featureDescription="Run a keeper or dynasty league — keep a set number of players season-over-season at a draft cost, or persist full rosters and draft only the players nobody owns."
                     >
                       <RosterContinuityField
                         rosterContinuity={formData.rosterContinuity}

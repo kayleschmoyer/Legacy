@@ -279,6 +279,15 @@ builder.mutationField('initializeDraft', (t) =>
           // to their teams (with cost applied) before the first pick. Must
           // run after the seats exist (forfeited-pick rows reference this
           // draftId) and before any pick/bid can happen.
+          //
+          // Dynasty leagues (LS-8386) deliberately take no branch here. The
+          // roster renewLeague carried forward IS the dynasty roster, so the
+          // correct action is to leave team_members untouched — every carried
+          // player stays rostered and is therefore excluded from the draftable
+          // pool by buildDraftAdpPoolConditions, leaving exactly the unrostered
+          // players (rookies/free agents) to draft. Keeper's wipe-and-rebuild
+          // is the opposite operation and must not run for dynasty; asserting
+          // that by omission is subtle, so it is stated here instead.
           if (league.rosterContinuity === 'keeper' && league.keeperSettings) {
             await applyKeeperDesignationsForDraft(tx, {
               leagueId,

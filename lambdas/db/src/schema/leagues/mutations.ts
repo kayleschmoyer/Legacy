@@ -311,6 +311,42 @@ export function validateKeeperConfig(
   return costModel;
 }
 
+/** How a season rollover treats rosters and the next season's draft. */
+export interface RolloverContinuityPlan {
+  /** Copy the prior season's team_members into the new league's teams. */
+  carryRosters: boolean;
+  /** Leave the new league with a draft to hold ('not-started'/'pre-draft'). */
+  holdsDraft: boolean;
+}
+
+/**
+ * Decide a season rollover's roster/draft shape from the league's roster
+ * continuity and the commissioner's `keepRosters` choice (LS-8386).
+ *
+ * Redraft and keeper leagues honour `keepRosters` as before: keeping rosters
+ * means there is nothing left to draft, so the new season opens already
+ * 'completed' and in the offseason.
+ *
+ * Dynasty is the exception, and the reason this is a function rather than two
+ * inline ternaries: it is the only mode where both are true at once. Full
+ * rosters persist — that is what dynasty *means*, so `keepRosters: false`
+ * cannot switch it off — and a draft is still held, over the players nobody
+ * has rostered (rookies and free agents). The draftable pool is narrowed to
+ * exactly those players by the `team_members` exclusion in
+ * buildDraftAdpPoolConditions, so carrying the roster forward is the entire
+ * carryover mechanism; no dynasty-specific draft-init step is needed.
+ */
+export function resolveRolloverContinuity(
+  rosterContinuity: 'redraft' | 'keeper' | 'dynasty' | null | undefined,
+  keepRosters: boolean,
+): RolloverContinuityPlan {
+  const isDynasty = rosterContinuity === 'dynasty';
+  return {
+    carryRosters: keepRosters || isDynasty,
+    holdsDraft: !keepRosters || isDynasty,
+  };
+}
+
 // ── Input / payload types ──────────────────────────────────────────────────
 
 // Keeper configuration input (LS-8671). Only valid when the accompanying
@@ -825,15 +861,24 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       // without this gate a direct API call still creates a keeper league on a
       // free account. Checked BEFORE validateKeeperConfig so a free caller gets
       // the upgrade prompt rather than a config-shape error, matching the
-      // auction_draft / draft_slot_trading gates above (LS-5159). Note:
-      // 'dynasty' is deliberately NOT gated — the mode is unimplemented
-      // (LS-8386) and grants nothing today; LS-8386 owns minting and gating its
-      // own entitlement key when it ships.
+      // auction_draft / draft_slot_trading gates above (LS-5159).
+      //
+      // Dynasty (LS-8386) is the strictest variant of the same roster-continuity
+      // model, so it carries its own key rather than riding on keeper_leagues:
+      // the two are independently sellable, and a plan could grant one without
+      // the other. Both are checked here so neither mode can be created by a
+      // direct API call that bypasses the creation UI's PremiumGate.
       if (inputRosterContinuity === 'keeper') {
         await requireFreshEntitlement(
           context,
           ENTITLEMENTS.keeper_leagues,
           'Keeper leagues require a premium subscription. Upgrade to carry players over between seasons.',
+        );
+      } else if (inputRosterContinuity === 'dynasty') {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.dynasty_leagues,
+          'Dynasty leagues require a premium subscription. Upgrade to keep full rosters between seasons.',
         );
       }
 
@@ -3462,6 +3507,10 @@ builder.mutationField('joinPublicLeague', (t) =>
  *
  * keepRosters = true  ? copy team_members into the new league's teams
  * keepRosters = false ? leave rosters empty so a new draft can be held
+ *
+ * Dynasty leagues (LS-8386) override that choice: rosters always carry over
+ * AND a draft is always held, because a dynasty season drafts only the players
+ * nobody has rostered. See the `isDynasty` derivation in the resolver.
  */
 builder.mutationField('renewLeague', (t) =>
   t.field({
@@ -3599,6 +3648,31 @@ builder.mutationField('renewLeague', (t) =>
         );
       }
 
+      // Roster continuity became a carried-forward setting in LS-8386 (before
+      // that, renewal silently reset every league to 'redraft'), so it joins
+      // the LS-5127 re-check above: a commissioner who has since downgraded
+      // must re-qualify rather than inherit keeper/dynasty for another season.
+      if (oldLeague.rosterContinuity === 'keeper') {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.keeper_leagues,
+          'Keeper leagues require a premium subscription. Upgrade to carry players over between seasons.',
+        );
+      } else if (oldLeague.rosterContinuity === 'dynasty') {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.dynasty_leagues,
+          'Dynasty leagues require a premium subscription. Upgrade to keep full rosters between seasons.',
+        );
+      }
+
+      // Roster continuity drives how a season rolls over (LS-8386) — see
+      // resolveRolloverContinuity for why dynasty overrides keepRosters.
+      const { carryRosters, holdsDraft } = resolveRolloverContinuity(
+        oldLeague.rosterContinuity,
+        keepRosters,
+      );
+
       // 3. Load current teams (preserving order)
       const oldTeams = await context.db
         .select()
@@ -3649,7 +3723,7 @@ builder.mutationField('renewLeague', (t) =>
         number,
         (typeof PublicSchema.teamMembers.$inferSelect)[]
       >();
-      if (keepRosters) {
+      if (carryRosters) {
         const allRosters = await context.db
           .select()
           .from(PublicSchema.teamMembers)
@@ -3734,8 +3808,8 @@ builder.mutationField('renewLeague', (t) =>
             maxRosterSize: oldLeague.maxRosterSize,
             currentMatchup: null,
             currentWeek: null,
-            draftStatus: keepRosters ? 'completed' : 'not-started',
-            leaguePhase: keepRosters ? 'offseason' : 'pre-draft',
+            draftStatus: holdsDraft ? 'not-started' : 'completed',
+            leaguePhase: holdsDraft ? 'pre-draft' : 'offseason',
             inviteCode: newInviteCode,
             minGamesPerSeason: oldLeague.minGamesPerSeason,
             gamesPerMatchup: oldLeague.gamesPerMatchup,
@@ -3779,6 +3853,12 @@ builder.mutationField('renewLeague', (t) =>
             auctionMinBid: oldLeague.auctionMinBid,
             // Draft slot trading carried forward (LS-8675)
             allowDraftSlotTrading: oldLeague.allowDraftSlotTrading,
+            // Roster continuity carried forward (LS-8386). Without this a
+            // renewed season silently reverted to 'redraft', so season 2 of a
+            // keeper or dynasty league would have drafted from the full pool
+            // and dropped the mode the commissioner paid for.
+            rosterContinuity: oldLeague.rosterContinuity,
+            keeperSettings: oldLeague.keeperSettings,
           })
           .returning();
 
@@ -3837,10 +3917,10 @@ builder.mutationField('renewLeague', (t) =>
           }
         }
 
-        // 14. Copy rosters if keepRosters is requested
+        // 14. Copy rosters if the rollover carries them (keepRosters, or dynasty)
         // Collects carriedOverPlayerIds so LS-645 can apply salary escalation
         const carriedOverPlayerIds = new Set<number>();
-        if (keepRosters && oldRostersByTeamId.size > 0) {
+        if (carryRosters && oldRostersByTeamId.size > 0) {
           const rosterRows: (typeof PublicSchema.teamMembers.$inferInsert)[] =
             [];
           for (const [oldTeamId, members] of oldRostersByTeamId.entries()) {
@@ -4016,6 +4096,9 @@ builder.mutationField('renewLeague', (t) =>
         oldLeagueId: leagueId,
         newLeagueId: newLeague.id,
         keepRosters,
+        rosterContinuity: oldLeague.rosterContinuity,
+        carryRosters,
+        holdsDraft,
         userId,
       });
 

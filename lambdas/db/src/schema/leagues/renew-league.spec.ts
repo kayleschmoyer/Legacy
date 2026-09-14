@@ -628,6 +628,60 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
       ).rejects.toThrow('Salary cap leagues require a premium subscription');
     });
 
+    it('blocks a free user renewing a dynasty league (LS-8386)', async () => {
+      // Roster continuity became a carried-forward setting in LS-8386, which
+      // brings it under this LS-5127 re-check: a downgraded commissioner must
+      // not inherit dynasty for another season just because season 1 was
+      // created while they were premium.
+      const { resolve, context } = setupFreeUser(
+        { rosterContinuity: 'dynasty' },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Dynasty leagues require a premium subscription');
+    });
+
+    it('blocks a free user renewing a keeper league (LS-8386)', async () => {
+      const { resolve, context } = setupFreeUser(
+        { rosterContinuity: 'keeper' },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Keeper leagues require a premium subscription');
+    });
+
+    it('allows a free user renewing a redraft league', async () => {
+      // The re-check must not fire for the default continuity, or every free
+      // renewal would break.
+      const { resolve, context } = setupFreeUser(
+        { rosterContinuity: 'redraft' },
+        0,
+      );
+
+      await expect(
+        resolve(
+          {},
+          { leagueId: 1, keepRosters: false },
+          context,
+          undefined as never,
+        ),
+      ).resolves.toBeDefined();
+    });
+
     it('blocks a free user renewing a league with a non-free era filter', async () => {
       const { resolve, context } = setupFreeUser(
         { sport: 'baseball', baseballEraFilter: 'dead_ball' },

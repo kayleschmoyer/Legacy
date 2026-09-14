@@ -64,6 +64,7 @@ export const ENTITLEMENTS = {
   premium_draft_controls: 'premium_draft_controls',
   draft_packet: 'draft_packet',
   keeper_leagues: 'keeper_leagues',
+  dynasty_leagues: 'dynasty_leagues',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -117,4 +118,6 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
     'Draft packet (full all-teams draft results, viewable and downloadable as CSV)',
   keeper_leagues:
     'Keeper leagues (carry players over between seasons at league creation)',
+  dynasty_leagues:
+    'Dynasty leagues (full rosters persist between seasons; only unrostered players are drafted)',
 };

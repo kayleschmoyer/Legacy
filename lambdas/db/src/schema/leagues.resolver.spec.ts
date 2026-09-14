@@ -1751,6 +1751,151 @@ describe('League Mutations', () => {
     });
   });
 
+  describe('createLeagueAndTeams mutation — dynasty entitlement gate (LS-8386)', () => {
+    // Dynasty carries no keeper configuration at all — the server rejects
+    // keeperSettings sent alongside it (validateKeeperConfig, LS-8671) — so a
+    // valid dynasty input is just the continuity value.
+    const baseInput = {
+      leagueName: 'Dynasty League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      selectionMethod: 'standard',
+      rosterContinuity: 'dynasty',
+    };
+
+    it('blocks a free user from creating a dynasty league', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: baseInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Dynasty leagues require a premium subscription');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('does not let the keeper entitlement stand in for the dynasty one', async () => {
+      // The two modes are separately sellable, so the dynasty gate must name
+      // its own key — a free caller must not see the keeper copy here.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      let message: string | undefined;
+      try {
+        await (field.resolve(
+          {},
+          { input: baseInput },
+          mockContext,
+          undefined as never,
+        ) as Promise<unknown>);
+      } catch (e) {
+        message = (e as Error).message;
+      }
+
+      expect(message).toBeDefined();
+      expect(message).toContain('Dynasty leagues');
+      expect(message).not.toContain('Keeper leagues');
+    });
+
+    it('allows a premium (admin) user to create a dynasty league', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'Dynasty League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: baseInput },
+        adminContext,
+        undefined as never,
+      );
+
+      // Dynasty is persisted with no keeper settings — the mode costs nothing,
+      // so there is no count or cost model to store.
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rosterContinuity: 'dynasty',
+          keeperSettings: null,
+        }),
+      );
+    });
+
+    it('rejects keeper settings supplied alongside dynasty', async () => {
+      // Admin (premium) so the request clears the entitlement gate and the
+      // failure can only come from validateKeeperConfig.
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          {
+            input: {
+              ...baseInput,
+              keeperSettings: { keeperCount: 3, costModel: 'round-penalty' },
+            },
+          },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        "Keeper settings are only allowed when rosterContinuity is 'keeper'",
+      );
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createLeagueAndTeams mutation — Hall of Fame Only entitlement gate (LS-6080)', () => {
     const baseInput = {
       leagueName: 'HOF League',
