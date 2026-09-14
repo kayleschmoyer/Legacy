@@ -157,7 +157,10 @@ export function coalesceWindowsTestPathPatterns(tokens: string[]): string[] {
   return result;
 }
 
-const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+// Allows an optional npm-style scope prefix (e.g. "@legacy-sports/video")
+// in addition to a bare project name, since Nx projects declared with a
+// scoped package.json `name` resolve under their full scoped name (LS-10119).
+const NX_NAME_REGEX = /^(@[a-z0-9-._]+\/)?[a-z0-9-._]+$/i;
 
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();

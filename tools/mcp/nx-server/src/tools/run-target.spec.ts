@@ -238,6 +238,33 @@ describe('runTarget', () => {
     expect(jobCallArgs()).toEqual(['exec', 'nx', 'run', 'graphql:codegen']);
   });
 
+  it('accepts a scoped project name (LS-10119)', async () => {
+    setupJob();
+    const result = await runTarget({
+      project: '@legacy-sports/video',
+      target: 'test',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(jobCallArgs()).toEqual([
+      'exec',
+      'nx',
+      'run',
+      '@legacy-sports/video:test',
+    ]);
+  });
+
+  it('rejects a project name containing shell-unsafe characters even with a scope prefix', async () => {
+    const result = await runTarget({
+      project: '@legacy-sports/vid;eo',
+      target: 'test',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Invalid project name/);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
   it('accepts test:web and test:mobile variants', async () => {
     setupJob();
     const web = await runTarget({
