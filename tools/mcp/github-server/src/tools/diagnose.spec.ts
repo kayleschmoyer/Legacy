@@ -37,6 +37,7 @@ const BASE_PR = {
   state: 'OPEN',
   isDraft: false,
   mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
   isInMergeQueue: false,
   headRefOid: 'abc123',
   baseRefName: 'main',
@@ -100,14 +101,75 @@ describe('diagnose', () => {
     expect(payload.reason).toBe('MERGE_CONFLICT');
   });
 
-  it('returns MERGE_CONFLICT from the CI: Conflicts label when mergeable is stale-MERGEABLE', async () => {
+  it('returns MERGE_CONFLICT from the CI: Conflicts label when mergeable is stale-MERGEABLE and mergeStateStatus has not confirmed clean', async () => {
     mockGithubGraphQL.mockResolvedValue({
       data: {
         repository: {
           pullRequest: {
             ...BASE_PR,
             mergeable: 'MERGEABLE',
+            mergeStateStatus: 'UNKNOWN',
             labels: { nodes: [{ name: 'CI: Conflicts' }] },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
+    expect(payload.reason).toBe('MERGE_CONFLICT');
+  });
+
+  // LS-9945: the CI: Conflicts label is written by a separate,
+  // independently-scheduled workflow and can lag real git state by
+  // 5-15+ minutes after a conflict actually resolves. GitHub's own
+  // `mergeable` + `mergeStateStatus` fields are recomputed live on every
+  // push and don't share that lag — once both already agree the branch is
+  // clean, a stale label alone must not override them. github_pr_why_blocked
+  // got this fix first; github_pr_diagnose must apply the same check.
+  it('does not report MERGE_CONFLICT from a stale CI: Conflicts label once live mergeable + mergeStateStatus both confirm the branch is clean (LS-9945)', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+            labels: { nodes: [{ name: 'CI: Conflicts' }] },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
+    expect(payload.reason).not.toBe('MERGE_CONFLICT');
+  });
+
+  it('also treats mergeStateStatus UNSTABLE (mergeable, but failing non-required checks) as confirming a lingering label is stale', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'UNSTABLE',
+            labels: { nodes: [{ name: 'CI: Conflicts' }] },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
+    expect(payload.reason).not.toBe('MERGE_CONFLICT');
+  });
+
+  it('still reports MERGE_CONFLICT when mergeable itself is live CONFLICTING, even if mergeStateStatus disagrees', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            mergeable: 'CONFLICTING',
+            mergeStateStatus: 'DIRTY',
           },
         },
       },
