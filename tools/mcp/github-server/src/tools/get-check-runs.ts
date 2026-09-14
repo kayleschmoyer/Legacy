@@ -15,6 +15,7 @@ interface GetCheckRunsParams {
   shas?: string[];
   checkName?: string;
   resolveRunId?: boolean;
+  latestPerName?: boolean;
 }
 
 interface CheckRunOutput {
@@ -46,6 +47,7 @@ interface CheckRunsResponse {
 }
 
 interface SerializedCheckRun {
+  id: number;
   name: string;
   status: string;
   conclusion: string | null;
@@ -82,19 +84,25 @@ export function parseRunIds(
 // Single-sha results are a flat, uniform list → Markdown table (LS-8021).
 // The nested `output` object is pruned to a truncated `summary` cell (the field
 // agents read when triaging a failure); `output.title` and `app` are dropped as
-// rarely consumed, and `startedAt` is dropped in favour of `completedAt`.
+// rarely consumed. `id` and `startedAt` are included so a caller can feed `id`
+// straight into `get_check_run`/`get_job_logs` and use `startedAt` to tell a
+// current attempt from a superseded one when a name repeats (LS-10154).
 const CHECK_RUN_COLUMNS = [
+  'id',
   'name',
   'status',
   'conclusion',
+  'startedAt',
   'completedAt',
   'summary',
 ] as const;
 
 const CHECK_RUN_COLUMNS_WITH_IDS = [
+  'id',
   'name',
   'status',
   'conclusion',
+  'startedAt',
   'completedAt',
   'summary',
   'workflowRunId',
@@ -106,9 +114,11 @@ function checkRunRow(
   resolveRunId?: boolean,
 ): Record<string, unknown> {
   const row: Record<string, unknown> = {
+    id: run.id,
     name: run.name,
     status: run.status,
     conclusion: run.conclusion ?? '',
+    startedAt: run.startedAt ?? '',
     completedAt: run.completedAt ?? '',
     summary: truncate(run.output.summary ?? '', 200),
   };
@@ -163,6 +173,7 @@ async function fetchCheckRunsForSha(
   repo: string,
   sha: string,
   resolveRunId?: boolean,
+  latestPerName?: boolean,
 ): Promise<SerializedCheckRun[]> {
   const baseQuery: Record<string, string> = { per_page: '100' };
 
@@ -184,37 +195,42 @@ async function fetchCheckRunsForSha(
     page++;
   }
 
-  // Deduplicate by name — keep the latest run per check name.
-  // GitHub returns runs newest-first, so first occurrence wins.
+  // GitHub returns runs newest-first. Default (latestPerName not false):
+  // collapse to one run per check name, matching every existing caller's
+  // expectations. Pass `latestPerName: false` to see every run, including
+  // superseded re-run attempts under a repeated name — `id` + `startedAt`
+  // let a caller tell those attempts apart (LS-10154).
   const seen = new Set<string>();
-  const deduped: SerializedCheckRun[] = [];
+  const results: SerializedCheckRun[] = [];
   for (const run of allCheckRuns) {
-    if (!seen.has(run.name)) {
+    if (latestPerName !== false) {
+      if (seen.has(run.name)) continue;
       seen.add(run.name);
-      const serialized: SerializedCheckRun = {
-        name: run.name,
-        status: run.status,
-        conclusion: run.conclusion,
-        startedAt: run.started_at,
-        completedAt: run.completed_at,
-        output: {
-          title: run.output.title,
-          summary: run.output.summary,
-        },
-        app: run.app ? { slug: run.app.slug, name: run.app.name } : null,
-      };
-      if (resolveRunId) {
-        const ids = parseRunIds(run);
-        if (ids) {
-          serialized.workflowRunId = ids.workflowRunId;
-          serialized.jobId = ids.jobId;
-          serialized.detailsUrl = ids.detailsUrl;
-        }
-      }
-      deduped.push(serialized);
     }
+    const serialized: SerializedCheckRun = {
+      id: run.id,
+      name: run.name,
+      status: run.status,
+      conclusion: run.conclusion,
+      startedAt: run.started_at,
+      completedAt: run.completed_at,
+      output: {
+        title: run.output.title,
+        summary: run.output.summary,
+      },
+      app: run.app ? { slug: run.app.slug, name: run.app.name } : null,
+    };
+    if (resolveRunId) {
+      const ids = parseRunIds(run);
+      if (ids) {
+        serialized.workflowRunId = ids.workflowRunId;
+        serialized.jobId = ids.jobId;
+        serialized.detailsUrl = ids.detailsUrl;
+      }
+    }
+    results.push(serialized);
   }
-  return deduped;
+  return results;
 }
 
 export async function getCheckRuns(
@@ -228,6 +244,7 @@ export async function getCheckRuns(
       params.shas,
       params.checkName,
       params.resolveRunId,
+      params.latestPerName,
     );
   }
 
@@ -265,22 +282,23 @@ export async function getCheckRuns(
       repo.name,
       sha,
       params.resolveRunId,
+      params.latestPerName,
     );
-    const deduped = params.checkName
+    const filtered = params.checkName
       ? filterRunsByName(allRuns, params.checkName)
       : allRuns;
 
-    const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${deduped.length}_`;
+    const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${filtered.length}_`;
     const columns = params.resolveRunId
       ? CHECK_RUN_COLUMNS_WITH_IDS
       : CHECK_RUN_COLUMNS;
     const text =
-      deduped.length === 0
+      filtered.length === 0
         ? params.checkName && allRuns.length > 0
           ? `No check runs matching "${params.checkName}" for ${sha.slice(0, 7)}. Available check names: ${allRuns.map((r) => r.name).join(', ')}`
           : `No check runs found for ${sha.slice(0, 7)}.`
         : `${header}\n\n${markdownTable(
-            deduped.map((r) => checkRunRow(r, params.resolveRunId)),
+            filtered.map((r) => checkRunRow(r, params.resolveRunId)),
             {
               columns,
             },
@@ -314,6 +332,7 @@ async function getCheckRunsBatch(
   shas: string[],
   checkName: string | undefined,
   resolveRunId?: boolean,
+  latestPerName?: boolean,
 ): Promise<ToolResult> {
   const checkRuns: Record<string, SerializedCheckRun[]> = {};
   const missing: { sha: string; error: string }[] = [];
@@ -326,6 +345,7 @@ async function getCheckRunsBatch(
         repo.name,
         sha,
         resolveRunId,
+        latestPerName,
       );
       const filtered = checkName
         ? filterRunsByName(allRuns, checkName)

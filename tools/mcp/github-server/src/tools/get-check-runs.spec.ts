@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 
 describe('getCheckRuns single-sha path', () => {
-  it('returns deduped runs for an explicit sha', async () => {
+  it('returns all runs for an explicit sha', async () => {
     mockGithubRest.mockResolvedValueOnce(
       pageOnce([makeRun('bot-review'), makeRun('Build')]),
     );
@@ -61,12 +61,67 @@ describe('getCheckRuns single-sha path', () => {
     const result = await getCheckRuns({ sha: 'abc123' });
     expect(result.isError).toBeFalsy();
     // Single-sha results render as a token-efficient Markdown table (LS-8021):
-    // a header line plus one row per deduped run.
+    // a header line plus one row per run.
     const text = result.content[0].text;
     expect(text).toContain('total: 2');
     expect(text).toContain('bot-review');
     expect(text).toContain('Build');
     expect(text).not.toContain('missing');
+  });
+
+  it('includes id and startedAt in each row (LS-10154)', async () => {
+    mockGithubRest.mockResolvedValueOnce(
+      pageOnce([
+        makeRun('bot-review', { id: 4242, started_at: '2026-09-13T10:00:00Z' }),
+      ]),
+    );
+
+    const result = await getCheckRuns({ sha: 'abc123' });
+    expect(result.isError).toBeFalsy();
+    const text = result.content[0].text;
+    expect(text).toContain('4242');
+    expect(text).toContain('2026-09-13T10:00:00Z');
+  });
+
+  it('collapses to the latest run per name by default when a check name repeats', async () => {
+    mockGithubRest.mockResolvedValueOnce(
+      pageOnce([
+        makeRun('Run Integration Suite', {
+          id: 2,
+          started_at: '2026-09-13T12:00:00Z',
+        }),
+        makeRun('Run Integration Suite', {
+          id: 1,
+          started_at: '2026-09-13T10:00:00Z',
+        }),
+        makeRun('Build', { id: 3 }),
+      ]),
+    );
+
+    const result = await getCheckRuns({ sha: 'abc123' });
+    expect(result.isError).toBeFalsy();
+    const text = result.content[0].text;
+    expect(text).toContain('total: 2');
+  });
+
+  it('returns every re-run attempt when latestPerName is false', async () => {
+    mockGithubRest.mockResolvedValueOnce(
+      pageOnce([
+        makeRun('Run Integration Suite', {
+          id: 2,
+          started_at: '2026-09-13T12:00:00Z',
+        }),
+        makeRun('Run Integration Suite', {
+          id: 1,
+          started_at: '2026-09-13T10:00:00Z',
+        }),
+      ]),
+    );
+
+    const result = await getCheckRuns({ sha: 'abc123', latestPerName: false });
+    expect(result.isError).toBeFalsy();
+    const text = result.content[0].text;
+    expect(text).toContain('total: 2');
   });
 
   it('resolves PR number to head SHA when sha is omitted', async () => {
@@ -146,6 +201,8 @@ describe('getCheckRuns batch mode', () => {
     expect((body.checkRuns as Record<string, unknown[]>).sha_a).toHaveLength(1);
     expect((body.checkRuns as Record<string, unknown[]>).sha_b).toHaveLength(1);
     expect(body.missing).toEqual([]);
+    const [runA] = (body.checkRuns as Record<string, { id: number }[]>).sha_a;
+    expect(runA.id).toBe(1);
   });
 
   it('isolates per-sha failures to missing[]', async () => {
