@@ -71,10 +71,13 @@ export function validateReplies(
   const errors: ValidationError[] = [];
   const kinds: ReplyKind[] = ['FIX', 'JUSTIFY', 'CANNOT-COMPLY'];
 
-  if (!Array.isArray(replies) || replies.length === 0) {
-    errors.push({ index: -1, message: 'replies must be a non-empty array' });
+  if (!Array.isArray(replies)) {
+    errors.push({ index: -1, message: 'replies must be an array' });
     return errors;
   }
+  // An empty array is valid — it's the label-only re-trigger shape for a
+  // threadless push (conflict resolution, base merge, rebase) with nothing
+  // to reply to (LS-10121). Reply/resolve phases simply no-op below.
 
   for (let i = 0; i < replies.length; i++) {
     const r = replies[i];
@@ -315,6 +318,12 @@ async function resolveBatch(threadIds: string[]): Promise<ResolveOutcome[]> {
  * single invalid entry rejects the whole call. Per-thread reply failures
  * do not block successful replies; failed threads are surfaced in
  * `errors[]` and are NOT resolved.
+ *
+ * `replies` may be empty — the label-only re-trigger shape for a threadless
+ * push (conflict resolution, base merge, rebase onto main) where there is
+ * nothing to reply to or resolve. The reply and resolve phases simply
+ * no-op and the call proceeds straight to the label remove-then-add cycle
+ * (LS-10121).
  */
 export async function finishFixRound(
   params: FinishFixRoundParams,

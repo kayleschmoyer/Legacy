@@ -591,6 +591,34 @@ describe('index tool registration — prNumber alias resolution', () => {
       ]);
       expect(finishFixRound).not.toHaveBeenCalled();
     });
+
+    it('defaults "replies" to [] when omitted — label-only re-trigger (LS-10121)', async () => {
+      const result = await client.callTool({
+        name: 'github_finish_fix_round',
+        arguments: { prNumber: 123 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(finishFixRound).toHaveBeenCalledWith({
+        prNumber: 123,
+        replies: [],
+        readyLabel: 'bot:ready-for-review',
+      });
+    });
+
+    it('accepts an explicit empty "replies" array', async () => {
+      const result = await client.callTool({
+        name: 'github_finish_fix_round',
+        arguments: { prNumber: 123, replies: [] },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(finishFixRound).toHaveBeenCalledWith({
+        prNumber: 123,
+        replies: [],
+        readyLabel: 'bot:ready-for-review',
+      });
+    });
   });
 
   describe('github_resolve_threads', () => {

@@ -4857,9 +4857,8 @@
             },
             "replies": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "constraints": [
-                "min 1",
                 "max 100"
               ],
               "items": {
@@ -4910,7 +4909,8 @@
                   }
                 }
               },
-              "description": "One entry per thread to reply to."
+              "default": [],
+              "description": "One entry per thread. Omit or [] for a label-only re-trigger."
             },
             "readyLabel": {
               "type": "string",

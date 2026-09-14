@@ -150,7 +150,7 @@ Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread F
 | --- | --- | --- | --- | --- |
 | `prNumber` | number |  | coerced | PR number |
 | `number` | number |  | coerced | Alias for "prNumber" — use either, not both |
-| `replies` | object[] | **required** | min 1, max 100 | One entry per thread to reply to. |
+| `replies` | object[] |  | max 100 | One entry per thread. Omit or [] for a label-only re-trigger. |
 | `readyLabel` | string |  | min 1 | Label to apply after replying + resolving (default: bot:ready-for-review) |
 
 ### `github_get_branch_protection`

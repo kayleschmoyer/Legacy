@@ -1512,9 +1512,11 @@ export function createServer(): McpServer {
               ),
           }),
         )
-        .min(1)
         .max(100)
-        .describe('One entry per thread to reply to.'),
+        .default([])
+        .describe(
+          'One entry per thread. Omit or [] for a label-only re-trigger.',
+        ),
       readyLabel: z
         .string()
         .trim()

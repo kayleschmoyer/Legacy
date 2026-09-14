@@ -45,8 +45,12 @@ function parse(result: {
 }
 
 describe('validateReplies', () => {
-  it('rejects an empty array', () => {
-    expect(validateReplies([])).toHaveLength(1);
+  it('accepts an empty array (label-only re-trigger, LS-10121)', () => {
+    expect(validateReplies([])).toEqual([]);
+  });
+
+  it('rejects a non-array', () => {
+    expect(validateReplies(null as unknown as never[])).toHaveLength(1);
   });
 
   it('rejects FIX without sha', () => {
@@ -433,6 +437,40 @@ describe('finishFixRound (integration)', () => {
       ([args]) => args.method === 'DELETE',
     );
     expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('label-only re-trigger: empty replies skips reply/resolve and still cycles the label (LS-10121)', async () => {
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET'
+        ? Promise.resolve([{ name: 'bot:ready-for-review' }])
+        : Promise.resolve({}),
+    );
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [],
+    });
+
+    expect(result.isError).toBe(false);
+    const data = parse(result);
+    expect(data.replied).toBe(0);
+    expect(data.resolved).toBe(0);
+    expect(data.replies).toEqual([]);
+    expect(data.resolutions).toEqual([]);
+    expect(data.labelReapplied).toBe(true);
+    expect(mockGraphQL).not.toHaveBeenCalled();
+
+    const labelPath = '/repos/bkrupa/legacy-sports/issues/42/labels';
+    const deleteCallIndex = mockRest.mock.calls.findIndex(
+      ([args]) =>
+        args.method === 'DELETE' &&
+        args.path === `${labelPath}/bot%3Aready-for-review`,
+    );
+    const postCallIndex = mockRest.mock.calls.findIndex(
+      ([args]) => args.method === 'POST' && args.path === labelPath,
+    );
+    expect(deleteCallIndex).toBeGreaterThanOrEqual(0);
+    expect(postCallIndex).toBeGreaterThanOrEqual(0);
   });
 
   it('still adds the label when the remove-then-add DELETE 404s (label removed by a racing call)', async () => {
