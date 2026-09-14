@@ -34,6 +34,7 @@ Fetch GitHub Actions job logs with server-side truncation. When a step is marked
 | `error_summary` | boolean |  | — | Extract only error/failure lines (plus 2 lines of context) instead of tailing. |
 | `truncate_line_length` | number |  | coerced, integer, > 0 | Truncate lines longer than this many characters (e.g. 500), so one pathologically long line can't alone consume the max_chars budget. |
 | `grep_pattern` | string |  | min 1, max 200 | Substring search (plus 2 lines context) instead of tailing. Case-insensitive; excl. error_summary. |
+| `failed_step_only` | boolean |  | — | Force step-scoping; sets stepScopeFailed if no span is found, instead of a silent unscoped fallback. |
 
 ### `github_auth_status`
 

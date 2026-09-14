@@ -19,6 +19,7 @@ export interface GetJobLogsParams {
   errorSummary?: boolean;
   truncateLineLength?: number;
   grepPattern?: string;
+  failedStepOnly?: boolean;
 }
 
 /** Default hard cap on output characters to prevent context window overflow. */
@@ -263,26 +264,94 @@ async function fetchJobDetail(
   });
 }
 
+/** Marks the start of a GitHub Actions log-group, e.g. `##[group]Run npm test`. */
+const LOG_GROUP_START = /##\[group\]/;
+/** Marks the end of a GitHub Actions log-group. */
+const LOG_GROUP_END = /##\[endgroup\]/;
+/** Marks a line GitHub Actions itself flagged as an error annotation. */
+const LOG_ERROR_MARKER = /##\[error\]/;
+
+/**
+ * Fallback scoping (LS-10107) for when structural step->ZIP-entry matching
+ * fails to identify a span — e.g. a composite action collapses several
+ * virtual steps into one ZIP entry, so the failing step's own entry still
+ * contains mostly-unrelated output. Locates the failing span directly from
+ * GitHub's own `##[group]`/`##[error]` annotations embedded in the raw log
+ * text: from the nearest `##[group]` before the first `##[error]`, through
+ * the nearest `##[endgroup]` after the last `##[error]` (or end of text).
+ * Returns null when no `##[error]` marker is present at all.
+ */
+function scopeToErrorBoundary(text: string): string | null {
+  const lines = text.split(/\r?\n/);
+  const errorIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (LOG_ERROR_MARKER.test(lines[i])) errorIndices.push(i);
+  }
+  if (errorIndices.length === 0) return null;
+
+  let start = 0;
+  for (let i = errorIndices[0]; i >= 0; i--) {
+    if (LOG_GROUP_START.test(lines[i])) {
+      start = i;
+      break;
+    }
+  }
+
+  let end = lines.length - 1;
+  for (let i = errorIndices[errorIndices.length - 1]; i < lines.length; i++) {
+    if (LOG_GROUP_END.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+
+  return lines.slice(start, end + 1).join('\n');
+}
+
 /**
  * Fetch a job's log text, scoped to its failing step(s) when step data is
  * available and a ZIP entry matches (LS-9644). Falls back to the full job
  * log text (previous behaviour) whenever scoping isn't possible — e.g. a
  * plain-text log response, a job with no distinct failing step (cancelled
  * at the job level), or missing step data.
+ *
+ * When `failedStepOnly` is set, structural scoping failure is not the end of
+ * the road (LS-10107): a `##[group]`/`##[error]` boundary scan is tried next,
+ * and if that also can't locate a span, the response says so explicitly via
+ * `stepScopeFailed` rather than silently returning the unscoped tail with
+ * `scopedToFailingStep: false`.
  */
 async function fetchScopedJobLog(
   owner: string,
   repo: string,
   jobId: number,
   knownSteps?: GitHubJobStep[],
+  failedStepOnly?: boolean,
 ): Promise<{
   text: string;
   scopedToFailingStep: boolean;
   stepNames: string[];
+  stepScopeFailed: boolean;
 }> {
   const { entries, text } = await fetchJobLogEntries(owner, repo, jobId);
   if (!entries) {
-    return { text, scopedToFailingStep: false, stepNames: [] };
+    if (failedStepOnly) {
+      const errorScoped = scopeToErrorBoundary(text);
+      if (errorScoped) {
+        return {
+          text: errorScoped,
+          scopedToFailingStep: true,
+          stepNames: [],
+          stepScopeFailed: false,
+        };
+      }
+    }
+    return {
+      text,
+      scopedToFailingStep: false,
+      stepNames: [],
+      stepScopeFailed: Boolean(failedStepOnly),
+    };
   }
 
   let steps = knownSteps;
@@ -305,9 +374,28 @@ async function fetchScopedJobLog(
       text: scoped.text,
       scopedToFailingStep: true,
       stepNames: scoped.stepNames,
+      stepScopeFailed: false,
     };
   }
-  return { text, scopedToFailingStep: false, stepNames: [] };
+
+  if (failedStepOnly) {
+    const errorScoped = scopeToErrorBoundary(text);
+    if (errorScoped) {
+      return {
+        text: errorScoped,
+        scopedToFailingStep: true,
+        stepNames: [],
+        stepScopeFailed: false,
+      };
+    }
+  }
+
+  return {
+    text,
+    scopedToFailingStep: false,
+    stepNames: [],
+    stepScopeFailed: Boolean(failedStepOnly),
+  };
 }
 
 /**
@@ -529,24 +617,34 @@ function applyLimits(
   const totalBytes = lines.reduce((n, l) => n + l.length + 1, 0);
   const tailed = lines.length > tailLines ? lines.slice(-tailLines) : lines;
 
+  // Walk the tail window from its END backwards so that when maxChars binds
+  // before the whole window fits, what gets dropped is the EARLIER part of
+  // the window, not the true tail — otherwise a larger tail_lines only moves
+  // the window's start earlier without ever showing more of the log's actual
+  // end (LS-10107).
   let budget = maxChars;
   const out: string[] = [];
-  for (const rawLine of tailed) {
-    if (budget <= 0) break;
+  let charsTruncated = false;
+  for (let i = tailed.length - 1; i >= 0; i--) {
+    if (budget <= 0) {
+      charsTruncated = true;
+      break;
+    }
+    const rawLine = tailed[i];
     const line =
       truncateLineLength !== undefined && rawLine.length > truncateLineLength
         ? `${rawLine.slice(0, truncateLineLength)}...[line truncated]`
         : rawLine;
     if (line.length > budget) {
-      out.push(line.slice(0, budget));
+      out.unshift(line.slice(line.length - budget));
       budget = 0;
+      charsTruncated = true;
     } else {
-      out.push(line);
+      out.unshift(line);
       budget -= line.length + 1;
     }
   }
 
-  const charsTruncated = budget <= 0;
   const lineTruncated = lines.length > tailLines;
   const truncated = lineTruncated || charsTruncated;
   const indicator = truncated
@@ -654,11 +752,18 @@ export async function getJobLogs(
     let jobLabel: string;
     let scopedToFailingStep = false;
     let failingSteps: string[] = [];
+    let stepScopeFailed = false;
 
     if (params.jobId) {
       let scoped;
       try {
-        scoped = await fetchScopedJobLog(owner, name, params.jobId);
+        scoped = await fetchScopedJobLog(
+          owner,
+          name,
+          params.jobId,
+          undefined,
+          params.failedStepOnly,
+        );
       } catch (err) {
         if (isBlobNotFoundError(err)) {
           return {
@@ -671,6 +776,7 @@ export async function getJobLogs(
       rawText = scoped.text;
       scopedToFailingStep = scoped.scopedToFailingStep;
       failingSteps = scoped.stepNames;
+      stepScopeFailed = scoped.stepScopeFailed;
       jobLabel = `job ${params.jobId}`;
     } else {
       if (!params.runId) {
@@ -691,6 +797,7 @@ export async function getJobLogs(
         };
       }
       const stepNamesByJob = new Set<string>();
+      let anyStepScopeFailed = false;
       const parts = await Promise.all(
         jobs.map(async (job) => {
           try {
@@ -699,11 +806,13 @@ export async function getJobLogs(
               name,
               job.id,
               job.steps,
+              params.failedStepOnly,
             );
             if (scoped.scopedToFailingStep) {
               scopedToFailingStep = true;
               for (const s of scoped.stepNames) stepNamesByJob.add(s);
             }
+            if (scoped.stepScopeFailed) anyStepScopeFailed = true;
             return `${job.name}\n${scoped.text}`;
           } catch (err) {
             if (isBlobNotFoundError(err)) {
@@ -714,9 +823,16 @@ export async function getJobLogs(
         }),
       );
       failingSteps = [...stepNamesByJob];
+      stepScopeFailed = anyStepScopeFailed;
       rawText = parts.join('\n\n');
       jobLabel = `run ${params.runId}`;
     }
+
+    const stepScopeFailedMessage = stepScopeFailed
+      ? 'failed_step_only was requested but no failing step could be located ' +
+        '(no matching step entry and no ##[error] annotation in the log) -- ' +
+        'showing the unscoped tail instead.'
+      : undefined;
 
     const allLines = rawText.split(/\r?\n/);
 
@@ -741,6 +857,9 @@ export async function getJobLogs(
                 matchedLines: matchedLines.length,
                 scopedToFailingStep,
                 ...(scopedToFailingStep ? { failingSteps } : {}),
+                ...(stepScopeFailed
+                  ? { stepScopeFailed, stepScopeFailedMessage }
+                  : {}),
                 truncated,
                 returnedLines,
                 ...(truncated ? { returnedFrom: 'tail' } : {}),
@@ -775,6 +894,9 @@ export async function getJobLogs(
                 errorLines: errorLines.length,
                 scopedToFailingStep,
                 ...(scopedToFailingStep ? { failingSteps } : {}),
+                ...(stepScopeFailed
+                  ? { stepScopeFailed, stepScopeFailedMessage }
+                  : {}),
                 truncated,
                 returnedLines,
                 ...(truncated ? { returnedFrom: 'tail' } : {}),
@@ -807,6 +929,9 @@ export async function getJobLogs(
               tailLines,
               scopedToFailingStep,
               ...(scopedToFailingStep ? { failingSteps } : {}),
+              ...(stepScopeFailed
+                ? { stepScopeFailed, stepScopeFailedMessage }
+                : {}),
               truncated,
               returnedLines,
               ...(truncated ? { returnedFrom: 'tail' } : {}),

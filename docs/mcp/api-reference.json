@@ -4393,6 +4393,12 @@
                 "max 200"
               ],
               "description": "Substring search (plus 2 lines context) instead of tailing. Case-insensitive; excl. error_summary."
+            },
+            "failed_step_only": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "Force step-scoping; sets stepScopeFailed if no span is found, instead of a silent unscoped fallback."
             }
           },
           "transports": [

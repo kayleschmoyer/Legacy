@@ -458,6 +458,90 @@ describe('getJobLogs', () => {
     });
   });
 
+  describe('failed_step_only (LS-10107)', () => {
+    it('scopes via ##[group]/##[error] boundaries when structural step matching fails', async () => {
+      const log = [
+        'noise before',
+        '##[group]Run e2e tests',
+        'progress line 1',
+        'progress line 2',
+        '##[error]1 failed',
+        '  spec.ts:103:7 the failing test',
+        '##[endgroup]',
+        'post-job cleanup noise',
+        'more cleanup noise',
+      ].join('\n');
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(log));
+      mockRest.mockResolvedValue({
+        id: 1,
+        name: 'e2e',
+        conclusion: 'failure',
+        steps: [{ name: 'Run e2e tests', conclusion: 'failure', number: 1 }],
+      });
+
+      const result = await getJobLogs({ jobId: 1, failedStepOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(true);
+      expect(payload.stepScopeFailed).toBeUndefined();
+      expect(payload.logs as string).toContain('the failing test');
+      expect(payload.logs as string).not.toContain('post-job cleanup');
+      expect(payload.logs as string).not.toContain('noise before');
+    });
+
+    it('reports stepScopeFailed explicitly instead of silently returning the unscoped tail', async () => {
+      const log = ['no error markers here', 'all fine', 'still fine'].join(
+        '\n',
+      );
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(log));
+      mockRest.mockResolvedValue({
+        id: 1,
+        name: 'job',
+        conclusion: 'cancelled',
+        steps: [{ name: 'Step', conclusion: 'cancelled', number: 1 }],
+      });
+
+      const result = await getJobLogs({ jobId: 1, failedStepOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(false);
+      expect(payload.stepScopeFailed).toBe(true);
+      expect(payload.stepScopeFailedMessage).toMatch(/no failing step/i);
+    });
+
+    it('does not set stepScopeFailed when failed_step_only is not requested', async () => {
+      const log = 'plain unscoped log';
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(log));
+
+      const result = await getJobLogs({ jobId: 1 });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(false);
+      expect(payload.stepScopeFailed).toBeUndefined();
+    });
+  });
+
+  describe('tail truncation keeps the true end of the log (LS-10107)', () => {
+    it('shows the last lines of the log, not the first lines of the tail window, when maxChars binds', async () => {
+      const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(lines.join('\n')));
+
+      const result = await getJobLogs({
+        jobId: 1,
+        tailLines: 50,
+        maxChars: 100,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.logs as string).toContain('line 99');
+      expect(payload.logs as string).not.toContain('line 50\n');
+    });
+  });
+
   describe('run_id path', () => {
     function makeJobsResponse(
       jobs: Array<{ id: number; name: string; conclusion: string | null }>,

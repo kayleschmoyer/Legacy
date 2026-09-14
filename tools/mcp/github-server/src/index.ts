@@ -2439,6 +2439,12 @@ export function createServer(): McpServer {
         .describe(
           'Substring search (plus 2 lines context) instead of tailing. Case-insensitive; excl. error_summary.',
         ),
+      failed_step_only: z
+        .boolean()
+        .default(false)
+        .describe(
+          'Force step-scoping; sets stepScopeFailed if no span is found, instead of a silent unscoped fallback.',
+        ),
     },
     async (params) =>
       getJobLogs({
@@ -2455,6 +2461,7 @@ export function createServer(): McpServer {
         errorSummary: params.error_summary,
         truncateLineLength: params.truncate_line_length,
         grepPattern: params.grep_pattern,
+        failedStepOnly: params.failed_step_only,
       }),
   );
 
