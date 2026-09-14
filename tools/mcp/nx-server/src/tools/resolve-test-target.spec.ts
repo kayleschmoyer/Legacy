@@ -129,6 +129,47 @@ describe('resolveTestTargetPlan', () => {
     });
   });
 
+  it('returns "nodeTest" for an nx:run-commands target running node --test (LS-10159)', async () => {
+    mockRunNx.mockResolvedValue(
+      JSON.stringify({
+        targets: {
+          test: {
+            executor: 'nx:run-commands',
+            options: {
+              command: 'node --test lib/__tests__/*.test.mjs',
+              cwd: '.github/scripts/reviewer',
+            },
+          },
+        },
+      }),
+    );
+
+    const plan = await resolveTestTargetPlan('ci-reviewer', '/repo');
+
+    expect(plan).toEqual({ kind: 'nodeTest', target: 'test' });
+  });
+
+  it('does not treat an nx:run-commands target as node --test when the command lacks --test', async () => {
+    mockRunNx.mockResolvedValue(
+      JSON.stringify({
+        targets: {
+          test: {
+            executor: 'nx:run-commands',
+            options: { command: 'echo no-op' },
+          },
+        },
+      }),
+    );
+
+    const plan = await resolveTestTargetPlan('no-op-project', '/repo');
+
+    expect(plan).toEqual({
+      kind: 'single',
+      target: 'test',
+      shellJoinsArgs: false,
+    });
+  });
+
   it('falls back to "single" without spawning nx for an invalid project name', async () => {
     const plan = await resolveTestTargetPlan(
       'shared-components; rm -rf /',

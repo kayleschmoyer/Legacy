@@ -136,6 +136,40 @@ describe('runTest', () => {
     expect(result).toBe(expected);
   });
 
+  it('errors without calling runTarget when testPathPatterns is missing for a "single" Jest plan', async () => {
+    const result = await runTest({ project: 'db' });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('errors without calling runTarget when testPathPatterns is missing for a "fanout" plan', async () => {
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'fanout',
+      targets: ['test:web', 'test:mobile'],
+      skipped: [],
+    });
+
+    const result = await runTest({ project: 'shared-components' });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('errors without calling runTarget when testPathPatterns is missing for config', async () => {
+    const result = await runTest({
+      project: 'shared-components',
+      config: 'mobile',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/testPathPatterns is required/);
+    expect(mockRunTarget).not.toHaveBeenCalled();
+    expect(mockResolveTestTargetPlan).not.toHaveBeenCalled();
+  });
+
   it('returns the error message and never calls runTarget when the plan is "error"', async () => {
     mockResolveTestTargetPlan.mockResolvedValue({
       kind: 'error',
@@ -240,6 +274,65 @@ describe('runTest', () => {
     };
     expect(parsed.passed).toBe(true);
     expect(parsed.skippedNonJestTargets).toEqual(['test:stories']);
+  });
+});
+
+describe('runTest node --test target (LS-10159)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRunTarget.mockResolvedValue(stubResult());
+    mockResolveTestTargetPlan.mockResolvedValue({
+      kind: 'nodeTest',
+      target: 'test',
+    });
+    mockTargetShellJoinsArgs.mockResolvedValue(false);
+  });
+
+  it('appends files as positional args instead of --testPathPatterns', async () => {
+    await runTest({
+      project: 'ci-reviewer',
+      files: [
+        'lib/__tests__/retry.test.mjs',
+        'lib/__tests__/multi-pass.test.mjs',
+      ],
+    });
+
+    expect(mockRunTarget).toHaveBeenCalledWith({
+      project: 'ci-reviewer',
+      target: 'test',
+      noCache: undefined,
+      args: [
+        'lib/__tests__/retry.test.mjs',
+        'lib/__tests__/multi-pass.test.mjs',
+      ],
+      worktreePath: undefined,
+    });
+  });
+
+  it('errors without calling runTarget when files is missing', async () => {
+    const result = await runTest({ project: 'ci-reviewer' });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/node --test/);
+    expect(result.content[0].text).toMatch(/files: string\[\]/);
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('errors without calling runTarget when files is an empty array', async () => {
+    const result = await runTest({ project: 'ci-reviewer', files: [] });
+
+    expect(result.isError).toBe(true);
+    expect(mockRunTarget).not.toHaveBeenCalled();
+  });
+
+  it('does not require testPathPatterns for a nodeTest plan', async () => {
+    const result = await runTest({
+      project: 'ci-reviewer',
+      files: ['lib/__tests__/retry.test.mjs'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunTarget).toHaveBeenCalled();
   });
 });
 

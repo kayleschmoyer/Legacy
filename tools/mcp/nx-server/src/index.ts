@@ -169,17 +169,26 @@ server.tool(
     'shell when narrowing to one spec/test. Wrapper over nx_run: resolves `config` to the ' +
     'matching jest target (e.g. "mobile" -> "test:mobile") and forwards testPathPatterns/' +
     'testNamePattern. Omit `config` for a single "test" target (fans out for aggregate targets, ' +
-    'e.g. shared-components). Same job semantics as nx_run — call nx_job_wait if slow. ' +
-    'On a failing run pass report: "summary" for the full failing-test list; the raw log is ' +
-    'truncated and cuts through the middle of it.',
+    'e.g. shared-components; auto-routes to `files` for a `node --test` target, e.g. ci-reviewer). ' +
+    'Same job semantics as nx_run — call nx_job_wait if slow. On a failing run pass report: ' +
+    '"summary" for the full failing-test list; the raw log is truncated and cuts through the middle of it.',
   {
     project: z.string().describe('Project name'),
     testPathPatterns: z
       .string()
+      .optional()
       .describe(
         'Jest --testPathPatterns value: a spec filename or regex pattern (e.g. "LeagueListRow"). ' +
           'For multiple patterns, pipe-separate: "FileA|FileB". Capped at 300 characters and rejects ' +
-          'nested-quantifier shapes like "(a+)+" (ReDoS) — use a simple spec name/pattern.',
+          'nested-quantifier shapes like "(a+)+" (ReDoS) — use a simple spec name/pattern. Required ' +
+          'unless the target runs `node --test`, where `files` is used instead.',
+      ),
+    files: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Project-relative file paths, for a "test" target running `node --test` instead of Jest ' +
+          '(e.g. ["lib/__tests__/retry.test.mjs"]). Unused for Jest targets.',
       ),
     testNamePattern: z
       .string()

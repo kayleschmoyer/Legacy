@@ -13,7 +13,8 @@ import type { ToolResult } from '../types.js';
 
 export interface RunTestParams {
   project: string;
-  testPathPatterns: string;
+  /** Jest --testPathPatterns value. Required unless `files` is used instead. */
+  testPathPatterns?: string;
   testNamePattern?: string;
   config?: string;
   updateSnapshot?: boolean;
@@ -25,6 +26,14 @@ export interface RunTestParams {
    * "json" returns those plus the ANSI-stripped raw output.
    */
   report?: JestReportMode;
+  /**
+   * Project-relative file paths, for a project whose "test" target runs
+   * through Node's own test runner (`nx:run-commands` running
+   * `node --test ...`) rather than Jest (LS-10159). Appended as positional
+   * args to the underlying command. Ignored for Jest targets, which use
+   * `testPathPatterns` instead.
+   */
+  files?: string[];
 }
 
 /**
@@ -51,10 +60,13 @@ function validatePattern(paramName: string, value: string): string | null {
   return null;
 }
 
-/** Whether either pattern value could be split by a shell word-split. */
+/**
+ * Whether either pattern value could be split by a shell word-split. Only
+ * called once `testPathPatterns` has already been validated as present.
+ */
 function hasWhitespaceValue(params: RunTestParams): boolean {
   return (
-    /\s/.test(params.testPathPatterns) ||
+    /\s/.test(params.testPathPatterns ?? '') ||
     /\s/.test(params.testNamePattern ?? '')
   );
 }
@@ -77,7 +89,9 @@ function runJestTarget(
   const quote = (value: string) =>
     shellJoinsArgs ? quoteForShellJoin(value) : value;
 
-  const args = ['--testPathPatterns', quote(params.testPathPatterns)];
+  // Callers only reach here once testPathPatterns has been validated as
+  // present (the Jest-target branches of runTest all check it first).
+  const args = ['--testPathPatterns', quote(params.testPathPatterns as string)];
   if (params.testNamePattern) {
     args.push('--testNamePattern', quote(params.testNamePattern));
   }
@@ -94,6 +108,25 @@ function runJestTarget(
     ...(params.report
       ? { jestReport: { mode: params.report, outputFile: newJestReportFile() } }
       : {}),
+  });
+}
+
+/**
+ * Runs an `nx:run-commands` `node --test` target (LS-10159), appending
+ * `files` as plain positional args instead of Jest's `--testPathPatterns`.
+ * `updateSnapshot`/`report` are Jest-specific and have no equivalent here,
+ * so they are not forwarded.
+ */
+function runNodeTestTarget(
+  params: RunTestParams,
+  target: string,
+): Promise<ToolResult> {
+  return runTarget({
+    project: params.project,
+    target,
+    noCache: params.noCache,
+    args: params.files,
+    worktreePath: params.worktreePath,
   });
 }
 
@@ -220,10 +253,19 @@ function mergeFanoutResults(
  * `testPathPatterns` and runs the full, unfiltered suite. In that case the
  * pattern is fanned out across the aggregate's jest-executor dependencies
  * and the results are merged, instead of silently running everything.
+ *
+ * Some projects' "test" target isn't Jest at all — an `nx:run-commands`
+ * target running `node --test ...` (e.g. ci-reviewer) — where
+ * `testPathPatterns`/`testNamePattern` have nothing to bind to (LS-10159).
+ * That case is detected the same way and routed to `files: string[]`
+ * instead, appended as positional args, with an explicit error rather than
+ * a silent full-suite run when `files` is missing.
  */
 export async function runTest(params: RunTestParams): Promise<ToolResult> {
   const validationError =
-    validatePattern('testPathPatterns', params.testPathPatterns) ??
+    (params.testPathPatterns != null
+      ? validatePattern('testPathPatterns', params.testPathPatterns)
+      : null) ??
     (params.testNamePattern != null
       ? validatePattern('testNamePattern', params.testNamePattern)
       : null);
@@ -237,6 +279,17 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
 
   if (params.config) {
+    if (!params.testPathPatterns) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'testPathPatterns is required when config is set (config targets a Jest variant).',
+          },
+        ],
+        isError: true,
+      };
+    }
     const target = `test:${params.config}`;
     // The executor lookup costs an `nx show project --json` spawn, which on a
     // cold project graph is seconds the caller's sync budget has to absorb.
@@ -258,8 +311,46 @@ export async function runTest(params: RunTestParams): Promise<ToolResult> {
     };
   }
 
+  if (plan.kind === 'nodeTest') {
+    if (!params.files || params.files.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `"${params.project}"'s "test" target runs via Node's own test runner (node --test), not Jest — testPathPatterns/testNamePattern don't apply. Pass files: string[] (paths relative to the project root, e.g. ["lib/__tests__/retry.test.mjs"]) to select which files run.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    return runNodeTestTarget(params, plan.target);
+  }
+
   if (plan.kind === 'single') {
+    if (!params.testPathPatterns) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'testPathPatterns is required for a Jest target.',
+          },
+        ],
+        isError: true,
+      };
+    }
     return runJestTarget(params, plan.target, plan.shellJoinsArgs);
+  }
+
+  if (!params.testPathPatterns) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'testPathPatterns is required for a Jest target.',
+        },
+      ],
+      isError: true,
+    };
   }
 
   const perTarget = await Promise.all(
