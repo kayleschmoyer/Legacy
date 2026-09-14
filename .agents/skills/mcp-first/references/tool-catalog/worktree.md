@@ -151,13 +151,14 @@ Git diff against a base ref (default: origin/main). Supports stat/name-only. Pas
 
 ### `worktree_fetch`
 
-Fetch from a remote (git fetch [remote] [branch]). Returns updated refs plus real `upToDate`/`ahead`/`behind` (not fetch's stdout). Use this instead of worktree_run(command: "git fetch origin") for up-to-date remote refs before a merge-base check, ancestor comparison, or any origin/* read. Typical use: fetch before worktree_status() to get accurate ahead/behind counts, or before worktree_run(command: "git merge-base --is-ancestor origin/main HEAD"). If a merge-base check fails with "unrelated histories" or comes back empty, the worktree is likely a shallow clone — pass `deepen` (e.g. 200) instead of falling back to a raw `git fetch --deepen`/`git rev-parse --is-shallow-repository` via Bash.
+Fetch from a remote (git fetch [remote] [branch]). Returns real `upToDate`/`ahead`/`behind` (not fetch's stdout) plus shallow state (`isShallow`, `commitCount`) — check before trusting an empty history query as "never existed". Use instead of worktree_run(command: "git fetch origin") before a merge-base check, ancestor comparison, or any op reading origin/* refs — e.g. before worktree_status() for accurate ahead/behind counts. If a merge-base check fails or is empty, the worktree is likely shallow — pass `deepen` or `unshallow: true` (exclusive) instead of raw git via Bash.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `remote` | string |  | — | Remote name (default: "origin"). |
 | `branch` | string |  | — | Specific branch or refspec to fetch (e.g. "main" or "refs/heads/main"). Omit to fetch all branches from the remote. |
-| `deepen` | number |  | — | Deepen a shallow clone by this many additional commits (`git fetch --deepen=<n>`). Use when a merge-base check against origin/main fails or returns nothing. 200 covers typical PR depths. |
+| `deepen` | number |  | — | Deepen a shallow clone by this many commits (`git fetch --deepen=<n>`). Exclusive with `unshallow`. |
+| `unshallow` | boolean |  | — | Fully unshallow (`git fetch --unshallow`) instead of guessing `deepen`. Exclusive with `deepen`. |
 | `worktree` | string |  | — | Ticket key, absolute path, or omit for active worktree. |
 
 ### `worktree_file_info`
@@ -613,7 +614,7 @@ Restore the most recently stashed changes. Equivalent to `git stash pop`. Use af
 
 ### `worktree_status`
 
-Structured git status: files, branch, ahead/behind, rebase/conflict state.
+Structured git status: files, branch, ahead/behind, rebase/conflict, shallow state (`isShallow`, `commitCount`).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

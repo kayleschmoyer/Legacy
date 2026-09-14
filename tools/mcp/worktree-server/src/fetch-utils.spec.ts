@@ -67,11 +67,35 @@ describe('buildFetchArgs', () => {
       'origin',
     ]);
   });
+
+  it('inserts --unshallow before the remote when unshallow is true', () => {
+    expect(buildFetchArgs('origin', 'main', undefined, true)).toEqual([
+      'fetch',
+      '--unshallow',
+      'origin',
+      'main',
+    ]);
+  });
+
+  it('prefers --unshallow over --deepen when both are somehow passed', () => {
+    expect(buildFetchArgs('origin', undefined, 200, true)).toEqual([
+      'fetch',
+      '--unshallow',
+      'origin',
+    ]);
+  });
+
+  it('omits --unshallow when false or absent', () => {
+    expect(buildFetchArgs('origin', undefined, undefined, false)).toEqual([
+      'fetch',
+      'origin',
+    ]);
+  });
 });
 
 describe('buildFetchResult', () => {
   it('falls back to output-text guessing when divergence could not be computed', () => {
-    expect(buildFetchResult('origin', undefined, '', null)).toEqual({
+    expect(buildFetchResult('origin', undefined, '', null, false, 50)).toEqual({
       success: true,
       remote: 'origin',
       branch: null,
@@ -79,11 +103,20 @@ describe('buildFetchResult', () => {
       ahead: null,
       behind: null,
       output: '(already up to date)',
+      isShallow: false,
+      commitCount: 50,
     });
   });
 
   it('treats whitespace-only output as up to date when divergence is unknown', () => {
-    const result = buildFetchResult('origin', undefined, '   \n  ', null);
+    const result = buildFetchResult(
+      'origin',
+      undefined,
+      '   \n  ',
+      null,
+      false,
+      50,
+    );
     expect(result.upToDate).toBe(true);
     expect(result.output).toBe('(already up to date)');
   });
@@ -91,7 +124,7 @@ describe('buildFetchResult', () => {
   it('reports not-upToDate and trims real fetch output when divergence is unknown', () => {
     const raw =
       '\nFrom github.com:org/repo\n   abc123..def456  main -> origin/main\n';
-    const result = buildFetchResult('origin', 'main', raw, null);
+    const result = buildFetchResult('origin', 'main', raw, null, false, 7978);
     expect(result).toEqual({
       success: true,
       remote: 'origin',
@@ -101,33 +134,55 @@ describe('buildFetchResult', () => {
       behind: null,
       output:
         'From github.com:org/repo\n   abc123..def456  main -> origin/main',
+      isShallow: false,
+      commitCount: 7978,
     });
   });
 
   it('echoes the requested branch in the result', () => {
     expect(
-      buildFetchResult('upstream', 'develop', 'updated', null).branch,
+      buildFetchResult('upstream', 'develop', 'updated', null, false, 10)
+        .branch,
     ).toBe('develop');
+  });
+
+  it('surfaces shallow state and commit count', () => {
+    const result = buildFetchResult('origin', undefined, '', null, true, 50);
+    expect(result.isShallow).toBe(true);
+    expect(result.commitCount).toBe(50);
+  });
+
+  it('passes through a null commitCount when it could not be determined', () => {
+    const result = buildFetchResult('origin', undefined, '', null, false, null);
+    expect(result.commitCount).toBeNull();
   });
 
   it('prefers real divergence over the output-text guess, including when output is misleadingly empty (LS-10084)', () => {
     // Reproduces the bug: git fetch's update-summary lines went to stderr and
     // never reached `rawOutput`, so the old heuristic reported upToDate:
     // true even though the branch was 24 commits behind its remote.
-    const result = buildFetchResult('origin', 'feature', '', {
-      ahead: 0,
-      behind: 24,
-    });
+    const result = buildFetchResult(
+      'origin',
+      'feature',
+      '',
+      { ahead: 0, behind: 24 },
+      false,
+      null,
+    );
     expect(result.upToDate).toBe(false);
     expect(result.ahead).toBe(0);
     expect(result.behind).toBe(24);
   });
 
   it('reports upToDate: true from real divergence of {0, 0}', () => {
-    const result = buildFetchResult('origin', 'feature', '', {
-      ahead: 0,
-      behind: 0,
-    });
+    const result = buildFetchResult(
+      'origin',
+      'feature',
+      '',
+      { ahead: 0, behind: 0 },
+      false,
+      null,
+    );
     expect(result.upToDate).toBe(true);
     expect(result.ahead).toBe(0);
     expect(result.behind).toBe(0);
@@ -242,7 +297,7 @@ describe('tryRefreshRemoteTrackingRef', () => {
 describe('executeWorktreeFetch', () => {
   const okResolver: FetchDeps['resolveTargetDir'] = () => ({ path: '/wt' });
 
-  it('returns the fetch result on success, invokes git with the right args/cwd, and reports real divergence', () => {
+  it('returns the fetch result on success, invokes git with the right args/cwd, and reports real divergence plus shallow state', () => {
     const runGit = jest
       .fn<FetchDeps['runGit']>()
       .mockImplementation((args: string[]) => {
@@ -254,6 +309,9 @@ describe('executeWorktreeFetch', () => {
           return 'remote-sha';
         if (args.join(' ') === 'rev-list --count origin/main..main') return '0';
         if (args.join(' ') === 'rev-list --count main..origin/main') return '3';
+        if (args.join(' ') === 'rev-parse --is-shallow-repository')
+          return 'false';
+        if (args.join(' ') === 'rev-list --count HEAD') return '50';
         throw new Error(`unexpected git args: ${args.join(' ')}`);
       });
 
@@ -273,6 +331,8 @@ describe('executeWorktreeFetch', () => {
       behind: 3,
       output:
         'From github.com:org/repo\n   abc123..def456  main -> origin/main',
+      isShallow: false,
+      commitCount: 50,
     });
   });
 
@@ -291,6 +351,9 @@ describe('executeWorktreeFetch', () => {
           return '0';
         if (args.join(' ') === 'rev-list --count feature..origin/feature')
           return '24';
+        if (args.join(' ') === 'rev-parse --is-shallow-repository')
+          return 'false';
+        if (args.join(' ') === 'rev-list --count HEAD') return '0';
         throw new Error(`unexpected git args: ${args.join(' ')}`);
       });
 
@@ -318,6 +381,81 @@ describe('executeWorktreeFetch', () => {
       ['fetch', '--deepen=200', 'origin', 'main'],
       '/wt',
     );
+  });
+
+  it('passes unshallow through to buildFetchArgs', () => {
+    const runGit = jest.fn<FetchDeps['runGit']>().mockReturnValue('');
+
+    executeWorktreeFetch(
+      { remote: 'origin', unshallow: true },
+      { resolveTargetDir: okResolver, runGit },
+    );
+
+    expect(runGit).toHaveBeenCalledWith(
+      ['fetch', '--unshallow', 'origin'],
+      '/wt',
+    );
+  });
+
+  it('rejects unshallow and deepen passed together without running git', () => {
+    const runGit = jest.fn<FetchDeps['runGit']>().mockReturnValue('');
+
+    const res = executeWorktreeFetch(
+      { unshallow: true, deepen: 200 },
+      { resolveTargetDir: okResolver, runGit },
+    );
+
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('mutually exclusive');
+    expect(runGit).not.toHaveBeenCalled();
+  });
+
+  it('surfaces isShallow: true and the commit count after the fetch', () => {
+    const runGit = jest
+      .fn<FetchDeps['runGit']>()
+      .mockImplementation((args: string[]) => {
+        if (args[0] === 'fetch') return '';
+        if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') return '';
+        if (args.join(' ') === 'rev-parse --is-shallow-repository')
+          return 'true';
+        if (args.join(' ') === 'rev-list --count HEAD') return '50';
+        throw new Error(`unexpected git args: ${args.join(' ')}`);
+      });
+
+    const res = executeWorktreeFetch(
+      {},
+      { resolveTargetDir: okResolver, runGit },
+    );
+
+    expect(JSON.parse(res.content[0].text)).toMatchObject({
+      isShallow: true,
+      commitCount: 50,
+    });
+  });
+
+  it('reports a null commitCount when rev-list fails', () => {
+    const runGit = jest
+      .fn<FetchDeps['runGit']>()
+      .mockImplementation((args: string[]) => {
+        if (args[0] === 'fetch') return '';
+        if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') return '';
+        if (args.join(' ') === 'rev-parse --is-shallow-repository')
+          return 'false';
+        if (args.join(' ') === 'rev-list --count HEAD') {
+          throw new Error('fatal: bad revision HEAD');
+        }
+        throw new Error(`unexpected git args: ${args.join(' ')}`);
+      });
+
+    const res = executeWorktreeFetch(
+      {},
+      { resolveTargetDir: okResolver, runGit },
+    );
+
+    expect(JSON.parse(res.content[0].text)).toMatchObject({
+      isShallow: false,
+      commitCount: null,
+    });
   });
 
   it('defaults the remote to origin and falls back to output-based upToDate when the branch cannot be resolved', () => {

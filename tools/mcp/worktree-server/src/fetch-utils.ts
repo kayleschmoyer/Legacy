@@ -5,6 +5,8 @@
 // result-shaping logic can be unit-tested without spawning git.
 // ---------------------------------------------------------------------------
 
+import { isShallowRepository } from './shallow-utils';
+
 /** Shape returned by worktree_fetch on success. */
 export interface FetchResult {
   success: true;
@@ -16,6 +18,10 @@ export interface FetchResult {
   /** Commits on the remote-tracking ref not yet on the local branch, or `null` if it couldn't be determined. */
   behind: number | null;
   output: string;
+  /** `git rev-parse --is-shallow-repository` after the fetch (LS-10112). */
+  isShallow: boolean;
+  /** `git rev-list --count HEAD` after the fetch, or null if it couldn't be read. */
+  commitCount: number | null;
 }
 
 /** Real ahead/behind divergence between a local branch and its remote-tracking ref. */
@@ -44,6 +50,12 @@ export interface FetchArgs {
   worktree?: string;
   /** Deepen a shallow clone by this many commits (`git fetch --deepen=<n>`). */
   deepen?: number;
+  /**
+   * Fully unshallow the clone (`git fetch --unshallow`). Mutually exclusive
+   * with `deepen` — use this instead of guessing a `deepen` count when the
+   * commit you need is an unknown distance back (LS-10112).
+   */
+  unshallow?: boolean;
 }
 
 /**
@@ -68,14 +80,22 @@ export interface FetchDeps {
  * <remote> <branch>`) when `deepen` is a positive integer, so callers can
  * recover a shallow clone (e.g. after a stale merge-base) without a raw
  * `git fetch --deepen` via Bash (LS-9232).
+ *
+ * `unshallow` takes precedence over `deepen` (callers should reject passing
+ * both before reaching here — see `executeWorktreeFetch`) and inserts
+ * `--unshallow` instead, for the case where the needed commit is an unknown
+ * distance back and a guessed `deepen` count won't reach it (LS-10112).
  */
 export function buildFetchArgs(
   remote: string,
   branch?: string,
   deepen?: number,
+  unshallow?: boolean,
 ): string[] {
   const args = ['fetch'];
-  if (Number.isInteger(deepen) && (deepen as number) > 0) {
+  if (unshallow) {
+    args.push('--unshallow');
+  } else if (Number.isInteger(deepen) && (deepen as number) > 0) {
     args.push(`--deepen=${deepen}`);
   }
   args.push(remote);
@@ -97,12 +117,20 @@ export function buildFetchArgs(
  * only as a last-resort fallback for the rare case a real divergence check
  * isn't possible (detached HEAD with no `branch` argument, a branch with no
  * remote-tracking ref yet, etc).
+ *
+ * `isShallow`/`commitCount` are passed in already-computed (post-fetch) so an
+ * agent reading a `worktree_fetch` result can see the clone's shallow state
+ * directly, instead of reaching for the banned `git rev-parse
+ * --is-shallow-repository` via Bash — an empty history-archaeology result on
+ * a shallow clone otherwise reads as "never existed" (LS-10112).
  */
 export function buildFetchResult(
   remote: string,
   branch: string | undefined,
   rawOutput: string,
   divergence: RemoteDivergence | null,
+  isShallow: boolean,
+  commitCount: number | null,
 ): FetchResult {
   const trimmed = rawOutput.trim();
   const upToDate = divergence
@@ -116,6 +144,8 @@ export function buildFetchResult(
     ahead: divergence?.ahead ?? null,
     behind: divergence?.behind ?? null,
     output: trimmed || '(already up to date)',
+    isShallow,
+    commitCount,
   };
 }
 
@@ -223,7 +253,25 @@ export function executeWorktreeFetch(
   args: FetchArgs,
   deps: FetchDeps,
 ): ToolResponse {
-  const { remote = 'origin', branch, worktree: wtKey, deepen } = args;
+  const {
+    remote = 'origin',
+    branch,
+    worktree: wtKey,
+    deepen,
+    unshallow,
+  } = args;
+
+  if (unshallow && Number.isInteger(deepen) && (deepen as number) > 0) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: '`unshallow` and `deepen` are mutually exclusive — pass one or the other, not both.',
+        },
+      ],
+      isError: true,
+    };
+  }
 
   const target = deps.resolveTargetDir(wtKey);
   if ('error' in target) {
@@ -235,7 +283,7 @@ export function executeWorktreeFetch(
 
   try {
     const output = deps.runGit(
-      buildFetchArgs(remote, branch, deepen),
+      buildFetchArgs(remote, branch, deepen, unshallow),
       target.path,
     );
     const divergence = computeRemoteDivergence(
@@ -244,12 +292,30 @@ export function executeWorktreeFetch(
       remote,
       branch,
     );
+    const isShallow = isShallowRepository({ runGit: deps.runGit }, target.path);
+    let commitCount: number | null = null;
+    try {
+      const parsed = parseInt(
+        deps.runGit(['rev-list', '--count', 'HEAD'], target.path).trim(),
+        10,
+      );
+      commitCount = Number.isNaN(parsed) ? null : parsed;
+    } catch {
+      commitCount = null;
+    }
     return {
       content: [
         {
           type: 'text',
           text: JSON.stringify(
-            buildFetchResult(remote, branch, output, divergence),
+            buildFetchResult(
+              remote,
+              branch,
+              output,
+              divergence,
+              isShallow,
+              commitCount,
+            ),
             null,
             2,
           ),

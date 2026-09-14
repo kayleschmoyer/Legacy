@@ -2024,7 +2024,8 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_status',
       description:
-        'Structured git status: files, branch, ahead/behind, rebase/conflict state.',
+        'Structured git status: files, branch, ahead/behind, rebase/conflict, shallow state ' +
+        '(`isShallow`, `commitCount`).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -3102,14 +3103,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_fetch',
       description:
         'Fetch from a remote (git fetch [remote] [branch]). ' +
-        "Returns updated refs plus real `upToDate`/`ahead`/`behind` (not fetch's stdout). " +
-        'Use this instead of worktree_run(command: "git fetch origin") for up-to-date remote refs ' +
-        'before a merge-base check, ancestor comparison, or any origin/* read. ' +
-        'Typical use: fetch before worktree_status() to get accurate ahead/behind counts, ' +
-        'or before worktree_run(command: "git merge-base --is-ancestor origin/main HEAD"). ' +
-        'If a merge-base check fails with "unrelated histories" or comes back empty, the worktree is ' +
-        'likely a shallow clone — pass `deepen` (e.g. 200) instead of falling back to a raw ' +
-        '`git fetch --deepen`/`git rev-parse --is-shallow-repository` via Bash.',
+        "Returns real `upToDate`/`ahead`/`behind` (not fetch's stdout) plus shallow state " +
+        '(`isShallow`, `commitCount`) — check before trusting an empty history query as "never existed". ' +
+        'Use instead of worktree_run(command: "git fetch origin") before a merge-base check, ancestor ' +
+        'comparison, or any op reading origin/* refs — e.g. before worktree_status() for accurate ' +
+        'ahead/behind counts. If a merge-base check fails or is empty, the worktree is likely shallow — ' +
+        'pass `deepen` or `unshallow: true` (exclusive) instead of raw git via Bash.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -3126,9 +3125,14 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           deepen: {
             type: 'number',
             description:
-              'Deepen a shallow clone by this many additional commits ' +
-              '(`git fetch --deepen=<n>`). Use when a merge-base check against origin/main ' +
-              'fails or returns nothing. 200 covers typical PR depths.',
+              'Deepen a shallow clone by this many commits (`git fetch --deepen=<n>`). ' +
+              'Exclusive with `unshallow`.',
+          },
+          unshallow: {
+            type: 'boolean',
+            description:
+              'Fully unshallow (`git fetch --unshallow`) instead of guessing `deepen`. ' +
+              'Exclusive with `deepen`.',
           },
           worktree: {
             type: 'string',
@@ -7811,6 +7815,23 @@ const handleCallTool = async (
           // merge-base can fail on orphan branches or if origin/main doesn't exist
         }
 
+        // Shallow-clone state (LS-10112) — surfaced so an agent can tell an
+        // empty history/archaeology query result apart from "never existed"
+        // without a raw `git rev-parse --is-shallow-repository` via Bash.
+        const isShallow = isShallowRepository({ runGit }, cwd);
+        let commitCount: number | null = null;
+        try {
+          const parsed = parseInt(
+            runGit(['rev-list', '--count', 'HEAD'], cwd, {
+              timeout: 10_000,
+            }).trim(),
+            10,
+          );
+          commitCount = Number.isNaN(parsed) ? null : parsed;
+        } catch {
+          commitCount = null;
+        }
+
         const result = {
           branch: branch || '(detached)',
           modified,
@@ -7822,6 +7843,8 @@ const handleCallTool = async (
           rebaseInProgress,
           mergeInProgress,
           mergeBase,
+          isShallow,
+          commitCount,
           clean:
             modified.length === 0 &&
             staged.length === 0 &&
