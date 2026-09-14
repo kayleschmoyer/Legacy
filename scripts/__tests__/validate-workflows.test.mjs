@@ -353,6 +353,49 @@ test('isYamllintAvailable skips an impostor and falls through to the real yamlli
   assert.deepEqual(isYamllintAvailable([fakeVersion('1.7.0'), real]), real);
 });
 
+// LS-10126 regression: the fallback above only proves that distinct
+// *candidate entries* are tried in order. In production there is exactly one
+// bare `yamllint` candidate, resolved via PATH lookup — so an impostor and a
+// real yamllint sharing that name but sitting in different PATH directories
+// (the actual `pnpm run` shape: node_modules/.bin/yamllint shadowing a
+// `uv tool install`'d yamllint later on PATH) were never disambiguated at
+// all; the first PATH hit won regardless of what it printed. Build a real
+// two-directory PATH with an impostor first and a real yamllint second and
+// confirm the bare-command candidate finds the real one.
+test('isYamllintAvailable finds a same-named real yamllint later on PATH, past an impostor shadowing it first', () => {
+  const tmpRoot = mkdtempSync(join(tmpdir(), 'ls-10126-'));
+  const impostorDir = join(tmpRoot, 'node_modules', '.bin');
+  const realDir = join(tmpRoot, 'real-bin');
+  mkdirSync(impostorDir, { recursive: true });
+  mkdirSync(realDir, { recursive: true });
+
+  const impostorPath = join(impostorDir, 'yamllint');
+  const realPath = join(realDir, 'yamllint');
+  writeFileSync(impostorPath, '#!/usr/bin/env node\nconsole.log("1.7.0");\n', {
+    mode: 0o755,
+  });
+  writeFileSync(
+    realPath,
+    '#!/usr/bin/env node\nconsole.log("yamllint 1.38.0");\n',
+    { mode: 0o755 },
+  );
+
+  const originalPath = process.env.PATH;
+  try {
+    // Keep the original PATH after our two directories so `#!/usr/bin/env
+    // node` can still resolve node itself; neither fake script is named
+    // anything the real PATH would already contain, so ordering still puts
+    // our impostor first and our real fake second.
+    process.env.PATH = [impostorDir, realDir, originalPath].join(
+      process.platform === 'win32' ? ';' : ':',
+    );
+    assert.deepEqual(isYamllintAvailable([['yamllint']]), [realPath]);
+  } finally {
+    process.env.PATH = originalPath;
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
 test('isYamllintRequired: CI or REQUIRE_YAMLLINT, ignoring falsy spellings', () => {
   assert.equal(isYamllintRequired({}), false);
   assert.equal(isYamllintRequired({ CI: 'true' }), true);

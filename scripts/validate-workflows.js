@@ -246,6 +246,34 @@ const DEFAULT_YAMLLINT_CANDIDATES = [
 // Python yamllint identifies itself as `yamllint X.Y.Z`.
 const PYTHON_YAMLLINT_VERSION = /^yamllint \d+\.\d+/m;
 
+// Resolve every executable named `command` on PATH, in PATH order — not just
+// the first, the way spawnSync's own shell-style lookup would. Needed because
+// `pnpm run` prepends node_modules/.bin to PATH, and a same-named impostor
+// there (e.g. the `yaml-lint` npm package's `yamllint`) permanently shadows a
+// real binary installed later on PATH, such as a `uv tool install yamllint`
+// (LS-10126).
+function resolveAllOnPath(command) {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const exts =
+    process.platform === 'win32'
+      ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';')
+      : [''];
+
+  const resolved = [];
+  for (const dir of dirs) {
+    for (const ext of exts) {
+      const full = path.join(dir, command + ext);
+      try {
+        fs.accessSync(full, fs.constants.X_OK);
+        resolved.push(full);
+      } catch {
+        // Not present/executable in this PATH entry; keep looking.
+      }
+    }
+  }
+  return resolved;
+}
+
 // Returns the argv prefix ([command, ...args]) of the first runnable yamllint,
 // or null when none of the candidates work.
 //
@@ -255,19 +283,32 @@ const PYTHON_YAMLLINT_VERSION = /^yamllint \d+\.\d+/m;
 // puts node_modules/.bin first on PATH, so under `pnpm run test:scripts` the
 // bare `yamllint` candidate resolved to it and the lint passed vacuously
 // (LS-10104). Only accept a binary that identifies as Python yamllint.
+//
+// Rejecting the impostor isn't enough on its own (LS-10126): a bare,
+// single-word candidate like `yamllint` is normally resolved by PATH lookup,
+// which only ever returns the FIRST match. If that first match is the
+// impostor, a real yamllint sitting later on PATH (e.g. from
+// `uv tool install`) was never tried at all, and detection returned null even
+// though a real yamllint was installed. For that shape of candidate, probe
+// every PATH entry ourselves and try each executable in PATH order.
 function isYamllintAvailable(candidates = DEFAULT_YAMLLINT_CANDIDATES) {
   for (const candidate of candidates) {
     const [command, ...args] = candidate;
-    const result = spawnSync(command, [...args, '--version'], {
-      encoding: 'utf8',
-    });
-    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
-    if (
-      !result.error &&
-      result.status === 0 &&
-      PYTHON_YAMLLINT_VERSION.test(output)
-    ) {
-      return candidate;
+    const isBareCommand = args.length === 0 && !command.includes(path.sep);
+    const executables = isBareCommand ? resolveAllOnPath(command) : [command];
+
+    for (const executable of executables) {
+      const result = spawnSync(executable, [...args, '--version'], {
+        encoding: 'utf8',
+      });
+      const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+      if (
+        !result.error &&
+        result.status === 0 &&
+        PYTHON_YAMLLINT_VERSION.test(output)
+      ) {
+        return [executable, ...args];
+      }
     }
   }
   return null;
