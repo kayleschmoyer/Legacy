@@ -708,6 +708,10 @@
       "lib/shared-components/src/features/roster/**",
       "lib/shared-components/src/features/stats/**"
     ],
+    "apps/web-e2e/src/tests/overflow-guard-boundary.spec.ts": [
+      "apps/web/src/styles.css",
+      "lib/design-tokens/src/lib/**"
+    ],
     "apps/web-e2e/src/tests/breakpoint-alignment.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/pages/football/**",

@@ -286,8 +286,16 @@ body {
   white-space: nowrap;
 }
 
-/* Ensure no horizontal overflow escapes the viewport */
-@media (max-width: 800px) {
+/* Ensure no horizontal overflow escapes the viewport.
+ * Boundary tied to the design-token scale (@legacy-sports/design-tokens,
+ * lib/design-tokens/src/lib/breakpoints.ts / tokens.css --bp-sm), not a bare
+ * literal: --bp-sm is 800px, the *lower* bound of the $sm compact-tablet
+ * band, so the $xs phone band this guard targets tops out one pixel below
+ * it at 799px. All three rules below are scoped to $xs (phone only) — LS-10114
+ * considered widening to the $sm band (859px) for the tablist rule, but that
+ * would be a behavioral change across the 800-859px compact-tablet range and
+ * needs its own ticket/check rather than riding along here. */
+@media (max-width: 799px) {
   /* Force tables inside Tamagui components to scroll */
   table {
     min-width: max-content;
