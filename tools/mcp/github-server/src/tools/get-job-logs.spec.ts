@@ -543,4 +543,54 @@ describe('getJobLogs', () => {
       expect(result.content[0].text).toContain('GitHub API 404');
     });
   });
+
+  describe('BlobNotFound 404 (LS-10158)', () => {
+    const blobNotFoundError = new Error(
+      'GitHub API GET /actions/jobs/103634057690/logs failed (404): ' +
+        '<?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code>' +
+        '<Message>The specified blob does not exist.\n' +
+        'RequestId:dc37d091-f01e-0025-750a-433296000000\n' +
+        'Time:2026-09-12T23:00:10.5748648Z</Message></Error>',
+    );
+
+    it('translates a BlobNotFound 404 into an actionable message on the job_id path', async () => {
+      mockGetArrayBuffer.mockRejectedValue(blobNotFoundError);
+
+      const result = await getJobLogs({ jobId: 103634057690 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).not.toContain('BlobNotFound');
+      expect(result.content[0].text).not.toContain('<?xml');
+      expect(result.content[0].text).toMatch(/not yet available/i);
+      expect(result.content[0].text).toMatch(/retry/i);
+    });
+
+    it('still passes through a genuine (non-blob) 404 as-is on the job_id path', async () => {
+      mockGetArrayBuffer.mockRejectedValue(
+        new Error(
+          'GitHub API GET /actions/jobs/1/logs failed (404): {"message":"Not Found"}',
+        ),
+      );
+
+      const result = await getJobLogs({ jobId: 1 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).not.toMatch(/not yet available/i);
+    });
+
+    it('translates a BlobNotFound 404 into an actionable per-job message on the run_id path', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 1,
+        jobs: [{ id: 10, name: 'build', conclusion: 'failure' }],
+      });
+      mockGetArrayBuffer.mockRejectedValue(blobNotFoundError);
+
+      const result = await getJobLogs({ runId: 99, failedOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.logs as string).not.toContain('BlobNotFound');
+      expect(payload.logs as string).toMatch(/not yet available/i);
+    });
+  });
 });

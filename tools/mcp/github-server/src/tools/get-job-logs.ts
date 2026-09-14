@@ -19,6 +19,32 @@ export interface GetJobLogsParams {
 /** Default hard cap on output characters to prevent context window overflow. */
 const DEFAULT_MAX_CHARS = 10_000;
 
+/**
+ * Friendly message for a job whose log archive GitHub hasn't finished
+ * uploading yet. The check-run conclusion is delivered by webhook before the
+ * log blob is durably available, so a log fetch immediately after
+ * completion routinely 404s even for a perfectly valid job_id (LS-10158).
+ */
+const LOGS_NOT_YET_AVAILABLE_MESSAGE =
+  'Job logs are not yet available -- GitHub has not finished uploading them. ' +
+  'This is normal within ~1-2 minutes of job completion; retry shortly.';
+
+/**
+ * True for the raw Azure Blob Storage 404 GitHub's log-blob endpoint returns
+ * when a job's log archive hasn't finished uploading yet -- distinct from the
+ * JSON 404 GitHub returns for an unknown job_id, which never mentions
+ * BlobNotFound (LS-10158). Without this check the caller sees the raw
+ * storage-provider XML body and reads it as a hard failure / bad job_id
+ * rather than "too early, retry".
+ */
+function isBlobNotFoundError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    /failed \(404\)/.test(err.message) &&
+    /<Code>BlobNotFound<\/Code>/.test(err.message)
+  );
+}
+
 /** Default number of tail lines when tail_lines is not specified. */
 const DEFAULT_TAIL_LINES = 200;
 
@@ -508,7 +534,18 @@ export async function getJobLogs(
     let failingSteps: string[] = [];
 
     if (params.jobId) {
-      const scoped = await fetchScopedJobLog(owner, name, params.jobId);
+      let scoped;
+      try {
+        scoped = await fetchScopedJobLog(owner, name, params.jobId);
+      } catch (err) {
+        if (isBlobNotFoundError(err)) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: LOGS_NOT_YET_AVAILABLE_MESSAGE }],
+          };
+        }
+        throw err;
+      }
       rawText = scoped.text;
       scopedToFailingStep = scoped.scopedToFailingStep;
       failingSteps = scoped.stepNames;
@@ -545,7 +582,10 @@ export async function getJobLogs(
               for (const s of scoped.stepNames) stepNamesByJob.add(s);
             }
             return `${job.name}\n${scoped.text}`;
-          } catch {
+          } catch (err) {
+            if (isBlobNotFoundError(err)) {
+              return `${job.name}\n${LOGS_NOT_YET_AVAILABLE_MESSAGE}`;
+            }
             return `${job.name}\n(Failed to fetch logs for this job)`;
           }
         }),
