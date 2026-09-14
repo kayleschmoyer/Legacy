@@ -10,7 +10,14 @@ import type {
 } from './types';
 import { DraftGrid } from './DraftGrid';
 import { DraftBoardTimeline } from './DraftBoardTimeline';
-import { BENCH_SLOT, buildDepthChartBuckets } from './rosterSlots';
+import {
+  BENCH_SLOT,
+  buildDepthChartBuckets,
+  buildRosterSlotInstances,
+  nextPrioritySlotKey,
+  openStarterSlotLabels,
+  rosterSlotFillCounts,
+} from './rosterSlots';
 import { DraftPlayerDock } from './DraftPlayerDock';
 import {
   dockPickLabel,
@@ -335,6 +342,14 @@ const TEXT = 'var(--d-text)';
 const TEXT_SECONDARY = 'var(--d-text-secondary)';
 const TEXT_MUTED = 'var(--d-text-muted)';
 const PANEL = 'var(--d-panel)';
+// Depth chart's priority-slot marker (design `.depth-slot .slot-row.need`:
+// `border-color: var(--seam); color: var(--seam-bright);`) — deliberately
+// the seam-red family, not the slot strip's gold `.sb-slot.need`: the two
+// "need" markers use different accents by design. Theme tokens only (no
+// literal hex/rgba) — the theme-compliance ratchet (LS-8519) fails CI on
+// new hardcoded colors.
+const NEED_BORDER = 'var(--d-seam-red)';
+const NEED_TEXT = 'var(--brandSeamRedLight)';
 
 /** Data Table column header that's clickable to sort (Rank/Pos/Player/ADP and
  * the per-sport stat columns). */
@@ -684,6 +699,34 @@ export function DraftPlayerBoard({
   const depthChartBuckets = useMemo(
     () => buildDepthChartBuckets(leaguePositions, myTeam, sport, maxRosterSize),
     [leaguePositions, myTeam, sport, maxRosterSize],
+  );
+
+  // Depth chart summary line + priority marker (LS-10166) — derived from the
+  // same per-slot expansion the bottom-pinned strip and squad strip already
+  // use (`rosterSlots.ts`), so the depth chart can never disagree with them
+  // about which slot is "the" priority hole.
+  const myRosterSlots = useMemo(
+    () =>
+      buildRosterSlotInstances(leaguePositions, myTeam, sport, maxRosterSize),
+    [leaguePositions, myTeam, sport, maxRosterSize],
+  );
+  const priorityDepthSlotKey = useMemo(
+    () => nextPrioritySlotKey(myRosterSlots),
+    [myRosterSlots],
+  );
+  const { filled: depthSlotsFilled, total: depthSlotsTotal } = useMemo(
+    () => rosterSlotFillCounts(myRosterSlots),
+    [myRosterSlots],
+  );
+  const nextNeedLabels = useMemo(
+    () => openStarterSlotLabels(myRosterSlots),
+    [myRosterSlots],
+  );
+  const myTeamName = useMemo(
+    () =>
+      boardOrderedTeams.find((t) => String(t.id) === String(myTeamId))?.name ??
+      null,
+    [boardOrderedTeams, myTeamId],
   );
 
   // Preserves each player's original rank (1-based position in filteredPlayers)
@@ -1223,113 +1266,174 @@ export function DraftPlayerBoard({
 
         {/* My Depth Chart view */}
         {viewMode === 'depth' && (
-          <DepthGrid>
-            {depthChartBuckets.map(({ positionType, total, players }) => {
-              const complete = total > 0 && players.length >= total;
-              const posColor = getPositionColor(sport, positionType);
-              return (
-                <YStack
-                  key={positionType}
-                  flexBasis={`${100 / depthGridColumns}%`}
-                  minWidth={0}
-                  paddingHorizontal={5}
-                  paddingBottom={10}
-                >
+          <>
+            {/* Summary line (design `.result-meta`, LS-10166): team + overall
+                fill count on the left, the distinct still-open starter
+                position types on the right — same derivation the squad
+                strip's "Open slots: …" summary uses, so the two can't
+                disagree. */}
+            <XStack
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="wrap"
+              gap={6}
+              paddingHorizontal={2}
+              marginBottom={8}
+            >
+              <Text fontSize={12} color={TEXT_SECONDARY}>
+                {myTeamName ? `${myTeamName} · ` : ''}
+                {depthSlotsFilled} of {depthSlotsTotal} positions filled
+              </Text>
+              <Text
+                fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                fontSize={11}
+                fontWeight="700"
+                letterSpacing={1.1}
+                textTransform="uppercase"
+                color={TEXT_SECONDARY}
+              >
+                {nextNeedLabels.length > 0
+                  ? `Next need: ${nextNeedLabels.join(', ')}`
+                  : 'Roster set'}
+              </Text>
+            </XStack>
+            <DepthGrid>
+              {depthChartBuckets.map(({ positionType, total, players }) => {
+                const complete = total > 0 && players.length >= total;
+                const posColor = getPositionColor(sport, positionType);
+                // The pitching staff bucket spans the full grid width and
+                // lays its rows out in its own sub-grid (design: `P —
+                // Pitching Staff`, `grid-column: span 4`).
+                const isPitchingStaff = positionType === 'P';
+                return (
                   <YStack
-                    style={csp({
-                      background: PANEL,
-                      border: complete ? undefined : `1px solid ${BORDER}`,
-                      borderRadius: 8,
-                      padding: 12,
-                    })}
+                    key={positionType}
+                    flexBasis={
+                      isPitchingStaff ? '100%' : `${100 / depthGridColumns}%`
+                    }
+                    minWidth={0}
+                    paddingHorizontal={5}
+                    paddingBottom={10}
                   >
-                    <XStack
-                      alignItems="center"
-                      justifyContent="space-between"
-                      marginBottom={8}
+                    <YStack
+                      style={csp({
+                        background: PANEL,
+                        border: complete ? undefined : `1px solid ${BORDER}`,
+                        borderRadius: 8,
+                        padding: 12,
+                      })}
                     >
-                      <Text
-                        color={posColor}
-                        fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
-                        fontWeight="800"
-                        fontSize={13}
-                        letterSpacing={1.3}
-                        aria-label={
-                          positionType === BENCH_SLOT
-                            ? 'Bench'
-                            : getPositionLabel(positionType)
-                        }
+                      <XStack
+                        alignItems="center"
+                        justifyContent="space-between"
+                        marginBottom={8}
                       >
-                        {positionType}
-                      </Text>
-                      <Text
-                        fontSize={11}
-                        color={complete ? '$statusSuccessFg' : TEXT_SECONDARY}
-                      >
-                        {players.length} / {total}
-                      </Text>
-                    </XStack>
-                    {Array.from({
-                      length: Math.max(total, players.length),
-                    }).map((_, i) => {
-                      const player = players[i];
-                      return (
-                        <XStack
-                          key={i}
-                          alignItems="center"
-                          justifyContent={player ? 'space-between' : 'center'}
-                          paddingVertical={5}
-                          paddingHorizontal={8}
-                          marginBottom={3}
-                          borderRadius={4}
-                          style={csp({
-                            background: player ? PANEL : 'transparent',
-                            border: player ? undefined : `1px dashed ${BORDER}`,
-                          })}
+                        <Text
+                          color={posColor}
+                          fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                          fontWeight="800"
+                          fontSize={13}
+                          letterSpacing={1.3}
+                          aria-label={
+                            positionType === BENCH_SLOT
+                              ? 'Bench'
+                              : getPositionLabel(positionType)
+                          }
                         >
-                          {player ? (
-                            <>
-                              <Text
-                                fontWeight="600"
-                                fontSize={12}
-                                color={TEXT}
-                                numberOfLines={1}
-                                style={csp({
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                })}
-                              >
-                                {player.name}
-                              </Text>
-                              <Text fontSize={10} color={TEXT_MUTED}>
-                                {player.position}
-                              </Text>
-                            </>
-                          ) : (
-                            <Text
-                              fontSize={12}
-                              color={TEXT_MUTED}
-                              fontStyle="italic"
+                          {isPitchingStaff
+                            ? 'P — Pitching Staff'
+                            : positionType}
+                        </Text>
+                        <Text
+                          fontSize={11}
+                          color={complete ? '$statusSuccessFg' : TEXT_SECONDARY}
+                        >
+                          {players.length} / {total}
+                        </Text>
+                      </XStack>
+                      <YStack
+                        style={csp(
+                          isPitchingStaff
+                            ? {
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: 4,
+                              }
+                            : {},
+                        )}
+                      >
+                        {Array.from({
+                          length: Math.max(total, players.length),
+                        }).map((_, i) => {
+                          const player = players[i];
+                          const isPriority =
+                            !player &&
+                            `${positionType}-${i}` === priorityDepthSlotKey;
+                          return (
+                            <XStack
+                              key={i}
+                              alignItems="center"
+                              justifyContent={
+                                player ? 'space-between' : 'center'
+                              }
+                              paddingVertical={5}
+                              paddingHorizontal={8}
+                              marginBottom={3}
+                              borderRadius={4}
+                              style={csp({
+                                background: player ? PANEL : 'transparent',
+                                border: player
+                                  ? undefined
+                                  : isPriority
+                                    ? `1px solid ${NEED_BORDER}`
+                                    : `1px dashed ${BORDER}`,
+                              })}
                             >
-                              Open
-                            </Text>
-                          )}
-                        </XStack>
-                      );
-                    })}
+                              {player ? (
+                                <>
+                                  <Text
+                                    fontWeight="600"
+                                    fontSize={12}
+                                    color={TEXT}
+                                    numberOfLines={1}
+                                    style={csp({
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    })}
+                                  >
+                                    {player.name}
+                                  </Text>
+                                  <Text fontSize={10} color={TEXT_MUTED}>
+                                    {player.position}
+                                  </Text>
+                                </>
+                              ) : (
+                                <Text
+                                  fontSize={12}
+                                  color={isPriority ? NEED_TEXT : TEXT_MUTED}
+                                  fontStyle={isPriority ? 'normal' : 'italic'}
+                                >
+                                  {isPriority ? 'Open — priority' : 'Open'}
+                                </Text>
+                              )}
+                            </XStack>
+                          );
+                        })}
+                      </YStack>
+                    </YStack>
                   </YStack>
+                );
+              })}
+              {myTeam.length === 0 && (
+                <YStack flexBasis="100%" alignItems="center" padding={24}>
+                  <Text fontSize={13} color={TEXT_MUTED}>
+                    No players drafted yet
+                  </Text>
                 </YStack>
-              );
-            })}
-            {myTeam.length === 0 && (
-              <YStack flexBasis="100%" alignItems="center" padding={24}>
-                <Text fontSize={13} color={TEXT_MUTED}>
-                  No players drafted yet
-                </Text>
-              </YStack>
-            )}
-          </DepthGrid>
+              )}
+            </DepthGrid>
+          </>
         )}
 
         {/* Cards / List / Compact view */}

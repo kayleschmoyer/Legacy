@@ -421,6 +421,53 @@ describe('DraftPlayerBoard — My Depth Chart view (LS-8785)', () => {
     expect(getByText('Star QB')).toBeTruthy();
     expect(getAllByText('Open').length).toBeGreaterThan(0);
   });
+
+  it('renders the summary line and marks only the next-need slot as priority (LS-10166)', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'Test Catcher', position: 'C' },
+    ];
+    const { getByText, getAllByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          viewMode: 'depth',
+          myTeam,
+          myTeamId: 7,
+          boardOrderedTeams: [
+            { id: '7', name: 'Sandlot Dreamers', leagueId: 1 },
+          ],
+        })}
+      />,
+    );
+
+    // Summary line: team name + overall fill count, plus the distinct
+    // still-open starter positions in lineup order.
+    expect(
+      getByText(/Sandlot Dreamers · 1 of \d+ positions filled/),
+    ).toBeTruthy();
+    expect(getByText(/^Next need: 1B, 2B, 3B, SS/)).toBeTruthy();
+
+    // Only the first open starter slot (1B, the next slot after the filled
+    // C) is marked as the priority hole — every other open slot stays plain.
+    expect(getAllByText('Open — priority')).toHaveLength(1);
+  });
+
+  it('shows "Roster set" once every starter slot is filled', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'Star QB', position: 'QB' },
+    ];
+    const { getByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          viewMode: 'depth',
+          sport: 'football',
+          myTeam,
+          leaguePositions: [{ id: 0, positionType: 'QB' }],
+          maxRosterSize: 1,
+        })}
+      />,
+    );
+    expect(getByText('Roster set')).toBeTruthy();
+  });
 });
 
 // LS-10003: below the `desktop` tier the mock replaces the rounds x teams
