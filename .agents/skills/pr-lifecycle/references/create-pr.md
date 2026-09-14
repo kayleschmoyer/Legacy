@@ -203,7 +203,10 @@ LS-8934 concluded the _write_ path strips (LS-8934 attributing it to
 intermittency and prescribing a read-back-and-retry loop), and LS-9227 /
 LS-9228 were both closed **Won't Do** on that basis, reasoning that those
 reports were the same read-path false-negative documented above rather than a
-real write-side bug.
+real write-side bug. LS-9191 landed on the same misdiagnosis again from a CCR
+session; the CCR-specific pointer to this section now lives in
+[`cloud-agent-mode/references/claude-code-remote.md` § jira-link marker "stripping" in CCR](../../cloud-agent-mode/references/claude-code-remote.md#jira-link-marker-stripping-in-ccr-is-a-read-path-false-negative-not-a-write-bug-ls-9191)
+so a future CCR session hits the answer before re-investigating.
 
 **LS-8694 confirms the Won't Do reasoning and closes the ambiguity: the write
 path does not strip.** Its own report described the same symptom pattern —
