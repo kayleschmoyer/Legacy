@@ -23,7 +23,11 @@
  * Usage:
  *   node scripts/generate-mcp-api-reference.mjs                  # write both files
  *   node scripts/generate-mcp-api-reference.mjs --check          # fail on drift + budget (CI)
- *   node scripts/generate-mcp-api-reference.mjs --update-budget  # re-seed ceilings from current measurement
+ *   node scripts/generate-mcp-api-reference.mjs --update-budget  # re-seed EVERY ceiling from current measurement
+ *   node scripts/generate-mcp-api-reference.mjs --update-budget=<server-id>
+ *       # raise only <server-id>'s ceiling to its current measurement, recompute `total` to
+ *       # match, and leave every other server's ceiling untouched — the targeted alternative
+ *       # to a full re-seed when only one server's growth is being deliberately signed off on.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -32,6 +36,7 @@ import {
   budgetFromMeasurement,
   checkBudget,
   measureDefinitionTokens,
+  updateSingleServerBudget,
 } from './mcp-api-reference/budget.mjs';
 import { collect } from './mcp-api-reference/collect.mjs';
 import { computeInlineCsp } from './mcp-api-reference/csp.mjs';
@@ -87,7 +92,13 @@ function readIfPresent(path) {
 
 function main() {
   const check = process.argv.includes('--check');
-  const updateBudget = process.argv.includes('--update-budget');
+  const updateBudgetArg = process.argv.find((arg) =>
+    arg.startsWith('--update-budget'),
+  );
+  const updateBudget = updateBudgetArg === '--update-budget';
+  const updateBudgetServer = updateBudgetArg?.startsWith('--update-budget=')
+    ? updateBudgetArg.slice('--update-budget='.length)
+    : undefined;
 
   const model = collect(REPO_ROOT);
   if (model.toolCount === 0) {
@@ -98,6 +109,40 @@ function main() {
   }
 
   const measured = measureDefinitionTokens(model);
+
+  if (updateBudgetServer) {
+    const existingRaw = readIfPresent(BUDGET_PATH);
+    if (existingRaw === undefined) {
+      console.error(
+        `Missing ${relative(REPO_ROOT, BUDGET_PATH)}.\n\n` +
+          'Seed it first with `node scripts/generate-mcp-api-reference.mjs --update-budget` (no filter).',
+      );
+      process.exit(1);
+    }
+
+    let updated;
+    try {
+      updated = updateSingleServerBudget(
+        measured,
+        JSON.parse(existingRaw),
+        updateBudgetServer,
+      );
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+
+    const body = `${JSON.stringify(updated, null, 2)}\n`;
+    mkdirSync(OUT_DIR, { recursive: true });
+    writeFileSync(BUDGET_PATH, body);
+    const actual = measured.servers[updateBudgetServer];
+    console.log(
+      `Raised ${updateBudgetServer}'s ceiling to ${actual.tools} tools / ${actual.tokens} definition tokens\n` +
+        `and recomputed total to ${updated.total.tools} tools / ${updated.total.tokens} tokens.\n` +
+        'Every other server ceiling is untouched. Review the diff and justify the raise in the PR description.',
+    );
+    return;
+  }
 
   if (updateBudget) {
     const body = `${JSON.stringify(budgetFromMeasurement(measured), null, 2)}\n`;
@@ -178,7 +223,9 @@ function main() {
           violations.map((v) => `  - ${v}`).join('\n\n') +
           '\n\nTool definitions are always-resident token cost — every registered tool bills every\n' +
           'session whether or not it is called. See .agents/skills/create/references/mcp-tool-consolidation.md.\n' +
-          'To re-seed every ceiling from the current measurement:\n' +
+          "To raise just one server's ceiling (leaving the others untouched):\n" +
+          '  node scripts/generate-mcp-api-reference.mjs --update-budget=<server-id>\n' +
+          'To re-seed every ceiling from the current measurement (a real consolidation):\n' +
           '  node scripts/generate-mcp-api-reference.mjs --update-budget',
       );
       process.exit(1);

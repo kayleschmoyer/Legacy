@@ -17,6 +17,7 @@ import {
   checkBudget,
   measureDefinitionTokens,
   tokenTolerance,
+  updateSingleServerBudget,
 } from '../mcp-api-reference/budget.mjs';
 
 /** Minimal model in the shape `collect()` returns. */
@@ -162,6 +163,41 @@ test('fails when the repo-wide total exceeds its ceiling', () => {
 
   const { violations } = checkBudget(measured, budget);
   assert.ok(violations.some((v) => /^TOTAL: /.test(v)));
+});
+
+test('updateSingleServerBudget raises only the named server and recomputes total', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+  const originalB = { ...budget.servers['srv-b'] };
+
+  // Simulate srv-a growing past its committed ceiling (tool count unchanged).
+  budget.servers['srv-a'].tokens = measured.servers['srv-a'].tokens - 50;
+  budget.total.tokens = budget.total.tokens - 50;
+
+  const updated = updateSingleServerBudget(measured, budget, 'srv-a');
+
+  assert.deepEqual(updated.servers['srv-a'], {
+    tools: measured.servers['srv-a'].tools,
+    tokens: measured.servers['srv-a'].tokens,
+  });
+  // srv-b's ceiling is untouched.
+  assert.deepEqual(updated.servers['srv-b'], originalB);
+  // total is recomputed to match the swap, not re-seeded from scratch.
+  assert.equal(updated.total.tokens, measured.total);
+  assert.equal(updated.total.tools, measured.toolCount);
+
+  const { violations } = checkBudget(measured, updated);
+  assert.deepEqual(violations, []);
+});
+
+test('updateSingleServerBudget throws for a server absent from the measurement', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+
+  assert.throws(
+    () => updateSingleServerBudget(measured, budget, 'srv-nonexistent'),
+    /srv-nonexistent: not found in the current measurement/,
+  );
 });
 
 test('reports per-server headroom on every run, passing or failing', () => {

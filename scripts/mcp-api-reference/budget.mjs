@@ -151,6 +151,40 @@ export function checkBudget(measured, budget) {
   return { violations, lines };
 }
 
+/**
+ * Raise a single server's ceiling to its current measurement, recomputing
+ * `total` to match, and leaving every other server's ceiling untouched.
+ *
+ * This is the narrow counterpart to `budgetFromMeasurement`'s full re-seed:
+ * a justified single-server raise shouldn't also silently absorb whatever
+ * headroom the other servers happen to be carrying (LS-10180).
+ */
+export function updateSingleServerBudget(measured, budget, serverId) {
+  const actual = measured.servers[serverId];
+  if (!actual) {
+    throw new Error(
+      `${serverId}: not found in the current measurement. Known servers: ` +
+        `${Object.keys(measured.servers).sort().join(', ')}`,
+    );
+  }
+
+  const existing = budget.servers?.[serverId];
+  const prevTools = existing?.tools ?? 0;
+  const prevTokens = existing?.tokens ?? 0;
+
+  return {
+    ...budget,
+    total: {
+      tools: (budget.total?.tools ?? 0) - prevTools + actual.tools,
+      tokens: (budget.total?.tokens ?? 0) - prevTokens + actual.tokens,
+    },
+    servers: {
+      ...budget.servers,
+      [serverId]: { tools: actual.tools, tokens: actual.tokens },
+    },
+  };
+}
+
 /** Build a budget file body from the current measurement (for seeding/updating). */
 export function budgetFromMeasurement(measured) {
   const servers = {};
@@ -166,7 +200,9 @@ export function budgetFromMeasurement(measured) {
       'Enforced by `make lint-mcp-api-reference`. This is a RATCHET: when a consolidation lowers the ' +
       'measured value, lower the ceiling in the same PR. Raising a ceiling requires a justification in ' +
       'the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md.',
-    _regenerate: 'node scripts/generate-mcp-api-reference.mjs --update-budget',
+    _regenerate:
+      'node scripts/generate-mcp-api-reference.mjs --update-budget ' +
+      '(or --update-budget=<server-id> to raise just one ceiling)',
     total: { tools: measured.toolCount, tokens: measured.total },
     servers,
   };
