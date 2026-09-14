@@ -2,7 +2,7 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { detectConflictSignals } from '../conflict-signals.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
-import { FAILED_CONCLUSIONS } from '../types.js';
+import { CI_FAILURE_CONCLUSIONS, SUPERSEDED_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRScanParams {
@@ -423,7 +423,8 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     }
 
     type BasePR = { number: number; title: string; headRefName: string };
-    type CIFailingPR = BasePR & { failedChecks: string[] };
+    type CancelledPR = BasePR & { cancelledChecks?: string[] };
+    type CIFailingPR = CancelledPR & { failedChecks: string[] };
     type ReviewPR = BasePR & {
       threads: ThreadDetail[];
       threadsTruncated: boolean;
@@ -431,8 +432,13 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
 
     const conflicting: BasePR[] = [];
     const ciFailing: CIFailingPR[] = [];
-    const ciPending: BasePR[] = [];
+    const ciPending: CancelledPR[] = [];
     const ciPassingNumbers = new Set<number>();
+    // Superseded checks (a cancelled/stale merge-queue attempt) stay visible
+    // to the sweep rather than being silently dropped, mirroring
+    // github_pr_batch_status's cancelledJobs (LS-10130, same reasoning as
+    // LS-10116).
+    const cancelledChecksByNumber = new Map<number, string[]>();
 
     for (const pr of filteredPrs) {
       const base: BasePR = {
@@ -473,17 +479,42 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
 
       const checks = checkNodes.map(normalizeCheckConclusion);
 
+      // CI_FAILURE_CONCLUSIONS (not FAILED_CONCLUSIONS, which github_retrigger_check
+      // still uses to decide what's worth re-dispatching) excludes CANCELLED/STALE:
+      // a superseded merge-queue attempt is not a failure (LS-10130, same defect
+      // shape as LS-10116).
       const failed = checks.filter(
-        (c) => c.conclusion && FAILED_CONCLUSIONS.has(c.conclusion),
+        (c) => c.conclusion && CI_FAILURE_CONCLUSIONS.has(c.conclusion),
+      );
+      const cancelled = checks.filter(
+        (c) => c.conclusion && SUPERSEDED_CONCLUSIONS.has(c.conclusion),
       );
       const pending = checks.filter(
         (c) => !c.conclusion || c.conclusion === '',
       );
 
+      if (cancelled.length > 0) {
+        cancelledChecksByNumber.set(
+          pr.number,
+          cancelled.map((c) => c.name),
+        );
+      }
+
       if (failed.length > 0) {
-        ciFailing.push({ ...base, failedChecks: failed.map((c) => c.name) });
+        ciFailing.push({
+          ...base,
+          failedChecks: failed.map((c) => c.name),
+          ...(cancelled.length > 0
+            ? { cancelledChecks: cancelled.map((c) => c.name) }
+            : {}),
+        });
       } else if (pending.length > 0) {
-        ciPending.push(base);
+        ciPending.push({
+          ...base,
+          ...(cancelled.length > 0
+            ? { cancelledChecks: cancelled.map((c) => c.name) }
+            : {}),
+        });
       } else {
         ciPassingNumbers.add(pr.number);
       }
@@ -497,7 +528,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     );
 
     const reviews: ReviewPR[] = [];
-    const clean: BasePR[] = [];
+    const clean: CancelledPR[] = [];
 
     for (const pr of filteredPrs) {
       const fetchResult = threadMap.get(pr.number);
@@ -522,10 +553,12 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         // (it can contradict a stale MERGEABLE right after a base push). In
         // degraded mode, skip label sync instead of assuming clean based on
         // incomplete data.
+        const cancelledChecks = cancelledChecksByNumber.get(pr.number);
         clean.push({
           number: pr.number,
           title: pr.title,
           headRefName: pr.headRefName,
+          ...(cancelledChecks ? { cancelledChecks } : {}),
         });
       }
     }
@@ -575,14 +608,17 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
           number: p.number,
           branch: p.headRefName,
           failedChecks: p.failedChecks,
+          ...(p.cancelledChecks ? { cancelledChecks: p.cancelledChecks } : {}),
         })),
         ciPending: ciPending.map((p) => ({
           number: p.number,
           branch: p.headRefName,
+          ...(p.cancelledChecks ? { cancelledChecks: p.cancelledChecks } : {}),
         })),
         clean: clean.map((p) => ({
           number: p.number,
           branch: p.headRefName,
+          ...(p.cancelledChecks ? { cancelledChecks: p.cancelledChecks } : {}),
         })),
         ...(labelActions.length > 0 ? { labelActions } : {}),
       };
