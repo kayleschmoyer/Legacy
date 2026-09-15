@@ -248,6 +248,37 @@ describe('prBatchStatus — statusCheckRollup pagination (LS-8829 Cycle 2)', () 
   });
 });
 
+// LS-10151: reported recurrence of LS-10116 against PR #7974 — compact output
+// was observed as `{"ciSummary":"fail","failedJobs":["process-merge-queue"]}`
+// for a PR whose only non-success job was a single cancelled
+// `process-merge-queue` check run (confirmed via `github_get_check_runs` as
+// `completed`/`cancelled`). Reproduced here with the exact reported PR number,
+// `mergeable` value, and single-job shape (no other checks alongside it,
+// unlike the LS-10116 suite's multi-job cases above). Investigation found no
+// defect in the current CI_FAILURE_CONCLUSIONS/NON_RESULT_CONCLUSIONS
+// classification (this test passes against current source) — most likely
+// explanation is a deployed MCP server instance that had not yet picked up
+// the LS-10116 fix. Kept as a permanent regression guard against this exact
+// reported shape recurring in the classifier itself.
+describe('prBatchStatus — LS-10151 recurrence guard (exact reported shape)', () => {
+  it('reports pass, not fail, for PR #7974 with only a cancelled process-merge-queue job', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse({
+        pr_7974: makePR(7974, [checkRun('process-merge-queue', 'CANCELLED')], {
+          headRefName: 'claude/blissful-ride-xbfdqj',
+          mergeable: 'UNKNOWN',
+        }),
+      }),
+    );
+
+    const result = await prBatchStatus({ numbers: [7974], compact: true });
+    const parsed = JSON.parse(result.content[0].text) as ParsedBatchStatus;
+
+    expect(parsed.prs[0].ciSummary).toBe('pass');
+    expect(parsed.prs[0]).not.toHaveProperty('failedJobs');
+  });
+});
+
 function checkRun(
   name: string,
   conclusion: string | null,
