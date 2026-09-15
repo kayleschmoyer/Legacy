@@ -30,7 +30,7 @@ import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
 import { DraftPickToast } from './DraftPickToast';
-import { DraftMyPickSplash } from './DraftMyPickSplash';
+import { DraftMyPickAnnouncement } from './DraftMyPickAnnouncement';
 import { DraftRoomRecap } from './DraftRoomRecap';
 import { resolveBoardRounds } from './nativeDraftBoard';
 import {
@@ -285,12 +285,6 @@ function CompactLiveDraftBoard({
   // reads it. The *selected team* it shows still lives in `useDraftUIState`,
   // which is what survived the roster tab's removal.
   const [squadSheetOpen, setSquadSheetOpen] = useState(false);
-
-  // AC3 (LS-9402): the same `celebrate` flag the pre-v2 full-screen
-  // DraftPickAnnouncement consumed — currently hardcoded on, since there is
-  // no user-facing celebration toggle yet (README "Settings surfaced in the
-  // prototype's Tweaks panel" documents `celebration` as a future setting).
-  const celebrateOnMyPick = true;
 
   const boardTeams =
     queries.boardOrderedTeams.length > 0
@@ -618,17 +612,16 @@ function CompactLiveDraftBoard({
         />
       </DraftPickSheet>
 
-      {/* ---- Draft Room v2 overlays (LS-9402): AI-pick toast + my-pick splash ---- */}
+      {/* ---- Draft Room v2 overlays (LS-9402): AI-pick toast + my-pick announcement (LS-10205) ---- */}
       <DraftPickToast
         queue={ui.pickToastQueue}
         onDismiss={ui.dequeuePickToast}
         sport={sport}
       />
-      <DraftMyPickSplash
+      <DraftMyPickAnnouncement
         queue={ui.pickSplashQueue}
         onDismiss={ui.dequeuePickSplash}
-        sport={sport}
-        celebrate={celebrateOnMyPick}
+        teamName={queries.teamNameById(queries.myTeamId)}
       />
 
       {/* Toast overlay */}

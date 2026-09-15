@@ -328,14 +328,17 @@ jest.mock('./DraftPickToast', () => ({
       <div data-testid="draft-pick-toast" data-pick={queue[0].pickNumber} />
     ) : null,
 }));
-jest.mock('./DraftMyPickSplash', () => ({
-  DraftMyPickSplash: ({
+jest.mock('./DraftMyPickAnnouncement', () => ({
+  DraftMyPickAnnouncement: ({
     queue,
   }: {
     queue: ReadonlyArray<{ pickNumber: number }>;
   }) =>
     queue[0] ? (
-      <div data-testid="draft-my-pick-splash" data-pick={queue[0].pickNumber} />
+      <div
+        data-testid="draft-my-pick-announcement"
+        data-pick={queue[0].pickNumber}
+      />
     ) : null,
 }));
 jest.mock('./DraftRoomRecap', () => ({
@@ -2312,7 +2315,7 @@ describe('EliteDraftBoardScreen — compact viewport, Draft Room v2 overlays (LS
     expect(screen.queryByTestId('draft-pick-toast')).toBeNull();
   });
 
-  it('wires the splash queue through to DraftMyPickSplash', () => {
+  it('wires the splash queue through to DraftMyPickAnnouncement', () => {
     setupCompactLiveDraft({
       ui: {
         pickSplashQueue: [
@@ -2330,16 +2333,18 @@ describe('EliteDraftBoardScreen — compact viewport, Draft Room v2 overlays (LS
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(
-      screen.getByTestId('draft-my-pick-splash').getAttribute('data-pick'),
+      screen
+        .getByTestId('draft-my-pick-announcement')
+        .getAttribute('data-pick'),
     ).toBe('3');
   });
 
-  it('renders nothing for DraftMyPickSplash when the splash queue is empty', () => {
+  it('renders nothing for DraftMyPickAnnouncement when the splash queue is empty', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.queryByTestId('draft-my-pick-splash')).toBeNull();
+    expect(screen.queryByTestId('draft-my-pick-announcement')).toBeNull();
   });
 });
 
