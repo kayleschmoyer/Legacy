@@ -260,6 +260,31 @@ const STALENESS_RETRIGGER_WINDOW_LABEL = `${
 const STALENESS_RETRIGGER_MARKER_RE =
   /<!-- LS-9662-RETRIGGERS:(\[[^\]]*\]) -->/;
 
+// LS-10098: the rolling window above bounds retrigger *rate*, not retrigger
+// *duration* — it was reachable-by-construction for a BURST of retriggers
+// (LS-10123), but a STEADY DRIP evades it by design: each earlier entry ages
+// out of the trailing STALENESS_RETRIGGER_WINDOW_MS window before the next
+// overlap arrives, so retriggerHistory.length never reaches
+// MAX_STALENESS_RETRIGGERS at evaluation time no matter how many times the
+// PR has actually been bounced. PR #7906 went green 4 times over 7h — each
+// revalidation legitimately passed, but a new overlapping gap commit landed
+// on main roughly every ~1.75h (comfortably longer than the burst window
+// needs to forget the prior entry) and the queue re-merged main into the PR
+// branch again before it could ever land, starving it indefinitely.
+//
+// A second, absolute cap closes that gap: once the PR's FIRST ever recorded
+// retrigger is older than this, stop retriggering regardless of how sparse
+// the pattern was — this bounds total wall-clock starvation, not just
+// burst rate. This requires the persisted history to retain every retrigger
+// for the life of the guard's involvement with this PR (see
+// getStalenessRetriggerHistory / evaluateStalenessGuard) rather than being
+// pruned to the rolling window before it is written back, which is what let
+// the steady-drip pattern hide from the burst cap in the first place.
+const MAX_STALENESS_STARVATION_MS = 3 * 60 * 60 * 1000;
+const STALENESS_STARVATION_LABEL = `${
+  MAX_STALENESS_STARVATION_MS / (60 * 60 * 1000)
+}h`;
+
 module.exports = async ({
   github,
   context,
@@ -1141,17 +1166,65 @@ module.exports = async ({
       if (proximityNarrowed) verdict = 'overlap:narrowed';
 
       // LS-9753: hourly backoff — don't keep retriggering revalidation on the
-      // same PR forever while main churns. Read the current window's history
-      // BEFORE deciding, so a dry run (which never actually retriggers) never
+      // same PR forever while main churns. Read the FULL history BEFORE
+      // deciding, so a dry run (which never actually retriggers) never
       // advances the counter.
+      //
+      // LS-10098: `allRetriggers` is never window-filtered before it is
+      // persisted (see the return statements below) — only the LOCAL
+      // `windowedRetriggers` view used for the burst cap is. Filtering the
+      // persisted value itself was the bug: it silently discarded every
+      // retrigger older than the window on each write, so a PR bounced by a
+      // steady drip of overlapping gap commits (each one landing just past
+      // the window's edge relative to the last) could never accumulate
+      // enough recorded history to prove it was being starved.
       const now = Date.now();
-      const retriggerHistory = (await getStalenessRetriggerHistory(pr)).filter(
+      const allRetriggers = await getStalenessRetriggerHistory(pr);
+
+      // Walk the FULL history backward from "now", chaining consecutive
+      // retriggers whose gap to the next-more-recent one is within the burst
+      // window. This finds how far back an UNBROKEN run of starvation
+      // stretches, deliberately distinct from "the earliest retrigger ever":
+      // a long-dormant PR that was retriggered once, long ago, and has had no
+      // overlap since must NOT be starved out by that ancient, disconnected
+      // entry (see "ignores retrigger history older than the rolling window"
+      // below) — only a run that stays continuously active up to the present
+      // counts. If the chain breaks (a gap bigger than the window) or the
+      // most recent entry itself is already outside the window, there is no
+      // active streak at all.
+      const streakStartMs = [...allRetriggers]
+        .map((ts) => new Date(ts).getTime())
+        .sort((a, b) => a - b)
+        .reduceRight(
+          (streak, t) =>
+            streak.cursor - t <= STALENESS_RETRIGGER_WINDOW_MS
+              ? { start: t, cursor: t }
+              : streak,
+          { start: null, cursor: now },
+        ).start;
+      if (
+        streakStartMs !== null &&
+        now - streakStartMs >= MAX_STALENESS_STARVATION_MS
+      ) {
+        logVerdict(
+          'fail-open:starvation-cap-reached',
+          `this PR has been continuously bounced by the staleness guard for over ` +
+            `${STALENESS_STARVATION_LABEL} — the ${STALENESS_RETRIGGER_WINDOW_LABEL} burst cap ` +
+            `(LS-9753/LS-10123) never engaged because each overlap arrived just after the ` +
+            `previous one aged out of that window, but the PR was still never able to merge — ` +
+            `merging on the validation this PR already passed rather than starving it further ` +
+            `(LS-10098)`,
+        );
+        return { verdict: 'fail-open:starvation-cap-reached', block: false };
+      }
+
+      const windowedRetriggers = allRetriggers.filter(
         (ts) => now - new Date(ts).getTime() < STALENESS_RETRIGGER_WINDOW_MS,
       );
-      if (retriggerHistory.length >= MAX_STALENESS_RETRIGGERS) {
+      if (windowedRetriggers.length >= MAX_STALENESS_RETRIGGERS) {
         logVerdict(
           'fail-open:retrigger-cap-reached',
-          `${retriggerHistory.length} revalidation(s) already triggered on this PR in the last ` +
+          `${windowedRetriggers.length} revalidation(s) already triggered on this PR in the last ` +
             `${STALENESS_RETRIGGER_WINDOW_LABEL} (cap ${MAX_STALENESS_RETRIGGERS}) — merging on ` +
             `the validation this PR already passed rather than retriggering again ` +
             `(LS-9753, recalibrated in LS-10123)`,
@@ -1167,10 +1240,11 @@ module.exports = async ({
         gapCommits,
         totalGapCommits,
         validatedBase,
-        // Which revalidation this one is (1-based). Reported separately from
-        // retriggerHistory because a dry run deliberately does NOT advance
-        // that array, so its length would under-report by one there.
-        retriggerOrdinal: retriggerHistory.length + 1,
+        // Which revalidation this one is (1-based), within the burst window.
+        // Reported separately from the persisted history because a dry run
+        // deliberately does NOT advance that array, so its length would
+        // under-report by one there.
+        retriggerOrdinal: windowedRetriggers.length + 1,
       };
 
       if (isDryRun) {
@@ -1178,7 +1252,7 @@ module.exports = async ({
           `🏃 DRY RUN: Would update branch on PR #${pr.number} to revalidate against current ` +
             `${pr.base.ref} (${overlap.length} overlapping spec(s))`,
         );
-        return { ...blockedResult, retriggerHistory };
+        return { ...blockedResult, retriggerHistory: allRetriggers };
       }
       try {
         await github.rest.pulls.updateBranch({
@@ -1193,7 +1267,7 @@ module.exports = async ({
         );
         return {
           ...blockedResult,
-          retriggerHistory: [...retriggerHistory, new Date(now).toISOString()],
+          retriggerHistory: [...allRetriggers, new Date(now).toISOString()],
         };
       } catch (updateError) {
         // Never wedge: an overlap we cannot revalidate merges as today (the

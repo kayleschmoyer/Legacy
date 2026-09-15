@@ -3603,6 +3603,157 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
     }),
   );
 
+  // ── LS-10098: absolute starvation cap for a steady drip of retriggers ──────
+  //
+  // Root cause: the rolling window only bounds retrigger RATE. A PR bounced
+  // by gap commits arriving slower than the window (but still steadily) never
+  // accumulates MAX_STALENESS_RETRIGGERS retriggers inside any single
+  // trailing window — each earlier entry ages out just before the next
+  // overlap lands — so the burst cap never engages. PR #7906 went green 4
+  // times over 7h without ever merging: retriggers landed roughly every
+  // 2h20m, comfortably below the 4h window's threshold for "count as a
+  // burst" each time it was evaluated.
+
+  it(
+    'fails open once a PR has been continuously bounced past the starvation cap, even though no single window ever saw two retriggers',
+    withGuardWorkspace(async () => {
+      // The PR #7906 pattern: 3 prior retriggers ~2h20m apart, spanning 7h.
+      // At any given evaluation, only the single most recent entry falls
+      // inside the 4h rolling window — the burst cap (>=2) never sees it.
+      const steadyDripHistory = [420, 280, 140].map((minutesAgo) =>
+        new Date(Date.now() - minutesAgo * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0018rrr')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(steadyDripHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        0,
+        'a steady drip of retriggers, each individually below the burst-window ' +
+          'threshold, must still eventually stop retriggering (LS-10098)',
+      );
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'the PR must merge on the validation it already passed rather than ' +
+          'being starved forever',
+      );
+      assert.match(logs, /verdict=fail-open:starvation-cap-reached/);
+      assert.doesNotMatch(
+        logs,
+        /verdict=fail-open:retrigger-cap-reached/,
+        'this scenario is specifically the one the rolling-window burst cap misses',
+      );
+    }),
+  );
+
+  // Negative control: the same steady-drip shape as above, but the run has
+  // only been going for 1h — well under the starvation cap — so the guard
+  // must still behave exactly as it did before LS-10098: block and retrigger.
+  it(
+    'still blocks and retriggers a short-lived steady drip that has not reached the starvation cap',
+    withGuardWorkspace(async () => {
+      const shortDripHistory = [60].map((minutesAgo) =>
+        new Date(Date.now() - minutesAgo * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0019sss')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(shortDripHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        1,
+        'a single retrigger an hour ago must not trip either cap yet',
+      );
+      assert.strictEqual(calls.merges.length, 0);
+      assert.match(logs, /verdict=overlap(?!:narrowed)/);
+      assert.doesNotMatch(logs, /fail-open:starvation-cap-reached/);
+      assert.doesNotMatch(logs, /fail-open:retrigger-cap-reached/);
+    }),
+  );
+
+  // Negative control: an old, disconnected retrigger cluster (already covered
+  // by "ignores retrigger history older than the rolling window" for the
+  // burst cap) must also not trip the NEW starvation cap — a long-dormant PR
+  // that picks up a fresh, unrelated overlap is not "continuously starved"
+  // and must not be punished for ancient history the window has every right
+  // to forget.
+  it(
+    'does not apply the starvation cap to an old, disconnected retrigger cluster',
+    withGuardWorkspace(async () => {
+      const disconnectedHistory = [400, 401, 402].map((minutesAgo) =>
+        new Date(Date.now() - minutesAgo * 60 * 1000).toISOString(),
+      );
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0020ttt')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+        issueComments: [
+          {
+            id: 42,
+            body:
+              '<!-- MERGE-QUEUE-STATUS -->\nprior status\n' +
+              `<!-- LS-9662-RETRIGGERS:${JSON.stringify(disconnectedHistory)} -->`,
+          },
+        ],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.updateBranch.length,
+        1,
+        'a fresh overlap after a long-dormant gap must retrigger normally, not ' +
+          'be treated as a continuation of ancient, disconnected history',
+      );
+      assert.strictEqual(calls.merges.length, 0);
+      assert.doesNotMatch(logs, /fail-open:starvation-cap-reached/);
+    }),
+  );
+
   it(
     'names the retrigger count and cap in the revalidation comment',
     withGuardWorkspace(async () => {
