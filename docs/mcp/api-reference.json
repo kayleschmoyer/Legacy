@@ -2778,6 +2778,11 @@
               "type": "boolean",
               "optional": true,
               "description": "When true, enables Playwright tracing (--trace=on) in either mode. Trace zip paths are returned in traceArtifacts."
+            },
+            "skipGlobalSetup": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Integration mode only. Skips globalSetup and the JWT/E2EPOOLPASSWORD preflight, for hermetic *.contract.spec.ts files."
             }
           },
           "transports": [

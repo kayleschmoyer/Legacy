@@ -337,6 +337,13 @@ server.tool(
         'When true, enables Playwright tracing (--trace=on) in either mode. ' +
           'Trace zip paths are returned in traceArtifacts.',
       ),
+    skipGlobalSetup: z
+      .boolean()
+      .optional()
+      .describe(
+        'Integration mode only. Skips globalSetup and the JWT/E2EPOOLPASSWORD preflight, ' +
+          'for hermetic *.contract.spec.ts files.',
+      ),
   },
   async (params) => runE2ESpecs(params),
 );

@@ -278,6 +278,7 @@ export interface RunE2ESpecsParams {
   worktreePath?: string;
   integration?: boolean;
   withTracing?: boolean;
+  skipGlobalSetup?: boolean;
 }
 
 export async function runE2ESpecs(
@@ -285,6 +286,7 @@ export async function runE2ESpecs(
 ): Promise<ToolResult> {
   const integration = params.integration ?? false;
   const withTracing = params.withTracing ?? false;
+  const skipGlobalSetup = params.skipGlobalSetup ?? false;
   const cwd = params.worktreePath ?? getRepoRoot();
   const e2eAppDir = path.join(cwd, 'apps', 'web-e2e');
   // Config filename only — passed with cwd: e2eAppDir below (not cwd: cwd) so
@@ -295,8 +297,17 @@ export async function runE2ESpecs(
   // config arg itself is relative, so spawning from repo root while pointing
   // at an absolute/differently-cased config path was the actual cwd
   // mismatch — not just the spec-arg separator LS-9330 already fixed.
+  //
+  // skipGlobalSetup (LS-10155) swaps in playwright.integration-hermetic.config.ts
+  // — the same testDir/reporter/browser-resolution as playwright.integration.config.ts,
+  // minus globalSetup/globalTeardown — for the hermetic *.contract.spec.ts files
+  // that live under src/integration/tests/ alongside the live-backend specs but
+  // touch no network, so they need neither the live-backend setup nor the
+  // JWT/E2EPOOLPASSWORD preflight below.
   const configFile = integration
-    ? 'playwright.integration.config.ts'
+    ? skipGlobalSetup
+      ? 'playwright.integration-hermetic.config.ts'
+      : 'playwright.integration.config.ts'
     : 'playwright.config.ts';
   const distDir = path.join(cwd, 'dist', 'apps', 'web');
   // Both configs declare outputFile: 'test-results/results.json',
@@ -330,6 +341,10 @@ export async function runE2ESpecs(
     }
   }
 
+  // Strict allowlist, not a blocklist: project must exactly match one of the
+  // five known Playwright project names below, so no shell metacharacter can
+  // ever reach the spawned args via this parameter regardless of the (also
+  // shell:false, see binJobSpec) spawn mode.
   const project = params.project ?? 'chromium';
   if (!ALLOWED_PROJECTS.has(project)) {
     return {
@@ -350,10 +365,27 @@ export async function runE2ESpecs(
     };
   }
 
+  if (skipGlobalSetup && !integration) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text:
+            'skipGlobalSetup only applies when integration: true — hermetic mode ' +
+            '(the default) already runs without globalSetup.',
+        },
+      ],
+      isError: true,
+    };
+  }
+
   // --- Integration-mode preconditions ---
+  // Skipped when skipGlobalSetup is set: neither the JWT nor E2EPOOLPASSWORD
+  // is needed by a config with no globalSetup/live backend to authenticate
+  // against (LS-10155).
 
   let preconditionWarnings: string[] = [];
-  if (integration) {
+  if (integration && !skipGlobalSetup) {
     preconditionWarnings = await checkIntegrationPreconditions();
   }
 
@@ -512,6 +544,7 @@ export async function runE2ESpecs(
         e2eAppDir,
         integration,
         withTracing,
+        skipGlobalSetup,
         port,
         preconditionWarnings,
         timeoutMs,
@@ -530,6 +563,7 @@ export async function runE2ESpecs(
             status: snapshot.status,
             jobId: snapshot.jobId,
             elapsedSec: snapshot.elapsedSec,
+            ...(skipGlobalSetup ? { skipGlobalSetup: true } : {}),
             ...(preconditionWarnings.length > 0
               ? { preconditionWarnings }
               : {}),
@@ -555,6 +589,7 @@ interface E2eJobMeta {
   e2eAppDir?: unknown;
   integration?: unknown;
   withTracing?: unknown;
+  skipGlobalSetup?: unknown;
   port?: unknown;
   preconditionWarnings?: unknown;
   timeoutMs?: unknown;
@@ -571,6 +606,7 @@ async function buildE2eResult(
   const meta = (snapshot.meta ?? {}) as E2eJobMeta;
   const integration = meta.integration === true;
   const withTracing = meta.withTracing === true;
+  const skipGlobalSetup = meta.skipGlobalSetup === true;
   const resultsFile =
     typeof meta.resultsFile === 'string' ? meta.resultsFile : null;
   const e2eAppDir = typeof meta.e2eAppDir === 'string' ? meta.e2eAppDir : null;
@@ -706,6 +742,7 @@ async function buildE2eResult(
       success,
       mode: integration ? 'integration' : 'hermetic',
       ...(port != null ? { port } : {}),
+      ...(skipGlobalSetup ? { skipGlobalSetup: true } : {}),
       ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
       ...(reason != null ? { reason, error: reasonMessages[reason] } : {}),
       stats: {

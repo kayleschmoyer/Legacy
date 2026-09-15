@@ -114,6 +114,7 @@ Prefer this over raw `npx playwright test` shell commands. Hermetic mode (defaul
 | `worktreePath` | string |  | — | Worktree path (default: repo root) |
 | `integration` | boolean |  | — | When true, runs specs against the live backend using playwright.integration.config.ts instead of the hermetic config. Enforces workers=1. Checks JWT freshness and E2EPOOLPASSWORD before launching. |
 | `withTracing` | boolean |  | — | When true, enables Playwright tracing (--trace=on) in either mode. Trace zip paths are returned in traceArtifacts. |
+| `skipGlobalSetup` | boolean |  | — | Integration mode only. Skips globalSetup and the JWT/E2EPOOLPASSWORD preflight, for hermetic *.contract.spec.ts files. |
 
 ### `nx_run_eslint`
 

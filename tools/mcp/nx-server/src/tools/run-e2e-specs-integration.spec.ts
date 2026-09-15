@@ -308,6 +308,81 @@ describe('runE2ESpecs — integration mode', () => {
     expect(payload['preconditionWarnings']).toBeUndefined();
   });
 
+  // --- skipGlobalSetup (LS-10155) ---
+
+  describe('skipGlobalSetup', () => {
+    it('rejects skipGlobalSetup:true without integration:true', async () => {
+      const result = await runE2ESpecs({
+        specs: [SPEC],
+        skipGlobalSetup: true,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/only applies when integration/);
+      expect(mockRunJob).not.toHaveBeenCalled();
+    });
+
+    it('uses playwright.integration-hermetic.config.ts instead of playwright.integration.config.ts', async () => {
+      await runE2ESpecs({
+        specs: [SPEC],
+        integration: true,
+        skipGlobalSetup: true,
+      });
+      const args = jobCallOpts().args;
+      expect(args.find((a) => a.includes('--config='))).toMatch(
+        /playwright\.integration-hermetic\.config\.ts/,
+      );
+    });
+
+    it('skips the JWT/E2EPOOLPASSWORD precondition check entirely', async () => {
+      // No JWT file, no E2EPOOLPASSWORD — would normally produce two warnings.
+      mockExistsSync.mockReturnValue(false);
+      delete process.env['E2EPOOLPASSWORD'];
+
+      const result = await runE2ESpecs({
+        specs: [SPEC],
+        integration: true,
+        skipGlobalSetup: true,
+      });
+      const payload = JSON.parse(result.content[0].text) as Record<
+        string,
+        unknown
+      >;
+      expect(payload['preconditionWarnings']).toBeUndefined();
+    });
+
+    it('sets skipGlobalSetup:true in the response payload', async () => {
+      const result = await runE2ESpecs({
+        specs: [SPEC],
+        integration: true,
+        skipGlobalSetup: true,
+      });
+      const payload = JSON.parse(result.content[0].text) as {
+        skipGlobalSetup?: boolean;
+      };
+      expect(payload.skipGlobalSetup).toBe(true);
+    });
+
+    it('omits skipGlobalSetup from the response payload when not set', async () => {
+      const result = await runE2ESpecs({ specs: [SPEC], integration: true });
+      const payload = JSON.parse(result.content[0].text) as Record<
+        string,
+        unknown
+      >;
+      expect(payload['skipGlobalSetup']).toBeUndefined();
+    });
+
+    it('still enforces --workers=1 and mode:"integration"', async () => {
+      const result = await runE2ESpecs({
+        specs: [SPEC],
+        integration: true,
+        skipGlobalSetup: true,
+      });
+      expect(jobCallOpts().args).toContain('--workers=1');
+      const payload = JSON.parse(result.content[0].text) as { mode: string };
+      expect(payload.mode).toBe('integration');
+    });
+  });
+
   // --- Output shape ---
 
   it('omits port field in integration mode', async () => {
