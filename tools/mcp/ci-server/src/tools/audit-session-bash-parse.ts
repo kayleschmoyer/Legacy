@@ -571,6 +571,50 @@ export const NOISE_PATTERNS: ReadonlySet<string> = new Set([
   'printenv',
 ]);
 
+/**
+ * Executables whose invocation is investigative/utility noise no matter what
+ * arguments follow — e.g. `cat some/deep/file.json`, `mkdir -p foo/bar`, or
+ * `npx some-checker --version`. NOISE_PATTERNS above matches the full
+ * normalized first-3-token pattern, so a bare `cat`/`ls`/`mkdir`/`npx`
+ * one-off *with* arguments never matches it (the pattern is `cat
+ * foo.json`, not `cat`) and fell through to the generic low-confidence
+ * `missing-tool` / server "unknown" fallback in classifyGapType instead of
+ * being filtered — 22/30 findings junk, noise_filtered always 0 (LS-10142).
+ * This matches on the leading token alone so arguments don't matter.
+ */
+export const NOISE_EXECUTABLES: ReadonlySet<string> = new Set([
+  'ls',
+  'dir',
+  'pwd',
+  'echo',
+  'cat',
+  'head',
+  'tail',
+  'wc',
+  'type',
+  'which',
+  'where',
+  'whoami',
+  'hostname',
+  'date',
+  'env',
+  'set',
+  'printenv',
+  'mkdir',
+  'npx',
+  'touch',
+  'clear',
+  'true',
+  'false',
+]);
+
+/** Whether `sample`'s leading executable is a known-plain, always-noise command. */
+export function isKnownPlainCommand(sample: string): boolean {
+  const stripped = stripCdPrefix(sample.trim());
+  const firstToken = stripped.split(/\s+/)[0]?.toLowerCase() ?? '';
+  return firstToken.length > 0 && NOISE_EXECUTABLES.has(firstToken);
+}
+
 interface RecurringInfo {
   gap_type: string;
   server: string;
@@ -1082,12 +1126,25 @@ export function formatAudit(
     const recurringInfo = matchRecurringInfo(pat, sample);
     const isRecurring = recurringInfo !== null;
 
-    if (NOISE_PATTERNS.has(pat) && !isRecurring) {
+    if (!isRecurring && NOISE_PATTERNS.has(pat)) {
       noise.push({
         pattern: pat,
         count,
         sample: sample.slice(0, 120),
         reason: 'known noise pattern',
+      });
+      continue;
+    }
+
+    // Denylist heuristic (LS-10142): catches known-plain commands
+    // (cat/ls/mkdir/npx/...) that NOISE_PATTERNS misses once arguments are
+    // present, since NOISE_PATTERNS requires an exact full-pattern match.
+    if (!isRecurring && isKnownPlainCommand(sample)) {
+      noise.push({
+        pattern: pat,
+        count,
+        sample: sample.slice(0, 120),
+        reason: 'known-plain command (denylisted executable)',
       });
       continue;
     }

@@ -140,6 +140,13 @@ const ALLOWED_TARGETS = new Set([
   // Troubleshooting
   'kill-stale',
   'diagnose',
+  // CCR fallback for the MCP gap-audit classifier (LS-10152) — read-only,
+  // invokes the same audit-session-bash-cli.ts the ci_audit_session_bash MCP
+  // tool wraps, for the case (documented in
+  // .agents/skills/mcp-first/references/gaps.md) where that server can't
+  // read the session transcript. Without this entry the documented fallback
+  // was only reachable via raw Bash, defeating MCP-first.
+  'audit-session',
 
   // Post-rebase stabilization (LS-10181) — install -> schema -> codegen -> pc,
   // mandated by the rebase skill's own step 4; read-mostly composite, no

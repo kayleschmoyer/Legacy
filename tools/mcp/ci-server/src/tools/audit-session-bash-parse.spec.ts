@@ -17,7 +17,9 @@ import {
   findSessionByPid,
   formatAudit,
   formatGapsOnly,
+  isKnownPlainCommand,
   isRecurringInvestigative,
+  NOISE_EXECUTABLES,
   NOISE_PATTERNS,
   stripCdPrefix,
 } from './audit-session-bash-parse.js';
@@ -532,6 +534,32 @@ describe('audit-session-bash-parse', () => {
       );
       expect(isRecurringInvestigative('ls', 'ls -la')).toBe(false);
     });
+
+    it('flags bare cat/ls/mkdir/npx one-offs as known-plain regardless of arguments (LS-10142)', () => {
+      for (const executable of [
+        'ls',
+        'dir',
+        'pwd',
+        'echo',
+        'cat',
+        'head',
+        'tail',
+        'wc',
+        'mkdir',
+        'npx',
+      ]) {
+        expect(NOISE_EXECUTABLES.has(executable)).toBe(true);
+      }
+
+      expect(isKnownPlainCommand('cat some/deep/file.json')).toBe(true);
+      expect(isKnownPlainCommand('mkdir -p foo/bar/baz')).toBe(true);
+      expect(isKnownPlainCommand('npx some-checker --version')).toBe(true);
+      expect(isKnownPlainCommand('cd /repo && ls -la some/nested/dir')).toBe(
+        true,
+      );
+      expect(isKnownPlainCommand('git status')).toBe(false);
+      expect(isKnownPlainCommand('curl -s https://example.com')).toBe(false);
+    });
   });
 
   describe('classifyGapType', () => {
@@ -738,6 +766,47 @@ describe('audit-session-bash-parse', () => {
       });
       expect(report.instructions).toContain(
         "Review 'action_required' section.",
+      );
+    });
+
+    it('filters bare cat/mkdir/npx one-offs as noise instead of low-confidence missing-tool junk (LS-10142)', () => {
+      const calls = [
+        synthBashCall('cat some/deep/file.json'),
+        synthBashCall('mkdir -p foo/bar'),
+        synthBashCall('npx some-checker --version'),
+        synthBashCall('git status'),
+      ];
+
+      const report = JSON.parse(formatAudit(calls, [], 'session-1')) as {
+        summary: Record<string, number>;
+        action_required: {
+          gaps_to_review: Array<Record<string, unknown>>;
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+        informational: {
+          noise_filtered: Array<Record<string, unknown>>;
+        };
+      };
+
+      expect(report.summary.gaps_found).toBe(0);
+      expect(report.summary.noise_filtered).toBe(3);
+      expect(report.action_required.gaps_to_review).toHaveLength(0);
+      expect(report.action_required.gaps_auto_classified).toHaveLength(0);
+      expect(report.informational.noise_filtered).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            pattern: 'cat some/deep/file.json',
+            reason: 'known-plain command (denylisted executable)',
+          }),
+          expect.objectContaining({
+            pattern: 'mkdir -p foo/bar',
+            reason: 'known-plain command (denylisted executable)',
+          }),
+          expect.objectContaining({
+            pattern: 'npx some-checker --version',
+            reason: 'known-plain command (denylisted executable)',
+          }),
+        ]),
       );
     });
 

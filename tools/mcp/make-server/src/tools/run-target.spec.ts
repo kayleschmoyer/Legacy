@@ -34,6 +34,11 @@ describe('runTarget — allowlist gate', () => {
     expect(result.content[0].text).toContain('lint-touch-map');
   });
 
+  it('allows the audit-session CCR gap-audit fallback (LS-10152)', async () => {
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    expect(result.content[0].text).toContain('audit-session');
+  });
+
   it('allows the drift-check lint targets (LS-8549)', async () => {
     const result = await runTarget({ target: '__not_a_real_target__' });
     expect(result.content[0].text).toContain('lint-skill-index');
