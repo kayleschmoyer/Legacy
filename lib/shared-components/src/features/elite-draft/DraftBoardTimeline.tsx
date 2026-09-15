@@ -39,7 +39,7 @@ import {
   buildPickInspectorData,
   type PickInspectorData,
   type PickInspectorState,
-} from './draftPickInspector';
+} from './draftPickInspectorModel';
 import { formatClock } from './nativeDraftBoard';
 import { getPositionColor } from './utils';
 import { handleKeyActivate } from '../../utils/keyboardActivation';

@@ -10,7 +10,7 @@ import { DraftPickInspector } from './DraftPickInspector';
 import {
   buildPickInspectorData,
   type PickInspectorData,
-} from './draftPickInspector';
+} from './draftPickInspectorModel';
 import { snakePickInRound } from './nativeDraftBoard';
 import { getPositionColor, normalizeTeamId } from './utils';
 import {

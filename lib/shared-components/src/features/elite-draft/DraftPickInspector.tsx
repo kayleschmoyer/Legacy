@@ -10,7 +10,7 @@
  *
  * One component hosts all three surfaces — `DraftGrid`, `DraftBoardTimeline`,
  * `DraftRoundBoard` — each of which only has to build a `PickInspectorData`
- * (see `draftPickInspector.ts`) from whatever pick state it already has and
+ * (see `draftPickInspectorModel.ts`) from whatever pick state it already has and
  * hand it here. It is purely presentational: no query, no board-specific
  * layout knowledge.
  *
@@ -31,7 +31,7 @@
 import React, { useEffect } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 
-import type { PickInspectorData } from './draftPickInspector';
+import type { PickInspectorData } from './draftPickInspectorModel';
 import { handleKeyActivate } from '../../utils/keyboardActivation';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { BLACK, withAlpha } from '../../utils/colors';

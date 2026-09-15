@@ -1,6 +1,6 @@
 import React from 'react';
 import { DraftPickInspector } from './DraftPickInspector';
-import { buildPickInspectorData } from './draftPickInspector';
+import { buildPickInspectorData } from './draftPickInspectorModel';
 import { fireEvent, render, screen } from '../../test-utils';
 
 const MADE = buildPickInspectorData({

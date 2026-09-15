@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync lint-eslint-tsconfig-anchored mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs audit-session lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
+	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync lint-eslint-tsconfig-anchored mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs audit-session lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps lint-case-collisions hash-design-bundle format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -356,6 +356,10 @@ lint-animated-theme-vars: ## Fail if an animated Tamagui component uses var(--to
 lint-workspace-deps: ## Fail if a package under apps/ or lib/ imports an undeclared @legacy-sports/* dep (LS-8622)
 	@$(call echo_blue,Checking workspace dependency declarations...)
 	@node scripts/check-workspace-deps.mjs
+
+lint-case-collisions: ## Fail if tracked paths or import specifiers differ only by letter case (LS-10207)
+	@$(call echo_blue,Checking for case-only path collisions...)
+	@node scripts/check-case-collisions.mjs
 
 hash-design-bundle: ## Compute a docs/design/<id> bundle's manifest lastSyncedHash (LS-9020); usage: make hash-design-bundle DIR=docs/design/<id>
 	@$(call echo_blue,Hashing design bundle...)

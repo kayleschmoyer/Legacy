@@ -31,7 +31,7 @@ import {
   buildPickInspectorData,
   type PickInspectorData,
   type PickInspectorState,
-} from './draftPickInspector';
+} from './draftPickInspectorModel';
 import {
   buildRoundSummary,
   buildRoundTiles,

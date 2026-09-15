@@ -1,4 +1,4 @@
-import { buildPickInspectorData } from './draftPickInspector';
+import { buildPickInspectorData } from './draftPickInspectorModel';
 
 describe('buildPickInspectorData', () => {
   it('builds the made variant — player, meta, and Team/Position/Pick/Status rows', () => {
