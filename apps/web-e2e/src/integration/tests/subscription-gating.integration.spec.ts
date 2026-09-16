@@ -28,6 +28,7 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/ui';
 import { gqlFetchEnvelope as gqlFetch } from '../helpers/gql-fetch';
+import { cleanupLeague } from '../helpers/cleanup-league';
 
 // These tests intentionally inspect `errors[].extensions.code` to verify
 // premium-gating middleware shapes (`PREMIUM_REQUIRED`, etc.), so they use
@@ -184,16 +185,27 @@ test.describe('subscription gating — league limit enforcement @critical', () =
 test.describe('subscription gating — mock draft limit @critical', () => {
   test('initializeMockDraft mutation returns PREMIUM_REQUIRED after 2 mock drafts/week for free user', async ({
     freeJwt,
+    apiCommissioner,
   }) => {
     // The limit is enforced at the GraphQL layer inside initialize-mock-draft.ts.
     // We verify the error shape when the limit is reached.
-    // Note: this test is intentionally not creating real mock drafts (which would
-    // mutate state); instead we check that the resolver exists and the correct
-    // error code is returned for a realistic over-limit scenario.
+    //
+    // Despite the comment this test used to carry, `initializeMockDraft` is NOT
+    // a no-op probe — it is the same real mutation the mock-draft-simulator-ui
+    // spec drives through the UI, and it creates a real "Mock Draft Practice"
+    // league (with `freeJwt`/MANAGER_1 as commissioner) whenever the weekly
+    // limit hasn't yet been reached. Left uncleaned, this leaked one league per
+    // run:integration execution — accumulating unboundedly because MANAGER_1
+    // *owns* each one, and the manager-membership sweep in global-setup.ts only
+    // reaps leagues a manager is a *member* of, not one they commission
+    // (LS-10134). This is what ultimately pinned MANAGER_1 (free-tier) over the
+    // 3-league join cap and hard-failed globalSetup for every PR.
     //
     // If the user already has ≥ 2 mock drafts this week, the error fires immediately.
     // If not, we document the expected error shape via the unit tests.
-    const result = await gqlFetch<{ initializeMockDraft: unknown }>(
+    const result = await gqlFetch<{
+      initializeMockDraft: { leagueId?: number } | null;
+    }>(
       freeJwt,
       `
         mutation InitMockDraft {
@@ -217,6 +229,15 @@ test.describe('subscription gating — mock draft limit @critical', () => {
           !e.message.toLowerCase().includes('premium'),
       ) ?? false;
     expect(hasUnhandledError).toBe(false);
+
+    // Clean up any league this mutation actually created. Deletion goes through
+    // the admin commissioner (not freeJwt) because `deleteLeague` only allows
+    // the owner or an admin caller, and this mirrors the admin-bypass delete
+    // path the manager-membership sweep already relies on (LS-9280).
+    const leagueId = result.data?.initializeMockDraft?.leagueId;
+    if (leagueId) {
+      await cleanupLeague(apiCommissioner, leagueId);
+    }
   });
 });
 

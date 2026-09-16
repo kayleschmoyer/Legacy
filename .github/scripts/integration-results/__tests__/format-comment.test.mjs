@@ -245,4 +245,38 @@ describe('format-comment.mjs (LS-4617)', () => {
     assert.equal(/<integration-results>/.test(out), false);
     assert.match(out, /No integration spec results matched/);
   });
+
+  it('renders a distinct globalSetup-failure message instead of the spec-filter text (LS-10134)', () => {
+    const reportPath = join(dir, 'global-setup-failure.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        suites: [],
+        errors: [
+          {
+            message:
+              '[integration setup] pre-flight: manager persona(s) still over the free-tier league cap after the manager-membership sweep: MANAGER_1 (39/3).',
+          },
+        ],
+      }),
+    );
+    const out = run(reportPath, [
+      '--specs',
+      'apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+    ]);
+    assert.equal(/No integration spec results matched/.test(out), false);
+    assert.match(out, /globalSetup` threw before any spec could run/);
+    assert.match(out, /MANAGER_1 \(39\/3\)/);
+  });
+
+  it('falls back to the spec-filter message when report.errors is empty', () => {
+    const reportPath = join(dir, 'no-errors.json');
+    writeFileSync(reportPath, JSON.stringify({ suites: [], errors: [] }));
+    const out = run(reportPath, [
+      '--specs',
+      'apps/web-e2e/src/integration/tests/foo.integration.spec.ts',
+    ]);
+    assert.match(out, /No integration spec results matched/);
+    assert.equal(/globalSetup` threw/.test(out), false);
+  });
 });

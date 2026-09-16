@@ -17,6 +17,11 @@
  *
  * Writes the comment body to stdout. Non-zero exit on missing report file or
  * unparseable JSON; emits an empty body (just a header) when no specs match.
+ *
+ * When zero specs are present, `report.errors` (Playwright's globalSetup/
+ * globalTeardown failure channel) is checked before falling back to the
+ * generic "no specs matched" message, so a globalSetup failure renders
+ * distinctly from a spec-filter mismatch (LS-10134).
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -193,8 +198,28 @@ function main() {
     ? filterByTouchedSpecs(allSpecs, specFilter)
     : allSpecs;
 
+  // Playwright's JSON reporter populates top-level `errors` (not `suites`)
+  // when `globalSetup` throws before any spec runs — e.g. `global-setup.ts`'s
+  // `preflightCheckManagerQuota` aborting on a quota exhaustion. Zero specs
+  // then has two unrelated causes: the filter matched nothing (a spec-filter
+  // misconfiguration), or the suite never started at all. Rendering both as
+  // "No integration spec results matched" sent a real investigation down the
+  // wrong path (LS-10134) — check `report.errors` first so a globalSetup
+  // failure is never read as a spec-filter mismatch.
+  const globalSetupErrors = Array.isArray(report.errors) ? report.errors : [];
+
   const lines = ['## Integration Test Results', ''];
-  if (specs.length === 0) {
+  if (specs.length === 0 && globalSetupErrors.length > 0) {
+    lines.push(
+      '_The integration suite never started: Playwright `globalSetup` threw before any spec could run. This is not a spec-filter mismatch — see the underlying error below._',
+      '',
+      '```',
+      ...globalSetupErrors.map((e) =>
+        e && typeof e.message === 'string' ? e.message : JSON.stringify(e),
+      ),
+      '```',
+    );
+  } else if (specs.length === 0) {
     lines.push(
       '_No integration spec results matched. If you expected a touched spec to appear here, check that the file is under `apps/web-e2e/src/integration/tests/**` and that the workflow ran with the correct spec filter._',
     );
