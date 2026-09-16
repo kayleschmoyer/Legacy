@@ -1040,12 +1040,17 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "glue:GetDatabase",
           "glue:UpdateDatabase",
           "glue:DeleteDatabase",
-          "glue:CreateCrawler",
           "glue:GetCrawler",
           "glue:UpdateCrawler",
           "glue:DeleteCrawler",
           "glue:TagResource",
-          "glue:UntagResource"
+          "glue:UntagResource",
+          # LS-10172 follow-up: the AWS provider calls glue:GetTags (a
+          # distinct action from glue:TagResource) to refresh a Glue
+          # resource's tags on every plan/apply — confirmed missing via a
+          # real post-merge apply failure ("listing tags for Glue Database
+          # ... AccessDeniedException ... glue:GetTags").
+          "glue:GetTags"
         ]
         Resource = [
           "arn:aws:glue:${local.region}:${local.account_id}:catalog",
@@ -1056,11 +1061,18 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "arn:aws:glue:${local.region}:${local.account_id}:crawler/${local.name_prefix}-cloudtrail-crawler"
         ]
       },
-      # Glue classifier actions do not support resource-level permissions —
-      # must use Resource "*" (same pattern as sqs:ListQueues / cloudtrail:ListTrails above).
+      # Glue classifier actions, and glue:CreateCrawler, do not support
+      # resource-level permissions — must use Resource "*" (same pattern as
+      # sqs:ListQueues / cloudtrail:ListTrails above). glue:CreateCrawler was
+      # originally in the scoped statement above, where it never matched:
+      # `aws iam simulate-custom-policy` with CreateCrawler scoped to the crawler
+      # ARN returns implicitDeny on every resource, and allowed only with
+      # Resource "*". UpdateCrawler/GetCrawler/DeleteCrawler do scope, so they
+      # stay above.
       {
         Effect = "Allow"
         Action = [
+          "glue:CreateCrawler",
           "glue:CreateClassifier",
           "glue:GetClassifier",
           "glue:GetClassifiers",
@@ -1068,6 +1080,26 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "glue:DeleteClassifier"
         ]
         Resource = "*"
+      },
+      # Athena permissions for the CloudTrail forensics workgroup
+      # (aws_athena_workgroup.cloudtrail_forensics, cloudtrail.tf LS-8922) —
+      # LS-10172 follow-up. Missed in the original LS-10172 fix, which only
+      # covered the Glue half of the same never-granted LS-8922 resource set;
+      # a real post-merge apply confirmed "athena:CreateWorkGroup" AccessDenied.
+      {
+        Effect = "Allow"
+        Action = [
+          "athena:CreateWorkGroup",
+          "athena:GetWorkGroup",
+          "athena:UpdateWorkGroup",
+          "athena:DeleteWorkGroup",
+          "athena:TagResource",
+          "athena:UntagResource",
+          "athena:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${local.name_prefix}-cloudtrail-forensics"
+        ]
       }
     ]
   })
@@ -1531,6 +1563,43 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
         Action = ["logs:DescribeMetricFilters"]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*"
+        ]
+      },
+      # Glue read (plan refresh for aws_glue_catalog_database / aws_glue_crawler /
+      # aws_glue_classifier — cloudtrail.tf, LS-8922). LS-10172 granted these Get*
+      # actions to the apply role's github_actions_supplemental_2 but missed
+      # mirroring them here — confirmed by a real PR-time plan failure once the
+      # apply role's fix let the database/classifier actually get created
+      # (glue:GetDatabase / glue:GetClassifier AccessDenied on the plan role).
+      # glue:GetClassifier/GetClassifiers do not support resource-level
+      # permissions — Resource "*" required, same as the apply-role statement.
+      {
+        Sid    = "GlueRead"
+        Effect = "Allow"
+        Action = [
+          "glue:GetDatabase",
+          "glue:GetCrawler",
+          "glue:GetTags"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:catalog",
+          "arn:aws:glue:${local.region}:${local.account_id}:database/*_cloudtrail",
+          "arn:aws:glue:${local.region}:${local.account_id}:crawler/${local.name_prefix}-cloudtrail-crawler"
+        ]
+      },
+      {
+        Sid      = "GlueClassifierRead"
+        Effect   = "Allow"
+        Action   = ["glue:GetClassifier", "glue:GetClassifiers"]
+        Resource = "*"
+      },
+      # Athena read (plan refresh for aws_athena_workgroup — cloudtrail.tf, LS-8922)
+      {
+        Sid    = "AthenaRead"
+        Effect = "Allow"
+        Action = ["athena:GetWorkGroup", "athena:ListTagsForResource"]
+        Resource = [
+          "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${local.name_prefix}-cloudtrail-forensics"
         ]
       },
       # SNS read
