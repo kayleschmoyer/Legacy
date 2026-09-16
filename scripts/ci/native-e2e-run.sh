@@ -73,6 +73,16 @@ echo "🔧 Native harness APK: $E2E_NATIVE_APP"
 export E2E_NATIVE_GRAPHQL_PORT="${E2E_NATIVE_GRAPHQL_PORT:-8083}"
 echo "🔧 Native GraphQL device port (adb reverse target): $E2E_NATIVE_GRAPHQL_PORT"
 
+# createAndroidSession's `appium:platformVersion` capability requires an exact
+# match against the booted emulator or Appium 500s the session (LS-10089:
+# appium-env.ts's hardcoded '13' default drifted from the ANDROID_API_LEVEL 35
+# image this workflow actually boots — Android 15). Querying the connected
+# device directly, rather than hardcoding a second guess here, keeps this in
+# sync with whatever image android-emulator-runner boots for `api-level` above.
+ANDROID_PLATFORM_VERSION=$(adb shell getprop ro.build.version.release | tr -d '\r\n')
+export ANDROID_PLATFORM_VERSION
+echo "🔧 Detected emulator OS version: $ANDROID_PLATFORM_VERSION"
+
 # ── 2. Start Appium (UiAutomator2) ────────────────────────────────────
 echo "🔌 Ensuring Appium UiAutomator2 driver is installed"
 pnpm exec appium driver install uiautomator2 2>/dev/null \
