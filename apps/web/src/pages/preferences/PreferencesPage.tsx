@@ -62,6 +62,7 @@ interface UserPreferences {
   statsFormat: StatsFormat;
   showSeasonTotals: boolean;
   enableAnimations: boolean;
+  audioEnabled: boolean;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -70,6 +71,8 @@ const DEFAULT_PREFS: UserPreferences = {
   statsFormat: 'standard',
   showSeasonTotals: true,
   enableAnimations: true,
+  // Audio is strictly opt-in — never on by default (LS-10111).
+  audioEnabled: false,
 };
 
 const CLOSE_GAME_MIN = 1;
@@ -1343,6 +1346,18 @@ const PreferencesPage: React.FC = () => {
     }
   }, [serverPrefsData]);
 
+  // Same for the audio opt-in (LS-10111) — it gates sound effects, so the
+  // server value is authoritative the moment it arrives.
+  useEffect(() => {
+    const serverAudio = serverPrefsData?.getUserPreferences?.audioEnabled;
+    if (typeof serverAudio === 'boolean') {
+      setPrefs((prev) => {
+        if (prev.audioEnabled === serverAudio) return prev;
+        return { ...prev, audioEnabled: serverAudio };
+      });
+    }
+  }, [serverPrefsData]);
+
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
       if (key === 'theme') {
@@ -1353,6 +1368,13 @@ const PreferencesPage: React.FC = () => {
       if (key === 'statsFormat' && isAuthenticated) {
         void updateUserPreferences({
           variables: { input: { statsFormat: value as StatsFormat } },
+        });
+      }
+      // Audio opt-in is persisted server-side too, so the gate travels with
+      // the account rather than the browser (LS-10111).
+      if (key === 'audioEnabled' && isAuthenticated) {
+        void updateUserPreferences({
+          variables: { input: { audioEnabled: value as boolean } },
         });
       }
       setPrefs((prev) => ({ ...prev, [key]: value }));
@@ -1484,6 +1506,15 @@ const PreferencesPage: React.FC = () => {
                   onChange={(v) => update('enableAnimations', v)}
                   label="Animations"
                   description="Page transitions and micro-motion. Disable for reduced motion."
+                />
+
+                <Separator />
+
+                <PrefToggle
+                  value={prefs.audioEnabled}
+                  onChange={(v) => update('audioEnabled', v)}
+                  label="Sound effects"
+                  description="Play short sounds for big moments, like a touchdown. Off by default."
                 />
               </SectionBody>
             </CollapsibleBody>

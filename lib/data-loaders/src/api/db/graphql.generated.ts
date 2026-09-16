@@ -5320,6 +5320,7 @@ export type UserLeagueSummary = {
 
 export type UserPreference = {
   __typename?: 'UserPreference';
+  audioEnabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   statsFormat?: Maybe<Scalars['String']['output']>;
@@ -5328,6 +5329,7 @@ export type UserPreference = {
 };
 
 export type UserPreferenceInput = {
+  audioEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   statsFormat?: InputMaybe<Scalars['String']['input']>;
 };
 

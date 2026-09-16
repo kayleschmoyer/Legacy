@@ -97,6 +97,7 @@ describe('UserPreferencesService', () => {
         id: 1,
         userId: 10,
         statsFormat: 'expanded',
+        audioEnabled: false,
         createdAt: NOW,
         updatedAt: NOW,
       });
@@ -175,6 +176,84 @@ describe('UserPreferencesService', () => {
       expect(result.statsFormat).toBe('standard');
     });
 
+    it('persists an audio_enabled opt-in', async () => {
+      const update = makeUpdate([
+        {
+          id: 4,
+          userId: 40,
+          statsFormat: 'standard',
+          audioEnabled: true,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ]);
+      runWith({
+        select: jest.fn(() => makeSelect([{ id: 4, userId: 40 }])),
+        update: jest.fn(() => update),
+        insert: jest.fn(() => makeInsert([])),
+      });
+
+      const result = await service.updateUserPreferences(40, {
+        audioEnabled: true,
+      });
+
+      expect(update.set).toHaveBeenCalledWith(
+        expect.objectContaining({ audioEnabled: true }),
+      );
+      expect(result.audioEnabled).toBe(true);
+    });
+
+    it('drops a non-boolean audio_enabled instead of persisting it', async () => {
+      // Audio is an opt-in gate — a stray non-boolean must never flip it on.
+      const update = makeUpdate([
+        {
+          id: 5,
+          userId: 50,
+          statsFormat: 'standard',
+          audioEnabled: false,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ]);
+      runWith({
+        select: jest.fn(() => makeSelect([{ id: 5, userId: 50 }])),
+        update: jest.fn(() => update),
+        insert: jest.fn(() => makeInsert([])),
+      });
+
+      const result = await service.updateUserPreferences(50, {
+        statsFormat: 'standard',
+        audioEnabled: 'yes' as never,
+      });
+
+      // Exact match: the cleaned update carries stats_format only, which is
+      // precisely the claim — audio_enabled never reached the write.
+      expect(update.set).toHaveBeenCalledWith({ statsFormat: 'standard' });
+      expect(result.audioEnabled).toBe(false);
+    });
+
+    it('defaults audio_enabled to false for a row predating the column', async () => {
+      runWith({
+        select: jest.fn(() =>
+          makeSelect([
+            {
+              id: 6,
+              userId: 60,
+              statsFormat: 'standard',
+              createdAt: NOW,
+              updatedAt: NOW,
+            },
+          ]),
+        ),
+        insert: jest.fn(() => makeInsert([])),
+        update: jest.fn(() => makeUpdate([])),
+      });
+
+      const result = await service.getUserPreferences(60);
+
+      expect(result?.audioEnabled).toBe(false);
+    });
+
     it('drops an invalid stats_format value instead of persisting it', async () => {
       const insert = makeInsert([
         {
@@ -229,6 +308,7 @@ describe('UserPreferencesService', () => {
         id: 5,
         userId: 50,
         statsFormat: 'expanded',
+        audioEnabled: false,
         createdAt: NOW,
         updatedAt: NOW,
       });

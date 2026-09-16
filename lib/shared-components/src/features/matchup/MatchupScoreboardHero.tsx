@@ -10,13 +10,16 @@ import {
 } from './StaleScoringIndicator';
 import {
   BLACK,
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   GREEN,
   GREEN_DEEP,
+  POS_DST,
   POS_OUTFIELD,
+  POS_WR,
   RED,
   TEXT_MUTED,
   TEXT_PRIMARY,
@@ -27,6 +30,32 @@ import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
 import { useAnimatedNumber } from '../../hooks/useAnimatedNumber';
 import { ScoreDeltaBadge } from '../../components/ScoreDeltaBadge';
+import { ConfettiBurst } from '../../components/ConfettiBurst';
+
+/**
+ * Fantasy points for a touchdown — the floor for "a touchdown-sized scoring
+ * event" (LS-10111). A rushing/receiving TD is 6 points under every scoring
+ * profile in the product, so a single settled increase of at least this much
+ * is the celebration trigger; routine reception/yardage ticks never reach it.
+ *
+ * Presentation-only: this reads the score deltas the scoreboard is already
+ * animating and computes nothing. It is deliberately NOT derived from the
+ * scoring config — scoring logic is owned elsewhere (LS-9532).
+ */
+const TOUCHDOWN_POINTS = 6;
+
+/** How long a burst stays mounted — just past the web shim's longest piece. */
+const CONFETTI_LIFETIME_MS = 2800;
+
+/** Brand celebration palette for the touchdown burst. */
+const TOUCHDOWN_CONFETTI_COLORS = [
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_SEAM_RED,
+  TEXT_PRIMARY,
+  POS_WR,
+  POS_DST,
+];
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
@@ -207,17 +236,18 @@ export interface MatchupScoreboardHeroProps {
   /** `Matchup.scoringChangeLog` — shown on interaction with the indicator. */
   scoringChangeLog?: readonly StaleScoringChangeLogEntry[] | null;
   /**
-   * Whether the viewing user has premium access. Gates the "+N points"
-   * flourish that accompanies a score increase (LS-6392); the score count-up
-   * itself is not gated, since the instant-replacement it fixes was a defect
-   * for every tier, not a premium feature.
+   * Retained for API compatibility with the LS-6392 call sites; no longer
+   * gates anything on this scoreboard.
    *
-   * Resolved by each platform and passed down rather than read here, because
-   * this component is deliberately presentational and does no data fetching —
-   * the same contract that lets its specs render it without an Apollo or auth
-   * provider. Mirrors the existing `FootballPlayerDetail.isPremium` /
-   * `MLBHome.isPremium` prop pattern. Defaults to `false`, so a caller that
-   * has not been wired up shows no premium affordance rather than leaking one.
+   * LS-6392 gated the "+N points" flourish on this prop. LS-10111 recorded
+   * the product decision that the scoreboard's celebration affordances (the
+   * "+N" badge, the touchdown confetti, and the touchdown cue in LS-10195)
+   * are FREE — cosmetic delight is not billable, following the
+   * assistant-manager-invites precedent — so the gate was removed rather
+   * than migrated to a dedicated entitlement key. See
+   * `docs/product/subscription-tiers.md`.
+   *
+   * @deprecated No longer read. Remove once both platforms stop passing it.
    */
   isPremium?: boolean;
 }
@@ -231,7 +261,7 @@ function TeamPanel({
   totalGames,
   onTeamPress,
   preLock,
-  isPremium,
+  onTouchdown,
 }: {
   team: MatchupScoreboardHeroTeam;
   leading: boolean;
@@ -239,7 +269,7 @@ function TeamPanel({
   totalGames: number;
   onTeamPress?: (teamId: number) => void;
   preLock: boolean;
-  isPremium: boolean;
+  onTouchdown: () => void;
 }) {
   const score = team.score ?? 0;
   // Pre-lock (scheduled, no games started), a 0 score means "no stats yet",
@@ -248,8 +278,19 @@ function TeamPanel({
   // Count the score up to its new value instead of swapping it instantly
   // (LS-6392). Suppressed pre-lock, where the score is a placeholder rather
   // than a number to count toward.
+  // Fire the shared celebration when this side posts a touchdown-sized gain
+  // (LS-10111). `onDelta` is the hook's own "once per settled increase" hook
+  // point — reading the `delta` state instead would miss two identical
+  // back-to-back scores, since React bails out on an unchanged state value.
+  const onScoreIncrease = React.useCallback(
+    (increase: number) => {
+      if (increase >= TOUCHDOWN_POINTS) onTouchdown();
+    },
+    [onTouchdown],
+  );
   const { current, delta } = useAnimatedNumber(score, {
     disabled: showPlaceholder,
+    onDelta: onScoreIncrease,
   });
   const scoreDisplay = showPlaceholder ? '—' : current.toFixed(2);
   // The announced value is always the settled score, never a mid-tween frame:
@@ -311,18 +352,16 @@ function TeamPanel({
       >
         {scoreDisplay}
       </ScoreText>
-      {isPremium && (
-        // Fixed-height slot: the badge mounts and unmounts on every score
-        // change, and letting it do that inline would shove the projected
-        // score below it down for the ~1.6s it is visible — reintroducing
-        // exactly the jarring movement this ticket set out to remove.
-        <YStack height={22} justifyContent="center">
-          <ScoreDeltaBadge
-            delta={delta}
-            testID={team.id != null ? `score-delta-${team.id}` : undefined}
-          />
-        </YStack>
-      )}
+      {/* Fixed-height slot: the badge mounts and unmounts on every score
+          change, and letting it do that inline would shove the projected
+          score below it down for the ~1.6s it is visible — reintroducing
+          exactly the jarring movement LS-6392 set out to remove. */}
+      <YStack height={22} justifyContent="center">
+        <ScoreDeltaBadge
+          delta={delta}
+          testID={team.id != null ? `score-delta-${team.id}` : undefined}
+        />
+      </YStack>
       {team.projectedScore != null && (
         <Text
           fontFamily={FONT_MONO}
@@ -362,9 +401,23 @@ export function MatchupScoreboardHero({
   onTeamPress,
   scoringIsStale,
   scoringChangeLog,
-  isPremium = false,
 }: MatchupScoreboardHeroProps) {
   const isBye = status === 'bye';
+  // One burst for the whole card, whichever side scored (LS-10111). The seed
+  // increments per touchdown so back-to-back scores restart the animation
+  // rather than reusing a settled one; it clears itself so the overlay does
+  // not linger over the scoreboard.
+  const [touchdownSeed, setTouchdownSeed] = React.useState(0);
+  const [celebrating, setCelebrating] = React.useState(false);
+  const onTouchdown = React.useCallback(() => {
+    setTouchdownSeed((previous) => previous + 1);
+    setCelebrating(true);
+  }, []);
+  React.useEffect(() => {
+    if (!celebrating) return;
+    const timer = setTimeout(() => setCelebrating(false), CONFETTI_LIFETIME_MS);
+    return () => clearTimeout(timer);
+  }, [celebrating, touchdownSeed]);
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
@@ -481,7 +534,7 @@ export function MatchupScoreboardHero({
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
-            isPremium={isPremium}
+            onTouchdown={onTouchdown}
           />
           <YStack alignSelf="center" paddingHorizontal="$2">
             <Text
@@ -501,9 +554,16 @@ export function MatchupScoreboardHero({
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
-            isPremium={isPremium}
+            onTouchdown={onTouchdown}
           />
         </XStack>
+      )}
+      {celebrating && (
+        <ConfettiBurst
+          seed={touchdownSeed}
+          colors={TOUCHDOWN_CONFETTI_COLORS}
+          testID="touchdown-confetti"
+        />
       )}
     </HeroCard>
   );

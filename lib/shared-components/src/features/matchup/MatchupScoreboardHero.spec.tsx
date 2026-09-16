@@ -357,15 +357,14 @@ describe('MatchupScoreboardHero', () => {
       expect(screen.getByLabelText('Team A score 94.50')).toBeTruthy();
     });
 
-    it('shows the "+N" badge to premium users when a score increases', () => {
-      const { rerender } = render(
-        <MatchupScoreboardHero {...baseProps({ isPremium: true })} />,
-      );
+    it('shows the "+N" badge on a score increase, for every tier', () => {
+      // LS-10111 recorded these celebrations as Free, so the badge is no
+      // longer gated — `isPremium` is deliberately not passed here.
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
 
       rerender(
         <MatchupScoreboardHero
           {...baseProps({
-            isPremium: true,
             team1: {
               id: 10,
               name: 'Team A',
@@ -380,7 +379,9 @@ describe('MatchupScoreboardHero', () => {
       expect(screen.getByText('+7.00')).toBeTruthy();
     });
 
-    it('withholds the "+N" badge from free-tier users', () => {
+    it('still shows the "+N" badge when isPremium is explicitly false', () => {
+      // The prop is retained but deprecated; a caller still passing `false`
+      // must not suppress a Free affordance.
       const { rerender } = render(
         <MatchupScoreboardHero {...baseProps({ isPremium: false })} />,
       );
@@ -399,14 +400,22 @@ describe('MatchupScoreboardHero', () => {
         />,
       );
 
-      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+      expect(screen.getByTestId('score-delta-10')).toBeTruthy();
     });
 
-    it('withholds the "+N" badge when isPremium is not supplied at all', () => {
-      // Defaulting to false keeps an unwired caller from leaking a premium
-      // affordance to every tier.
-      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+    it('shows no badge on first render, when there is no increase yet', () => {
+      render(<MatchupScoreboardHero {...baseProps()} />);
+      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+      expect(screen.queryByTestId('score-delta-20')).toBeNull();
+    });
+  });
 
+  describe('touchdown confetti (LS-10111)', () => {
+    it('celebrates a touchdown-sized increase', () => {
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+      expect(screen.queryByTestId('touchdown-confetti')).toBeNull();
+
+      // +7.00 clears the 6-point touchdown floor.
       rerender(
         <MatchupScoreboardHero
           {...baseProps({
@@ -420,13 +429,51 @@ describe('MatchupScoreboardHero', () => {
         />,
       );
 
-      expect(screen.queryByTestId('score-delta-10')).toBeNull();
+      expect(screen.getByTestId('touchdown-confetti')).toBeTruthy();
     });
 
-    it('shows no badge on first render, when there is no increase yet', () => {
-      render(<MatchupScoreboardHero {...baseProps({ isPremium: true })} />);
-      expect(screen.queryByTestId('score-delta-10')).toBeNull();
-      expect(screen.queryByTestId('score-delta-20')).toBeNull();
+    it('does not celebrate a routine sub-touchdown gain', () => {
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+
+      // +2.30 — a reception and some yardage, not a scoring play.
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            team1: {
+              id: 10,
+              name: 'Team A',
+              score: 89.8,
+              projectedScore: 120.5,
+            },
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId('touchdown-confetti')).toBeNull();
+    });
+
+    it('celebrates a touchdown by either team', () => {
+      const { rerender } = render(<MatchupScoreboardHero {...baseProps()} />);
+
+      rerender(
+        <MatchupScoreboardHero
+          {...baseProps({
+            team2: {
+              id: 20,
+              name: 'Team B',
+              score: 144.0,
+              projectedScore: 150.25,
+            },
+          })}
+        />,
+      );
+
+      expect(screen.getByTestId('touchdown-confetti')).toBeTruthy();
+    });
+
+    it('does not celebrate on first render', () => {
+      render(<MatchupScoreboardHero {...baseProps()} />);
+      expect(screen.queryByTestId('touchdown-confetti')).toBeNull();
     });
   });
 });

@@ -3,6 +3,7 @@ import {
   serial,
   integer,
   varchar,
+  boolean,
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core';
@@ -29,6 +30,9 @@ export const userPreferences = pgTable(
     statsFormat: varchar('stats_format', { length: 20 })
       .notNull()
       .default('standard'),
+    // Opt-in gate for in-app sound effects (LS-10111). Defaults to false —
+    // audio never plays unless the user explicitly turns it on.
+    audioEnabled: boolean('audio_enabled').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

@@ -9,12 +9,14 @@ export interface UserPreferences {
   id: number;
   userId: number;
   statsFormat: StatsFormat;
+  audioEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface UserPreferencesUpdate {
   statsFormat?: StatsFormat;
+  audioEnabled?: boolean;
 }
 
 const VALID_STATS_FORMATS: readonly StatsFormat[] = ['standard', 'expanded'];
@@ -32,7 +34,7 @@ function normalizeStatsFormat(value: string | null | undefined): StatsFormat {
  *
  * Persists the stats-format preference per user so it survives clearing site
  * data and stays consistent across devices, instead of living only in the
- * browser's localStorage.
+ * browser's localStorage. LS-10111 added `audioEnabled` on the same basis.
  */
 export class UserPreferencesService {
   constructor(private options: DbOptions) {}
@@ -55,6 +57,7 @@ export class UserPreferencesService {
         id: Number(pref.id),
         userId: Number(pref.userId),
         statsFormat: normalizeStatsFormat(pref.statsFormat),
+        audioEnabled: pref.audioEnabled ?? false,
         createdAt: pref.createdAt,
         updatedAt: pref.updatedAt,
       };
@@ -76,6 +79,11 @@ export class UserPreferencesService {
       VALID_STATS_FORMATS.includes(updates.statsFormat)
     ) {
       cleaned.statsFormat = updates.statsFormat;
+    }
+    // Audio is a plain boolean — accept it only when genuinely boolean, so a
+    // stray non-boolean can't flip the opt-in gate on (LS-10111).
+    if (typeof updates.audioEnabled === 'boolean') {
+      cleaned.audioEnabled = updates.audioEnabled;
     }
 
     return runWithPublicClient(this.options, async (db) => {
@@ -114,6 +122,7 @@ export class UserPreferencesService {
         id: Number(result.id),
         userId: Number(result.userId),
         statsFormat: normalizeStatsFormat(result.statsFormat),
+        audioEnabled: result.audioEnabled ?? false,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
       };

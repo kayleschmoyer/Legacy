@@ -5655,6 +5655,7 @@ type UserLeagueSummary {
 }
 
 type UserPreference {
+  audioEnabled: Boolean
   createdAt: String
   id: Int
   statsFormat: String
@@ -5663,6 +5664,7 @@ type UserPreference {
 }
 
 input UserPreferenceInput {
+  audioEnabled: Boolean
   statsFormat: String
 }
 

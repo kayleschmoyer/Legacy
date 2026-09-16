@@ -5326,6 +5326,7 @@ export type UserLeagueSummary = {
 
 export type UserPreference = {
   __typename?: 'UserPreference';
+  audioEnabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   statsFormat?: Maybe<Scalars['String']['output']>;
@@ -5334,6 +5335,7 @@ export type UserPreference = {
 };
 
 export type UserPreferenceInput = {
+  audioEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   statsFormat?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -15558,6 +15560,7 @@ export type UserPreferenceFragment = {
   id?: number | null;
   userId?: number | null;
   statsFormat?: string | null;
+  audioEnabled?: boolean | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -15571,6 +15574,7 @@ export type GetUserPreferencesQuery = {
     id?: number | null;
     userId?: number | null;
     statsFormat?: string | null;
+    audioEnabled?: boolean | null;
     createdAt?: string | null;
     updatedAt?: string | null;
   } | null;
@@ -15587,6 +15591,7 @@ export type UpdateUserPreferencesMutation = {
     id?: number | null;
     userId?: number | null;
     statsFormat?: string | null;
+    audioEnabled?: boolean | null;
     createdAt?: string | null;
     updatedAt?: string | null;
   } | null;
@@ -17341,6 +17346,7 @@ export const UserPreferenceFragmentDoc = gql`
     id
     userId
     statsFormat
+    audioEnabled
     createdAt
     updatedAt
   }

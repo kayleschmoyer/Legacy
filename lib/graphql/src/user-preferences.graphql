@@ -2,6 +2,7 @@ fragment UserPreference on UserPreference {
   id
   userId
   statsFormat
+  audioEnabled
   createdAt
   updatedAt
 }

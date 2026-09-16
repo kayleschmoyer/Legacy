@@ -10,6 +10,7 @@ const dbService = createDatabaseService(getDbOptions());
 const UserPreferenceInput = builder.inputType('UserPreferenceInput', {
   fields: (t) => ({
     statsFormat: t.string({ required: false }),
+    audioEnabled: t.boolean({ required: false }),
   }),
 });
 
@@ -18,6 +19,7 @@ const UserPreferenceRef = builder.objectRef<{
   id: number;
   userId: number;
   statsFormat: string;
+  audioEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }>('UserPreference');
@@ -27,6 +29,7 @@ UserPreferenceRef.implement({
     id: t.exposeInt('id'),
     userId: t.exposeInt('userId'),
     statsFormat: t.exposeString('statsFormat'),
+    audioEnabled: t.exposeBoolean('audioEnabled'),
     createdAt: t.string({
       resolve: (parent) => parent.createdAt.toISOString(),
     }),
@@ -54,6 +57,7 @@ builder.queryField('getUserPreferences', (t) =>
         id: Number(prefs.id),
         userId: Number(prefs.userId),
         statsFormat: prefs.statsFormat,
+        audioEnabled: prefs.audioEnabled,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
       };
@@ -76,7 +80,9 @@ builder.mutationField('updateUserPreferences', (t) =>
       const userId = context.user.id;
 
       // The service validates stats-format values; invalid/unknown values are
-      // dropped rather than persisted.
+      // dropped rather than persisted. `audioEnabled` is nullable in the input
+      // so an unrelated preference write doesn't reset it — only a genuine
+      // boolean is forwarded (LS-10111).
       const prefs = await dbService.userPreferences.updateUserPreferences(
         userId,
         {
@@ -84,12 +90,17 @@ builder.mutationField('updateUserPreferences', (t) =>
             input.statsFormat === 'standard' || input.statsFormat === 'expanded'
               ? input.statsFormat
               : undefined,
+          audioEnabled:
+            typeof input.audioEnabled === 'boolean'
+              ? input.audioEnabled
+              : undefined,
         },
       );
       return {
         id: Number(prefs.id),
         userId: Number(prefs.userId),
         statsFormat: prefs.statsFormat,
+        audioEnabled: prefs.audioEnabled,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
       };

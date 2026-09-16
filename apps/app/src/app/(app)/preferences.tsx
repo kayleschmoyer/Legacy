@@ -19,6 +19,10 @@ import {
   YStack,
 } from 'tamagui';
 import { brand } from '@legacy-sports/design-tokens';
+import {
+  useGetUserPreferencesQuery,
+  useUpdateUserPreferencesMutation,
+} from '@legacy-sports/graphql';
 import { useThemeContext } from '../../context/ThemeContext';
 import { AUTHORIZED_CONTEXT } from '../../common/auth/AuthorizedUserContext';
 import { useDeviceLoggingPreference } from '../../features/device-logs/useDeviceLoggingPreference';
@@ -38,6 +42,7 @@ interface UserPreferences {
   statsFormat: StatsFormat;
   showSeasonTotals: boolean;
   enableAnimations: boolean;
+  audioEnabled: boolean;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -46,6 +51,8 @@ const DEFAULT_PREFS: UserPreferences = {
   statsFormat: 'standard',
   showSeasonTotals: true,
   enableAnimations: true,
+  // Audio is strictly opt-in — never on by default (LS-10111).
+  audioEnabled: false,
 };
 
 /* ─── Storage helpers (AsyncStorage on native / sessionStorage on web) ─── */
@@ -301,10 +308,28 @@ export default function PreferencesScreen(): React.JSX.Element {
   const [saved, setSaved] = useState(false);
   const initialLoadDone = useRef(false);
 
+  // The audio opt-in is persisted server-side so it syncs across devices
+  // (LS-10111), the same basis as web's stats-format sync (LS-7138). Every
+  // other preference on this screen remains device-local.
+  const isAuthenticated = currentUser != null;
+  const { data: serverPrefsData } = useGetUserPreferencesQuery({
+    skip: !isAuthenticated,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [updateUserPreferences] = useUpdateUserPreferencesMutation();
+  // The server is authoritative for the audio opt-in. Held in a ref so the
+  // on-device load below can't clobber it: that load is async, so it can
+  // resolve *after* the query has already hydrated the account's value.
+  const serverAudioRef = useRef<boolean | null>(null);
+
   // Load persisted preferences on mount
   useEffect(() => {
     void loadPrefsAsync().then((loaded) => {
-      setPrefs((prev) => ({ ...loaded, theme: prev.theme }));
+      setPrefs((prev) => ({
+        ...loaded,
+        theme: prev.theme,
+        audioEnabled: serverAudioRef.current ?? loaded.audioEnabled,
+      }));
       // Delay flag so the save effect skips the initial render cycle
       requestAnimationFrame(() => {
         initialLoadDone.current = true;
@@ -317,16 +342,36 @@ export default function PreferencesScreen(): React.JSX.Element {
     setPrefs((prev) => ({ ...prev, theme: themePreference }));
   }, [themePreference]);
 
+  // Reflect the server-side audio opt-in once it loads, so a value set on
+  // another device wins over stale on-device storage (LS-10111).
+  useEffect(() => {
+    const serverAudio = serverPrefsData?.getUserPreferences?.audioEnabled;
+    if (typeof serverAudio === 'boolean') {
+      serverAudioRef.current = serverAudio;
+      setPrefs((prev) => {
+        if (prev.audioEnabled === serverAudio) return prev;
+        return { ...prev, audioEnabled: serverAudio };
+      });
+    }
+  }, [serverPrefsData]);
+
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
       if (key === 'theme') {
         // Route theme changes through ThemeContext so they apply immediately
         setThemePreference(value as ThemePreference);
       }
+      // Audio opt-in is persisted server-side so the gate travels with the
+      // account rather than the device (LS-10111).
+      if (key === 'audioEnabled' && isAuthenticated) {
+        void updateUserPreferences({
+          variables: { input: { audioEnabled: value as boolean } },
+        });
+      }
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
     },
-    [setThemePreference],
+    [setThemePreference, isAuthenticated, updateUserPreferences],
   );
 
   useEffect(() => {
@@ -417,6 +462,16 @@ export default function PreferencesScreen(): React.JSX.Element {
             onChange={(v) => update('enableAnimations', v)}
             label="Enable animations"
             description="Show transition animations throughout the app"
+          />
+
+          <Separator />
+
+          <PrefToggle
+            value={prefs.audioEnabled}
+            onChange={(v) => update('audioEnabled', v)}
+            label="Sound effects"
+            description="Play short sounds for big moments, like a touchdown. Off by default."
+            testID="audio-enabled-toggle"
           />
         </SectionCard>
 

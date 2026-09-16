@@ -39,6 +39,22 @@ const mockEnableDeviceLogging = jest.fn();
 const mockDisableDeviceLogging = jest.fn();
 const mockShareCurrentLogFile = jest.fn();
 
+// The screen reads and writes the server-side audio preference (LS-10111).
+// This spec renders without an Apollo provider — matching the module-mocking
+// style it already uses for the other side effects — so the two generated
+// hooks are stubbed rather than wrapping every case in a MockedProvider.
+const mockUpdateUserPreferences = jest.fn();
+let mockServerPreferences: { audioEnabled: boolean } | null = null;
+
+jest.mock('@legacy-sports/graphql', () => ({
+  useGetUserPreferencesQuery: () => ({
+    data: mockServerPreferences
+      ? { getUserPreferences: mockServerPreferences }
+      : undefined,
+  }),
+  useUpdateUserPreferencesMutation: () => [mockUpdateUserPreferences],
+}));
+
 jest.mock('../../features/device-logs/deviceLogs', () => ({
   DEVICE_LOGS_PREF_KEY: 'enable_device_logs',
   enableDeviceLogging: (...args: unknown[]): unknown =>
@@ -201,6 +217,46 @@ describe('PreferencesScreen', () => {
     mockAsyncStorageSetItem.mockResolvedValue(undefined);
     mockEnableDeviceLogging.mockResolvedValue(undefined);
     mockShareCurrentLogFile.mockResolvedValue(undefined);
+    mockServerPreferences = null;
+  });
+
+  describe('sound effects preference (LS-10111)', () => {
+    it('renders the toggle', () => {
+      renderWithUser(false);
+      expect(screen.getByText('Sound effects')).toBeTruthy();
+      expect(screen.getByTestId('audio-enabled-toggle')).toBeTruthy();
+    });
+
+    it('starts off, so the first press opts in rather than out', async () => {
+      // Audio is never on by default — the first press must turn it ON.
+      renderWithUser(false);
+
+      fireEvent.press(screen.getByTestId('audio-enabled-toggle'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith({
+          variables: { input: { audioEnabled: true } },
+        });
+      });
+    });
+
+    it('hydrates from the server so the opt-in follows the account', async () => {
+      // Already opted in on another device: the first press here must turn it
+      // OFF, which is only true if the server value won over the local default.
+      mockServerPreferences = { audioEnabled: true };
+      renderWithUser(false);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('audio-enabled-toggle')).toBeTruthy();
+      });
+      fireEvent.press(screen.getByTestId('audio-enabled-toggle'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith({
+          variables: { input: { audioEnabled: false } },
+        });
+      });
+    });
   });
 
   describe('initial rendering', () => {
