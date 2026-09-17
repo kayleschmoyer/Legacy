@@ -1061,6 +1061,24 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
           "arn:aws:glue:${local.region}:${local.account_id}:crawler/${local.name_prefix}-cloudtrail-crawler"
         ]
       },
+      # LS-10172 follow-up: glue:DeleteDatabase alone (scoped to the database
+      # ARN above) isn't sufficient — AWS authorizes DeleteDatabase against
+      # the *table* ARN pattern under that database, since deleting a
+      # database cascades to delete any tables it contains. Confirmed via a
+      # real post-merge apply against a tainted aws_glue_catalog_database.cloudtrail
+      # ("deleting Glue Catalog Database ... AccessDeniedException ...
+      # glue:DeleteDatabase on resource: arn:...:table/legacy_sports_dev_cloudtrail/*").
+      # A separate statement because no other action in the grant above needs
+      # table-level resource access.
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:DeleteDatabase"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:table/*_cloudtrail/*"
+        ]
+      },
       # Glue classifier actions, and glue:CreateCrawler, do not support
       # resource-level permissions — must use Resource "*" (same pattern as
       # sqs:ListQueues / cloudtrail:ListTrails above). glue:CreateCrawler was
