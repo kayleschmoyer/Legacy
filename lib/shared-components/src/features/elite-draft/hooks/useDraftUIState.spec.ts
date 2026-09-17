@@ -95,10 +95,10 @@ describe('useDraftUIState — pre-existing call sites unchanged', () => {
 });
 
 describe('useDraftUIState — Draft Room v2 shell additions (LS-9397)', () => {
-  it('defaults activeTab to board, selectedTeamId to null, and unreadChat to false', () => {
+  it('defaults activeTab to players, selectedTeamId to null, and unreadChat to false', () => {
     const { result } = renderHook(() => useDraftUIState());
 
-    expect(result.current.activeTab).toBe('board');
+    expect(result.current.activeTab).toBe('players');
     expect(result.current.selectedTeamId).toBeNull();
     expect(result.current.unreadChat).toBe(false);
   });

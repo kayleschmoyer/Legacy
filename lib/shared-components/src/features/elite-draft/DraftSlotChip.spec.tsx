@@ -75,8 +75,8 @@ describe('DraftSlotChip', () => {
 // LS-10001 AC: "44px minimum hit targets throughout" on the phone squad strip.
 // Asserted on the metrics table rather than the rendered node because this
 // suite's Tamagui mock strips layout props before they reach the DOM, so a
-// `toHaveStyle` assertion here would pass vacuously (same reason
-// `DraftBottomNav.spec.tsx` asserts on `draftBottomNavHeight`).
+// `toHaveStyle` assertion here would pass vacuously, so the sizes are
+// asserted as exported constants instead.
 describe('DRAFT_SLOT_CHIP_SIZES', () => {
   it('gives the phone chip a 44px touch-target floor', () => {
     expect(DRAFT_SLOT_CHIP_SIZES.sm.minHeight).toBe(44);

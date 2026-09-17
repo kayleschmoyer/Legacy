@@ -346,3 +346,51 @@
 .mob-announce .meta { font-family: var(--f-body); font-size: 12px; color: var(--text-sec); }
 .mob-announce .quip { margin: 14px auto 0; font-family: var(--f-body); font-style: italic; font-size: 13px; color: var(--text-sec); max-width: 34ch; }
 
+/* ── Phone in-page navigation (LS-10165) ─────────────────────
+   No draft-owned nav bar: on web the app keeps its header and
+   fixed bottom bar on the draft route, so a draft bottom nav
+   stacked a second one. The board is the page; Players / Queue /
+   History are tabs in the pick sheet; Chat is a full-height panel
+   raised from the clock bar. The slim nav (.mob-nav) is back +
+   title only, and only on native, where no app header exists. */
+.mob-clock { grid-template-columns: 1fr auto auto; }
+.mob-chat-btn { position: relative; width: 44px; height: 44px; border-radius: 9999px; border: 1px solid var(--border-hov); background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
+.mob-clock.mine .mob-chat-btn { border-color: var(--gold-dim); color: var(--gold); }
+.mob-chat-btn .dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 9999px; background: var(--seam-bright); }
+
+.mob-picksheet .mob-tabs { margin: 0 0 10px; }
+.mob-picksheet .ps-pane { display: none; }
+.mob-picksheet[data-tab="players"] .ps-pane[data-pane="players"],
+.mob-picksheet[data-tab="queue"] .ps-pane[data-pane="queue"],
+.mob-picksheet[data-tab="history"] .ps-pane[data-pane="history"] { display: block; }
+
+.mob-qlist, .mob-hlist { display: flex; flex-direction: column; gap: 6px; padding: 0 6px 6px; }
+.mob-qrow, .mob-hrow { display: grid; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; }
+.mob-qrow { grid-template-columns: 22px 1fr auto; }
+.mob-hrow { grid-template-columns: 34px 1fr auto; }
+.mob-qrow .rk, .mob-hrow .lb { font-family: var(--f-display); font-weight: 800; font-size: 12px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
+.mob-qrow .nm, .mob-hrow .nm { font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mob-qrow .mt, .mob-hrow .mt { font-family: var(--f-body); font-size: 11px; color: var(--text-sec); }
+.mob-qrow .rm { min-width: 44px; min-height: 44px; margin: -8px -10px -8px 0; background: transparent; border: 0; color: var(--text-sec); font-size: 15px; cursor: pointer; }
+.mob-hrow .ov { font-family: var(--f-body); font-size: 10px; color: var(--text-mute); }
+.mob-hrow.me { border-color: var(--gold-dim); }
+.mob-hrow.me .nm { color: var(--gold); }
+
+.mob-chat { position: absolute; inset: 0; z-index: 8; display: none; flex-direction: column; background: var(--bg-page); }
+.mob[data-chat="open"] .mob-chat { display: flex; }
+.mob-chat .hd { min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 14px; border-bottom: 1px solid var(--border); }
+.mob-chat .hd h3 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); }
+.mob-chat .hd .x { min-width: 44px; min-height: 44px; background: transparent; border: 0; color: var(--text-mute); font-size: 19px; cursor: pointer; }
+.mob-chat .msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.mob-chat .msg { max-width: 80%; padding: 8px 11px; border-radius: 12px; background: var(--bg-panel); border: 1px solid var(--border); }
+.mob-chat .msg.mine { align-self: flex-end; background: var(--navy); border-color: var(--navy-light); }
+.mob-chat .msg .who { font-family: var(--f-display); font-weight: 700; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); }
+.mob-chat .msg .txt { font-family: var(--f-body); font-size: 13px; color: var(--text); margin-top: 2px; }
+.mob-chat .compose { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--border); }
+.mob-chat .compose input { min-height: 44px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--f-body); font-size: 13px; padding: 0 12px; }
+.mob-chat .compose button { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold); color: #12182A; font-family: var(--f-display); font-weight: 800; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+
+/* Loading skeleton for the board-first phone layout (DraftRoom.states.html). */
+.mob-sk-track { display: flex; gap: 5px; overflow: hidden; }
+.mob-sk-track .sk { flex: 0 0 40px; height: 44px; border-radius: 8px; }
+

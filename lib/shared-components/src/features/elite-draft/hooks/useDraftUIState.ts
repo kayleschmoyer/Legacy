@@ -26,16 +26,15 @@ export interface ToastMessage {
   type: 'error' | 'warning' | 'info' | 'success';
 }
 
-/** The persistent bottom-nav destinations in the Draft Room v2 shell (LS-9397).
- *  The player browser is not one of them — it rides in the Board tab's pick
- *  sheet (LS-10002). */
 /**
- * Phone draft-room tabs. No `team` tab: LS-10001 moved the roster out of the
- * tab set and into the persistent squad strip pinned above this nav, which
- * expands into the full squad sheet. `selectedTeamId` below still exists —
- * the sheet keeps the team switcher, it just no longer has a tab of its own.
+ * Phone pick-sheet tabs (LS-10165). The board is the page itself, not a tab,
+ * and Chat opens from the clock bar — the draft room owns no nav bar of its
+ * own, so nothing stacks with the app's header or bottom bar. No `team` tab:
+ * LS-10001 moved the roster into the persistent squad strip, which expands
+ * into the squad sheet. `selectedTeamId` below still drives that sheet's team
+ * switcher.
  */
-export type DraftRoomTab = 'board' | 'queue' | 'chat';
+export type DraftRoomTab = 'players' | 'queue' | 'history';
 
 /** One queued AI-pick toast (Draft Room v2 header/overlay chrome, LS-9397). Rendering
  *  and dequeue-on-dismiss timing belong to the overlay ticket (child 6) — this hook
@@ -203,7 +202,7 @@ export function useDraftUIState() {
   // room, LS-8790's native draft screen if it shares this hook) are
   // unaffected whether or not they read these fields.
   // ---------------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState<DraftRoomTab>('board');
+  const [activeTab, setActiveTab] = useState<DraftRoomTab>('players');
   /** Team whose roster the Team tab is showing — null means "my team". */
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [unreadChat, setUnreadChat] = useState(false);

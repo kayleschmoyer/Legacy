@@ -151,6 +151,17 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
       const navTarget = target.closest('[role="tab"], a[href]');
       if (!navTarget) return;
 
+      // The phone pick sheet (Players / Queue / History tabs, LS-10165) is a
+      // Tamagui modal portaled to <body>, so containerRef can't see it. A tab
+      // inside a dialog switches the dialog's own content — it never changes
+      // the route. Links inside dialogs still get the prompt.
+      if (
+        navTarget.getAttribute('role') === 'tab' &&
+        navTarget.closest('[role="dialog"]')
+      ) {
+        return;
+      }
+
       // Re-selecting the current tab is a no-op route-wise.
       if (navTarget.getAttribute('aria-selected') === 'true') return;
 

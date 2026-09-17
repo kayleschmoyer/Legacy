@@ -41,13 +41,22 @@
     <div class="viewport vp-mobile">
       <div class="viewport-chrome">Mobile · 375</div>
       <div class="mob" data-picksheet="closed" style="position:relative;">
-        <div class="mob-nav">
+        <!-- Slim nav bar — back + league title, nothing else. Native app only:
+             the route sits outside the tab shell with no stack header, so this
+             is the way out. On web the app header already carries the back
+             path and league, so it does not render there. It holds no
+             destinations: the draft room's in-page nav is the pick sheet's
+             tabs plus the clock bar's chat control (LS-10165). -->
+        <div class="mob-nav" data-host="native">
           <span class="back-icon">←</span>
           <span class="title"><span data-sport="baseball">Dead Ball Dynasty</span><span data-sport="football">Gridiron Dynasty</span></span>
           <span class="back-icon" style="visibility:hidden;">⋯</span>
         </div>
         <!-- Clock bar: who + how long, in one line. The full hero
-             is desktop-only — a phone needs the fact, not the frame. -->
+             is desktop-only — a phone needs the fact, not the frame.
+             Chat opens from here, not from a bar of its own: on web the
+             app keeps its header and bottom bar on this route, so a draft
+             nav bar would stack a second one. -->
         <div class="mob-clock mine">
           <div>
             <div class="eyebrow">You're on the clock · R4 · P42</div>
@@ -60,19 +69,33 @@
             </svg>
             <div class="t num">0:47</div>
           </div>
+          <button class="mob-chat-btn" data-chat-open aria-haspopup="dialog" aria-label="Open chat, unread messages">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+            <span class="dot"></span>
+          </button>
         </div>
 
         <div class="mob-round" data-sport="baseball"></div>
         <div class="mob-round" data-sport="football"></div>
         <div class="mob-cta"><button data-picksheet-open>Pick a player · 0:47 left</button></div>
         <div class="ps-scrim" data-picksheet-close></div>
-        <div class="mob-picksheet">
+        <div class="mob-picksheet" data-tab="players">
           <div class="grab"></div>
           <div class="sh-hd">
-            <div><h3>Available players</h3><p>Pick #42 · 1,148 available · open slots first</p></div>
+            <div><h3>Available players</h3><p>Pick #42 · Round 4</p></div>
             <button class="x" data-picksheet-close aria-label="Close">✕</button>
           </div>
+          <!-- The draft room's in-page nav (LS-10165): Players / Queue /
+               History, pinned under the sheet heading. The heading follows the
+               tab. The CTA and your on-the-clock tile always land on Players.
+               Roster left the tab set — it lives in the squad strip below. -->
+          <div class="mob-tabs" role="tablist">
+            <button class="active" role="tab" data-pstab="players" data-title="Available players">Players</button>
+            <button role="tab" data-pstab="queue" data-title="Queue">Queue</button>
+            <button role="tab" data-pstab="history" data-title="Pick history">History</button>
+          </div>
           <div class="ps-body">
+          <div class="ps-pane" data-pane="players">
             <!-- Search + sort sit above the pills: on a phone you type a
                  name far more often than you browse a position. -->
             <div class="mob-search">
@@ -81,13 +104,6 @@
                 <button class="active">ADP</button>
                 <button>PTS</button>
               </div>
-            </div>
-
-            <!-- Roster left the tab set — it lives in the squad strip below. -->
-            <div class="mob-tabs" style="margin-top:12px;">
-              <button class="active">Players</button>
-              <button>Queue</button>
-              <button>History</button>
             </div>
 
             <div class="mob-filter" data-sport="baseball">
@@ -239,8 +255,49 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Queue: priority order; auto-pick takes the top row. -->
+          <div class="ps-pane" data-pane="queue">
+            <div class="mob-qlist" data-sport="baseball">
+              <div class="mob-qrow"><span class="rk">1</span><div><div class="nm">Lou Gehrig</div><div class="mt">1B · NYY</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+              <div class="mob-qrow"><span class="rk">2</span><div><div class="nm">Honus Wagner</div><div class="mt">SS · PIT</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+              <div class="mob-qrow"><span class="rk">3</span><div><div class="nm">Greg Maddux</div><div class="mt">P · ATL</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+            </div>
+            <div class="mob-qlist" data-sport="football">
+              <div class="mob-qrow"><span class="rk">1</span><div><div class="nm">Randy Moss</div><div class="mt">WR · MIN</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+              <div class="mob-qrow"><span class="rk">2</span><div><div class="nm">Emmitt Smith</div><div class="mt">RB · DAL</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+              <div class="mob-qrow"><span class="rk">3</span><div><div class="nm">Tony Gonzalez</div><div class="mt">TE · KC/ATL</div></div><button class="rm" aria-label="Remove from queue">✕</button></div>
+            </div>
+          </div>
+
+          <!-- History: newest pick first, your own picks in gold. -->
+          <div class="ps-pane" data-pane="history">
+            <div class="mob-hlist" data-sport="baseball">
+              <div class="mob-hrow"><span class="lb">4.01</span><div><div class="nm">Rogers Hornsby</div><div class="mt">2B · Bronx Bombers</div></div><span class="ov">#37</span></div>
+              <div class="mob-hrow me"><span class="lb">3.07</span><div><div class="nm">Yogi Berra</div><div class="mt">C · Sandlot Dreamers</div></div><span class="ov">#31</span></div>
+              <div class="mob-hrow"><span class="lb">3.06</span><div><div class="nm">Mickey Mantle</div><div class="mt">OF · Fenway Faithful</div></div><span class="ov">#30</span></div>
+            </div>
+            <div class="mob-hlist" data-sport="football">
+              <div class="mob-hrow"><span class="lb">4.01</span><div><div class="nm">Jerry Rice</div><div class="mt">WR · Steel Curtain Crew</div></div><span class="ov">#37</span></div>
+              <div class="mob-hrow me"><span class="lb">3.07</span><div><div class="nm">Joe Montana</div><div class="mt">QB · Sunday Captains</div></div><span class="ov">#31</span></div>
+              <div class="mob-hrow"><span class="lb">3.06</span><div><div class="nm">Walter Payton</div><div class="mt">RB · Monsters of Midway</div></div><span class="ov">#30</span></div>
+            </div>
+          </div>
 
           </div>
+        </div>
+
+        <!-- Chat panel (LS-10165): full height, raised from the clock bar's
+             chat control. It stays mounted while down so new messages can
+             light the unread dot. -->
+        <div class="mob-chat" role="dialog" aria-label="Draft chat">
+          <div class="hd"><h3>Chat</h3><button class="x" data-chat-close aria-label="Close chat">✕</button></div>
+          <div class="msgs">
+            <div class="msg"><div class="who">Bronx Bombers</div><div class="txt">Hornsby at 37 is a steal and you all know it.</div></div>
+            <div class="msg mine"><div class="who">You</div><div class="txt">Clock's on me — don't touch my first baseman.</div></div>
+          </div>
+          <div class="compose"><input type="text" placeholder="Message the room…" /><button>Send</button></div>
         </div>
 
 

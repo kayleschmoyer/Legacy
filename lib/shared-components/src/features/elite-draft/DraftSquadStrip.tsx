@@ -63,7 +63,16 @@ export interface DraftSquadStripProps {
   maxRosterSize: number | null;
   /** Raises the full squad sheet. */
   onOpen: () => void;
+  /**
+   * Bottom safe-area inset (LS-9444). The strip is the phone draft room's
+   * bottom-most band now that the draft-owned bottom nav is gone (LS-10165),
+   * so it reserves Android's edge-to-edge navigation bar itself.
+   */
+  bottomInset?: number;
 }
+
+/** The design's `.mob-squad { padding-bottom: 12px }`, before any inset. */
+const STRIP_PADDING_BOTTOM = 12;
 
 export function DraftSquadStrip({
   leaguePositions,
@@ -71,6 +80,7 @@ export function DraftSquadStrip({
   sport,
   maxRosterSize,
   onOpen,
+  bottomInset = 0,
 }: DraftSquadStripProps): React.JSX.Element {
   const slots = useMemo(
     () =>
@@ -91,7 +101,7 @@ export function DraftSquadStrip({
       borderTopColor={withAlpha(BRAND_GOLD, 0.3)}
       backgroundColor={withAlpha(BG_DARK, 0.94)}
       paddingTop={9}
-      paddingBottom={12}
+      paddingBottom={STRIP_PADDING_BOTTOM + Math.max(bottomInset, 0)}
       paddingHorizontal={12}
       gap={8}
     >

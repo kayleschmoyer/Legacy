@@ -18,7 +18,8 @@ import { DraftRoundBoard } from './DraftRoundBoard';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftConnectionBanner } from './DraftConnectionBanner';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
-import { DraftBottomNav } from './DraftBottomNav';
+import { DraftSheetTabs } from './DraftSheetTabs';
+import { DraftPickHistoryList } from './DraftPickHistoryList';
 import { DraftSlotStrip } from './DraftSlotStrip';
 import { DraftPlayersTab } from './DraftPlayersTab';
 import {
@@ -57,7 +58,9 @@ import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftChatTabRenderer } from './DraftChatTab';
 import type { DraftPickRecord, DraftPlayer } from './types';
+import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { useAuth } from '../../features/auth';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 import { useHasEntitlement } from '../../hooks/useEntitlement';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
@@ -189,6 +192,13 @@ function GhostButton({
 // used it — this render path is only reachable when useDraftViewportTier()
 // returns 'phone' (LS-9207 review fix).
 // ---------------------------------------------------------------------------
+/** Pick-sheet heading (and dialog name) per tab (LS-10165). */
+const PICK_SHEET_TITLES: Record<DraftRoomTab, string> = {
+  players: 'Available players',
+  queue: 'Queue',
+  history: 'Pick history',
+};
+
 interface CompactLiveDraftBoardProps {
   ui: ReturnType<typeof useDraftUIState>;
   queries: ReturnType<typeof useDraftQueries>;
@@ -210,7 +220,8 @@ interface CompactLiveDraftBoardProps {
    *  commissionerPick mutation under the hood — no CPU auto-picker exists
    *  in this mode. */
   controlAllTeams: boolean;
-  /** Bottom safe-area inset reserved under the persistent bottom nav (LS-9444). */
+  /** Bottom safe-area inset reserved under the squad strip, sheets and chat
+   *  panel — the phone board's bottom-most surfaces (LS-9444, LS-10165). */
   bottomInset: number;
   /** Read-only league/draft settings summary rendered under the Team tab (LS-9857). */
   draftDetails: DraftDetailsSettings;
@@ -260,20 +271,28 @@ function CompactLiveDraftBoard({
   userId,
   renderChatTab,
 }: CompactLiveDraftBoardProps): React.JSX.Element {
-  const hasChatTab = leagueId !== null && !!renderChatTab;
+  // ---- Phone in-page navigation (LS-10165) ----
+  // The draft room owns no nav bar. On native the route sits outside the
+  // `(tabs)` shell with no stack header; on web at phone width the app keeps
+  // its header and fixed MobileBottomBar on this route, so the old draft
+  // bottom nav stacked a second bar on top of the app's. Instead: the board is
+  // the page, Players / Queue / History are tabs in the pick sheet, and Chat
+  // is a full-height panel raised from the clock bar's chat control.
+  const [chatOpen, setChatOpen] = useState(false);
+  const openChat = useCallback(() => setChatOpen(true), []);
+  const closeChat = useCallback(() => setChatOpen(false), []);
 
-  // Unread-chat dot (LS-9401, README "Chat tab"): clears the moment the
-  // Chat tab is opened, and is set only when a new message arrives while a
-  // *different* tab is active. The renderChatTab data connector stays
-  // mounted regardless of activeTab (display:none when hidden) specifically
-  // so this can fire while the viewer is elsewhere.
+  // Unread-chat dot (LS-9401): clears the moment the chat panel opens, and is
+  // set only when a new message arrives while it is closed. The renderChatTab
+  // data connector stays mounted while the panel is down (display:none)
+  // specifically so this can fire while the viewer is on the board.
   const handleNewChatMessage = useCallback(() => {
-    if (ui.activeTab !== 'chat') ui.setUnreadChat(true);
-  }, [ui]);
+    if (!chatOpen) ui.setUnreadChat(true);
+  }, [ui, chatOpen]);
 
   useEffect(() => {
-    if (ui.activeTab === 'chat') ui.setUnreadChat(false);
-  }, [ui]);
+    if (chatOpen) ui.setUnreadChat(false);
+  }, [ui, chatOpen]);
 
   // Pick sheet (LS-10002) — raised over the board by the CTA or the viewer's
   // own on-the-clock tile; owned here rather than in useDraftUIState because
@@ -371,9 +390,14 @@ function CompactLiveDraftBoard({
       : null;
   }, [isMyPick, queries.queueEntries, playerData.statsLookup]);
 
-  // Board tab: tapping the viewer's own on-the-clock tile raises the pick
-  // sheet, same as the CTA — the pick happens without leaving the board.
-  const openPickSheet = useCallback(() => setPickSheetOpen(true), []);
+  // Tapping the viewer's own on-the-clock tile raises the pick sheet, same as
+  // the CTA — the pick happens without leaving the board. Both are "pick a
+  // player" actions, so they land on the Players tab whichever tab the sheet
+  // was last left on.
+  const openPickSheet = useCallback(() => {
+    ui.setActiveTab('players');
+    setPickSheetOpen(true);
+  }, [ui]);
   // Drafting from the sheet completes the pick and drops the sheet, so the
   // pick toast/splash lands on the board rather than behind the scrim. A
   // failed pick still surfaces through the board's own urgent-error overlay.
@@ -403,6 +427,8 @@ function CompactLiveDraftBoard({
         pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
         onClockTeamName={queries.teamNameById(queries.currentPickTeamId)}
         topQueuedPlayerName={topQueuedPlayerName}
+        onOpenChat={openChat}
+        unreadChat={ui.unreadChat}
       />
       <DraftLastPickTicker
         lastPick={lastPick}
@@ -410,132 +436,90 @@ function CompactLiveDraftBoard({
         teamName={lastPick ? queries.teamNameById(lastPick.teamId) : ''}
       />
 
-      {/* Mounted regardless of activeTab (display:none when hidden) so the
-          connector's live subscription keeps running and can still report
-          "message arrives while another tab is open" for the unread dot.
-          Narrowing leagueId/renderChatTab inline (rather than via the
-          `hasChatTab` boolean) so TypeScript proves both are defined here
-          without a non-null assertion. */}
-      {leagueId !== null && renderChatTab && (
-        <YStack
-          flex={1}
-          testID="draft-chat-tab-slot"
-          style={{ display: ui.activeTab === 'chat' ? 'flex' : 'none' }}
-        >
-          {renderChatTab({
-            leagueId,
-            userId,
-            onNewMessage: handleNewChatMessage,
-          })}
-        </YStack>
-      )}
-      {ui.activeTab === 'queue' ? (
-        <DraftQueueTab
-          draftId={queries.draftId ?? 0}
-          entries={queries.queueEntries}
-          statsLookup={playerData.statsLookup}
-          sport={sport}
-          onRemove={(playerId) => void actions.handleToggleQueue(playerId)}
-          onError={(message) => ui.showToast(message, 'error')}
-        />
-      ) : ui.activeTab === 'chat' && !hasChatTab ? (
-        <YStack
-          flex={1}
-          alignItems="center"
-          justifyContent="center"
-          padding="$6"
-        >
-          <Text color="$fg4" textAlign="center">
-            Chat tab is coming soon.
-          </Text>
-        </YStack>
-      ) : null}
-      {ui.activeTab === 'board' && (
-        <>
-          {/* The board scrolls; the CTA below it does not. A 14-team round
+      {/* ---- Board: the page itself, never a tab (LS-10165) ---- */}
+      <>
+        {/* The board scrolls; the CTA below it does not. A 14-team round
               plus the commissioner bar outgrows a short phone, and the pick
               control must never be the thing that falls off the fold. */}
-          <ScrollView flex={1} contentContainerStyle={{ paddingBottom: 8 }}>
-            <DraftRoundBoard
-              teams={boardTeams}
-              picks={queries.pickHistory}
-              currentPickInfo={queries.currentPickInfo}
-              myTeamId={queries.myTeamId}
-              statsLookup={playerData.statsLookup}
-              rounds={boardRounds}
-              sport={sport}
-              onMakePick={openPickSheet}
-            />
+        <ScrollView flex={1} contentContainerStyle={{ paddingBottom: 8 }}>
+          <DraftRoundBoard
+            teams={boardTeams}
+            picks={queries.pickHistory}
+            currentPickInfo={queries.currentPickInfo}
+            myTeamId={queries.myTeamId}
+            statsLookup={playerData.statsLookup}
+            rounds={boardRounds}
+            sport={sport}
+            onMakePick={openPickSheet}
+          />
 
-            {/* ---- Commissioner controls ---- */}
-            {showCommissionerBar && (
-              <XStack
-                gap="$2"
-                paddingHorizontal="$3"
-                paddingTop={8}
-                alignItems="center"
-              >
-                {!ui.draftPaused ? (
-                  <GhostButton
-                    label="PAUSE"
-                    disabled={actions.pauseLoading}
-                    onPress={() => void actions.handlePauseDraft()}
-                  />
-                ) : (
-                  <GhostButton
-                    label="RESUME"
-                    tone="active"
-                    disabled={actions.resumeLoading}
-                    onPress={() => void actions.handleResumeDraft()}
-                  />
-                )}
+          {/* ---- Commissioner controls ---- */}
+          {showCommissionerBar && (
+            <XStack
+              gap="$2"
+              paddingHorizontal="$3"
+              paddingTop={8}
+              alignItems="center"
+            >
+              {!ui.draftPaused ? (
                 <GhostButton
-                  label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
-                  tone={ui.commPickMode ? 'active' : 'neutral'}
-                  onPress={() => ui.setCommPickMode(!ui.commPickMode)}
+                  label="PAUSE"
+                  disabled={actions.pauseLoading}
+                  onPress={() => void actions.handlePauseDraft()}
                 />
-              </XStack>
-            )}
+              ) : (
+                <GhostButton
+                  label="RESUME"
+                  tone="active"
+                  disabled={actions.resumeLoading}
+                  onPress={() => void actions.handleResumeDraft()}
+                />
+              )}
+              <GhostButton
+                label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
+                tone={ui.commPickMode ? 'active' : 'neutral'}
+                onPress={() => ui.setCommPickMode(!ui.commPickMode)}
+              />
+            </XStack>
+          )}
 
-            {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
-            {isMockDraft && (
-              <XStack
-                gap="$2"
-                paddingHorizontal="$3"
-                paddingTop={8}
-                alignItems="center"
-              >
-                <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
-              </XStack>
-            )}
-          </ScrollView>
+          {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
+          {isMockDraft && (
+            <XStack
+              gap="$2"
+              paddingHorizontal="$3"
+              paddingTop={8}
+              alignItems="center"
+            >
+              <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
+            </XStack>
+          )}
+        </ScrollView>
 
-          {/* ---- Pick CTA (LS-10002) ---- */}
-          <YStack paddingHorizontal={14} paddingVertical={10}>
-            <DraftPickCta
-              canDraft={canDraft}
-              untimed={untimed}
-              draftPaused={ui.draftPaused}
-              timeRemaining={timeRemaining}
-              pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
-              onPress={openPickSheet}
-            />
-          </YStack>
-        </>
-      )}
+        {/* ---- Pick CTA (LS-10002) ---- */}
+        <YStack paddingHorizontal={14} paddingVertical={10}>
+          <DraftPickCta
+            canDraft={canDraft}
+            untimed={untimed}
+            draftPaused={ui.draftPaused}
+            timeRemaining={timeRemaining}
+            pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+            onPress={openPickSheet}
+          />
+        </YStack>
+      </>
 
       {/* ---- Squad strip (LS-10001): replaces the roster tab ----
-          Outside the activeTab switch on purpose — "persistent" is the point.
-          Now that Team is gone from the nav, this is the *only* route to the
-          roster, so it has to be reachable from Queue and Chat too, not just
-          the Board. Sits directly above the bottom nav, matching the design's
-          `.mob-squad` as the bottom-most band with the CTA above it. */}
+          The only route to the roster. Matches the design's `.mob-squad` as
+          the bottom-most band with the CTA above it, so it also reserves the
+          bottom safe-area inset (LS-9444). */}
       <DraftSquadStrip
         leaguePositions={queries.leaguePositions}
         players={playerData.myTeam}
         sport={sport}
         maxRosterSize={queries.league?.maxRosterSize ?? null}
         onOpen={() => setSquadSheetOpen(true)}
+        bottomInset={bottomInset}
       />
 
       {/* ---- Squad sheet (LS-10001): the expanded strip ----
@@ -580,37 +564,145 @@ function CompactLiveDraftBoard({
         />
       </DraftPickSheet>
 
-      {/* ---- Pick sheet (LS-10002): the phone tier's one player browser ---- */}
+      {/* ---- Pick sheet (LS-10002): Players / Queue / History (LS-10165) ---- */}
       <DraftPickSheet
         open={pickSheetOpen}
         onOpenChange={setPickSheetOpen}
+        title={PICK_SHEET_TITLES[ui.activeTab]}
         subtitle={pickSheetSubtitle}
         bottomInset={bottomInset}
       >
-        <DraftPlayersTab
-          players={playerData.enrichedPlayers}
-          myTeam={playerData.myTeam}
-          sport={sport}
-          leaguePositions={queries.leaguePositions}
-          defensiveFormat={defensiveFormat}
-          maxRosterSize={queries.league?.maxRosterSize ?? null}
-          selectedPosition={ui.selectedPosition}
-          searchTerm={ui.searchTerm}
-          onSetSelectedPosition={ui.setSelectedPosition}
-          onSetSearchTerm={ui.setSearchTerm}
-          canDraft={canDraft}
-          draftActionLabel={isRealCommPick ? 'ASSIGN' : 'DRAFT'}
-          currentPickInfo={queries.currentPickInfo}
-          boardOrderedTeams={boardTeams}
-          myTeamId={queries.myTeamId}
-          queuedPlayerIds={queries.queuedPlayerIds}
-          onToggleQueue={handleToggleQueue}
-          onDraftPlayer={handleSheetDraft}
-          hasMorePlayers={queries.hasMorePlayers}
-          loadingMore={queries.loadingMore}
-          onLoadMore={onLoadMore}
+        <DraftSheetTabs
+          activeTab={ui.activeTab}
+          onChangeTab={ui.setActiveTab}
         />
+        {ui.activeTab === 'queue' ? (
+          <DraftQueueTab
+            draftId={queries.draftId ?? 0}
+            entries={queries.queueEntries}
+            statsLookup={playerData.statsLookup}
+            sport={sport}
+            onRemove={(playerId) => void actions.handleToggleQueue(playerId)}
+            onError={(message) => ui.showToast(message, 'error')}
+          />
+        ) : ui.activeTab === 'history' ? (
+          <DraftPickHistoryList
+            picks={queries.pickHistory}
+            statsLookup={playerData.statsLookup}
+            myTeamId={queries.myTeamId}
+            teamNameById={queries.teamNameById}
+          />
+        ) : (
+          <DraftPlayersTab
+            players={playerData.enrichedPlayers}
+            myTeam={playerData.myTeam}
+            sport={sport}
+            leaguePositions={queries.leaguePositions}
+            defensiveFormat={defensiveFormat}
+            maxRosterSize={queries.league?.maxRosterSize ?? null}
+            selectedPosition={ui.selectedPosition}
+            searchTerm={ui.searchTerm}
+            onSetSelectedPosition={ui.setSelectedPosition}
+            onSetSearchTerm={ui.setSearchTerm}
+            canDraft={canDraft}
+            draftActionLabel={isRealCommPick ? 'ASSIGN' : 'DRAFT'}
+            currentPickInfo={queries.currentPickInfo}
+            boardOrderedTeams={boardTeams}
+            myTeamId={queries.myTeamId}
+            queuedPlayerIds={queries.queuedPlayerIds}
+            onToggleQueue={handleToggleQueue}
+            onDraftPlayer={handleSheetDraft}
+            hasMorePlayers={queries.hasMorePlayers}
+            loadingMore={queries.loadingMore}
+            onLoadMore={onLoadMore}
+          />
+        )}
       </DraftPickSheet>
+
+      {/* ---- Chat panel (LS-10165): raised from the clock bar ----
+          A full-height panel rather than a sheet: the connector must stay
+          mounted while it is down (display:none) so its live subscription can
+          still report "message arrives while the panel is closed" for the
+          unread dot, and the modal Sheet unmounts its children when hidden.
+          Narrowing leagueId/renderChatTab inline (rather than via the
+          `hasChatTab` boolean) so TypeScript proves both are defined here
+          without a non-null assertion. */}
+      <YStack
+        testID="draft-chat-panel"
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        zIndex={50}
+        backgroundColor="$background"
+        paddingBottom={Math.max(bottomInset, 0)}
+        role="dialog"
+        aria-label="Draft chat"
+        accessibilityLabel="Draft chat"
+        style={{ display: chatOpen ? 'flex' : 'none' }}
+      >
+        <XStack
+          minHeight={48}
+          alignItems="center"
+          justifyContent="space-between"
+          paddingLeft={14}
+          paddingRight={6}
+          borderBottomWidth={1}
+          borderBottomColor="$outlineSubtle"
+        >
+          <Text
+            fontFamily="$heading"
+            fontSize={16}
+            fontWeight="800"
+            letterSpacing={0.6}
+            textTransform="uppercase"
+            color="$color"
+          >
+            Chat
+          </Text>
+          <YStack
+            testID="draft-chat-panel-close"
+            minWidth={44}
+            minHeight={44}
+            alignItems="center"
+            justifyContent="center"
+            onPress={closeChat}
+            pressStyle={{ opacity: 0.7 }}
+            cursor="pointer"
+            role="button"
+            accessibilityRole="button"
+            tabIndex={0}
+            onKeyDown={handleKeyActivate(closeChat)}
+            aria-label="Close chat"
+            accessibilityLabel="Close chat"
+          >
+            <Text fontSize={19} lineHeight={19} color="$fg4">
+              ✕
+            </Text>
+          </YStack>
+        </XStack>
+        {leagueId !== null && renderChatTab ? (
+          <YStack flex={1} testID="draft-chat-tab-slot">
+            {renderChatTab({
+              leagueId,
+              userId,
+              onNewMessage: handleNewChatMessage,
+            })}
+          </YStack>
+        ) : (
+          <YStack
+            flex={1}
+            alignItems="center"
+            justifyContent="center"
+            padding="$6"
+          >
+            <Text color="$fg4" textAlign="center">
+              Chat is coming soon.
+            </Text>
+          </YStack>
+        )}
+      </YStack>
 
       {/* ---- Draft Room v2 overlays (LS-9402): AI-pick toast + my-pick announcement (LS-10205) ---- */}
       <DraftPickToast
@@ -691,12 +783,6 @@ function CompactLiveDraftBoard({
       >
         {ui.liveMessage}
       </Text>
-      <DraftBottomNav
-        activeTab={ui.activeTab}
-        onChangeTab={ui.setActiveTab}
-        unreadChat={ui.unreadChat}
-        bottomInset={bottomInset}
-      />
     </YStack>
   );
 }

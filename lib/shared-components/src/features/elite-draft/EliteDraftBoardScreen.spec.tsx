@@ -176,6 +176,8 @@ jest.mock('./DraftHeaderBand', () => ({
     onClockTeamName,
     topQueuedPlayerName,
     connectionStale,
+    onOpenChat,
+    unreadChat,
   }: {
     isMyPick: boolean;
     draftPaused: boolean;
@@ -186,6 +188,8 @@ jest.mock('./DraftHeaderBand', () => ({
     onClockTeamName: string | null;
     topQueuedPlayerName: string | null;
     connectionStale?: boolean;
+    onOpenChat?: () => void;
+    unreadChat?: boolean;
   }) => (
     <div
       data-testid="draft-header-band"
@@ -198,7 +202,15 @@ jest.mock('./DraftHeaderBand', () => ({
       data-pick-time-limit-seconds={pickTimeLimitSeconds}
       data-team={onClockTeamName ?? ''}
       data-top-queued-player={topQueuedPlayerName ?? ''}
-    />
+    >
+      {onOpenChat && (
+        <button
+          data-testid="draft-header-band-chat"
+          data-unread-chat={String(!!unreadChat)}
+          onClick={onOpenChat}
+        />
+      )}
+    </div>
   ),
 }));
 jest.mock('./DraftLastPickTicker', () => ({
@@ -217,25 +229,25 @@ jest.mock('./DraftLastPickTicker', () => ({
       />
     ) : null,
 }));
-jest.mock('./DraftBottomNav', () => ({
-  DraftBottomNav: ({
+// Pick-sheet tabs + History (LS-10165) — DraftSheetTabs.spec.tsx and
+// DraftPickHistoryList.spec.tsx cover the components; here they only have to
+// report what the screen passed them.
+jest.mock('./DraftSheetTabs', () => ({
+  DraftSheetTabs: ({
     activeTab,
     onChangeTab,
-    unreadChat,
-    bottomInset,
   }: {
     activeTab: string;
     onChangeTab: (tab: string) => void;
-    unreadChat?: boolean;
-    bottomInset?: number;
   }) => (
-    <button
-      data-testid="draft-bottom-nav"
-      data-active-tab={activeTab}
-      data-unread-chat={String(!!unreadChat)}
-      data-bottom-inset={String(bottomInset)}
-      onClick={() => onChangeTab('chat')}
-    />
+    <div data-testid="draft-sheet-tabs" data-active-tab={activeTab}>
+      <button onClick={() => onChangeTab('history')}>tab-history</button>
+    </div>
+  ),
+}));
+jest.mock('./DraftPickHistoryList', () => ({
+  DraftPickHistoryList: ({ picks }: { picks: readonly unknown[] }) => (
+    <div data-testid="draft-pick-history" data-picks-count={picks.length} />
   ),
 }));
 // Pick sheet (LS-10002) — DraftPickSheet.spec.tsx covers the host itself; here
@@ -405,8 +417,18 @@ jest.mock('./DraftQueueTab', () => ({
 // Squad strip (LS-10001) — DraftSquadStrip.spec.tsx covers the strip itself;
 // here it only has to be mounted and to raise the squad sheet.
 jest.mock('./DraftSquadStrip', () => ({
-  DraftSquadStrip: ({ onOpen }: { onOpen: () => void }) => (
-    <button data-testid="draft-squad-strip" onClick={onOpen} />
+  DraftSquadStrip: ({
+    onOpen,
+    bottomInset,
+  }: {
+    onOpen: () => void;
+    bottomInset?: number;
+  }) => (
+    <button
+      data-testid="draft-squad-strip"
+      data-bottom-inset={String(bottomInset)}
+      onClick={onOpen}
+    />
   ),
 }));
 jest.mock('./DraftTeamTab', () => ({
@@ -450,7 +472,7 @@ function makeBaseUI(
     watchlist: [],
     notifiedPicksRef: { current: new Set<number>() },
     // Draft Room v2 shell (LS-9397)
-    activeTab: 'board' as const,
+    activeTab: 'players' as const,
     selectedTeamId: null,
     unreadChat: false,
     pickToastQueue: [],
@@ -1587,9 +1609,12 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(screen.getByTestId('draft-round-board')).toBeTruthy();
   });
 
-  it('raises the pick sheet when DraftRoundBoard fires onMakePick', () => {
+  it('raises the pick sheet on its Players tab when DraftRoundBoard fires onMakePick', () => {
     const setActiveTab = jest.fn();
-    setupCompactLiveDraft({ isMyPick: true, ui: { setActiveTab } });
+    setupCompactLiveDraft({
+      isMyPick: true,
+      ui: { activeTab: 'history', setActiveTab },
+    });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
     fireEvent.click(screen.getByTestId('draft-round-board'));
@@ -1597,7 +1622,8 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(
       screen.getByTestId('draft-pick-sheet').getAttribute('data-open'),
     ).toBe('true');
-    expect(setActiveTab).not.toHaveBeenCalled();
+    // A pick action lands on the browser, whichever tab the sheet was left on.
+    expect(setActiveTab).toHaveBeenCalledWith('players');
   });
 
   it('closes the pick sheet from its dismissal path', () => {
@@ -1858,28 +1884,29 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     expect(ticker.getAttribute('data-team')).toBe('Bronx Bombers');
   });
 
-  it('defaults to the Board tab, showing the board and its pick CTA and hiding the other tabs', () => {
+  it('shows the board and its pick CTA as the page, with every other surface down', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(screen.getByTestId('draft-round-board')).toBeTruthy();
     expect(screen.getByTestId('draft-pick-cta')).toBeTruthy();
-    expect(screen.queryByText('Chat tab is coming soon.')).toBeNull();
+    expect(screen.getByTestId('draft-chat-panel').style.display).toBe('none');
     expect(screen.queryByTestId('draft-players-tab')).toBeNull();
     expect(screen.queryByTestId('draft-queue-tab')).toBeNull();
+    expect(screen.queryByTestId('draft-pick-history')).toBeNull();
     expect(screen.queryByTestId('draft-team-tab')).toBeNull();
   });
 
-  it('shows a placeholder body and hides the board content for the one remaining placeholder tab (chat)', () => {
-    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+  // LS-10165: on web at phone width the app keeps its header and fixed
+  // MobileBottomBar on the draft route, so the draft room must not render a
+  // nav bar of its own — the old DraftBottomNav stacked on the app's.
+  it('renders no draft-owned bottom nav', () => {
+    setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.getByText('Chat tab is coming soon.')).toBeTruthy();
-    expect(screen.queryByTestId('draft-round-board')).toBeNull();
-    expect(screen.queryByTestId('draft-pick-cta')).toBeNull();
-    expect(screen.queryByTestId('draft-players-tab')).toBeNull();
+    expect(screen.queryByTestId('draft-bottom-nav')).toBeNull();
   });
 
   it('wires players, myTeam, position/search state, canDraft, and myTeamId through to the sheet browser', () => {
@@ -1935,25 +1962,52 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     ).toBe('true');
   });
 
-  it('renders the bottom nav with the current active tab and routes taps to ui.setActiveTab', () => {
+  // ---- Pick-sheet tabs (LS-10165) ----
+
+  it('hosts the Players / Queue / History tabs in the pick sheet and routes taps to ui.setActiveTab', () => {
     const setActiveTab = jest.fn();
     setupCompactLiveDraft({ ui: { activeTab: 'queue', setActiveTab } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
+    // Down: no tabs mounted outside the sheet.
+    expect(screen.queryByTestId('draft-sheet-tabs')).toBeNull();
 
-    const nav = screen.getByTestId('draft-bottom-nav');
-    expect(nav.getAttribute('data-active-tab')).toBe('queue');
+    fireEvent.click(screen.getByTestId('draft-pick-cta'));
+    setActiveTab.mockClear(); // the CTA's own "land on Players"
 
-    fireEvent.click(nav);
-
-    expect(setActiveTab).toHaveBeenCalledWith('chat');
+    expect(
+      screen.getByTestId('draft-sheet-tabs').getAttribute('data-active-tab'),
+    ).toBe('queue');
+    fireEvent.click(screen.getByText('tab-history'));
+    expect(setActiveTab).toHaveBeenCalledWith('history');
   });
+
+  it.each([
+    ['players', 'draft-players-tab', 'Available players'],
+    ['queue', 'draft-queue-tab', 'Queue'],
+    ['history', 'draft-pick-history', 'Pick history'],
+  ] as const)(
+    'renders the %s body, titled for it, when that sheet tab is active',
+    (activeTab, bodyTestId, title) => {
+      setupCompactLiveDraft({ ui: { activeTab } });
+
+      render(<EliteDraftBoardScreen {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('draft-pick-cta'));
+
+      expect(screen.getByTestId(bodyTestId)).toBeTruthy();
+      expect(
+        screen.getByTestId('draft-pick-sheet').getAttribute('data-title'),
+      ).toBe(title);
+      // The board stays up behind the sheet on every tab.
+      expect(screen.getByTestId('draft-round-board')).toBeTruthy();
+    },
+  );
 
   // ---- Squad strip / squad sheet (LS-10001) ----
 
-  // "Persistent" is the whole point: now that Team has left the tab set, the
-  // strip is the only route to the roster, so it has to survive a tab change.
-  it.each(['board', 'queue', 'chat'] as const)(
+  // "Persistent" is the whole point: the strip is the only route to the
+  // roster, so it has to survive whichever sheet tab was last left open.
+  it.each(['players', 'queue', 'history'] as const)(
     'keeps the squad strip mounted on the %s tab',
     (activeTab) => {
       setupCompactLiveDraft({ ui: { activeTab } });
@@ -2023,26 +2077,27 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     ).toBe('48');
   });
 
-  // LS-9444: the draft room is pushed outside the `(tabs)` shell, so its own
-  // bottom nav is the only thing that can reserve Android's edge-to-edge
-  // navigation-bar inset — it never gets there unless this screen forwards it.
-  it('forwards the bottom safe-area inset to the bottom nav', () => {
+  // LS-9444: the draft room is pushed outside the `(tabs)` shell, so its
+  // bottom-most band — the squad strip, now that the draft bottom nav is gone
+  // (LS-10165) — is the only thing that can reserve Android's edge-to-edge
+  // navigation-bar inset; it never gets there unless this screen forwards it.
+  it('forwards the bottom safe-area inset to the squad strip', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
 
     expect(
-      screen.getByTestId('draft-bottom-nav').getAttribute('data-bottom-inset'),
+      screen.getByTestId('draft-squad-strip').getAttribute('data-bottom-inset'),
     ).toBe('48');
   });
 
-  it('defaults the bottom nav inset to 0 when no inset is supplied', () => {
+  it('defaults the squad strip inset to 0 when no inset is supplied', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(
-      screen.getByTestId('draft-bottom-nav').getAttribute('data-bottom-inset'),
+      screen.getByTestId('draft-squad-strip').getAttribute('data-bottom-inset'),
     ).toBe('0');
   });
 
@@ -2087,32 +2142,52 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
   });
 });
 
-describe('EliteDraftBoardScreen — Chat tab (LS-9401)', () => {
-  it('shows the "coming soon" placeholder on the Chat tab when renderChatTab is omitted', () => {
-    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+describe('EliteDraftBoardScreen — Chat panel (LS-9401, LS-10165)', () => {
+  const chatPanel = (): HTMLElement => screen.getByTestId('draft-chat-panel');
+  const openChat = (): void => {
+    fireEvent.click(screen.getByTestId('draft-header-band-chat'));
+  };
+
+  it('raises the chat panel from the clock bar and closes it from its own control', () => {
+    setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
+    expect(chatPanel().style.display).toBe('none');
 
-    expect(screen.getByText('Chat tab is coming soon.')).toBeTruthy();
+    openChat();
+    expect(chatPanel().style.display).toBe('flex');
+
+    fireEvent.click(screen.getByTestId('draft-chat-panel-close'));
+    expect(chatPanel().style.display).toBe('none');
   });
 
-  it('calls renderChatTab with leagueId/userId and renders its output on the Chat tab', () => {
-    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+  it('shows the "coming soon" placeholder in the chat panel when renderChatTab is omitted', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+    openChat();
+
+    expect(screen.getByText('Chat is coming soon.')).toBeTruthy();
+  });
+
+  it('calls renderChatTab with leagueId/userId and renders its output in the chat panel', () => {
+    setupCompactLiveDraft();
     const renderChatTab = jest.fn(() => <div data-testid="chat-tab-body" />);
 
     render(
       <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
     );
+    openChat();
 
     expect(screen.getByTestId('chat-tab-body')).toBeTruthy();
-    expect(screen.queryByText('Chat tab is coming soon.')).toBeNull();
+    expect(screen.queryByText('Chat is coming soon.')).toBeNull();
     expect(renderChatTab).toHaveBeenCalledWith(
       expect.objectContaining({ leagueId: 1, userId: 1 }),
     );
   });
 
-  it('keeps the chat renderer mounted (display:none) rather than unmounted when another tab is active', () => {
-    setupCompactLiveDraft({ ui: { activeTab: 'queue' } });
+  it('keeps the chat renderer mounted (display:none) while the panel is down', () => {
+    setupCompactLiveDraft();
     const renderChatTab = jest.fn(() => <div data-testid="chat-tab-body" />);
 
     render(
@@ -2120,26 +2195,26 @@ describe('EliteDraftBoardScreen — Chat tab (LS-9401)', () => {
     );
 
     expect(renderChatTab).toHaveBeenCalled();
-    const slot = screen.getByTestId('draft-chat-tab-slot');
-    expect(slot.style.display).toBe('none');
-    expect(screen.getByTestId('draft-queue-tab')).toBeTruthy();
+    expect(screen.getByTestId('draft-chat-tab-slot')).toBeTruthy();
+    expect(chatPanel().style.display).toBe('none');
+    expect(screen.getByTestId('draft-round-board')).toBeTruthy();
   });
 
-  it('forwards ui.unreadChat to DraftBottomNav', () => {
-    setupCompactLiveDraft({ ui: { activeTab: 'board', unreadChat: true } });
+  it('forwards ui.unreadChat to the clock bar chat control', () => {
+    setupCompactLiveDraft({ ui: { unreadChat: true } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(
-      screen.getByTestId('draft-bottom-nav').getAttribute('data-unread-chat'),
+      screen
+        .getByTestId('draft-header-band-chat')
+        .getAttribute('data-unread-chat'),
     ).toBe('true');
   });
 
-  it('sets the unread-chat flag when a new message arrives while another tab is active', () => {
+  it('sets the unread-chat flag when a new message arrives while the panel is down', () => {
     const setUnreadChat = jest.fn();
-    setupCompactLiveDraft({
-      ui: { activeTab: 'queue', setUnreadChat },
-    });
+    setupCompactLiveDraft({ ui: { setUnreadChat } });
     let onNewMessage: () => void = jest.fn();
     const renderChatTab = jest.fn((props: { onNewMessage: () => void }) => {
       onNewMessage = props.onNewMessage;
@@ -2154,11 +2229,9 @@ describe('EliteDraftBoardScreen — Chat tab (LS-9401)', () => {
     expect(setUnreadChat).toHaveBeenCalledWith(true);
   });
 
-  it('does not set the unread-chat flag for a new message while the Chat tab is already active', () => {
+  it('does not set the unread-chat flag for a new message while the panel is open', () => {
     const setUnreadChat = jest.fn();
-    setupCompactLiveDraft({
-      ui: { activeTab: 'chat', setUnreadChat },
-    });
+    setupCompactLiveDraft({ ui: { setUnreadChat } });
     let onNewMessage: () => void = jest.fn();
     const renderChatTab = jest.fn((props: { onNewMessage: () => void }) => {
       onNewMessage = props.onNewMessage;
@@ -2168,17 +2241,21 @@ describe('EliteDraftBoardScreen — Chat tab (LS-9401)', () => {
     render(
       <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
     );
-    setUnreadChat.mockClear(); // clear the mount-time clear-on-open call
+    openChat();
+    setUnreadChat.mockClear(); // clear the clear-on-open call
     onNewMessage();
 
     expect(setUnreadChat).not.toHaveBeenCalledWith(true);
   });
 
-  it('clears the unread-chat flag when the Chat tab becomes active', () => {
+  it('clears the unread-chat flag when the panel opens', () => {
     const setUnreadChat = jest.fn();
-    setupCompactLiveDraft({ ui: { activeTab: 'chat', setUnreadChat } });
+    setupCompactLiveDraft({ ui: { setUnreadChat } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
+    expect(setUnreadChat).not.toHaveBeenCalledWith(false);
+
+    openChat();
 
     expect(setUnreadChat).toHaveBeenCalledWith(false);
   });

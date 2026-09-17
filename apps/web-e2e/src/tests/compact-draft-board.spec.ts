@@ -10,8 +10,8 @@
  * here.
  *
  * On phone the player browser (`DraftPlayersTab`) rides in a sheet raised
- * over the round board by the gold CTA (LS-10002) — it replaced the Players
- * bottom-nav tab. Covers the sheet against real Tamagui (open, scrim and close
+ * over the round board by the gold CTA (LS-10002), alongside the Queue and
+ * History tabs (LS-10165). Covers the sheet against real Tamagui (open, scrim and close
  * dismissal, viewport bounds, draft-then-dismiss — the jest Sheet mock can't)
  * and the browser's own affordances inside it: the search input, the position
  * chip rail (and its active/selected state), the queue star, and the DRAFT
@@ -305,14 +305,15 @@ async function setupCompactDraftRoute(
 
 /**
  * Navigate to the draft and raise the compact board's pick sheet (LS-10002).
- * The sheet is the phone tier's only route to `DraftPlayersTab` — the Players
- * bottom-nav tab it replaced is gone.
+ * The sheet is the phone tier's only route to `DraftPlayersTab`; since
+ * LS-10165 the draft room has no bottom nav at all.
  */
 async function openPickSheet(page: import('@playwright/test').Page) {
   await page.goto(DRAFT_URL);
   await page.waitForLoadState('load');
-  // Confirms the compact board (not the desktop `draft-board` grid) rendered.
-  await page.getByTestId('draft-bottom-nav').waitFor({ timeout: 15000 });
+  // Confirms the compact board (not the desktop `draft-board` grid) rendered —
+  // the squad strip only mounts on the phone tier.
+  await page.getByTestId('draft-squad-strip').waitFor({ timeout: 15000 });
   await page.getByTestId('draft-pick-cta').click();
   await page
     .getByTestId('draft-players-row')
@@ -334,6 +335,51 @@ test.describe('Compact Draft Board — pick sheet @regression', () => {
     // Over the board, not instead of it.
     await expect(page.getByTestId('draft-round-board')).toBeAttached();
     await expect(page.getByTestId('draft-bottom-nav-players')).toHaveCount(0);
+  });
+
+  // LS-10165: the app keeps its header and fixed MobileBottomBar on this route
+  // at phone width, so the draft room must not add a nav bar of its own. Its
+  // in-page navigation is the pick sheet's tabs plus the clock bar's chat.
+  test('reaches Queue, History and Chat without a draft-owned nav bar', async ({
+    page,
+  }, testInfo) => {
+    // The web wrapper's leave-draft guard (LS-4986) prompts on clicks to
+    // role="tab" outside the board's container. The pick sheet is portaled to
+    // <body>, so its tabs once tripped that prompt — and Playwright auto-
+    // dismisses dialogs, which silently swallowed the tab switch. Any dialog
+    // here is a regression.
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+
+    await setupCompactDraftRoute(page);
+    await openPickSheet(page);
+
+    await expect(page.getByTestId('draft-bottom-nav')).toHaveCount(0);
+    await expect(page.getByTestId('draft-sheet-tabs')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('phone-players.png') });
+
+    await page.getByTestId('draft-sheet-tab-queue').click();
+    await expect(page.getByTestId('draft-queue-tab')).toBeVisible();
+    await expect(page.getByTestId('draft-players-row')).toHaveCount(0);
+
+    await page.getByTestId('draft-sheet-tab-history').click();
+    await expect(page.getByTestId('draft-pick-history')).toBeVisible();
+    await expect(page.getByText('Pick history')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('phone-history.png') });
+    expect(dialogs).toEqual([]);
+
+    await page.getByTestId('draft-pick-sheet-close').click();
+    await expect(page.getByTestId('draft-pick-sheet')).toHaveCount(0);
+
+    await page.getByTestId('draft-header-band-chat').click();
+    await expect(page.getByTestId('draft-chat-panel')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('phone-chat.png') });
+    await page.getByTestId('draft-chat-panel-close').click();
+    await expect(page.getByTestId('draft-chat-panel')).toBeHidden();
+    await expect(page.getByTestId('draft-round-board')).toBeVisible();
   });
 
   test('the sheet stays inside the viewport with its close control on screen', async ({

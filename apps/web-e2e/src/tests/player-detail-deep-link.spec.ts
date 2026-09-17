@@ -720,7 +720,7 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
     const viewportWidth = page.viewportSize()?.width ?? 0;
     if (viewportWidth < 800) {
       // The phone player browser rides in the pick sheet raised by the gold
-      // CTA (LS-10002); it replaced the Players bottom-nav tab.
+      // CTA (LS-10002), on the sheet's Players tab (LS-10165).
       await page.getByTestId('draft-pick-cta').click();
       await page.waitForSelector('[data-testid="draft-players-row"]', {
         timeout: 15000,

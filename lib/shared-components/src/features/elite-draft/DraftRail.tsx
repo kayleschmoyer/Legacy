@@ -9,6 +9,7 @@ import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { CurrentPickPanel } from './CurrentPickPanel';
 import { DraftDetailsPanel } from './DraftDetailsPanel';
+import { pickPlayerName, pickRoundLabel } from './DraftPickHistoryList';
 import type { DraftDetailsSettings } from './draftDetails';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
@@ -349,20 +350,6 @@ interface DraftRailProps {
   onRetryCurrentPick: () => void;
   onToggleChat: () => void;
   onRefresh: () => void;
-}
-
-function playerName(
-  pick: DraftPickRecord,
-  statsLookup: Map<number, DraftPlayer>,
-): string {
-  const stat = statsLookup.get(pick.playerId);
-  if (stat) return stat.name;
-  if (pick.player) return `${pick.player.firstName} ${pick.player.lastName}`;
-  return `Player #${pick.playerId}`;
-}
-
-function pickRoundLabel(pick: DraftPickRecord): string {
-  return `${pick.round}.${pick.pickNumber.toString().padStart(2, '0')}`;
 }
 
 function getPositionPill(pos: string): { bg: string; color: string } {
@@ -722,7 +709,7 @@ export function DraftRail({
                 .reverse()
                 .slice(0, 40)
                 .map((pick) => {
-                  const name = playerName(pick, statsLookup);
+                  const name = pickPlayerName(pick, statsLookup);
                   const pos =
                     statsLookup.get(pick.playerId)?.position ??
                     pick.player?.eligiblePositions?.[0] ??

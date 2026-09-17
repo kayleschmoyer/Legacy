@@ -455,6 +455,35 @@
       mob.querySelectorAll('[data-picksheet-close]').forEach(b => b.addEventListener('click', () => mob.dataset.picksheet = 'closed'));
       /* Drafting from the sheet closes it so the announcement lands on the board. */
       sheet.querySelectorAll('.draft-sm').forEach(b => b.addEventListener('click', () => mob.dataset.picksheet = 'closed'));
+
+      /* Players / Queue / History — the draft room's in-page nav (LS-10165).
+         The heading follows the tab; a pick action always lands on Players. */
+      const tabs = sheet.querySelectorAll('.mob-tabs [data-pstab]');
+      const heading = sheet.querySelector('.sh-hd h3');
+      const selectTab = tab => {
+        sheet.dataset.tab = tab.dataset.pstab;
+        tabs.forEach(x => x.classList.toggle('active', x === tab));
+        if (heading) heading.textContent = tab.dataset.title;
+      };
+      tabs.forEach(tab => tab.addEventListener('click', () => selectTab(tab)));
+      mob.querySelectorAll('[data-picksheet-open]').forEach(b => b.addEventListener('click', () => {
+        const players = sheet.querySelector('[data-pstab="players"]');
+        if (players) selectTab(players);
+      }));
+    });
+
+    /* Chat panel, raised from the clock bar's chat control; opening it
+       clears the unread dot. */
+    document.querySelectorAll('.mob-chat').forEach(panel => {
+      const mob = panel.closest('.mob');
+      if(!mob) return;
+      mob.querySelectorAll('[data-chat-open]').forEach(b => b.addEventListener('click', () => {
+        mob.dataset.chat = 'open';
+        const dot = b.querySelector('.dot');
+        if (dot) dot.remove();
+        b.setAttribute('aria-label', 'Open chat');
+      }));
+      panel.querySelectorAll('[data-chat-close]').forEach(b => b.addEventListener('click', () => { mob.dataset.chat = 'closed'; }));
     });
   })();
 

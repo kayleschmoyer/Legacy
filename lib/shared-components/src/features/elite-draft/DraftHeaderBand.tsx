@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { MessageCircle } from '@tamagui/lucide-icons';
 import { formatPickClock } from './pickClock';
 import { useDraftPalette } from './nativeDraftPalette';
 import { GradientSurface } from '../home/GradientSurface';
 import { ACCENT_INK, withAlpha } from '../../utils/colors';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 
 export interface DraftHeaderBandProps {
   isMyPick: boolean;
@@ -27,7 +29,18 @@ export interface DraftHeaderBandProps {
    * (also hidden when it isn't the viewer's pick).
    */
   topQueuedPlayerName: string | null;
+  /**
+   * Opens the phone chat panel (LS-10165). Chat lives in the clock bar rather
+   * than a draft-owned nav bar so nothing stacks with the app's own header or
+   * bottom bar. Omitted → no chat control.
+   */
+  onOpenChat?: () => void;
+  /** Seam-red dot on the chat control while a message is unread (LS-9401). */
+  unreadChat?: boolean;
 }
+
+/** Touch-target floor for the chat control. */
+const CHAT_BUTTON_SIZE = 44;
 
 /** Pulses `true`/`false` on a 1s cycle while `active` — the header's
  *  `clockBreath` effect at <=10s on my pick (README "Header band"). */
@@ -60,6 +73,8 @@ export function DraftHeaderBand({
   connectionStale = false,
   onClockTeamName,
   topQueuedPlayerName,
+  onOpenChat,
+  unreadChat = false,
 }: DraftHeaderBandProps): React.JSX.Element {
   const palette = useDraftPalette();
   // A stale clock must not breathe — the pulse is the board's strongest
@@ -136,6 +151,46 @@ export function DraftHeaderBand({
             {onClockTeamName ?? 'Waiting…'}
           </Text>
         </YStack>
+
+        {onOpenChat && (
+          <YStack
+            testID="draft-header-band-chat"
+            width={CHAT_BUTTON_SIZE}
+            height={CHAT_BUTTON_SIZE}
+            flexShrink={0}
+            alignItems="center"
+            justifyContent="center"
+            borderRadius={CHAT_BUTTON_SIZE / 2}
+            borderWidth={1}
+            borderColor={withAlpha(primaryColor, 0.35)}
+            onPress={onOpenChat}
+            pressStyle={{ opacity: 0.7 }}
+            cursor="pointer"
+            role="button"
+            accessibilityRole="button"
+            tabIndex={0}
+            onKeyDown={handleKeyActivate(onOpenChat)}
+            aria-haspopup="dialog"
+            aria-label={unreadChat ? 'Open chat, unread messages' : 'Open chat'}
+            accessibilityLabel={
+              unreadChat ? 'Open chat, unread messages' : 'Open chat'
+            }
+          >
+            <MessageCircle size={18} color={primaryColor} />
+            {unreadChat && (
+              <YStack
+                testID="draft-header-band-chat-unread-dot"
+                position="absolute"
+                top={9}
+                right={9}
+                width={7}
+                height={7}
+                borderRadius={4}
+                backgroundColor="$brandSeamRed"
+              />
+            )}
+          </YStack>
+        )}
       </XStack>
 
       {showHint && (

@@ -1,4 +1,5 @@
 import React from 'react';
+import { fireEvent } from '@testing-library/react';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { render, screen } from '../../test-utils';
 
@@ -77,6 +78,43 @@ describe('DraftHeaderBand', () => {
     );
 
     expect(screen.queryByTestId('draft-header-band-autopick-hint')).toBeNull();
+  });
+});
+
+describe('DraftHeaderBand chat control (LS-10165)', () => {
+  it('renders no chat control unless onOpenChat is supplied', () => {
+    render(<DraftHeaderBand {...baseProps} />);
+
+    expect(screen.queryByTestId('draft-header-band-chat')).toBeNull();
+  });
+
+  it('opens chat from the clock bar', () => {
+    const onOpenChat = jest.fn();
+    render(<DraftHeaderBand {...baseProps} onOpenChat={onOpenChat} />);
+
+    fireEvent.click(screen.getByTestId('draft-header-band-chat'));
+
+    expect(onOpenChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the unread dot only while a message is unread', () => {
+    const { rerender } = render(
+      <DraftHeaderBand {...baseProps} onOpenChat={jest.fn()} unreadChat />,
+    );
+    expect(
+      screen.getByTestId('draft-header-band-chat-unread-dot'),
+    ).toBeTruthy();
+
+    rerender(
+      <DraftHeaderBand
+        {...baseProps}
+        onOpenChat={jest.fn()}
+        unreadChat={false}
+      />,
+    );
+    expect(
+      screen.queryByTestId('draft-header-band-chat-unread-dot'),
+    ).toBeNull();
   });
 });
 
