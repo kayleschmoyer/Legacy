@@ -21,7 +21,7 @@ export interface DraftConnectionBannerProps {
  *
  * It says the board is stale rather than that it is broken, because at this
  * point recovery is still the likely outcome — the pick clock is dimmed
- * alongside it (`connectionStale` on DraftTopBand / DraftHeaderBand) so the
+ * alongside it (`connectionStale` on DraftTopBand / DraftClockBar) so the
  * running timer cannot be read as live state.
  */
 export function DraftConnectionBanner({

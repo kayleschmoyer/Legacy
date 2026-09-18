@@ -46,6 +46,7 @@ export const Link2 = () => 'Link2';
 export const Share2 = () => 'Share2';
 export const Swords = () => 'Swords';
 export const UserPlus = () => 'UserPlus';
+export const ArrowLeft = () => 'ArrowLeft';
 export const ArrowLeftRight = () => 'ArrowLeftRight';
 export const CalendarCheck = () => 'CalendarCheck';
 export const Play = () => 'Play';

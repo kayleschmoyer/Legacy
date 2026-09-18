@@ -15,7 +15,9 @@ import { DraftRail } from './DraftRail';
 import { DraftDetailsPanel } from './DraftDetailsPanel';
 import type { DraftDetailsSettings } from './draftDetails';
 import { DraftRoundBoard } from './DraftRoundBoard';
-import { DraftHeaderBand } from './DraftHeaderBand';
+import { DraftClockBar } from './DraftClockBar';
+import { DraftSlimNav } from './DraftSlimNav';
+import { DraftHero } from './DraftHero';
 import { DraftConnectionBanner } from './DraftConnectionBanner';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftSheetTabs } from './DraftSheetTabs';
@@ -360,7 +362,7 @@ function CompactLiveDraftBoard({
   const showCommissionerBar =
     queries.isCommissioner && !queries.league?.isMockDraft;
 
-  // ---- Draft Room v2 shell (LS-9397): header band + ticker + bottom nav ----
+  // ---- Phone shell: slim nav + clock bar (LS-10204) + last-pick ticker ----
   const lastPick = useMemo(
     () =>
       queries.pickHistory.reduce<DraftPickRecord | null>(
@@ -372,23 +374,6 @@ function CompactLiveDraftBoard({
       ),
     [queries.pickHistory],
   );
-
-  const topQueuedPlayerName = useMemo(() => {
-    if (!isMyPick) return null;
-    const entries = queries.queueEntries ?? [];
-    if (entries.length === 0) return null;
-    const top = [...entries].sort(
-      (a, b) =>
-        (a.priority ?? Number.MAX_SAFE_INTEGER) -
-        (b.priority ?? Number.MAX_SAFE_INTEGER),
-    )[0];
-    if (top?.playerId == null) return null;
-    const stats = playerData.statsLookup.get(top.playerId);
-    if (stats) return stats.name;
-    return top.player
-      ? `${top.player.firstName} ${top.player.lastName}`.trim()
-      : null;
-  }, [isMyPick, queries.queueEntries, playerData.statsLookup]);
 
   // Tapping the viewer's own on-the-clock tile raises the pick sheet, same as
   // the CTA — the pick happens without leaving the board. Both are "pick a
@@ -416,7 +401,8 @@ function CompactLiveDraftBoard({
   return (
     <YStack flex={1} backgroundColor="$background">
       {connectionStale && <DraftConnectionBanner onRetry={onRetryConnection} />}
-      <DraftHeaderBand
+      <DraftSlimNav leagueName={queries.league?.name} onBack={onExitDraft} />
+      <DraftClockBar
         connectionStale={connectionStale}
         isMyPick={isMyPick}
         draftPaused={ui.draftPaused}
@@ -426,7 +412,6 @@ function CompactLiveDraftBoard({
         timeRemaining={timeRemaining}
         pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
         onClockTeamName={queries.teamNameById(queries.currentPickTeamId)}
-        topQueuedPlayerName={topQueuedPlayerName}
         onOpenChat={openChat}
         unreadChat={ui.unreadChat}
       />
@@ -1473,14 +1458,24 @@ export function EliteDraftBoardScreen({
   const layoutGridStyle: React.CSSProperties = media.md
     ? {
         gridTemplateColumns: '1fr',
-        gridTemplateRows: 'auto auto 1fr',
-        gridTemplateAreas: '"topband" "main" "rail"',
+        gridTemplateRows: 'auto auto auto 1fr',
+        gridTemplateAreas: '"hero" "topband" "main" "rail"',
       }
     : {
         gridTemplateColumns: `1fr ${desktopRailWidth}px`,
-        gridTemplateRows: 'auto 1fr',
-        gridTemplateAreas: '"topband topband" "main rail"',
+        gridTemplateRows: 'auto auto 1fr',
+        gridTemplateAreas: '"hero hero" "topband topband" "main rail"',
       };
+  // Hero (LS-10204): back link, "League · Draft" and the live / pick / format
+  // badges — DraftRoom.html's `.hero`. The design's `.nav` row above it
+  // (burger, breadcrumbs) is apps/web's own header, so it is not drawn here.
+  const maxRosterSize = queries.league?.maxRosterSize ?? 0;
+  const heroTotalPicks =
+    maxRosterSize > 0 && queries.leagueTeams.length > 0
+      ? maxRosterSize * queries.leagueTeams.length
+      : null;
+  const heroBackHref =
+    isMockDraft || leagueId == null ? null : `/${sport}/league/${leagueId}`;
 
   return (
     <div className="d-root" data-sport={sport}>
@@ -1500,6 +1495,19 @@ export function EliteDraftBoardScreen({
         </div>
       )}
       <div className="d-layout" style={layoutGridStyle}>
+        <DraftHero
+          leagueName={queries.league?.name}
+          backHref={heroBackHref}
+          onNavigate={onNavigate}
+          draftPaused={ui.draftPaused}
+          round={round}
+          overallPick={currentPick}
+          totalPicks={heroTotalPicks}
+          teamCount={queries.leagueTeams.length}
+          selectionMethod={queries.leagueDraft?.selectionMethod}
+          draftOrder={queries.leagueDraft?.draftOrder}
+          compact={Boolean(media.md)}
+        />
         <DraftTopBand
           connectionStale={connectionStale}
           draftPaused={ui.draftPaused}

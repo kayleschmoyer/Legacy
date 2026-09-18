@@ -22,7 +22,7 @@
 
 import { expect, test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
-import { MOBILE_VIEWPORT } from '../utils/viewport';
+import { DESKTOP_VIEWPORT, MOBILE_VIEWPORT } from '../utils/viewport';
 
 const LEAGUE_ID = 1;
 const DRAFT_URL = `/baseball/league/${LEAGUE_ID}/draft`;
@@ -127,6 +127,10 @@ const DRAFT_IN_PROGRESS = {
   totalRounds: 25,
   totalPicks: 100,
   draftType: 'snake',
+  // The fields GetLiveDraftLeagueDraft actually selects — the hero's
+  // "2 teams · Snake" badge reads draftOrder (LS-10204).
+  selectionMethod: 'standard',
+  draftOrder: 'snake',
   secondsPerPick: 90,
   scheduledFor: null,
 };
@@ -374,7 +378,7 @@ test.describe('Compact Draft Board — pick sheet @regression', () => {
     await page.getByTestId('draft-pick-sheet-close').click();
     await expect(page.getByTestId('draft-pick-sheet')).toHaveCount(0);
 
-    await page.getByTestId('draft-header-band-chat').click();
+    await page.getByTestId('draft-clock-bar-chat').click();
     await expect(page.getByTestId('draft-chat-panel')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('phone-chat.png') });
     await page.getByTestId('draft-chat-panel-close').click();
@@ -592,5 +596,142 @@ test.describe('Compact Draft Board — player browser in the pick sheet @regress
     await expect(
       page.getByTestId(`draft-players-queue-${PLAYER_A.id}`),
     ).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Header chrome per tier (LS-10204). Product constraint: the draft room adds no
+// navigation that duplicates or fights the app shell. On web the shell keeps
+// its header on this route at every width (burger + league chip below 980, the
+// full nav above), so the draft room draws neither a slim nav bar nor a
+// burger/breadcrumb row — only the phone clock bar, or the tablet/desktop hero.
+// ---------------------------------------------------------------------------
+const TABLET_VIEWPORT = { width: 860, height: 1000 } as const;
+
+async function gotoDraft(page: import('@playwright/test').Page) {
+  await page.goto(DRAFT_URL);
+  await page.waitForLoadState('load');
+}
+
+test.describe('Draft room header chrome — phone (LS-10204) @regression', () => {
+  test.use({ viewport: MOBILE_VIEWPORT });
+
+  test('the clock bar replaces the header band and no slim nav stacks under the app header', async ({
+    page,
+  }, testInfo) => {
+    await setupCompactDraftRoute(page);
+    await gotoDraft(page);
+
+    const clockBar = page.getByTestId('draft-clock-bar');
+    await expect(clockBar).toBeVisible({ timeout: 15000 });
+    await expect(
+      clockBar.getByText("You're on the clock · R1 · P1"),
+    ).toBeVisible();
+    await expect(clockBar.getByRole('timer')).toBeVisible();
+    await expect(page.getByTestId('draft-clock-bar-chat')).toBeVisible();
+
+    // The shell's header is the only nav: one burger, no draft slim nav, no
+    // hero.
+    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
+      1,
+    );
+    await expect(page.getByTestId('draft-slim-nav')).toHaveCount(0);
+    await expect(page.getByTestId('draft-hero')).toHaveCount(0);
+
+    await page.screenshot({ path: testInfo.outputPath('phone-header.png') });
+  });
+});
+
+test.describe('Draft room header chrome — tablet and desktop (LS-10204) @regression', () => {
+  for (const [tier, viewport] of [
+    ['tablet', TABLET_VIEWPORT],
+    ['desktop', DESKTOP_VIEWPORT],
+  ] as const) {
+    test.describe(tier, () => {
+      test.use({ viewport });
+
+      test(`renders the hero under the shell header without a second nav (${tier})`, async ({
+        page,
+      }, testInfo) => {
+        await setupCompactDraftRoute(page);
+        await gotoDraft(page);
+
+        const hero = page.getByTestId('draft-hero');
+        await expect(hero).toBeVisible({ timeout: 15000 });
+        await expect(
+          hero.getByRole('heading', { name: 'Test Draft League · Draft' }),
+        ).toBeVisible();
+        await expect(hero.getByText('Draft Live')).toBeVisible();
+        await expect(hero.getByText('Round 1 · Pick 1 of 32')).toBeVisible();
+        await expect(hero.getByText('2 teams · Snake')).toBeVisible();
+        await expect(page.getByTestId('draft-hero-back')).toBeVisible();
+
+        // Burger and breadcrumbs come from the app shell, not the draft room:
+        // at most one burger (the shell's, below 980) and no draft slim nav.
+        const burgers = page.getByRole('button', { name: 'Open menu' });
+        if (tier === 'tablet') {
+          await expect(burgers).toHaveCount(1);
+          await expect(burgers).toBeVisible();
+        } else {
+          await expect(burgers).toBeHidden();
+        }
+        await expect(page.getByTestId('draft-slim-nav')).toHaveCount(0);
+        await expect(page.getByTestId('draft-clock-bar')).toHaveCount(0);
+
+        await page.screenshot({
+          path: testInfo.outputPath(`${tier}-header.png`),
+        });
+      });
+    });
+  }
+
+  test.describe('back link', () => {
+    test.use({ viewport: TABLET_VIEWPORT });
+
+    // The back link sits inside the board, where the live-draft leave guard
+    // (apps/web EliteDraftBoard.tsx) otherwise waves clicks through as draft
+    // interactions. It must still ask before leaving a live draft — and
+    // Playwright auto-dismisses dialogs, so assert the prompt explicitly.
+    test('asks before leaving a live draft, and stays put when cancelled', async ({
+      page,
+    }) => {
+      await setupCompactDraftRoute(page);
+      await gotoDraft(page);
+      await expect(page.getByTestId('draft-hero-back')).toBeVisible({
+        timeout: 15000,
+      });
+
+      const dialogs: string[] = [];
+      page.on('dialog', (dialog) => {
+        dialogs.push(dialog.message());
+        void dialog.dismiss();
+      });
+
+      await page.getByTestId('draft-hero-back').click();
+      await expect.poll(() => dialogs.length).toBe(1);
+      expect(dialogs[0]).toContain('Your draft is still in progress');
+      await expect(page).toHaveURL(new RegExp(`${DRAFT_URL}$`));
+      await expect(page.getByTestId('draft-hero')).toBeVisible();
+    });
+
+    test('goes back to the league when confirmed', async ({ page }) => {
+      await setupCompactDraftRoute(page);
+      await gotoDraft(page);
+      await expect(page.getByTestId('draft-hero-back')).toBeVisible({
+        timeout: 15000,
+      });
+
+      const dialogs: string[] = [];
+      page.on('dialog', (dialog) => {
+        dialogs.push(dialog.message());
+        void dialog.accept();
+      });
+
+      await page.getByTestId('draft-hero-back').click();
+      await expect(page).toHaveURL(
+        new RegExp(`/baseball/league/${LEAGUE_ID}$`),
+      );
+      expect(dialogs).toHaveLength(1);
+    });
   });
 });

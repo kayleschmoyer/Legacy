@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   DraftChatTab,
   EliteDraftBoardScreen,
+  LEAVES_DRAFT_ATTRIBUTE,
 } from '@legacy-sports/shared-components/elite-draft';
 import type {
   DraftChatProps,
@@ -146,7 +147,14 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
       if (!(target instanceof Element)) return;
 
       // Clicks within the draft board are draft interactions — let them through.
-      if (containerRef.current?.contains(target)) return;
+      // The exception is the board's own way out (the hero's back link,
+      // LS-10204), which marks itself as leaving the draft.
+      if (
+        containerRef.current?.contains(target) &&
+        !target.closest(`[${LEAVES_DRAFT_ATTRIBUTE}]`)
+      ) {
+        return;
+      }
 
       const navTarget = target.closest('[role="tab"], a[href]');
       if (!navTarget) return;

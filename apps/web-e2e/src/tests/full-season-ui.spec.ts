@@ -825,16 +825,21 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       //
       // Below the `$sm` breakpoint (both mobile Playwright projects run at
       // 375px) EliteDraftBoardScreen swaps to CompactLiveDraftBoard, whose
-      // DraftHeaderBand has no "Live Draft" text at all in any state — only
-      // "RD {round} · PICK {pick}", which DraftTopBand (desktop) doesn't
-      // render. Same rule as playwright.config.ts's
+      // DraftClockBar (LS-10204) has no "Live Draft" text at all in any
+      // state — only "R{round} · P{pick}", which DraftTopBand (desktop)
+      // doesn't render. Same rule as playwright.config.ts's
       // DESKTOP_DRAFT_TOPBAND_ONLY_SPECS: assert per viewport tier instead of
       // excluding the phase from mobile outright (LS-10049).
       const isCompactViewport = (page.viewportSize()?.width ?? 1280) < 800;
       if (isCompactViewport) {
         await expect(
-          page.getByText('RD 1', { exact: false }).first(),
+          page.getByTestId('draft-clock-bar').getByText('R1 · P', {
+            exact: false,
+          }),
         ).toBeVisible();
+        // The phone board lists available players only in the pick sheet
+        // (LS-10002/LS-10165), so raise it before looking for one.
+        await page.getByTestId('draft-pick-cta').click();
       } else {
         await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
       }

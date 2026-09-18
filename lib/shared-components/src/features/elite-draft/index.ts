@@ -22,6 +22,7 @@ export { useSpectatorDraftData } from './hooks';
 // Sub-components (exported in case consumers need them directly)
 export { CircularTimer } from './CircularTimer';
 export { DraftGrid } from './DraftGrid';
+export { LEAVES_DRAFT_ATTRIBUTE } from './DraftHero';
 export { DraftBoardTimeline } from './DraftBoardTimeline';
 export {
   buildTimelineRounds,

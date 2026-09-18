@@ -164,9 +164,9 @@ jest.mock('./PickAnnouncement', () => ({
 // spec (DraftMiniBoard.spec.tsx etc.), so these are shallow wiring mocks
 // rather than a re-verification of their internals.
 // Draft Room v2 shell (LS-9397) — same shallow-wiring-mock convention: each
-// has its own component-level spec (DraftHeaderBand.spec.tsx etc.).
-jest.mock('./DraftHeaderBand', () => ({
-  DraftHeaderBand: ({
+// has its own component-level spec (DraftClockBar.spec.tsx etc.).
+jest.mock('./DraftClockBar', () => ({
+  DraftClockBar: ({
     isMyPick,
     draftPaused,
     round,
@@ -174,7 +174,6 @@ jest.mock('./DraftHeaderBand', () => ({
     timeRemaining,
     pickTimeLimitSeconds,
     onClockTeamName,
-    topQueuedPlayerName,
     connectionStale,
     onOpenChat,
     unreadChat,
@@ -186,13 +185,12 @@ jest.mock('./DraftHeaderBand', () => ({
     timeRemaining: number;
     pickTimeLimitSeconds: number;
     onClockTeamName: string | null;
-    topQueuedPlayerName: string | null;
     connectionStale?: boolean;
     onOpenChat?: () => void;
     unreadChat?: boolean;
   }) => (
     <div
-      data-testid="draft-header-band"
+      data-testid="draft-clock-bar"
       data-connection-stale={String(!!connectionStale)}
       data-is-my-pick={String(!!isMyPick)}
       data-draft-paused={String(!!draftPaused)}
@@ -201,11 +199,10 @@ jest.mock('./DraftHeaderBand', () => ({
       data-time-remaining={timeRemaining}
       data-pick-time-limit-seconds={pickTimeLimitSeconds}
       data-team={onClockTeamName ?? ''}
-      data-top-queued-player={topQueuedPlayerName ?? ''}
     >
       {onOpenChat && (
         <button
-          data-testid="draft-header-band-chat"
+          data-testid="draft-clock-bar-chat"
           data-unread-chat={String(!!unreadChat)}
           onClick={onOpenChat}
         />
@@ -213,6 +210,70 @@ jest.mock('./DraftHeaderBand', () => ({
     </div>
   ),
 }));
+jest.mock('./DraftSlimNav', () => ({
+  DraftSlimNav: ({
+    leagueName,
+    onBack,
+  }: {
+    leagueName?: string | null;
+    onBack: () => void;
+  }) => (
+    <button
+      data-testid="draft-slim-nav"
+      data-league-name={leagueName ?? ''}
+      onClick={onBack}
+    />
+  ),
+}));
+jest.mock('./DraftHero', () => ({
+  DraftHero: ({
+    leagueName,
+    backHref,
+    onNavigate,
+    draftPaused,
+    round,
+    overallPick,
+    totalPicks,
+    teamCount,
+    selectionMethod,
+    draftOrder,
+    compact,
+  }: {
+    leagueName?: string | null;
+    backHref: string | null;
+    onNavigate: (path: string) => void;
+    draftPaused: boolean;
+    round: number;
+    overallPick: number;
+    totalPicks: number | null;
+    teamCount: number;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    compact: boolean;
+  }) => (
+    <div
+      data-testid="draft-hero"
+      data-league-name={leagueName ?? ''}
+      data-back-href={backHref ?? ''}
+      data-draft-paused={String(draftPaused)}
+      data-round={round}
+      data-overall-pick={overallPick}
+      data-total-picks={totalPicks ?? ''}
+      data-team-count={teamCount}
+      data-selection-method={selectionMethod ?? ''}
+      data-draft-order={draftOrder ?? ''}
+      data-compact={String(compact)}
+    >
+      {backHref && (
+        <button
+          data-testid="draft-hero-back"
+          onClick={() => onNavigate(backHref)}
+        />
+      )}
+    </div>
+  ),
+}));
+
 jest.mock('./DraftLastPickTicker', () => ({
   DraftLastPickTicker: ({
     lastPick,
@@ -1535,35 +1596,35 @@ describe('EliteDraftBoardScreen — compact viewport branch selection', () => {
 });
 
 describe('EliteDraftBoardScreen — compact viewport, live board', () => {
-  it('wires the on-clock team, round, and round-pick number through to DraftHeaderBand', () => {
+  it('wires the on-clock team, round, and round-pick number through to DraftClockBar', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    const header = screen.getByTestId('draft-header-band');
+    const header = screen.getByTestId('draft-clock-bar');
     expect(header.getAttribute('data-team')).toBe('Bronx Bombers');
     expect(header.getAttribute('data-round')).toBe('1');
     expect(header.getAttribute('data-round-pick-number')).toBe('2');
     expect(header.getAttribute('data-is-my-pick')).toBe('false');
   });
 
-  it('tells DraftHeaderBand when the viewer is on the clock', () => {
+  it('tells DraftClockBar when the viewer is on the clock', () => {
     setupCompactLiveDraft({ isMyPick: true });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(
-      screen.getByTestId('draft-header-band').getAttribute('data-is-my-pick'),
+      screen.getByTestId('draft-clock-bar').getAttribute('data-is-my-pick'),
     ).toBe('true');
   });
 
-  it('passes the draft timer and paused state through to DraftHeaderBand', () => {
+  it('passes the draft timer and paused state through to DraftClockBar', () => {
     setupCompactLiveDraft({ ui: { draftPaused: true } });
     jest.mocked(useDraftTimer).mockReturnValue({ timeRemaining: 42 });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    const header = screen.getByTestId('draft-header-band');
+    const header = screen.getByTestId('draft-clock-bar');
     expect(header.getAttribute('data-time-remaining')).toBe('42');
     expect(header.getAttribute('data-draft-paused')).toBe('true');
   });
@@ -2100,52 +2161,12 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
       screen.getByTestId('draft-squad-strip').getAttribute('data-bottom-inset'),
     ).toBe('0');
   });
-
-  it('shows the top queued player on DraftHeaderBand only when it is my pick', () => {
-    setupCompactLiveDraft({
-      isMyPick: true,
-      queries: {
-        queueEntries: [
-          { id: 1, draftId: 42, teamId: 1, playerId: 1, priority: 1 },
-        ],
-      },
-      players: [makeDraftPlayer()],
-    });
-
-    render(<EliteDraftBoardScreen {...defaultProps} />);
-
-    expect(
-      screen
-        .getByTestId('draft-header-band')
-        .getAttribute('data-top-queued-player'),
-    ).toBe('Bobby Witt Jr.');
-  });
-
-  it('hides the top queued player when it is not my pick, even with a queue', () => {
-    setupCompactLiveDraft({
-      isMyPick: false,
-      queries: {
-        queueEntries: [
-          { id: 1, draftId: 42, teamId: 1, playerId: 1, priority: 1 },
-        ],
-      },
-      players: [makeDraftPlayer()],
-    });
-
-    render(<EliteDraftBoardScreen {...defaultProps} />);
-
-    expect(
-      screen
-        .getByTestId('draft-header-band')
-        .getAttribute('data-top-queued-player'),
-    ).toBe('');
-  });
 });
 
 describe('EliteDraftBoardScreen — Chat panel (LS-9401, LS-10165)', () => {
   const chatPanel = (): HTMLElement => screen.getByTestId('draft-chat-panel');
   const openChat = (): void => {
-    fireEvent.click(screen.getByTestId('draft-header-band-chat'));
+    fireEvent.click(screen.getByTestId('draft-clock-bar-chat'));
   };
 
   it('raises the chat panel from the clock bar and closes it from its own control', () => {
@@ -2207,7 +2228,7 @@ describe('EliteDraftBoardScreen — Chat panel (LS-9401, LS-10165)', () => {
 
     expect(
       screen
-        .getByTestId('draft-header-band-chat')
+        .getByTestId('draft-clock-bar-chat')
         .getAttribute('data-unread-chat'),
     ).toBe('true');
   });
@@ -2512,7 +2533,7 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
 
     expect(getByTestId('draft-connection-banner')).toBeTruthy();
     expect(
-      getByTestId('draft-header-band').getAttribute('data-connection-stale'),
+      getByTestId('draft-clock-bar').getAttribute('data-connection-stale'),
     ).toBe('true');
   });
 
@@ -2545,5 +2566,111 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
     fireEvent.click(getByText('Retry'));
 
     expect(retryConnection).toHaveBeenCalledTimes(1);
+  });
+});
+
+// LS-10204 — header chrome per tier: the phone gets the slim nav + clock bar,
+// the tablet/desktop frame gets the hero. Each component's own spec covers its
+// rendering; these check what the screen hands them.
+describe('EliteDraftBoardScreen — header chrome (LS-10204)', () => {
+  it('gives the phone slim nav the league name and the exit handler', () => {
+    setupCompactLiveDraft();
+    const onExitDraft = jest.fn();
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} onExitDraft={onExitDraft} />,
+    );
+
+    const nav = screen.getByTestId('draft-slim-nav');
+    expect(nav.getAttribute('data-league-name')).toBe('Test League');
+    fireEvent.click(nav);
+    expect(onExitDraft).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('draft-hero')).toBeNull();
+  });
+
+  it('renders the hero on the wide board, not the phone header', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: false,
+          maxRosterSize: 23,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+        leagueTeams: TEAMS,
+        boardOrderedTeams: TEAMS,
+        leagueDraft: {
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+          draftCompletedAt: null,
+          id: '42',
+        },
+        currentPickInfo: {
+          draftId: 42,
+          teamId: 2,
+          round: 2,
+          pickNumber: 1,
+          overallPick: 3,
+          isComplete: false,
+        },
+      } as unknown as Partial<ReturnType<typeof useDraftQueries>>),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} sport="football" />);
+
+    const hero = screen.getByTestId('draft-hero');
+    expect(hero.getAttribute('data-league-name')).toBe('Test League');
+    expect(hero.getAttribute('data-back-href')).toBe('/football/league/1');
+    expect(hero.getAttribute('data-round')).toBe('2');
+    expect(hero.getAttribute('data-overall-pick')).toBe('3');
+    // 23 rounds × 2 teams.
+    expect(hero.getAttribute('data-total-picks')).toBe('46');
+    expect(hero.getAttribute('data-team-count')).toBe('2');
+    expect(hero.getAttribute('data-selection-method')).toBe('standard');
+    expect(hero.getAttribute('data-draft-order')).toBe('snake');
+    expect(screen.queryByTestId('draft-slim-nav')).toBeNull();
+    expect(screen.queryByTestId('draft-clock-bar')).toBeNull();
+  });
+
+  it('routes the hero back link through onNavigate', () => {
+    const onNavigate = jest.fn();
+
+    render(<EliteDraftBoardScreen {...defaultProps} onNavigate={onNavigate} />);
+
+    fireEvent.click(screen.getByTestId('draft-hero-back'));
+    expect(onNavigate).toHaveBeenCalledWith('/baseball/league/1');
+  });
+
+  it('omits the total when the round count is unknown', () => {
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-hero').getAttribute('data-total-picks'),
+    ).toBe('');
+  });
+
+  // A mock draft already has DraftTopBand's Exit Draft; a second way out in
+  // the hero would duplicate it.
+  it('drops the hero back link for mock drafts', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Mock Draft Practice',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'commissioner', teamId: 1 },
+        },
+      }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-hero').getAttribute('data-back-href'),
+    ).toBe('');
+    expect(screen.queryByTestId('draft-hero-back')).toBeNull();
   });
 });
