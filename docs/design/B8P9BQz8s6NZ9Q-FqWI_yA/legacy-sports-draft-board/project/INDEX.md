@@ -10,10 +10,10 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 | styles/states.css | production | — | 4,161 | loading / lobby / error |
 | styles/mobile.css | production | — | 34,669 | 375px layouts |
 | styles/adaptive.css | production | — | 16,141 | football theme + container/media queries — link LAST |
-| scripts/draft.js | production | — | 32,473 | shared harness + interaction script |
-| DraftRoom.html | production | draft-room | 55,931 | desktop · populated · Cards view; tabs link into components/ |
+| scripts/draft.js | production | — | 32,456 | shared harness + interaction script |
+| DraftRoom.html | production | draft-room | 55,821 | desktop · populated · Cards view; tabs link into components/ |
 | components/PlayerTable.html | production | draft-room | 19,732 | Data Table view |
-| components/DraftGrid.html | production | draft-room | 57,613 | Draft Board view — option C value-heat cell |
+| components/DraftGrid.html | production | draft-room | 57,569 | Draft Board view — option C value-heat cell |
 | components/DepthChart.html | production | draft-room | 10,570 | Depth Chart view |
 | DraftRoomMobile.html | production | draft-room | 28,938 | 375px viewport, same surface |
 | DraftRoom.states.html | production | draft-room | 32,640 | loading / error / pre-draft, both viewports |
@@ -38,7 +38,7 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 
 **Pull order for implementation:** `colors_and_type.css`, `styles/harness.css`, `styles/board.css`, `styles/states.css`, `styles/mobile.css`, `styles/adaptive.css` (link in exactly this order — `adaptive.css` relies on source order to win), `scripts/draft.js`, then `DraftRoom.html`, `components/PlayerTable.html`, `components/DraftGrid.html`, `components/DepthChart.html`, `DraftRoomMobile.html`, `DraftRoom.states.html`.
 
-**Total production bytes:** 351,118 across 13 files. **Largest production file:** 57,613 (56.3 KiB — `components/DraftGrid.html`) — every production file is under the 60 KiB target, so the whole design pulls in one pass.
+**Total production bytes:** 350,947 across 13 files. **Largest production file:** 57,569 (56.2 KiB — `components/DraftGrid.html`) — every production file is under the 60 KiB target, so the whole design pulls in one pass.
 
 **Do not implement:** `options/**` (read each directory's `README.md` — `draft-room` is decided and its winner already lives in `components/DraftGrid.html`; `draft-room-mobile` is decided too, option E, and its winner already lives in `DraftRoomMobile.html`) and `scratch/**` (superseded originals, kept as the design record; `scratch/draft.html` is over the hard ceiling and must not be pulled at all).
 

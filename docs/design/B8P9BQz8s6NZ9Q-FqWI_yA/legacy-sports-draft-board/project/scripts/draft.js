@@ -344,7 +344,7 @@
             P('Reggie White','DEF','PHI','1985–00','198','SACK',9),P('Brett Favre','QB','GNB','1991–10','508','TD',20),
             P('L. Tomlinson','RB','SDG','2001–11','13,684','YDS',17),P('Bruce Smith','DEF','BUF','1985–03','200','SACK',15),
             P('Cris Carter','WR','MIN','1987–02','130','TD',26),P('Steve Young','QB','SFO','1985–99','232','TD',24),
-            P('Anthony Muñoz','TE','CIN','1980–92','11','PRO BOWL',30),P('Joe Greene','DEF','PIT','1969–81','78.5','SACK',28),
+            P('Anthony Muñoz','TE','CIN','1980–92','4','TD',30),P('Joe Greene','DEF','PIT','1969–81','78.5','SACK',28),
             P('Ronnie Lott','DEF','SFO','1981–94','63','INT',31),P('Earl Campbell','RB','HOU','1978–85','9,407','YDS',22)]},
           {r:3,nums:['3.25','3.26','3.27','3.28','3.29','3.30','3.31','3.32','3.33','3.34','3.35','3.36'],picks:[
             P('Eric Dickerson','RB','LAR','1983–93','13,259','YDS',19),P('T. Bradshaw','QB','PIT','1970–83','4','RINGS',34),
@@ -352,7 +352,7 @@
             P('Antonio Gates','TE','SDG','2003–18','116','TD',29),P('M. Harrison','WR','IND','1996–08','128','TD',27),
             P('L. Fitzgerald','WR','ARI','2004–20','17,492','YDS',33),P('Champ Bailey','DEF','DEN','1999–13','52','INT',44),
             P('Steve Largent','WR','SEA','1976–89','100','TD',40),P('Tony Dorsett','RB','DAL','1977–88','12,739','YDS',38),
-            P('Joe Thomas','TE','CLE','2007–17','10','PRO BOWL',48),P('R. Staubach','QB','DAL','1969–79','153','TD',42)]},
+            P('Joe Thomas','TE','CLE','2007–17','','',48),P('R. Staubach','QB','DAL','1969–79','153','TD',42)]},
           {r:4,nums:['4.37','4.38','4.39','4.40','4.41','4.42','4.43','4.44','4.45','4.46','4.47','4.48'],picks:[
             P('Mel Blount','DEF','PIT','1970–83','57','INT',39),P('Marcus Allen','RB','LAR','1982–97','12,243','YDS',37),
             P('Lamar Jackson','QB','BAL','2018–','6,173','RUSH',35),P('Russell Wilson','QB','SEA','2012–','350','TD',46),
