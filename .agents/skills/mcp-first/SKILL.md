@@ -36,7 +36,9 @@ metadata:
 
 ## Environment Detection
 
-Never assert which environment you are in from prose — probe the actual tool surface with `ToolSearch` and route accordingly:
+Never assert which environment you are in from prose — probe the actual tool surface with `ToolSearch` and route accordingly.
+
+> **Bare `select:` names are shorthand — an empty result is not proof of absence (LS-10136).** Some harnesses only match `mcp__<server>__<tool>`. Before reading "Absent" below, retry qualified, then keyword, then check the tools listing: [name forms](references/tool-surfaces.md#toolsearch-name-forms-ls-10136).
 
 | Probe (`ToolSearch` query)            | Present means                                            | Absent means                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

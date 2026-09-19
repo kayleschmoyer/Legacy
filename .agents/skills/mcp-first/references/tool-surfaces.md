@@ -85,6 +85,20 @@ Separately, `settings.json#permissions.allow` pre-approves _tool calls_ (e.g. `m
 
 > **No stdio `legacy-sports-jira` entry — intentional, do not add one (LS-9370).** `.mcp.json` has never carried a stdio-launched `jira-server` entry alongside the hosted `legacy-sports-jira` connector, even though `tools/mcp/jira-server` exists as a buildable stdio server (it also backs the hosted Lambda deployment and the Copilot/CCR machine-bearer paths). Registering it as a second, always-local stdio source would put two independently-authenticated servers behind the same `jira_*` tool names in the same session — whichever one wins isn't predictable, and it duplicates the OAuth-vs-stdio-credential split the connector migration (LS-4595, see above) was meant to collapse into one path. The late-attach cost documented below is real, but the fix is re-probing for the hosted connector, not standing up a second registration surface for it.
 
+<a id="toolsearch-name-forms-ls-10136"></a>
+
+### ToolSearch name forms: an empty `select:` result is not proof of absence (LS-10136)
+
+`ToolSearch("select:<name>")` is an exact-name lookup, and whether a **bare** name (`select:jira_auth_status`) resolves to the fully-qualified registered name (`mcp__legacy-sports-jira__jira_auth_status`) **depends on the harness**. Observed: in a CCR session (LS-6393, 2026-09-12) the bare form returned "No matching deferred tools found" while the qualified form returned every schema immediately; in a local desktop session a bare `select:worktree_ping` resolved fine. So every bare `select:` example in this repo's skills is shorthand, and **an empty bare result is indistinguishable from "connector never registered"** — the exact signal the LS-9576/LS-9749 fallbacks key on.
+
+Before concluding a tool or connector is absent, try all three of these (one call each; the first hit wins):
+
+1. **Bare** — `select:jira_auth_status`. Matches UUID-aliased late attaches (`mcp__<uuid>__jira_*`, see below) but may not match at all in some harnesses.
+2. **Fully-qualified** — `select:mcp__legacy-sports-jira__jira_auth_status`. Prefix pattern is `mcp__<server>__<tool>`; server ids are the `.mcp.json` keys (`worktree`, `legacy-sports-nx`, `legacy-sports-make`, …) or the hosted connector names (`legacy-sports-jira`, `legacy-sports-github`, …). Misses UUID aliases.
+3. **Keyword / roster** — `ToolSearch("jira auth status")` (no `select:`), or read the session's deferred-tools `<system-reminder>` listing directly. The listing is ground truth: if the tool name appears there, it exists, whatever `select:` returned.
+
+Only when all three come back empty is the tool genuinely absent. To load several tools in one call, pass a comma list of names in a single form.
+
 <a id="hosted-connector-late-attach-ls-9370"></a>
 
 ### Hosted connectors absent at session start, attach later (local launcher-worktree, LS-9370)
@@ -96,7 +110,7 @@ Distinct from both the LS-9576 "never registers at all" case and a mid-session 4
 
 **Sanctioned response — re-probe by bare tool name before each lifecycle step, not just once at Step 0b:**
 
-- Do not treat the Step 0b (or any single) `ToolSearch`/connection-error result as final for the session's lifetime. Before each subsequent Jira- or GitHub-touching step (claim/transition, comment, PR create, PR ready, label management), re-run `ToolSearch` on the **bare** tool name you need (`select:jira_view`, `select:jira_transition`, `select:github_open_pr`, …) rather than a server-prefixed query — a UUID-aliased late attach matches the bare-name search but not a `legacy-sports-jira`-scoped one.
+- Do not treat the Step 0b (or any single) `ToolSearch`/connection-error result as final for the session's lifetime. Before each subsequent Jira- or GitHub-touching step (claim/transition, comment, PR create, PR ready, label management), re-run `ToolSearch` on the **bare** tool name you need (`select:jira_view`, `select:jira_transition`, `select:github_open_pr`, …) — a UUID-aliased late attach matches the bare-name search but not a `legacy-sports-jira`-scoped one. If the bare form is empty, also try the qualified and keyword forms before treating it as still-absent ([name forms](#toolsearch-name-forms-ls-10136)); some harnesses don't resolve bare names at all.
 - If the re-probe finds the tool (under its configured name or a UUID alias), use it — switch off any REST/`acli`/`gh` fallback already in flight for the rest of the session.
 - If the re-probe still finds nothing, proceed with the documented fallback for the failure shape you're seeing (`configured: false` → Step 0b's stop condition; `Incompatible auth server…` → [Auth per surface](auth-and-routing.md#auth-per-surface) row below; entirely absent for the session → the [LS-9576 substitution table](auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576), which applies here too even though this failure mode isn't CCR-specific), and note in the MCP gap audit which lifecycle steps ran on the fallback so a late attach mid-lifecycle is visible in the record.
 - This costs one extra `ToolSearch` call per lifecycle step against the alternative of running the entire claim → PR → merge path on REST/CLI fallbacks — cheap by comparison, and it's the only way to recover the real tools once they attach.
