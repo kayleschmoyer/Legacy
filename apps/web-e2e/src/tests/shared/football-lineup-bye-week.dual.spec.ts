@@ -20,7 +20,7 @@
  * Mock-only, same reasoning as `footballLineup()` (LS-9655) — see
  * `FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON` in `fixtures/test-data.ts`. Runs
  * on `chromium` (hermetic mock) and `native-android` (native mock server,
- * ADR-0017), not `shared-live`.
+ * ADR-0017); skips itself on `shared-live` (LS-10217).
  */
 import { test } from '../../fixtures/dual';
 
@@ -29,6 +29,12 @@ test.describe('Football Roster bye-week (dual-mode) @dual @regression', () => {
     testData,
     rosterPage,
   }) => {
+    test.skip(
+      testData.mode === 'live',
+      'footballLineupByeWeek() has no live implementation (LS-9655) — see ' +
+        'FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON in fixtures/test-data.ts',
+    );
+
     const { leagueId, byeStarter } = await testData.footballLineupByeWeek();
 
     await rosterPage.goto(leagueId, 'football');

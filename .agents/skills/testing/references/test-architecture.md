@@ -124,7 +124,7 @@ pnpm exec playwright test --project=chromium --config=apps/web-e2e/playwright.co
 pnpm exec playwright test --project=shared-live --config=apps/web-e2e/playwright.integration.config.ts
 ```
 
-Rules for dual-mode specs: no `page.route()`, no mock payload imports, no identity setup — preconditions go through `TestData` (grow it verb-by-verb; a verb one backend cannot satisfy must throw, not no-op). Assert only on handles `TestData` returned, never on mock-specific incidentals. The nightly integration shard partition does not include `shared-live` yet — wiring it in is an ADR-0016 rollout follow-up.
+Rules for dual-mode specs: no `page.route()`, no mock payload imports, no identity setup — preconditions go through `TestData` (grow it verb-by-verb; a verb one backend cannot satisfy must throw, not no-op). **`shared-live` runs every file under `src/tests/shared/`** (no `testIgnore`), so a test calling a verb `LiveTestData` throws a `*_LIVE_UNSUPPORTED_REASON` for must open with `test.skip(testData.mode === 'live', '… <REASON_CONSTANT> …')` — a header comment saying "not registered on shared-live" enforces nothing (LS-10217). `src/dual-spec-live-skip-guard.test.ts` (part of `web-e2e:test`) fails if the skip is missing; precedent: `season-renewal-dialog.dual.spec.ts`. Assert only on handles `TestData` returned, never on mock-specific incidentals. The nightly integration shard partition does not include `shared-live` yet — wiring it in is an ADR-0016 rollout follow-up.
 
 Reference dual-mode spec: `src/tests/shared/player-stats-search.dual.spec.ts`.
 

@@ -29,8 +29,8 @@
  * `TestData.footballLineup()` and `footballTeamDetailVisitor()` are both
  * mock-only — see `FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON` in
  * `fixtures/test-data.ts` — so this spec runs on the `chromium` (hermetic
- * mock) and `native-android` (native mock server, ADR-0017) projects and is
- * NOT registered on `shared-live`.
+ * mock) and `native-android` (native mock server, ADR-0017) projects; both
+ * tests skip themselves on `shared-live` (LS-10217).
  *
  * Speaks ONLY the `AppDriver` vocabulary (no `page.route`/`page.waitForRequest`
  * network gates): the native mock server is a real out-of-process HTTP server
@@ -51,6 +51,12 @@ test.describe('Football Team Detail lineup (dual-mode) @dual @regression', () =>
     testData,
     rosterPage,
   }) => {
+    test.skip(
+      testData.mode === 'live',
+      'footballLineup() has no live implementation (LS-9655) — see ' +
+        'FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON in fixtures/test-data.ts',
+    );
+
     const lineup = await testData.footballLineup();
     const { fullName } = lineup.benchPlayer;
     const { positionType } = lineup.openSlot;
@@ -90,6 +96,12 @@ test.describe('Football Team Detail lineup (dual-mode) @dual @regression', () =>
     testData,
     rosterPage,
   }) => {
+    test.skip(
+      testData.mode === 'live',
+      'footballTeamDetailVisitor() has no live implementation (LS-9655) — see ' +
+        'FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON in fixtures/test-data.ts',
+    );
+
     // The Team-Detail-only case: the board renders a team the viewer does NOT
     // own. Web gates on `viewerMembership.teamId`, native on `userTeamId` —
     // the shared verb points both at a different team than the one viewed.

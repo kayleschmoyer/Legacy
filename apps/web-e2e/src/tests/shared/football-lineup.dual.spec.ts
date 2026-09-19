@@ -18,8 +18,8 @@
  * `TestData.footballLineup()` (LS-9655) is mock-only — see
  * `FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON` in `fixtures/test-data.ts` — so
  * this spec runs against the `chromium` (hermetic mock) and `native-android`
- * (native mock server, ADR-0017) projects. It is NOT registered on the
- * `shared-live` project.
+ * (native mock server, ADR-0017) projects. On `shared-live` — whose
+ * `testDir` is all of `src/tests/shared/` — it skips itself (LS-10217).
  *
  * `football-roster-lineup.spec.ts` keeps only the position-grouping render
  * assertion (a web-rendering-only concern with no native page-object
@@ -42,6 +42,12 @@ test.describe('Football Roster lineup (dual-mode) @dual @regression', () => {
     testData,
     rosterPage,
   }) => {
+    test.skip(
+      testData.mode === 'live',
+      'footballLineup() has no live implementation (LS-9655) — see ' +
+        'FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON in fixtures/test-data.ts',
+    );
+
     const lineup = await testData.footballLineup();
     const { fullName } = lineup.benchPlayer;
     const { positionType } = lineup.openSlot;
