@@ -1194,6 +1194,16 @@ export const LEAGUE_WITH_MEMBER_LIVE_REQUIRES_BROWSER_REASON =
  * how `_dualMockState` is threaded through for mock mode.
  */
 export class DualLiveState {
+  /**
+   * The test's shared seeded league (LS-10218). Stored by the FIRST
+   * `league()`/`leagueWithMember()` caller so a second, distinct caller
+   * (`counterpartyTestData`) resolves to the SAME league — the live analogue
+   * of `DualMockState.league()`. Without it the counterparty drove its own
+   * create-league UI as its own identity (seat 4) and then resolved
+   * `userTeamId` with the commissioner's JWT, which is never a member of that
+   * second league, so the lookup returned null on every run.
+   */
+  league?: SeededLeague;
   waiverQueue?: {
     leagueId: number;
     inviteCode: string;
@@ -1421,6 +1431,11 @@ export class LiveTestData implements TestData {
   }
 
   async league(): Promise<SeededLeague> {
+    // Second, distinct caller (`counterpartyTestData`): the SAME league the
+    // first caller seeded — see `DualLiveState.league`.
+    if (this.#liveState?.league) {
+      return this.#liveState.league;
+    }
     if (!this.#page) {
       throw new Error(LEAGUE_LIVE_REQUIRES_PAGE_REASON);
     }
@@ -1430,7 +1445,11 @@ export class LiveTestData implements TestData {
     });
     const commissionerJwt = await getAuthJwt();
     const commissionerTeamId = await fetchUserTeamId(commissionerJwt, leagueId);
-    return { leagueId, inviteCode, commissionerTeamId };
+    const league = { leagueId, inviteCode, commissionerTeamId };
+    if (this.#liveState) {
+      this.#liveState.league = league;
+    }
+    return league;
   }
 
   async leagueWithMember(): Promise<SeededLeagueWithMember> {
@@ -1728,8 +1747,9 @@ async function fetchUserTeamId(jwt: string, leagueId: number): Promise<number> {
   if (userTeamId == null) {
     throw new Error(
       `userTeamId(leagueId: ${leagueId}) returned null for the seeded-league ` +
-        'fixture — the create/join mutation may not have propagated to the ' +
-        'read path yet.',
+        'fixture — the JWT identity has no team in that league. The ' +
+        'create/join write is visible to this read immediately (LS-4379), so ' +
+        'this is an identity mismatch, not propagation lag (LS-10218).',
     );
   }
   return userTeamId;
