@@ -1,7 +1,7 @@
 > [!WARNING]
-> **Partly superseded. Do not run `/implement-design` against this bundle as a whole.** (LS-10161, 2026-09-13)
+> **Partly superseded. Do not run `/implement-design` against this bundle as a whole.** (LS-10161, 2026-09-13; updated LS-10206, 2026-09-18)
 >
-> The September Claude Design Draft Board bundle, [`docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/`](../../B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/) (`project/DraftRoomMobile.html`, phone option E), is canonical for the phone draft room wherever the two specs overlap. It was implemented under epic LS-9999.
+> The September Claude Design Draft Board bundle, [`docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/`](../../B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/) (`project/DraftRoomMobile.html`, phone option E), is canonical for the phone draft room wherever the two specs overlap. It was implemented under epic LS-9999. Since LS-10206 it also draws the last-pick ticker, the AI-pick toast, the chat panel and the draft-complete recap, so read those there, not here.
 >
 > **Replaced — do not reintroduce:**
 >
@@ -10,21 +10,19 @@
 > | **Board** tab (rounds × teams grid) | Round view: round tabs over a tile grid (`DraftRoundBoard`) | LS-10000 |
 > | **Players** tab | Slide-up pick sheet holding the player list (`DraftPickSheet` → `DraftPlayersTab`) | LS-10002 |
 > | **Team** tab | Persistent squad strip that opens a squad sheet (`DraftTeamTab`) | LS-10001 |
+> | Bottom nav (Board · Players · Queue · Team · Chat, later Board · Queue · Chat — `DraftBottomNav`) | No draft-owned nav bar. The board is the page; Players / Queue / History are tabs inside the pick sheet (`DraftSheetTabs`); Chat is a full-height panel opened from a chat control in the clock bar (`DraftHeaderBand`) | LS-10165 |
+> | **Chat** tab | That chat panel (`draft-chat-panel`), showing "Chat is coming soon." when the host passes no chat renderer | LS-10165 |
+> | My-pick splash with confetti (`DraftMyPickSplash`) | My-pick announcement card (`DraftMyPickAnnouncement`) | LS-10205 |
 >
-> The five-tab bottom nav (Board · Players · Queue · Team · Chat) is now **Board · Queue · Chat**, and its Board tab shows the round view.
+> **Still shipping from v2** (phone tier of `EliteDraftBoardScreen.tsx`), each now drawn in the September bundle:
 >
-> **Still shipping from v2** (phone tier of `EliteDraftBoardScreen.tsx`). The September phone page is silent on most of these, so this README remains their spec:
->
-> - On-the-clock header band (`DraftHeaderBand`)
+> - On-the-clock header band (`DraftHeaderBand`), in the September clock-bar form (LS-10204)
 > - Last-pick ticker (`DraftLastPickTicker`)
-> - My-pick splash with celebration (`DraftMyPickSplash`). The September page also specifies a my-pick announcement card; the shipped splash is the v2 one.
 > - AI-pick toast (`DraftPickToast`)
-> - Queue tab (`DraftQueueTab`)
-> - Chat tab (rendered when the host passes a chat renderer; otherwise a placeholder)
+> - Queue list (`DraftQueueTab`), now the pick sheet's Queue tab
 > - Draft-complete recap (`DraftRoomRecap`, phone only)
-> - Board · Queue · Chat bottom nav (`DraftBottomNav`)
 >
-> **Known conflict, unresolved:** the September phone page has no bottom nav. It puts Players · Queue · History tabs inside the pick sheet. The shipped Board · Queue · Chat nav comes from v2. Which spec wins is tracked in LS-10165. Until that is decided, do not change the phone nav from either bundle.
+> The phone-nav conflict this notice used to flag is resolved: LS-10165 adopted the September model above.
 >
 > Everything below is the original August handoff, unedited.
 

@@ -1,7 +1,7 @@
 # Sync report — Mobile Draft Room v2
 
 > [!WARNING]
-> **Partly superseded (LS-10161).** The Board grid, Players tab and Team tab were replaced by the September Draft Board bundle (LS-10000 / LS-10002 / LS-10001). Before implementing anything from this bundle, read the notice at the top of [`legacy-sports-draft-room-v2/README.md`](legacy-sports-draft-room-v2/README.md). It lists what was replaced and what still ships.
+> **Partly superseded (LS-10161, LS-10206).** The Board grid, Players tab and Team tab (LS-10000 / LS-10002 / LS-10001), the bottom nav and Chat tab (LS-10165) and the confetti my-pick splash (LS-10205) were all replaced by the September Draft Board bundle. Before implementing anything from this bundle, read the notice at the top of [`legacy-sports-draft-room-v2/README.md`](legacy-sports-draft-room-v2/README.md). It lists what was replaced and what still ships.
 
 **Date:** 2026-08-12
 **Jira ticket:** LS-9395

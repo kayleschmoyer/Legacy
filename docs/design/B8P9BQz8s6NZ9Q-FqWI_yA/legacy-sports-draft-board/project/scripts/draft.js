@@ -497,3 +497,48 @@
     }));
   });
 
+  /* Phone overlays and states (LS-10206): AI-pick toast, chat panel body
+     states, Draft Packet entitlement, packet expand, composer enable. */
+  (function(){
+    const body = document.body;
+    const live = () => document.querySelector('[data-stage="populated"] .mob');
+    const toLive = () => {
+      const b = document.querySelector('#state-group [data-state="populated"]');
+      if (b) b.click();
+    };
+    let toastT;
+    document.querySelectorAll('#demo-group [data-toast]').forEach(b => b.addEventListener('click', () => {
+      const mob = live();
+      const toast = mob && mob.querySelector('.mob-toast');
+      if (!toast) return;
+      toLive();
+      toast.dataset.variant = b.dataset.toast;
+      mob.dataset.toast = 'on';
+      clearTimeout(toastT);
+      toastT = setTimeout(() => mob.removeAttribute('data-toast'), 1900);
+    }));
+    document.querySelectorAll('#demo-group [data-chat-demo]').forEach(b => b.addEventListener('click', () => {
+      const mob = live();
+      const panel = mob && mob.querySelector('.mob-chat');
+      if (!panel) return;
+      toLive();
+      panel.dataset.cp = b.dataset.chatDemo;
+      mob.dataset.chat = 'open';
+    }));
+    const planBtns = document.querySelectorAll('#plan-group [data-plan]');
+    planBtns.forEach(b => b.addEventListener('click', () => {
+      body.dataset.plan = b.dataset.plan;
+      planBtns.forEach(x => x.classList.toggle('active', x === b));
+    }));
+    document.querySelectorAll('[data-packet-toggle]').forEach(b => b.addEventListener('click', () => {
+      const packet = b.closest('.rc-packet');
+      const open = packet.dataset.open !== 'true';
+      packet.dataset.open = String(open);
+      b.textContent = open ? 'Hide' : 'View Full Draft';
+    }));
+    document.querySelectorAll('.mob-chat .compose').forEach(c => {
+      const input = c.querySelector('input');
+      const send = c.querySelector('button');
+      input.addEventListener('input', () => { send.disabled = !input.value.trim(); });
+    });
+  })();

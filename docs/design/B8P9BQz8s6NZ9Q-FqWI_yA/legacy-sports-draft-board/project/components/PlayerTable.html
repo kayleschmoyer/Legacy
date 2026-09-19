@@ -221,7 +221,12 @@
               </table>
             </div>
 
-            <!-- ── FOOTBALL DATA TABLE — same shape, NFL stat columns ── -->
+            <!-- ── FOOTBALL DATA TABLE — same shape, NFL stat columns ──
+                 Columns match STAT_COLUMNS_BY_SPORT.football (statColumns.ts,
+                 LS-10164): every one is a measured career stat. There is no
+                 Pro Bowl, All-Pro or AV data, so none is drawn. TD is rushing
+                 + receiving TDs (passing TDs are implied by PASS YDS). A
+                 player with no row in a category shows an em-dash, never 0. -->
             <div class="data-table" data-sport="football">
               <table>
                 <thead>
@@ -232,11 +237,11 @@
                     <th>Team</th>
                     <th>Career</th>
                     <th class="num sorted">ADP <span class="sort-ind">▲</span></th>
-                    <th class="num">YDS <span class="sort-ind">▲▼</span></th>
+                    <th class="num">PASS YDS <span class="sort-ind">▲▼</span></th>
+                    <th class="num">RUSH YDS <span class="sort-ind">▲▼</span></th>
+                    <th class="num">REC <span class="sort-ind">▲▼</span></th>
                     <th class="num">TD <span class="sort-ind">▲▼</span></th>
-                    <th class="num">PB <span class="sort-ind">▲▼</span></th>
-                    <th class="num">AP <span class="sort-ind">▲▼</span></th>
-                    <th class="num">AV <span class="sort-ind">▲▼</span></th>
+                    <th class="num">FG <span class="sort-ind">▲▼</span></th>
                     <th></th>
                   </tr>
                 </thead>
@@ -249,10 +254,10 @@
                     <td class="tbl-span">2000–2022</td>
                     <td class="num">1</td>
                     <td class="num">89,214</td>
-                    <td class="num">649</td>
-                    <td class="num">15</td>
-                    <td class="num">3</td>
-                    <td class="num">313</td>
+                    <td class="num">1,123</td>
+                    <td class="num">—</td>
+                    <td class="num">28</td>
+                    <td class="num">—</td>
                     <td></td>
                   </tr>
                   <tr class="taken">
@@ -262,11 +267,11 @@
                     <td>SF</td>
                     <td class="tbl-span">1985–2004</td>
                     <td class="num">2</td>
-                    <td class="num">22,895</td>
-                    <td class="num">208</td>
-                    <td class="num">13</td>
-                    <td class="num">10</td>
-                    <td class="num">192</td>
+                    <td class="num">—</td>
+                    <td class="num">645</td>
+                    <td class="num">1,549</td>
+                    <td class="num">207</td>
+                    <td class="num">—</td>
                     <td></td>
                   </tr>
                   <tr class="taken">
@@ -276,11 +281,11 @@
                     <td>CLE</td>
                     <td class="tbl-span">1957–1965</td>
                     <td class="num">3</td>
+                    <td class="num">—</td>
                     <td class="num">12,312</td>
+                    <td class="num">262</td>
                     <td class="num">126</td>
-                    <td class="num">9</td>
-                    <td class="num">8</td>
-                    <td class="num">144</td>
+                    <td class="num">—</td>
                     <td></td>
                   </tr>
                   <tr>
@@ -291,10 +296,10 @@
                     <td class="tbl-span">2017–present</td>
                     <td class="num">4</td>
                     <td class="num">31,438</td>
-                    <td class="num">245</td>
-                    <td class="num">7</td>
-                    <td class="num">2</td>
-                    <td class="num">128</td>
+                    <td class="num">2,280</td>
+                    <td class="num">—</td>
+                    <td class="num">17</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
@@ -305,10 +310,10 @@
                     <td class="tbl-span">1998–2015</td>
                     <td class="num">5</td>
                     <td class="num">71,940</td>
-                    <td class="num">539</td>
-                    <td class="num">14</td>
-                    <td class="num">7</td>
-                    <td class="num">271</td>
+                    <td class="num">667</td>
+                    <td class="num">—</td>
+                    <td class="num">18</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
@@ -318,11 +323,11 @@
                     <td>CHI</td>
                     <td class="tbl-span">1975–1987</td>
                     <td class="num">6</td>
+                    <td class="num">331</td>
                     <td class="num">16,726</td>
+                    <td class="num">492</td>
                     <td class="num">125</td>
-                    <td class="num">9</td>
-                    <td class="num">7</td>
-                    <td class="num">172</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
@@ -333,24 +338,24 @@
                     <td class="tbl-span">1979–1994</td>
                     <td class="num">7</td>
                     <td class="num">40,551</td>
-                    <td class="num">273</td>
-                    <td class="num">8</td>
-                    <td class="num">3</td>
-                    <td class="num">158</td>
+                    <td class="num">1,676</td>
+                    <td class="num">—</td>
+                    <td class="num">20</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
                     <td class="num">8</td>
-                    <td><span class="pill pill-DEF">DEF</span></td>
-                    <td><span class="tbl-name">Lawrence Taylor</span></td>
-                    <td>NYG</td>
-                    <td class="tbl-span">1981–1993</td>
+                    <td><span class="pill pill-K">K</span></td>
+                    <td><span class="tbl-name">Adam Vinatieri</span></td>
+                    <td>NE/IND</td>
+                    <td class="tbl-span">1996–2019</td>
                     <td class="num">8</td>
-                    <td class="num">132.5</td>
-                    <td class="num">9</td>
-                    <td class="num">10</td>
-                    <td class="num">8</td>
-                    <td class="num">138</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num">599</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
@@ -360,11 +365,11 @@
                     <td>MIN</td>
                     <td class="tbl-span">1998–2012</td>
                     <td class="num">14</td>
-                    <td class="num">15,292</td>
+                    <td class="num">—</td>
+                    <td class="num">159</td>
+                    <td class="num">982</td>
                     <td class="num">156</td>
-                    <td class="num">6</td>
-                    <td class="num">4</td>
-                    <td class="num">115</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                   <tr>
@@ -374,11 +379,11 @@
                     <td>DAL</td>
                     <td class="tbl-span">1990–2004</td>
                     <td class="num">15</td>
+                    <td class="num">—</td>
                     <td class="num">18,355</td>
-                    <td class="num">164</td>
-                    <td class="num">8</td>
-                    <td class="num">4</td>
-                    <td class="num">131</td>
+                    <td class="num">515</td>
+                    <td class="num">175</td>
+                    <td class="num">—</td>
                     <td><button class="btn primary tbl-draft">Draft</button></td>
                   </tr>
                 </tbody>

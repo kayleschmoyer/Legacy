@@ -8,14 +8,14 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 | styles/harness.css | production | — | 6,283 | review harness only — not production chrome |
 | styles/board.css | production | — | 47,555 | nav, hero, draft board, player board |
 | styles/states.css | production | — | 4,161 | loading / lobby / error |
-| styles/mobile.css | production | — | 34,669 | 375px layouts |
+| styles/mobile.css | production | — | 42,604 | 375px layouts, incl. ticker, AI-pick toast, chat states, draft-complete recap |
 | styles/adaptive.css | production | — | 16,141 | football theme + container/media queries — link LAST |
-| scripts/draft.js | production | — | 32,456 | shared harness + interaction script |
+| scripts/draft.js | production | — | 34,462 | shared harness + interaction script |
 | DraftRoom.html | production | draft-room | 55,821 | desktop · populated · Cards view; tabs link into components/ |
-| components/PlayerTable.html | production | draft-room | 19,732 | Data Table view |
+| components/PlayerTable.html | production | draft-room | 20,161 | Data Table view · football columns match `statColumns.ts` (PASS YDS / RUSH YDS / REC / TD / FG) |
 | components/DraftGrid.html | production | draft-room | 57,569 | Draft Board view — option C value-heat cell |
 | components/DepthChart.html | production | draft-room | 10,570 | Depth Chart view |
-| DraftRoomMobile.html | production | draft-room | 28,938 | 375px viewport, same surface |
+| DraftRoomMobile.html | production | draft-room | 44,665 | 375px viewport, same surface · Live + Draft complete states; last-pick ticker, AI-pick toast, chat panel states |
 | DraftRoom.states.html | production | draft-room | 32,640 | loading / error / pre-draft, both viewports |
 | scripts/options-board.js | option | draft-room | 7,173 | renderers for the desktop options |
 | scripts/options-mobile.js | option | draft-room-mobile | 19,869 | guarded renderers for the mobile options |
@@ -29,7 +29,7 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 | options/draft-room/a-player-first-card.html | option | draft-room | 1,513 | status=rejected |
 | options/draft-room/b-ranked-scoreboard.html | option | draft-room | 1,863 | status=rejected |
 | options/draft-room/c-value-heat-board.html | option | draft-room | 2,270 | status=chosen — implemented in components/DraftGrid.html |
-| INDEX.md | — | — | 5,308 | this file |
+| INDEX.md | — | — | 5,580 | this file |
 | options/draft-room-mobile/README.md | — | draft-room-mobile | 2,294 | the open question + the option E decision |
 | options/draft-room/README.md | — | draft-room | 2,441 | the open question + the option C decision (2026-09-12) |
 | scratch/board-explorations-small.html | scratch | — | 48,478 | DO NOT PULL — superseded by options/draft-room-mobile/ |
@@ -38,7 +38,7 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 
 **Pull order for implementation:** `colors_and_type.css`, `styles/harness.css`, `styles/board.css`, `styles/states.css`, `styles/mobile.css`, `styles/adaptive.css` (link in exactly this order — `adaptive.css` relies on source order to win), `scripts/draft.js`, then `DraftRoom.html`, `components/PlayerTable.html`, `components/DraftGrid.html`, `components/DepthChart.html`, `DraftRoomMobile.html`, `DraftRoom.states.html`.
 
-**Total production bytes:** 350,947 across 13 files. **Largest production file:** 57,569 (56.2 KiB — `components/DraftGrid.html`) — every production file is under the 60 KiB target, so the whole design pulls in one pass.
+**Total production bytes:** 377,044 across 13 files. **Largest production file:** 57,569 (56.2 KiB — `components/DraftGrid.html`) — every production file is under the 60 KiB target, so the whole design pulls in one pass.
 
 **Do not implement:** `options/**` (read each directory's `README.md` — `draft-room` is decided and its winner already lives in `components/DraftGrid.html`; `draft-room-mobile` is decided too, option E, and its winner already lives in `DraftRoomMobile.html`) and `scratch/**` (superseded originals, kept as the design record; `scratch/draft.html` is over the hard ceiling and must not be pulled at all).
 
@@ -50,5 +50,5 @@ Generated 2026-09-09. Sizes in bytes. Authored to `.agents/skills/design-sync/re
 
 | Surface | Production files |
 | --- | --- |
-| `draft-room` | `DraftRoom.html` (desktop) · `DraftRoomMobile.html` (375px) · `DraftRoom.states.html` (non-populated states) · `components/{PlayerTable,DraftGrid,DepthChart}.html` (the three non-default views) |
+| `draft-room` | `DraftRoom.html` (desktop) · `DraftRoomMobile.html` (375px, incl. the phone-only draft-complete recap) · `DraftRoom.states.html` (non-populated states) · `components/{PlayerTable,DraftGrid,DepthChart}.html` (the three non-default views) |
 | `draft-room-mobile` | none of its own — options only, decided (option E); the winner lives in `DraftRoomMobile.html` |
