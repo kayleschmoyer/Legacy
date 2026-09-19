@@ -33,3 +33,12 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+
+# Generated MCP API reference (LS-10150): every MCP-touching PR rewrites this
+# file wholesale from tools/mcp/, so two PRs in flight always conflict on it
+# even when neither changed anything the other cares about. `merge=ours`
+# (driver registered in scripts/setup-git-merge-drivers.js, run from
+# postinstall) auto-resolves instead of conflicting; mcp-api-reference-sync.sh
+# still fails CI if the checked-in file drifts from a fresh regeneration, so
+# a stale "ours" pick can never land silently — see docs/mcp/api-reference.html.
+docs/mcp/api-reference.html merge=mcp-generated-ours

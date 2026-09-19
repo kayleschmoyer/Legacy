@@ -110,3 +110,11 @@ try {
 } catch (error) {
   console.warn('⚠️  Tamagui fix script failed:', error.message);
 }
+
+// Register local git merge drivers referenced by .gitattributes (see
+// scripts/setup-git-merge-drivers.js) — best-effort, never fail postinstall.
+try {
+  require('./setup-git-merge-drivers.js');
+} catch (error) {
+  console.warn('⚠️  Git merge driver setup failed:', error.message);
+}
