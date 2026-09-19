@@ -534,6 +534,149 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
 }
 
 // ---------------------------------------------------------------------------
+// Draft board (Phase 5) helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Mocks every operation the live draft board fires. `availablePlayers` is the
+ * GetAvailableDraftPlayers payload — parameterised so the negative control can
+ * serve an empty pool through the exact same routing (LS-10216). Resolves
+ * `availablePlayersServed` once that operation has been answered.
+ */
+async function installDraftBoardMocks(
+  page: Page,
+  availablePlayers: ReturnType<typeof mockAvailableDraftPlayers>,
+) {
+  let markAvailablePlayersServed: () => void = () => undefined;
+  const availablePlayersServed = new Promise<void>((resolve) => {
+    markAvailablePlayersServed = resolve;
+  });
+  // Route on the EXACT operation name, never on a substring of the
+  // request body (LS-9792). This chain previously tested
+  // `operation === 'getdraft'` *before* its own more specific
+  // branches, and `'getdraftpicks'.includes('getdraft')` is true — so the
+  // broad branch swallowed every GetDraft* operation. GetDraftPicks and
+  // GetAvailableDraftPlayers could never reach their own handlers, and
+  // GetDraftPlayerStats / GetDraftPitchingStats were answered with a draft
+  // object. Nothing errored: the queries resolved with the wrong shape, the
+  // board rendered empty, and Phase 5's assertions passed vacuously.
+  // Exact matching (the LS-9413 pattern, as in shared-mocks' `useTier`)
+  // removes the whole class structurally rather than by branch ordering.
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const op = extractOperationName(route).toLowerCase();
+    const json = (data: unknown) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data }),
+      });
+
+    if (op === 'getleaguebyid' || op === 'getleague') {
+      await json({ league: mockLeague({ draftStatus: 'in-progress' }) });
+    } else if (op === 'getlivedraftleaguedraft') {
+      await json({ getLeagueDraft: mockDraft() });
+    } else if (op === 'getdraft') {
+      await json({ getDraft: mockDraft() });
+    } else if (op === 'getdraftpicks') {
+      await json({ getDraftPicks: [] });
+    } else if (op === 'getcurrentdraftpick') {
+      await json({
+        getCurrentDraftPick: {
+          __typename: 'CurrentDraftPick',
+          draftId: 1,
+          teamId: TEAM_1.id,
+          round: 1,
+          pickNumber: 1,
+          overallPick: 1,
+          isComplete: false,
+        },
+      });
+    } else if (op === 'getmydraftqueue') {
+      await json({ getMyDraftQueue: [] });
+    } else if (op === 'getdraftrecommendations') {
+      await json({ getDraftRecommendations: [] });
+    } else if (op === 'getavailabledraftplayers') {
+      await json({ getAvailableDraftPlayers: availablePlayers });
+      markAvailablePlayersServed();
+    } else if (op === 'getdraftplayerstats') {
+      await json({ careerBattingStats: [] });
+    } else if (
+      op === 'getdraftpitchingstats' ||
+      op === 'getdraftpitcherstats'
+    ) {
+      await json({ careerPitchingStats: [] });
+    } else if (op === 'getleagueteams') {
+      await json({ leagueTeams: mockTeams() });
+    } else if (op === 'getpositionsforleague') {
+      await json({ leaguePositions: mockPositions() });
+    } else if (op === 'getuserteamid') {
+      await json({ userTeamId: TEAM_1.id });
+    } else if (op === 'nudgeexpireddraftpick') {
+      // Defensive no-op: currentPickDeadline above is a realistic future
+      // timestamp so this should never fire in practice, but if a slow
+      // test run ever lets the deadline legitimately count down, answer
+      // it instead of failing API isolation (LS-10049).
+      await json({
+        autoProcessDraftPicks: { draftsProcessed: 0, picksAutoMade: 0 },
+      });
+    } else {
+      await unmockedGraphQLFallback(route);
+    }
+  });
+  return { availablePlayersServed };
+}
+
+/**
+ * Asserts the board rendered for this viewport tier and brings the
+ * available-players list on screen: on compact that list lives only in the
+ * pick sheet, so the sheet is raised first.
+ */
+async function openDraftBoardPlayerList(page: Page) {
+  // The draft board should load without a full-page error
+  await expect(page.locator('body')).not.toContainText(
+    'Unexpected Application Error',
+  );
+  // Assert on content that can only reach the screen through the draft
+  // operations themselves (LS-9792). The previous check — "no error page"
+  // plus a fixed 2s sleep — passed just as happily when every GetDraft*
+  // query was answered with the wrong payload and the board rendered no
+  // draft at all, which is exactly how the shadowed-branch bug survived.
+  //
+  // Below the `$sm` breakpoint (both mobile Playwright projects run at
+  // 375px) EliteDraftBoardScreen swaps to CompactLiveDraftBoard, whose
+  // DraftClockBar (LS-10204) has no "Live Draft" text at all in any
+  // state — only "R{round} · P{pick}", which DraftTopBand (desktop)
+  // doesn't render. Same rule as playwright.config.ts's
+  // DESKTOP_DRAFT_TOPBAND_ONLY_SPECS: assert per viewport tier instead of
+  // excluding the phase from mobile outright (LS-10049).
+  const isCompactViewport = (page.viewportSize()?.width ?? 1280) < 800;
+  if (isCompactViewport) {
+    await expect(
+      page.getByTestId('draft-clock-bar').getByText('R1 · P', {
+        exact: false,
+      }),
+    ).toBeVisible();
+    // The phone board lists available players only in the pick sheet
+    // (LS-10002/LS-10165), so raise it before looking for one.
+    await page.getByTestId('draft-pick-cta').click();
+  } else {
+    await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
+  }
+}
+
+/**
+ * Sourced from GetAvailableDraftPlayers — the branch that used to be
+ * unreachable, and whose query never even fired before the LS-9792 fix
+ * because the draft header it depends on resolved empty. Shared by Phase 5
+ * and its negative control so the two cannot drift apart.
+ */
+function expectAvailablePlayerVisible(page: Page, timeout?: number) {
+  return expect(page.getByText('Mike Johnson').first()).toBeVisible({
+    timeout,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Serial test suite
 // ---------------------------------------------------------------------------
 
@@ -736,118 +879,32 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
   test('Phase 5: Navigate to draft board', async ({ page }) => {
     await test.step('Mock draft data and navigate', async () => {
-      // Route on the EXACT operation name, never on a substring of the
-      // request body (LS-9792). This chain previously tested
-      // `operation === 'getdraft'` *before* its own more specific
-      // branches, and `'getdraftpicks'.includes('getdraft')` is true — so the
-      // broad branch swallowed every GetDraft* operation. GetDraftPicks and
-      // GetAvailableDraftPlayers could never reach their own handlers, and
-      // GetDraftPlayerStats / GetDraftPitchingStats were answered with a draft
-      // object. Nothing errored: the queries resolved with the wrong shape, the
-      // board rendered empty, and the assertions below passed vacuously.
-      // Exact matching (the LS-9413 pattern, as in shared-mocks' `useTier`)
-      // removes the whole class structurally rather than by branch ordering.
-      await page.route(isGraphQLEndpoint, async (route) => {
-        const op = extractOperationName(route).toLowerCase();
-        const json = (data: unknown) =>
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data }),
-          });
-
-        if (op === 'getleaguebyid' || op === 'getleague') {
-          await json({ league: mockLeague({ draftStatus: 'in-progress' }) });
-        } else if (op === 'getlivedraftleaguedraft') {
-          await json({ getLeagueDraft: mockDraft() });
-        } else if (op === 'getdraft') {
-          await json({ getDraft: mockDraft() });
-        } else if (op === 'getdraftpicks') {
-          await json({ getDraftPicks: [] });
-        } else if (op === 'getcurrentdraftpick') {
-          await json({
-            getCurrentDraftPick: {
-              __typename: 'CurrentDraftPick',
-              draftId: 1,
-              teamId: TEAM_1.id,
-              round: 1,
-              pickNumber: 1,
-              overallPick: 1,
-              isComplete: false,
-            },
-          });
-        } else if (op === 'getmydraftqueue') {
-          await json({ getMyDraftQueue: [] });
-        } else if (op === 'getdraftrecommendations') {
-          await json({ getDraftRecommendations: [] });
-        } else if (op === 'getavailabledraftplayers') {
-          await json({ getAvailableDraftPlayers: mockAvailableDraftPlayers() });
-        } else if (op === 'getdraftplayerstats') {
-          await json({ careerBattingStats: [] });
-        } else if (
-          op === 'getdraftpitchingstats' ||
-          op === 'getdraftpitcherstats'
-        ) {
-          await json({ careerPitchingStats: [] });
-        } else if (op === 'getleagueteams') {
-          await json({ leagueTeams: mockTeams() });
-        } else if (op === 'getpositionsforleague') {
-          await json({ leaguePositions: mockPositions() });
-        } else if (op === 'getuserteamid') {
-          await json({ userTeamId: TEAM_1.id });
-        } else if (op === 'nudgeexpireddraftpick') {
-          // Defensive no-op: currentPickDeadline above is a realistic future
-          // timestamp so this should never fire in practice, but if a slow
-          // test run ever lets the deadline legitimately count down, answer
-          // it instead of failing API isolation (LS-10049).
-          await json({
-            autoProcessDraftPicks: { draftsProcessed: 0, picksAutoMade: 0 },
-          });
-        } else {
-          await unmockedGraphQLFallback(route);
-        }
-      });
+      await installDraftBoardMocks(page, mockAvailableDraftPlayers());
 
       await page.goto(`/baseball/league/${LEAGUE_ID}/draft`);
       await page.waitForLoadState('load');
     });
 
     await test.step('Verify draft board renders', async () => {
-      // The draft board should load without a full-page error
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-      );
-      // Assert on content that can only reach the screen through the draft
-      // operations themselves (LS-9792). The previous check — "no error page"
-      // plus a fixed 2s sleep — passed just as happily when every GetDraft*
-      // query was answered with the wrong payload and the board rendered no
-      // draft at all, which is exactly how the shadowed-branch bug survived.
-      //
-      // Below the `$sm` breakpoint (both mobile Playwright projects run at
-      // 375px) EliteDraftBoardScreen swaps to CompactLiveDraftBoard, whose
-      // DraftClockBar (LS-10204) has no "Live Draft" text at all in any
-      // state — only "R{round} · P{pick}", which DraftTopBand (desktop)
-      // doesn't render. Same rule as playwright.config.ts's
-      // DESKTOP_DRAFT_TOPBAND_ONLY_SPECS: assert per viewport tier instead of
-      // excluding the phase from mobile outright (LS-10049).
-      const isCompactViewport = (page.viewportSize()?.width ?? 1280) < 800;
-      if (isCompactViewport) {
-        await expect(
-          page.getByTestId('draft-clock-bar').getByText('R1 · P', {
-            exact: false,
-          }),
-        ).toBeVisible();
-        // The phone board lists available players only in the pick sheet
-        // (LS-10002/LS-10165), so raise it before looking for one.
-        await page.getByTestId('draft-pick-cta').click();
-      } else {
-        await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
-      }
-      // Sourced from GetAvailableDraftPlayers — the branch that used to be
-      // unreachable, and whose query never even fired before the fix because
-      // the draft header it depends on resolved empty.
-      await expect(page.getByText('Mike Johnson').first()).toBeVisible();
+      await openDraftBoardPlayerList(page);
+      await expectAvailablePlayerVisible(page);
     });
+  });
+
+  test('Phase 5 negative control: empty player pool fails the player assertion', async ({
+    page,
+  }) => {
+    // Proves the Phase 5 assertion is fed by GetAvailableDraftPlayers and
+    // nothing else (LS-10216): with an empty pool the board still renders at
+    // every tier, but the same player assertion must fail. If it passed here,
+    // Phase 5 would be passing for the wrong reason.
+    const { availablePlayersServed } = await installDraftBoardMocks(page, []);
+    await page.goto(`/baseball/league/${LEAGUE_ID}/draft`);
+    await page.waitForLoadState('load');
+
+    await openDraftBoardPlayerList(page);
+    await availablePlayersServed;
+    await expect(expectAvailablePlayerVisible(page, 3_000)).rejects.toThrow();
   });
 
   // -----------------------------------------------------------------------
