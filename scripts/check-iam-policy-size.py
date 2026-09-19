@@ -102,17 +102,20 @@ def hcl_body_to_json(hcl_body: str) -> str:
     """Convert an HCL object body to compact JSON, returning the JSON string.
 
     The bodies we deal with here are restricted: pure data (strings, lists,
-    objects), bare identifier keys, `=` between key and value, no commas, and
-    `${local.x}` interpolations. We:
+    objects), bare or quoted-string identifier keys, `=` between key and
+    value, no commas, and `${local.x}` interpolations. We:
 
     1. Substitute HCL interpolations with realistic values (so the size we
        report matches what jsonencode emits at apply time).
     2. Strip line comments.
     3. Quote bare identifier keys: `Effect = ` -> `"Effect": `.
-    4. Insert commas between adjacent values (`}{` -> `},{`, and between
+    4. Convert already-quoted keys' `=` to `:` — Terraform condition blocks
+       key on the literal AWS condition-key name, which contains a `:` and
+       so can't be a bare HCL identifier (e.g. `"iam:AWSServiceName" = ...`).
+    5. Insert commas between adjacent values (`}{` -> `},{`, and between
        a value and the next key on a new line).
-    5. Parse the result with `ast.literal_eval` (safe — pure data only).
-    6. Re-serialize as compact JSON.
+    6. Parse the result with `ast.literal_eval` (safe — pure data only).
+    7. Re-serialize as compact JSON.
 
     Raises ParseError if the body can't be parsed (which means it has shape
     we don't yet handle — investigate before trusting any size estimate).
@@ -129,6 +132,10 @@ def hcl_body_to_json(hcl_body: str) -> str:
 
     # Quote bare identifier keys preceding `=`.
     s = re.sub(r"(?m)([A-Za-z_]\w*)(\s*)=", r'"\1"\2:', s)
+
+    # Convert an already-quoted key's `=` to `:` (a quoted key is always the
+    # first non-whitespace token on its line in these policy bodies).
+    s = re.sub(r'(?m)^(\s*"[^"]*")(\s*)=', r"\1\2:", s)
 
     # Insert commas:
     #   - between `}` and `{` (adjacent objects in a list)

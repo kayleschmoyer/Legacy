@@ -1126,6 +1126,34 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
         Resource = [
           "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${local.name_prefix}-cloudtrail-forensics"
         ]
+      },
+      # LS-10190: aws_cloudwatch_metric_alarm.nat_instance_status_check_failed_system
+      # (monitoring.tf) includes 'arn:aws:automate:${region}:ec2:recover' in its
+      # alarm_actions. CloudWatch alarms with an EC2 automate action require the
+      # AWSServiceRoleForCloudWatchEvents service-linked role, and PutMetricAlarm
+      # tries to create it on demand if missing — which needs
+      # iam:CreateServiceLinkedRole. That role has never existed in this account
+      # (no prior alarm used an ec2 automate action), so every apply of this
+      # pre-existing alarm resource fails with a generic "AccessDenied:
+      # UnknownError" that doesn't name the real denied action. Root-caused via
+      # `aws iam simulate-principal-policy` (see LS-10190) — this is not an SCP
+      # and not a gap in the existing cloudwatch:PutMetricAlarm grant, both of
+      # which already work. Condition-scoped to the one AWS-service value this
+      # alarm actually needs, so the CI role can't create service-linked roles
+      # for arbitrary services.
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole"
+        ]
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/aws-service-role/events.amazonaws.com/AWSServiceRoleForCloudWatchEvents"
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:AWSServiceName" = "events.amazonaws.com"
+          }
+        }
       }
     ]
   })
