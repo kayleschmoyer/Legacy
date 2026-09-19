@@ -1070,13 +1070,21 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
       # glue:DeleteDatabase on resource: arn:...:table/legacy_sports_dev_cloudtrail/*").
       # A separate statement because no other action in the grant above needs
       # table-level resource access.
+      #
+      # LS-10172 follow-up 2: the same cascade applies to Glue user-defined
+      # functions under the database — AWS's documented DeleteDatabase
+      # resource set is catalog/database/table/userDefinedFunction. Confirmed
+      # via a real post-merge apply after the table/* grant above landed
+      # ("deleting Glue Catalog Database ... AccessDeniedException ...
+      # glue:DeleteDatabase on resource: arn:...:userDefinedFunction/legacy_sports_dev_cloudtrail/*").
       {
         Effect = "Allow"
         Action = [
           "glue:DeleteDatabase"
         ]
         Resource = [
-          "arn:aws:glue:${local.region}:${local.account_id}:table/*_cloudtrail/*"
+          "arn:aws:glue:${local.region}:${local.account_id}:table/*_cloudtrail/*",
+          "arn:aws:glue:${local.region}:${local.account_id}:userDefinedFunction/*_cloudtrail/*"
         ]
       },
       # Glue classifier actions, and glue:CreateCrawler, do not support
