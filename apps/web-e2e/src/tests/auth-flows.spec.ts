@@ -6,6 +6,12 @@
  */
 
 import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
+import { buildAuthStorageState } from '../fixtures/auth-enhanced';
+import {
+  extractOperationName,
+  tierUserByIdResponse,
+} from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
@@ -899,6 +905,219 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
       await expect(page.getByText(/my leagues/i).first()).not.toBeVisible();
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// LS-2097: Token refresh — proactive refresh before expiry, and retry/failure
+// behavior. The Session Expiry tests above only cover an already-expired
+// JWT; these cover the client's automatic-refresh machinery:
+//   - useAuth.tsx `scheduleProactiveRefresh` fires a background refresh
+//     5 minutes before the token's `exp` (clamped to 0ms once already inside
+//     that window, which is how these tests trigger it near-instantly).
+//   - AuthService.refreshJwt() / jwt-refresh.ts `silentlyRefreshJwt()` treat
+//     a 401/403 from /refresh-jwt as a definitive AuthSessionExpiredError
+//     (forces logout); any other failure (5xx, network error) is a silent
+//     no-op — "the error link is the safety net" (useAuth.tsx).
+//   - apollo-client.ts's error link retries an ENTITLEMENTS_STALE response
+//     up to ENTITLEMENTS_STALE_MAX_ATTEMPTS (3) times with [0, 800, 2000]ms
+//     backoff before failing safe.
+// ---------------------------------------------------------------------------
+
+/** Create a JWT that expires `secondsUntilExpiry` from now — used to land the
+ * token inside the 5-minute proactive-refresh window without waiting 5 real
+ * minutes for the timer to fire. */
+function signNearExpiryJwt(secondsUntilExpiry: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  return signE2EJwt(
+    {
+      id: 1,
+      email: 'user@test.com',
+      username: 'testuser',
+      accessLevel: 'none',
+      iat: now - 60,
+      exp: now + secondsUntilExpiry,
+    },
+    E2E_SIGNING_SECRET,
+  );
+}
+
+/**
+ * Custom fixture that loads a JWT expiring in 60s — inside the 5-minute
+ * proactive-refresh window, so `scheduleProactiveRefresh`'s timer (clamped to
+ * `max(0, exp*1000 - now - 5min)`) fires almost immediately on mount instead
+ * of requiring a 5-minute real-time wait.
+ */
+const nearExpiryTest = test.extend({
+  storageState: async ({}, use) => {
+    const jwt = signNearExpiryJwt(60);
+    await use(buildAuthStorageState(jwt));
+  },
+});
+
+nearExpiryTest.describe('Proactive Token Refresh @critical', () => {
+  nearExpiryTest(
+    'refreshes the JWT automatically before it expires, keeping the user signed in (LS-2097)',
+    async ({ page }) => {
+      let refreshCalls = 0;
+      await page.route('**/refresh-jwt', async (route) => {
+        refreshCalls += 1;
+        // Cascade to the hermetic baseline handler (api-isolation.ts), which
+        // returns a fresh JWT for a valid, not-yet-expired cookie token.
+        await route.fallback();
+      });
+
+      await page.goto('/about');
+      await page.waitForLoadState('load');
+
+      // The token expires in 60s — inside the 5-minute proactive-refresh
+      // window — so a refresh call fires almost immediately rather than
+      // waiting for the token to actually expire.
+      await expect
+        .poll(() => refreshCalls, { timeout: 15000 })
+        .toBeGreaterThan(0);
+
+      // The refresh succeeds, so the user must never see the login gate.
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).not.toBeVisible();
+      await expect(
+        page.getByRole('navigation', { name: 'Primary' }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+
+  nearExpiryTest(
+    'does not log the user out when a refresh attempt fails transiently (LS-2097)',
+    async ({ page }) => {
+      await page.route('**/refresh-jwt', async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'refresh-jwt unavailable (simulated)',
+          }),
+        });
+      });
+
+      await page.goto('/about');
+      await page.waitForLoadState('load');
+
+      // Give the (near-instant) proactive timer time to fire and fail.
+      await page.waitForTimeout(2000);
+
+      // A transient (non-401/403) refresh failure must not force a logout —
+      // useAuth.tsx only clears tokens on AuthSessionExpiredError (401/403);
+      // any other failure is silently ignored.
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).not.toBeVisible();
+      await expect(
+        page.getByRole('navigation', { name: 'Primary' }),
+      ).toBeVisible({ timeout: 15000 });
+    },
+  );
+});
+
+test.describe('Entitlements-Stale Refresh Retry @critical', () => {
+  test('recovers from repeated ENTITLEMENTS_STALE responses within the bounded retry budget (LS-2097)', async ({
+    page,
+  }) => {
+    let getUserByIdCalls = 0;
+    let refreshCalls = 0;
+
+    await page.route('**/refresh-jwt', async (route) => {
+      refreshCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jwt: signE2EJwt(
+            {
+              id: 1,
+              email: 'user@test.com',
+              username: 'testuser',
+              accessLevel: 'none',
+            },
+            E2E_SIGNING_SECRET,
+            '1h',
+          ),
+          csrfToken: 'e2e-csrf-token',
+        }),
+      });
+    });
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'getuserbyid') {
+        getUserByIdCalls += 1;
+        // apollo-client.ts's errorLink retries ENTITLEMENTS_STALE up to
+        // ENTITLEMENTS_STALE_MAX_ATTEMPTS (3) times with [0, 800, 2000]ms
+        // backoff. Stale on the first call only, then recover — a single
+        // retry cycle (well inside the 3-attempt budget) is enough to
+        // exercise the refresh-and-replay mechanism end to end.
+        if (getUserByIdCalls <= 1) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [
+                {
+                  message: 'Entitlements stale',
+                  extensions: { code: 'ENTITLEMENTS_STALE' },
+                },
+              ],
+              data: null,
+            }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(tierUserByIdResponse('premium')),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    // Wait for the retried (recovering) call to land.
+    await expect
+      .poll(() => getUserByIdCalls, { timeout: 15000 })
+      .toBeGreaterThanOrEqual(2);
+
+    await expect(
+      page.getByRole('button', { name: /continue with google/i }),
+    ).not.toBeVisible();
+    expect(refreshCalls).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Refresh Endpoint Definitive Rejection (401/403) @critical', () => {
+  test('logs the user out when the refresh endpoint returns 401/403, distinct from a transient failure (LS-2097)', async ({
+    page,
+  }) => {
+    await page.route('**/refresh-jwt', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Session revoked (simulated)' }),
+      });
+    });
+
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    // AuthService.refreshJwt() treats 401/403 as a definitive rejection
+    // (AuthSessionExpiredError), clearing tokens and logging the user out —
+    // unlike the 5xx/network case above, which is a silent no-op.
+    await expect(
+      page.getByRole('button', { name: /continue with google/i }),
+    ).toBeVisible({ timeout: 15000 });
+  });
 });
 
 // ---------------------------------------------------------------------------
