@@ -20,9 +20,12 @@ import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { resolveConfigDir, groupByConfigDir, getChangedFiles } = require(
-  resolve(__dirname, '..', 'lint-fix-changed.js'),
-);
+const {
+  resolveConfigDir,
+  groupByConfigDir,
+  getChangedFiles,
+  buildEslintFixInvocation,
+} = require(resolve(__dirname, '..', 'lint-fix-changed.js'));
 
 function git(root, args) {
   execFileSync('git', args, { cwd: root, stdio: 'pipe' });
@@ -156,6 +159,33 @@ test('getChangedFiles returns [] with no changes vs base', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('buildEslintFixInvocation spawns the resolved node interpreter, never a .bin shim (LS-10097)', () => {
+  // `node_modules/.bin/eslint` is a `.cmd`/`.bat` file on Windows.
+  // child_process.spawn/execFileSync refuses to invoke one without
+  // `shell: true` since Node's CVE-2024-27980 fix (EINVAL) — this pins the
+  // invocation staying on `process.execPath` + eslint's own JS entry point,
+  // which needs no shell on any platform and so can never regress into that
+  // failure mode.
+  const eslintEntry = join('node_modules', 'eslint', 'bin', 'eslint.js');
+  const { command, args } = buildEslintFixInvocation(eslintEntry, [
+    'src/Foo.ts',
+    'src/Bar.ts',
+  ]);
+
+  assert.equal(command, process.execPath);
+  assert.ok(
+    !/\.(cmd|bat)$/i.test(command),
+    `command must not be a .cmd/.bat shim: ${command}`,
+  );
+  assert.deepEqual(args, [
+    eslintEntry,
+    '--fix',
+    '--fix-type=problem,suggestion,layout',
+    'src/Foo.ts',
+    'src/Bar.ts',
+  ]);
 });
 
 test('getChangedFiles fails safe (returns null) when git errors', () => {

@@ -159,6 +159,25 @@ function groupByConfigDir(files, root) {
   return byConfigDir;
 }
 
+/**
+ * Build the `execFileSync` invocation for one config-dir group's autofix
+ * pass. Pulled out of `main()`'s loop so a test can pin the EINVAL-safe
+ * invariant directly: always `process.execPath` (a real executable, never a
+ * `.cmd`/`.bat` shim), so this can never regress into spawning
+ * `node_modules/.bin/eslint.CMD` without `shell: true` (LS-10097).
+ */
+function buildEslintFixInvocation(eslintEntry, relFiles) {
+  return {
+    command: process.execPath,
+    args: [
+      eslintEntry,
+      '--fix',
+      '--fix-type=problem,suggestion,layout',
+      ...relFiles,
+    ],
+  };
+}
+
 function main() {
   const root = resolve(__dirname, '..');
   const eslintEntry = resolve(root, ESLINT_JS_ENTRY);
@@ -192,13 +211,8 @@ function main() {
       `  Fixing ${relFiles.length} file(s) in ${label}...\n`,
     );
     try {
-      const args = [
-        eslintEntry,
-        '--fix',
-        '--fix-type=problem,suggestion,layout',
-        ...relFiles,
-      ];
-      execFileSync(process.execPath, args, {
+      const { command, args } = buildEslintFixInvocation(eslintEntry, relFiles);
+      execFileSync(command, args, {
         cwd: configDir,
         stdio: 'inherit',
       });
@@ -230,4 +244,9 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { resolveConfigDir, groupByConfigDir, getChangedFiles };
+module.exports = {
+  resolveConfigDir,
+  groupByConfigDir,
+  getChangedFiles,
+  buildEslintFixInvocation,
+};
