@@ -71,6 +71,13 @@ export async function selectAndAssignGameIdentifiers(
     // player's assigned season), distinct from pitcherStartSkipped, which
     // is reserved for real SP rotation skips — conflating the two inflated
     // the "off days" count shown to users for hitters (LS-9122).
+    //
+    // The two flags are mutually exclusive by design, so SP-skipped rows are
+    // excluded here: they are intentional placeholders with a null
+    // gameIdentifier, not a data gap. Without this filter a single no-data run
+    // permanently stamped them noGameDataFound, and the matchup view (which
+    // checks noGameDataFound before pitcherStartSkipped) then rendered
+    // "Stats unavailable" instead of the off-day count (LS-10234).
     await db
       .update(PublicSchema.matchupPlayerGames)
       .set({ noGameDataFound: true, statsLoadingStatus: 'completed' })
@@ -78,6 +85,7 @@ export async function selectAndAssignGameIdentifiers(
         and(
           eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
           isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+          eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, false),
         ),
       );
     return;
@@ -86,6 +94,24 @@ export async function selectAndAssignGameIdentifiers(
   LOGGER.info(
     `Found ${uniqueGames.length} unique games for player ${playerId} season ${season}`,
   );
+
+  // Real per-game data exists for this player/season, so any noGameDataFound
+  // left on an SP-skipped row is stale — written by an earlier run that found
+  // no data (e.g. BBRef returned [] before Retrosheet backfilled the season).
+  // Heal it in one round-trip. This runs before the "nothing to assign" early
+  // return below on purpose: the rows that exhibit the bug typically have all
+  // their non-skipped slots already assigned, so a heal placed after that
+  // return would never fire for them (LS-10234).
+  await db
+    .update(PublicSchema.matchupPlayerGames)
+    .set({ noGameDataFound: false })
+    .where(
+      and(
+        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
+        eq(PublicSchema.matchupPlayerGames.pitcherStartSkipped, true),
+        eq(PublicSchema.matchupPlayerGames.noGameDataFound, true),
+      ),
+    );
 
   // Get records that need game_identifier assignment (null gameIdentifier, not SP-skipped).
   // pitcherStartSkipped rows are intentional placeholders — never assign them a real game.

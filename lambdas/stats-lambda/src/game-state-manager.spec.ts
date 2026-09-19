@@ -4,6 +4,11 @@
  * `pitcherStartSkipped` (LS-9122). Conflating the two caused hitters with
  * a data-availability gap to be mislabeled as having real off days,
  * inflating the "off days" count shown on the matchup page.
+ *
+ * LS-10234 extends this to the inverse direction: the no-data branch must
+ * not stamp `noGameDataFound` onto `pitcherStartSkipped` rows, and a later
+ * run that does find real game data must clear any flag a previous run
+ * already left on them.
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -114,8 +119,41 @@ import {
 
 type TableResults = Map<unknown, Array<{ gameIdentifier: string | null }>>;
 
-function createMockDb(resultsByTable: TableResults) {
+/**
+ * Flatten a drizzle SQL predicate into readable text. The schema stubs above
+ * are plain strings, so drizzle appends them to `queryChunks` verbatim and a
+ * recursive walk renders e.g. `(mpg.matchupPlayerId = 42 and ...)`. Used to
+ * assert on UPDATE WHERE clauses, which is the only place the
+ * noGameDataFound/pitcherStartSkipped mutual exclusion is observable.
+ */
+function renderSql(chunk: unknown): string {
+  if (chunk == null) return '';
+  if (typeof chunk === 'string') return chunk;
+  // Bound values are appended to queryChunks unwrapped, so a predicate's
+  // right-hand side arrives as a raw number or boolean (e.g. 42, false).
+  if (typeof chunk === 'number' || typeof chunk === 'boolean')
+    return String(chunk);
+  if (typeof chunk !== 'object') return '';
+  const node = chunk as { value?: unknown; queryChunks?: unknown[] };
+  if (Array.isArray(node.value)) return node.value.join('');
+  if (Array.isArray(node.queryChunks))
+    return node.queryChunks.map(renderSql).join('');
+  return '';
+}
+
+/**
+ * @param resultsByTable per-stat-table `selectDistinct` results
+ * @param selectResults  `select()` results consumed in call order — the
+ *                       production code issues them as: unassigned slots,
+ *                       then already-used game identifiers
+ */
+function createMockDb(
+  resultsByTable: TableResults,
+  selectResults: Array<Array<Record<string, unknown>>> = [],
+) {
   const updateSetCalls: Array<Record<string, unknown>> = [];
+  const updateWhereCalls: unknown[] = [];
+  let selectCallCount = 0;
 
   const db = {
     selectDistinct: jest.fn(() => ({
@@ -123,20 +161,29 @@ function createMockDb(resultsByTable: TableResults) {
         where: jest.fn(() => Promise.resolve(resultsByTable.get(table) ?? [])),
       })),
     })),
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => Promise.resolve([])),
-      })),
-    })),
+    select: jest.fn(() => {
+      const result = selectResults[selectCallCount] ?? [];
+      selectCallCount++;
+      return {
+        from: jest.fn(() => ({
+          where: jest.fn(() => Promise.resolve(result)),
+        })),
+      };
+    }),
     update: jest.fn(() => ({
       set: jest.fn((values: Record<string, unknown>) => {
         updateSetCalls.push(values);
-        return { where: jest.fn(() => Promise.resolve(undefined)) };
+        return {
+          where: jest.fn((condition: unknown) => {
+            updateWhereCalls.push(condition);
+            return Promise.resolve(undefined);
+          }),
+        };
       }),
     })),
   };
 
-  return { db, updateSetCalls };
+  return { db, updateSetCalls, updateWhereCalls };
 }
 
 describe('selectAndAssignGameIdentifiers', () => {
@@ -156,6 +203,62 @@ describe('selectAndAssignGameIdentifiers', () => {
       statsLoadingStatus: 'completed',
     });
     expect(updateSetCalls[0]).not.toHaveProperty('pitcherStartSkipped');
+  });
+
+  // LS-10234: noGameDataFound and pitcherStartSkipped are mutually exclusive
+  // by design (LS-9122), but the no-data branch bulk-flagged every row with a
+  // null gameIdentifier — SP-skipped placeholders included — and nothing ever
+  // cleared it again. The matchup view checks noGameDataFound first, so an
+  // affected player rendered "Stats unavailable" instead of "N off days" even
+  // after real games were assigned and scored.
+  it('excludes pitcherStartSkipped rows from the no-data bulk flag', async () => {
+    const { db, updateWhereCalls } = createMockDb(
+      new Map([
+        [gameBatting, []],
+        [gamePitching, []],
+      ]),
+    );
+
+    await selectAndAssignGameIdentifiers(db as never, 42, 2836, 1890);
+
+    // Negative control: on the unfixed code this WHERE has no
+    // pitcherStartSkipped term, so the assertion below fails.
+    expect(updateWhereCalls).toHaveLength(1);
+    expect(renderSql(updateWhereCalls[0])).toBe(
+      '(mpg.matchupPlayerId = 42 and mpg.gameIdentifier is null and mpg.pitcherStartSkipped = false)',
+    );
+  });
+
+  it('clears stale noGameDataFound on SP-skipped rows once real game data exists, even when there is nothing left to assign', async () => {
+    const { db, updateSetCalls, updateWhereCalls } = createMockDb(
+      new Map([[gameBatting, [{ gameIdentifier: 'BLN189706120' }]]]),
+      // No unassigned non-skipped slots — the state of the reported row
+      // (matchup_player 3793673), whose real slots were already filled.
+      [[]],
+    );
+
+    await selectAndAssignGameIdentifiers(db as never, 42, 2836, 1897);
+
+    // Negative control: the unfixed code issues no UPDATE at all here.
+    expect(updateSetCalls).toEqual([{ noGameDataFound: false }]);
+    expect(renderSql(updateWhereCalls[0])).toBe(
+      '(mpg.matchupPlayerId = 42 and mpg.pitcherStartSkipped = true and mpg.noGameDataFound = true)',
+    );
+  });
+
+  it('heals stale SP-skipped rows before assigning the remaining slots', async () => {
+    const { db, updateSetCalls } = createMockDb(
+      new Map([[gameBatting, [{ gameIdentifier: 'CHN189705312' }]]]),
+      // One unassigned non-skipped slot, then the already-used lookup.
+      [[{ id: 7 }], []],
+    );
+
+    await selectAndAssignGameIdentifiers(db as never, 42, 2836, 1897);
+
+    expect(updateSetCalls).toEqual([
+      { noGameDataFound: false },
+      { gameIdentifier: 'CHN189705312', noGameDataFound: false },
+    ]);
   });
 });
 
