@@ -29,6 +29,7 @@ const config: Config = {
     '^@legacy-sports/mcp-docs$': '<rootDir>/../../../lib/mcp-docs/src/index.ts',
     '^@legacy-sports/mcp-docs/pages/github$':
       '<rootDir>/../../../lib/mcp-docs/src/pages/github.generated.ts',
+    '^@legacy-sports/mcp-jobs$': '<rootDir>/../../../lib/mcp-jobs/src/index.ts',
     // NodeNext resolution uses .js extensions in imports; strip them for @swc/jest
     '^(\\.{1,2}/.+)\\.js$': '$1',
   },

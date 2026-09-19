@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { registerJobChild } from '@legacy-sports/mcp-jobs';
 import { execFile } from 'node:child_process';
 import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
@@ -59,7 +60,7 @@ function runGit(
   timeout = 120_000,
 ): Promise<string> {
   return new Promise((resolvePromise, rejectPromise) => {
-    execFile(
+    const child = execFile(
       GIT_CMD,
       args,
       {
@@ -82,6 +83,10 @@ function runGit(
         }
       },
     );
+    // Opts this git child into the enclosing job's tree-kill-on-timeout, if
+    // any (no-op outside a runWithChildTracking job — e.g. the Lambda path
+    // never runs git at all, and non-job callers just skip this).
+    registerJobChild(child);
   });
 }
 

@@ -66,3 +66,33 @@ Consumers: `tools/mcp/nx-server` (via its `src/jobs.ts` binding),
 (`packer-build.ts`). Import via the `@legacy-sports/mcp-jobs` path alias
 (`tsconfig.base.json` + per-server tsconfig paths + per-server jest
 `moduleNameMapper`), the same wiring as `@legacy-sports/mcp-format`.
+
+## Fn-job support (github-server, LS-8574)
+
+`createJobRunner` above models a job as a single spawned OS command. Some
+servers' background jobs are a different shape — an in-process async
+function that itself spawns several short-lived child processes and
+interleaves them with other async work (github-server's rebase-pr/bulk-rebase/
+open-pr jobs run `git` alongside GitHub API calls) — which doesn't fit
+`startJob`'s `{ command, args }` contract. For those, this package exports:
+
+- **`createFnJobRunner({ idPrefix, dirName })`** — disk-persisted job
+  _existence_ records only (jobId/label/startTime/done), namespaced the same
+  way as `createJobRunner`. A fn-job's promise and closure die with the MCP
+  server, so a restart can never recover its actual result the way a
+  command-job's exit-sidecar can — but a record found on disk and absent from
+  the caller's own in-memory registry can still be reported `orphaned`
+  instead of a bare "not found".
+- **`runWithChildTracking(fn, { timeoutMs })`** + **`registerJobChild(child)`**
+  — run `fn` with an `AsyncLocalStorage`-scoped registry of any child
+  processes it spawns (call `registerJobChild` right after each `spawn`/
+  `execFile`, no signature changes needed elsewhere). If `timeoutMs` elapses
+  before `fn` settles, every registered child is tree-killed (same
+  `killJobTree` used above) and the promise rejects — the caller's existing
+  error handling for a thrown `fn` covers this case too.
+
+The actual job registry (in-memory record, result storage, running/done
+snapshot formatting into the server's own `ToolResult` type) stays in the
+consuming server's own `jobs.ts`, mirroring how `createJobRunner` leaves
+`ToolResult` formatting to each command-based server's own job-tools.ts. See
+`tools/mcp/github-server/src/jobs.ts` for the full binding.

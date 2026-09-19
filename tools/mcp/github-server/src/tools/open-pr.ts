@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { registerJobChild } from '@legacy-sports/mcp-jobs';
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -73,7 +74,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
 function runGitPush(cwd: string, remote = 'origin'): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       'git',
       ['push', '-u', remote, 'HEAD', '--force-with-lease'],
       { cwd, timeout: 120_000 },
@@ -85,12 +86,13 @@ function runGitPush(cwd: string, remote = 'origin'): Promise<string> {
         }
       },
     );
+    registerJobChild(child);
   });
 }
 
 function getCurrentBranch(cwd: string): Promise<string> {
   return new Promise((res, reject) => {
-    execFile(
+    const child = execFile(
       'git',
       ['rev-parse', '--abbrev-ref', 'HEAD'],
       { cwd, timeout: 5_000 },
@@ -99,12 +101,13 @@ function getCurrentBranch(cwd: string): Promise<string> {
         else res(stdout.trim());
       },
     );
+    registerJobChild(child);
   });
 }
 
 function getUpstreamBranch(cwd: string): Promise<string | null> {
   return new Promise((res) => {
-    execFile(
+    const child = execFile(
       'git',
       ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
       { cwd, timeout: 5_000 },
@@ -116,6 +119,7 @@ function getUpstreamBranch(cwd: string): Promise<string | null> {
         }
       },
     );
+    registerJobChild(child);
   });
 }
 

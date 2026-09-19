@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -12,9 +12,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  createFnJobRunner,
   createJobRunner,
   encodeCommandAndArgs,
   PS_WRAPPER_SCRIPT,
+  registerJobChild,
+  runWithChildTracking,
   SIDECAR_INVOKE_FAILURE_MARKER,
 } from './index';
 
@@ -801,5 +804,101 @@ describe('PS_WRAPPER_SCRIPT on Windows PowerShell 5.1 / Desktop edition (LS-1006
 
     expect(result.status).toBe(0);
     expect(readFileSync(exitPath, 'utf-8').trim()).toBe('0');
+  });
+});
+
+describe('createFnJobRunner (LS-8574)', () => {
+  const runner = createFnJobRunner({
+    idPrefix: 'test-fn',
+    dirName: 'mcp-jobs-fn-test',
+  });
+
+  it('produces namespaced, unique job ids', () => {
+    const a = runner.newJobId();
+    const b = runner.newJobId();
+    expect(a).toMatch(/^test-fn-/);
+    expect(a).not.toBe(b);
+  });
+
+  it('round-trips a persisted meta record', () => {
+    const jobId = runner.newJobId();
+    expect(runner.readMeta(jobId)).toBeNull();
+
+    runner.persistMeta(jobId, 'my-label', 12345, false);
+    expect(runner.readMeta(jobId)).toEqual({
+      jobId,
+      label: 'my-label',
+      startTime: 12345,
+      done: false,
+    });
+
+    runner.persistMeta(jobId, 'my-label', 12345, true);
+    expect(runner.readMeta(jobId)?.done).toBe(true);
+
+    runner.deleteMeta(jobId);
+    expect(runner.readMeta(jobId)).toBeNull();
+  });
+
+  it('lists persisted records, ignoring non-json files in the same dir', () => {
+    const jobId = runner.newJobId();
+    runner.persistMeta(jobId, 'listed', Date.now(), false);
+    try {
+      const metas = runner.listMetas();
+      expect(metas.some((m) => m.jobId === jobId)).toBe(true);
+    } finally {
+      runner.deleteMeta(jobId);
+    }
+  });
+
+  it('readMeta returns null for an unknown jobId', () => {
+    expect(runner.readMeta('test-fn-does-not-exist')).toBeNull();
+  });
+});
+
+describe('runWithChildTracking / registerJobChild (LS-8574)', () => {
+  it('returns the fn result unchanged when no timeout is set', async () => {
+    const result = await runWithChildTracking(() => Promise.resolve('ok'));
+    expect(result).toBe('ok');
+  });
+
+  it('registerJobChild is a no-op outside a tracked run', () => {
+    const child = spawn('node', ['-e', 'setTimeout(() => {}, 1000)']);
+    expect(() => registerJobChild(child)).not.toThrow();
+    child.kill();
+  });
+
+  it('tree-kills a registered child and rejects when timeoutMs elapses', async () => {
+    let childPid: number | undefined;
+    await expect(
+      runWithChildTracking(
+        () =>
+          new Promise((_resolve, reject) => {
+            const child = spawn('node', ['-e', 'setTimeout(() => {}, 30000)']);
+            childPid = child.pid;
+            registerJobChild(child);
+            child.on('error', reject);
+          }),
+        { timeoutMs: 200 },
+      ),
+    ).rejects.toThrow(/timed out after 200ms/);
+
+    // Give the SIGTERM a moment to land, then confirm the process is gone.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(childPid).toBeDefined();
+    expect(() => process.kill(childPid as number, 0)).toThrow();
+  }, 10_000);
+
+  it('does not kill a child that finishes before the timeout', async () => {
+    const result = await runWithChildTracking(
+      () =>
+        new Promise<string>((resolvePromise, reject) => {
+          const child = spawn('node', ['-e', 'process.exit(0)']);
+          registerJobChild(child);
+          child.on('close', () => resolvePromise('done'));
+          child.on('error', reject);
+        }),
+      { timeoutMs: 5_000 },
+    );
+    expect(result).toBe('done');
   });
 });

@@ -217,13 +217,13 @@ Create, update, or delete an issue/PR comment. Works on both issue comments and 
 
 ### `github_job_list`
 
-List recent background jobs (newest first). In-memory only — jobs do not survive an MCP server restart.
+List recent background jobs (newest first). A job from a previous server process reports orphaned instead of running/done.
 
 _No parameters._
 
 ### `github_job_status`
 
-Non-blocking snapshot of a background job started by github_bulk_rebase or github_open_pr. Returns the originating tool's final result once done, or { status: "running", logTail } while in progress.
+Non-blocking snapshot of a background job started by github_bulk_rebase or github_open_pr. Returns the final result once done, { status: "running", logTail } while in progress, or "orphaned" for a jobId from a prior server process.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

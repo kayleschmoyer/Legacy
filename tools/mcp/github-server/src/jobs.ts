@@ -1,4 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  createFnJobRunner,
+  type FnJobMetaRecord,
+  runWithChildTracking,
+} from '@legacy-sports/mcp-jobs';
 import type { ToolResult } from './types.js';
 
 /**
@@ -7,21 +12,39 @@ import type { ToolResult } from './types.js';
  *
  * Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every
  * tool call, so no tool may block longer than MAX_WAIT_MS in a single call.
- * Unlike nx-server's child-process job runner (tools/mcp/nx-server/src/jobs.ts),
- * the work here is an async TS function that interleaves git child processes
- * with GitHub API calls — so jobs run as in-process promises tracked in a
- * registry. Callers get the tool's final ToolResult when the work finishes
- * within the sync budget, or a { jobId, status: "running" } snapshot to poll
- * with github_job_wait / github_job_status.
+ * Unlike nx/make/aws-server's `@legacy-sports/mcp-jobs` `createJobRunner`
+ * binding — a single spawned OS command — the work here is an async TS
+ * function that interleaves `git` child processes with GitHub API calls, so
+ * jobs run as in-process promises tracked in a registry. Callers get the
+ * tool's final ToolResult when the work finishes within the sync budget, or
+ * a { jobId, status: "running" } snapshot to poll with github_job_wait /
+ * github_job_status.
  *
- * Jobs do NOT survive an MCP server restart — a lost jobId means the outcome
- * must be re-verified (e.g. re-check the PR state), not silently re-run.
+ * The promise itself does NOT survive an MCP server restart — a lost jobId
+ * means the outcome must be re-verified (e.g. re-check the PR state), not
+ * silently re-run. What does survive: `@legacy-sports/mcp-jobs`'s
+ * `createFnJobRunner` persists a lightweight existence record per job to
+ * disk (namespaced under `github-mcp-jobs`), so a restarted server can still
+ * tell a caller "yes, a previous process started that jobId" and report it
+ * `orphaned` instead of a bare "not found" — and any `git` child process a
+ * job spawned is tree-killed if the job's own wall-clock budget
+ * (FN_JOB_TIMEOUT_MS) expires, via `runWithChildTracking`/`registerJobChild`
+ * (see rebase-pr.ts / open-pr.ts's git-spawn helpers). See LS-8574 and
+ * `lib/mcp-jobs/src/index.ts`'s "Fn-job support" section for the full
+ * rationale for this split from the command-based `createJobRunner`.
  */
 
 /** Hard cap for any single blocking wait — stays under the ~60s MCP transport timeout. */
 export const MAX_WAIT_MS = 55_000;
 /** Default synchronous budget before a tool call returns a running snapshot. */
 export const SYNC_BUDGET_MS = 45_000;
+/**
+ * Wall-clock ceiling for a whole job's fn — generous headroom over the
+ * longest single git call (rebasePRWorker's rebase step) plus GitHub API
+ * round-trips, so a hung `git`/network call is reaped instead of leaking a
+ * job (and its child process) forever.
+ */
+const FN_JOB_TIMEOUT_MS = 10 * 60_000;
 const LOG_TAIL_CHARS = 5_000;
 const JOB_LIST_LIMIT = 20;
 /** Completed jobs kept for late status queries before being pruned. */
@@ -44,9 +67,12 @@ interface FnJobRecord {
 // Authoritative for jobs spawned by this server process; in-memory only.
 const registry = new Map<string, FnJobRecord>();
 
-function newJobId(): string {
-  return `gh-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+// Disk-persisted existence records — lets a restarted server report
+// `orphaned` for a jobId it did not itself spawn (AC2, LS-8574).
+const diskJobs = createFnJobRunner({
+  idPrefix: 'gh',
+  dirName: 'github-mcp-jobs',
+});
 
 function waitHint(jobId: string): string {
   return (
@@ -62,6 +88,9 @@ function pruneDoneJobs(): void {
     .sort((a, b) => b.startTime - a.startTime);
   for (const record of done.slice(DONE_JOB_RETENTION)) {
     registry.delete(record.jobId);
+    // The job completed normally in this process — its disk record no
+    // longer serves the orphan-detection this exists for.
+    diskJobs.deleteMeta(record.jobId);
   }
 }
 
@@ -75,19 +104,24 @@ export function startFnJob(
   fn: (log: JobLogger) => Promise<ToolResult>,
 ): string {
   pruneDoneJobs();
-  const jobId = newJobId();
+  const jobId = diskJobs.newJobId();
+  const startTime = Date.now();
   const record: FnJobRecord = {
     jobId,
     label,
-    startTime: Date.now(),
+    startTime,
     done: false,
     result: null,
     logLines: [],
     settled: Promise.resolve(),
   };
+  diskJobs.persistMeta(jobId, label, startTime, false);
   record.settled = (async () => {
     try {
-      record.result = await fn((line) => record.logLines.push(line));
+      record.result = await runWithChildTracking(
+        () => fn((line) => record.logLines.push(line)),
+        { timeoutMs: FN_JOB_TIMEOUT_MS },
+      );
     } catch (err) {
       record.result = {
         isError: true,
@@ -105,6 +139,7 @@ export function startFnJob(
       };
     } finally {
       record.done = true;
+      diskJobs.persistMeta(jobId, label, startTime, true);
     }
   })();
   registry.set(jobId, record);
@@ -129,15 +164,41 @@ function runningSnapshot(record: FnJobRecord): ToolResult {
   };
 }
 
+function orphanedSnapshot(meta: FnJobMetaRecord): ToolResult {
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          jobId: meta.jobId,
+          status: 'orphaned',
+          label: meta.label,
+          elapsedSec: Math.round((Date.now() - meta.startTime) / 1000),
+          hint:
+            'This job was started by a previous MCP server process. Its outcome was an ' +
+            'in-process result that does not survive a restart, so it cannot be recovered ' +
+            'here — verify the outcome directly (e.g. github_view_pr / worktree_status) ' +
+            'instead of re-running the command.',
+        }),
+      },
+    ],
+  };
+}
+
 /**
  * Non-blocking snapshot: the terminal ToolResult when done, a running
- * snapshot otherwise, or null for an unknown jobId.
+ * snapshot otherwise, an orphaned snapshot for a jobId a previous server
+ * process started, or null for a jobId that was never started at all.
  */
 export function snapshotFnJob(jobId: string): ToolResult | null {
   const record = registry.get(jobId);
-  if (!record) return null;
-  if (record.done && record.result) return record.result;
-  return runningSnapshot(record);
+  if (record) {
+    if (record.done && record.result) return record.result;
+    return runningSnapshot(record);
+  }
+  const meta = diskJobs.readMeta(jobId);
+  return meta ? orphanedSnapshot(meta) : null;
 }
 
 /**
@@ -150,7 +211,7 @@ export async function waitForFnJob(
   maxWaitMs = MAX_WAIT_MS,
 ): Promise<ToolResult | null> {
   const record = registry.get(jobId);
-  if (!record) return null;
+  if (!record) return snapshotFnJob(jobId);
   if (!record.done) {
     let timer: NodeJS.Timeout | undefined;
     await Promise.race([
@@ -183,20 +244,44 @@ export async function runWithSyncBudget(
 export interface FnJobSummary {
   jobId: string;
   label: string;
-  status: 'running' | 'done';
+  status: 'running' | 'done' | 'orphaned';
   elapsedSec: number;
 }
 
-/** List recent jobs (newest first, capped). In-memory only — resets with the server. */
+/**
+ * List recent jobs (newest first, capped). Merges the in-memory registry
+ * (this process) with disk-persisted records from previous server processes
+ * that this process never spawned (reported `orphaned`, per AC2).
+ */
 export function listFnJobs(): FnJobSummary[] {
-  return [...registry.values()]
+  const inMemory: Array<FnJobSummary & { startTime: number }> = [
+    ...registry.values(),
+  ].map((r) => ({
+    jobId: r.jobId,
+    label: r.label,
+    status: r.done ? ('done' as const) : ('running' as const),
+    elapsedSec: Math.round((Date.now() - r.startTime) / 1000),
+    startTime: r.startTime,
+  }));
+  const knownIds = new Set(inMemory.map((j) => j.jobId));
+  const orphaned: Array<FnJobSummary & { startTime: number }> = diskJobs
+    .listMetas()
+    .filter((m) => !knownIds.has(m.jobId))
+    .map((m) => ({
+      jobId: m.jobId,
+      label: m.label,
+      status: 'orphaned' as const,
+      elapsedSec: Math.round((Date.now() - m.startTime) / 1000),
+      startTime: m.startTime,
+    }));
+  return [...inMemory, ...orphaned]
     .sort((a, b) => b.startTime - a.startTime)
     .slice(0, JOB_LIST_LIMIT)
-    .map((r) => ({
-      jobId: r.jobId,
-      label: r.label,
-      status: r.done ? ('done' as const) : ('running' as const),
-      elapsedSec: Math.round((Date.now() - r.startTime) / 1000),
+    .map(({ jobId, label, status, elapsedSec }) => ({
+      jobId,
+      label,
+      status,
+      elapsedSec,
     }));
 }
 

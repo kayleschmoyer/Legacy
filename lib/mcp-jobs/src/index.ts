@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { type ChildProcess, spawn } from 'node:child_process';
 import {
   closeSync,
@@ -6,6 +7,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -859,4 +861,193 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
   }
 
   return { startJob, snapshotJob, waitForJob, runJobWithBudget, listJobs };
+}
+
+// ---------------------------------------------------------------------------
+// Fn-job support (github-server, LS-8574)
+// ---------------------------------------------------------------------------
+//
+// `createJobRunner` above models a job as a single spawned OS command — the
+// right fit for nx/make/aws-server, whose long-running work is exactly that.
+// github-server's background jobs (rebase-pr, bulk-rebase, open-pr's push
+// phase) are different in kind: an in-process async TS function that
+// interleaves several short-lived `git` child processes with GitHub API
+// calls, tracked as a JS promise rather than a single OS process. That
+// promise and its closure die with the MCP server, so a restart can never
+// resume or re-report a fn-job's actual outcome the way a command-job's
+// exit-sidecar can — but it can still offer the same disk-persisted
+// existence check ("did a previous process start this jobId, and is it
+// unaccounted for?") and the same process-tree kill for whatever `git`
+// children the fn spawned before it hung.
+//
+// `createFnJobRunner` supplies the disk-persistence half (namespaced by
+// idPrefix/dirName, same as `createJobRunner`); `runWithChildTracking` +
+// `registerJobChild` supply the tree-kill half. The actual job registry
+// (in-memory record, result storage, running/done snapshot shaping into a
+// server's own `ToolResult` type) stays in each fn-based server's own
+// `jobs.ts`, since that shape is inherently server-specific — mirroring how
+// `createJobRunner` above stays result-agnostic and leaves ToolResult
+// formatting to each command-based server's own job-tools.ts.
+
+export interface FnJobMetaRecord {
+  jobId: string;
+  label: string;
+  startTime: number;
+  done: boolean;
+}
+
+export interface FnJobRunnerConfig {
+  /** jobId prefix, e.g. 'gh' produces ids like `gh-<epoch>-<rand>`. */
+  idPrefix: string;
+  /**
+   * Directory name under the OS tmpdir holding this runner's per-job meta
+   * files, e.g. 'github-mcp-jobs'. Namespaced per server, same as
+   * `createJobRunner`'s `dirName`.
+   */
+  dirName: string;
+}
+
+export interface FnJobRunner {
+  /** New jobId under this runner's idPrefix. */
+  newJobId: () => string;
+  /** Persist (or overwrite) a job's existence record. Best-effort. */
+  persistMeta: (
+    jobId: string,
+    label: string,
+    startTime: number,
+    done: boolean,
+  ) => void;
+  /** Remove a job's on-disk record — call once it no longer needs cross-restart detection (e.g. pruned from the in-memory registry after completing normally in this process). */
+  deleteMeta: (jobId: string) => void;
+  /** Load one job's on-disk record, or null if none exists. */
+  readMeta: (jobId: string) => FnJobMetaRecord | null;
+  /** All on-disk job records for this runner (any status). */
+  listMetas: () => FnJobMetaRecord[];
+}
+
+/** Create a disk-persistence helper for one fn-based MCP server's jobs. */
+export function createFnJobRunner(config: FnJobRunnerConfig): FnJobRunner {
+  function jobsDir(): string {
+    const dir = join(tmpdir(), config.dirName);
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  function metaPathFor(jobId: string): string {
+    return join(jobsDir(), `${jobId}.json`);
+  }
+
+  function newJobId(): string {
+    return `${config.idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function persistMeta(
+    jobId: string,
+    label: string,
+    startTime: number,
+    done: boolean,
+  ): void {
+    try {
+      writeFileSync(
+        metaPathFor(jobId),
+        JSON.stringify({ jobId, label, startTime, done }),
+      );
+    } catch {
+      // Metadata persistence is best-effort — the in-memory record still works.
+    }
+  }
+
+  function deleteMeta(jobId: string): void {
+    try {
+      unlinkSync(metaPathFor(jobId));
+    } catch {
+      // Already gone, or never persisted — nothing to clean up.
+    }
+  }
+
+  function readMeta(jobId: string): FnJobMetaRecord | null {
+    try {
+      return JSON.parse(
+        readFileSync(metaPathFor(jobId), 'utf-8'),
+      ) as FnJobMetaRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  function listMetas(): FnJobMetaRecord[] {
+    let files: string[];
+    try {
+      files = readdirSync(jobsDir());
+    } catch {
+      return [];
+    }
+    const metas: FnJobMetaRecord[] = [];
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const meta = readMeta(file.slice(0, -'.json'.length));
+      if (meta) metas.push(meta);
+    }
+    return metas;
+  }
+
+  return { newJobId, persistMeta, deleteMeta, readMeta, listMetas };
+}
+
+interface FnJobTrackingContext {
+  registerChild: (child: ChildProcess) => void;
+}
+
+const fnJobTracking = new AsyncLocalStorage<FnJobTrackingContext>();
+
+/**
+ * Register a spawned child process against the currently-running
+ * `runWithChildTracking` call, if any — a no-op outside one. Lets a shared
+ * git-spawn helper opt a job's `git` children into tree-kill-on-timeout
+ * without threading a callback through every call site.
+ */
+export function registerJobChild(child: ChildProcess): void {
+  fnJobTracking.getStore()?.registerChild(child);
+}
+
+/**
+ * Run `fn` with child-process tracking and an optional wall-clock timeout,
+ * for fn-based jobs (see the section doc comment above). Any child process
+ * spawned inside `fn` and registered via `registerJobChild` is tree-killed
+ * (same `killJobTree` used for command jobs) if `timeoutMs` elapses before
+ * `fn` settles, and the returned promise rejects — the caller's existing
+ * error handling for a thrown `fn` then applies unchanged.
+ */
+export async function runWithChildTracking<T>(
+  fn: () => Promise<T>,
+  opts: { timeoutMs?: number } = {},
+): Promise<T> {
+  const children = new Set<ChildProcess>();
+  const context: FnJobTrackingContext = {
+    registerChild: (child) => {
+      children.add(child);
+      child.once('exit', () => children.delete(child));
+    },
+  };
+  return fnJobTracking.run(context, async () => {
+    if (!opts.timeoutMs) return fn();
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            for (const child of children) killJobTree(child);
+            reject(
+              new Error(
+                `Job timed out after ${opts.timeoutMs}ms — any spawned child processes were killed`,
+              ),
+            );
+          }, opts.timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  });
 }

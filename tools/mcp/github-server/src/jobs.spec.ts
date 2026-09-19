@@ -1,3 +1,4 @@
+import { createFnJobRunner } from '@legacy-sports/mcp-jobs';
 import {
   listFnJobs,
   runWithSyncBudget,
@@ -126,6 +127,64 @@ describe('job tools', () => {
 
     release();
     await waitForFnJob(jobId);
+  });
+});
+
+describe('orphaned jobs (LS-8574)', () => {
+  // Simulates "a previous MCP server process spawned this job" by writing a
+  // disk record directly — jobs.ts's own in-memory registry never learns
+  // about it, exactly like a real restart.
+  const diskJobs = createFnJobRunner({
+    idPrefix: 'gh',
+    dirName: 'github-mcp-jobs',
+  });
+
+  it('snapshotFnJob reports orphaned for a jobId only known on disk', () => {
+    const jobId = diskJobs.newJobId();
+    diskJobs.persistMeta(jobId, 'from-a-dead-process', Date.now(), false);
+    try {
+      const result = snapshotFnJob(jobId);
+      expect(result).not.toBeNull();
+      expect(result?.isError).toBe(true);
+      const body = JSON.parse(result?.content[0].text as string) as {
+        status: string;
+        label: string;
+      };
+      expect(body.status).toBe('orphaned');
+      expect(body.label).toBe('from-a-dead-process');
+    } finally {
+      diskJobs.deleteMeta(jobId);
+    }
+  });
+
+  it('jobStatus surfaces the orphaned snapshot instead of "not found"', () => {
+    const jobId = diskJobs.newJobId();
+    diskJobs.persistMeta(jobId, 'from-a-dead-process', Date.now(), false);
+    try {
+      const result = jobStatus({ jobId });
+      const body = JSON.parse(result.content[0].text) as { status: string };
+      expect(body.status).toBe('orphaned');
+    } finally {
+      diskJobs.deleteMeta(jobId);
+    }
+  });
+
+  it('listFnJobs includes disk-only jobs as orphaned', () => {
+    const jobId = diskJobs.newJobId();
+    diskJobs.persistMeta(jobId, 'from-a-dead-process', Date.now(), false);
+    try {
+      const jobs = listFnJobs();
+      expect(jobs.find((j) => j.jobId === jobId)?.status).toBe('orphaned');
+    } finally {
+      diskJobs.deleteMeta(jobId);
+    }
+  });
+
+  it('a job that completes normally in this process is not reported orphaned', async () => {
+    const jobId = startFnJob('normal', () => Promise.resolve(okResult('fine')));
+    await waitForFnJob(jobId);
+    const result = snapshotFnJob(jobId);
+    expect(result?.content[0].text).toBe('fine');
   });
 });
 
