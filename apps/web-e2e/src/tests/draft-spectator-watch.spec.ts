@@ -127,10 +127,23 @@ test.describe('Draft Spectator Watch page @critical', () => {
         }),
     });
 
-    // 3. Intercept the WebSocket connection before navigation.
+    // 3. Intercept the WebSocket connection before navigation. The page can
+    //    open two sockets: a league-channel one while getLeagueDraft is still
+    //    in flight (draftId unknown), then — once draftId resolves — the
+    //    draft-keyed channel that replaces it (LS-10160, useDraftWebSocket).
+    //    The replaced socket's listeners are torn down, so a pick pushed on it
+    //    is never seen. Capture only the draft-channel socket (LS-10220):
+    //    pushing on whichever socket had opened so far raced that swap and
+    //    lost on slow runners (the ~25 min Mobile Safari nightly).
     let wsRoute: WebSocketRoute | undefined;
     await page.routeWebSocket(/wss?:\/\//, (ws) => {
-      wsRoute = ws;
+      const params = new URL(ws.url()).searchParams;
+      if (
+        params.get('viewContext') === 'draft' &&
+        params.get('draftId') === '1'
+      ) {
+        wsRoute = ws;
+      }
       ws.onMessage(() => {
         /* no-op — spectator never sends draft mutations over the socket */
       });
@@ -150,8 +163,8 @@ test.describe('Draft Spectator Watch page @critical', () => {
     await expect(page.getByText('Home Team').first()).toBeVisible();
     await expect(page.getByText('Away Team').first()).toBeVisible();
 
-    // 6. Wait for the app to open the WebSocket connection, then push a
-    //    DRAFT_PICK_MADE notification — the splash must appear.
+    // 6. Wait for the app to join the draft-keyed channel, then push a
+    //    DRAFT_PICK_MADE notification on it — the splash must appear.
     await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
