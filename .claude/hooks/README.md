@@ -9,29 +9,30 @@ Node hooks (`*.mjs`) share helpers in [`lib/hook-utils.mjs`](lib/hook-utils.mjs)
 
 ## Inventory
 
-| Hook                                                           | Event                                              | Behavior                                                                                         |
-| -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `setup-worktree-symlink.sh`                                    | SessionStart                                       | Link node_modules pool into ephemeral worktrees                                                  |
-| `check-github-auth.sh`                                         | SessionStart                                       | Surface expired GitHub auth early                                                                |
-| `check-workspace-auth.sh`                                      | SessionStart                                       | Surface expired workspace auth early                                                             |
-| `reset-tool-count.sh`                                          | SessionStart                                       | Zero the compact-reminder counter                                                                |
-| `session-model-audit.mjs`                                      | SessionStart + Stop                                | **Session model audit** — record which model served the session; warn on unexpected model family |
-| `read-compact-handoff.mjs`                                     | SessionStart (`compact`)                           | Inject the pre-compact handoff snapshot back into context                                        |
-| `guard-main-repo.sh`                                           | PreToolUse (Edit/Write)                            | Block edits while HEAD is on `main`                                                              |
-| `inject-skill-reminder.js`                                     | PreToolUse (Edit/Write)                            | Remind about scope-matching skills                                                               |
-| `guard-bash-mcp-first.sh`                                      | PreToolUse (Bash)                                  | Warn when a Bash command has an MCP replacement                                                  |
-| `guard-make-pc.sh`                                             | PreToolUse (Bash, make_run)                        | Block monolithic `make pc` in cloud sessions                                                     |
-| `enforce-background.mjs` (.agents/hooks)                       | PreToolUse (Bash)                                  | Block long-running nx/make without `run_in_background`                                           |
-| `block-tmp-polling.mjs` (.agents/hooks)                        | PreToolUse (Read)                                  | Block polling of running task output files                                                       |
-| `guard-risky-tools.mjs`                                        | PreToolUse (Bash/Edit/Write/NotebookEdit/db_query) | **Pre-tool risk guard** — tiered block/warn for destructive and policy-violating calls           |
-| `remind-compact.sh`                                            | PreToolUse (all)                                   | `/compact` reminder every 35 tool calls                                                          |
-| `budget-governor.mjs`                                          | PreToolUse (all)                                   | **Budget governor** — soft/hard per-session tool-call budget                                     |
-| `log-tool-evidence.mjs`                                        | PostToolUse (all)                                  | **Evidence logger** — per-session JSONL ledger of every tool call                                |
-| `check-incomplete-work.sh`                                     | Stop                                               | Block stop on uncommitted/unpushed work or draft PRs                                             |
-| `delivery-gate.mjs`                                            | Stop                                               | **Delivery gate** — block stop when code changed but no validation ran                           |
-| `check-open-pr.sh`                                             | Stop                                               | Block stop while a drivable PR is open and unmerged                                              |
-| `write-compact-handoff.mjs`                                    | PreCompact                                         | **Handoff writer** — snapshot git + evidence state before compaction                             |
-| `cleanup-worktree-junction.sh` / `cleanup-worktree-symlink.sh` | SessionEnd                                         | Tear down worktree links                                                                         |
+| Hook                                                           | Event                                              | Behavior                                                                                                      |
+| -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `setup-worktree-symlink.sh`                                    | SessionStart                                       | Link node_modules pool into ephemeral worktrees                                                               |
+| `check-github-auth.sh`                                         | SessionStart                                       | Surface expired GitHub auth early                                                                             |
+| `check-workspace-auth.sh`                                      | SessionStart                                       | Surface expired workspace auth early                                                                          |
+| `reset-tool-count.sh`                                          | SessionStart                                       | Zero the compact-reminder counter                                                                             |
+| `session-model-audit.mjs`                                      | SessionStart + Stop                                | **Session model audit** — record which model served the session; warn on unexpected model family              |
+| `read-compact-handoff.mjs`                                     | SessionStart (`compact`)                           | Inject the pre-compact handoff snapshot back into context                                                     |
+| `guard-main-repo.sh`                                           | PreToolUse (Edit/Write)                            | Block edits while HEAD is on `main`                                                                           |
+| `inject-skill-reminder.js`                                     | PreToolUse (Edit/Write)                            | Remind about scope-matching skills                                                                            |
+| `guard-bash-mcp-first.sh`                                      | PreToolUse (Bash)                                  | Warn when a Bash command has an MCP replacement                                                               |
+| `guard-make-pc.sh`                                             | PreToolUse (Bash, make_run)                        | Block monolithic `make pc` in cloud sessions                                                                  |
+| `guard-gh-pr-marker.mjs`                                       | PreToolUse (Bash)                                  | Block `gh pr create`/`gh pr edit` bodies with no valid jira-link marker (LS-10110); use `scripts/open-pr.mjs` |
+| `enforce-background.mjs` (.agents/hooks)                       | PreToolUse (Bash)                                  | Block long-running nx/make without `run_in_background`                                                        |
+| `block-tmp-polling.mjs` (.agents/hooks)                        | PreToolUse (Read)                                  | Block polling of running task output files                                                                    |
+| `guard-risky-tools.mjs`                                        | PreToolUse (Bash/Edit/Write/NotebookEdit/db_query) | **Pre-tool risk guard** — tiered block/warn for destructive and policy-violating calls                        |
+| `remind-compact.sh`                                            | PreToolUse (all)                                   | `/compact` reminder every 35 tool calls                                                                       |
+| `budget-governor.mjs`                                          | PreToolUse (all)                                   | **Budget governor** — soft/hard per-session tool-call budget                                                  |
+| `log-tool-evidence.mjs`                                        | PostToolUse (all)                                  | **Evidence logger** — per-session JSONL ledger of every tool call                                             |
+| `check-incomplete-work.sh`                                     | Stop                                               | Block stop on uncommitted/unpushed work or draft PRs                                                          |
+| `delivery-gate.mjs`                                            | Stop                                               | **Delivery gate** — block stop when code changed but no validation ran                                        |
+| `check-open-pr.sh`                                             | Stop                                               | Block stop while a drivable PR is open and unmerged                                                           |
+| `write-compact-handoff.mjs`                                    | PreCompact                                         | **Handoff writer** — snapshot git + evidence state before compaction                                          |
+| `cleanup-worktree-junction.sh` / `cleanup-worktree-symlink.sh` | SessionEnd                                         | Tear down worktree links                                                                                      |
 
 ## The evidence pipeline
 

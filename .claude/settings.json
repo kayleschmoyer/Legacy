@@ -215,6 +215,11 @@
           },
           {
             "type": "command",
+            "command": "node .claude/hooks/guard-gh-pr-marker.mjs",
+            "windowsHide": true
+          },
+          {
+            "type": "command",
             "command": "node .agents/hooks/enforce-background.mjs",
             "windowsHide": true
           }
