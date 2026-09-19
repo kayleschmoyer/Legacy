@@ -7,10 +7,23 @@
  * The OnboardingTutorial component has no GraphQL dependencies — it is a
  * pure UI walkthrough rendered on /help when the "Launch Tutorial" button
  * is clicked.
+ *
+ * LS-2098 adds coverage for the *complete* new-user flow — the tests above
+ * only ever exercise the tutorial UI in isolation via the manual "Launch
+ * Tutorial" button on /help. The tests at the bottom of this file
+ * (`New user onboarding flow with auth redirect`) instead drive it through
+ * the real trigger path: first login → redirect to "/" → the tutorial
+ * auto-opens on HomePage for a user with no leagues who hasn't completed it
+ * (see `HomePage.tsx`'s `ls_onboarding_complete_<uid>` localStorage gate) →
+ * completing it dismisses the dialog and leaves the user on the home page.
+ * A companion test asserts the tutorial does NOT re-open for a user whose
+ * completion flag is already set.
  */
 
+import { type Page } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { test, unauthTest } from '../fixtures/auth-enhanced';
+import { E2EJwtUtil } from '../utils/jwt';
 
 const HELP_URL = '/help';
 
@@ -263,3 +276,142 @@ test.describe('Help Page — tutorial launcher section @regression', () => {
     });
   });
 });
+
+// ── Tests: New user onboarding flow with auth redirect (LS-2098) ────────────
+
+// Minimal GSI mock — same shape as login-completion.spec.ts's
+// GSI_MOCK_WITH_HOOKS, duplicated locally (not exported there) so this file
+// stays independently readable. Only the button-click code-flow path is
+// exercised; One Tap is not relevant to onboarding-trigger coverage.
+const GSI_MOCK = [
+  'window.google = { accounts: {',
+  '  id: { initialize: function() {}, renderButton: function() {}, prompt: function() {}, cancel: function() {} },',
+  '  oauth2: {',
+  '    initCodeClient: function(config) {',
+  '      return {',
+  '        requestCode: function() {',
+  '          if (config.callback) config.callback({ code: "fake-auth-code" });',
+  '        },',
+  '      };',
+  '    },',
+  '  },',
+  '}};',
+].join('\n');
+
+/** Mocks the Google login round trip so `unauthTest` can drive a real login. */
+async function mockGoogleLogin(page: Page, userId: number): Promise<void> {
+  await page.route('**/accounts.google.com/gsi/client', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: GSI_MOCK,
+    }),
+  );
+
+  const jwt = E2EJwtUtil.generateJwt({
+    id: userId,
+    email: 'onboarding@test.com',
+  });
+  await page.route('http://localhost:5001/google', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jwt,
+        csrfToken: 'e2e-csrf-token',
+        user: {
+          id: userId,
+          email: 'onboarding@test.com',
+          username: 'onboardinguser',
+          accessLevel: 'none',
+        },
+      }),
+    }),
+  );
+}
+
+/** Clicks through every tutorial step to the final "Get Started" button. */
+async function completeTutorial(page: Page): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    await page.getByRole('button', { name: /next/i }).click();
+  }
+  await page.getByRole('button', { name: /get started/i }).click();
+}
+
+unauthTest.describe(
+  'New user onboarding flow with auth redirect @regression',
+  () => {
+    unauthTest(
+      'first login redirects to home and auto-triggers onboarding; completing it dismisses the tutorial and stays on home (LS-2098)',
+      async ({ page }) => {
+        await mockGoogleLogin(page, 501);
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const loginButton = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(loginButton).toBeVisible({ timeout: 15000 });
+        await loginButton.click();
+
+        // Auth redirect: logging in from "/" lands the user on the home
+        // dashboard ("/"), the getUserLeagueSummaries baseline returns no
+        // leagues, and no `ls_onboarding_complete_501` flag exists yet — the
+        // tutorial auto-triggers per HomePage.tsx's onboarding effect.
+        await expect(page).toHaveURL('/');
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('Welcome to Legacy Sports')).toBeVisible();
+
+        await completeTutorial(page);
+
+        // Completion dismisses the tutorial and leaves the user on home —
+        // no further redirect away from "/".
+        await expect(page.getByRole('dialog')).not.toBeVisible({
+          timeout: 10000,
+        });
+        await expect(page).toHaveURL('/');
+
+        // Completion status persisted so the tutorial does not reopen.
+        const completed = await page.evaluate(() =>
+          window.localStorage.getItem('ls_onboarding_complete_501'),
+        );
+        expect(completed).toBe('true');
+      },
+    );
+
+    unauthTest(
+      'returning user who already completed onboarding does not see the tutorial after login (LS-2098)',
+      async ({ page }) => {
+        await mockGoogleLogin(page, 502);
+        // Seed the completion flag before the app boots, simulating a user
+        // who finished onboarding in a previous session.
+        await page.addInitScript(() => {
+          window.localStorage.setItem(
+            'ls_onboarding_complete_502',
+            JSON.stringify(true),
+          );
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const loginButton = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(loginButton).toBeVisible({ timeout: 15000 });
+        await loginButton.click();
+
+        await expect(page).toHaveURL('/');
+        await expect(
+          page.getByRole('navigation', { name: 'Primary' }),
+        ).toBeVisible({ timeout: 10000 });
+
+        // Tutorial must stay hidden — the completion flag was already set.
+        await expect(page.getByRole('dialog')).not.toBeVisible({
+          timeout: 5000,
+        });
+      },
+    );
+  },
+);
