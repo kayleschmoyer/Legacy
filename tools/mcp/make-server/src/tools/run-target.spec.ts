@@ -55,6 +55,26 @@ describe('runTarget — allowlist gate', () => {
     const result = await runTarget({ target: '__not_a_real_target__' });
     expect(result.content[0].text).toContain('lockfile');
   });
+
+  it('allows the LS-10152 AC3 recurrence-guard cleanup targets', async () => {
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    for (const target of [
+      'check-skipped-tests',
+      'ci-classify-failure',
+      'dev-env-health',
+      'diagrams',
+      'e2e-scope',
+      'hash-design-bundle',
+      'help',
+      'lint-animated-theme-vars',
+      'lint-eslint-tsconfig-anchored',
+      'lint-theme-compliance',
+      'scaffold-story',
+      'scan-secret',
+    ]) {
+      expect(result.content[0].text).toContain(target);
+    }
+  });
 });
 
 describe('runTarget — variable injection guard', () => {

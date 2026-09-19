@@ -153,6 +153,26 @@ const ALLOWED_TARGETS = new Set([
   // destructive semantics.
   'stabilize-after-rebase',
 
+  // LS-10152 AC3 recurrence-guard cleanup — read-only checks or additive
+  // generation targets already mandated by a skill/AGENTS.md, caught by
+  // scripts/check-mandated-make-targets.mjs's sweep of the doc corpus.
+  // (Targets from that sweep that are NOT safe for MCP reach — long-running
+  // dev servers, destructive/interactive local-only flows, targets
+  // superseded by a dedicated MCP tool — are documented instead in that
+  // script's EXPECTED_LOCAL_ONLY exception list.)
+  'check-skipped-tests',
+  'ci-classify-failure',
+  'dev-env-health',
+  'diagrams',
+  'e2e-scope',
+  'hash-design-bundle',
+  'help',
+  'lint-animated-theme-vars',
+  'lint-eslint-tsconfig-anchored',
+  'lint-theme-compliance',
+  'scaffold-story',
+  'scan-secret',
+
   // Validation
   'validate',
 

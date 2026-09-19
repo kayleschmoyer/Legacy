@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync lint-eslint-tsconfig-anchored mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs audit-session lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps lint-case-collisions hash-design-bundle format fmt typecheck validate \
+	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-eslint-nx-exclude-sync lint-eslint-tsconfig-anchored mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs audit-session lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps lint-case-collisions lint-mandated-make-targets hash-design-bundle format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -317,6 +317,10 @@ mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} and .agents/
 lint-mcp-api-reference: ## Check MCP API reference sync + the tool-definition budget (docs/mcp/tool-budget.json)
 	@$(call echo_blue,Checking MCP API reference sync and tool-definition budget...)
 	@node scripts/generate-mcp-api-reference.mjs --check
+
+lint-mandated-make-targets: ## Check every Makefile target mandated by AGENTS.md/skills is in make_run's allowlist or documented as local-only (LS-10152 AC3)
+	@$(call echo_blue,Checking mandated Makefile targets against make_run's allowlist...)
+	@node scripts/check-mandated-make-targets.mjs
 
 mcp-tool-budget: ## Re-seed docs/mcp/tool-budget.json ceilings from the current measurement (review the diff!)
 	@$(call echo_blue,Re-seeding MCP tool-definition budget...)
