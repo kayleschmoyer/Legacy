@@ -28,7 +28,12 @@
  *       # raise only <server-id>'s ceiling to its current measurement, recompute `total` to
  *       # match, and leave every other server's ceiling untouched — the targeted alternative
  *       # to a full re-seed when only one server's growth is being deliberately signed off on.
+ *   node scripts/generate-mcp-api-reference.mjs --check --baseRef[=<ref>]
+ *       # (LS-10149) also measure <ref> (default origin/main) via `git show`/`git ls-tree` —
+ *       # no worktree needed — and, on a TOTAL budget violation, report whether the base ref
+ *       # or this branch owns the overage instead of unconditionally blaming the branch.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +87,23 @@ function pageModule(server, html, csp) {
   ].join('\n');
 }
 
+/** Does `ref` resolve to a commit? Guards against a silent zero-tool "base" measurement (LS-10149). */
+function refResolves(ref, repoRoot) {
+  try {
+    execFileSync(
+      'git',
+      ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+      {
+        cwd: repoRoot,
+        stdio: 'ignore',
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readIfPresent(path) {
   try {
     return readFileSync(path, 'utf-8');
@@ -98,6 +120,14 @@ function main() {
   const updateBudget = updateBudgetArg === '--update-budget';
   const updateBudgetServer = updateBudgetArg?.startsWith('--update-budget=')
     ? updateBudgetArg.slice('--update-budget='.length)
+    : undefined;
+  const baseRefArg = process.argv.find(
+    (arg) => arg === '--baseRef' || arg.startsWith('--baseRef='),
+  );
+  const baseRef = baseRefArg
+    ? baseRefArg.startsWith('--baseRef=')
+      ? baseRefArg.slice('--baseRef='.length)
+      : 'origin/main'
     : undefined;
 
   const model = collect(REPO_ROOT);
@@ -212,7 +242,23 @@ function main() {
       process.exit(1);
     }
 
-    const { violations, lines } = checkBudget(measured, JSON.parse(budgetRaw));
+    let base;
+    if (baseRef) {
+      if (!refResolves(baseRef, REPO_ROOT)) {
+        console.error(
+          `--baseRef=${baseRef} does not resolve to a commit (try \`git fetch origin main\` first).`,
+        );
+        process.exit(1);
+      }
+      const baseModel = collect(REPO_ROOT, { ref: baseRef });
+      base = { ref: baseRef, measured: measureDefinitionTokens(baseModel) };
+    }
+
+    const { violations, lines } = checkBudget(
+      measured,
+      JSON.parse(budgetRaw),
+      base,
+    );
     console.log(
       `MCP tool-definition budget (${measured.toolCount} tools, ${measured.total} tokens):\n${lines.join('\n')}`,
     );

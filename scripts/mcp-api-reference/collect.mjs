@@ -2,9 +2,10 @@
  * Builds the MCP API reference model: which servers exist, how each is reached,
  * and the full tool surface of each.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { extractToolsFromFile } from './extract.mjs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
+import { extractToolsFromFile, fsReader } from './extract.mjs';
 
 /**
  * One entry per server package under tools/mcp/.
@@ -123,7 +124,71 @@ function mergeTool(existing, incoming, transport) {
   return merged;
 }
 
-export function collect(repoRoot) {
+/**
+ * A reader backed by `git show`/`git ls-tree` against `ref` instead of the
+ * working tree, so a historical (or base-branch) measurement never needs a
+ * worktree or checkout — see LS-10149. Results are cached per path since the
+ * same file is frequently read once for extraction and once for an existence
+ * check.
+ */
+function gitReader(repoRoot, ref) {
+  const toGitPath = (path) => relative(repoRoot, path).split(sep).join('/');
+  const cache = new Map();
+
+  const readFile = (path) => {
+    const gitPath = toGitPath(path);
+    if (cache.has(gitPath)) return cache.get(gitPath);
+    let content;
+    try {
+      content = execFileSync('git', ['show', `${ref}:${gitPath}`], {
+        cwd: repoRoot,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {
+      content = undefined;
+    }
+    cache.set(gitPath, content);
+    return content;
+  };
+
+  return {
+    exists: (path) => readFile(path) !== undefined,
+    readFile,
+    listFiles(dir) {
+      const gitPath = toGitPath(dir);
+      try {
+        // `git ls-tree --name-only <ref> <dir>/` prints each entry prefixed
+        // with the full path passed in, not just its basename — unlike
+        // fsReader's readdirSync, which returns bare filenames. Strip the
+        // prefix so callers (extract.mjs's `join(dir, name)`) don't double it.
+        return execFileSync(
+          'git',
+          ['ls-tree', '--name-only', ref, `${gitPath}/`],
+          {
+            cwd: repoRoot,
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          },
+        )
+          .split('\n')
+          .filter(Boolean)
+          .map((entry) => basename(entry));
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
+/**
+ * Build the tool-surface model. Pass `ref` (e.g. `origin/main`) to measure
+ * that ref via git plumbing instead of the working tree — no worktree or
+ * checkout required, since the model only ever reads the handful of source
+ * files (see TRANSPORT_SOURCES) a tool definition can live in.
+ */
+export function collect(repoRoot, { ref } = {}) {
+  const reader = ref ? gitReader(repoRoot, ref) : fsReader;
   const servers = [];
 
   for (const entry of SERVERS) {
@@ -134,10 +199,10 @@ export function collect(repoRoot) {
 
     for (const { file, transport } of TRANSPORT_SOURCES) {
       const path = join(packageDir, file);
-      if (!existsSync(path)) continue;
+      if (!reader.exists(path)) continue;
       transports.push(transport);
 
-      const result = extractToolsFromFile(path);
+      const result = extractToolsFromFile(path, reader);
       serverInfo ??= result.serverInfo;
       for (const tool of result.tools) {
         byName.set(

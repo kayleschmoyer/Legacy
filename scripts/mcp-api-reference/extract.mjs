@@ -19,6 +19,38 @@ import ts from 'typescript';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+/**
+ * Default reader — plain disk access. `collectAtRef` (collect.mjs) swaps this
+ * for a reader backed by `git show`/`git ls-tree` so a historical ref can be
+ * measured without a worktree or checkout.
+ */
+export const fsReader = {
+  exists(path) {
+    try {
+      readFileSync(path, 'utf-8');
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  readFile(path) {
+    try {
+      return readFileSync(path, 'utf-8');
+    } catch {
+      return undefined;
+    }
+  },
+  listFiles(dir) {
+    try {
+      return readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name);
+    } catch {
+      return [];
+    }
+  },
+};
+
 /* ------------------------------------------------------------------ *
  * Literal evaluation
  * ------------------------------------------------------------------ */
@@ -635,10 +667,10 @@ function collectDeclarations(sourceFile, constants, functions) {
   ts.forEachChild(sourceFile, visit);
 }
 
-function parseFile(filePath) {
+function parseSource(filePath, content) {
   return ts.createSourceFile(
     filePath,
-    readFileSync(filePath, 'utf-8'),
+    content,
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.TS,
@@ -650,35 +682,38 @@ function parseFile(filePath) {
  * across tools live in files like `src/schemas.ts`; without these the shared
  * parameters would document as a bare identifier.
  */
-function collectPackageDeclarations(entryPath, constants, functions) {
+function collectPackageDeclarations(entryPath, constants, functions, reader) {
   const dir = dirname(entryPath);
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.spec.ts'))
-      continue;
-    const path = join(dir, entry.name);
+  for (const name of reader.listFiles(dir)) {
+    if (!name.endsWith('.ts') || name.endsWith('.spec.ts')) continue;
+    const path = join(dir, name);
     if (path === entryPath) continue;
+    const content = reader.readFile(path);
+    if (content === undefined) continue;
     try {
-      collectDeclarations(parseFile(path), constants, functions);
+      collectDeclarations(parseSource(path, content), constants, functions);
     } catch {
       // A sibling that fails to parse simply contributes nothing.
     }
   }
 }
 
-/** Extract every tool registered in one source file. */
-export function extractToolsFromFile(filePath) {
-  const sourceFile = parseFile(filePath);
+/**
+ * Extract every tool registered in one source file.
+ *
+ * @param {string} filePath
+ * @param {{exists(path: string): boolean, readFile(path: string): string | undefined, listFiles(dir: string): string[]}} [reader]
+ *   Defaults to plain disk access; pass a git-backed reader (collect.mjs) to
+ *   extract from a historical ref instead of the working tree.
+ */
+export function extractToolsFromFile(filePath, reader = fsReader) {
+  const content = reader.readFile(filePath);
+  if (content === undefined) return { serverInfo: undefined, tools: [] };
+  const sourceFile = parseSource(filePath, content);
   const constants = new Map();
   const functions = new Map();
   collectDeclarations(sourceFile, constants, functions);
-  collectPackageDeclarations(filePath, constants, functions);
+  collectPackageDeclarations(filePath, constants, functions, reader);
   const ctx = { sourceFile, constants, functions, resolving: new Set() };
 
   const tools = [];

@@ -208,3 +208,56 @@ test('reports per-server headroom on every run, passing or failing', () => {
   assert.ok(lines.every((l) => l.includes('headroom')));
   assert.ok(lines.some((l) => l.includes('srv-a')));
 });
+
+// LS-10149: a `base` measurement (from `--baseRef`) lets a TOTAL violation say
+// whether the base ref or this branch owns the overage, instead of always
+// pointing at the branch.
+test('TOTAL violation attributes the overage to an already-over-ceiling base, not the branch', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+  budget.total.tokens = measured.total - 50; // ceiling sits below both base and branch
+
+  const base = {
+    ref: 'origin/main',
+    // Base measured identically to this branch — this branch added nothing.
+    measured: { total: measured.total, servers: measured.servers },
+  };
+
+  const { violations } = checkBudget(measured, budget, base);
+  const totalLine = violations.find((v) => v.startsWith('TOTAL: '));
+  assert.ok(totalLine, 'expected a TOTAL violation line');
+  assert.match(totalLine, /base origin\/main: \d+, this branch: 0/);
+  assert.match(totalLine, /base is already \+50 OVER/);
+});
+
+test('TOTAL violation attributes the overage to this branch when base is under ceiling', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+  const baseTotal = measured.total - 10; // base sits comfortably under ceiling
+  budget.total.tokens = baseTotal + 2; // branch's +10 pushes total 8 over
+
+  const base = {
+    ref: 'origin/main',
+    measured: { total: baseTotal, servers: {} },
+  };
+
+  const { violations } = checkBudget(measured, budget, base);
+  const totalLine = violations.find((v) => v.startsWith('TOTAL: '));
+  assert.ok(totalLine, 'expected a TOTAL violation line');
+  assert.match(totalLine, /this branch: \+10/);
+  assert.match(
+    totalLine,
+    /this branch added \+10, pushing TOTAL \+8 over the ceiling/,
+  );
+});
+
+test('TOTAL violation falls back to the unattributed message when no base is given', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+  budget.total.tokens = measured.total - 1;
+
+  const { violations } = checkBudget(measured, budget);
+  const totalLine = violations.find((v) => v.startsWith('TOTAL: '));
+  assert.match(totalLine, /definition tokens exceeds the ceiling of/);
+  assert.ok(!totalLine.includes('base '));
+});

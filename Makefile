@@ -314,9 +314,9 @@ mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} and .agents/
 	@$(call echo_blue,Generating MCP API reference...)
 	@node scripts/generate-mcp-api-reference.mjs
 
-lint-mcp-api-reference: ## Check MCP API reference sync + the tool-definition budget (docs/mcp/tool-budget.json)
+lint-mcp-api-reference: ## Check MCP API reference sync + the tool-definition budget (docs/mcp/tool-budget.json); attributes any TOTAL overage to base vs this branch (LS-10149)
 	@$(call echo_blue,Checking MCP API reference sync and tool-definition budget...)
-	@node scripts/generate-mcp-api-reference.mjs --check
+	@node scripts/generate-mcp-api-reference.mjs --check --baseRef=origin/main
 
 lint-mandated-make-targets: ## Check every Makefile target mandated by AGENTS.md/skills is in make_run's allowlist or documented as local-only (LS-10152 AC3)
 	@$(call echo_blue,Checking mandated Makefile targets against make_run's allowlist...)

@@ -72,10 +72,16 @@ function formatDelta(measured, ceiling) {
 /**
  * Compare measured usage against the committed ceilings.
  *
+ * @param {*} measured Working-tree measurement from `measureDefinitionTokens`.
+ * @param {*} budget Parsed `docs/mcp/tool-budget.json`.
+ * @param {{ ref: string, measured: * } | undefined} base When provided (see
+ *   `--baseRef`), a TOTAL violation is attributed to whichever side —
+ *   the base ref or this branch — actually owns the overage, instead of
+ *   unconditionally telling the caller to trim their own branch (LS-10149).
  * @returns {{ violations: string[], lines: string[] }} `violations` is empty
  *   when the budget holds; `lines` is the always-printed per-server report.
  */
-export function checkBudget(measured, budget) {
+export function checkBudget(measured, budget, base) {
   const violations = [];
   const lines = [];
 
@@ -142,10 +148,23 @@ export function checkBudget(measured, budget) {
 
   const totalCeiling = budget.total?.tokens;
   if (typeof totalCeiling === 'number' && measured.total > totalCeiling) {
-    violations.push(
-      `TOTAL: ${measured.total} definition tokens exceeds the ceiling of ${totalCeiling} ` +
-        `(${formatDelta(measured.total, totalCeiling)}).`,
-    );
+    if (base) {
+      const branchDelta = formatDelta(measured.total, base.measured.total);
+      const baseOverage = base.measured.total - totalCeiling;
+      const verdict =
+        baseOverage > 0
+          ? `base is already ${formatDelta(base.measured.total, totalCeiling)} OVER`
+          : `this branch added ${branchDelta}, pushing TOTAL ${formatDelta(measured.total, totalCeiling)} over the ceiling`;
+      violations.push(
+        `TOTAL: ${measured.total} (base ${base.ref}: ${base.measured.total}, this branch: ${branchDelta}) — ` +
+          `ceiling ${totalCeiling} (${verdict})`,
+      );
+    } else {
+      violations.push(
+        `TOTAL: ${measured.total} definition tokens exceeds the ceiling of ${totalCeiling} ` +
+          `(${formatDelta(measured.total, totalCeiling)}).`,
+      );
+    }
   }
 
   return { violations, lines };
