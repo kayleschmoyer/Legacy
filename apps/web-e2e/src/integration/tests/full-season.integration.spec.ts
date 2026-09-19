@@ -39,10 +39,10 @@ interface SeasonState {
   team2Roster: number[];
   /** Available players fetched during draft setup. */
   availablePlayers: Array<{ id: number; firstName: string }>;
-  /** IDs of matchup-player entries for lineup management. */
-  matchupPlayerIds: number[];
-  /** League position IDs for lineup slot assignment. */
-  leaguePositionIds: number[];
+  /** api's matchup-player entries, with eligibility, for lineup management. */
+  matchupPlayers: EligibilityCandidate[];
+  /** League positions (slot id + type) for lineup slot assignment. */
+  leaguePositions: EligibilitySlot[];
   matchupId: number;
   tradeOfferId: number;
   waiverClaimId: number;
@@ -108,6 +108,41 @@ function findEligibleAssignment(
   return undefined;
 }
 
+/**
+ * Greedily pairs two distinct members with two distinct slots they are each
+ * eligible for — the input a swap mutation needs, since
+ * `swapTeamMemberPositions`/`swapMatchupPlayerPositions` enforce the same gate
+ * on both sides. Returns `undefined` if no such pair exists.
+ */
+function findEligibleSwapPair(
+  candidates: readonly EligibilityCandidate[],
+  slots: readonly EligibilitySlot[],
+  sport: SportKind,
+):
+  | [
+      { member: EligibilityCandidate['member']; slot: EligibilitySlot },
+      { member: EligibilityCandidate['member']; slot: EligibilitySlot },
+    ]
+  | undefined {
+  const usedSlotIds = new Set<number>();
+  const picked: Array<{
+    member: EligibilityCandidate['member'];
+    slot: EligibilitySlot;
+  }> = [];
+  for (const candidate of candidates) {
+    const slot = slots.find(
+      (s) =>
+        !usedSlotIds.has(s.id) &&
+        canFillSlot(candidate.eligiblePositions, s.positionType, sport),
+    );
+    if (!slot) continue;
+    usedSlotIds.add(slot.id);
+    picked.push({ member: candidate.member, slot });
+    if (picked.length === 2) return [picked[0], picked[1]];
+  }
+  return undefined;
+}
+
 // Roster size used at league creation. The backend marks a draft `completed`
 // only after every roster is full — `numTeams * MAX_ROSTER_SIZE` picks
 // (lambdas/db/.../drafts/helpers.ts: isDraftComplete). Free-agent claims
@@ -135,8 +170,8 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       team1Roster: [],
       team2Roster: [],
       availablePlayers: [],
-      matchupPlayerIds: [],
-      leaguePositionIds: [],
+      matchupPlayers: [],
+      leaguePositions: [],
       matchupId: 0,
       tradeOfferId: 0,
       waiverClaimId: 0,
@@ -723,31 +758,22 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       }>;
 
       if (members.length >= 2 && posData.leaguePositions.length >= 2) {
-        // Greedily pair up two distinct members with two distinct slots they
-        // are each genuinely eligible for, rather than blindly swapping
-        // members[0]/members[1] into posIds[1]/posIds[0] whenever either
-        // member's current slot is unset (LS-10036) — swapTeamMemberPositions
-        // enforces the same eligibility gate as updateTeamMemberPosition.
-        const usedSlotIds = new Set<number>();
-        const assignments: Array<{
-          member: { id: number };
-          slot: { id: number; positionType: string };
-        }> = [];
-        for (const m of members) {
-          const eligiblePositions = m.player?.eligiblePositions ?? [];
-          const slot = posData.leaguePositions.find(
-            (s) =>
-              !usedSlotIds.has(s.id) &&
-              canFillSlot(eligiblePositions, s.positionType, leagueSport),
-          );
-          if (!slot) continue;
-          usedSlotIds.add(slot.id);
-          assignments.push({ member: { id: m.id }, slot });
-          if (assignments.length === 2) break;
-        }
+        // Pair two distinct members with two distinct slots they are each
+        // genuinely eligible for, rather than blindly swapping
+        // members[0]/members[1] into posIds[1]/posIds[0] (LS-10036) —
+        // swapTeamMemberPositions enforces the same eligibility gate as
+        // updateTeamMemberPosition.
+        const pair = findEligibleSwapPair(
+          members.map((m) => ({
+            member: { id: m.id, positionId: m.positionId },
+            eligiblePositions: m.player?.eligiblePositions ?? [],
+          })),
+          posData.leaguePositions,
+          leagueSport,
+        );
 
-        if (assignments.length === 2) {
-          const [first, second] = assignments;
+        if (pair) {
+          const [first, second] = pair;
           const swapData = await graphqlOk<{
             swapTeamMemberPositions: Array<{ id: number; positionId: number }>;
           }>(
@@ -799,6 +825,18 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // -------------------------------------------------------------------------
 
   test('Phase 4: Matchups & lineups', async ({ api, apiCommissioner }) => {
+    // Lineup mutations enforce the same slot-eligibility gate as the roster
+    // ones (assertPositionAssignmentsEligible), keyed by sport — 4.4/4.5 must
+    // pick eligible (player, slot) pairs, not index blindly (LS-10215).
+    const leagueData = await graphqlOk<{ league: { sport: SportKind } }>(
+      api,
+      `query LeagueSport($leagueId: Int!) {
+         league(id: $leagueId) { sport }
+       }`,
+      { leagueId: state.leagueId },
+    );
+    const leagueSport = leagueData.league.sport;
+
     await test.step('4.1 Commissioner creates all matchups', async () => {
       const data = await graphqlOk<{
         createAllMatchups: {
@@ -848,39 +886,55 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
             playerId: number;
             teamId: number;
             positionId: number | null;
+            player: { eligiblePositions: string[] | null } | null;
           }>;
         }>(
           api,
           `query MatchupPlayers($matchupId: Int!) {
              getMatchupPlayers(matchupId: $matchupId) {
-               id playerId teamId positionId
+               id playerId teamId positionId player { eligiblePositions }
              }
            }`,
           { matchupId: state.matchupId },
         ),
-        graphqlOk<{ leaguePositions: Array<{ id: number }> }>(
+        graphqlOk<{
+          leaguePositions: Array<{ id: number; positionType: string }>;
+        }>(
           api,
           `query Positions($leagueId: Int!) {
-             leaguePositions(leagueId: $leagueId) { id }
+             leaguePositions(leagueId: $leagueId) { id positionType }
            }`,
           { leagueId: state.leagueId },
         ),
       ]);
-      state.matchupPlayerIds = matchupData.getMatchupPlayers
+      state.matchupPlayers = matchupData.getMatchupPlayers
         .filter((mp) => Number(mp.teamId) === state.teams[0].id)
-        .map((mp) => Number(mp.id));
-      state.leaguePositionIds = posData.leaguePositions.map((p) =>
-        Number(p.id),
-      );
+        .map((mp) => ({
+          member: { id: Number(mp.id), positionId: mp.positionId },
+          eligiblePositions: mp.player?.eligiblePositions ?? [],
+        }));
+      state.leaguePositions = posData.leaguePositions.map((p) => ({
+        id: Number(p.id),
+        positionType: p.positionType,
+      }));
     });
 
     await test.step('4.4 Set weekly lineup position', async () => {
-      if (
-        state.matchupPlayerIds.length > 0 &&
-        state.leaguePositionIds.length > 0
-      ) {
-        const mp = state.matchupPlayerIds[0];
-        const positionId = state.leaguePositionIds[0];
+      if (state.matchupPlayers.length > 0 && state.leaguePositions.length > 0) {
+        // Resolve a pair the server will accept instead of assuming
+        // matchupPlayers[0] fits leaguePositions[0] (LS-10215).
+        const assignment = findEligibleAssignment(
+          state.matchupPlayers,
+          state.leaguePositions,
+          leagueSport,
+        );
+        if (!assignment) {
+          throw new Error(
+            'Expected at least one matchup player eligible for at least one league position',
+          );
+        }
+        const mp = assignment.member.id;
+        const positionId = assignment.slot.id;
         const data = await graphqlOk<{
           updateMatchupPlayerPosition: { id: string; positionId: number };
         }>(
@@ -897,12 +951,14 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     });
 
     await test.step('4.5 Swap lineup positions', async () => {
-      if (
-        state.matchupPlayerIds.length >= 2 &&
-        state.leaguePositionIds.length >= 2
-      ) {
-        const [a, b] = state.matchupPlayerIds;
-        const [posA, posB] = state.leaguePositionIds;
+      // Same gate as 4.4 on both sides of the swap (LS-10215).
+      const pair = findEligibleSwapPair(
+        state.matchupPlayers,
+        state.leaguePositions,
+        leagueSport,
+      );
+      if (pair) {
+        const [first, second] = pair;
         const data = await graphqlOk<{
           swapMatchupPlayerPositions: Array<{
             id: string;
@@ -921,10 +977,10 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
              ) { id positionId }
            }`,
           {
-            matchupPlayerIdA: a,
-            matchupPlayerIdB: b,
-            positionIdA: posB,
-            positionIdB: posA,
+            matchupPlayerIdA: first.member.id,
+            matchupPlayerIdB: second.member.id,
+            positionIdA: first.slot.id,
+            positionIdB: second.slot.id,
           },
         );
         expect(data.swapMatchupPlayerPositions).toHaveLength(2);
