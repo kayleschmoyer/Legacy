@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -6,6 +7,7 @@ import {
 import {
   type AppMatchupFragment,
   type AppMatchupPlayerFragment,
+  MatchupStatus,
 } from '@legacy-sports/graphql';
 import { type ScoringSettings } from '../../common/scoring';
 import {
@@ -13,6 +15,8 @@ import {
   mapFieldingStats,
   mapPitchingStats,
 } from '../../common/scoring/mapGraphQLToScoringFormat';
+
+declare const __DEV__: boolean;
 
 export interface ComputedMatchupScores {
   team1Score: number;
@@ -35,31 +39,22 @@ export interface ComputeMatchupScoresInput {
   seasonStatsMap: ReadonlyMap<number, SeasonStats>;
 }
 
-/**
- * Compute team actual + projected scores for the matchup scoreboard.
- *
- * Native mirror of web's `computeMatchupScores`
- * (apps/web/src/features/matchup/MatchupScoreboard.tsx) so both platforms feed
- * the shared `MatchupScoreboardHero` identical values. When the players query
- * errors (or required inputs are missing) we fall back to the matchup's
- * server-stored `team1Score`/`team2Score` (see LS-2937).
- */
-export function computeMatchupScores({
-  matchup,
-  players,
-  hasPlayersError,
-  scoringSettings,
-  seasonStatsMap,
-}: ComputeMatchupScoresInput): ComputedMatchupScores {
-  if (hasPlayersError || !players || !scoringSettings || !matchup) {
-    return {
-      team1Score: matchup?.team1Score ?? 0,
-      team2Score: matchup?.team2Score ?? 0,
-      team1Projected: null,
-      team2Projected: null,
-    };
-  }
+interface TeamTotals {
+  team1Total: number;
+  team2Total: number;
+  team1ProjTotal: number;
+  team2ProjTotal: number;
+}
 
+/** Tolerance for the dev-only client/server score parity check (BMD-009). */
+const SCORE_PARITY_EPSILON = 0.05;
+
+function calculateTeamTotals(
+  matchup: AppMatchupFragment,
+  players: readonly AppMatchupPlayerFragment[],
+  scoringSettings: ScoringSettings,
+  seasonStatsMap: ReadonlyMap<number, SeasonStats>,
+): TeamTotals {
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
   const calculateGameScore = (
@@ -143,6 +138,96 @@ export function computeMatchupScores({
       team2ProjTotal += playerProjected;
     }
   });
+
+  return { team1Total, team2Total, team1ProjTotal, team2ProjTotal };
+}
+
+/**
+ * Dev-only safety net: warn when the server-stored score (authoritative for
+ * completed matchups, see `computeMatchupScores`) has drifted from what the
+ * client would compute from raw per-player stats — e.g. because scoring
+ * settings changed after the matchup finalized (BMD-009).
+ */
+function warnOnScoreParityDrift(
+  matchup: AppMatchupFragment,
+  players: readonly AppMatchupPlayerFragment[],
+  scoringSettings: ScoringSettings,
+  seasonStatsMap: ReadonlyMap<number, SeasonStats>,
+): void {
+  const { team1Total, team2Total } = calculateTeamTotals(
+    matchup,
+    players,
+    scoringSettings,
+    seasonStatsMap,
+  );
+  const serverTeam1Score = matchup.team1Score ?? 0;
+  const serverTeam2Score = matchup.team2Score ?? 0;
+
+  if (
+    Math.abs(team1Total - serverTeam1Score) > SCORE_PARITY_EPSILON ||
+    Math.abs(team2Total - serverTeam2Score) > SCORE_PARITY_EPSILON
+  ) {
+    LOGGER.warn(
+      'Matchup score parity drift: client-computed score diverges from server-stored score',
+      {
+        matchupId: matchup.id,
+        serverTeam1Score,
+        clientTeam1Score: team1Total,
+        serverTeam2Score,
+        clientTeam2Score: team2Total,
+      },
+    );
+  }
+}
+
+/**
+ * Compute team actual + projected scores for the matchup scoreboard.
+ *
+ * Native mirror of web's `computeMatchupScores`
+ * (apps/web/src/features/matchup/MatchupScoreboard.tsx) so both platforms feed
+ * the shared `MatchupScoreboardHero` identical values. When the players query
+ * errors (or required inputs are missing) we fall back to the matchup's
+ * server-stored `team1Score`/`team2Score` (see LS-2937).
+ *
+ * Once a matchup is `Completed`, the server-stored scores are the sole
+ * authority — recomputing from raw per-player stats is both a heavy hot path
+ * and a second source of truth that can silently diverge from the server if
+ * scoring settings change after the matchup finalizes. Live (`InProgress`)
+ * matchups still recompute client-side so the score can update ahead of the
+ * next server sync. Web adopted this rule under BMD-009/LS-5879; ported here
+ * under LS-6390 to close the cross-platform score divergence caused by
+ * mobile continuing to recompute completed matchups after web had stopped.
+ */
+export function computeMatchupScores({
+  matchup,
+  players,
+  hasPlayersError,
+  scoringSettings,
+  seasonStatsMap,
+}: ComputeMatchupScoresInput): ComputedMatchupScores {
+  if (hasPlayersError || !players || !scoringSettings || !matchup) {
+    return {
+      team1Score: matchup?.team1Score ?? 0,
+      team2Score: matchup?.team2Score ?? 0,
+      team1Projected: null,
+      team2Projected: null,
+    };
+  }
+
+  if (matchup.status === MatchupStatus.Completed) {
+    if (__DEV__) {
+      warnOnScoreParityDrift(matchup, players, scoringSettings, seasonStatsMap);
+    }
+    return {
+      team1Score: matchup.team1Score ?? 0,
+      team2Score: matchup.team2Score ?? 0,
+      team1Projected: null,
+      team2Projected: null,
+    };
+  }
+
+  const { team1Total, team2Total, team1ProjTotal, team2ProjTotal } =
+    calculateTeamTotals(matchup, players, scoringSettings, seasonStatsMap);
 
   return {
     team1Score: team1Total,
