@@ -2,8 +2,8 @@
   "_comment": "Per-server ceilings for MCP tool count and definition tokens (name + description + input schema). Enforced by `make lint-mcp-api-reference`. This is a RATCHET: when a consolidation lowers the measured value, lower the ceiling in the same PR. Raising a ceiling requires a justification in the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md.",
   "_regenerate": "node scripts/generate-mcp-api-reference.mjs --update-budget (or --update-budget=<server-id> to raise just one ceiling)",
   "total": {
-    "tools": 273,
-    "tokens": 99286
+    "tools": 274,
+    "tokens": 100188
   },
   "servers": {
     "legacy-sports-android": {
@@ -11,8 +11,8 @@
       "tokens": 2157
     },
     "legacy-sports-aws": {
-      "tools": 26,
-      "tokens": 9803
+      "tools": 27,
+      "tokens": 10705
     },
     "legacy-sports-browser": {
       "tools": 8,

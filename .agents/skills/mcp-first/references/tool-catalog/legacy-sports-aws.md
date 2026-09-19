@@ -10,7 +10,7 @@
 
 CloudWatch logs, Lambda/EC2/API Gateway inspection, Secrets Manager, SSM, and SSO auth health.
 
-Local stdio process only — not exposed as a hosted connector. 26 tools.
+Local stdio process only — not exposed as a hosted connector. 27 tools.
 
 ---
 
@@ -165,6 +165,21 @@ Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a L
 | `maxLines` | number |  | coerced, integer, > 0, max 1000 | Cap output to the last N lines (default: 500, maximum: 1000). Use a smaller value for high-volume log groups to avoid token overflow. |
 | `maxBytes` | number |  | coerced, integer, > 0 | Byte-cap on logs, in addition to maxLines (default: 150000). Truncates cleanly instead of erroring. |
 | `format` | enum |  | — | Output shape. `markdown` (default) groups extracted ERROR/WARN/Exception lines into a top `### Errors` section followed by a `### Recent` code-block with the last 50 log lines — far cheaper for the agent to read. `json` returns the original structured payload with the full `logs` string. |
+
+### `aws_s3_inspect`
+
+Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus, legacy-sports-dev-football-corpus). One tool, three actions: "list" pages keys with LastModified + size under a prefix (or, with summary:true, walks every page and returns only count / totalSize / min+max LastModified so a 100k-key prefix can be characterised without dumping keys); "head" returns one object's ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Uses only s3:ListBucket and s3:GetObject — never writes, copies, or deletes. Replaces shell fallback to `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.
+
+| Param | Type | Required | Constraints | Description |
+| --- | --- | --- | --- | --- |
+| `action` | enum | **required** | — | list = page keys under a prefix; head = one object's metadata (exists:false on 404); get = peek at a small object's contents. |
+| `bucket` | string | **required** | — | Bucket name without the s3:// scheme (e.g. "legacy-sports-dev-retrosheet-corpus"). |
+| `prefix` | string |  | — | Key prefix to scope a "list" (e.g. "retrosheet/v1/"). Ignored by head/get. |
+| `key` | string |  | — | Full object key. Required for "head" and "get"; ignored by "list". Keys starting with "-" are not supported. |
+| `maxKeys` | number |  | coerced, integer, min 1, max MAX_KEYS | Keys per "list" page (default and max: ${MAX_KEYS}). In summary mode this is the internal page size, not a result cap. |
+| `continuationToken` | string |  | — | Resume a "list" from the nextContinuationToken a previous call returned. |
+| `summary` | boolean |  | — | For "list": walk every page of the prefix and return aggregates only (count, totalSize, min/max LastModified) instead of the key listing. Use for large prefixes. Default: false. |
+| `maxBytes` | number |  | coerced, integer, min 1, max MAX_GET_MAX_BYTES | For "get": decoded bytes to return (default: ${DEFAULT_GET_MAX_BYTES}, max: ${MAX_GET_MAX_BYTES}). Applied after gunzipping; the response reports truncated:true when the object is longer. |
 
 ### `aws_secretsmanager_describe_secret`
 

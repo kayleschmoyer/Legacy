@@ -22,6 +22,12 @@ import {
   getSecretValue,
   listSecrets,
 } from './tools/secretsmanager.js';
+import {
+  DEFAULT_GET_MAX_BYTES,
+  MAX_GET_MAX_BYTES,
+  MAX_KEYS,
+  s3Inspect,
+} from './tools/s3-inspect.js';
 import { syncSecretToGithub } from './tools/sync-to-github.js';
 import { ssmGet } from './tools/ssm-get.js';
 import { ssmRunCommand } from './tools/ssm-run-command.js';
@@ -248,6 +254,67 @@ server.tool(
       ),
   },
   async (params) => lambdaStatus(params),
+);
+
+// --- aws_s3_inspect ---
+server.tool(
+  'aws_s3_inspect',
+  'Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus, legacy-sports-dev-football-corpus). One tool, three actions: "list" pages keys with LastModified + size under a prefix (or, with summary:true, walks every page and returns only count / totalSize / min+max LastModified so a 100k-key prefix can be characterised without dumping keys); "head" returns one object\'s ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Uses only s3:ListBucket and s3:GetObject — never writes, copies, or deletes. Replaces shell fallback to `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.',
+  {
+    action: z
+      .enum(['list', 'head', 'get'])
+      .describe(
+        "list = page keys under a prefix; head = one object's metadata (exists:false on 404); get = peek at a small object's contents.",
+      ),
+    bucket: z
+      .string()
+      .describe(
+        'Bucket name without the s3:// scheme (e.g. "legacy-sports-dev-retrosheet-corpus").',
+      ),
+    prefix: z
+      .string()
+      .optional()
+      .describe(
+        'Key prefix to scope a "list" (e.g. "retrosheet/v1/"). Ignored by head/get.',
+      ),
+    key: z
+      .string()
+      .optional()
+      .describe(
+        'Full object key. Required for "head" and "get"; ignored by "list". Keys starting with "-" are not supported.',
+      ),
+    maxKeys: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_KEYS)
+      .optional()
+      .describe(
+        `Keys per "list" page (default and max: ${MAX_KEYS}). In summary mode this is the internal page size, not a result cap.`,
+      ),
+    continuationToken: z
+      .string()
+      .optional()
+      .describe(
+        'Resume a "list" from the nextContinuationToken a previous call returned.',
+      ),
+    summary: z
+      .boolean()
+      .default(false)
+      .describe(
+        'For "list": walk every page of the prefix and return aggregates only (count, totalSize, min/max LastModified) instead of the key listing. Use for large prefixes. Default: false.',
+      ),
+    maxBytes: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_GET_MAX_BYTES)
+      .optional()
+      .describe(
+        `For "get": decoded bytes to return (default: ${DEFAULT_GET_MAX_BYTES}, max: ${MAX_GET_MAX_BYTES}). Applied after gunzipping; the response reports truncated:true when the object is longer.`,
+      ),
+  },
+  async (params) => s3Inspect(params),
 );
 
 // --- aws_ssm_get ---

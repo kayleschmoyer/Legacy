@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 273,
+  "toolCount": 274,
   "servers": [
     {
       "dir": "worktree-server",
@@ -7793,7 +7793,7 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 26,
+      "toolCount": 27,
       "tools": [
         {
           "name": "aws_apigateway_inspect",
@@ -8329,6 +8329,73 @@
               ],
               "default": "markdown",
               "description": "Output shape. `markdown` (default) groups extracted ERROR/WARN/Exception lines into a top `### Errors` section followed by a `### Recent` code-block with the last 50 log lines — far cheaper for the agent to read. `json` returns the original structured payload with the full `logs` string."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "aws_s3_inspect",
+          "description": "Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus, legacy-sports-dev-football-corpus). One tool, three actions: \"list\" pages keys with LastModified + size under a prefix (or, with summary:true, walks every page and returns only count / totalSize / min+max LastModified so a 100k-key prefix can be characterised without dumping keys); \"head\" returns one object's ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; \"get\" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Uses only s3:ListBucket and s3:GetObject — never writes, copies, or deletes. Replaces shell fallback to `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.",
+          "inputs": {
+            "action": {
+              "type": "enum",
+              "optional": false,
+              "enum": [
+                "list",
+                "head",
+                "get"
+              ],
+              "description": "list = page keys under a prefix; head = one object's metadata (exists:false on 404); get = peek at a small object's contents."
+            },
+            "bucket": {
+              "type": "string",
+              "optional": false,
+              "description": "Bucket name without the s3:// scheme (e.g. \"legacy-sports-dev-retrosheet-corpus\")."
+            },
+            "prefix": {
+              "type": "string",
+              "optional": true,
+              "description": "Key prefix to scope a \"list\" (e.g. \"retrosheet/v1/\"). Ignored by head/get."
+            },
+            "key": {
+              "type": "string",
+              "optional": true,
+              "description": "Full object key. Required for \"head\" and \"get\"; ignored by \"list\". Keys starting with \"-\" are not supported."
+            },
+            "maxKeys": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "min 1",
+                "max MAX_KEYS"
+              ],
+              "description": "Keys per \"list\" page (default and max: ${MAX_KEYS}). In summary mode this is the internal page size, not a result cap."
+            },
+            "continuationToken": {
+              "type": "string",
+              "optional": true,
+              "description": "Resume a \"list\" from the nextContinuationToken a previous call returned."
+            },
+            "summary": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "For \"list\": walk every page of the prefix and return aggregates only (count, totalSize, min/max LastModified) instead of the key listing. Use for large prefixes. Default: false."
+            },
+            "maxBytes": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "min 1",
+                "max MAX_GET_MAX_BYTES"
+              ],
+              "description": "For \"get\": decoded bytes to return (default: ${DEFAULT_GET_MAX_BYTES}, max: ${MAX_GET_MAX_BYTES}). Applied after gunzipping; the response reports truncated:true when the object is longer."
             }
           },
           "transports": [
