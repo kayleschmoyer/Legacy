@@ -13,7 +13,6 @@ import {
   OAuthResponse,
   SecureStorageProvider,
 } from '@legacy-sports/shared-components';
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/native';
 import {
@@ -24,7 +23,6 @@ import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
 import { onSessionExpired } from './sessionEvents';
 import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
-import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
 import { trackGoogleSignInFailure } from '../../utils/analytics';
 import { clearPushTokenRegistration } from '../../features/notifications/pushRegistrationFingerprint';
@@ -489,7 +487,19 @@ export function useCurrentUserInfo(): AsyncHookResult<LegacySportsJwt | null> {
 
   const runHook = useCallback(async () => {
     void lastUpdateTime;
-    if (getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH) === 'true') {
+    // Read via a static `process.env.EXPO_PUBLIC_*` member expression, not the
+    // shared `getEnvVarOptional(EnvironmentVariable.BYPASS_AUTH)` helper's
+    // dynamic `process.env[envVar]` lookup (LS-10047). babel-preset-expo's
+    // Metro-time env-var inlining only rewrites literal
+    // `process.env.EXPO_PUBLIC_X` member expressions it can statically find
+    // in source — a computed/bracket access with a runtime variable is never
+    // inlined, so on a real device/emulator (no live Node `process.env`) it
+    // always evaluated to `undefined`, silently disabling the bypass in every
+    // build (including the Maestro sweep's authenticated-flow debug APK,
+    // which never reached the home screen as a result). Every other
+    // EXPO_PUBLIC_* read in the native app already uses this static form —
+    // see lib/app-config/src/lib/config.native.ts.
+    if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') {
       if (process.env.NODE_ENV === 'production') {
         throw new Error(
           'BYPASS_AUTH is set in a production build — remove EXPO_PUBLIC_BYPASS_AUTH from your production environment.',

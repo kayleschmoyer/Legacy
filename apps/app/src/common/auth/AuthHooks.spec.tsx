@@ -197,18 +197,6 @@ jest.mock('../../utils/analytics', () => ({
     mockTrackGoogleSignInFailure(...args),
 }));
 
-// Mock env utilities (still used by AuthHooks for BYPASS_AUTH)
-const mockEnvVars: Record<string, string> = {};
-
-jest.mock('@legacy-sports/env-utilities', () => ({
-  getEnvVarRequired: (key: string) => {
-    const val = mockEnvVars[key];
-    if (!val) throw new Error(`Missing required env var: ${key}`);
-    return val;
-  },
-  getEnvVarOptional: (key: string) => mockEnvVars[key] ?? undefined,
-}));
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Create a fake JWT string that jwt-decode can parse (base64url-encoded payload) */
@@ -258,7 +246,7 @@ describe('AuthHooks', () => {
       (key) => delete mockSecureStorage[key],
     );
     // Reset env vars
-    delete mockEnvVars['EXPO_PUBLIC_BYPASS_AUTH'];
+    delete process.env.EXPO_PUBLIC_BYPASS_AUTH;
   });
 
   // ── readKeychainValue ───────────────────────────────────────────────────
@@ -881,7 +869,7 @@ describe('AuthHooks', () => {
     });
 
     it('returns LOCAL_USER when BYPASS_AUTH is true', async () => {
-      mockEnvVars['EXPO_PUBLIC_BYPASS_AUTH'] = 'true';
+      process.env.EXPO_PUBLIC_BYPASS_AUTH = 'true';
 
       const { result } = renderHook(() => useCurrentUserInfo());
 
@@ -899,7 +887,7 @@ describe('AuthHooks', () => {
     });
 
     it('surfaces an error when BYPASS_AUTH is true in a production build', async () => {
-      mockEnvVars['EXPO_PUBLIC_BYPASS_AUTH'] = 'true';
+      process.env.EXPO_PUBLIC_BYPASS_AUTH = 'true';
       const originalNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
       try {
