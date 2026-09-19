@@ -109,7 +109,10 @@ test.describe
 
     await test.step('Verify there is no rounds (roster size) setting (LS-10086)', async () => {
       // A mock draft always runs the sport's full default roster, so the
-      // setup form no longer collects a roster size.
+      // setup form no longer collects a roster size. This step previously
+      // failed against the live backend purely from deploy lag (Apply Lambda
+      // Infrastructure had been red since before LS-10086 shipped — see
+      // LS-10172/LS-10190); re-verified passing here post-fix (LS-10115).
       await expect(page.getByText('Rounds (Roster Size)')).toHaveCount(0);
     });
 
