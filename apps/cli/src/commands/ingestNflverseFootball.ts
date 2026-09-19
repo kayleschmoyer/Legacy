@@ -27,8 +27,11 @@ import { gzipSync } from 'node:zlib';
  * for player categories and one per (nflTeam, season) for team defense.
  *
  * Replaces per-player Pro Football Reference scraping as the bulk source for
- * 1999-2025 game-level football stats (LS-9989). Mirrors
- * `apps/cli/src/commands/ingestRetrosheet.ts` (LS-9817) structurally; see
+ * game-level football stats from 1999 onward (LS-9989). nflverse publishes the
+ * current season's weekly stats during the season, so the in-season refresh is
+ * documented in .agents/skills/dev-environment/references/cli-commands.md.
+ *
+ * Mirrors `apps/cli/src/commands/ingestRetrosheet.ts` (LS-9817) structurally; see
  * `terraform/main/football-corpus.tf` for the bucket this writes to and
  * `docs/decisions/0022-football-per-game-stats-source.md` for why nflverse
  * (not PFR) is the source for this range.
@@ -47,8 +50,7 @@ const weeklyStatsUrl = (season: number) =>
 
 /** nflverse's unified weekly stats file starts at 1999 (play-by-play does
  * not exist before that — the league's own digitization limit, ADR 0022). */
-const FIRST_SEASON = 1999;
-const LAST_SEASON = 2025;
+export const FIRST_SEASON = 1999;
 
 const FETCH_TIMEOUT_MS = 120_000;
 
@@ -63,14 +65,86 @@ export interface IngestNflverseFootballArgs {
   dryRun?: boolean;
 }
 
+class HttpStatusError extends Error {
+  constructor(
+    url: string,
+    readonly status: number,
+  ) {
+    super(`GET ${url} failed: ${status}`);
+  }
+}
+
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`GET ${url} failed: ${response.status}`);
+    throw new HttpStatusError(url, response.status);
   }
   return response.text();
+}
+
+// ---------------------------------------------------------------------------
+// Season range
+// ---------------------------------------------------------------------------
+
+/**
+ * The NFL season in progress (or most recently started) at `now`.
+ *
+ * nflverse labels a season by the calendar year it starts in, and the regular
+ * season opens in September and runs into February of the following year. So
+ * between January and August the current season is still last calendar year's.
+ */
+export function currentNflSeason(now: Date): number {
+  const year = now.getUTCFullYear();
+  // getUTCMonth() is 0-based: 8 === September.
+  return now.getUTCMonth() >= 8 ? year : year - 1;
+}
+
+export type SeasonRange =
+  | { ok: true; from: number; to: number }
+  | { ok: false; error: string };
+
+/**
+ * Resolve --from/--to against the current date (LS-10235).
+ *
+ * Unlike Retrosheet (LS-10232), nflverse publishes the current season's weekly
+ * stats *during* the season, so the default upper bound is the current season
+ * rather than last year. Seasons beyond it cannot exist and are clamped away;
+ * a season whose file is not posted yet 404s and the season loop skips it with
+ * a warning.
+ */
+export function resolveSeasonRange(
+  args: Pick<IngestNflverseFootballArgs, 'from' | 'to'>,
+  now: Date = new Date(),
+): SeasonRange {
+  // Validate BEFORE clamping. `--from abc` parses to NaN, and NaN survives
+  // Math.max/Math.min silently: the `from > to` check below is false for NaN,
+  // so the season loop would simply never iterate and the command would exit 0
+  // reporting "0 objects written" — a silent no-op that looks like success.
+  for (const [flag, value] of [
+    ['--from', args.from],
+    ['--to', args.to],
+  ] as const) {
+    if (value !== undefined && !Number.isInteger(value)) {
+      return {
+        ok: false,
+        error: `${flag} must be a whole year (got: ${value})`,
+      };
+    }
+  }
+
+  const currentSeason = currentNflSeason(now);
+  const from = Math.max(args.from ?? FIRST_SEASON, FIRST_SEASON);
+  const to = Math.min(args.to ?? currentSeason, currentSeason);
+
+  if (from > to) {
+    return {
+      ok: false,
+      error: `Empty season range: ${from} > ${to} (nflverse weekly stats cover ${FIRST_SEASON}-${currentSeason})`,
+    };
+  }
+  return { ok: true, from, to };
 }
 
 function groupByPlayer(rows: NflverseRow[]): Map<string, NflverseRow[]> {
@@ -127,25 +201,14 @@ export async function handleIngestNflverseFootball(
 
   const prefix = args.prefix ?? process.env.FOOTBALL_CORPUS_S3_PREFIX ?? '';
 
-  for (const [flag, value] of [
-    ['--from', args.from],
-    ['--to', args.to],
-  ] as const) {
-    if (value !== undefined && !Number.isInteger(value)) {
-      LOGGER.error(`${flag} must be a whole year (got: ${value})`);
-      process.exit(1);
-    }
-  }
-
-  const from = Math.max(args.from ?? FIRST_SEASON, FIRST_SEASON);
-  const to = Math.min(args.to ?? LAST_SEASON, LAST_SEASON);
-
-  if (from > to) {
-    LOGGER.error(
-      `Empty season range: ${from} > ${to} (nflverse weekly stats cover ${FIRST_SEASON}-${LAST_SEASON})`,
-    );
+  const range = resolveSeasonRange(args);
+  // `in` narrowing: this project compiles without strictNullChecks, where a
+  // boolean-literal discriminant (`!range.ok`) does not narrow the union.
+  if ('error' in range) {
+    LOGGER.error(range.error);
     process.exit(1);
   }
+  const { from, to } = range;
 
   LOGGER.info(
     `nflverse football ingest: seasons ${from}-${to} -> s3://${bucket ?? '(dry-run)'}/${prefix} (force=${Boolean(args.force)}, dryRun=${Boolean(args.dryRun)}, payload v${NFLVERSE_PAYLOAD_VERSION})`,
@@ -170,12 +233,24 @@ export async function handleIngestNflverseFootball(
   let totalTeamObjects = 0;
   let totalSkipped = 0;
   let totalUnmapped = 0;
+  const unpublishedSeasons: number[] = [];
 
   for (let season = from; season <= to; season++) {
+    const url = weeklyStatsUrl(season);
     let weeklyCsv: string;
     try {
-      weeklyCsv = await fetchText(weeklyStatsUrl(season));
+      weeklyCsv = await fetchText(url);
     } catch (error) {
+      // nflverse posts the current season's weekly file once the season is
+      // under way; before that it 404s. That is expected, not a failure.
+      if (error instanceof HttpStatusError && error.status === 404) {
+        unpublishedSeasons.push(season);
+        LOGGER.warn(
+          `Season ${season}: weekly stats not published yet (404 at ${url}), skipping`,
+          error,
+        );
+        continue;
+      }
       LOGGER.error(`Season ${season}: download failed`, error as Error);
       continue;
     }
@@ -265,4 +340,11 @@ export async function handleIngestNflverseFootball(
     `Ingest complete: ${totalPlayerObjects} player objects, ${totalTeamObjects} team-defense objects, ` +
       `${totalSkipped} skipped (already present), ${totalUnmapped} distinct unmapped nflverse players (no pfr_id crosswalk)`,
   );
+  if (unpublishedSeasons.length > 0) {
+    // Name them: a season silently absent from the corpus is indistinguishable
+    // from one that was never requested when reading only the summary line.
+    LOGGER.warn(
+      `Season(s) not yet published by nflverse, ingested nothing: ${unpublishedSeasons.join(', ')}`,
+    );
+  }
 }

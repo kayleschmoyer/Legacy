@@ -69,10 +69,28 @@ Retrosheet publishes each season's processed CSVs the winter after the season en
 
 ## Data loading — football
 
-| Command                | Purpose                                                                                                                                                                    |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `load-football-career` | PFR career stats → `career_football_*`. One of `--player-id <id>`, `--all`, `--batch <file>`, or `--limit N` (resumable); `--start-season <year>`                          |
-| `queue-players`        | Discover + batch-enqueue players to the stats SQS queue. `--sport baseball\|football` (required), `--letter <x>`, `--skip-queue`. Football scrapes the PFR A–Z index first |
+| Command                    | Purpose                                                                                                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load-football-career`     | PFR career stats → `career_football_*`. One of `--player-id <id>`, `--all`, `--batch <file>`, or `--limit N` (resumable); `--start-season <year>`                                                                                 |
+| `queue-players`            | Discover + batch-enqueue players to the stats SQS queue. `--sport baseball\|football` (required), `--letter <x>`, `--skip-queue`. Football scrapes the PFR A–Z index first                                                        |
+| `ingest-nflverse-football` | Stage the nflverse football corpus in S3, one object per player-season and per team-defense-season. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [in-season refresh](#in-season-nflverse-corpus-refresh) |
+
+### In-season nflverse corpus refresh
+
+Unlike Retrosheet, nflverse publishes the **current** season's weekly stats while the season is being played, so the corpus can (and should) be topped up during the season rather than once a year. `ingest-nflverse-football` defaults to 1999 through the current season — the season that started in September, so January–August still resolves to the previous season's label. A season whose weekly file 404s (not posted yet) is skipped with a warning and named in the final summary, not treated as an error (LS-10235).
+
+- **When:** weekly during the NFL regular season and postseason (roughly September–February), and once more after the season ends to pick up any late corrections. Existing objects are skipped unless `--force`, so a re-run only writes what is new.
+- **Who:** a maintainer with AWS credentials for the target account. Agents cannot mint them.
+- **Command** (the bucket is Terraform-managed as `<name_prefix>-football-corpus`, the same value the stats lambda reads from `FOOTBALL_CORPUS_S3_BUCKET`):
+
+  ```bash
+  ./ls-cli.sh ingest-nflverse-football --from <year> --to <year> --dry-run
+  ./ls-cli.sh ingest-nflverse-football --from <year> --to <year> --force --bucket <name_prefix>-football-corpus
+  ```
+
+  Pass `--force` for an in-progress season: the weekly file grows each week, and without it the player-season objects written earlier in the season are skipped as already present.
+
+- **Verify:** the `Season <year>: N players in nflverse ...` log line reports the expected player count and the `unmapped` count is small. Players who debuted that season may lack a `pfr_id` in the nflverse crosswalk until it catches up; a later re-run picks them up.
 
 ## Stats pipeline operations
 

@@ -225,7 +225,7 @@ export function buildProgram(): Command {
   program
     .command('ingest-nflverse-football')
     .description(
-      'Stage the nflverse football corpus (1999-2025) in S3, one object per player-season and per team-defense-season (LS-9989)',
+      'Stage the nflverse football corpus (1999 through the current season) in S3, one object per player-season and per team-defense-season (LS-9989)',
     )
     .option(
       '-b, --bucket <name>',
@@ -236,7 +236,11 @@ export function buildProgram(): Command {
       'Key prefix (default $FOOTBALL_CORPUS_S3_PREFIX)',
     )
     .option('--from <year>', 'First season (default 1999)', parseInt)
-    .option('--to <year>', 'Last season (default 2025)', parseInt)
+    .option(
+      '--to <year>',
+      'Last season (default the current season, skipped if not published yet)',
+      parseInt,
+    )
     .option('--force', 'Re-upload objects that already exist')
     .option('--dry-run', 'Parse and report without writing to S3')
     .action(
