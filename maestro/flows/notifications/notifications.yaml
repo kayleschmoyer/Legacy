@@ -1,0 +1,35 @@
+# Notifications: You tab -> Notifications row -> notifications list/preferences.
+appId: com.legacysports.app
+tags:
+  - notifications
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- tapOn: "You"
+- extendedWaitUntil:
+    visible:
+      id: "you-notifications"
+    timeout: 15000
+- takeScreenshot: maestro/artifacts/notifications/01-you-tab
+- tapOn:
+    id: "you-notifications"
+# Mandatory landing (LS-8446 convention): anchor on the route's own testID so a
+# broken navigation or crashed screen fails the flow rather than asserting
+# against a false positive (the previous screen's "Notifications" row label
+# text would otherwise still read as "visible").
+- extendedWaitUntil:
+    visible:
+      id: "notifications-page"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/notifications/02-notifications-list
+- runFlow:
+    when:
+      visible: "Mark all as read"
+    commands:
+      - takeScreenshot: maestro/artifacts/notifications/03-before-mark-all-read
+      - tapOn: "Mark all as read"
+      - takeScreenshot: maestro/artifacts/notifications/04-after-mark-all-read
+- scroll
+- takeScreenshot: maestro/artifacts/notifications/05-scrolled
+- back

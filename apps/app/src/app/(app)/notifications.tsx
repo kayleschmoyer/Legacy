@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { config } from '@legacy-sports/app-config/native';
 import { NotificationsScreen as NotificationsScreenComponent } from '@legacy-sports/shared-components/notifications';
@@ -30,37 +31,39 @@ export default function NotificationsScreen(): React.JSX.Element {
   }, []);
 
   return (
-    <NotificationsScreenComponent
-      userId={userInfo.id}
-      websocketUrl={config.websocketUrl}
-      websocketToken={wsToken}
-      onNavigateToMatchup={(matchupId, leagueId) =>
-        router.push({
-          pathname: '/baseball/matchup',
-          params: {
-            matchupId: String(matchupId),
-            leagueId: String(leagueId),
-          },
-        })
-      }
-      onNavigateToLeague={(leagueId) =>
-        router.push({
-          pathname: '/baseball/league/[leagueId]',
-          params: { leagueId: String(leagueId) },
-        })
-      }
-      onNavigateToTrades={(leagueId, tradeOfferId) =>
-        router.push({
-          pathname: '/TradeCenterPage',
-          params: {
-            leagueId: String(leagueId),
-            ...(tradeOfferId != null && {
-              tradeOfferId: String(tradeOfferId),
-            }),
-          },
-        })
-      }
-    />
+    <View testID="notifications-page" style={{ flex: 1 }}>
+      <NotificationsScreenComponent
+        userId={userInfo.id}
+        websocketUrl={config.websocketUrl}
+        websocketToken={wsToken}
+        onNavigateToMatchup={(matchupId, leagueId) =>
+          router.push({
+            pathname: '/baseball/matchup',
+            params: {
+              matchupId: String(matchupId),
+              leagueId: String(leagueId),
+            },
+          })
+        }
+        onNavigateToLeague={(leagueId) =>
+          router.push({
+            pathname: '/baseball/league/[leagueId]',
+            params: { leagueId: String(leagueId) },
+          })
+        }
+        onNavigateToTrades={(leagueId, tradeOfferId) =>
+          router.push({
+            pathname: '/TradeCenterPage',
+            params: {
+              leagueId: String(leagueId),
+              ...(tradeOfferId != null && {
+                tradeOfferId: String(tradeOfferId),
+              }),
+            },
+          })
+        }
+      />
+    </View>
   );
 }
 
