@@ -20,6 +20,14 @@ Cloud sessions (Claude Code Web) cannot reach Claude Design via `WebFetch` eithe
 - The manifest `id` field (bundle directory name) is a **different namespace** from the claude.ai project UUID. Auto-synced entries use the handoff id (e.g. `F89Q4j6WFCFqqsZpQ4VhlQ`); the same design's claude.ai project UUID looks like `019dd2d6-75a1-7916-8566-672f7d4189fa`. `manifest.designs[].projectId` records the latter when known. Never assume one can be derived from the other.
 - Verify before writing: `get_project` returns `type` — only `PROJECT_TYPE_DESIGN_SYSTEM` projects belong in design-system push flows; page mockup projects are `PROJECT_TYPE_PROJECT`.
 
+## Main-session only — not exposed to subagents (LS-9985)
+
+`DesignSync` is absent from a subagent's deferred-tool inventory — not attached-but-down, simply not registered there at all. `ToolSearch({ query: "select:DesignSync" })` inside any `Agent`-dispatched subagent returns `"No matching deferred tools found."`, confirmed across five parallel general-purpose subagents dispatched to pull disjoint file sets for a single sync (LS-9981). The subagents correctly refused to fabricate content and wrote nothing rather than guess.
+
+**Do not dispatch subagents to parallelize a design pull.** Every `get_file`/`list_files`/`get_project` call must run in the main session — there is no delegation path that avoids paying the full context cost inline. This is a Claude Code harness-level tool-registration boundary, not a per-repo config knob; there is nothing in this repo's `.mcp.json` or agent definitions that can grant a subagent access to a built-in tool the main session alone holds. If a future harness update exposes `DesignSync` (or a read-only subset) to subagents, this note is stale — for now, pace the pull in-context per [design-sync/SKILL.md § Large files](../SKILL.md#large-files-size-the-pull-before-you-make-it) rather than trying to fan it out.
+
+**Size asymmetry to plan around**: a response near the 256 KiB `get_file` cap is large enough that the harness persists it to a scratch file and hands back a reference instead of inlining the bytes, so a large-but-under-cap file can be cheaper to move than expected. A small file has no such escape hatch — it always returns inline and must be fully re-transcribed to write it out. Counterintuitively, pulling many small files back-to-back in the main session can burn more context than one file near the cap; batch small files together where the sync plan allows it rather than assuming size alone predicts cost.
+
 ## Read methods
 
 1. `get_project({ projectId })` — name, type, `canEdit`. Cheap existence/permission probe; run it first.

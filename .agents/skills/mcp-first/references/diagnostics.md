@@ -343,6 +343,16 @@ Then `Read` any `references/*.md` files the `SKILL.md` frontmatter/body points t
 
 This is a documented stopgap, not a fix for the underlying tool-invocation defect — apply it whenever `Skill(...)` returns generic re-invocation boilerplate or loses an argument, for any skill, not just `work-ticket`.
 
+## DesignSync Tool Absent From Subagent Tool Inventory (LS-9985)
+
+Distinct from the MCP server connectivity failures above — `DesignSync` is a Claude Code harness built-in (not one of this repo's MCP servers), and it is simply not registered in a subagent's deferred-tool list, not attached-but-down.
+
+**Symptom:** an `Agent`-dispatched subagent runs `ToolSearch({ query: "select:DesignSync" })` (or any keyword/name-constrained variant) and gets `"No matching deferred tools found."` The main session that spawned the subagent has full `DesignSync` access throughout. Confirmed with five parallel general-purpose subagents dispatched to pull disjoint file sets for one design sync (LS-9981) — all five hit the identical result and correctly refused to fabricate content, writing nothing.
+
+**Do not loop on retrying `ToolSearch` inside the subagent or re-dispatching with different phrasing** — the tool is absent from that inventory by harness-level design, not a transient miss; no query variant surfaces it. This is the same category of out-of-repo-fix-surface limitation as the [Skill Tool boilerplate defect](#skill-tool-returns-boilerplate-instead-of-skillmd-content-ls-8719) above: there is no `.mcp.json` entry, agent definition, or server-side registration this repo controls that grants a subagent a main-session-only built-in tool.
+
+**Recovery:** run every `DesignSync` call (`get_project`, `list_files`, `get_file`, and the write flow) from the main session, never from a dispatched subagent. Pace a bulk pull in-context instead of trying to parallelize it away — see [design-sync/references/designsync-tool.md § Main-session only](../../design-sync/references/designsync-tool.md#main-session-only--not-exposed-to-subagents-ls-9985) for the workaround and the file-size cost asymmetry to plan around.
+
 ## See Also
 
 - [LS-9439](https://bkrupa.atlassian.net/browse/LS-9439) — tracking ticket for the auth-server-incompatibility failure mode above; root cause still open
