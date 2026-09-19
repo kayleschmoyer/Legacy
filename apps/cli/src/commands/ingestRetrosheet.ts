@@ -26,8 +26,10 @@ import { gzipSync } from 'node:zlib';
  * GLOBALLY, so warming the ~90k cold player-seasons that way would take
  * ~300 hours; Retrosheet is static files, so the same corpus lands in minutes.
  *
- * Retrosheet's processed CSVs cover 1897-2025. Pre-1897 player-seasons are not
- * available here and remain on the scraper fallback.
+ * Retrosheet's processed CSVs start in 1897 and gain one season per year, each
+ * published the winter after it ends. Pre-1897 player-seasons are not
+ * available here and remain on the scraper fallback. The annual refresh is
+ * documented in .agents/skills/dev-environment/references/cli-commands.md.
  *
  * Data source and attribution:
  *   The information used here was obtained free of charge from and is
@@ -41,9 +43,8 @@ const CHADWICK_SHARD_URL =
   'https://raw.githubusercontent.com/chadwickbureau/register/master/data/people-{shard}.csv';
 const CHADWICK_SHARDS = '0123456789abcdef'.split('');
 
-/** Retrosheet's processed CSV coverage. */
-const FIRST_SEASON = 1897;
-const LAST_SEASON = 2025;
+/** First season in Retrosheet's processed CSV coverage. */
+export const FIRST_SEASON = 1897;
 
 const USER_AGENT = 'legacy-sports-retrosheet-ingest/1.0';
 
@@ -69,15 +70,73 @@ export interface IngestRetrosheetArgs {
  */
 const FETCH_TIMEOUT_MS = 120_000;
 
+class HttpStatusError extends Error {
+  constructor(
+    url: string,
+    readonly status: number,
+  ) {
+    super(`GET ${url} failed: ${status}`);
+  }
+}
+
 async function fetchBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url, {
     headers: { 'User-Agent': USER_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`GET ${url} failed: ${response.status}`);
+    throw new HttpStatusError(url, response.status);
   }
   return Buffer.from(await response.arrayBuffer());
+}
+
+// ---------------------------------------------------------------------------
+// Season range
+// ---------------------------------------------------------------------------
+
+export type SeasonRange =
+  | { ok: true; from: number; to: number }
+  | { ok: false; error: string };
+
+/**
+ * Resolve --from/--to against the current date (LS-10232).
+ *
+ * Retrosheet publishes season Y the winter after it ends, so the default upper
+ * bound is last year. An explicit --to may reach the current season; if its
+ * archive is not published yet, the season loop skips it with a warning.
+ * Future seasons cannot exist and are clamped away.
+ */
+export function resolveSeasonRange(
+  args: Pick<IngestRetrosheetArgs, 'from' | 'to'>,
+  now: Date = new Date(),
+): SeasonRange {
+  // Validate BEFORE clamping. `--from abc` parses to NaN, and NaN survives
+  // Math.max/Math.min silently: the `from > to` check below is false for NaN,
+  // so the season loop would simply never iterate and the command would exit 0
+  // reporting "0 objects written" — a silent no-op that looks like success.
+  for (const [flag, value] of [
+    ['--from', args.from],
+    ['--to', args.to],
+  ] as const) {
+    if (value !== undefined && !Number.isInteger(value)) {
+      return {
+        ok: false,
+        error: `${flag} must be a whole year (got: ${value})`,
+      };
+    }
+  }
+
+  const currentSeason = now.getUTCFullYear();
+  const from = Math.max(args.from ?? FIRST_SEASON, FIRST_SEASON);
+  const to = Math.min(args.to ?? currentSeason - 1, currentSeason);
+
+  if (from > to) {
+    return {
+      ok: false,
+      error: `Empty season range: ${from} > ${to} (Retrosheet covers ${FIRST_SEASON}-${currentSeason - 1}, plus ${currentSeason} once published)`,
+    };
+  }
+  return { ok: true, from, to };
 }
 
 /**
@@ -289,29 +348,14 @@ export async function handleIngestRetrosheet(
 
   const prefix = args.prefix ?? process.env.RETROSHEET_S3_PREFIX ?? '';
 
-  // Validate BEFORE clamping. `--from abc` parses to NaN, and NaN survives
-  // Math.max/Math.min silently: the `from > to` check below is false for NaN,
-  // so the season loop would simply never iterate and the command would exit 0
-  // reporting "0 objects written" — a silent no-op that looks like success.
-  for (const [flag, value] of [
-    ['--from', args.from],
-    ['--to', args.to],
-  ] as const) {
-    if (value !== undefined && !Number.isInteger(value)) {
-      LOGGER.error(`${flag} must be a whole year (got: ${value})`);
-      process.exit(1);
-    }
-  }
-
-  const from = Math.max(args.from ?? FIRST_SEASON, FIRST_SEASON);
-  const to = Math.min(args.to ?? LAST_SEASON, LAST_SEASON);
-
-  if (from > to) {
-    LOGGER.error(
-      `Empty season range: ${from} > ${to} (Retrosheet covers ${FIRST_SEASON}-${LAST_SEASON})`,
-    );
+  const range = resolveSeasonRange(args);
+  // `in` narrowing: this project compiles without strictNullChecks, where a
+  // boolean-literal discriminant (`!range.ok`) does not narrow the union.
+  if ('error' in range) {
+    LOGGER.error(range.error);
     process.exit(1);
   }
+  const { from, to } = range;
 
   LOGGER.info(
     `Retrosheet ingest: seasons ${from}-${to} -> s3://${bucket ?? '(dry-run)'}/${prefix} (force=${Boolean(args.force)}, dryRun=${Boolean(args.dryRun)})`,
@@ -333,6 +377,15 @@ export async function handleIngestRetrosheet(
     try {
       archive = await fetchBuffer(url);
     } catch (error) {
+      // Retrosheet publishes a season the winter after it ends; until then the
+      // archive 404s. That is expected, not a failure.
+      if (error instanceof HttpStatusError && error.status === 404) {
+        LOGGER.warn(
+          `Season ${season}: archive not published yet (404 at ${url}), skipping`,
+          error,
+        );
+        continue;
+      }
       LOGGER.error(`Season ${season}: download failed`, error as Error);
       continue;
     }

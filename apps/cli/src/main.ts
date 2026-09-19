@@ -196,7 +196,7 @@ export function buildProgram(): Command {
   program
     .command('ingest-retrosheet')
     .description(
-      'Stage the Retrosheet corpus (1897-2025) in S3, one object per player-season',
+      'Stage the Retrosheet corpus (1897 through the latest published season) in S3, one object per player-season',
     )
     .option(
       '-b, --bucket <name>',
@@ -204,7 +204,11 @@ export function buildProgram(): Command {
     )
     .option('--prefix <prefix>', 'Key prefix (default $RETROSHEET_S3_PREFIX)')
     .option('--from <year>', 'First season (default 1897)', parseInt)
-    .option('--to <year>', 'Last season (default 2025)', parseInt)
+    .option(
+      '--to <year>',
+      'Last season (default last year; up to the current year, skipped if unpublished)',
+      parseInt,
+    )
     .option('--force', 'Re-upload objects that already exist')
     .option('--dry-run', 'Parse and report without writing to S3')
     .action(

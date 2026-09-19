@@ -40,16 +40,32 @@ For schema changes never use `query-db` — migrations only ([database](../../da
 
 ## Data loading — baseball
 
-| Command                       | Purpose                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `load-players`                | Load all players from Baseball Reference (`pnpm run cli:load-players`)                                       |
-| `load-career-stats`           | Career stats for players. `--limit N`, `--remote` (via SQS), `--prioritize-new`, `--show-summary`, `--quiet` |
-| `load-single-player-stats`    | One player: `--player <bref_id>` (`--remote` for SQS)                                                        |
-| `load-game-stats`             | Game-level stats: `--player <bref_id> --season <year>` (both required), `--position <pos>`                   |
-| `load-woba-weights`           | FanGraphs wOBA season weights → `woba_season_weights` (`--upsert`)                                           |
-| `load-br-park-factors`        | Scrape BPF/PPF park factors → `park_factors` (`--upsert`, `--from`, `--to`)                                  |
-| `load-positional-adjustments` | Year-specific positional adjustments → `positional_adjustments` (`--upsert`)                                 |
-| `load-on-this-day-events`     | MLB Stats API transactions → `on_this_day_events` (`--from`, `--to`, `--delay <ms>`, `--upsert`)             |
+| Command                       | Purpose                                                                                                                                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load-players`                | Load all players from Baseball Reference (`pnpm run cli:load-players`)                                                                                                                                |
+| `load-career-stats`           | Career stats for players. `--limit N`, `--remote` (via SQS), `--prioritize-new`, `--show-summary`, `--quiet`                                                                                          |
+| `load-single-player-stats`    | One player: `--player <bref_id>` (`--remote` for SQS)                                                                                                                                                 |
+| `load-game-stats`             | Game-level stats: `--player <bref_id> --season <year>` (both required), `--position <pos>`                                                                                                            |
+| `load-woba-weights`           | FanGraphs wOBA season weights → `woba_season_weights` (`--upsert`)                                                                                                                                    |
+| `load-br-park-factors`        | Scrape BPF/PPF park factors → `park_factors` (`--upsert`, `--from`, `--to`)                                                                                                                           |
+| `load-positional-adjustments` | Year-specific positional adjustments → `positional_adjustments` (`--upsert`)                                                                                                                          |
+| `load-on-this-day-events`     | MLB Stats API transactions → `on_this_day_events` (`--from`, `--to`, `--delay <ms>`, `--upsert`)                                                                                                      |
+| `ingest-retrosheet`           | Stage the Retrosheet game-level corpus in S3, one object per player-season. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [annual refresh](#annual-retrosheet-corpus-refresh) |
+
+### Annual Retrosheet corpus refresh
+
+Retrosheet publishes each season's processed CSVs the winter after the season ends. `ingest-retrosheet` defaults to 1897 through last year, and an explicit `--to` can reach the current year. A season whose archive 404s (not published yet) is skipped with a warning, not an error (LS-10232). Until a season is ingested, its player-seasons fall back to the rate-limited Baseball Reference scraper.
+
+- **When:** once a year, after Retrosheet announces the new season on [retrosheet.org](https://www.retrosheet.org/) (usually December–February). Check that `https://www.retrosheet.org/downloads/<year>/<year>csvs.zip` downloads.
+- **Who:** a maintainer with AWS credentials for the target account. Agents cannot mint them.
+- **Command** (the bucket is Terraform-managed as `<name_prefix>-retrosheet-corpus`, the same value the stats lambda reads from `RETROSHEET_S3_BUCKET`):
+
+  ```bash
+  ./ls-cli.sh ingest-retrosheet --from <year> --to <year> --dry-run
+  ./ls-cli.sh ingest-retrosheet --from <year> --to <year> --bucket <name_prefix>-retrosheet-corpus
+  ```
+
+- **Verify:** the `Season <year>: N player-seasons` log line reports thousands of player-seasons, and the `unmapped` count is small. Players who debuted that season may lack a Chadwick `key_retro` until the Register catches up; re-run with the same range later to pick them up (existing objects are skipped unless `--force`).
 
 ## Data loading — football
 
