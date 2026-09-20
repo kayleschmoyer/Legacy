@@ -175,3 +175,39 @@ test.describe('Mobile panel interaction: close on link click @regression', () =>
     await navHeader.expectMobileMenuHidden();
   });
 });
+
+// ── Panel closes on sign out ───────────────────────────────────────────────
+
+test.describe('Mobile panel interaction: sign out @regression', () => {
+  // LS-2109: the drawer's Sign Out item was covered for open/close and link
+  // clicks, but not for the sign-out action itself closing the panel and
+  // returning the user to the landing page.
+  test('panel closes and lands on the landing page after Sign out is clicked', async ({
+    page,
+    navHeader,
+    settingsPage,
+    browserName,
+  }) => {
+    test.skip(
+      browserName === 'webkit',
+      'WebKit blocks localStorage access in this context',
+    );
+
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await navHeader.openMobileMenu();
+    await navHeader.expectMobileMenuVisible();
+
+    await navHeader.clickMobileMenuItem(/^sign out$/i);
+
+    // The drawer closes as part of the sign-out action.
+    await navHeader.expectMobileMenuHidden();
+
+    // /about is normally a public path, but EnhancedAuthGuard shows the
+    // login gate right after a sign-out so the user isn't stranded without
+    // a way back in.
+    await settingsPage.profile.expectContinueWithGoogle();
+  });
+});
