@@ -819,6 +819,27 @@ test.describe('Authenticated Access @critical', () => {
     );
   });
 
+  // LS-2108: app.tsx routes /login to <Navigate to="/" replace /> for an
+  // already-authenticated user, so a signed-in visitor who types the URL (or
+  // follows a stale "Create an account" link) bounces to home instead of
+  // seeing the sign-in form (LS-6690's app.tsx comment). No test previously
+  // exercised this — the Login Flow tests above only cover unauthenticated
+  // visitors.
+  test('redirects an authenticated user away from /login to home', async ({
+    page,
+  }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('load');
+
+    await expect(page).toHaveURL(`${E2E_ORIGIN}/`);
+    await expect(
+      page.getByRole('button', { name: /continue with google/i }),
+    ).not.toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
+      { timeout: 15000 },
+    );
+  });
+
   test('authenticated user can navigate between protected routes', async ({
     page,
   }) => {
