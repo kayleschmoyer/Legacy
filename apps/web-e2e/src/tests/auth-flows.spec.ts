@@ -929,6 +929,167 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-2111: Malformed/invalid JWT cookie handling — the Session Expiry suite
+// above covers a well-formed JWT whose `exp` has genuinely passed. These
+// tests cover cookie *corruption* instead: a JWT that was never valid to
+// begin with (not a JWT at all, an undecodable payload segment, or a wrong
+// signature). The client can never read the HttpOnly `ls_jwt` cookie value
+// directly — "handling gracefully" means useAuth.tsx's initializeAuth()
+// silent-refresh path treats a rejected/undecodable refresh the same as a
+// definitively-expired session (falls back to the login gate) instead of
+// throwing an unhandled error anywhere in the render path.
+// ---------------------------------------------------------------------------
+
+/** Custom fixture builder: same storage shape as `expiredSessionTest` (a
+ * locally-expired cached session, forcing useAuth.tsx's synchronous "attempt
+ * silent refresh" branch on mount) but with a corrupted `ls_jwt` cookie value
+ * instead of a genuinely time-expired JWT. */
+function buildCorruptedJwtSessionTest(jwtCookieValue: string) {
+  return test.extend({
+    storageState: async ({}, use) => {
+      const expiry = Math.floor(Date.now() / 1000) - 3600; // locally expired
+      await use({
+        cookies: [
+          {
+            name: 'ls_jwt',
+            value: jwtCookieValue,
+            domain: 'localhost',
+            path: '/',
+            httpOnly: true,
+            secure: false,
+            sameSite: 'Lax' as const,
+            expires: -1,
+          },
+          {
+            name: 'ls_csrf',
+            value: 'e2e-csrf-token',
+            domain: 'localhost',
+            path: '/',
+            httpOnly: false,
+            secure: false,
+            sameSite: 'Lax' as const,
+            expires: -1,
+          },
+        ],
+        origins: [
+          {
+            origin: E2E_ORIGIN,
+            localStorage: [
+              {
+                name: 'ls_user_profile',
+                value: JSON.stringify({
+                  id: 1,
+                  email: 'corrupted@test.com',
+                  username: 'corrupted',
+                  accessLevel: 'none',
+                }),
+              },
+              { name: 'ls_token_expiry', value: String(expiry) },
+            ],
+          },
+        ],
+      });
+    },
+  });
+}
+
+// Not a JWT at all — no dots, no base64 segments.
+const malformedJwtTest = buildCorruptedJwtSessionTest('not-a-real-jwt-token');
+
+// Structurally JWT-shaped (three dot-separated segments) but the payload
+// segment contains characters that are not valid base64.
+const invalidBase64JwtTest = buildCorruptedJwtSessionTest(
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.!!!not-valid-base64!!!.fakesignature',
+);
+
+// Well-formed and decodable, but signed with the wrong secret.
+const wrongSignatureJwtTest = buildCorruptedJwtSessionTest(
+  signE2EJwt(
+    {
+      id: 1,
+      email: 'user@test.com',
+      username: 'testuser',
+      accessLevel: 'none',
+    },
+    'a-completely-different-signing-secret',
+    '1h',
+  ),
+);
+
+test.describe('Malformed/Invalid JWT Cookie Handling @critical', () => {
+  malformedJwtTest(
+    'shows the landing page, without crashing, when the JWT cookie is not a JWT at all (LS-2111)',
+    async ({ page }) => {
+      const pageErrors: Error[] = [];
+      page.on('pageerror', (err) => pageErrors.push(err));
+
+      // The hermetic /refresh-jwt baseline mock (api-isolation.ts) already
+      // catches the decode failure for a non-3-segment token and treats it
+      // as "no valid cookie token" — no route override needed here.
+      await page.goto('/');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).toBeVisible({ timeout: 15000 });
+      expect(pageErrors).toEqual([]);
+    },
+  );
+
+  invalidBase64JwtTest(
+    'shows the landing page, without crashing, when the JWT payload segment is not valid base64 (LS-2111)',
+    async ({ page }) => {
+      const pageErrors: Error[] = [];
+      page.on('pageerror', (err) => pageErrors.push(err));
+
+      await page.goto('/');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).toBeVisible({ timeout: 15000 });
+      expect(pageErrors).toEqual([]);
+    },
+  );
+
+  wrongSignatureJwtTest(
+    'shows the landing page, without crashing, when the JWT cookie has an invalid signature (LS-2111)',
+    async ({ page }) => {
+      const pageErrors: Error[] = [];
+      page.on('pageerror', (err) => pageErrors.push(err));
+
+      // Unlike the two corruption cases above, a wrong-signature JWT is
+      // still structurally well-formed (three segments, decodable payload,
+      // plausible claims) — the hermetic baseline mock only decodes claims
+      // for simulation and never verifies HMAC signatures, so left to its
+      // default behavior it would treat this as a valid, refreshable token.
+      // Override the endpoint here to simulate the real backend's signature
+      // verification rejecting it.
+      await page.route(
+        (url) => url.pathname.endsWith('/refresh-jwt'),
+        async (route) => {
+          await route.fulfill({
+            status: 401,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              error: 'Invalid token signature (simulated)',
+            }),
+          });
+        },
+      );
+
+      await page.goto('/');
+      await page.waitForLoadState('load');
+
+      await expect(
+        page.getByRole('button', { name: /continue with google/i }),
+      ).toBeVisible({ timeout: 15000 });
+      expect(pageErrors).toEqual([]);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // LS-2097: Token refresh — proactive refresh before expiry, and retry/failure
 // behavior. The Session Expiry tests above only cover an already-expired
 // JWT; these cover the client's automatic-refresh machinery:
