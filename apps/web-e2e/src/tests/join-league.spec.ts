@@ -59,6 +59,73 @@ async function routeGraphQL(
   });
 }
 
+/** A single scripted GraphQL response: either a fulfilled body or an aborted
+ *  ("failed") network request. */
+type ScriptedResponse = { abort: true } | { body: unknown };
+
+/**
+ * Route GraphQL requests with a per-operation queue of one-shot responses,
+ * falling back to `handlers` (by exact operation name, matching {@link
+ * routeGraphQL}) once an operation's queue is drained. This lets a spec
+ * script an operation to fail on its first call and succeed on a retry,
+ * without ever touching the real network (`route.abort`/`route.fulfill`
+ * only — no `route.continue`).
+ */
+async function routeGraphQLWithRetry(
+  page: import('@playwright/test').Page,
+  handlers: Record<string, unknown>,
+  sequenced: Record<string, ScriptedResponse[]>,
+) {
+  const queues = new Map(
+    Object.entries(sequenced).map(([key, responses]) => [
+      key.toLowerCase(),
+      [...responses],
+    ]),
+  );
+
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
+
+    const queue = queues.get(operation);
+    if (queue && queue.length > 0) {
+      const next = queue.shift() as ScriptedResponse;
+      if ('abort' in next) {
+        await route.abort('failed');
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(next.body),
+        });
+      }
+      return;
+    }
+
+    for (const [key, body] of Object.entries(handlers)) {
+      if (operation === key.toLowerCase()) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+        return;
+      }
+    }
+
+    await unmockedGraphQLFallback(route);
+  });
+}
+
+/** A GraphQL error response shaped like the server's `graphql-errors.ts`
+ *  factories (`extensions.code` + message), for scripting `joinLeagueByCode`
+ *  failures without depending on the lambda. */
+function joinLeagueErrorResponse(message: string, code?: string) {
+  return {
+    data: null,
+    errors: [{ message, ...(code && { extensions: { code } }) }],
+  };
+}
+
 // ── critical: page load ───────────────────────────────────────────
 
 test.describe('Join League — page load @critical', () => {
@@ -378,6 +445,227 @@ test.describe('Join League — error handling @regression', () => {
 
     await leaguePage.formErrorCard.expectVisible();
     await expect(page).toHaveURL('/baseball/league/join');
+  });
+});
+
+// ── regression: retry after network error (LS-2119) ──────────────
+
+test.describe('Join League — retry after network error @regression', () => {
+  test('retrying after a network failure succeeds without reloading the page', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+    });
+    // Every joinLeagueByCode attempt fails while the network is down. A
+    // single scripted failure isn't reliable here — Apollo's `retryLink`
+    // (apollo-client.ts) transparently retries transient network errors up
+    // to 3 times, so a one-shot abort can get silently absorbed before the
+    // UI ever sees it.
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'joinleaguebycode') {
+        await route.abort('failed');
+        return;
+      }
+      await route.fallback();
+    });
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Retry Team');
+
+    // The network failure (plus retryLink's exhausted backoff) surfaces an
+    // inline error rather than navigating away.
+    await leaguePage.formErrorCard.expectVisible({ timeout: 15000 });
+    await expect(page).toHaveURL('/baseball/league/join');
+
+    // The join button re-enables after the failed attempt so the user can retry.
+    await leaguePage.joinButton.expectEnabled();
+
+    // The network recovers — swap in a route that succeeds — and the user
+    // retries via the same button without reloading the page.
+    await page.unroute(isGraphQLEndpoint);
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+      joinleaguebycode: joinLeagueByCodeResponse(88),
+    });
+
+    await leaguePage.joinButton.tap();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/88/, { timeout: 15000 });
+  });
+});
+
+// ── regression: clear error and rejoin (LS-2119) ──────────────────
+
+test.describe('Join League — clear error and rejoin @regression', () => {
+  test('clears the error banner and successfully joins on the next attempt', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQLWithRetry(
+      page,
+      {
+        validateinvitecode: validateInviteCodeResponse(),
+        joinleaguebycode: joinLeagueByCodeResponse(91),
+      },
+      {
+        joinleaguebycode: [
+          { body: joinLeagueErrorResponse('You are already in this league') },
+        ],
+      },
+    );
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'First Team');
+
+    // Scope the text match to the inline card itself — the same message is
+    // also broadcast to the global ApolloErrorToast (apollo-client.ts), so a
+    // page-wide text lookup would be ambiguous.
+    await leaguePage.formErrorCard
+      .filterByText(/already in this league/i)
+      .expectVisible();
+
+    // Correct the team name and rejoin — the previous error must not linger.
+    await leaguePage.teamNameInput.fill('Corrected Team');
+    await leaguePage.joinButton.tap();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/91/, { timeout: 15000 });
+    await leaguePage.formErrorCard.expectHidden();
+  });
+});
+
+// ── regression: rate limiting on join attempts (LS-2119) ──────────
+
+test.describe('Join League — rate limiting @regression', () => {
+  test('surfaces the rate-limit message without crashing the form', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+      joinleaguebycode: joinLeagueErrorResponse(
+        'Too many attempts. Please try again later.',
+        'RATE_LIMITED',
+      ),
+    });
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Rate Limited Team');
+
+    await leaguePage.formErrorCard
+      .filterByText(/too many attempts/i)
+      .expectVisible();
+
+    // Stays on the join page and remains usable (button re-enabled) rather
+    // than crashing or getting stuck in a loading state.
+    await expect(page).toHaveURL('/baseball/league/join');
+    await leaguePage.joinButton.expectEnabled();
+  });
+});
+
+// ── regression: error message specificity (LS-2119) ──────────────
+//
+// A joinLeagueByCode failure always renders through the same inline error
+// card (JoinLeagueByCodePage.tsx passes `error.message` straight through —
+// it never branches on the GraphQL error code to pick a surface); the
+// dedicated orange "This league is full" banner is driven exclusively by
+// the earlier validateInviteCode preview (`leagueInfo.isFull`), already
+// covered by the "Join League — invite code validation" describe block
+// above. What these tests lock in is message *specificity*: three distinct
+// join-time failures must produce three distinct, non-overlapping messages
+// in that one card, so a user never mistakes a full league for the
+// "already a member" case, or either for a generic server error.
+
+test.describe('Join League — error message specificity @regression', () => {
+  test('shows the "already a member" message for a BAD_USER_INPUT duplicate-join error', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+      joinleaguebycode: joinLeagueErrorResponse(
+        'You are already in this league',
+        'BAD_USER_INPUT',
+      ),
+    });
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Member Team');
+
+    await leaguePage.formErrorCard
+      .filterByText(/already in this league/i)
+      .expectVisible();
+    await leaguePage.formErrorCard
+      .filterByText(/league is (now )?full/i)
+      .expectHidden();
+  });
+
+  test('shows a "league is full" message when the last spot is claimed at submit time', async ({
+    page,
+    leaguePage,
+  }) => {
+    // Simulates a race: the preview said spots were open, but another user
+    // claimed the last one before this join mutation landed.
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse({
+        availableSpots: 1,
+        isFull: false,
+      }),
+      joinleaguebycode: joinLeagueErrorResponse(
+        'This league is now full',
+        'BAD_USER_INPUT',
+      ),
+    });
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Latecomer Team');
+
+    await leaguePage.formErrorCard
+      .filterByText(/league is now full/i)
+      .expectVisible();
+    await leaguePage.formErrorCard
+      .filterByText(/already in this league/i)
+      .expectHidden();
+  });
+
+  test('shows a generic message for an unrecognized server error', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+      joinleaguebycode: joinLeagueErrorResponse(
+        'Internal server error. Please try again later.',
+        'INTERNAL_SERVER_ERROR',
+      ),
+    });
+
+    await leaguePage.gotoJoin();
+    await leaguePage.expectJoinFormVisible();
+
+    await leaguePage.fillAndSubmitJoinForm('VALIDCO1', 'Server Error Team');
+
+    await leaguePage.formErrorCard
+      .filterByText(/internal server error/i)
+      .expectVisible();
+    await leaguePage.formErrorCard
+      .filterByText(/already in this league/i)
+      .expectHidden();
+    await leaguePage.formErrorCard
+      .filterByText(/league is (now )?full/i)
+      .expectHidden();
   });
 });
 
