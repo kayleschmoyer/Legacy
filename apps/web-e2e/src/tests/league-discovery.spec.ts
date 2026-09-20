@@ -14,6 +14,14 @@
  * - Join validation: empty team name keeps button disabled
  * - Join success: success banner shown, redirect triggered
  * - Footer CTA: "Can't find the right league?" visible when leagues present
+ * - Advanced filtering: draft-status + player-pool filters combined in one
+ *   query, search combined with an active filter, results count updating
+ *   after a filter narrows the result set (LS-2117)
+ *
+ * Pagination/infinite-scroll is NOT covered here: LeagueDiscoveryPage fetches
+ * a single fixed `limit: 50, offset: 0` page with no load-more control and no
+ * scroll-triggered fetch, so there is no such behavior to test yet. Tracked
+ * as a feature gap in LS-10251.
  *
  * Page-object migration (LS-8092 / ADR-0015): all locators live on
  * `leaguePage` and the `LeagueCard` component — specs are selector-free.
@@ -22,6 +30,7 @@
 import { expect, leagueTest as test } from '../fixtures/pages';
 import {
   extractOperationName,
+  extractOperationVariables,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import {
@@ -436,5 +445,143 @@ test.describe('League Discovery — filters @regression', () => {
 
     // A new network call should have been made
     await expect.poll(() => callCount).toBeGreaterThan(initialCount);
+  });
+});
+
+// ── regression: advanced filtering (LS-2117) ─────────────────────
+
+/**
+ * Route `getPublicLeagues` through a per-request responder, recording each
+ * request's variables. Unlike {@link routeGraphQL}'s static handler map, the
+ * responder sees the variables for every call — needed to simulate the
+ * backend narrowing results as filters/search change, and to assert on
+ * exactly what was sent to the server.
+ */
+async function routePublicLeagues(
+  page: import('@playwright/test').Page,
+  responder: (variables: Record<string, unknown>) => object,
+): Promise<Record<string, unknown>[]> {
+  const capturedVariables: Record<string, unknown>[] = [];
+  await page.route(isGraphQLEndpoint, async (route) => {
+    const operation = extractOperationName(route).toLowerCase();
+    if (operation === 'getpublicleagues') {
+      const variables = extractOperationVariables(route);
+      capturedVariables.push(variables);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(responder(variables)),
+      });
+      return;
+    }
+    await unmockedGraphQLFallback(route);
+  });
+  return capturedVariables;
+}
+
+test.describe('League Discovery — advanced filtering @regression', () => {
+  test('combining draft-status and player-pool filters sends both to the query in one request', async ({
+    page,
+    leaguePage,
+  }) => {
+    const capturedVariables = await routePublicLeagues(page, () =>
+      publicLeaguesResponse(),
+    );
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.clickButton('Open (Not Started)', { exact: true });
+    await leaguePage.clickButton('NL Only', { exact: true });
+
+    await expect
+      .poll(() => capturedVariables.at(-1)?.draftStatus)
+      .toBe('not-started');
+    expect(capturedVariables.at(-1)?.playerPool).toBe('nl');
+  });
+
+  test('search combined with an active filter sends both variables together', async ({
+    page,
+    leaguePage,
+  }) => {
+    const capturedVariables = await routePublicLeagues(page, () =>
+      publicLeaguesResponse(),
+    );
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.clickButton('Queued', { exact: true });
+    await leaguePage.discoverySearch.fill('Alpha');
+
+    // Search is debounced (300ms) — poll until the debounced query fires.
+    await expect.poll(() => capturedVariables.at(-1)?.search).toBe('Alpha');
+    expect(capturedVariables.at(-1)?.draftStatus).toBe('queued');
+  });
+
+  test('result count updates after a filter narrows the results', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routePublicLeagues(page, (variables) =>
+      variables.playerPool === 'nl'
+        ? publicLeaguesResponse([
+            mockPublicLeague({
+              id: 1,
+              name: 'NL Only League',
+              playerPool: 'nl',
+            }),
+          ])
+        : publicLeaguesResponse([
+            mockPublicLeague({
+              id: 1,
+              name: 'NL Only League',
+              playerPool: 'nl',
+            }),
+            mockPublicLeague({
+              id: 2,
+              name: 'AL Only League',
+              playerPool: 'al',
+            }),
+          ]),
+    );
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.discoveryResultsCount.expectContainsText('2');
+
+    await leaguePage.clickButton('NL Only', { exact: true });
+
+    await leaguePage.discoveryResultsCount.expectContainsText('1');
+    const countText = await leaguePage.discoveryResultsCount.text();
+    expect(countText).not.toContain('2');
+  });
+
+  test('search that matches nothing shows the filtered empty state, not the generic one', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routePublicLeagues(page, (variables) =>
+      variables.search
+        ? publicLeaguesEmptyResponse()
+        : publicLeaguesResponse([
+            mockPublicLeague({ id: 1, name: 'Alpha League' }),
+          ]),
+    );
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.discoveryResultsCount.expectContainsText('1');
+
+    await leaguePage.discoverySearch.fill('Zzzznomatch');
+
+    await leaguePage
+      .text(/No leagues matched your search/i)
+      .expectVisible({ timeout: 5000 });
+    await leaguePage.discoveryResultsCount.expectContainsText(
+      'none match your filters',
+    );
   });
 });
