@@ -2,10 +2,8 @@
   "name": "@legacy-sports/logging",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "react-native": "./src/index.native.ts",
-  "dependencies": {
-    "@legacy-sports/env-utilities": "workspace:*"
-  }
+  "react-native": "./src/index.native.ts"
 }

@@ -1,4 +1,3 @@
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import {
   type ILogger,
   type LogArgs,
@@ -18,8 +17,7 @@ export class Logger implements ILogger {
     this.config = config;
 
     // Get minimum log level from environment or config
-    const envLogLevel =
-      getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
+    const envLogLevel = process.env[EnvironmentVariable.LOG_LEVEL] || 'info';
     this.minimumLevel = config.minimumLevel || envLogLevel;
   }
 

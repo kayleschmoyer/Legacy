@@ -1840,11 +1840,7 @@ importers:
 
   lib/graphql: {}
 
-  lib/logging:
-    dependencies:
-      '@legacy-sports/env-utilities':
-        specifier: workspace:*
-        version: link:../env-utilities
+  lib/logging: {}
 
   lib/mcp-bearer-auth: {}
 

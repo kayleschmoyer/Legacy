@@ -1,4 +1,3 @@
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 // Type for log arguments
@@ -26,7 +25,7 @@ const invokeDir =
     : '';
 
 // Get log level from environment or default to 'info'
-const logLevel = getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
+const logLevel = process.env[EnvironmentVariable.LOG_LEVEL] || 'info';
 
 // Log levels with numeric values for comparison
 const LOG_LEVELS: Record<string, number> = {
@@ -86,7 +85,7 @@ class UniversalLogger implements Logger {
   private writeToFile(level: string, message: string, ...args: LogArgs): void {
     if (!isNode) return;
 
-    const logFile = getEnvVarOptional(EnvironmentVariable.LOG_LOCATION);
+    const logFile = process.env[EnvironmentVariable.LOG_LOCATION];
     const filesToWrite = logFile
       ? [logFile, ...this.additionalLogFiles]
       : this.additionalLogFiles;

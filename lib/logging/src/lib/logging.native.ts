@@ -1,4 +1,3 @@
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 // Type for log arguments
@@ -14,7 +13,7 @@ interface Logger {
 }
 
 // Get log level from environment or default to 'info'
-const logLevel = getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
+const logLevel = process.env[EnvironmentVariable.LOG_LEVEL] || 'info';
 
 // Log levels with numeric values for comparison
 const LOG_LEVELS: Record<string, number> = {

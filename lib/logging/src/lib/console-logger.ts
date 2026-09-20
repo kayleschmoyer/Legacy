@@ -1,4 +1,3 @@
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import {
   formatLogEntry,
   type ILogger,
@@ -16,7 +15,7 @@ export class ConsoleLogger implements ILogger {
   private currentLogLevel: LogLevel;
 
   constructor() {
-    const logLevel = getEnvVarOptional(EnvironmentVariable.LOG_LEVEL) || 'info';
+    const logLevel = process.env[EnvironmentVariable.LOG_LEVEL] || 'info';
     this.currentLogLevel =
       logLevel.toLowerCase() in LOG_LEVELS ? logLevel.toLowerCase() : 'info';
   }

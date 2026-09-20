@@ -1,4 +1,3 @@
-import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import {
   formatLogEntry,
   type LogArgs,
@@ -12,7 +11,7 @@ export class FileLogger {
   private logFile: string | undefined;
 
   constructor() {
-    this.logFile = getEnvVarOptional(EnvironmentVariable.LOG_LOCATION);
+    this.logFile = process.env[EnvironmentVariable.LOG_LOCATION];
   }
 
   writeToFile(level: LogLevel, message: string, ...args: LogArgs): void {
