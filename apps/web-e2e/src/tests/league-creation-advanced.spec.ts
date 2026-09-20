@@ -908,6 +908,232 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.text('Draft opens').expectVisible();
   });
 
+  // ─── Error States (LS-2118) ────────────────────────────────────────────────
+  //
+  // Rate limiting and network-timeout failures both reach the submit handler
+  // as non-GraphQL errors (a `ServerError` with an HTTP status, or a plain
+  // network Error) — LeagueCreatePage's `getSubmitErrorMessage` (LS-6069)
+  // only trusts `CombinedGraphQLErrors` carrying an allowlisted `code`, so
+  // both cases fall back to the same generic, non-leaking message. The
+  // "duplicate name" GraphQL error path (`BAD_USER_INPUT`, safe to display
+  // verbatim) is already covered by league-creation.spec.ts's "should handle
+  // GraphQL errors gracefully" — not duplicated here.
+
+  test('recovers automatically from a transient rate-limit response without ever surfacing an error', async ({
+    page,
+    leaguePage,
+  }) => {
+    // apollo-client.ts's `rateLimitRetryLink` (LS-8138) retries a 429/503
+    // HTTP response up to 4 attempts before the mutation's catch block ever
+    // sees it — a momentarily saturated backend should recover silently.
+    let attempts = 0;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation !== 'createleagueandteams') {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Too Many Requests' }] }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createLeagueAndTeams: {
+              __typename: 'CreateLeagueAndTeamsPayload',
+              league: { __typename: 'League', id: 556 },
+            },
+          },
+        }),
+      });
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.fillLeagueName('Rate Limited League');
+    await leaguePage.submitCreate();
+
+    await leaguePage.continueToLeague();
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    expect(attempts).toBe(2);
+  });
+
+  test('shows the generic fallback message and preserves form state once rate-limit retries are exhausted', async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createleagueandteams') {
+        // Every attempt (including the rateLimitRetryLink's own 4 internal
+        // retries) is rejected — there is no successful response to recover on.
+        await route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Too Many Requests' }],
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.fillLeagueName('Rate Limited League');
+    await leaguePage.submitCreate();
+
+    // A 429 has no GraphQL extensions.code to trust, so the raw "Too Many
+    // Requests" text must never reach the UI — only the generic fallback.
+    await leaguePage
+      .text(
+        'Unable to save league. Your settings are still filled in — try again or come back later.',
+      )
+      .expectVisible({ timeout: 20000 });
+    await leaguePage.text('Too Many Requests').expectHidden();
+
+    // Form stays on the create page with the entered data intact, ready
+    // for the user to retry — partial-submission recovery.
+    await expect(page).toHaveURL('/baseball/league/create');
+    await leaguePage.leagueNameInput.expectValue('Rate Limited League');
+  });
+
+  test('recovers automatically from a transient network timeout without ever surfacing an error', async ({
+    page,
+    leaguePage,
+  }) => {
+    // apollo-client.ts's transient-network `retryLink` (LS-900) retries a
+    // plain network failure (no HTTP status, e.g. an aborted/timed-out
+    // request) up to 3 attempts before the mutation's catch block ever sees
+    // it — so a single dropped request should recover with no user-visible
+    // error at all, not just a friendly fallback message.
+    let attempts = 0;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation !== 'createleagueandteams') {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts === 1) {
+        await route.abort('timedout');
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createLeagueAndTeams: {
+              __typename: 'CreateLeagueAndTeamsPayload',
+              league: { __typename: 'League', id: 555 },
+            },
+          },
+        }),
+      });
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.fillLeagueName('Timeout Retry League');
+    await leaguePage.submitCreate();
+
+    // A single click drives the whole retry-then-succeed sequence — the
+    // in-flight submit error banner from a transient hiccup is never shown.
+    await leaguePage.continueToLeague();
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    expect(attempts).toBe(2);
+  });
+
+  test('shows the generic fallback message and preserves form state once timeout retries are exhausted', async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createleagueandteams') {
+        // Every attempt (including the retryLink's own 3 internal retries)
+        // times out — there is no successful response left to recover on.
+        await route.abort('timedout');
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.fillLeagueName('Timeout League');
+    await leaguePage.submitCreate();
+
+    await leaguePage
+      .text(
+        'Unable to save league. Your settings are still filled in — try again or come back later.',
+      )
+      .expectVisible({ timeout: 15000 });
+    await expect(page).toHaveURL('/baseball/league/create');
+
+    // Partial-submission recovery: the league name survived the failed
+    // attempt, so the user can retry without re-filling the form.
+    await leaguePage.leagueNameInput.expectValue('Timeout League');
+  });
+
+  // ─── Team Count Edge Cases ──────────────────────────────────────────────────
+
+  for (const teamCount of [4, 16]) {
+    test(`should submit numberOfTeams correctly at the ${teamCount}-team boundary`, async ({
+      page,
+      leaguePage,
+    }) => {
+      let submittedTeams: number | undefined;
+      await page.route(isGraphQLEndpoint, async (route) => {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation !== 'createleagueandteams') {
+          await unmockedGraphQLFallback(route);
+          return;
+        }
+        const parsed = JSON.parse(route.request().postData() ?? '') as {
+          variables?: { input?: { numberOfTeams?: number } };
+        };
+        submittedTeams = parsed.variables?.input?.numberOfTeams;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              createLeagueAndTeams: {
+                __typename: 'CreateLeagueAndTeamsPayload',
+                league: { __typename: 'League', id: 321 },
+              },
+            },
+          }),
+        });
+      });
+
+      await leaguePage.gotoCreate();
+      await leaguePage.leagueNameInput.expectVisible();
+      await leaguePage.selectTeamCount(teamCount);
+      await leaguePage.fillLeagueName(`${teamCount}-Team League`);
+      await leaguePage.submitCreate();
+      await leaguePage.continueToLeague();
+
+      await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+      expect(submittedTeams).toBe(teamCount);
+    });
+  }
+
   // ─── Loading State ────────────────────────────────────────────────────────
 
   test('should show Creating... text on button while submitting', async ({
