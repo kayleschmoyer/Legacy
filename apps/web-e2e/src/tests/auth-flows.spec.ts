@@ -7,6 +7,7 @@
 
 import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
 import { buildAuthStorageState } from '../fixtures/auth-enhanced';
+import { withApiIsolation } from '../fixtures/api-isolation';
 import {
   extractOperationName,
   tierUserByIdResponse,
@@ -1404,4 +1405,150 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
       ).toBeVisible({ timeout: 15000 });
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// LS-2104: Session recovery after tab/window close and reopen.
+//
+// Playwright cannot literally close and reopen an OS-level browser tab, but
+// the behavior that matters — does a session survive once the in-memory
+// page/JS runtime is gone and only persistent storage (cookies +
+// localStorage) remains — is exactly what closing the live context and
+// opening a brand-new one from a captured storageState snapshot exercises.
+// This is distinct from:
+//   - the Session Expiry / Malformed JWT suites above, which build
+//     storageState from scratch rather than carrying it over from a live,
+//     already-authenticated context/tab.
+//   - page.reload() coverage elsewhere in this file, which keeps the same
+//     tab (and its in-memory AuthProvider state) alive throughout — reload
+//     never actually drops JS memory the way a real tab/window close does.
+// ---------------------------------------------------------------------------
+
+test.describe('Session Recovery After Tab/Window Close and Reopen @critical', () => {
+  test('restores an authenticated session in a reopened tab/window from persisted storage (LS-2104)', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    await page.goto('/');
+    await page.waitForLoadState('load');
+
+    // Confirm the original tab is authenticated before "closing" it.
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
+      { timeout: 15000 },
+    );
+
+    // Snapshot what a real browser retains after a tab/window closes —
+    // cookies and localStorage — then close the tab, discarding the
+    // AuthProvider's in-memory state entirely.
+    const storageState = await page.context().storageState();
+    await page.close();
+
+    // Reopen: a brand-new context/page seeded only from what a real
+    // browser restart would still have on disk.
+    const reopenedContext = await browser.newContext({ storageState });
+    try {
+      const reopenedPage = await reopenedContext.newPage();
+      await withApiIsolation(reopenedPage, testInfo, async () => {
+        await reopenedPage.goto('/');
+        await reopenedPage.waitForLoadState('load');
+
+        await expect(
+          reopenedPage.getByRole('button', {
+            name: /continue with google/i,
+          }),
+        ).not.toBeVisible();
+        await expect(
+          reopenedPage.getByRole('navigation', { name: 'Primary' }),
+        ).toBeVisible({ timeout: 15000 });
+      });
+    } finally {
+      await reopenedContext.close();
+    }
+  });
+
+  test('shows the login gate in a reopened tab/window when the persisted session had already expired (LS-2104)', async ({
+    browser,
+  }, testInfo) => {
+    // A JWT whose `exp` is already in the past, as if the browser were
+    // relaunched onto a session that expired while the browser was
+    // closed. The cookie itself uses `expires: -1` (a session cookie, so
+    // the browser jar still carries and sends it) — it's the JWT's own
+    // `exp` claim that must be in the past, not the cookie's expiry;
+    // mirrors the `expiredSessionTest` fixture above.
+    const now = Math.floor(Date.now() / 1000);
+    const expiredJwt = signE2EJwt(
+      {
+        id: 1,
+        email: 'user@test.com',
+        username: 'testuser',
+        accessLevel: 'none',
+        iat: now - 7200,
+        exp: now - 3600,
+      },
+      E2E_SIGNING_SECRET,
+    );
+    const expiry = now - 3600;
+
+    const storageState = {
+      cookies: [
+        {
+          name: 'ls_jwt',
+          value: expiredJwt,
+          domain: 'localhost',
+          path: '/',
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Lax' as const,
+          expires: -1,
+        },
+        {
+          name: 'ls_csrf',
+          value: 'e2e-csrf-token',
+          domain: 'localhost',
+          path: '/',
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax' as const,
+          expires: -1,
+        },
+      ],
+      origins: [
+        {
+          origin: E2E_ORIGIN,
+          localStorage: [
+            {
+              name: 'ls_user_profile',
+              value: JSON.stringify({
+                id: 1,
+                email: 'expired@test.com',
+                username: 'expired',
+                accessLevel: 'none',
+              }),
+            },
+            { name: 'ls_token_expiry', value: String(expiry) },
+          ],
+        },
+      ],
+    };
+
+    const reopenedContext = await browser.newContext({ storageState });
+    try {
+      const reopenedPage = await reopenedContext.newPage();
+      await withApiIsolation(reopenedPage, testInfo, async () => {
+        await reopenedPage.goto('/');
+        await reopenedPage.waitForLoadState('load');
+
+        // The expired cookie can't silently refresh (api-isolation.ts
+        // 401s an expired token), so the reopened tab must land on the
+        // login gate rather than a broken authenticated shell.
+        await expect(
+          reopenedPage.getByRole('button', {
+            name: /continue with google/i,
+          }),
+        ).toBeVisible({ timeout: 15000 });
+      });
+    } finally {
+      await reopenedContext.close();
+    }
+  });
 });
