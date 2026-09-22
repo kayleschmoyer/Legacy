@@ -201,7 +201,7 @@ jobs:
 
       - name: Setup Android SDK
         if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
-        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
 
@@ -384,7 +384,7 @@ jobs:
       # route reads (LS-9455). This is additive — the public GitHub release
       # below is unchanged and still carries the APK.
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME || 'arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions' }}
           aws-region: ${{ env.AWS_REGION }}
