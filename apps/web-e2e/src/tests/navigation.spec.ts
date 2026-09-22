@@ -10,7 +10,7 @@
  * own navigation and viewport, never header selectors.
  */
 
-import { expect, test } from '../fixtures/pages';
+import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 test.describe('Navigation Header @smoke', () => {
@@ -79,3 +79,59 @@ test.describe('Navigation Header @smoke', () => {
     await navHeader.expectHamburgerVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-2102: nav items visibility/state changes on logout, and the
+// unauthenticated landing page renders no internal (app) nav links.
+// auth-flows.spec.ts covers the login-gate side effect of logout (the
+// "Continue with Google" CTA reappearing); these tests cover the
+// navHeader's own primary-nav state directly.
+// ---------------------------------------------------------------------------
+
+adminTest.describe('Navigation Header — Logout State @regression', () => {
+  adminTest.use({ viewport: DESKTOP_VIEWPORT });
+
+  adminTest(
+    'primary navigation and its nav items disappear after signing out',
+    async ({ page, navHeader }) => {
+      await page.goto('/about');
+      await page.waitForLoadState('load');
+
+      // Confirm the authenticated nav is present before logging out.
+      await navHeader.expectPrimaryNavVisible();
+      await navHeader.expectNavItem(/^players$/i);
+      await navHeader.expectNavItem(/^minigames$/i);
+
+      await navHeader.openUserProfileMenu();
+      await navHeader.expectUserProfileMenuItem(/sign out/i);
+      await navHeader.clickUserProfileMenuItem(/sign out/i);
+
+      // The auth guard swaps to the landing page — the app's primary nav and
+      // its items must no longer be present.
+      await navHeader.expectPrimaryNavHidden();
+      await navHeader.expectNavItemHidden(/^players$/i);
+      await navHeader.expectNavItemHidden(/^minigames$/i);
+    },
+  );
+});
+
+unauthTest.describe(
+  'Navigation Header — Unauthenticated Landing @regression',
+  () => {
+    unauthTest.use({ viewport: DESKTOP_VIEWPORT });
+
+    unauthTest(
+      'unauthenticated landing page renders no internal app nav links',
+      async ({ page, navHeader }) => {
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        // The authenticated app's primary nav (and its Players/Minigames
+        // links) must never render for an unauthenticated visitor.
+        await navHeader.expectPrimaryNavHidden();
+        await navHeader.expectNavItemHidden(/^players$/i);
+        await navHeader.expectNavItemHidden(/^minigames$/i);
+      },
+    );
+  },
+);

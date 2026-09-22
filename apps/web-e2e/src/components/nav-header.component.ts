@@ -187,6 +187,18 @@ export class NavHeader extends BaseComponent {
     });
   }
 
+  /** Assert the primary (desktop) navigation landmark is absent/not visible. */
+  async expectPrimaryNavHidden(): Promise<void> {
+    await expect(this.#primaryNav).not.toBeVisible({ timeout: 15000 });
+  }
+
+  /** Assert a primary-nav pill link with the given accessible name is absent/not visible. */
+  async expectNavItemHidden(name: string | RegExp): Promise<void> {
+    await expect(this.#primaryNav.getByRole('link', { name })).not.toBeVisible({
+      timeout: 15000,
+    });
+  }
+
   /** Assert the mobile hamburger (open-menu) button is visible. */
   async expectHamburgerVisible(): Promise<void> {
     await expect(this.#openMenuButton).toBeVisible({ timeout: 15000 });
