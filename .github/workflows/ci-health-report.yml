@@ -1,0 +1,132 @@
+# =============================================================================
+# CI Health Report
+# =============================================================================
+# Automated failure-rate monitoring for the CI orchestrator (LS-1121, child of
+# LS-1114). The 50% failure rate investigated in LS-1100 was only discovered
+# via a one-off manual audit of 35 runs — there was no ongoing tracking, so a
+# reliability regression would go unnoticed until it became painful again.
+#
+# This workflow queries the last N `ci-orchestrator.yml` runs, computes the
+# failure rate (`.github/scripts/analyze-ci-runs.js`), and files a
+# `CI Health Report - YYYY-MM-DD` issue with the stats — labelled
+# `ci-health-alert` when the rate exceeds the 20% threshold from the ticket's
+# acceptance criteria.
+#
+# Schedule-free CI policy (ADR 0010 amendment, LS-8487): no `schedule:` cron.
+# Anchored instead on ci-orchestrator.yml completions (the natural signal that
+# there is new run history worth analyzing) and debounced to at most once per
+# CI_HEALTH_REPORT_MIN_INTERVAL_HOURS (repo var, default 168h == weekly),
+# mirroring the gate job in run-maestro-sweep.yml / run-playwright-tests.yml.
+# Manual dispatch always runs, for on-demand reports.
+# =============================================================================
+
+name: "CI Health Report"
+
+on:
+  workflow_run:
+    workflows: ["Legacy Sports CI Orchestrator"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run-limit:
+        description: "Number of recent ci-orchestrator runs to analyze"
+        required: false
+        default: "50"
+        type: string
+      alert-threshold:
+        description: "Failure rate (0-1) above which the report is flagged as an alert"
+        required: false
+        default: "0.2"
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  actions: read # gate job inspects prior runs of this workflow for debouncing
+
+# Serialize automated (workflow_run-triggered) reports; manual dispatches keep
+# their own unique group so an on-demand report is never queued behind one.
+concurrency:
+  group: ci-health-report-${{ github.event_name == 'workflow_run' && 'auto' || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Debounce gate (schedule-free CI policy). Mirrors the `gate` job in
+  # run-maestro-sweep.yml: a debounced run skips the analyze job entirely, so
+  # the debounce check inspects prior runs' "Analyze" job (non-skipped = a
+  # real attempt) rather than run-level conclusions.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: "CI Health Report Gate"
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - name: "Decide whether to run"
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_INTERVAL_HOURS: ${{ vars.CI_HEALTH_REPORT_MIN_INTERVAL_HOURS || '168' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+          # This workflow runs on every ci-orchestrator.yml completion (i.e.
+          # roughly every PR push), far more often than it actually analyzes —
+          # most of those runs get debounced below without reaching "Analyze".
+          # A busy repo can rack up well over one page of them inside the
+          # debounce window, so --paginate (rather than a single per_page=30
+          # request) is required to see runs older in the window, not just the
+          # newest page.
+          RUN_IDS=$(gh api --paginate \
+            "repos/${{ github.repository }}/actions/workflows/ci-health-report.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=100" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+
+          for id in $RUN_IDS; do
+            ANALYZED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+              --jq '[.jobs[] | select(.name == "Analyze" and .conclusion != null and .conclusion != "skipped")] | length')
+            if [ "$ANALYZED" -gt 0 ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Debounced — a CI health report (run ${id}) already ran within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "No CI health report in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Analyze last N ci-orchestrator runs and file the report issue.
+  # ---------------------------------------------------------------------------
+  analyze:
+    name: "Analyze"
+    needs: [gate]
+    if: needs.gate.outputs.should-run == 'true'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (analysis script only)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/analyze-ci-runs.js
+          sparse-checkout-cone-mode: false
+
+      - name: Analyze CI runs and file health report
+        id: analyze
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          RUN_LIMIT: ${{ github.event.inputs.run-limit || '50' }}
+          ALERT_THRESHOLD: ${{ github.event.inputs.alert-threshold || '0.2' }}
+        with:
+          script: |
+            const run = require('./.github/scripts/analyze-ci-runs.js');
+            return run({ github, context, core });
