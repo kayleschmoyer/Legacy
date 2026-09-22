@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   char,
   decimal,
@@ -83,6 +84,22 @@ export const matchups = pgTable(
      * `updateMatchupScore` in PublicDbClient.
      */
     scoredAt: timestamp('scored_at', { withTimezone: true }),
+    /**
+     * Optimistic-concurrency counter for team1_score / team2_score (LS-6391).
+     *
+     * Incremented by every writer of the score columns (the admin/system
+     * `updateMatchupScore` GraphQL mutation, the commissioner's
+     * `editMatchupScore` tool, and the scoring-engine `updateMatchupScore`
+     * PublicDbClient helper) in the same write as the score itself, so a
+     * caller that read a stale version before computing its score can be
+     * rejected instead of silently overwriting a fresher write — closing the
+     * lost-update race where two concurrent scoring writers for the same
+     * matchup land in an order that doesn't match which one has the freshest
+     * stats.
+     */
+    scoreVersion: bigint('score_version', { mode: 'number' })
+      .notNull()
+      .default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

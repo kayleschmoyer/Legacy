@@ -147,6 +147,7 @@ export const Matchup = builder.objectRef<{
   cancellationReason: string | null;
   updatedAt: Date;
   scoredAt: Date | null;
+  scoreVersion: number;
 }>('Matchup');
 
 // MatchupRecap ref — declared here so the Matchup.recap field can reference it.
@@ -222,6 +223,14 @@ builder.objectType(Matchup, {
     // stale snapshot after a mobile network switch.
     updatedAt: t.string({
       resolve: (matchup) => matchup.updatedAt.toISOString(),
+    }),
+    // Optimistic-concurrency counter for team1Score/team2Score (LS-6391).
+    // Callers that read a matchup before computing a score pass this back as
+    // `updateMatchupScore`'s `expectedScoreVersion` so a write racing against
+    // a fresher one is rejected rather than silently overwriting it.
+    scoreVersion: t.exposeInt('scoreVersion', {
+      description:
+        'Optimistic-concurrency version for the score columns, incremented on every write to team1Score/team2Score. Pass the value read here as expectedScoreVersion to updateMatchupScore to guard against overwriting a fresher concurrent write.',
     }),
     // Scoring provenance (LS-9665). Null when the matchup has no persisted
     // score at all — nothing has been computed, so there is nothing whose
@@ -616,6 +625,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     cancellationReason: string | null;
     updatedAt: Date;
     scoredAt: Date | null;
+    scoreVersion: number;
   }>;
   currentMatchupId: number | null;
 }>('AdvanceLeagueWeekResponse');

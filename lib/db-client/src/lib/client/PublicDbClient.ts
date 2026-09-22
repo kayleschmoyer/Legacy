@@ -625,17 +625,42 @@ export async function updateMatchupScore(
   // one computed before they last changed.
   updateData.scoredAt = new Date();
 
-  const results = await db
-    .update(Schema.matchups)
-    .set(updateData)
-    .where(eq(Schema.matchups.id, matchupId))
-    .returning();
+  // Row-level lock (LS-6391): two scoring workers (e.g. a live tick and a
+  // stat correction re-processing the same game) can call this for the same
+  // matchupId at nearly the same time. Taking `SELECT ... FOR UPDATE` first
+  // serializes the two writes instead of letting them interleave, and
+  // `scoreVersion` is bumped in the same write so every writer of the score
+  // columns keeps it meaningful for the admin/system GraphQL mutation's
+  // optimistic-concurrency check.
+  const matchup = await db.transaction(async (tx) => {
+    const [lockedMatchup] = await tx
+      .select({ scoreVersion: Schema.matchups.scoreVersion })
+      .from(Schema.matchups)
+      .where(eq(Schema.matchups.id, matchupId))
+      .limit(1)
+      .for('update');
 
-  if (!results[0]) {
+    if (!lockedMatchup) {
+      throw new Error(`Matchup ${matchupId} not found`);
+    }
+
+    const [updated] = await tx
+      .update(Schema.matchups)
+      .set({
+        ...updateData,
+        scoreVersion: lockedMatchup.scoreVersion + 1,
+      })
+      .where(eq(Schema.matchups.id, matchupId))
+      .returning();
+
+    return updated;
+  });
+
+  if (!matchup) {
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  return results[0];
+  return matchup;
 }
 
 export async function updateMatchupStatus(

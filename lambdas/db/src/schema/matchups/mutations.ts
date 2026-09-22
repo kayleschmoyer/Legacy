@@ -183,6 +183,108 @@ export async function publishMatchupScoreUpdated(
   }
 }
 
+/**
+ * Concurrency (LS-6391): two scoring workers (e.g. a live tick and a stat
+ * correction re-processing the same game) can call `updateMatchupScore` for
+ * the same matchupId at nearly the same time. A bare `UPDATE ... WHERE id =
+ * :id` has no row-level lock or version check, so whichever write commits
+ * last wins regardless of which one carries the freshest stats. This closes
+ * that gap two ways: it takes a row-level lock (`SELECT ... FOR UPDATE`) so
+ * the two writes serialize rather than interleave, and it accepts an
+ * optional `expectedScoreVersion` — when a caller passes the version it read
+ * before computing its score, a write that raced against a fresher one is
+ * rejected with ConflictError instead of silently overwriting it.
+ *
+ * Exported standalone (rather than inlined in the resolver) so it can be
+ * exercised directly against a real Postgres instance in integration tests,
+ * mirroring performMatchupPlayerPositionUpdate/performMatchupPlayerPositionSwap.
+ */
+export async function performUpdateMatchupScore(
+  db: GenericDatabase<typeof PublicSchema>,
+  params: {
+    matchupId: number;
+    team1Score?: number | null;
+    team2Score?: number | null;
+    expectedScoreVersion?: number | null;
+  },
+): Promise<typeof PublicSchema.matchups.$inferSelect> {
+  const { matchupId, team1Score, team2Score, expectedScoreVersion } = params;
+
+  const updateData: {
+    team1Score?: string;
+    team2Score?: string;
+    scoredAt?: Date;
+  } = {};
+
+  if (team1Score !== null && team1Score !== undefined) {
+    updateData.team1Score = team1Score.toString();
+  }
+  if (team2Score !== null && team2Score !== undefined) {
+    updateData.team2Score = team2Score.toString();
+  }
+
+  // Every writer of the score columns stamps scoring provenance (LS-9665).
+  // This mutation takes the number from an admin or the scoring system
+  // rather than computing one, but the persisted score is still current as
+  // of now — leaving it unstamped would report it stale forever.
+  const hasScoreChange = Object.keys(updateData).length > 0;
+  if (hasScoreChange) {
+    updateData.scoredAt = new Date();
+  }
+
+  return db.transaction(async (tx) => {
+    // Surface lock waits as errors rather than silent hangs, mirroring
+    // performMatchupPlayerPositionUpdate.
+    await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+    const [lockedMatchup] = await tx
+      .select({ scoreVersion: PublicSchema.matchups.scoreVersion })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, matchupId))
+      .limit(1)
+      .for('update');
+
+    if (!lockedMatchup) {
+      throw new Error('Matchup not found');
+    }
+
+    if (
+      expectedScoreVersion != null &&
+      expectedScoreVersion !== lockedMatchup.scoreVersion
+    ) {
+      throw ConflictError(
+        'This matchup’s score was updated by another writer since it was read. Refetch the current score and scoreVersion before retrying.',
+      );
+    }
+
+    if (!hasScoreChange) {
+      const [existing] = await tx
+        .select()
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, matchupId))
+        .limit(1);
+      if (!existing) {
+        throw new Error('Matchup not found');
+      }
+      return existing;
+    }
+
+    const [updated] = await tx
+      .update(PublicSchema.matchups)
+      .set({
+        ...updateData,
+        scoreVersion: lockedMatchup.scoreVersion + 1,
+      })
+      .where(eq(PublicSchema.matchups.id, matchupId))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Matchup not found');
+    }
+    return updated;
+  });
+}
+
 // Mutation: updateMatchupScore
 builder.mutationField('updateMatchupScore', (t) =>
   t.field({
@@ -191,6 +293,11 @@ builder.mutationField('updateMatchupScore', (t) =>
       matchupId: t.arg.int({ required: true }),
       team1Score: t.arg.float({ required: false }),
       team2Score: t.arg.float({ required: false }),
+      expectedScoreVersion: t.arg.int({
+        required: false,
+        description:
+          'Optimistic-concurrency guard (LS-6391). When provided, the write is rejected with a conflict error unless it matches the matchup’s current scoreVersion.',
+      }),
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
@@ -204,38 +311,12 @@ builder.mutationField('updateMatchupScore', (t) =>
         );
       }
 
-      const updateData: {
-        team1Score?: string;
-        team2Score?: string;
-        scoredAt?: Date;
-      } = {};
-
-      if (args.team1Score !== null && args.team1Score !== undefined) {
-        updateData.team1Score = args.team1Score.toString();
-      }
-      if (args.team2Score !== null && args.team2Score !== undefined) {
-        updateData.team2Score = args.team2Score.toString();
-      }
-
-      // Every writer of the score columns stamps scoring provenance (LS-9665).
-      // This mutation takes the number from an admin or the scoring system
-      // rather than computing one, but the persisted score is still current as
-      // of now — leaving it unstamped would report it stale forever.
-      if (Object.keys(updateData).length > 0) {
-        updateData.scoredAt = new Date();
-      }
-
-      const results = await context.db
-        .update(PublicSchema.matchups)
-        .set(updateData)
-        .where(eq(PublicSchema.matchups.id, args.matchupId))
-        .returning();
-
-      if (!results[0]) {
-        throw new Error('Matchup not found');
-      }
-
-      const matchup = results[0];
+      const matchup = await performUpdateMatchupScore(context.db, {
+        matchupId: args.matchupId,
+        team1Score: args.team1Score,
+        team2Score: args.team2Score,
+        expectedScoreVersion: args.expectedScoreVersion,
+      });
 
       await publishMatchupScoreUpdated(context, matchup);
 

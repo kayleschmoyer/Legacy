@@ -23,7 +23,7 @@ import {
   partitionMatchupPlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { builder } from './builder';
 import { checkAdminInDb, verifyCommissionerAccess } from './authorization';
@@ -362,6 +362,11 @@ builder.mutationField('editMatchupScore', (t) =>
           // (LS-9665). A commissioner's hand-entered score is current as of the
           // moment it was entered, so it is not stale.
           scoredAt: new Date(),
+          // Every writer of the score columns bumps the optimistic-concurrency
+          // counter (LS-6391), so a scoring-system write racing against this
+          // edit with a stale expectedScoreVersion is rejected rather than
+          // clobbering it.
+          scoreVersion: sql`${PublicSchema.matchups.scoreVersion} + 1`,
         })
         .where(eq(PublicSchema.matchups.id, matchupId));
 

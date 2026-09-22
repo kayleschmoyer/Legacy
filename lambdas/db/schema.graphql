@@ -2101,6 +2101,11 @@ type Matchup {
   recap: MatchupRecap
 
   """
+  Optimistic-concurrency version for the score columns, incremented on every write to team1Score/team2Score. Pass the value read here as expectedScoreVersion to updateMatchupScore to guard against overwriting a fresher concurrent write.
+  """
+  scoreVersion: Int
+
+  """
   The league's scoring-settings changes relevant to this matchup's staleness — what changed, by whom, and when. Empty when the matchup has no persisted score.
   """
   scoringChangeLog: [ScoringChangeLogEntry!]!
@@ -3184,6 +3189,10 @@ type Mutation {
     positionId: Int
   ): MatchupPlayer
   updateMatchupScore(
+    """
+    Optimistic-concurrency guard (LS-6391). When provided, the write is rejected with a conflict error unless it matches the matchup’s current scoreVersion.
+    """
+    expectedScoreVersion: Int
     matchupId: Int!
     team1Score: Float
     team2Score: Float

@@ -1755,6 +1755,8 @@ export type Matchup = {
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;
+  /** Optimistic-concurrency version for the score columns, incremented on every write to team1Score/team2Score. Pass the value read here as expectedScoreVersion to updateMatchupScore to guard against overwriting a fresher concurrent write. */
+  scoreVersion?: Maybe<Scalars['Int']['output']>;
   /** The league's scoring-settings changes relevant to this matchup's staleness — what changed, by whom, and when. Empty when the matchup has no persisted score. */
   scoringChangeLog: Array<ScoringChangeLogEntry>;
   /** Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score. */
@@ -2935,6 +2937,7 @@ export type MutationUpdateMatchupPlayerPositionArgs = {
 };
 
 export type MutationUpdateMatchupScoreArgs = {
+  expectedScoreVersion?: InputMaybe<Scalars['Int']['input']>;
   matchupId: Scalars['Int']['input'];
   team1Score?: InputMaybe<Scalars['Float']['input']>;
   team2Score?: InputMaybe<Scalars['Float']['input']>;

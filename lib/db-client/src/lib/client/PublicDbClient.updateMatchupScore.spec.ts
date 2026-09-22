@@ -9,6 +9,8 @@ function makeSelectChain(rows: any[]): any {
     select: jest.fn(),
     from: jest.fn(),
     where: jest.fn(),
+    limit: jest.fn(),
+    for: jest.fn(),
     then: jest
       .fn()
       .mockImplementation((cb: (items: any[]) => any) =>
@@ -18,6 +20,8 @@ function makeSelectChain(rows: any[]): any {
   chain.select.mockReturnValue(chain);
   chain.from.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
+  chain.limit.mockReturnValue(chain);
+  chain.for.mockReturnValue(chain);
   return chain;
 }
 
@@ -47,9 +51,19 @@ function makeUpdateChain(returning: any[]): UpdateChain {
 function makeDb(existingRow: any, returning: any[] = []): any {
   const sel = makeSelectChain(existingRow !== undefined ? [existingRow] : []);
   const upd = makeUpdateChain(returning);
+  // The row-lock + write both happen inside a transaction (LS-6391); `tx`
+  // shares the same select/update mocks as `db` so existing assertions on
+  // `db.select`/`db.update`/`updateChain` keep working regardless of which
+  // handle the code under test calls through.
+  const tx = { select: sel.select, update: upd.update };
   // `updateChain` is exposed so tests can assert on the .set() payload; it is
   // not part of the Drizzle surface updateMatchupScore uses.
-  return { select: sel.select, update: upd.update, updateChain: upd };
+  return {
+    select: sel.select,
+    update: upd.update,
+    updateChain: upd,
+    transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(tx)),
+  };
 }
 
 const matchupRow = {
@@ -64,6 +78,7 @@ const matchupRow = {
   weekNumber: 1,
   startTime: null,
   endTime: null,
+  scoreVersion: 0,
 };
 
 describe('updateMatchupScore', () => {
@@ -100,8 +115,12 @@ describe('updateMatchupScore', () => {
 
     const result = await updateMatchupScore(db, 1, 15, null);
 
+    expect(db.transaction).toHaveBeenCalled();
     expect(db.update).toHaveBeenCalled();
-    expect(db.select).not.toHaveBeenCalled();
+    // The row-lock select (LS-6391) now runs inside the same transaction as
+    // the write, so `select` is called even though no caller-visible read
+    // happens.
+    expect(db.select).toHaveBeenCalled();
     expect(result).toBe(updated);
   });
 
@@ -111,8 +130,9 @@ describe('updateMatchupScore', () => {
 
     const result = await updateMatchupScore(db, 1, 10, 8);
 
+    expect(db.transaction).toHaveBeenCalled();
     expect(db.update).toHaveBeenCalled();
-    expect(db.select).not.toHaveBeenCalled();
+    expect(db.select).toHaveBeenCalled();
     expect(result).toBe(updated);
   });
 
@@ -188,5 +208,45 @@ describe('updateMatchupScore — scored_at stamping', () => {
     const stamped = setPayload(db).scoredAt as Date;
     expect(stamped.getTime()).toBeGreaterThanOrEqual(before);
     expect(stamped.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+/**
+ * LS-6391 — row lock + optimistic-concurrency counter.
+ *
+ * A score write now takes a row lock (`SELECT ... FOR UPDATE`) on the
+ * matchup before writing, inside a transaction, and bumps `scoreVersion` in
+ * the same write — so every scoring-path writer keeps the counter that
+ * `updateMatchupScore`'s admin/system GraphQL mutation uses for its
+ * `expectedScoreVersion` optimistic-concurrency check meaningful.
+ */
+describe('updateMatchupScore — row lock + scoreVersion (LS-6391)', () => {
+  const setPayload = (db: {
+    updateChain: UpdateChain;
+  }): Record<string, unknown> =>
+    db.updateChain.set.mock.calls[0][0] as Record<string, unknown>;
+
+  it('takes the row lock and writes inside the same transaction', async () => {
+    const db = makeDb(matchupRow, [matchupRow]);
+
+    await updateMatchupScore(db, 1, 15, null);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('bumps scoreVersion by one on a score write', async () => {
+    const db = makeDb({ ...matchupRow, scoreVersion: 4 }, [matchupRow]);
+
+    await updateMatchupScore(db, 1, 15, null);
+
+    expect(setPayload(db).scoreVersion).toBe(5);
+  });
+
+  it('throws when the locked row is not found', async () => {
+    const db = makeDb(undefined, [matchupRow]);
+
+    await expect(updateMatchupScore(db, 99, 15, null)).rejects.toThrow(
+      'Matchup 99 not found',
+    );
   });
 });
