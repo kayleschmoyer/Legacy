@@ -406,6 +406,7 @@ export function LeagueDuesStatusDashboard({
             return (
               <XStack
                 key={member.userId}
+                data-testid={`dues-member-row-${member.userId}`}
                 padding="$2"
                 paddingHorizontal="$3"
                 borderRadius="$3"
