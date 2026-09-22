@@ -75,7 +75,7 @@ When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job,
 
 Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci` label — a footgun once `CI Gate` is required; see [the skip-ci footgun](../../pr-lifecycle/references/ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected).
 
-**Stage 3 -- E2E Tests:** Playwright, sharded matrix from detect-changes.
+**Stage 3 -- E2E Tests:** Playwright, sharded matrix from detect-changes. `e2e` and `e2e-mobile` both run with `strategy.fail-fast: true` (LS-1119): a shard that genuinely fails cancels its siblings instead of letting them run to their full 45-minute timeout. This is safe with the gate's cancellation classification — GitHub's matrix rollup gives the failing shard's `failure` precedence over a cancelled sibling, and `runner-cancellation.js`/`ci-gate.js` already promote a shard with a real failing step to `failure` even if its own job conclusion rolls up to `cancelled` (LS-9467). A fail-fast-cancelled sibling classifies as `deliberate-cancel` (pending, not failure) same as any other cancellation.
 
 - PRs: `@critical` (excluding `@slow`) **plus** the affected specs mapped from changed files; a broad-surface change escalates to the full hermetic suite, sharded. A "narrow" selection of **≥100 spec files also promotes to the full-suite sharded run** (LS-9449): an over-selected narrow run would put the whole list on ONE shard against the 30-minute job timeout (plus a full mobile re-run against 20 minutes) — 203 files ran 26–31 min and got timeout-cancelled on three consecutive runs before this guard existed. Promotion also skips the mobile duplication, same as any broad change.
 - Downloads the web build artifact from the `build` job

@@ -751,7 +751,18 @@ jobs:
     # side). More headroom makes hitting that exact race far less likely.
     timeout-minutes: 45
     strategy:
-      fail-fast: false
+      # LS-1119: a genuinely-failing shard (real test breakage, not runner
+      # churn) should stop its siblings from burning the rest of their
+      # 45-minute budget instead of running to completion regardless. Safe
+      # with the existing cancellation-classification stack: a shard that
+      # actually failed reports job-level `failure` (GitHub's matrix rollup
+      # gives failure precedence over a sibling's cancellation), so `CI Gate`
+      # and the `e2e-affected` gate still see a real failure, not a masked
+      # cancel — see runner-cancellation.js / ci-gate.js's
+      # cancelledJobHadRealFailure and docs/ci-cd/ci-gate-aggregator.md.
+      # Cancelled siblings classify as `deliberate-cancel` (pending, not
+      # failure), same as any other fail-fast cancellation.
+      fail-fast: true
       matrix:
         # Shard count is computed by detect-changes (LS-7846): 1 shard for a
         # narrow change (@critical + affected specs), 3 shards when a broad
@@ -918,7 +929,10 @@ jobs:
     # here — same budget rationale as the chromium e2e job above (LS-9467).
     timeout-minutes: 45
     strategy:
-      fail-fast: false
+      # LS-1119: same fail-fast rationale as the chromium `e2e` job above —
+      # see that job's strategy block for why this is safe with the gate's
+      # cancellation classification.
+      fail-fast: true
       matrix:
         # Identical shard matrix to the chromium e2e job (LS-9658): 1 shard
         # for a narrow change (@critical + affected specs), 3 shards when a
