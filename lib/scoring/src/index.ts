@@ -14,3 +14,4 @@ export * from './matchup-player-stats';
 export * from './matchup-projections';
 export * from './scoring-profile-utils';
 export * from './multiplier-groups';
+export * from './roundScore';

@@ -13,6 +13,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { roundScore } from '@legacy-sports/scoring';
 import {
   ALLOWED_POSITIONS_BY_SPORT,
   ENTITLEMENTS,
@@ -217,10 +218,10 @@ export async function performUpdateMatchupScore(
   } = {};
 
   if (team1Score !== null && team1Score !== undefined) {
-    updateData.team1Score = team1Score.toString();
+    updateData.team1Score = roundScore(team1Score);
   }
   if (team2Score !== null && team2Score !== undefined) {
-    updateData.team2Score = team2Score.toString();
+    updateData.team2Score = roundScore(team2Score);
   }
 
   // Every writer of the score columns stamps scoring provenance (LS-9665).
