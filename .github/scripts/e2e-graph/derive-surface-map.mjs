@@ -458,6 +458,19 @@ export const WILDCARD_SEGMENT = '\u0000';
 
 const GOTO_RE = /(?:([\w$.]+)\s*\.\s*)?(goto(?:App)?|open)\s*\(\s*([^)]*)/g;
 
+// `expect(page).toHaveURL(...)` / `page.waitForURL(...)` are arrival
+// CONFIRMATIONS, not the navigation trigger itself — the actual trigger is
+// almost always a UI interaction (link/button click) this static analysis
+// cannot trace (LS-10239: about-page.spec.ts reaches '/' via a "Get Started
+// Free" button click, asserted only via `toHaveURL('/')` — no `goto('/')`
+// anywhere in its closure, so the route and HomePage.tsx's closure were
+// silently missing from the derived map). Captured as a WEAK signal — same
+// treatment as `open()` — so an unresolvable arg (a cross-file route-builder
+// function call like `canonicalStandingsPath(id)`) is dropped silently
+// rather than escalating to "reaches every routed page".
+const NAV_ASSERT_RE =
+  /(?:([\w$.]+)\s*\.\s*)?(toHaveURL|waitForURL)\s*\(\s*([^)]*)/g;
+
 // `test('page.goto(commissionerUrl) detects …', …)` / `describe(...)` titles
 // routinely document call shapes in prose — GOTO_RE has no way to tell that
 // apart from a real call unless the title text is removed first.
@@ -538,13 +551,15 @@ function normalizeRouteArg(raw) {
  * string`) is skipped: the value flows in from call sites, which are
  * themselves goto/open calls captured in their own files.
  *
- * @returns {{ routes: string[], weakRoutes: string[], unresolved: string[] }}
+ * @returns {{ routes: string[], weakRoutes: string[], unresolved: string[], weakUnresolvedNames: string[] }}
  */
 export function extractRoutes(source) {
   const routes = new Set();
   const weakRoutes = new Set();
   const unresolved = [];
-  for (const m of stripNonCallText(source).matchAll(GOTO_RE)) {
+  const weakUnresolvedNames = new Set();
+  const stripped = stripNonCallText(source);
+  for (const m of stripped.matchAll(GOTO_RE)) {
     const isOpen = m[2] === 'open';
     const routeReceiver = !isOpen && isRouteReceiver(m[1]);
     const arg = normalizeRouteArg(m[3]);
@@ -581,10 +596,43 @@ export function extractRoutes(source) {
     }
     if (!isOpen) unresolved.push(String(arg.unresolved).slice(0, 60));
   }
+  for (const m of stripped.matchAll(NAV_ASSERT_RE)) {
+    if (m[1] === 'not' || /(?:^|\.)not$/.test(m[1] ?? '')) continue; // negative assertion — page must NOT be here
+    const arg = normalizeRouteArg(m[3]);
+    if (arg === null) continue;
+    if (typeof arg === 'string') {
+      if (arg.startsWith('/') || arg.startsWith(WILDCARD_SEGMENT)) {
+        weakRoutes.add(arg);
+      }
+      continue; // absolute URL / non-route string — not an app route either way
+    }
+    if (arg.identifier) {
+      const name = arg.identifier.split('.')[0];
+      // `waitForURL`/`toHaveURL` (unlike goto) commonly take a RegExp
+      // argument (`/\/players(\?.*)?/`) — normalizeRouteArg's fallback
+      // branch reports that raw text as an "identifier" since it isn't a
+      // quoted string, but it is never a valid const name and must not
+      // reach `new RegExp(name)` inside CONST_STRING_RE (regex metachars
+      // in `name` throw "Unterminated group" etc.). Silently drop.
+      if (!/^[A-Za-z_$][\w$]*$/.test(name)) continue;
+      const decl = source.match(CONST_STRING_RE(name));
+      if (decl) {
+        const value = decl[2].replace(/\$\{[^}]*\}/g, WILDCARD_SEGMENT);
+        if (value.startsWith('/') || value.startsWith(WILDCARD_SEGMENT)) {
+          weakRoutes.add(value);
+        }
+        continue; // resolved same-file
+      }
+      weakUnresolvedNames.add(name); // cross-file const — resolved by the caller across the spec's closure
+    }
+    // regex-literal / fully dynamic args: silently dropped, same as an
+    // unmatched `open()` argument — never escalates to "unresolved".
+  }
   return {
     routes: [...routes].sort(),
     weakRoutes: [...weakRoutes].sort(),
     unresolved,
+    weakUnresolvedNames: [...weakUnresolvedNames].sort(),
   };
 }
 
@@ -859,6 +907,7 @@ export function derive({ repoRoot }) {
     const routes = new Set();
     const unresolvedGotos = [];
     const e2eSources = new Map();
+    const weakUnresolvedNames = new Set();
     for (const f of e2eClosure) {
       if (!f.startsWith('apps/web-e2e/')) continue;
       if (!isCodeFile(f)) continue;
@@ -869,15 +918,44 @@ export function derive({ repoRoot }) {
         continue;
       }
       e2eSources.set(f, src);
-      const { routes: r, weakRoutes, unresolved } = extractRoutes(src);
+      const {
+        routes: r,
+        weakRoutes,
+        unresolved,
+        weakUnresolvedNames: wun,
+      } = extractRoutes(src);
       for (const x of r) routes.add(x);
       for (const w of weakRoutes) {
-        // Weak (open-call) routes count only when they match a real pattern.
+        // Weak (open-call / toHaveURL / waitForURL) routes count only when
+        // they match a real pattern.
         if (routeEntries.some((re) => routeMatches(re.pattern, w))) {
           routes.add(w);
         }
       }
       for (const u of unresolved) unresolvedGotos.push(`${f}: ${u}`);
+      for (const n of wun) weakUnresolvedNames.add(n);
+    }
+
+    // `toHaveURL`/`waitForURL` args that name a cross-file const (e.g.
+    // `HOME_PATH` imported from support/canonical-routes.ts) couldn't resolve
+    // same-file above — resolve them now against every file in the spec's
+    // e2e closure. Silent no-op if the name is a route-builder FUNCTION
+    // (e.g. `canonicalStandingsPath(id)`) rather than a plain string const —
+    // that residual is accepted the same way an unmatched `open()` arg is;
+    // it never escalates to "unresolved"/"reaches every routed page".
+    for (const name of weakUnresolvedNames) {
+      for (const src of e2eSources.values()) {
+        const decl = src.match(CONST_STRING_RE(name));
+        if (!decl) continue;
+        const value = decl[2].replace(/\$\{[^}]*\}/g, WILDCARD_SEGMENT);
+        if (
+          (value.startsWith('/') || value.startsWith(WILDCARD_SEGMENT)) &&
+          routeEntries.some((re) => routeMatches(re.pattern, value))
+        ) {
+          routes.add(value);
+        }
+        break;
+      }
     }
 
     // Unresolvable goto arguments: before degrading to "every routed page",

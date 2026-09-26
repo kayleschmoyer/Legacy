@@ -320,6 +320,76 @@ describe('extractRoutes', () => {
     assert.deepEqual(r.routes, ['/about']);
     assert.deepEqual(r.unresolved, []);
   });
+
+  // LS-10239: toHaveURL()/waitForURL() are arrival CONFIRMATIONS, not the
+  // navigation trigger itself (real-world case: about-page.spec.ts reaches
+  // '/' via a button click asserted only with `toHaveURL('/')` — no
+  // `goto('/')` anywhere in its closure, so HomePage.tsx's closure was
+  // silently missing from the derived map).
+  it('captures a string-literal toHaveURL() arg as a weak route', () => {
+    const r = extractRoutes("await expect(page).toHaveURL('/');");
+    assert.deepEqual(r.weakRoutes, ['/']);
+    assert.deepEqual(r.routes, []);
+    assert.deepEqual(r.unresolved, []);
+  });
+
+  it('captures a string-literal waitForURL() arg as a weak route', () => {
+    const r = extractRoutes("await page.waitForURL('/');");
+    assert.deepEqual(r.weakRoutes, ['/']);
+  });
+
+  it('ignores .not.toHaveURL() — a negative assertion names no destination', () => {
+    const r = extractRoutes(
+      'await expect(page).not.toHaveURL(/\\/admin/, { timeout: 10000 });',
+    );
+    assert.deepEqual(r.weakRoutes, []);
+    assert.deepEqual(r.weakUnresolvedNames, []);
+  });
+
+  it('resolves a same-file const identifier passed to toHaveURL()', () => {
+    const r = extractRoutes(
+      "const HOME_PATH = '/';\nawait expect(page).toHaveURL(HOME_PATH);",
+    );
+    assert.deepEqual(r.weakRoutes, ['/']);
+    assert.deepEqual(r.weakUnresolvedNames, []);
+  });
+
+  it('reports a cross-file toHaveURL() const identifier as weakUnresolvedNames, not routes', () => {
+    // Resolution across the spec's e2e closure is the caller's (derive()'s)
+    // job — extractRoutes only sees one file at a time.
+    const r = extractRoutes('await expect(page).toHaveURL(HOME_PATH);');
+    assert.deepEqual(r.routes, []);
+    assert.deepEqual(r.weakRoutes, []);
+    assert.deepEqual(r.weakUnresolvedNames, ['HOME_PATH']);
+  });
+
+  it('silently drops a route-builder FUNCTION-call arg to toHaveURL() (never crashes, never escalates)', () => {
+    const r = extractRoutes(
+      'await expect(page).toHaveURL(canonicalStandingsPath(leagueId));',
+    );
+    assert.deepEqual(r.routes, []);
+    assert.deepEqual(r.weakRoutes, []);
+    assert.deepEqual(r.unresolved, []);
+    // The regex-cut argument resolves to the identifier "canonicalStandingsPath"
+    // (a same-file const declaration never found) — extractRoutes can't yet
+    // tell a function from a not-yet-seen cross-file const, so it defers to
+    // derive()'s cross-closure CONST_STRING_RE search. That search finds no
+    // `const canonicalStandingsPath = '...'` anywhere either (it really is a
+    // function), so it resolves to nothing — never crashes, never escalates.
+    assert.deepEqual(r.weakUnresolvedNames, ['canonicalStandingsPath']);
+  });
+
+  it('silently drops a RegExp literal arg to waitForURL() without throwing (regression)', () => {
+    // A RegExp argument (`normalizeRouteArg`'s non-quote/non-backtick
+    // fallback) previously reached `new RegExp(name)` inside CONST_STRING_RE
+    // with the raw regex text as `name`, throwing "Unterminated group" for
+    // any pattern containing an unescaped capture group.
+    assert.doesNotThrow(() => {
+      const r = extractRoutes('await page.waitForURL(/\\/players(\\?.*)?/);');
+      assert.deepEqual(r.weakRoutes, []);
+      assert.deepEqual(r.weakUnresolvedNames, []);
+    });
+  });
 });
 
 describe('extractRouteLiterals', () => {
@@ -396,9 +466,30 @@ describe('derive() on the mini fixture repo', () => {
     assert.deepEqual(Object.keys(manifest.specs).sort(), [
       'apps/web-e2e/src/tests/about.spec.ts',
       'apps/web-e2e/src/tests/draft.spec.ts',
+      'apps/web-e2e/src/tests/home-via-click.spec.ts',
       'apps/web-e2e/src/tests/loop.spec.ts',
       'apps/web-e2e/src/tests/redirect.spec.ts',
     ]);
+  });
+
+  it('a spec with zero goto() calls still reaches the home route through toHaveURL()/waitForURL() (LS-10239)', () => {
+    // home-via-click.spec.ts never calls page.goto() at all — it navigates
+    // via a UI click and only confirms arrival with toHaveURL()/waitForURL(),
+    // using a HOME_PATH const imported from a DIFFERENT file than the spec
+    // itself. Both the "no goto() at all" case and the cross-file const
+    // resolution must work for '/'s HomeScreen -> AboutTeaser -> AboutPage
+    // closure to show up here.
+    const home =
+      manifest.specs['apps/web-e2e/src/tests/home-via-click.spec.ts'];
+    assert.ok(home.includes('apps/web/src/pages/about/AboutPage.tsx'));
+    assert.ok(
+      !home.includes('apps/web/src/pages/draft/DraftPage.tsx'),
+      'must stay precise — no reachEverything fallback triggered',
+    );
+    assert.ok(
+      !stats.warnings.some((w) => w.includes('home-via-click.spec.ts')),
+      'a cleanly resolved toHaveURL()/waitForURL() arg must not warn',
+    );
   });
 
   it('a spec that only visits a pure <Navigate> redirect route reaches the destination page (LS-9994)', () => {
