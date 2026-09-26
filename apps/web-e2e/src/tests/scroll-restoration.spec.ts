@@ -104,19 +104,28 @@ test.describe('Router scroll restoration @regression', () => {
     // mount/unmount here is the root cause this test guards against.
     await expect(brandText).toBeAttached();
 
+    // Both rects are read inside ONE page.evaluate, i.e. the same frame.
+    // Two separate boundingBox() round-trips (LS-10253) could sample the
+    // logo before its 200ms height shrink and the wordmark after its
+    // margin/max-width collapse, reporting an overlap that never rendered.
     const assertNoOverlap = async () => {
-      const [logoBox, textBox] = await Promise.all([
-        logo.boundingBox(),
-        brandText.boundingBox(),
-      ]);
-      if (!logoBox || !textBox) {
+      const rects = await page.evaluate(() => {
+        const logoEl = document.querySelector('[data-testid="header-logo"]');
+        const textEl = document.querySelector('[data-testid="brand-text"]');
+        if (!logoEl || !textEl) return null;
+        const logoRect = logoEl.getBoundingClientRect();
+        const textRect = textEl.getBoundingClientRect();
+        return { logoRight: logoRect.right, textLeft: textRect.left };
+      });
+      if (!rects) {
         throw new Error(
-          'Expected both the logo and the wordmark to report a bounding box',
+          'Expected both the logo and the wordmark to be in the DOM',
         );
       }
       // The wordmark must never start left of where the logo ends, in any
       // scroll/animation state — otherwise the crest overlaps the "L".
-      expect(textBox.x).toBeGreaterThanOrEqual(logoBox.x + logoBox.width);
+      // 0.5px absorbs sub-pixel rounding of the width:auto logo mid-resize.
+      expect(rects.textLeft).toBeGreaterThanOrEqual(rects.logoRight - 0.5);
     };
 
     // Steady state, not compact.
@@ -125,8 +134,8 @@ test.describe('Router scroll restoration @regression', () => {
     // Cross the compact threshold and sample repeatedly through the 200ms
     // logo-height / wordmark-collapse transition window, not just after it
     // settles — the original bug only showed up mid-transition. Each
-    // boundingBox() round-trip already spaces the samples out in time, so no
-    // explicit wait is needed between iterations.
+    // page.evaluate() round-trip already spaces the samples out in time, so
+    // no explicit wait is needed between iterations.
     await page.evaluate(() => window.scrollTo(0, 200));
     await expect
       .poll(() => page.evaluate(() => window.scrollY))
