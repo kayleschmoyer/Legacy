@@ -42,6 +42,7 @@ import {
   HOSTED_CONNECTOR_CAVEAT,
   rosterHasService,
 } from './auth-checks';
+import { assessRerereResolution } from './assess-rerere-resolution';
 import { baselineSetup, slugifyRef } from './baseline-setup';
 import { executeWorktreeBranch } from './branch-ops';
 import { classifyForceRemoveFailure } from './classify-force-remove-failure';
@@ -6129,29 +6130,56 @@ const handleCallTool = async (
         log.push(`Exit code: ${e.status ?? 'unknown'}`, output);
 
         if (hasConflicts) {
-          // Check if rerere auto-resolved all conflicts.
-          // rerere may populate the working tree without staging, so stage
-          // resolved files first, then check for remaining unmerged entries.
-          let rerereResolved = false;
-          try {
-            runGit(['add', '-u'], cwd);
-            const conflictCheck = run(
-              'git diff --name-only --diff-filter=U',
-              cwd,
-            ).trim();
-            if (!conflictCheck) {
-              // No unresolved conflicts — rerere handled them all
-              rerereResolved = true;
-            }
-          } catch {
-            // If we can't check, fall through to manual resolution
-          }
+          // Check whether rerere genuinely auto-resolved all conflicts.
+          //
+          // This MUST NOT stage anything first: `git add` on a conflicted path
+          // is what marks it resolved, so the old "stage, then check
+          // --diff-filter=U" sequence could never report a leftover conflict and
+          // happily committed conflict markers — even with disableRerere, where
+          // rerere never ran at all (LS-10254).
+          const assessment = assessRerereResolution(
+            cwd,
+            output,
+            { disableRerere: disableRerere === true },
+            {
+              runShell: run,
+              readFile: (p: string) => readFileSync(p, 'utf8'),
+              join,
+            },
+          );
+          log.push('', assessment.reason);
 
-          if (rerereResolved) {
-            log.push(
-              '',
-              'rerere auto-resolved all conflicts. Continuing rebase...',
-            );
+          if (assessment.autoContinueSafe) {
+            // Stage only what rerere actually resolved — never `git add -u`/-A,
+            // which would mask any conflict this assessment did not cover.
+            try {
+              if (assessment.pathsToStage.length > 0) {
+                runGit(['add', '--', ...assessment.pathsToStage], cwd);
+              }
+            } catch (stageErr: unknown) {
+              const se = stageErr as { message?: string };
+              log.push(
+                `Failed to stage rerere-resolved files: ${se.message ?? 'unknown error'}`,
+                'Not auto-continuing. Resolve manually, then worktree_rebase_continue.',
+              );
+              return {
+                content: [{ type: 'text', text: log.join('\n') }],
+                isError: true,
+              };
+            }
+            log.push('Continuing rebase...');
+
+            // Capture the pre-rebase tip up front. If a bad resolution is only
+            // discovered after the rebase has already completed, this is the
+            // SHA to reset back to — `worktree_rebase_continue` is useless
+            // there, because there is no longer a rebase in progress
+            // (LS-10254).
+            let preRebaseSha = '';
+            try {
+              preRebaseSha = run('git rev-parse ORIG_HEAD', cwd).trim();
+            } catch {
+              // ORIG_HEAD unavailable — the recovery hint falls back to reflog.
+            }
 
             // Compute gitDir once for rebase-in-progress checks
             let gitDir: string;
@@ -6182,7 +6210,8 @@ const handleCallTool = async (
             // during the replay — the set rerere could have corrupted.
             const scanForConflictMarkers = (): string[] => {
               try {
-                const origHead = run('git rev-parse ORIG_HEAD', cwd).trim();
+                const origHead =
+                  preRebaseSha || run('git rev-parse ORIG_HEAD', cwd).trim();
                 const changedFiles = run(
                   `git diff --name-only ${origHead}`,
                   cwd,
@@ -6225,20 +6254,34 @@ const handleCallTool = async (
                   '⚠ Conflict markers detected in rebased files despite rerere reporting success:',
                   markerFiles.join('\n'),
                   '',
+                  // The rebase has already COMPLETED at this point, so the
+                  // markers are committed and there is nothing left to
+                  // continue or abort — worktree_rebase_continue and
+                  // worktree_rebase(abort: true) are both no-ops here. The
+                  // only recovery is to rewind to the pre-rebase tip and redo
+                  // the rebase (LS-10254).
+                  'The rebase has already completed, so these markers are COMMITTED.',
+                  'Do not call worktree_rebase_continue — there is no rebase in progress.',
+                  'Rewind to the pre-rebase tip and retry:',
+                  preRebaseSha
+                    ? `  worktree_reset(sha: "${preRebaseSha}", mode: "hard", force: true, allowNonAncestor: true)`
+                    : '  worktree_reset(sha: <pre-rebase SHA from worktree_reflog>, mode: "hard", force: true, allowNonAncestor: true)',
+                  '',
                   ...(stillShallow
                     ? [
                         'This worktree is still a shallow clone with insufficient history — that',
                         '(not a bad rerere resolution) is the likely cause of spurious conflicts',
                         'across many files. The automatic `git fetch --unshallow` attempted before',
-                        'this rebase did not resolve it; retry once the deepen succeeds, or run',
-                        '`git fetch --unshallow origin` manually, then remove any remaining conflict',
-                        'markers, stage the fixes, and run worktree_rebase_continue.',
+                        'this rebase did not resolve it; after resetting, run',
+                        '`git fetch --unshallow origin` manually, then rebase again.',
                       ]
                     : [
-                        'rerere likely stored a bad resolution. Inspect the listed files,',
-                        'remove all conflict markers, stage the fixes, then:',
-                        '  worktree_rebase_continue',
-                        'Or: worktree_rebase(abort: true) to abort and retry from a clean state.',
+                        'rerere stored a bad resolution for the listed files. After resetting,',
+                        'rebase again with rerere off so it stops on the real conflict:',
+                        '  worktree_rebase(base: "origin/main", disableRerere: true)',
+                        'Then resolve by hand. To also drop the bad cache entry, call',
+                        `worktree_rerere_forget(paths: ${JSON.stringify(markerFiles)}) while that`,
+                        'rebase is paused on the conflict — it is a no-op outside one.',
                       ]),
                 );
                 return {
@@ -6332,30 +6375,40 @@ const handleCallTool = async (
                   );
 
                 if (isConflictError) {
-                  // rerere may have resolved this step's conflicts in the
-                  // working tree without staging.  Stage first, then check.
+                  // Same rule as the initial verdict: assess BEFORE staging,
+                  // and only continue when rerere genuinely resolved every
+                  // conflicted path without leaving markers (LS-10254).
+                  const stepAssessment = assessRerereResolution(
+                    cwd,
+                    continueOutput,
+                    { disableRerere: disableRerere === true },
+                    {
+                      runShell: run,
+                      readFile: (p: string) => readFileSync(p, 'utf8'),
+                      join,
+                    },
+                  );
+
+                  if (!stepAssessment.autoContinueSafe) {
+                    log.push(
+                      `Step ${iterations}: ${stepAssessment.reason}`,
+                      '',
+                      'Rebase paused. Resolve remaining conflicts, then:',
+                      '  worktree_rebase_continue',
+                      'Or: worktree_rebase(abort: true) to abort.',
+                    );
+                    return {
+                      content: [{ type: 'text', text: log.join('\n') }],
+                      isError: true,
+                    };
+                  }
+
                   try {
-                    runGit(['add', '-u'], cwd);
-                    const remainingConflicts = run(
-                      'git diff --name-only --diff-filter=U',
-                      cwd,
-                    )
-                      .trim()
-                      .split('\n')
-                      .filter(Boolean);
-                    if (remainingConflicts.length > 0) {
-                      log.push(
-                        `Step ${iterations}: new conflicts encountered:`,
-                        remainingConflicts.join('\n'),
-                        '',
-                        'Rebase paused. Resolve remaining conflicts, then:',
-                        '  worktree_rebase_continue',
-                        'Or: worktree_rebase(abort: true) to abort.',
+                    if (stepAssessment.pathsToStage.length > 0) {
+                      runGit(
+                        ['add', '--', ...stepAssessment.pathsToStage],
+                        cwd,
                       );
-                      return {
-                        content: [{ type: 'text', text: log.join('\n') }],
-                        isError: true,
-                      };
                     }
                     // rerere resolved this step too — continue the loop
                     log.push(
@@ -6387,17 +6440,13 @@ const handleCallTool = async (
             };
           }
 
-          // rerere did not resolve all conflicts — manual resolution needed
-          const unresolvedCount = (() => {
-            try {
-              return run('git diff --name-only --diff-filter=U', cwd)
-                .trim()
-                .split('\n')
-                .filter(Boolean).length;
-            } catch {
-              return 0;
-            }
-          })();
+          // rerere did not resolve all conflicts — manual resolution needed.
+          // Nothing has been staged, so the unmerged paths from the assessment
+          // are still authoritative.
+          const unresolvedCount = assessment.unmergedPaths.length;
+          if (unresolvedCount > 0) {
+            log.push('', 'Conflicted files:', ...assessment.unmergedPaths);
+          }
           const stillShallow = isShallowRepository({ runGit }, cwd);
           if (stillShallow && unresolvedCount > 10) {
             log.push(
