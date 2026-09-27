@@ -177,6 +177,7 @@ export interface CreateLeagueResult {
     allowDraftSlotTrading?: boolean;
     rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
     keeperSettings?: KeeperSettings | null;
+    gamesPerMatchup?: number;
   };
   teams: {
     id: number;
@@ -326,6 +327,7 @@ export class LeagueService {
                   PublicSchema.leagues.allowDraftSlotTrading,
                 rosterContinuity: PublicSchema.leagues.rosterContinuity,
                 keeperSettings: PublicSchema.leagues.keeperSettings,
+                gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
               })
               .from(PublicSchema.leagues)
               .where(
@@ -382,7 +384,10 @@ export class LeagueService {
               );
 
               return {
-                league: existingLeague,
+                league: {
+                  ...existingLeague,
+                  gamesPerMatchup: existingLeague.gamesPerMatchup ?? undefined,
+                },
                 teams: existingTeams,
                 leagueMembers: [
                   {
@@ -483,6 +488,7 @@ export class LeagueService {
             allowDraftSlotTrading: PublicSchema.leagues.allowDraftSlotTrading,
             rosterContinuity: PublicSchema.leagues.rosterContinuity,
             keeperSettings: PublicSchema.leagues.keeperSettings,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
           });
 
         // 2. Create teams — assign each team to a division (round-robin across divisions)
@@ -604,7 +610,10 @@ export class LeagueService {
         }
 
         return {
-          league,
+          league: {
+            ...league,
+            gamesPerMatchup: league.gamesPerMatchup ?? undefined,
+          },
           teams,
           leagueMembers: [ownerMember],
         };

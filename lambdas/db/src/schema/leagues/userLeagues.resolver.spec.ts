@@ -197,6 +197,47 @@ describe('userLeagues query (LS-5798)', () => {
     expect(result).toEqual([]);
   });
 
+  it('maps gamesPerMatchup through to the response (LS-8661)', async () => {
+    mockDb.then.mockImplementationOnce((resolve) =>
+      resolve([
+        {
+          id: 7,
+          name: 'My League',
+          owner: 1,
+          sport: 'baseball',
+          defensiveFormat: null,
+          maxRosterSize: 25,
+          currentMatchup: null,
+          currentWeek: null,
+          draftStatus: 'not-started',
+          leaguePhase: 'pre-draft',
+          inviteCode: 'ABC123',
+          playerPool: 'all',
+          weekAdvanceStatus: null,
+          waiverType: 'standard',
+          waiverEnabled: true,
+          faabBudgetDefault: 100,
+          isPublic: false,
+          gamesPerMatchup: 5,
+          tierFrozenAt: null,
+        },
+      ]),
+    );
+
+    const result = (await getResolver()(
+      {},
+      {},
+      mockContext,
+      undefined as never,
+    )) as Array<{ id: number; gamesPerMatchup: number | undefined }>;
+
+    // Regression: this list query feeds the same normalized Apollo League
+    // entity as the single-league `league` query — a dropped field here
+    // silently overwrites the correct cached value with null on revisit
+    // to the Leagues list (LS-8661).
+    expect(result[0].gamesPerMatchup).toBe(5);
+  });
+
   describe('pagination (LS-9101)', () => {
     it('defaults to a limit of 50 and an offset of 0 when no args are passed', async () => {
       await getResolver()({}, {}, mockContext, undefined as never);

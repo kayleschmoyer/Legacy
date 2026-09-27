@@ -56,6 +56,7 @@ describe('myLeagues query (LS-255 AC12)', () => {
           faabBudgetDefault: 'faabBudgetDefault',
           isPublic: 'isPublic',
           isMockDraft: 'isMockDraft',
+          gamesPerMatchup: 'gamesPerMatchup',
           tierFrozenAt: 'tierFrozenAt',
         },
         leagueMembers: {
@@ -205,6 +206,7 @@ describe('myLeagues query (LS-255 AC12)', () => {
           waiverEnabled: true,
           faabBudgetDefault: 100,
           isPublic: false,
+          gamesPerMatchup: 5,
           tierFrozenAt: null,
         },
       ]),
@@ -219,6 +221,7 @@ describe('myLeagues query (LS-255 AC12)', () => {
       id: number;
       sport: string;
       defensiveFormat: string | null;
+      gamesPerMatchup: number | undefined;
     }>;
 
     expect(result).toHaveLength(1);
@@ -227,6 +230,11 @@ describe('myLeagues query (LS-255 AC12)', () => {
       sport: 'football',
       defensiveFormat: 'idp',
     });
+    // Regression (LS-8661): the row's gamesPerMatchup must flow through to the
+    // response — this list query feeds the same normalized Apollo League
+    // entity as the single-league `league` query, so a dropped field here
+    // overwrites the correct cached value with null on revisit.
+    expect(result[0].gamesPerMatchup).toBe(5);
   });
 
   it('passes through filter conditions when sport arg is set', async () => {

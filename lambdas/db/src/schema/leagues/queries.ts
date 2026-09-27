@@ -564,6 +564,7 @@ builder.queryField('myLeagues', (t) =>
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
             tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
           })
           .from(PublicSchema.leagues)
@@ -593,6 +594,7 @@ builder.queryField('myLeagues', (t) =>
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
+          gamesPerMatchup: league.gamesPerMatchup ?? undefined,
           tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
         }));
       } catch (error) {

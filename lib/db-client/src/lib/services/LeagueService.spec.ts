@@ -352,7 +352,11 @@ describe('LeagueService.createLeague — idempotent resubmission (LS-6063)', () 
     // lookup — `.where().limit(1)`.
     mockTx.where
       .mockImplementationOnce(() => ({
-        limit: jest.fn().mockResolvedValue([{ id: 100, name: 'Test League' }]),
+        limit: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 100, name: 'Test League', gamesPerMatchup: 5 },
+          ]),
       }))
       .mockImplementationOnce(() =>
         Promise.resolve([{ id: 200, leagueId: 100, name: 'Team 1' }]),
@@ -367,9 +371,19 @@ describe('LeagueService.createLeague — idempotent resubmission (LS-6063)', () 
 
     const result = await service.createLeague(baseInput);
 
+    // gamesPerMatchup must survive the resubmission path too, or the create
+    // response under-reports it and poisons the Apollo League cache (LS-8661).
     expect(result.league).toEqual(
-      expect.objectContaining({ id: 100, name: 'Test League' }),
+      expect.objectContaining({
+        id: 100,
+        name: 'Test League',
+        gamesPerMatchup: 5,
+      }),
     );
+    const [[existingLeagueColumns]] = mockTx.select.mock.calls as [
+      [Record<string, unknown>],
+    ];
+    expect(existingLeagueColumns).toHaveProperty('gamesPerMatchup');
     expect(result.teams).toEqual([
       expect.objectContaining({ id: 200, leagueId: 100 }),
     ]);
