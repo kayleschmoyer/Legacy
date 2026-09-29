@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { NetworkStatus } from '@apollo/client';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -898,8 +899,11 @@ function NotificationPreferencesSection({
   onToggleCollapse: () => void;
   onSaved: () => void;
 }) {
-  const { data, loading, error, refetch } =
-    useGetUserNotificationPreferencesQuery();
+  const { data, loading, error, refetch, networkStatus } =
+    useGetUserNotificationPreferencesQuery({
+      notifyOnNetworkStatusChange: true,
+    });
+  const isRefetching = networkStatus === NetworkStatus.refetch;
   const [updatePrefs] = useUpdateNotificationPreferencesMutation();
 
   const prefs = data?.getUserNotificationPreferences;
@@ -1019,7 +1023,7 @@ function NotificationPreferencesSection({
     </SectionHeader>
   );
 
-  if (loading) {
+  if (loading && !isRefetching) {
     // The spinner lives in the header so it stays visible when the section is collapsed.
     return (
       <SectionCard style={cardStyle}>
@@ -1034,7 +1038,7 @@ function NotificationPreferencesSection({
     );
   }
 
-  if (error && !loading) {
+  if (error && (!loading || isRefetching)) {
     return (
       <SectionCard style={cardStyle}>
         {headerNode(
@@ -1074,7 +1078,13 @@ function NotificationPreferencesSection({
                   borderWidth={1}
                   borderColor="$glassBorder"
                   borderRadius="$3"
-                  onPress={() => void refetch()}
+                  disabled={isRefetching}
+                  opacity={isRefetching ? 0.6 : 1}
+                  icon={isRefetching ? <Spinner size="small" /> : undefined}
+                  aria-busy={isRefetching}
+                  onPress={() => {
+                    if (!isRefetching) void refetch();
+                  }}
                   hoverStyle={{ borderColor: '$brandGold' }}
                   pressStyle={{ scale: 0.97 }}
                 >
