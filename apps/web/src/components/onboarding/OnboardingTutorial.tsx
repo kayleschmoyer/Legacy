@@ -39,6 +39,26 @@ interface TutorialStep {
   accentColor: string;
 }
 
+/**
+ * Sample data for the tutorial's example cards. Kept in one place so the
+ * era shown across both cards can be swapped with a single edit. It is
+ * labelled as a historical season so it reads as the product's premise,
+ * not a stale demo.
+ */
+const SAMPLE_SEASON = 2019;
+const SAMPLE_GAME_SLOTS = [
+  { slot: 'Game 1', matchup: 'PHI @ NYM', date: `Aug 5, ${SAMPLE_SEASON}` },
+  { slot: 'Game 2', matchup: 'CHC @ STL', date: `Aug 7, ${SAMPLE_SEASON}` },
+  { slot: 'Game 3', matchup: 'BOS @ NYY', date: `Aug 9, ${SAMPLE_SEASON}` },
+  { slot: 'Game 4', matchup: 'LAD @ SF', date: `Aug 12, ${SAMPLE_SEASON}` },
+  { slot: 'Game 5', matchup: 'HOU @ OAK', date: `Aug 14, ${SAMPLE_SEASON}` },
+];
+const SAMPLE_WEEK_LABEL = `Week 7 · Aug 5–7, ${SAMPLE_SEASON}`;
+const SAMPLE_TOP_PERFORMERS = [
+  { name: 'Mike Trout', stats: '2 HR, 1 SB, 5 R', pts: '+18' },
+  { name: 'Gerrit Cole', stats: 'W, 8 K, 1 ER', pts: '+14' },
+];
+
 /** Game slots example table — adapts background to current theme */
 function GameSlotsExample() {
   const { resolvedTheme } = useThemeContext();
@@ -62,17 +82,11 @@ function GameSlotsExample() {
         style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
       >
         <Paragraph fontWeight="700" color="$brandGold" fontSize="$3">
-          Example — Week 7 Game Slots (5 games)
+          Example — Week 7 Game Slots (5 games) · {SAMPLE_SEASON} season
         </Paragraph>
       </XStack>
       <YStack padding="$3" gap="$2">
-        {[
-          { slot: 'Game 1', matchup: 'PHI @ NYM', date: 'Aug 5, 2019' },
-          { slot: 'Game 2', matchup: 'CHC @ STL', date: 'Aug 7, 2019' },
-          { slot: 'Game 3', matchup: 'BOS @ NYY', date: 'Aug 9, 2019' },
-          { slot: 'Game 4', matchup: 'LAD @ SF', date: 'Aug 12, 2019' },
-          { slot: 'Game 5', matchup: 'HOU @ OAK', date: 'Aug 14, 2019' },
-        ].map(({ slot, matchup, date }) => (
+        {SAMPLE_GAME_SLOTS.map(({ slot, matchup, date }) => (
           <XStack
             key={slot}
             justifyContent="space-between"
@@ -129,7 +143,7 @@ function SampleMatchupCard() {
         style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
       >
         <Paragraph color="$brandGoldLight" fontWeight="700" fontSize="$3">
-          Week 7 · Aug 5–7, 2019
+          {SAMPLE_WEEK_LABEL}
         </Paragraph>
       </XStack>
 
@@ -199,10 +213,7 @@ function SampleMatchupCard() {
         >
           Top Performers This Week
         </Paragraph>
-        {[
-          { name: 'Mike Trout', stats: '2 HR, 1 SB, 5 R', pts: '+18' },
-          { name: 'Gerrit Cole', stats: 'W, 8 K, 1 ER', pts: '+14' },
-        ].map(({ name, stats, pts }) => (
+        {SAMPLE_TOP_PERFORMERS.map(({ name, stats, pts }) => (
           <XStack key={name} justifyContent="space-between" alignItems="center">
             <YStack>
               <Paragraph fontWeight="600" color="$color" fontSize="$3">
