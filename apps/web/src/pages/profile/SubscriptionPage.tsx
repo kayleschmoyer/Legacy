@@ -258,9 +258,11 @@ export function shouldContinueActivationPolling(
 function PastDueBanner({
   onRetry,
   loading,
+  gracePeriodEndsAt,
 }: {
   onRetry: () => void;
   loading: boolean;
+  gracePeriodEndsAt?: string | null;
 }) {
   return (
     <SectionCard
@@ -281,8 +283,9 @@ function PastDueBanner({
             Payment Past Due
           </Paragraph>
           <Paragraph size="$3" color="$colorPress">
-            Your payment failed. Please update your payment method to keep your
-            Premium access.
+            {gracePeriodEndsAt
+              ? `Your payment failed. Please update your payment method to keep your Premium access until ${formatDate(gracePeriodEndsAt)}.`
+              : 'Your payment failed. Please update your payment method to keep your Premium access.'}
           </Paragraph>
         </YStack>
         <CtaButton
@@ -833,6 +836,7 @@ const SubscriptionPage: React.FC = () => {
             <PastDueBanner
               onRetry={() => void handleManageSubscription()}
               loading={portalLoading}
+              gracePeriodEndsAt={subscription?.gracePeriodEndsAt}
             />
           )}
 

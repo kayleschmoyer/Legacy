@@ -22,6 +22,7 @@ type SubscriptionMock = {
   tier: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  gracePeriodEndsAt?: string | null;
 };
 
 type MySubscriptionQueryMock = {
@@ -352,6 +353,62 @@ describe('SubscriptionPage — live update on SUBSCRIPTION_UPDATED push (LS-7384
       expect.objectContaining({ autoConnect: false }),
     );
   });
+});
+
+describe('SubscriptionPage — past-due banner grace period date (LS-7400)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  function mockPastDue(gracePeriodEndsAt: string | null | undefined) {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'past_due',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+          gracePeriodEndsAt,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('shows the formatted grace period expiry date in the banner', () => {
+    mockPastDue('2026-07-15T12:00:00.000Z');
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        'Your payment failed. Please update your payment method to keep your Premium access until July 15, 2026.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([null, undefined])(
+    'falls back to the date-less text when gracePeriodEndsAt is %s',
+    (value) => {
+      mockPastDue(value);
+
+      renderPage();
+
+      expect(
+        screen.getByText(
+          'Your payment failed. Please update your payment method to keep your Premium access.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/until/)).not.toBeInTheDocument();
+    },
+  );
 });
 
 // LS-8813: useStripePrices returns the hardcoded fallback prices ($4.99/mo,
