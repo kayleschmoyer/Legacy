@@ -6,6 +6,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { isPremiumFromTier } from '@legacy-sports/utils';
 import { Button, ScrollView, Separator, styled } from 'tamagui';
 import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
 import { CheckCircle2 } from '@tamagui/lucide-icons/icons/CheckCircle2';
@@ -260,7 +261,7 @@ export function getTierLabel(tier: string): string {
 export function deriveIsPremium(
   subscription: { tier?: string | null } | null | undefined,
 ): boolean {
-  return subscription?.tier === 'premium';
+  return isPremiumFromTier(subscription?.tier);
 }
 
 // LS-5204: after the Stripe checkout redirect the subscription tier only flips

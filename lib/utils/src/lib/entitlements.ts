@@ -78,6 +78,17 @@ export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
  */
 export type SubscriptionTier = 'free' | 'premium';
 
+/**
+ * Single cross-platform source of truth for tier-based premium derivation.
+ * Premium is decided by `tier`, never by Stripe `status`: during the grace
+ * period `status='past_due'` while `tier` stays `'premium'` (LS-5177). Web and
+ * mobile both call this so the comparison cannot drift between platforms
+ * (LS-7387).
+ */
+export function isPremiumFromTier(tier: string | null | undefined): boolean {
+  return tier === 'premium';
+}
+
 /** Human-readable labels for error messages when an entitlement is missing. */
 export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   salary_cap_leagues: 'Salary cap leagues',

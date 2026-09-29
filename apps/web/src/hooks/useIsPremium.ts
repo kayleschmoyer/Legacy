@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { type EntitlementKey } from '@legacy-sports/utils';
+import { type EntitlementKey, isPremiumFromTier } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   useGetUserByIdQuery,
@@ -123,10 +123,13 @@ export function useIsPremiumStatus(): {
   // claim could otherwise unlock premium UI for a free user (LGN-013). The
   // `GetUserById` response reads accessLevel from the DB and is already guarded
   // by `dataIsForCurrentUser`, mirroring the trusted pattern in AdminUsersPage.
+  // The admin shortcut is deliberately web-only: mobile `useSubscription`
+  // derives isPremium from tier alone and relies on the server granting admins
+  // the full entitlement catalog via `useEntitlements` (LS-7387).
   if (data?.user?.accessLevel === 'admin')
     return { isPremium: true, isLoading };
   return {
-    isPremium: data?.user?.subscriptionTier === 'premium',
+    isPremium: isPremiumFromTier(data?.user?.subscriptionTier),
     isLoading,
   };
 }

@@ -31,6 +31,9 @@ jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: jest.requireActual<
     typeof import('../../../../../lib/utils/src/lib/entitlements')
   >('../../../../../lib/utils/src/lib/entitlements').ENTITLEMENTS,
+  isPremiumFromTier: jest.requireActual<
+    typeof import('../../../../../lib/utils/src/lib/entitlements')
+  >('../../../../../lib/utils/src/lib/entitlements').isPremiumFromTier,
 }));
 
 const mockUseGetMySubscriptionQuery = jest.fn();
@@ -223,6 +226,21 @@ describe('useSubscription — isPremium', () => {
     const { result } = renderHook(() => useSubscription());
 
     expect(result.current.isPremium).toBe(false);
+  });
+
+  it('LS-7387: stays tier-only — no admin shortcut on mobile (admin parity is web-only by design)', () => {
+    // The web `useIsPremium` treats accessLevel==='admin' as premium; mobile
+    // deliberately does not (admins get the full entitlement catalog
+    // server-side via useEntitlements). A free-tier subscription record is
+    // therefore never promoted here, whatever the user's role.
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({ status: 'active', tier: 'free' }),
+    );
+
+    const { result } = renderHook(() => useSubscription());
+
+    expect(result.current.isPremium).toBe(false);
+    expect(result.current.tier).toBe('free');
   });
 
   it('exposes tier from the subscription', () => {

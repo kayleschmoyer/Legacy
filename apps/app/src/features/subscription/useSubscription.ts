@@ -4,6 +4,7 @@ import { WebSocketClient } from '@legacy-sports/websocket-client';
 import {
   ClientNotificationType,
   type EntitlementKey,
+  isPremiumFromTier,
 } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { config } from '@legacy-sports/app-config/native';
@@ -124,7 +125,12 @@ export function useSubscription() {
   const { data, loading, error, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
 
-  const isPremium = subscription?.tier === 'premium';
+  // Tier-only on purpose: the web `useIsPremium` additionally treats
+  // `accessLevel === 'admin'` as premium, but that shortcut is deliberately
+  // web-only. Mobile feature gating goes through `useEntitlements` /
+  // `useHasEntitlement`, where the server already grants admins the full
+  // catalog. See LS-7387 and apps/web/src/hooks/useIsPremium.ts.
+  const isPremium = isPremiumFromTier(subscription?.tier);
   const tier = subscription?.tier ?? 'free';
 
   useOnSubscriptionUpdated(() => {
