@@ -992,7 +992,7 @@ function NotificationPreferencesSection({
     [updatePrefs, optimistic, onSaved],
   );
 
-  const headerNode = (meta: React.ReactNode) => (
+  const headerNode = (meta: React.ReactNode, trailing?: React.ReactNode) => (
     <SectionHeader
       expanded={!isCollapsed}
       onPress={onToggleCollapse}
@@ -1007,24 +1007,22 @@ function NotificationPreferencesSection({
         <SectionTitle>Notifications</SectionTitle>
         {meta}
       </YStack>
+      {trailing}
       <CollapseChevron isCollapsed={isCollapsed} />
     </SectionHeader>
   );
 
   if (loading) {
+    // The spinner lives in the header so it stays visible when the section is collapsed.
     return (
       <SectionCard style={cardStyle}>
-        {headerNode(<SectionMeta>Loading…</SectionMeta>)}
-        <CollapsibleBody isCollapsed={isCollapsed}>
-          <SectionBody>
-            <XStack justifyContent="center" padding="$4">
-              <Spinner
-                size="small"
-                color={isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY}
-              />
-            </XStack>
-          </SectionBody>
-        </CollapsibleBody>
+        {headerNode(
+          <SectionMeta>Loading…</SectionMeta>,
+          <Spinner
+            size="small"
+            color={isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY}
+          />,
+        )}
       </SectionCard>
     );
   }
