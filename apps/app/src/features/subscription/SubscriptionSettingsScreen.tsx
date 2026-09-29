@@ -194,6 +194,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   // via an effect once the hook state settles (mirrors SubscriptionScreen).
   const restoreInitiated = useRef(false);
 
+  // `checkoutLoading` only flips after Apollo starts the mutation, so a second
+  // tap (or a double-tap on the iOS Alert's "Continue") can slip in before the
+  // Upgrade button is disabled. This ref is a synchronous re-entrancy lock.
+  const checkoutSubmittingRef = useRef(false);
+
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
 
   // `checkout` is set by the `+native-intent` rewrite of the Stripe return deep
@@ -325,6 +330,9 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
       return;
     }
 
+    if (checkoutSubmittingRef.current) return;
+    checkoutSubmittingRef.current = true;
+
     try {
       const result = await createCheckoutSession({
         variables: {
@@ -339,6 +347,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
       }
     } catch {
       Alert.alert('Error', 'Unable to start checkout. Please try again.');
+    } finally {
+      checkoutSubmittingRef.current = false;
     }
   };
 

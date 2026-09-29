@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Component under test ─────────────────────────────────────────────────────
@@ -309,6 +309,119 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
 
     expect(mockRequireStepUp).toHaveBeenCalledTimes(1);
     expect(mockCreateCheckout).not.toHaveBeenCalled();
+  });
+
+  describe('double-tap guard (LS-7405)', () => {
+    const originalOS = Platform.OS;
+
+    beforeEach(() => {
+      mockUseSubscription.mockReturnValue({
+        subscription: null,
+        isPremium: false,
+        tier: 'free',
+        loading: false,
+        refetch: mockRefetch,
+      });
+      // Fresh step-up: the gate runs the action synchronously.
+      mockRequireStepUp.mockImplementation((action: () => void) => action());
+    });
+
+    afterEach(() => {
+      Object.defineProperty(Platform, 'OS', { value: originalOS });
+    });
+
+    it('creates one checkout session when Upgrade is pressed twice before the mutation resolves', async () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      let resolveCheckout: (v: unknown) => void = () => undefined;
+      const mockCreateCheckout = jest.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveCheckout = resolve;
+          }),
+      );
+      // `loading` stays false: the render-lag window the ref guards against.
+      mockUseCheckoutSession.mockReturnValue([
+        mockCreateCheckout,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+
+      const upgrade = screen.getAllByText(/^Upgrade/).slice(-1)[0];
+      fireEvent.press(upgrade);
+      fireEvent.press(upgrade);
+
+      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveCheckout({ data: { createCheckoutSession: { url: null } } });
+        await Promise.resolve();
+      });
+    });
+
+    it('creates one checkout session when the iOS Continue button is pressed twice', async () => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios' });
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+      let resolveCheckout: (v: unknown) => void = () => undefined;
+      const mockCreateCheckout = jest.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveCheckout = resolve;
+          }),
+      );
+      mockUseCheckoutSession.mockReturnValue([
+        mockCreateCheckout,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      fireEvent.press(screen.getAllByText(/^Upgrade/).slice(-1)[0]);
+
+      const buttons = alertSpy.mock.calls[0][2] ?? [];
+      const proceed = buttons.find((b) => b.text === 'Continue');
+      proceed?.onPress?.();
+      proceed?.onPress?.();
+
+      expect(mockCreateCheckout).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveCheckout({ data: { createCheckoutSession: { url: null } } });
+        await Promise.resolve();
+      });
+      alertSpy.mockRestore();
+    });
+
+    it('releases the lock after a failure so the user can retry', async () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+      const mockCreateCheckout = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValue({ data: { createCheckoutSession: { url: null } } });
+      mockUseCheckoutSession.mockReturnValue([
+        mockCreateCheckout,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      const upgrade = screen.getAllByText(/^Upgrade/).slice(-1)[0];
+
+      await act(async () => {
+        fireEvent.press(upgrade);
+        await Promise.resolve();
+      });
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Error',
+        'Unable to start checkout. Please try again.',
+      );
+
+      await act(async () => {
+        fireEvent.press(upgrade);
+        await Promise.resolve();
+      });
+      expect(mockCreateCheckout).toHaveBeenCalledTimes(2);
+      alertSpy.mockRestore();
+    });
   });
 
   it('routes the Manage Subscription button through requireStepUp instead of opening the portal directly', () => {
