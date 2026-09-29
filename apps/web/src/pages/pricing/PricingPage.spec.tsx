@@ -266,6 +266,25 @@ describe('PricingPage — testimonial semantics (LS-7201)', () => {
   });
 });
 
+// LS-7187: on narrow viewports the gold "game" must not wrap onto a line by
+// itself, so it is joined to the preceding word with a non-breaking space.
+describe('PricingPage — hero heading wrapping (LS-7187)', () => {
+  it('joins "your" and the gold "game" with a non-breaking space', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    render(<PricingPage />);
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.textContent).toBe('The plan that fits your\u00a0game');
+  });
+});
+
 // LS-7167: the Monthly/Annual toggle must be keyboard operable.
 describe('PricingPage — billing toggle keyboard accessibility (LS-7167)', () => {
   beforeEach(() => {

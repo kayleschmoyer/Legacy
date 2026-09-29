@@ -581,7 +581,7 @@ export default function PricingPage() {
               fontWeight="800"
               $sm={{ fontSize: '$8' }}
             >
-              The plan that fits your{' '}
+              The plan that fits your{'\u00a0'}
               <Text color={BRAND_GOLD} fontWeight="800">
                 game
               </Text>
