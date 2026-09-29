@@ -33,6 +33,7 @@ import {
   useUpdateNotificationPreferencesMutation,
   useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
+import { getDefaultEnableAnimations } from './defaultEnableAnimations';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -67,15 +68,19 @@ interface UserPreferences {
   audioEnabled: boolean;
 }
 
-const DEFAULT_PREFS: UserPreferences = {
-  theme: 'system',
-  defaultSport: 'baseball',
-  statsFormat: 'standard',
-  showSeasonTotals: true,
-  enableAnimations: true,
-  // Audio is strictly opt-in — never on by default (LS-10111).
-  audioEnabled: false,
-};
+// Evaluated per call so the animations default tracks the OS reduced-motion
+// setting at load time (LS-7072) instead of being frozen at module import.
+function getDefaultPrefs(): UserPreferences {
+  return {
+    theme: 'system',
+    defaultSport: 'baseball',
+    statsFormat: 'standard',
+    showSeasonTotals: true,
+    enableAnimations: getDefaultEnableAnimations(),
+    // Audio is strictly opt-in — never on by default (LS-10111).
+    audioEnabled: false,
+  };
+}
 
 const CLOSE_GAME_MIN = 1;
 const CLOSE_GAME_MAX = 200;
@@ -84,13 +89,13 @@ const CLOSE_GAME_DEFAULT = 50;
 function loadPrefs(): UserPreferences {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
-    if (!raw) return DEFAULT_PREFS;
+    if (!raw) return getDefaultPrefs();
     return {
-      ...DEFAULT_PREFS,
+      ...getDefaultPrefs(),
       ...(JSON.parse(raw) as Partial<UserPreferences>),
     };
   } catch {
-    return DEFAULT_PREFS;
+    return getDefaultPrefs();
   }
 }
 
