@@ -700,3 +700,50 @@ describe('SubscriptionSettingsScreen — combined cancel/past-due banner (LS-739
     expect(screen.getByText('Renews on')).toBeTruthy();
   });
 });
+
+describe('SubscriptionSettingsScreen — trial end date (LS-7392)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  it('shows "Trial ends on <date>" when trialEndsAt is present', () => {
+    mockUseSubscription.mockReturnValue({
+      subscription: {
+        status: 'trialing',
+        tier: 'premium',
+        trialEndsAt: '2026-08-15T12:00:00.000Z',
+      },
+      isPremium: true,
+      tier: 'premium',
+      loading: false,
+      refetch: mockRefetch,
+    });
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Trial ends on')).toBeTruthy();
+    expect(screen.getByText('August 15, 2026')).toBeTruthy();
+  });
+
+  it('does not show the trial row when trialEndsAt is null', () => {
+    mockUseSubscription.mockReturnValue({
+      subscription: {
+        status: 'active',
+        tier: 'premium',
+        currentPeriodEnd: '2026-09-01T12:00:00.000Z',
+        cancelAtPeriodEnd: false,
+        trialEndsAt: null,
+      },
+      isPremium: true,
+      tier: 'premium',
+      loading: false,
+      refetch: mockRefetch,
+    });
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText('Trial ends on')).toBeNull();
+    expect(screen.getByText('Renews on')).toBeTruthy();
+  });
+});

@@ -508,6 +508,22 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 ) : null}
               </XStack>
 
+              {subscription?.trialEndsAt ? (
+                <XStack alignItems="center" gap="$4">
+                  <Paragraph
+                    size="$3"
+                    color="$colorPress"
+                    fontWeight="500"
+                    width={120}
+                  >
+                    Trial ends on
+                  </Paragraph>
+                  <Paragraph size="$4" color="$color" flex={1}>
+                    {formatDate(subscription.trialEndsAt)}
+                  </Paragraph>
+                </XStack>
+              ) : null}
+
               {subscription?.currentPeriodEnd ? (
                 <XStack alignItems="center" gap="$4">
                   <Paragraph

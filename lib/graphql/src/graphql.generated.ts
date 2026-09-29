@@ -9352,6 +9352,7 @@ export type SubscriptionInfoFragment = {
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean | null;
   gracePeriodEndsAt?: string | null;
+  trialEndsAt?: string | null;
 };
 
 export type GetMySubscriptionQueryVariables = Exact<{ [key: string]: never }>;
@@ -9365,6 +9366,7 @@ export type GetMySubscriptionQuery = {
     currentPeriodEnd?: string | null;
     cancelAtPeriodEnd?: boolean | null;
     gracePeriodEndsAt?: string | null;
+    trialEndsAt?: string | null;
   } | null;
 };
 
@@ -16745,6 +16747,7 @@ export const SubscriptionInfoFragmentDoc = gql`
     currentPeriodEnd
     cancelAtPeriodEnd
     gracePeriodEndsAt
+    trialEndsAt
   }
 `;
 export const TeamFragmentDoc = gql`

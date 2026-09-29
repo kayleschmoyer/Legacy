@@ -119,6 +119,7 @@ function makeQueryResult(
     currentPeriodEnd?: string | null;
     cancelAtPeriodEnd?: boolean | null;
     gracePeriodEndsAt?: string | null;
+    trialEndsAt?: string | null;
   } | null,
   opts: { loading?: boolean; error?: unknown; refetch?: jest.Mock } = {},
 ) {
@@ -232,6 +233,22 @@ describe('useSubscription — isPremium', () => {
     const { result } = renderHook(() => useSubscription());
 
     expect(result.current.tier).toBe('premium');
+  });
+
+  it('passes trialEndsAt through from the query result (LS-7392)', () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({
+        status: 'trialing',
+        tier: 'premium',
+        trialEndsAt: '2026-08-01T00:00:00.000Z',
+      }),
+    );
+
+    const { result } = renderHook(() => useSubscription());
+
+    expect(result.current.subscription?.trialEndsAt).toBe(
+      '2026-08-01T00:00:00.000Z',
+    );
   });
 
   it('defaults tier to free when subscription is null', () => {

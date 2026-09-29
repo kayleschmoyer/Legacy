@@ -23,6 +23,7 @@ export interface SubscriptionData {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean | null;
   gracePeriodEndsAt: string | null;
+  trialEndsAt: string | null;
 }
 
 /**
