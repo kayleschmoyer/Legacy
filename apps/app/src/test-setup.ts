@@ -38,3 +38,13 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
+
+// expo-audio ships ESM and needs the native audio module, neither of which
+// exists under jest. The shared TouchdownHorn (LS-10195) imports it, and every
+// spec that renders the matchup scoreboard pulls that in transitively.
+jest.mock('expo-audio', () => ({
+  useAudioPlayer: () => ({
+    play: jest.fn(),
+    seekTo: jest.fn(() => Promise.resolve()),
+  }),
+}));

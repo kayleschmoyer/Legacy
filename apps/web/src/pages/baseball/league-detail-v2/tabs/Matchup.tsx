@@ -4,6 +4,7 @@ import {
   MatchupScoreboardHero,
   type MatchupScoreboardHeroTeam,
 } from '@legacy-sports/shared-components/matchup';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import { formatRecord } from '@legacy-sports/shared-components/utils';
 import {
   type LeagueFragment,
@@ -12,6 +13,7 @@ import {
   Sport,
   useGetLeagueStandingsQuery,
   useGetMatchupPlayersQuery,
+  useGetUserPreferencesQuery,
 } from '@legacy-sports/graphql';
 import {
   useCurrentWeek,
@@ -69,6 +71,14 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   // Gates the premium "+N points" score flourish on the scoreboard hero
   // (LS-6392); the count-up animation itself is ungated.
   const isPremium = useIsPremium();
+  // The touchdown horn plays only for users who explicitly opted in (LS-10195);
+  // a free preference gate, not a tier gate.
+  const { isAuthenticated } = useAuth();
+  const { data: preferencesData } = useGetUserPreferencesQuery({
+    skip: !isAuthenticated,
+  });
+  const audioEnabled =
+    preferencesData?.getUserPreferences?.audioEnabled === true;
   const { currentWeek } = useCurrentWeek(league.id ?? null);
   const [week, setWeek] = useState<number>(
     league.currentWeekNumber ?? currentWeek ?? 1,
@@ -519,6 +529,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         totalGames={totalGames}
         onTeamPress={onTeam}
         isPremium={isPremium}
+        audioEnabled={audioEnabled}
       />
 
       {!isFootball && totalGames > 0 ? (

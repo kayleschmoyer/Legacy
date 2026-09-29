@@ -102,6 +102,10 @@ module.exports = {
     // equivalent) with no branches to test; its generic spec drives the web
     // `window.SpeechRecognition` implementation exclusively (LS-9180).
     '/src/hooks/useVoiceCommands\\.spec\\.ts$',
+    // LS-10195: TouchdownHorn has a `.native.tsx` fork (expo-audio); this
+    // generic spec drives the web HTMLAudioElement implementation, and its
+    // `TouchdownHorn.native.spec.tsx` sibling covers the native one.
+    '/src/components/TouchdownHorn\\.spec\\.tsx$',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],

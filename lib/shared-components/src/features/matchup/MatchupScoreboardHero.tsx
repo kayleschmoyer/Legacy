@@ -31,6 +31,7 @@ import { tamaguiStyled } from '../../utils/tamaguiStyled';
 import { useAnimatedNumber } from '../../hooks/useAnimatedNumber';
 import { ScoreDeltaBadge } from '../../components/ScoreDeltaBadge';
 import { ConfettiBurst } from '../../components/ConfettiBurst';
+import { TouchdownHorn } from '../../components/TouchdownHorn';
 
 /**
  * Fantasy points for a touchdown — the floor for "a touchdown-sized scoring
@@ -236,6 +237,13 @@ export interface MatchupScoreboardHeroProps {
   /** `Matchup.scoringChangeLog` — shown on interaction with the indicator. */
   scoringChangeLog?: readonly StaleScoringChangeLogEntry[] | null;
   /**
+   * The user's explicit `audioEnabled` preference (LS-10195). The touchdown
+   * horn plays only when this is `true` — a preference gate, not a tier gate
+   * (the cue is free; see `docs/product/subscription-tiers.md`). Defaults to
+   * `false`, so callers that do not pass it stay silent.
+   */
+  audioEnabled?: boolean;
+  /**
    * Retained for API compatibility with the LS-6392 call sites; no longer
    * gates anything on this scoreboard.
    *
@@ -401,6 +409,7 @@ export function MatchupScoreboardHero({
   onTeamPress,
   scoringIsStale,
   scoringChangeLog,
+  audioEnabled = false,
 }: MatchupScoreboardHeroProps) {
   const isBye = status === 'bye';
   // One burst for the whole card, whichever side scored (LS-10111). The seed
@@ -565,6 +574,10 @@ export function MatchupScoreboardHero({
           testID="touchdown-confetti"
         />
       )}
+      {/* Same touchdown event as the confetti (LS-10195); silent unless the
+          user opted in via `audioEnabled`. Always mounted so it outlives the
+          confetti's own timeout. */}
+      <TouchdownHorn seed={touchdownSeed} enabled={audioEnabled} />
     </HeroCard>
   );
 }

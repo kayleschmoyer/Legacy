@@ -28,6 +28,16 @@ jest.mock('../../components/Popover', () => ({
   ),
 }));
 
+// The horn's own playback rules are covered in TouchdownHorn(.native).spec.tsx;
+// here we only assert what the hero feeds it, so this spec is platform-agnostic.
+const mockTouchdownHorn = jest.fn<void, [{ seed: number; enabled: boolean }]>();
+jest.mock('../../components/TouchdownHorn', () => ({
+  TouchdownHorn: (props: { seed: number; enabled: boolean }) => {
+    mockTouchdownHorn(props);
+    return null;
+  },
+}));
+
 const baseProps = (
   overrides: Partial<MatchupScoreboardHeroProps> = {},
 ): MatchupScoreboardHeroProps => ({
@@ -474,6 +484,58 @@ describe('MatchupScoreboardHero', () => {
     it('does not celebrate on first render', () => {
       render(<MatchupScoreboardHero {...baseProps()} />);
       expect(screen.queryByTestId('touchdown-confetti')).toBeNull();
+    });
+  });
+
+  describe('touchdown horn (LS-10195)', () => {
+    beforeEach(() => mockTouchdownHorn.mockClear());
+
+    const lastHornProps = () => {
+      const { calls } = mockTouchdownHorn.mock;
+      return calls[calls.length - 1]?.[0];
+    };
+
+    const withTeam1Score = (score: number, audioEnabled?: boolean) =>
+      baseProps({
+        audioEnabled,
+        team1: { id: 10, name: 'Team A', score, projectedScore: 120.5 },
+      });
+
+    it('bumps the horn seed on a touchdown-sized increase and passes the opt-in', () => {
+      const { rerender } = render(
+        <MatchupScoreboardHero {...withTeam1Score(87.5, true)} />,
+      );
+      expect(lastHornProps()).toEqual({ seed: 0, enabled: true });
+
+      rerender(<MatchupScoreboardHero {...withTeam1Score(94.5, true)} />);
+
+      expect(lastHornProps()).toEqual({ seed: 1, enabled: true });
+    });
+
+    it('is disabled by default, even on a touchdown', () => {
+      const { rerender } = render(
+        <MatchupScoreboardHero {...withTeam1Score(87.5)} />,
+      );
+
+      rerender(<MatchupScoreboardHero {...withTeam1Score(94.5)} />);
+
+      expect(screen.getByTestId('touchdown-confetti')).toBeTruthy();
+      expect(lastHornProps()).toEqual({ seed: 1, enabled: false });
+    });
+
+    it('is disabled when audio is explicitly disabled', () => {
+      render(<MatchupScoreboardHero {...withTeam1Score(87.5, false)} />);
+      expect(lastHornProps()?.enabled).toBe(false);
+    });
+
+    it('does not bump the seed for a routine sub-touchdown gain', () => {
+      const { rerender } = render(
+        <MatchupScoreboardHero {...withTeam1Score(87.5, true)} />,
+      );
+
+      rerender(<MatchupScoreboardHero {...withTeam1Score(89.8, true)} />);
+
+      expect(lastHornProps()?.seed).toBe(0);
     });
   });
 });

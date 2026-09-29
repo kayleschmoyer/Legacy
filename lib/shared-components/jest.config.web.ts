@@ -70,6 +70,9 @@ module.exports = {
     // Belongs to shared-components:mobile only, which has a full
     // `react-native` mock in jest-setup-mobile.js.
     '/src/components/icons/BrandIcon.native.spec.tsx',
+    // Mobile-only (LS-10195) — covers TouchdownHorn.native.tsx (expo-audio);
+    // this web project resolves the HTMLAudioElement implementation instead.
+    '/src/components/TouchdownHorn.native.spec.tsx',
     // Mobile-only regression test (LS-9746) — covers
     // AnimatedLaunchScreen.native.tsx (react-native-svg stroke-draw
     // choreography, `Animated.Image`). This web project's

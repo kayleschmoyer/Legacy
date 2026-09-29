@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { Spinner, YStack } from 'tamagui';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
@@ -10,7 +10,9 @@ import {
   type AppMatchupPlayerFragment,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
+  useGetUserPreferencesQuery,
 } from '@legacy-sports/graphql';
+import { AUTHORIZED_CONTEXT } from '../../../common/auth/AuthorizedUserContext';
 import { useSubscription } from '../../subscription/useSubscription';
 import { useLeagueScoringSettings } from '../../../common/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQLToScoringFormat';
@@ -95,6 +97,14 @@ export function MatchupScoreboard({
   // Gates the premium "+N points" score flourish (LS-6392). Resolved here in
   // the data wrapper so the shared hero stays presentational.
   const { isPremium } = useSubscription();
+  // The touchdown horn plays only for users who explicitly opted in (LS-10195);
+  // a free preference gate, not a tier gate.
+  const currentUser = useContext(AUTHORIZED_CONTEXT);
+  const { data: preferencesData } = useGetUserPreferencesQuery({
+    skip: currentUser == null,
+  });
+  const audioEnabled =
+    preferencesData?.getUserPreferences?.audioEnabled === true;
   const matchupIdNum = matchup?.id ? parseInt(matchup.id, 10) : 0;
 
   const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
@@ -175,6 +185,7 @@ export function MatchupScoreboard({
       ) : null}
       <MatchupScoreboardHero
         isPremium={isPremium}
+        audioEnabled={audioEnabled}
         weekNumber={matchup?.weekNumber}
         totalMatchups={totalMatchups}
         status={matchup?.status}

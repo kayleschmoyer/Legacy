@@ -105,6 +105,18 @@ jest.mock('@legacy-sports/graphql', () => ({
   })),
   useGetLeagueStandingsQuery: (...args: unknown[]) =>
     mockUseGetLeagueStandingsQuery(...args),
+  useGetUserPreferencesQuery: (...args: unknown[]) =>
+    mockUseGetUserPreferencesQuery(...args),
+}));
+
+// --- touchdown-horn opt-in (LS-10195) ---------------------------------------
+const mockUseGetUserPreferencesQuery = jest.fn<
+  { data?: { getUserPreferences?: { audioEnabled?: boolean } | null } },
+  [{ skip?: boolean }?]
+>(() => ({ data: undefined }));
+const mockUseAuth = jest.fn(() => ({ isAuthenticated: true }));
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => mockUseAuth(),
 }));
 
 // --- heavy sub-components --------------------------------------------------
@@ -226,6 +238,46 @@ beforeEach(() => {
     connected: true,
   });
   mockMatchupGrid.mockClear();
+  mockMatchupScoreboardHero.mockClear();
+  mockUseGetUserPreferencesQuery.mockReset();
+  mockUseGetUserPreferencesQuery.mockReturnValue({ data: undefined });
+  mockUseAuth.mockReturnValue({ isAuthenticated: true });
+});
+
+describe('MatchupTab — touchdown horn opt-in (LS-10195)', () => {
+  const lastHeroProps = () =>
+    mockMatchupScoreboardHero.mock.calls.at(-1)?.[0] as {
+      audioEnabled?: boolean;
+    };
+
+  it('passes audioEnabled=true when the user opted in', () => {
+    mockUseGetUserPreferencesQuery.mockReturnValue({
+      data: { getUserPreferences: { audioEnabled: true } },
+    });
+    renderTab();
+    expect(lastHeroProps().audioEnabled).toBe(true);
+  });
+
+  it('passes audioEnabled=false while preferences are loading or unset', () => {
+    renderTab();
+    expect(lastHeroProps().audioEnabled).toBe(false);
+  });
+
+  it('passes audioEnabled=false when the user has not opted in', () => {
+    mockUseGetUserPreferencesQuery.mockReturnValue({
+      data: { getUserPreferences: { audioEnabled: false } },
+    });
+    renderTab();
+    expect(lastHeroProps().audioEnabled).toBe(false);
+  });
+
+  it('skips the preferences query for a signed-out viewer', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: false });
+    renderTab();
+    expect(mockUseGetUserPreferencesQuery).toHaveBeenCalledWith({
+      skip: true,
+    });
+  });
 });
 
 describe('MatchupTab — football-awareness', () => {

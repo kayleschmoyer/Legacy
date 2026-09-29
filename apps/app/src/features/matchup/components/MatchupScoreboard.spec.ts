@@ -8,6 +8,14 @@ jest.mock('../../subscription/useSubscription', () => ({
   useSubscription: () => ({ isPremium: false }),
 }));
 
+// The touchdown-horn opt-in (LS-10195) reads the signed-in user from
+// AUTHORIZED_CONTEXT, whose module pulls in expo-router and the auth hooks —
+// the same Expo native runtime this pure-logic spec cannot load. The component
+// is never rendered here, so the context value is never read.
+jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
+  AUTHORIZED_CONTEXT: null,
+}));
+
 describe('formatTeamRecord', () => {
   const standings: readonly TeamStandingRecord[] = [
     { teamId: 10, wins: 5, losses: 2, ties: 0 },
