@@ -13,6 +13,7 @@ import { brand } from '@legacy-sports/design-tokens';
 import { useAuthHandlers } from '../../../common/auth/AuthHooks';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../../../features/notifications/getEasProjectId';
+import { trackSignOut } from '../../../utils/analytics';
 
 interface MenuRowProps {
   icon: string;
@@ -94,6 +95,7 @@ export default function YouTab(): React.JSX.Element {
 
   const handleLogout = () => {
     setLoggingOut(true);
+    trackSignOut('you_tab');
     void (async () => {
       // Best-effort: deactivate the Expo push token before clearing
       // credentials so a logged-out device stops receiving notifications.

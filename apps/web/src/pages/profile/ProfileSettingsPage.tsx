@@ -26,6 +26,7 @@ import {
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
+import { trackSignOut } from '../../utils/analytics';
 
 /** Preset avatars are stored as relative paths; the API requires absolute HTTPS URLs. */
 const resolvePresetUrl = (url: string): string =>
@@ -230,6 +231,10 @@ function getAccessBadgeColor(level: string): string {
 const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
+  const handleSignOut = () => {
+    trackSignOut('profile_settings');
+    signOut(auth);
+  };
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const authService = useMemo(
@@ -1068,9 +1073,7 @@ const ProfileSettingsPage: React.FC = () => {
                 <SignOutButton
                   role="button"
                   tabIndex={0}
-                  onPress={() => {
-                    signOut(auth);
-                  }}
+                  onPress={handleSignOut}
                   onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
                     if (e.repeat) {
                       return;
@@ -1079,7 +1082,7 @@ const ProfileSettingsPage: React.FC = () => {
                       if (e.key === ' ') {
                         e.preventDefault();
                       }
-                      signOut(auth);
+                      handleSignOut();
                     }
                   }}
                 >

@@ -98,6 +98,10 @@ export function trackLogin(method: string): void {
   void trackEvent('login', { method });
 }
 
+export function trackSignOut(source: string): void {
+  void trackEvent('sign_out', { source, category: 'auth' });
+}
+
 export function trackSignup(method: string): void {
   void trackEvent('sign_up', { method });
 }

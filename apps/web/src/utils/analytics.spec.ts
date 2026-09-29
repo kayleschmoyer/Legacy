@@ -8,7 +8,12 @@
  *     throwing, when window.gtag is unavailable or the GA measurement ID is
  *     unset.
  */
-import { trackEvent, trackMatchupViewed, trackTeamViewed } from './analytics';
+import {
+  trackEvent,
+  trackMatchupViewed,
+  trackSignOut,
+  trackTeamViewed,
+} from './analytics';
 import { getEnvironmentConfig } from '../config/environment';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -139,5 +144,27 @@ describe('trackTeamViewed de-dupe (LS-6050)', () => {
     expect(window.gtag).toHaveBeenCalledTimes(1);
 
     getItemSpy.mockRestore();
+  });
+});
+
+describe('trackSignOut (LS-7224)', () => {
+  afterEach(() => {
+    delete (window as { gtag?: unknown }).gtag;
+  });
+
+  it('emits a sign_out event with its source and no PII', () => {
+    mockGetEnvironmentConfig.mockReturnValue({
+      googleAnalyticsMeasurementId: 'G-TEST123',
+    } as ReturnType<typeof getEnvironmentConfig>);
+    const gtag = jest.fn();
+    window.gtag = gtag;
+
+    trackSignOut('profile_settings');
+
+    expect(gtag).toHaveBeenCalledWith(
+      'event',
+      'sign_out',
+      expect.objectContaining({ source: 'profile_settings', category: 'auth' }),
+    );
   });
 });

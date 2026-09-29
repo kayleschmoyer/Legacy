@@ -128,6 +128,17 @@ export function trackSignup(method: string): void {
 }
 
 /**
+ * Track a user-initiated sign-out (LS-7224). Sign-out spikes are a churn /
+ * bad-deploy signal. GA4 event names only allow letters, digits and
+ * underscores, so this is `sign_out` rather than a dotted `profile.sign_out`;
+ * GA stamps the event time itself.
+ * @param source - Where the user signed out from (e.g., 'profile_settings')
+ */
+export function trackSignOut(source: string): void {
+  trackEvent('sign_out', { source, category: 'auth' });
+}
+
+/**
  * Track player selection
  * @param playerId - The selected player ID
  * @param position - Player position

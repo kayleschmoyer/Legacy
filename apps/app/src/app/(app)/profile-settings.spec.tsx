@@ -29,6 +29,10 @@ const mockUser = {
   accessLevel: 'user',
 };
 
+jest.mock('../../utils/analytics', () => ({
+  trackSignOut: jest.fn(),
+}));
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { error: jest.fn() },
 }));

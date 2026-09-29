@@ -45,6 +45,10 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+jest.mock('../../../utils/analytics', () => ({
+  trackSignOut: jest.fn(),
+}));
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),

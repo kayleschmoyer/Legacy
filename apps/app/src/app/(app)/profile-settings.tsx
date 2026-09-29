@@ -29,6 +29,7 @@ import {
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription';
+import { trackSignOut } from '../../utils/analytics';
 import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
@@ -78,6 +79,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
 
   const handleLogout = async () => {
     setLoggingOut(true);
+    trackSignOut('profile_settings');
     try {
       await logout();
     } finally {

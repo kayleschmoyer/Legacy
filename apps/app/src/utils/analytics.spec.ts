@@ -6,7 +6,12 @@ import {
   setUserProperty,
 } from '@react-native-firebase/analytics';
 
-import { setUserId, setUserProperties, trackLogin } from './analytics';
+import {
+  setUserId,
+  setUserProperties,
+  trackLogin,
+  trackSignOut,
+} from './analytics';
 
 // Mock the RN Firebase modular modules. Factories use inline jest.fn() (no
 // references to outer-scope variables) so they are hoist-safe; return values
@@ -80,6 +85,17 @@ describe('mobile analytics — v22 modular API', () => {
       mockAnalyticsInstance,
       'login',
       expect.objectContaining({ method: 'google' }),
+    );
+  });
+
+  it('logs sign_out with its source', async () => {
+    trackSignOut('you_tab');
+    await Promise.resolve();
+
+    expect(logEvent).toHaveBeenCalledWith(
+      mockAnalyticsInstance,
+      'sign_out',
+      expect.objectContaining({ source: 'you_tab', category: 'auth' }),
     );
   });
 });
