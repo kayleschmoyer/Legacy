@@ -17,7 +17,7 @@ This produces a structured JSON report with:
 
 The tool is Node-native (LS-8316) — it needs no Python interpreter and works in every environment (local Windows, cloud Linux, hosted server). If the hosted `legacy-sports-ci` MCP server is _unavailable_, fix that connection (see [diagnostics.md](diagnostics.md)). If it is connected but **cannot read your transcript** — the CCR case, where it runs in a different container/namespace — use the local CLI: [run the audit locally](#when-the-server-cannot-see-the-transcript-ccr-run-the-audit-locally) (LS-8890).
 
-**`legacy-sports-ci-local` (the stdio server that hosts `ci_audit_session_bash` locally) reporting `CONNECTION_CLOSED`/never connecting for the whole session is a third, common case, not a variant of "server unavailable, go fix it" above** — go straight to the same local-CLI fallback, do not retry `ToolSearch` for the tool or wait for the server to come back. This is a recurring pattern (20+ sessions, [LS-10099](https://bkrupa.atlassian.net/browse/LS-10099); root-caused per-server in [LS-10125](https://bkrupa.atlassian.net/browse/LS-10125) — see [diagnostics.md](diagnostics.md#legacy-sports-ci-local-and-stripe-connection_closed-as-a-two-server-only-cohort-distinct-repo-side-per-entry-causes-ls-10125)) confirmed **not** to block the audit at all: `make audit-session ARGS="--auditMode"` runs the identical `auditSessionBash` implementation in your own process and needs no MCP server connection whatsoever — it produces the full pre-classified report every time, server up or down. The accurate framing for this case is "blocked via MCP, reachable via `make audit-session`," not "gap audit blocked."
+**`legacy-sports-ci-local` (the stdio server that hosts `ci_audit_session_bash` locally) reporting `CONNECTION_CLOSED`/never connecting for the whole session is a third, common case, not a variant of "server unavailable, go fix it" above** — go straight to the same local-CLI fallback, do not retry `ToolSearch` for the tool or wait for the server to come back. This is a recurring pattern (20+ sessions, [LS-10099](https://bkrupa.atlassian.net/browse/LS-10099); root-caused per-server in [LS-10125](https://bkrupa.atlassian.net/browse/LS-10125) — see [diagnostics.md](diagnostics.md#legacy-sports-ci-local-and-stripe-connection_closed-as-a-two-server-only-cohort-distinct-repo-side-per-entry-causes-ls-10125)) confirmed **not** to block the audit at all: `make audit-session ARGS="--auditMode"` (via `make_run`: `variables: "ARGS=--auditMode"`, no inner quotes) runs the identical `auditSessionBash` implementation in your own process and needs no MCP server connection whatsoever — it produces the full pre-classified report every time, server up or down. The accurate framing for this case is "blocked via MCP, reachable via `make audit-session`," not "gap audit blocked."
 
 > **Pass `sessionToolNames` so `gh pr *`/`gh run *` etc. are classified accurately (LS-9749).** The tool's coverage table pre-classifies these Bash commands as `covered` by `github-mcp`/`ci-mcp` on prefix match alone — it has no visibility into whether that server's tools were actually present in your session. If `legacy-sports-github` was absent for this session (see the [absent-hosted-connector cases](auth-and-routing.md#jira-github-hosted-servers-absent-in-ccr-ls-9576)), every `gh pr *` fallback command gets silently filed under `informational.covered_commands` instead of surfacing as the real gap it is. Pass your session's current tool-name list (the deferred-tools listing, or a `ToolSearch` result) as `sessionToolNames` and any command whose "covering" server isn't actually in that list is reclassified as a real gap (`expected_mcp_tool` + a note explaining why), not silently dropped: `ci_audit_session_bash({ auditMode: true, sessionToolNames: [...] })`.
 
@@ -151,6 +151,8 @@ namespace, where the transcript is readable.
 make audit-session ARGS="--auditMode"
 ```
 
+Via MCP instead of Bash, use `make_run({ target: "audit-session", variables: "ARGS=--auditMode" })` — no inner quotes: the quotes above exist only for the shell, and `make_run`'s `VARIABLE_PATTERN` (`run-target-utils.ts`) rejects `"` with `Invalid variable format` (LS-10248).
+
 It prints the identical report `ci_audit_session_bash({ auditMode: true })`
 would have — same pre-classification, same draft summaries, same subagent
 coverage — so continue from [Step 2](#2-review-the-report) unchanged. Pass any
@@ -218,7 +220,7 @@ When neither `projectsDir` nor `transcriptContent` gets you a working audit
 (e.g. the CCR cross-container case where the server can't read _any_
 directory you point it at, LS-9458/LS-9538):
 
-1. Run `make audit-session ARGS="--auditMode"` (above) — this is the supported
+1. Run `make audit-session ARGS="--auditMode"` (above; via `make_run` pass `variables: "ARGS=--auditMode"` with no inner quotes) — this is the supported
    recovery for that exact case, and it does not involve the server at all.
    Only if it too fails, continue:
 2. Confirm the transcript exists from the agent's own Bash tool (`ls -la

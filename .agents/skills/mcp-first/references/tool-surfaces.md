@@ -141,6 +141,8 @@ implementation locally instead of shipping the file to the server:
 make audit-session ARGS="--auditMode"
 ```
 
+Via `make_run`: `make_run({ target: "audit-session", variables: "ARGS=--auditMode" })` — no inner quotes; `VARIABLE_PATTERN` in `run-target-utils.ts` rejects `"` (LS-10248).
+
 This is the identical `auditSessionBash` code executed in the agent's own
 namespace, so the report matches the MCP tool's exactly. Prefer it over the
 `transcriptContent` upload param, which also works but costs the whole
