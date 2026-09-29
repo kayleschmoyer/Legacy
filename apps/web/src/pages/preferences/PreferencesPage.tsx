@@ -14,6 +14,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { LOGGER } from '@legacy-sports/logging';
 import { Bell } from '@tamagui/lucide-icons/icons/Bell';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
@@ -115,7 +116,7 @@ const DEFAULT_COLLAPSED: Record<SectionId, boolean> = {
   notifications: false,
 };
 
-function loadCollapsedSections(): Record<SectionId, boolean> {
+export function loadCollapsedSections(): Record<SectionId, boolean> {
   try {
     const raw = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
     if (!raw) return { ...DEFAULT_COLLAPSED };
@@ -123,7 +124,13 @@ function loadCollapsedSections(): Record<SectionId, boolean> {
       ...DEFAULT_COLLAPSED,
       ...(JSON.parse(raw) as Partial<Record<SectionId, boolean>>),
     };
-  } catch {
+  } catch (err) {
+    // Corrupt JSON (or unreadable storage) silently reset every section to
+    // expanded; surface it so the corruption is diagnosable (LS-7097).
+    LOGGER.warn(
+      '[Preferences] Failed to load collapsed sections; using defaults:',
+      err as object,
+    );
     return { ...DEFAULT_COLLAPSED };
   }
 }
