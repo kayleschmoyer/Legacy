@@ -87,6 +87,7 @@ import {
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { AvatarPicker } from '@legacy-sports/shared-components/ui';
 import {
   handleRosterMutationError,
   MATCHUP_LOCK_POLL_INTERVAL_MS,
@@ -124,7 +125,7 @@ import {
   mapSeasonPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner';
-import { AvatarImage, AvatarPicker } from '../../components/common';
+import { AvatarImage } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
@@ -3158,6 +3159,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   ?.logoUrl ?? null
               }
               username={leagueTeams.find((t) => t.id === userTeamId)?.name}
+              resolveUrl={(url) => `${window.location.origin}${url}`}
               onSelect={(url) => {
                 if (!userTeamId) return;
                 setLogoSuccess(false);

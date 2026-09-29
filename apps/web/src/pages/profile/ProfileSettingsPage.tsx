@@ -13,6 +13,7 @@ import {
   useMfa,
 } from '@legacy-sports/shared-components/auth';
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
+import { AvatarPicker } from '@legacy-sports/shared-components/ui';
 import { Input, ScrollView, Spinner, styled } from 'tamagui';
 import {
   useGetUserByIdQuery,
@@ -23,7 +24,10 @@ import {
 } from '@legacy-sports/graphql';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
-import { AvatarPicker } from '../../components/common';
+
+/** Preset avatars are stored as relative paths; the API requires absolute HTTPS URLs. */
+const resolvePresetUrl = (url: string): string =>
+  `${window.location.origin}${url}`;
 
 /* ─── Styled Components ─── */
 
@@ -649,6 +653,7 @@ const ProfileSettingsPage: React.FC = () => {
                 username={userName}
                 onSelect={handleAvatarSelect}
                 loading={avatarLoading}
+                resolveUrl={resolvePresetUrl}
               />
             </SectionBody>
           </SectionCard>
