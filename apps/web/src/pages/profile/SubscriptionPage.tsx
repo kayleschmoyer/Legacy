@@ -48,9 +48,23 @@ import {
   trackSubscriptionStarted,
 } from '../../utils/analytics';
 
-const PREMIUM_FEATURES: { label: string; free: boolean; premium: boolean }[] = [
-  { label: 'Join up to 3 leagues', free: true, premium: true },
-  { label: 'Unlimited active leagues', free: false, premium: true },
+type FeatureValue = boolean | string;
+
+interface PremiumFeature {
+  label: string;
+  free: FeatureValue;
+  premium: FeatureValue;
+  /** Label for the cancel dialog's "you'll lose access to" list, when the comparison label doesn't read as a loss. */
+  lossLabel?: string;
+}
+
+const PREMIUM_FEATURES: PremiumFeature[] = [
+  {
+    label: 'Active leagues',
+    free: 'Up to 3',
+    premium: 'Unlimited',
+    lossLabel: 'Unlimited active leagues',
+  },
   { label: 'Salary cap leagues', free: false, premium: true },
   {
     label: 'Advanced playoff formats (6-team, 8-team)',
@@ -399,6 +413,29 @@ function PricingToggle({
   );
 }
 
+function FeatureValueCell({
+  value,
+  checkColor,
+}: {
+  value: FeatureValue;
+  checkColor: string;
+}) {
+  if (typeof value === 'string') {
+    return (
+      <Paragraph size="$3" color="$color" textAlign="center">
+        {value}
+      </Paragraph>
+    );
+  }
+  return value ? (
+    <CheckCircle2 size={18} color={checkColor} />
+  ) : (
+    <Paragraph size="$4" color="$glassBorder">
+      —
+    </Paragraph>
+  );
+}
+
 function FeatureComparisonTable() {
   return (
     <YStack>
@@ -447,22 +484,10 @@ function FeatureComparisonTable() {
             {feature.label}
           </Paragraph>
           <YStack width={70} alignItems="center">
-            {feature.free ? (
-              <CheckCircle2 size={18} color={EMERALD} />
-            ) : (
-              <Paragraph size="$4" color="$glassBorder">
-                —
-              </Paragraph>
-            )}
+            <FeatureValueCell value={feature.free} checkColor={EMERALD} />
           </YStack>
           <YStack width={80} alignItems="center">
-            {feature.premium ? (
-              <CheckCircle2 size={18} color={BRAND_GOLD} />
-            ) : (
-              <Paragraph size="$4" color="$glassBorder">
-                —
-              </Paragraph>
-            )}
+            <FeatureValueCell value={feature.premium} checkColor={BRAND_GOLD} />
           </YStack>
         </FeatureRow>
       ))}
@@ -522,14 +547,16 @@ function CancelConfirmDialog({
               If you cancel, you&apos;ll lose access to:
             </Paragraph>
             <YStack gap="$2">
-              {PREMIUM_FEATURES.filter((f) => !f.free).map((feature) => (
-                <XStack key={feature.label} alignItems="center" gap="$2">
-                  <AlertTriangle size={14} color={AMBER} />
-                  <Paragraph size="$3" color="$color">
-                    {feature.label}
-                  </Paragraph>
-                </XStack>
-              ))}
+              {PREMIUM_FEATURES.filter((f) => f.free !== true).map(
+                (feature) => (
+                  <XStack key={feature.label} alignItems="center" gap="$2">
+                    <AlertTriangle size={14} color={AMBER} />
+                    <Paragraph size="$3" color="$color">
+                      {feature.lossLabel ?? feature.label}
+                    </Paragraph>
+                  </XStack>
+                ),
+              )}
             </YStack>
             <Paragraph size="$3" color="$colorPress">
               You can resubscribe at any time to restore access.

@@ -11,7 +11,7 @@
  * `SubscriptionPage.spec` basename collides in TypeScript module resolution.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SubscriptionPage from './SubscriptionPage';
 
@@ -465,5 +465,59 @@ describe('SubscriptionPage — price loading state (LS-8813)', () => {
 
     expect(screen.getByText('$39.99')).toBeInTheDocument();
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+describe('SubscriptionPage — league-cap comparison row (LS-7394)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  it('renders one "Active leagues" row with text values instead of two boolean league rows', () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch: jest.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Active leagues')).toBeInTheDocument();
+    expect(screen.getByText('Up to 3')).toBeInTheDocument();
+    expect(screen.getByText('Unlimited')).toBeInTheDocument();
+    expect(screen.queryByText('Join up to 3 leagues')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Unlimited active leagues'),
+    ).not.toBeInTheDocument();
+    // Unchanged boolean rows still render.
+    expect(screen.getByText('Salary cap leagues')).toBeInTheDocument();
+    expect(screen.getByText('FAAB waivers')).toBeInTheDocument();
+  });
+
+  it('keeps the league row in the cancel dialog "lose access" list, worded as a loss', () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'active',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+
+    renderPage();
+    fireEvent.click(screen.getByText('Cancel Subscription'));
+
+    expect(screen.getByText('Unlimited active leagues')).toBeInTheDocument();
+    expect(screen.getByText('Salary cap leagues')).toBeInTheDocument();
   });
 });
