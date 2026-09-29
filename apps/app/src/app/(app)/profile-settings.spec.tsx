@@ -1,5 +1,7 @@
 import React from 'react';
+import { BackHandler } from 'react-native';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -31,13 +33,20 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { error: jest.fn() },
 }));
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    navigate: (...args: unknown[]): void => {
-      mockNavigate(...args);
+jest.mock('expo-router', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  return {
+    useRouter: () => ({
+      navigate: (...args: unknown[]): void => {
+        mockNavigate(...args);
+      },
+    }),
+    // Run the focus effect on mount, like a focused screen would.
+    useFocusEffect: (effect: () => void | (() => void)): void => {
+      React.useEffect(effect, [effect]);
     },
-  }),
-}));
+  };
+});
 
 jest.mock('@legacy-sports/shared-components', () => {
   const { View } =
@@ -312,6 +321,60 @@ describe('ProfileSettingsScreen', () => {
       fireEvent.press(screen.getByText('Sign Out'));
       await waitFor(() => {
         expect(mockLogout).toHaveBeenCalled();
+      });
+    });
+
+    describe('hardware back during sign-out (LS-7223)', () => {
+      const backHandlers: Array<() => boolean> = [];
+
+      afterEach(() => {
+        mockLogout.mockReset();
+        jest.restoreAllMocks();
+      });
+
+      beforeEach(() => {
+        backHandlers.length = 0;
+        jest
+          .spyOn(BackHandler, 'addEventListener')
+          .mockImplementation((_event, handler) => {
+            backHandlers.push(handler as () => boolean);
+            return {
+              remove: jest.fn(() => {
+                const idx = backHandlers.indexOf(handler as () => boolean);
+                if (idx !== -1) backHandlers.splice(idx, 1);
+              }),
+            };
+          });
+      });
+
+      it('does not intercept hardware back when not signing out', () => {
+        render(<ProfileSettingsScreen />);
+        expect(backHandlers).toHaveLength(0);
+      });
+
+      it('swallows hardware back while signing out and releases it afterwards', async () => {
+        let finishLogout: () => void = () => undefined;
+        mockLogout.mockImplementation(
+          () =>
+            new Promise<void>((resolve) => {
+              finishLogout = resolve;
+            }),
+        );
+        render(<ProfileSettingsScreen />);
+        fireEvent.press(screen.getByText('Sign Out'));
+
+        await waitFor(() => {
+          expect(screen.getByText('Signing out...')).toBeTruthy();
+        });
+        expect(backHandlers).toHaveLength(1);
+        expect(backHandlers[0]()).toBe(true);
+
+        await act(() => {
+          finishLogout();
+        });
+        await waitFor(() => {
+          expect(backHandlers).toHaveLength(0);
+        });
       });
     });
   });

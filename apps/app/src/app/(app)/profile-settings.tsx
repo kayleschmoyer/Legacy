@@ -29,6 +29,7 @@ import {
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription';
+import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
 
@@ -69,6 +70,11 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [updateAvatar, { loading: updatingAvatar }] =
     useUpdateUserAvatarMutation();
+
+  // logout() clears the token before it navigates away. A hardware back press
+  // in that window would pop the route while auth state is half-cleared, so
+  // swallow it until sign-out finishes (LS-7223).
+  useSystemBackAction(loggingOut, () => undefined);
 
   const handleLogout = async () => {
     setLoggingOut(true);
