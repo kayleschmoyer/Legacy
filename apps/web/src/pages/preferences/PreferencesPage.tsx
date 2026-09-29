@@ -34,6 +34,7 @@ import {
   useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { lightSurface } from '@legacy-sports/design-tokens';
+import { CollapsibleBody } from './CollapsibleBody';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
 import { useCoalescedSave } from './useCoalescedSave';
 import { PageMeta } from '../../components/PageMeta';
@@ -578,43 +579,6 @@ function CollapseChevron({ isCollapsed }: { isCollapsed: boolean }) {
     >
       <ChevronDown size={20} color="$colorPress" />
     </YStack>
-  );
-}
-
-function CollapsibleBody({
-  isCollapsed,
-  children,
-}: {
-  isCollapsed: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      aria-hidden={isCollapsed}
-      // `inert` removes the subtree from the accessibility tree AND from
-      // sequential focus navigation, so collapsed content isn't tab-stop
-      // reachable for assistive tech. Cast handles React typings that
-      // don't yet expose the attribute on every DOM element.
-      {...((isCollapsed
-        ? { inert: '' }
-        : {}) as React.HTMLAttributes<HTMLDivElement>)}
-      style={{
-        display: 'grid',
-        gridTemplateRows: isCollapsed ? '0fr' : '1fr',
-        transition: 'grid-template-rows 0.3s ease-out',
-      }}
-    >
-      <div
-        style={{
-          overflow: 'hidden',
-          minHeight: 0,
-          visibility: isCollapsed ? 'hidden' : 'visible',
-          pointerEvents: isCollapsed ? 'none' : 'auto',
-        }}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 
