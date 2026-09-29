@@ -56,6 +56,7 @@ import {
   provisionActiveMatchup,
   type ProvisionedActiveMatchup,
 } from '../integration/helpers/provision-active-matchup';
+import { provisionDraftedLeague } from '../integration/helpers/provision-drafted-league';
 import {
   buildIntegrationStorageState,
   getAuthJwt,
@@ -1206,8 +1207,9 @@ export class DualLiveState {
   league?: SeededLeague;
   waiverQueue?: {
     leagueId: number;
-    inviteCode: string;
-    commissionerTeamId: number;
+    memberTeamId: number;
+    /** A player on the member's (full) post-draft roster to drop for its claim. */
+    memberDropPlayerId: number;
     freeAgentPlayerId: number;
     freeAgentPlayerName: string;
   };
@@ -1487,32 +1489,66 @@ export class LiveTestData implements TestData {
       throw new Error(WAIVER_QUEUE_LIVE_REQUIRES_SHARED_STATE_REASON);
     }
     if (!this.#liveState.waiverQueue) {
-      // First caller (commissioner): create the league and pick the free
-      // agent both teams will compete for.
-      const league = await this.league();
+      // First caller (commissioner): provision a league whose draft has
+      // COMPLETED (LS-10228) — `claimFreeAgent` rejects every claim until
+      // `draft_status = 'completed'` AND `league_phase = 'active'`
+      // (`lambdas/db/src/schema/waivers/mutations.ts`). The member is the
+      // counterparty seat, so the second caller is already joined.
       const commissionerJwt = await getAuthJwt();
+      const memberJwt = await loginAs('premium', DUAL_LIVE_COUNTERPARTY_SEAT);
+      const league = await provisionDraftedLeague({
+        commissionerJwt,
+        memberJwt,
+        leagueName: `E2E Waiver Queue ${Date.now()}`,
+      });
       const { freeAgents } = await gqlFetch<{
-        freeAgents: Array<{ id: number; firstName: string; lastName: string }>;
+        freeAgents: Array<{
+          id: number;
+          firstName: string;
+          lastName: string;
+          eligiblePositions: string[] | null;
+        }>;
       }>(
         commissionerJwt,
         `query GetFreeAgentPlayersForWaiverQueue($leagueId: Int!) {
-           freeAgents(leagueId: $leagueId) { id firstName lastName }
+           freeAgents(leagueId: $leagueId) { id firstName lastName eligiblePositions }
          }`,
         { leagueId: league.leagueId },
       );
-      const picked = freeAgents[0];
+      // The free-agents UI defaults to the Hitters tab, so a pure pitcher
+      // would have no Add button for the spec's UI claim — same rule as
+      // `waiver-processing-ui.integration.spec.ts` (canonical pitcher set
+      // mirrored from @legacy-sports/utils PITCHING_POSITIONS).
+      const PITCHER_POSITIONS: ReadonlySet<string> = new Set(['SP', 'RP', 'P']);
+      const picked = freeAgents.find((p) => {
+        const positions = p.eligiblePositions ?? [];
+        return (
+          positions.length === 0 ||
+          positions.some((pos) => !PITCHER_POSITIONS.has(pos))
+        );
+      });
       if (!picked) {
         throw new Error(
-          `TestData.waiverQueue(): league ${league.leagueId} has no free ` +
-            'agents to seed the precondition.',
+          `TestData.waiverQueue(): league ${league.leagueId} has no hitter ` +
+            'free agents to seed the precondition.',
         );
       }
-      const freeAgentPlayerName =
-        `${picked.firstName} ${picked.lastName}`.trim();
+      const memberDropPlayerId =
+        league.rosterByTeamId[league.memberTeamId]?.[0];
+      if (memberDropPlayerId === undefined) {
+        throw new Error(
+          `TestData.waiverQueue(): member team ${league.memberTeamId} drafted ` +
+            'no players to drop for its claim.',
+        );
+      }
+      // Same normalization as the UI's "Add <name>" aria-label.
+      const freeAgentPlayerName = [picked.firstName, picked.lastName]
+        .filter((part) => part?.trim())
+        .join(' ');
       this.#liveState.waiverQueue = {
         leagueId: league.leagueId,
-        inviteCode: league.inviteCode,
-        commissionerTeamId: league.commissionerTeamId,
+        memberTeamId: league.memberTeamId,
+        memberDropPlayerId,
         freeAgentPlayerId: picked.id,
         freeAgentPlayerName,
       };
@@ -1523,35 +1559,27 @@ export class LiveTestData implements TestData {
       };
     }
 
-    // Second, distinct caller (the joined member, bound to `dual.ts`'s
-    // `counterpartyPage`): join the SAME league as that real identity and
-    // submit ITS competing claim via the API — not a second UI drive of the
-    // same free-agents flow the spec already exercises for the commissioner.
+    // Second, distinct caller (the member joined during the first call,
+    // bound to `dual.ts`'s `counterpartyPage`): submit ITS competing claim
+    // via the API — not a second UI drive of the same free-agents flow the
+    // spec already exercises for the commissioner. Its roster is full after
+    // the draft, so the claim must name a drop.
     const shared = this.#liveState.waiverQueue;
     const memberJwt = await loginAs('premium', DUAL_LIVE_COUNTERPARTY_SEAT);
-    const { joinLeagueByCode } = await gqlFetch<{
-      joinLeagueByCode: { id: number };
-    }>(
-      memberJwt,
-      `mutation JoinLeagueByCodeForWaiverQueue($inviteCode: String!, $teamName: String!) {
-         joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) { id }
-       }`,
-      {
-        inviteCode: shared.inviteCode,
-        teamName: `E2E Waiver Queue ${Date.now()}`,
-      },
-    );
-    const teamId = Number(joinLeagueByCode.id);
     await gqlFetch(
       memberJwt,
-      `mutation ClaimFreeAgentForWaiverQueue($leagueId: Int!, $playerId: Int!) {
-         claimFreeAgent(leagueId: $leagueId, playerId: $playerId) { id status }
+      `mutation ClaimFreeAgentForWaiverQueue($leagueId: Int!, $playerId: Int!, $dropPlayerId: Int) {
+         claimFreeAgent(leagueId: $leagueId, playerId: $playerId, dropPlayerId: $dropPlayerId) { id status }
        }`,
-      { leagueId: shared.leagueId, playerId: shared.freeAgentPlayerId },
+      {
+        leagueId: shared.leagueId,
+        playerId: shared.freeAgentPlayerId,
+        dropPlayerId: shared.memberDropPlayerId,
+      },
     );
     return {
       leagueId: shared.leagueId,
-      teamId,
+      teamId: shared.memberTeamId,
       freeAgent: {
         playerId: shared.freeAgentPlayerId,
         fullName: shared.freeAgentPlayerName,

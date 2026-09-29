@@ -40,8 +40,15 @@ test.describe('Waiver claim pipeline (dual-mode) @dual @regression', () => {
     await test.step('Submit a competing claim for the free agent via the free-agents UI', async () => {
       const freeAgentsPage = new FreeAgentsPage(driver);
       await freeAgentsPage.goto(queue.leagueId);
+      // The table sorts by points and paginates, so a live-seeded free agent
+      // may not be on the first page — search for it by last name.
+      await freeAgentsPage.search(
+        queue.freeAgent.fullName.split(' ').pop() ?? queue.freeAgent.fullName,
+      );
       await freeAgentsPage.openClaimModal(queue.freeAgent.fullName);
       await freeAgentsPage.claimModalHeader.expectVisible({ timeout: 10_000 });
+      // Live rosters are full after the draft (LS-10228); no-op in mock mode.
+      await freeAgentsPage.selectDropIfRosterFull();
       await freeAgentsPage.submitClaim();
       await freeAgentsPage.successHeader.expectVisible({ timeout: 20_000 });
       await freeAgentsPage.closeSuccess();

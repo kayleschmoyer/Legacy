@@ -107,6 +107,34 @@ export class FreeAgentsPage extends BaseScreen {
     return this.driver.byRole('button', { name: /Done/i });
   }
 
+  /**
+   * The claim modal's roster-status line, rendered once the claiming team's
+   * roster has loaded: "Roster full (n/max) — select a player to drop" or
+   * "Roster has space (n/max)".
+   */
+  get claimRosterStatus(): UIElement {
+    return this.driver.byText(/select a player to drop|Roster has space/i);
+  }
+
+  /** The full-roster prompt requiring a drop before the claim can submit. */
+  get dropPrompt(): UIElement {
+    return this.driver.byText(/select a player to drop/i);
+  }
+
+  /**
+   * The first drop-candidate row in the full-roster list. Resolved by role +
+   * accessible name ("Drop <player>"), not its `drop-player-<id>` testID —
+   * Tamagui drops testIDs on styled elements that carry a11y props.
+   */
+  get firstDropCandidate(): UIElement {
+    return this.driver.byRole('option', { name: /^Drop / }).first();
+  }
+
+  /** The "Dropping" badge on the selected drop-candidate row. */
+  get droppingBadge(): UIElement {
+    return this.driver.byText('Dropping');
+  }
+
   /** The "No players found" empty-state heading. */
   get emptyStateHeading(): UIElement {
     return this.driver.byText('No players found');
@@ -158,6 +186,25 @@ export class FreeAgentsPage extends BaseScreen {
   /** Open the waiver-claim modal for a player (clicks its "Add <player>" button). */
   async openClaimModal(playerName: string): Promise<void> {
     await this.addButton(playerName).tap();
+  }
+
+  /**
+   * In the open waiver-claim modal, pick a player to drop when the roster is
+   * full (e.g. right after a live draft, where rounds = max roster size);
+   * does nothing when the roster has space. Mirrors
+   * `integration/helpers/waiver-claim-drop.ts` on the driver interface
+   * (LS-10228). Waits for the roster-status line first so the "has space"
+   * branch isn't taken while the roster is still loading. Returns whether a
+   * drop was selected.
+   */
+  async selectDropIfRosterFull(): Promise<boolean> {
+    await this.claimRosterStatus.expectVisible({ timeout: 15_000 });
+    if (!(await this.dropPrompt.isVisible())) {
+      return false;
+    }
+    await this.firstDropCandidate.tap();
+    await this.droppingBadge.expectVisible({ timeout: 5_000 });
+    return true;
   }
 
   /** Submit the open waiver-claim modal. */
