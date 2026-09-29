@@ -2,7 +2,9 @@ import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import PricingPage from './PricingPage';
+import { ENTITLEMENT_LABELS, ENTITLEMENTS } from '@legacy-sports/utils';
+
+import PricingPage, { COMPARISON_ROWS } from './PricingPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -169,6 +171,53 @@ describe('PricingPage — Premium plan price loading state (LS-8813)', () => {
 
     expect(screen.getByTestId('plan-price-annual')).toHaveTextContent('3.33');
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+// LS-7182 — pricing copy must not silently drift from the entitlement catalog.
+describe('COMPARISON_ROWS ↔ entitlements catalog', () => {
+  const EXPECTED_ROW_ENTITLEMENTS: Array<[string, string]> = [
+    ['Leagues', ENTITLEMENTS.unlimited_leagues],
+    ['Stats', ENTITLEMENTS.football_projections],
+    ['Waiver system', ENTITLEMENTS.faab_waiver_type],
+    ['Playoff formats', ENTITLEMENTS.advanced_playoff_formats],
+    ['Historical eras', ENTITLEMENTS.historical_era_filters],
+    ['Mock drafts / week', ENTITLEMENTS.unlimited_mock_drafts],
+    ['Player comparison', ENTITLEMENTS.player_comparison],
+    ['Draft recommendations', ENTITLEMENTS.draft_recommendations],
+    ['AI-powered recaps', ENTITLEMENTS.ai_matchup_recap],
+    ['Salary cap leagues', ENTITLEMENTS.salary_cap_leagues],
+  ];
+
+  it('pins every comparison row to its expected entitlement (no rows added/removed unnoticed)', () => {
+    expect(
+      COMPARISON_ROWS.map((row) => [row.feature, row.entitlement]),
+    ).toEqual(EXPECTED_ROW_ENTITLEMENTS);
+  });
+
+  it.each(EXPECTED_ROW_ENTITLEMENTS)(
+    '%s references a live catalog entitlement with a label',
+    (_feature, key) => {
+      expect(Object.values(ENTITLEMENTS)).toContain(key);
+      expect(ENTITLEMENT_LABELS).toHaveProperty(key);
+    },
+  );
+
+  it('boolean rows are premium-only (free=false, premium=true)', () => {
+    COMPARISON_ROWS.filter(
+      (row) =>
+        typeof row.free === 'boolean' || typeof row.premium === 'boolean',
+    ).forEach((row) => {
+      expect({
+        feature: row.feature,
+        free: row.free,
+        premium: row.premium,
+      }).toEqual({
+        feature: row.feature,
+        free: false,
+        premium: true,
+      });
+    });
   });
 });
 

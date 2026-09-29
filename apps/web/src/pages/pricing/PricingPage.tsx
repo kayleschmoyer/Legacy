@@ -10,6 +10,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { type EntitlementKey, ENTITLEMENTS } from '@legacy-sports/utils';
 import { ScrollView, Separator, styled, Text } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
 import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
@@ -351,17 +352,74 @@ const PREMIUM_FEATURES = [
   { label: 'Draft recommendations', included: true },
 ];
 
-const COMPARISON_ROWS = [
-  { feature: 'Leagues', free: '3 max', premium: 'Unlimited' },
-  { feature: 'Stats', free: 'Basic', premium: 'Advanced + Projections' },
-  { feature: 'Waiver system', free: 'Standard', premium: 'Standard + FAAB' },
-  { feature: 'Playoff formats', free: '4-team only', premium: 'All formats' },
-  { feature: 'Historical eras', free: 'Modern era', premium: 'All eras' },
-  { feature: 'Mock drafts / week', free: '2', premium: 'Unlimited' },
-  { feature: 'Player comparison', free: false, premium: true },
-  { feature: 'Draft recommendations', free: false, premium: true },
-  { feature: 'AI-powered recaps', free: false, premium: true },
-  { feature: 'Salary cap leagues', free: false, premium: true },
+// Each row is pinned to the catalog entitlement it advertises (LS-7182) so
+// PricingPage.spec.tsx can fail when pricing copy and the gating catalog drift.
+export const COMPARISON_ROWS: ReadonlyArray<{
+  feature: string;
+  free: string | boolean;
+  premium: string | boolean;
+  entitlement: EntitlementKey;
+}> = [
+  {
+    feature: 'Leagues',
+    free: '3 max',
+    premium: 'Unlimited',
+    entitlement: ENTITLEMENTS.unlimited_leagues,
+  },
+  {
+    feature: 'Stats',
+    free: 'Basic',
+    premium: 'Advanced + Projections',
+    entitlement: ENTITLEMENTS.football_projections,
+  },
+  {
+    feature: 'Waiver system',
+    free: 'Standard',
+    premium: 'Standard + FAAB',
+    entitlement: ENTITLEMENTS.faab_waiver_type,
+  },
+  {
+    feature: 'Playoff formats',
+    free: '4-team only',
+    premium: 'All formats',
+    entitlement: ENTITLEMENTS.advanced_playoff_formats,
+  },
+  {
+    feature: 'Historical eras',
+    free: 'Modern era',
+    premium: 'All eras',
+    entitlement: ENTITLEMENTS.historical_era_filters,
+  },
+  {
+    feature: 'Mock drafts / week',
+    free: '2',
+    premium: 'Unlimited',
+    entitlement: ENTITLEMENTS.unlimited_mock_drafts,
+  },
+  {
+    feature: 'Player comparison',
+    free: false,
+    premium: true,
+    entitlement: ENTITLEMENTS.player_comparison,
+  },
+  {
+    feature: 'Draft recommendations',
+    free: false,
+    premium: true,
+    entitlement: ENTITLEMENTS.draft_recommendations,
+  },
+  {
+    feature: 'AI-powered recaps',
+    free: false,
+    premium: true,
+    entitlement: ENTITLEMENTS.ai_matchup_recap,
+  },
+  {
+    feature: 'Salary cap leagues',
+    free: false,
+    premium: true,
+    entitlement: ENTITLEMENTS.salary_cap_leagues,
+  },
 ];
 
 // The "try Premium" FAQ answer is derived at render time from the live trial
