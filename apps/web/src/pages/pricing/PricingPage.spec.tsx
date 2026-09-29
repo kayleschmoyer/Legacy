@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import PricingPage from './PricingPage';
@@ -43,7 +43,7 @@ type ButtonProps = ChildrenProps & { onPress?: () => void };
 // props (role, aria-*, tabIndex, onKeyDown) to the underlying DOM node —
 // Tamagui style props (fontWeight, alignItems, $sm, etc.) are not valid DOM
 // attributes and would otherwise spam React "unknown prop" warnings.
-const FORWARDED_PROPS = new Set(['role', 'tabIndex', 'onKeyDown']);
+const FORWARDED_PROPS = new Set(['role', 'tabIndex', 'onKeyDown', 'scope']);
 function mockDomProps(rest: ChildrenProps): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(rest).filter(
@@ -56,9 +56,12 @@ function mockDomProps(rest: ChildrenProps): Record<string, unknown> {
 }
 
 jest.mock('@legacy-sports/shared-components/ui', () => {
-  const PassThrough = ({ children, ...rest }: ChildrenProps) => (
-    <div {...mockDomProps(rest)}>{children}</div>
-  );
+  // Stacks also honor `tag` so the comparison-table markup (real
+  // table/thead/tbody/tr/th/td) can be asserted (LS-7180).
+  const PassThrough = ({ children, tag, ...rest }: ChildrenProps) => {
+    const Element = (typeof tag === 'string' ? tag : 'div') as 'div';
+    return <Element {...mockDomProps(rest)}>{children}</Element>;
+  };
   return {
     Button: ({ children, onPress, ...rest }: ButtonProps) => (
       <button type="button" onClick={onPress} {...mockDomProps(rest)}>
@@ -247,5 +250,46 @@ describe('PricingPage — billing toggle keyboard accessibility (LS-7167)', () =
     await user.keyboard('{ArrowRight}');
     expect(annual).toHaveAttribute('aria-checked', 'true');
     expect(annual).toHaveFocus();
+  });
+});
+
+// LS-7180: the comparison table must expose table semantics so screen readers
+// can navigate it by row and column.
+describe('PricingPage — feature comparison table semantics (LS-7180)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  it('exposes a named table with rowgroups, rows, column headers and cells', () => {
+    render(<PricingPage />);
+
+    const table = screen.getByRole('table', {
+      name: /feature comparison/i,
+    });
+    expect(table.tagName).toBe('TABLE');
+
+    expect(within(table).getAllByRole('rowgroup')).toHaveLength(2);
+
+    const headers = within(table).getAllByRole('columnheader');
+    expect(headers.map((h) => h.textContent)).toEqual([
+      'Feature',
+      'Free',
+      'Premium',
+    ]);
+    headers.forEach((h) => expect(h).toHaveAttribute('scope', 'col'));
+
+    const rows = within(table).getAllByRole('row');
+    // One header row plus one row per comparison feature.
+    expect(rows.length).toBeGreaterThan(1);
+    rows.slice(1).forEach((row) => {
+      expect(within(row).getAllByRole('cell')).toHaveLength(3);
+    });
   });
 });

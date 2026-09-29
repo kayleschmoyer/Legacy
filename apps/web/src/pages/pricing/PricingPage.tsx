@@ -767,82 +767,104 @@ export default function PricingPage() {
               </Paragraph>
             </SectionHeader>
 
-            <ComparisonTable>
+            {/* LS-7180: emit a real <table> on web via the Tamagui `tag` prop and
+                keep `role` for native/assistive tech (same pattern as the shared
+                Table component). Layout is unchanged — `tag` only sets the DOM
+                element name. */}
+            <ComparisonTable
+              tag="table"
+              role="table"
+              aria-label="Free versus Premium feature comparison"
+            >
               {/* Header */}
-              <TableRow header>
-                <TableFeatureCell>
-                  <Paragraph size="$3" fontWeight="700" marginBottom={0}>
-                    Feature
-                  </Paragraph>
-                </TableFeatureCell>
-                <TableCell>
-                  <Paragraph
-                    size="$3"
-                    fontWeight="700"
-                    textAlign="center"
-                    marginBottom={0}
+              <YStack tag="thead" role="rowgroup" width="100%">
+                <TableRow header tag="tr" role="row">
+                  <TableFeatureCell
+                    tag="th"
+                    role="columnheader"
+                    {...{ scope: 'col' }}
                   >
-                    Free
-                  </Paragraph>
-                </TableCell>
-                <TableCell>
-                  <Paragraph
-                    size="$3"
-                    fontWeight="700"
-                    color={BRAND_GOLD_LIGHT}
-                    textAlign="center"
-                    marginBottom={0}
-                  >
-                    Premium
-                  </Paragraph>
-                </TableCell>
-              </TableRow>
-
-              {COMPARISON_ROWS.map((row, i) => (
-                <TableRow
-                  key={row.feature}
-                  even={i % 2 === 0}
-                  last={i === COMPARISON_ROWS.length - 1}
-                >
-                  <TableFeatureCell>
-                    <Paragraph size="$3" marginBottom={0}>
-                      {row.feature}
+                    <Paragraph size="$3" fontWeight="700" marginBottom={0}>
+                      Feature
                     </Paragraph>
                   </TableFeatureCell>
-                  <TableCell>
-                    {typeof row.free === 'boolean' ? (
-                      row.free ? (
-                        <Check size={16} color={BRAND_GOLD_LIGHT} />
-                      ) : (
-                        <X size={16} color="$gray9" />
-                      )
-                    ) : (
-                      <Paragraph size="$3" textAlign="center" marginBottom={0}>
-                        {row.free}
-                      </Paragraph>
-                    )}
+                  <TableCell tag="th" role="columnheader" {...{ scope: 'col' }}>
+                    <Paragraph
+                      size="$3"
+                      fontWeight="700"
+                      textAlign="center"
+                      marginBottom={0}
+                    >
+                      Free
+                    </Paragraph>
                   </TableCell>
-                  <TableCell>
-                    {typeof row.premium === 'boolean' ? (
-                      row.premium ? (
-                        <Check size={16} color={BRAND_GOLD_LIGHT} />
-                      ) : (
-                        <X size={16} color="$gray9" />
-                      )
-                    ) : (
-                      <Paragraph
-                        size="$3"
-                        textAlign="center"
-                        fontWeight="600"
-                        color={BRAND_GOLD_LIGHT}
-                        marginBottom={0}
-                      >
-                        {row.premium}
-                      </Paragraph>
-                    )}
+                  <TableCell tag="th" role="columnheader" {...{ scope: 'col' }}>
+                    <Paragraph
+                      size="$3"
+                      fontWeight="700"
+                      color={BRAND_GOLD_LIGHT}
+                      textAlign="center"
+                      marginBottom={0}
+                    >
+                      Premium
+                    </Paragraph>
                   </TableCell>
                 </TableRow>
-              ))}
+              </YStack>
+
+              <YStack tag="tbody" role="rowgroup" width="100%">
+                {COMPARISON_ROWS.map((row, i) => (
+                  <TableRow
+                    key={row.feature}
+                    tag="tr"
+                    role="row"
+                    even={i % 2 === 0}
+                    last={i === COMPARISON_ROWS.length - 1}
+                  >
+                    <TableFeatureCell tag="td" role="cell">
+                      <Paragraph size="$3" marginBottom={0}>
+                        {row.feature}
+                      </Paragraph>
+                    </TableFeatureCell>
+                    <TableCell tag="td" role="cell">
+                      {typeof row.free === 'boolean' ? (
+                        row.free ? (
+                          <Check size={16} color={BRAND_GOLD_LIGHT} />
+                        ) : (
+                          <X size={16} color="$gray9" />
+                        )
+                      ) : (
+                        <Paragraph
+                          size="$3"
+                          textAlign="center"
+                          marginBottom={0}
+                        >
+                          {row.free}
+                        </Paragraph>
+                      )}
+                    </TableCell>
+                    <TableCell tag="td" role="cell">
+                      {typeof row.premium === 'boolean' ? (
+                        row.premium ? (
+                          <Check size={16} color={BRAND_GOLD_LIGHT} />
+                        ) : (
+                          <X size={16} color="$gray9" />
+                        )
+                      ) : (
+                        <Paragraph
+                          size="$3"
+                          textAlign="center"
+                          fontWeight="600"
+                          color={BRAND_GOLD_LIGHT}
+                          marginBottom={0}
+                        >
+                          {row.premium}
+                        </Paragraph>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </YStack>
             </ComparisonTable>
           </YStack>
 
