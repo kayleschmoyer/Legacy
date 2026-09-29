@@ -34,6 +34,7 @@ import {
   useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
+import { useCoalescedSave } from './useCoalescedSave';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -81,6 +82,22 @@ function getDefaultPrefs(): UserPreferences {
     audioEnabled: false,
   };
 }
+
+// Trailing-edge debounce for notification-preference saves (LS-7081).
+const NOTIFICATION_SAVE_DEBOUNCE_MS = 300;
+
+type NotificationToggleField =
+  | 'matchupStartedEnabled'
+  | 'matchupEndedEnabled'
+  | 'matchupCloseGameEnabled'
+  | 'matchupReminderEnabled'
+  | 'touchdownAlertEnabled'
+  | 'pushEnabled'
+  | 'emailEnabled';
+
+type NotificationPatch = Partial<
+  Record<NotificationToggleField, boolean> & { closeGameThreshold: number }
+>;
 
 const CLOSE_GAME_MIN = 1;
 const CLOSE_GAME_MAX = 200;
@@ -904,7 +921,7 @@ function NotificationPreferencesSection({
   onToggleCollapse: () => void;
   onSaved: () => void;
 }) {
-  const { data, loading, error, refetch, networkStatus } =
+  const { data, loading, error, refetch, networkStatus, updateQuery } =
     useGetUserNotificationPreferencesQuery({
       notifyOnNetworkStatusChange: true,
     });
@@ -913,55 +930,21 @@ function NotificationPreferencesSection({
 
   const prefs = data?.getUserNotificationPreferences;
 
-  const optimistic = useCallback(
-    (
-      patch: Partial<{
-        matchupStartedEnabled: boolean;
-        matchupEndedEnabled: boolean;
-        matchupCloseGameEnabled: boolean;
-        matchupReminderEnabled: boolean;
-        touchdownAlertEnabled: boolean;
-        pushEnabled: boolean;
-        emailEnabled: boolean;
-        closeGameThreshold: number;
-      }>,
-    ) => ({
-      __typename: 'NotificationPreference' as const,
-      id: prefs?.id ?? 0,
-      userId: prefs?.userId ?? 0,
-      matchupStartedEnabled: prefs?.matchupStartedEnabled ?? true,
-      matchupEndedEnabled: prefs?.matchupEndedEnabled ?? true,
-      matchupCloseGameEnabled: prefs?.matchupCloseGameEnabled ?? true,
-      matchupReminderEnabled: prefs?.matchupReminderEnabled ?? true,
-      touchdownAlertEnabled: prefs?.touchdownAlertEnabled ?? false,
-      pushEnabled: prefs?.pushEnabled ?? true,
-      emailEnabled: prefs?.emailEnabled ?? false,
-      closeGameThreshold: prefs?.closeGameThreshold ?? CLOSE_GAME_DEFAULT,
-      createdAt: prefs?.createdAt ?? '',
-      updatedAt: new Date().toISOString(),
-      ...patch,
-    }),
-    [prefs],
-  );
-
-  type NotificationToggleField =
-    | 'matchupStartedEnabled'
-    | 'matchupEndedEnabled'
-    | 'matchupCloseGameEnabled'
-    | 'matchupReminderEnabled'
-    | 'touchdownAlertEnabled'
-    | 'pushEnabled'
-    | 'emailEnabled';
-
-  const handleToggle = useCallback(
-    (field: NotificationToggleField, value: boolean) => {
-      void updatePrefs({
-        variables: { input: { [field]: value } },
-        optimisticResponse: {
-          __typename: 'Mutation',
-          updateNotificationPreferences: optimistic({ [field]: value }),
-        },
+  // Rapid toggles / stepper clicks are coalesced (LS-7081): each change is
+  // applied to the Apollo cache immediately so the UI stays responsive, while
+  // the mutation is debounced and sends the merged patch once, so the server
+  // only ever sees the final value instead of N racing writes.
+  const saveRef = useRef<{ hasPending: () => boolean }>({
+    hasPending: () => false,
+  });
+  const save = useCallback(
+    (input: NotificationPatch) => {
+      updatePrefs({
+        variables: { input },
         update(cache, { data: mutationData }) {
+          // A newer edit is already queued — writing this (older) response
+          // would flicker the UI back to a stale value.
+          if (saveRef.current.hasPending()) return;
           if (mutationData?.updateNotificationPreferences) {
             cache.writeQuery<GetUserNotificationPreferencesQuery>({
               query: GetUserNotificationPreferences,
@@ -973,39 +956,49 @@ function NotificationPreferencesSection({
             });
           }
         },
-      });
-      onSaved();
+      }).then(
+        () => onSaved(),
+        () => void refetch(),
+      );
     },
-    [updatePrefs, optimistic, onSaved],
+    [updatePrefs, onSaved, refetch],
+  );
+  const coalesced = useCoalescedSave<NotificationPatch>(
+    save,
+    NOTIFICATION_SAVE_DEBOUNCE_MS,
+  );
+  saveRef.current = coalesced;
+
+  const queueChange = useCallback(
+    (patch: NotificationPatch) => {
+      updateQuery((prev) =>
+        prev.getUserNotificationPreferences
+          ? {
+              ...prev,
+              getUserNotificationPreferences: {
+                ...prev.getUserNotificationPreferences,
+                ...patch,
+              },
+            }
+          : prev,
+      );
+      coalesced.queue(patch);
+    },
+    [updateQuery, coalesced],
+  );
+
+  const handleToggle = useCallback(
+    (field: NotificationToggleField, value: boolean) => {
+      queueChange({ [field]: value });
+    },
+    [queueChange],
   );
 
   const handleThresholdChange = useCallback(
     (next: number) => {
-      const safe = clampCloseGame(next);
-      void updatePrefs({
-        variables: { input: { closeGameThreshold: safe } },
-        optimisticResponse: {
-          __typename: 'Mutation',
-          updateNotificationPreferences: optimistic({
-            closeGameThreshold: safe,
-          }),
-        },
-        update(cache, { data: mutationData }) {
-          if (mutationData?.updateNotificationPreferences) {
-            cache.writeQuery<GetUserNotificationPreferencesQuery>({
-              query: GetUserNotificationPreferences,
-              data: {
-                __typename: 'Query',
-                getUserNotificationPreferences:
-                  mutationData.updateNotificationPreferences,
-              },
-            });
-          }
-        },
-      });
-      onSaved();
+      queueChange({ closeGameThreshold: clampCloseGame(next) });
     },
-    [updatePrefs, optimistic, onSaved],
+    [queueChange],
   );
 
   const headerNode = (meta: React.ReactNode, trailing?: React.ReactNode) => (
