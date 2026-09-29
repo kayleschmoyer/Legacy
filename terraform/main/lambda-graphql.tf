@@ -67,7 +67,11 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
             aws_secretsmanager_secret.system_api_key.arn,
             aws_secretsmanager_secret.rollbar_access_token.arn
           ],
-          var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : []
+          var.mlb_data_api_key != "" ? [aws_secretsmanager_secret.mlb_data_api_key[0].arn] : [],
+          # Highlight-video resolver (LS-9113): YouTube Data API key +
+          # Cloudflare Workers AI token for the wrong-player relevance judge.
+          var.youtube_api_key != "" ? [aws_secretsmanager_secret.youtube_api_key[0].arn] : [],
+          [aws_secretsmanager_secret.cloudflare_ai_api_token.arn]
         )
       }
     ]
@@ -342,6 +346,14 @@ resource "aws_lambda_function" "graphql" {
       # MLB data provider configuration
       MLB_DATA_PROVIDER            = var.mlb_data_provider
       MLB_DATA_API_KEY_SECRET_NAME = var.mlb_data_api_key != "" ? aws_secretsmanager_secret.mlb_data_api_key[0].name : ""
+
+      # Pick-splash highlight-video resolver (LS-9113). Secret NAMES only —
+      # values are fetched from Secrets Manager at cold start (LS-2792
+      # pattern). The Cloudflare pair powers the wrong-player relevance
+      # judge and reuses the image-upload lambda's Workers AI token.
+      YOUTUBE_API_KEY_SECRET_NAME = var.youtube_api_key != "" ? aws_secretsmanager_secret.youtube_api_key[0].name : ""
+      CLOUDFLARE_ACCOUNT_ID       = var.cloudflare_account_id
+      CLOUDFLARE_AI_TOKEN_PATH    = aws_secretsmanager_secret.cloudflare_ai_api_token.name
     }
   }
 

@@ -85,6 +85,8 @@ function BatterGraphic({ play }: { play: NotablePlaySummary }) {
         aria-label={`Notable play: ${play.description}`}
       >
         <defs>
+          {/* Theme tokens (not raw hex) so both themes render correctly —
+              SVG stops take var() via style, not presentation attributes. */}
           <linearGradient id="statTraj" x1="0%" y1="100%" x2="100%" y2="0%">
             <stop offset="0%" style={{ stopColor: 'var(--d-warning)' }} />
             <stop

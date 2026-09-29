@@ -2366,6 +2366,31 @@ export const CSS = `
   border-radius: var(--d-radius-pill);
   padding: 3px 10px;
 }
+/* Pick-splash YouTube highlight embed (LS-9113). RMF compliance: nothing is
+   ever layered over any part of the player (pick banner/name are adjacent
+   flex siblings in the chrome column), the 480x270 frame exceeds the 200x200
+   minimum, and the fixed splash position keeps it fully visible. The chrome
+   container is pointer-events:none, so re-enable events here — obscuring or
+   blocking player interaction is prohibited. */
+.d-splash-video {
+  pointer-events: auto;
+  background: var(--d-panel);
+  border: 1px solid var(--d-panel-border);
+  border-radius: var(--d-radius);
+  padding: 4px;
+  animation: fadeSlideUp 0.3s ease-out;
+}
+.d-splash-video-frame,
+.d-splash-video iframe {
+  display: block;
+  width: 480px;
+  height: 270px;
+  max-width: min(80vw, 480px);
+  /* ToS floor: the embedded player must never render below 200x200. */
+  min-width: 200px;
+  border: 0;
+  border-radius: calc(var(--d-radius) - 2px);
+}
 /* Pick-splash notable-play stat graphic (LS-9095). All intro animation
    completes within ~2s so it reads fully even in the 4s catch-up window. */
 .d-splash-stat {

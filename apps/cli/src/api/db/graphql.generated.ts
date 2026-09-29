@@ -1417,6 +1417,38 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Result of the scheduled highlight-video resolution run triggered by EventBridge */
+export type HighlightVideoResolveResult = {
+  __typename?: 'HighlightVideoResolveResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  /** Players cached with a validated video this run */
+  playersResolved?: Maybe<Scalars['Int']['output']>;
+  /** Players marked unresolved (no validated match — graphic fallback) */
+  playersUnresolved?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable explanation of the outcome */
+  reason?: Maybe<Scalars['String']['output']>;
+  /** search.list calls consumed from the daily 100-call bucket */
+  searchesUsed?: Maybe<Scalars['Int']['output']>;
+  /** Whether the run executed (false when no API key is configured) */
+  triggered?: Maybe<Scalars['Boolean']['output']>;
+};
+
+/** Result of the scheduled highlight-video verification pass triggered by EventBridge */
+export type HighlightVideoVerifyResult = {
+  __typename?: 'HighlightVideoVerifyResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Rows purged for exceeding the 30-day unverified window */
+  stalePurged?: Maybe<Scalars['Int']['output']>;
+  triggered?: Maybe<Scalars['Boolean']['output']>;
+  /** Resolved cache rows checked via batched videos.list */
+  videosChecked?: Maybe<Scalars['Int']['output']>;
+  /** Rows purged (video deleted, private, no longer embeddable, or flipped Made-for-Kids) */
+  videosPurged?: Maybe<Scalars['Int']['output']>;
+  /** Rows confirmed still embeddable and metadata-refreshed */
+  videosVerified?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ImpersonateUserResult = {
   __typename?: 'ImpersonateUserResult';
   token?: Maybe<Scalars['String']['output']>;
@@ -2181,6 +2213,8 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
+  /** Resolve players to validated MLB-channel highlight videos, budgeted to at most 95 search.list calls per run. Triggered nightly by EventBridge; system-only. */
+  resolveHighlightVideos?: Maybe<HighlightVideoResolveResult>;
   /** Accept or decline a proposed draft slot trade, as the counterpart team. */
   respondDraftSlotTrade?: Maybe<DraftSlotTrade>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
@@ -2282,6 +2316,8 @@ export type Mutation = {
   verifyApplePurchase?: Maybe<AppleVerifyResult>;
   /** Verify and record an Android Google Play Billing purchase. The client passes the purchaseToken and productId from the Billing Library. Returns the resulting subscription tier and status. */
   verifyGooglePurchase?: Maybe<GoogleVerifyResult>;
+  /** Re-verify cached highlight videos via batched videos.list, refresh metadata, and purge invalid or stale rows. Triggered weekly by EventBridge; system-only. */
+  verifyHighlightVideos?: Maybe<HighlightVideoVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
   /** Premium-league feature: cast a league member's vote (approve/veto) on an accepted trade during commissioner review. A strict majority of eligible teams voting to veto automatically reverses the trade, alongside the commissioner’s standalone veto power. */
@@ -2708,6 +2744,10 @@ export type MutationReorderDraftQueueArgs = {
 export type MutationReportLeagueMessageArgs = {
   messageId: Scalars['Int']['input'];
   reason: Scalars['String']['input'];
+};
+
+export type MutationResolveHighlightVideosArgs = {
+  searchBudget?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationRespondDraftSlotTradeArgs = {
@@ -3198,6 +3238,17 @@ export type Player = {
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** A player's validated MLB-official-YouTube-channel highlight video, shown as the pick-splash video tier on the draft spectator page (LS-9113). Only embeddable, non-Made-for-Kids videos are ever served. */
+export type PlayerHighlightVideo = {
+  __typename?: 'PlayerHighlightVideo';
+  /** players.id the video belongs to */
+  playerId?: Maybe<Scalars['Int']['output']>;
+  /** Video title as of the last verification pass */
+  videoTitle?: Maybe<Scalars['String']['output']>;
+  /** YouTube video id for the official IFrame embed */
+  youtubeVideoId?: Maybe<Scalars['String']['output']>;
+};
+
 /** A player's cached most-notable Statcast play, shown as the pick-splash stat graphic on the draft spectator page (LS-9095) */
 export type PlayerNotablePlay = {
   __typename?: 'PlayerNotablePlay';
@@ -3477,6 +3528,8 @@ export type Query = {
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   getUserPreferences?: Maybe<UserPreference>;
   hello?: Maybe<Scalars['String']['output']>;
+  /** Cached validated highlight videos for a set of players (players.id). Players without a validated video are simply absent from the result — the splash then uses the stat-graphic tier. */
+  highlightVideosByPlayerIds?: Maybe<Array<PlayerHighlightVideo>>;
   /** The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673) */
   keeperEligibleRoster?: Maybe<Array<KeeperEligiblePlayer>>;
   league?: Maybe<League>;
@@ -3920,6 +3973,10 @@ export type QueryGetTiebreakerHistoryArgs = {
 
 export type QueryGetTiebreakerRulesArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryHighlightVideosByPlayerIdsArgs = {
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type QueryKeeperEligibleRosterArgs = {

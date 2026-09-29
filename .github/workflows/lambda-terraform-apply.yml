@@ -261,6 +261,7 @@ jobs:
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
           # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
           # as "web push disabled" (non-fatal). LS-6838.
@@ -315,6 +316,7 @@ jobs:
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
           # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
           # as "web push disabled" (non-fatal). LS-6838.
@@ -425,6 +427,7 @@ jobs:
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
           # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
           # as "web push disabled" (non-fatal). LS-6838.
@@ -557,6 +560,7 @@ jobs:
           TF_VAR_apple_bundle_id: ${{ secrets.APPLE_BUNDLE_ID || vars.APPLE_BUNDLE_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
           # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
           # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
           # as "web push disabled" (non-fatal). LS-6838.

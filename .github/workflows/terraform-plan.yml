@@ -147,6 +147,7 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
           # Keep in lockstep with the apply workflow (LS-6838) so the VAPID
           # secrets don't show as spurious destroy candidates here.
           TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}

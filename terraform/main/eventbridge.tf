@@ -603,3 +603,94 @@ resource "aws_lambda_permission" "notable_plays_refresh_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.notable_plays_refresh.arn
 }
+
+# ── Baseball: Nightly Highlight-Video Resolution (LS-9113) ─────────────
+# Resolves players to validated MLB-official-YouTube-channel highlight
+# videos for the pick-splash video tier. Budget-aware: at most 95
+# search.list calls per run against the API's dedicated 100/day bucket,
+# prioritizing upcoming/active draft pools, then recently drafted players.
+# Fires nightly at 09:30 UTC (after the notable-plays refresh). No-ops
+# gracefully (triggered:false) when no YouTube API key is configured.
+
+resource "aws_cloudwatch_event_rule" "highlight_videos_resolve" {
+  name                = "${local.name_prefix}-highlight-videos-resolve"
+  description         = "Resolve players to validated MLB-channel highlight videos (pick-splash video tier) nightly at 09:30 UTC"
+  schedule_expression = "cron(30 9 * * ? *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "highlight_videos_resolve" {
+  rule      = aws_cloudwatch_event_rule.highlight_videos_resolve.name
+  target_id = "highlight-videos-resolve"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { resolveHighlightVideos { triggered reason searchesUsed playersResolved playersUnresolved errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "highlight_videos_resolve_eventbridge" {
+  statement_id  = "AllowEventBridgeHighlightVideosResolve"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.highlight_videos_resolve.arn
+}
+
+# ── Baseball: Weekly Highlight-Video Re-verification (LS-9113) ─────────
+# Re-confirms every cached video is still embeddable and not Made-for-Kids
+# via batched videos.list (1 quota unit / 50 ids), refreshes metadata, and
+# purges rows for deleted/private/no-longer-embeddable videos plus anything
+# unverified for 30+ days (YouTube DP III.E.4.d/e cache-refresh obligation).
+# Weekly is comfortably inside the 30-day window; Mondays 10:00 UTC.
+
+resource "aws_cloudwatch_event_rule" "highlight_videos_verify" {
+  name                = "${local.name_prefix}-highlight-videos-verify"
+  description         = "Re-verify cached highlight videos and purge stale rows weekly (Mondays 10:00 UTC)"
+  schedule_expression = "cron(0 10 ? * MON *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "highlight_videos_verify" {
+  rule      = aws_cloudwatch_event_rule.highlight_videos_verify.name
+  target_id = "highlight-videos-verify"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { verifyHighlightVideos { triggered reason videosChecked videosVerified videosPurged stalePurged errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "highlight_videos_verify_eventbridge" {
+  statement_id  = "AllowEventBridgeHighlightVideosVerify"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.highlight_videos_verify.arn
+}

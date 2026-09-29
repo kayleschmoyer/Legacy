@@ -296,6 +296,14 @@ query GetDraftPicks($draftId: Int!) {
   }
 }
 
+query GetHighlightVideos($playerIds: [Int!]!) {
+  highlightVideosByPlayerIds(playerIds: $playerIds) {
+    playerId
+    youtubeVideoId
+    videoTitle
+  }
+}
+
 query GetNotablePlays($mlbPlayerIds: [Int!]!) {
   notablePlaysByMlbPlayerIds(mlbPlayerIds: $mlbPlayerIds) {
     mlbPlayerId

@@ -156,6 +156,10 @@ export { PlayerService, createPlayerService } from './PlayerService';
 export type {
   PlayerNotablePlayRow,
   PlayerNotablePlayUpsert,
+  PlayerHighlightVideoRow,
+  HighlightVideoCandidate,
+  HighlightVideoResolution,
+  HighlightVideoVerification,
 } from './PlayerService';
 export {
   StatisticsService,

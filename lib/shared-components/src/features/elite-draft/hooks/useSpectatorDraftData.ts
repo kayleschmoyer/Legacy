@@ -6,6 +6,7 @@ import {
   GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
   GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
+  GetHighlightVideos as GET_HIGHLIGHT_VIDEOS,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
@@ -19,6 +20,8 @@ import {
   type GetDraftPlayerStatsQuery,
   type GetDraftTeamOrderQuery,
   type GetDraftTeamOrderQueryVariables,
+  type GetHighlightVideosQuery,
+  type GetHighlightVideosQueryVariables,
   type GetLeagueByIdQuery,
   type GetLeagueTeamsQuery,
   type GetLiveDraftLeagueDraftQuery,
@@ -32,6 +35,7 @@ import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
   DraftPlayer,
+  HighlightVideoSummary,
   LeagueTeam,
   NotablePlaySummary,
   PlayerStatsEntry,
@@ -293,6 +297,46 @@ export function useSpectatorDraftData({
     [mlbPlayerIdFor, notablePlayByMlbId],
   );
 
+  // ---- Highlight videos (pick-splash video tier, LS-9113) ----
+  // Same cache-read-only contract as the notable plays: the nightly resolver
+  // keeps player_highlight_videos warm, so the splash never waits on a
+  // YouTube API lookup. Keyed on our own players.id (mlb_player_id is NULL
+  // for all baseball rows).
+  const highlightPlayerIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of pickHistory) ids.add(p.playerId);
+    return [...ids].sort((a, b) => a - b);
+  }, [pickHistory]);
+
+  const { data: highlightVideosData } = useQuery<
+    GetHighlightVideosQuery,
+    GetHighlightVideosQueryVariables
+  >(GET_HIGHLIGHT_VIDEOS, {
+    variables: { playerIds: highlightPlayerIds },
+    skip: highlightPlayerIds.length === 0,
+    errorPolicy: 'all',
+  });
+
+  const highlightVideoByPlayerId = useMemo(() => {
+    const map = new Map<number, HighlightVideoSummary>();
+    for (const row of highlightVideosData?.highlightVideosByPlayerIds ?? []) {
+      if (row?.playerId == null || !row.youtubeVideoId) continue;
+      map.set(row.playerId, {
+        playerId: row.playerId,
+        youtubeVideoId: row.youtubeVideoId,
+        videoTitle: row.videoTitle ?? null,
+      });
+    }
+    return map;
+  }, [highlightVideosData]);
+
+  /** playerId → validated highlight video for the splash video tier (LS-9113). */
+  const highlightVideoFor = useCallback(
+    (playerId: number): HighlightVideoSummary | null =>
+      highlightVideoByPlayerId.get(playerId) ?? null,
+    [highlightVideoByPlayerId],
+  );
+
   // ---- Career stats (names, positions, and the splash stat line) ----
   const { data: statsData } = useQuery<GetDraftPlayerStatsQuery>(
     GET_DRAFT_PLAYER_STATS,
@@ -470,6 +514,7 @@ export function useSpectatorDraftData({
     refetchPickHistory,
     mlbPlayerIdFor,
     notablePlayFor,
+    highlightVideoFor,
     // Stats / lookups
     statsLookup,
     // Board

@@ -17,6 +17,7 @@ import {
   GetDraftRecommendations as GET_DRAFT_RECOMMENDATIONS,
   GetDraftTeamAutoPickStatuses as GET_DRAFT_TEAM_AUTO_PICK_STATUSES,
   GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
+  GetHighlightVideos as GET_HIGHLIGHT_VIDEOS,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
@@ -75,6 +76,7 @@ describe('useSpectatorDraftData', () => {
       GET_DRAFT_PITCHING_STATS,
       GET_DRAFT_TEAM_ORDER,
       GET_NOTABLE_PLAYS,
+      GET_HIGHLIGHT_VIDEOS,
     ]);
     for (const call of recordedCalls) {
       expect(allowed.has(call.document)).toBe(true);

@@ -420,6 +420,33 @@ resource "aws_secretsmanager_secret_version" "mlb_data_api_key" {
   secret_string = var.mlb_data_api_key
 }
 
+# YouTube Data API v3 key for the pick-splash highlight-video resolver
+# (LS-9113). Google Cloud project 1025244625243, API-restricted to YouTube
+# Data API v3. Managed like mlb_data_api_key: created and seeded only when
+# the variable is provided (secrets.auto.tfvars locally, the YOUTUBE_API_KEY
+# GitHub secret in CI). The GraphQL Lambda receives
+# YOUTUBE_API_KEY_SECRET_NAME and fetches the value at cold start.
+variable "youtube_api_key" {
+  description = "YouTube Data API v3 key for the highlight-video resolver (LS-9113)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+resource "aws_secretsmanager_secret" "youtube_api_key" {
+  count       = var.youtube_api_key != "" ? 1 : 0
+  name        = "${var.environment}/youtube-api-key"
+  description = "YouTube Data API v3 key for the pick-splash highlight-video resolver"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "youtube_api_key" {
+  count         = var.youtube_api_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.youtube_api_key[0].id
+  secret_string = var.youtube_api_key
+}
+
 # Discord webhook URL for the Rollbar Discord notification Lambda
 resource "aws_secretsmanager_secret" "discord_webhook_url" {
   name        = "${var.environment}/discord-webhook-url"

@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AvailableDraftPlayer,
   DraftPlayer,
+  HighlightVideoSummary,
   NotablePlaySummary,
 } from './types';
 import { PickAnnouncement } from './PickAnnouncement';
+import { PickSplashHighlightVideo } from './PickSplashHighlightVideo';
 import { PickSplashStatGraphic } from './PickSplashStatGraphic';
 import { getMlbHeadshotUrl } from './draftUtils';
 
@@ -211,6 +213,8 @@ export interface SplashQueueProps {
   mlbPlayerIdFor?: (playerId: number) => number | null;
   /** playerId → cached notable play for the stat graphic (LS-9095); null hides it. */
   notablePlayFor?: (playerId: number) => NotablePlaySummary | null;
+  /** playerId → validated highlight video for the video tier (LS-9113); null falls back to the graphic. */
+  highlightVideoFor?: (playerId: number) => HighlightVideoSummary | null;
 }
 
 /**
@@ -227,6 +231,7 @@ export function SplashQueue({
   commentaryFor,
   mlbPlayerIdFor,
   notablePlayFor,
+  highlightVideoFor,
 }: SplashQueueProps): React.JSX.Element | null {
   const [headshotFailed, setHeadshotFailed] = useState(false);
   const activePickNumber = active?.overallPick;
@@ -271,9 +276,18 @@ export function SplashQueue({
           </div>
         )}
         <div className="d-splash-team">{active.teamName}</div>
-        <PickSplashStatGraphic
+        {/* Highlight tier (LS-9113): validated YouTube clip when cached,
+            LS-9095 stat graphic otherwise. Keyed per pick so the player is
+            created and destroyed with each splash — the queue's single
+            `active` slot is what guarantees exactly one autoplaying player
+            per page. */}
+        <PickSplashHighlightVideo
           key={active.overallPick}
-          play={notablePlayFor?.(player.id) ?? null}
+          video={highlightVideoFor?.(player.id) ?? null}
+          playerName={player.name}
+          fallback={
+            <PickSplashStatGraphic play={notablePlayFor?.(player.id) ?? null} />
+          }
         />
         {pendingCount > 0 && (
           <div

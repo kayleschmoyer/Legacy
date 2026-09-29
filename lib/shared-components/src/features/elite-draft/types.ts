@@ -215,6 +215,17 @@ export interface NotablePlaySummary {
   filmRoomUrl: string | null;
 }
 
+/**
+ * A player's validated MLB-official-YouTube-channel highlight video, played
+ * as the pick-splash video tier (LS-9113). Only embeddable, non-Made-for-Kids
+ * videos are ever served by the backend cache.
+ */
+export interface HighlightVideoSummary {
+  playerId: number;
+  youtubeVideoId: string;
+  videoTitle: string | null;
+}
+
 export interface IntelligenceRecommendation {
   player: DraftPlayer;
   score: number;

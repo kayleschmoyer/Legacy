@@ -82,6 +82,7 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          TF_VAR_youtube_api_key: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           # -lock=false: read-only speculative plan; never contend with the
           # post-merge apply for the state lock.

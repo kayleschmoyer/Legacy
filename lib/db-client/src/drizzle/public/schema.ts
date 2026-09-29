@@ -13,6 +13,7 @@ export * from './models/Matchups';
 export * from './models/MlbTeams';
 export * from './models/NflTeamKickoffTimes';
 export * from './models/Notifications';
+export * from './models/PlayerHighlightVideos';
 export * from './models/PlayerNotablePlays';
 export * from './models/Players';
 export * from './models/Playoffs';

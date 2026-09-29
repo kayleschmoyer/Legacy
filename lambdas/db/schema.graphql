@@ -1664,6 +1664,67 @@ type HeadToHeadRecord {
   totalMatchups: Int
 }
 
+"""
+Result of the scheduled highlight-video resolution run triggered by EventBridge
+"""
+type HighlightVideoResolveResult {
+  errors: [String!]
+
+  """
+  Players cached with a validated video this run
+  """
+  playersResolved: Int
+
+  """
+  Players marked unresolved (no validated match — graphic fallback)
+  """
+  playersUnresolved: Int
+
+  """
+  Human-readable explanation of the outcome
+  """
+  reason: String
+
+  """
+  search.list calls consumed from the daily 100-call bucket
+  """
+  searchesUsed: Int
+
+  """
+  Whether the run executed (false when no API key is configured)
+  """
+  triggered: Boolean
+}
+
+"""
+Result of the scheduled highlight-video verification pass triggered by EventBridge
+"""
+type HighlightVideoVerifyResult {
+  errors: [String!]
+  reason: String
+
+  """
+  Rows purged for exceeding the 30-day unverified window
+  """
+  stalePurged: Int
+  triggered: Boolean
+
+  """
+  Resolved cache rows checked via batched videos.list
+  """
+  videosChecked: Int
+
+  """
+  Rows purged (video deleted, private, no longer embeddable, or flipped Made-for-Kids)
+  """
+  videosPurged: Int
+
+  """
+  Rows confirmed still embeddable and metadata-refreshed
+  """
+  videosVerified: Int
+}
+
 type ImpersonateUserResult {
   token: String
 }
@@ -2943,6 +3004,16 @@ type Mutation {
   requestDataExport: DataRequest
 
   """
+  Resolve players to validated MLB-channel highlight videos, budgeted to at most 95 search.list calls per run. Triggered nightly by EventBridge; system-only.
+  """
+  resolveHighlightVideos(
+    """
+    search.list calls to spend (default and max 95)
+    """
+    searchBudget: Int
+  ): HighlightVideoResolveResult
+
+  """
   Accept or decline a proposed draft slot trade, as the counterpart team.
   """
   respondDraftSlotTrade(accept: Boolean!, tradeId: Int!): DraftSlotTrade
@@ -3284,6 +3355,11 @@ type Mutation {
   ): GoogleVerifyResult
 
   """
+  Re-verify cached highlight videos via batched videos.list, refresh metadata, and purge invalid or stale rows. Triggered weekly by EventBridge; system-only.
+  """
+  verifyHighlightVideos: HighlightVideoVerifyResult
+
+  """
   Commissioner-only: veto an accepted trade, reversing the player swap.
   """
   vetoTrade(tradeId: Int!): TradeOffer
@@ -3534,6 +3610,26 @@ type Player {
   """
   seasonsPlayed: Int
   statsLastFetchedAt: String
+}
+
+"""
+A player's validated MLB-official-YouTube-channel highlight video, shown as the pick-splash video tier on the draft spectator page (LS-9113). Only embeddable, non-Made-for-Kids videos are ever served.
+"""
+type PlayerHighlightVideo {
+  """
+  players.id the video belongs to
+  """
+  playerId: Int
+
+  """
+  Video title as of the last verification pass
+  """
+  videoTitle: String
+
+  """
+  YouTube video id for the official IFrame embed
+  """
+  youtubeVideoId: String
 }
 
 """
@@ -4039,6 +4135,11 @@ type Query {
   getUserNotificationPreferences: NotificationPreference
   getUserPreferences: UserPreference
   hello: String
+
+  """
+  Cached validated highlight videos for a set of players (players.id). Players without a validated video are simply absent from the result — the splash then uses the stat-graphic tier.
+  """
+  highlightVideosByPlayerIds(playerIds: [Int!]!): [PlayerHighlightVideo!]
 
   """
   The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673)

@@ -1,5 +1,17 @@
-import { and, count, eq, ilike, inArray, ne, or, sql, SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
+import { filterPlayerIdsByLeagueEligibility } from '../DraftUtils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicDb, PublicSchema } from '../client/PublicDbClient';
 import { Player, PlayerPosition } from '../../types/DatabaseTypes';
@@ -182,6 +194,43 @@ export type PlayerNotablePlayUpsert = Omit<
   'createdAt' | 'updatedAt'
 >;
 
+/** Row shape of the player_highlight_videos cache table (LS-9113). */
+export type PlayerHighlightVideoRow =
+  typeof PublicSchema.playerHighlightVideos.$inferSelect;
+
+/**
+ * A player awaiting highlight-video resolution (LS-9113). Era fields are the
+ * first/last seasons with a batting or pitching line — context for the
+ * relevance judge when a video title only matches on last name.
+ */
+export interface HighlightVideoCandidate {
+  playerId: number;
+  firstName: string;
+  lastName: string;
+  mlbTeam: string | null;
+  firstSeason: number | null;
+  lastSeason: number | null;
+}
+
+/** Outcome of one player's resolution attempt (LS-9113). */
+export interface HighlightVideoResolution {
+  playerId: number;
+  /** NULL marks attempted-but-unresolved — the splash uses the graphic tier. */
+  youtubeVideoId: string | null;
+  videoTitle: string | null;
+  madeForKids: boolean | null;
+  embeddable: boolean | null;
+  matchMethod: 'full_name' | 'judge' | null;
+}
+
+/** Verification refresh for an already-resolved video row (LS-9113). */
+export interface HighlightVideoVerification {
+  playerId: number;
+  videoTitle: string | null;
+  madeForKids: boolean;
+  embeddable: boolean;
+}
+
 /**
  * Player service functions for database operations
  */
@@ -311,6 +360,315 @@ export class PlayerService {
         })
         .returning({ mlbPlayerId: t.mlbPlayerId });
       return updated.length;
+    });
+  }
+
+  /**
+   * Get validated highlight-video cache rows for a set of players (LS-9113).
+   * Splash-path read — only rows that are resolved, embeddable, and not
+   * Made-for-Kids are served; everything else falls back to the graphic tier.
+   */
+  async getHighlightVideosByPlayerIds(
+    playerIds: number[],
+  ): Promise<PlayerHighlightVideoRow[]> {
+    if (playerIds.length === 0) return [];
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      return db
+        .select()
+        .from(t)
+        .where(
+          and(
+            inArray(t.playerId, playerIds),
+            isNotNull(t.youtubeVideoId),
+            eq(t.embeddable, true),
+            eq(t.madeForKids, false),
+          ),
+        );
+    });
+  }
+
+  /**
+   * Priority-ordered players awaiting highlight-video resolution (LS-9113):
+   * draft-pool players of upcoming/active baseball leagues first (default
+   * scoring-cache FPG descending — the players most likely to be drafted),
+   * then previously drafted players by pick recency. Players with any cache
+   * row (resolved or attempted) are excluded; the 30-day stale purge is what
+   * re-opens unresolved players for a retry.
+   */
+  async getHighlightVideoResolutionCandidates(
+    limit: number,
+  ): Promise<HighlightVideoCandidate[]> {
+    if (limit <= 0) return [];
+    return runWithPublicClient(this.options, async (db) => {
+      const ordered: number[] = [];
+      const seen = new Set<number>();
+      const add = (id: number) => {
+        if (!seen.has(id) && ordered.length < limit) {
+          seen.add(id);
+          ordered.push(id);
+        }
+      };
+
+      // Tier 1: pool of leagues with an upcoming or active draft. The pool
+      // ranking is league-independent (default-profile FPG); per-league
+      // eligibility settings then gate which ranked players belong to each
+      // league's pool.
+      const draftingLeagues = await db
+        .select({
+          playerPool: PublicSchema.leagues.playerPool,
+          minCareerGames: PublicSchema.leagues.minCareerGames,
+          minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+          baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+          baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+          customEraStartYear: PublicSchema.leagues.customEraStartYear,
+          customEraEndYear: PublicSchema.leagues.customEraEndYear,
+        })
+        .from(PublicSchema.leagues)
+        .where(
+          and(
+            eq(PublicSchema.leagues.sport, 'baseball'),
+            inArray(PublicSchema.leagues.draftStatus, [
+              'not-started',
+              'queued',
+              'in-progress',
+            ]),
+          ),
+        )
+        .limit(20);
+
+      if (draftingLeagues.length > 0) {
+        const poolRows = await db.execute(
+          sql`SELECT p.id
+              FROM players p
+              LEFT JOIN public.player_scoring_cache cs
+                ON cs.player_id = p.id AND cs.league_id IS NULL
+              WHERE p.sport = 'baseball'
+                AND NOT EXISTS (
+                  SELECT 1 FROM player_highlight_videos phv
+                  WHERE phv.player_id = p.id
+                )
+              ORDER BY (
+                COALESCE(cs.batting_ppg, 0) +
+                COALESCE(cs.pitching_ppg, 0) +
+                COALESCE(cs.fielding_ppg, 0)
+              ) DESC
+              LIMIT ${limit * 4}`,
+        );
+        const rankedIds = poolRows.rows.map((r) => r.id as number);
+        for (const league of draftingLeagues) {
+          if (ordered.length >= limit) break;
+          const eligibility = await filterPlayerIdsByLeagueEligibility(
+            db,
+            rankedIds,
+            {
+              playerPool: league.playerPool,
+              minCareerGames: league.minCareerGames ?? 0,
+              minCareerSeasons: league.minCareerSeasons ?? 0,
+              baseballHofOnly: league.baseballHofOnly ?? false,
+              baseballEraFilter: league.baseballEraFilter ?? 'all',
+              customEraStartYear: league.customEraStartYear ?? null,
+              customEraEndYear: league.customEraEndYear ?? null,
+              sport: 'baseball',
+            },
+          );
+          for (const id of rankedIds) {
+            if (eligibility.eligibleIds.has(id)) add(id);
+          }
+        }
+      }
+
+      // Tier 2: previously drafted players, most recent pick first.
+      if (ordered.length < limit) {
+        const drafted = await db.execute(
+          sql`SELECT dp.player_id AS id
+              FROM draft_picks dp
+              JOIN players p ON p.id = dp.player_id AND p.sport = 'baseball'
+              WHERE NOT EXISTS (
+                SELECT 1 FROM player_highlight_videos phv
+                WHERE phv.player_id = dp.player_id
+              )
+              GROUP BY dp.player_id
+              ORDER BY MAX(dp.picked_at) DESC
+              LIMIT ${limit}`,
+        );
+        for (const r of drafted.rows) add(r.id as number);
+      }
+
+      if (ordered.length === 0) return [];
+
+      // Hydrate names, team, and era span (relevance-judge context).
+      const players = await db
+        .select({
+          id: PublicSchema.players.id,
+          firstName: PublicSchema.players.firstName,
+          lastName: PublicSchema.players.lastName,
+          mlbTeam: PublicSchema.players.mlbTeam,
+        })
+        .from(PublicSchema.players)
+        .where(inArray(PublicSchema.players.id, ordered));
+      const spans = new Map<number, { first: number; last: number }>();
+      for (const table of [
+        PublicSchema.seasonBatting,
+        PublicSchema.seasonPitching,
+      ] as const) {
+        const rows = await db
+          .select({
+            playerId: table.playerId,
+            first: sql<number>`min(${table.season})`,
+            last: sql<number>`max(${table.season})`,
+          })
+          .from(table)
+          .where(inArray(table.playerId, ordered))
+          .groupBy(table.playerId);
+        for (const row of rows) {
+          const existing = spans.get(row.playerId);
+          spans.set(row.playerId, {
+            first: Math.min(existing?.first ?? row.first, row.first),
+            last: Math.max(existing?.last ?? row.last, row.last),
+          });
+        }
+      }
+      const byId = new Map(players.map((p) => [p.id, p]));
+      return ordered
+        .map((id) => {
+          const p = byId.get(id);
+          if (!p) return null;
+          const span = spans.get(id);
+          return {
+            playerId: id,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            mlbTeam: p.mlbTeam,
+            firstSeason: span?.first ?? null,
+            lastSeason: span?.last ?? null,
+          };
+        })
+        .filter((c): c is HighlightVideoCandidate => c !== null);
+    });
+  }
+
+  /**
+   * Record resolution outcomes (LS-9113) — validated videos and
+   * attempted-but-unresolved markers alike. Resolved rows count as verified
+   * now (the resolver just confirmed status via videos.list).
+   */
+  async upsertHighlightVideoResolutions(
+    resolutions: HighlightVideoResolution[],
+  ): Promise<number> {
+    if (resolutions.length === 0) return 0;
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      const updated = await db
+        .insert(t)
+        .values(
+          resolutions.map((r) => ({
+            playerId: r.playerId,
+            youtubeVideoId: r.youtubeVideoId,
+            videoTitle: r.videoTitle,
+            madeForKids: r.madeForKids,
+            embeddable: r.embeddable,
+            matchMethod: r.matchMethod,
+            resolvedAt: sql`now()`,
+            lastVerifiedAt: r.youtubeVideoId != null ? sql`now()` : null,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: t.playerId,
+          set: {
+            youtubeVideoId: sql`excluded.youtube_video_id`,
+            videoTitle: sql`excluded.video_title`,
+            madeForKids: sql`excluded.made_for_kids`,
+            embeddable: sql`excluded.embeddable`,
+            matchMethod: sql`excluded.match_method`,
+            resolvedAt: sql`excluded.resolved_at`,
+            lastVerifiedAt: sql`excluded.last_verified_at`,
+            updatedAt: sql`now()`,
+          },
+        })
+        .returning({ playerId: t.playerId });
+      return updated.length;
+    });
+  }
+
+  /** All resolved video rows, for the weekly re-verify pass (LS-9113). */
+  async getHighlightVideosForVerification(): Promise<
+    Array<{ playerId: number; youtubeVideoId: string }>
+  > {
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      const rows = await db
+        .select({ playerId: t.playerId, youtubeVideoId: t.youtubeVideoId })
+        .from(t)
+        .where(isNotNull(t.youtubeVideoId));
+      return rows.filter(
+        (r): r is { playerId: number; youtubeVideoId: string } =>
+          r.youtubeVideoId !== null,
+      );
+    });
+  }
+
+  /**
+   * Refresh metadata for still-valid videos confirmed by the weekly
+   * videos.list pass (LS-9113).
+   */
+  async applyHighlightVideoVerifications(
+    verifications: HighlightVideoVerification[],
+  ): Promise<number> {
+    if (verifications.length === 0) return 0;
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      let updated = 0;
+      for (const v of verifications) {
+        const rows = await db
+          .update(t)
+          .set({
+            videoTitle: v.videoTitle,
+            madeForKids: v.madeForKids,
+            embeddable: v.embeddable,
+            lastVerifiedAt: sql`now()`,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(t.playerId, v.playerId))
+          .returning({ playerId: t.playerId });
+        updated += rows.length;
+      }
+      return updated;
+    });
+  }
+
+  /**
+   * Purge cache rows for videos that are gone, private, no longer
+   * embeddable, or flipped Made-for-Kids (LS-9113). The player becomes a
+   * resolution candidate again on a later nightly run.
+   */
+  async purgeHighlightVideos(playerIds: number[]): Promise<number> {
+    if (playerIds.length === 0) return 0;
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      const rows = await db
+        .delete(t)
+        .where(inArray(t.playerId, playerIds))
+        .returning({ playerId: t.playerId });
+      return rows.length;
+    });
+  }
+
+  /**
+   * Purge rows not verified within the YouTube API cache window (LS-9113,
+   * DP III.E.4.d/e — stored API data must be refreshed or deleted within 30
+   * days). Also the retry mechanism for unresolved markers.
+   */
+  async purgeStaleHighlightVideos(maxAgeDays: number): Promise<number> {
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerHighlightVideos;
+      const rows = await db
+        .delete(t)
+        .where(
+          sql`COALESCE(${t.lastVerifiedAt}, ${t.resolvedAt}) < now() - make_interval(days => ${maxAgeDays})`,
+        )
+        .returning({ playerId: t.playerId });
+      return rows.length;
     });
   }
 
