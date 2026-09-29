@@ -19,11 +19,15 @@ export {
   type StoredPitching,
 } from './lib/types';
 
+export { buildSeasonPayloads, type SeasonPayloadsResult } from './lib/payloads';
+
 export {
   aggregateFielding,
   assignGameNumbers,
+  isRegularSeasonRow,
   isValueRow,
   outsToInningsNotation,
+  REGULAR_SEASON_GAME_TYPES,
   toStoredBatting,
   toStoredPitching,
   type CsvRow,

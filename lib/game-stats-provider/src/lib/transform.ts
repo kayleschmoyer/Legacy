@@ -48,6 +48,29 @@ export function isValueRow(row: CsvRow): boolean {
   return row['stattype'] === 'value';
 }
 
+/**
+ * Retrosheet `gametype` values that Baseball Reference counts as regular
+ * season. The processed CSVs tag every row with the game's type; observed
+ * values are `regular`, `playoff`, `allstar`, `wildcard`, `divisionseries`,
+ * `lcs`, `worldseries`, `championship` (Negro League World Series) and
+ * `exhibition`.
+ *
+ * `playoff` is Retrosheet's label for a pennant/division TIEBREAKER (1946,
+ * 1951, 1978, 2009 "game 163", 2018 ...), not a postseason round. Those games
+ * count toward regular-season stats, and BBRef's game logs — which this corpus
+ * replaced — include them, so they are kept. Everything else is postseason,
+ * All-Star or exhibition play and is dropped (LS-10230).
+ */
+export const REGULAR_SEASON_GAME_TYPES: ReadonlySet<string> = new Set([
+  'regular',
+  'playoff',
+]);
+
+/** True when the row belongs to a regular-season (or tiebreaker) game. */
+export function isRegularSeasonRow(row: CsvRow): boolean {
+  return REGULAR_SEASON_GAME_TYPES.has(row['gametype'] ?? '');
+}
+
 export function toStoredBatting(
   row: CsvRow,
   season: number,

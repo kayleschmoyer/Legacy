@@ -2,6 +2,7 @@ import {
   aggregateFielding,
   assignGameNumbers,
   type CsvRow,
+  isRegularSeasonRow,
   isValueRow,
   outsToInningsNotation,
   toStoredBatting,
@@ -43,6 +44,29 @@ describe('isValueRow', () => {
     expect(isValueRow({ stattype: 'value' })).toBe(true);
     expect(isValueRow({ stattype: 'adjustment' })).toBe(false);
     expect(isValueRow({})).toBe(false);
+  });
+});
+
+describe('isRegularSeasonRow', () => {
+  it.each(['regular', 'playoff'])('keeps %s games', (gametype) => {
+    expect(isRegularSeasonRow({ gametype })).toBe(true);
+  });
+
+  it.each([
+    'allstar',
+    'wildcard',
+    'divisionseries',
+    'lcs',
+    'worldseries',
+    'championship',
+    'exhibition',
+    '',
+  ])('drops %s games', (gametype) => {
+    expect(isRegularSeasonRow({ gametype })).toBe(false);
+  });
+
+  it('drops a row with no gametype column', () => {
+    expect(isRegularSeasonRow({})).toBe(false);
   });
 });
 

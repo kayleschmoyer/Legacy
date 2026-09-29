@@ -4,16 +4,10 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import {
-  aggregateFielding,
-  assignGameNumbers,
   buildObjectKey,
+  buildSeasonPayloads,
   type CsvRow,
-  isValueRow,
   readZipEntryText,
-  RETROSHEET_PAYLOAD_VERSION,
-  type RetrosheetSeasonPayload,
-  toStoredBatting,
-  toStoredPitching,
 } from '@legacy-sports/game-stats-provider';
 import { LOGGER } from '@legacy-sports/logging';
 import { gzipSync } from 'node:zlib';
@@ -218,106 +212,6 @@ async function buildRetroToBref(): Promise<Map<string, string>> {
   return map;
 }
 
-// ---------------------------------------------------------------------------
-// Season processing
-// ---------------------------------------------------------------------------
-
-function groupByPlayer(rows: CsvRow[]): Map<string, CsvRow[]> {
-  const grouped = new Map<string, CsvRow[]>();
-  for (const row of rows) {
-    if (!isValueRow(row)) {
-      continue;
-    }
-    const id = row['id'];
-    if (!id) {
-      continue;
-    }
-    const bucket = grouped.get(id);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      grouped.set(id, [row]);
-    }
-  }
-  return grouped;
-}
-
-function buildPayloads(
-  season: number,
-  batting: CsvRow[],
-  pitching: CsvRow[],
-  fielding: CsvRow[],
-  retroToBref: Map<string, string>,
-): { payloads: RetrosheetSeasonPayload[]; unmapped: Set<string> } {
-  const byPlayer = new Map<
-    string,
-    { batting: CsvRow[]; pitching: CsvRow[]; fielding: CsvRow[] }
-  >();
-
-  const ensure = (id: string) => {
-    let entry = byPlayer.get(id);
-    if (!entry) {
-      entry = { batting: [], pitching: [], fielding: [] };
-      byPlayer.set(id, entry);
-    }
-    return entry;
-  };
-
-  for (const [id, rows] of groupByPlayer(batting)) ensure(id).batting = rows;
-  for (const [id, rows] of groupByPlayer(pitching)) ensure(id).pitching = rows;
-  for (const [id, rows] of groupByPlayer(fielding)) ensure(id).fielding = rows;
-
-  const payloads: RetrosheetSeasonPayload[] = [];
-  const unmapped = new Set<string>();
-
-  for (const [retroId, groups] of byPlayer) {
-    const brefId = retroToBref.get(retroId);
-    if (!brefId) {
-      unmapped.add(retroId);
-      continue;
-    }
-
-    // game_number is a per-player-season sequence over every game the player
-    // appeared in, in any capacity — so derive it from the union of all three
-    // stat families rather than per-family, keeping the three tables' game
-    // numbering consistent for the same player-season.
-    const allRows = [...groups.batting, ...groups.pitching, ...groups.fielding];
-    const gameNumbers = assignGameNumbers(allRows);
-    const numberFor = (gid: string) => gameNumbers.get(gid) ?? 0;
-
-    // Retrosheet emits one fielding row per position per game; the target
-    // table is one row per player-game, so collapse by game first.
-    const fieldingByGame = new Map<string, CsvRow[]>();
-    for (const row of groups.fielding) {
-      const gid = row['gid'];
-      const bucket = fieldingByGame.get(gid);
-      if (bucket) {
-        bucket.push(row);
-      } else {
-        fieldingByGame.set(gid, [row]);
-      }
-    }
-
-    payloads.push({
-      v: RETROSHEET_PAYLOAD_VERSION,
-      brefId,
-      retroId,
-      season,
-      batting: groups.batting.map((row) =>
-        toStoredBatting(row, season, numberFor(row['gid'])),
-      ),
-      pitching: groups.pitching.map((row) =>
-        toStoredPitching(row, season, numberFor(row['gid'])),
-      ),
-      fielding: [...fieldingByGame.values()].map((rows) =>
-        aggregateFielding(rows, season, numberFor(rows[0]['gid'])),
-      ),
-    });
-  }
-
-  return { payloads, unmapped };
-}
-
 async function objectExists(
   s3: S3Client,
   bucket: string,
@@ -396,13 +290,22 @@ export async function handleIngestRetrosheet(
         LOGGER.warn(`Season ${season}: missing member ${name}`);
         return [];
       }
-      return parseCsv(text);
+      const rows = parseCsv(text);
+      // Rows are kept only when `gametype` is a regular-season value, so a
+      // renamed or missing column would silently drop the entire season.
+      // Abort instead of writing an empty corpus.
+      if (rows.length > 0 && !('gametype' in rows[0])) {
+        throw new Error(
+          `Season ${season}: ${name} has no gametype column; cannot filter to the regular season`,
+        );
+      }
+      return rows;
     };
 
     // Only the three stat members are read. plays.csv is ~87% of the archive's
     // uncompressed bytes and is never decompressed, which keeps the working
     // set per season around 16 MiB instead of 126 MiB.
-    const { payloads, unmapped } = buildPayloads(
+    const { payloads, unmapped, empty } = buildSeasonPayloads(
       season,
       read(`${season}batting.csv`),
       read(`${season}pitching.csv`),
@@ -438,7 +341,7 @@ export async function handleIngestRetrosheet(
     totalUploaded += uploaded;
     totalSkipped += skipped;
     LOGGER.info(
-      `Season ${season}: ${payloads.length} player-seasons (${uploaded} written, ${skipped} already present, ${unmapped.size} unmapped)`,
+      `Season ${season}: ${payloads.length} player-seasons (${uploaded} written, ${skipped} already present, ${unmapped.size} unmapped, ${empty.size} with no regular-season batting or pitching)`,
     );
   }
 

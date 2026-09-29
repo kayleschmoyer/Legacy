@@ -37,7 +37,21 @@ async function loadPayload(player: Player, season: number) {
   if (!player.brefId) {
     return null;
   }
-  return getSeasonPayload(player.brefId, season);
+  const payload = await getSeasonPayload(player.brefId, season);
+  // Defence in depth (LS-10230): the ingest never writes a payload with no
+  // batting and no pitching, but if one exists, serving it would record the
+  // player-season as having no games. Treat it as a miss so the scraper runs.
+  if (
+    payload !== null &&
+    payload.batting.length === 0 &&
+    payload.pitching.length === 0
+  ) {
+    LOGGER.warn(
+      `Retrosheet payload for ${player.brefId} ${season} has no batting or pitching rows; falling back to Baseball Reference`,
+    );
+    return null;
+  }
+  return payload;
 }
 
 export async function getAllGameBattingStats(

@@ -5,11 +5,16 @@ import type {
 } from '@legacy-sports/db-client';
 
 /**
- * Current on-disk (in-S3) payload version. Bump alongside the `v1` path
- * segment in {@link buildObjectKey} whenever the stored shape changes so a
- * re-ingest can be rolled out without mutating existing objects in place.
+ * Current on-disk (in-S3) payload version. It is also the `v<N>` path segment
+ * in {@link buildObjectKey}, so bumping it points readers at a fresh prefix
+ * and a re-ingest can be rolled out without mutating existing objects in
+ * place.
+ *
+ * - v1: every Retrosheet game, including postseason and All-Star games.
+ * - v2: regular season (plus tiebreakers) only, and no object whose batting
+ *   and pitching are both empty (LS-10230).
  */
-export const RETROSHEET_PAYLOAD_VERSION = 1;
+export const RETROSHEET_PAYLOAD_VERSION = 2;
 
 /**
  * Rows are stored WITHOUT `playerId`: the app's surrogate player id is a
