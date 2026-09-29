@@ -293,6 +293,8 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                       onChangeText={setUsernameInput}
                       autoCapitalize="none"
                       autoCorrect={false}
+                      autoComplete="username"
+                      textContentType="username"
                       placeholder="username"
                     />
                     <Button
