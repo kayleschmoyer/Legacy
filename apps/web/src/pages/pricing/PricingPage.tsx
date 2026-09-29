@@ -207,6 +207,11 @@ const ComparisonTable = styled(YStack, {
   borderColor: '$borderColor',
   overflow: 'hidden',
   width: '100%',
+  // Below $sm the 25/50/25 columns get too narrow for values like
+  // 'Standard + FAAB', so rows keep a minimum width and the table scrolls.
+  $sm: {
+    overflowX: 'auto',
+  },
 });
 
 const TableRow = styled(XStack, {
@@ -216,6 +221,9 @@ const TableRow = styled(XStack, {
   paddingHorizontal: '$5',
   alignItems: 'center',
   width: '100%',
+  $sm: {
+    minWidth: 560,
+  },
   variants: {
     header: {
       true: {
