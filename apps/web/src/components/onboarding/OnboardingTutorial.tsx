@@ -552,6 +552,73 @@ const STEPS: TutorialStep[] = [
   },
 ];
 
+/* ─── Focus management ───────────────────────────────────── */
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * WAI-ARIA Modal Dialog Pattern (LS-6902): move focus into the dialog on
+ * open, trap Tab/Shift+Tab inside it, dismiss on Escape, and restore focus
+ * to the previously focused element on close.
+ */
+function useModalDialogFocus(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  onClose: () => void,
+) {
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    const getFocusable = () =>
+      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+
+    // Initial focus: the close button (first interactive element in DOM order).
+    getFocusable()[0]?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const isInside = active instanceof Node && container.contains(active);
+
+      if (e.shiftKey && (active === first || !isInside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !isInside)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [containerRef]);
+}
+
 /* ─── Main component ─────────────────────────────────────── */
 
 /**
@@ -560,6 +627,8 @@ const STEPS: TutorialStep[] = [
  */
 export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
   const [currentStep, setCurrentStep] = React.useState(0);
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+  useModalDialogFocus(backdropRef, onClose);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
   const step = STEPS[currentStep];
@@ -583,6 +652,7 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
   return (
     /* ── Backdrop ── */
     <div
+      ref={backdropRef}
       style={{
         position: 'fixed',
         top: 0,
