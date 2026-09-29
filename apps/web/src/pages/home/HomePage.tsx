@@ -19,6 +19,7 @@ import {
   useGetUserLeagueSummariesQuery,
   type UserLeagueSummaryFragment,
 } from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
@@ -206,7 +207,11 @@ export function HomePage(): React.JSX.Element {
         const completed =
           stored !== null ? (JSON.parse(stored) as boolean) : false;
         if (!completed) setTutorialOpen(true);
-      } catch {
+      } catch (caught) {
+        LOGGER.error(
+          'HomePage: onboarding localStorage access failed',
+          caught instanceof Error ? caught : new Error(String(caught)),
+        );
         setTutorialOpen(true);
       }
     }
@@ -220,8 +225,11 @@ export function HomePage(): React.JSX.Element {
           getOnboardingKey(userId),
           JSON.stringify(true),
         );
-      } catch {
-        // ignore
+      } catch (caught) {
+        LOGGER.error(
+          'HomePage: failed to persist onboarding completion',
+          caught instanceof Error ? caught : new Error(String(caught)),
+        );
       }
     }
   };
