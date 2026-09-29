@@ -675,90 +675,92 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             </YStack>
           ) : null}
 
-          {/* Feature Comparison */}
-          <YStack
-            borderRadius="$6"
-            borderWidth={1}
-            borderColor="$borderColor"
-            overflow="hidden"
-          >
-            <XStack
-              paddingHorizontal="$5"
-              paddingVertical="$4"
-              alignItems="center"
-              gap="$3"
-              borderBottomWidth={1}
-              borderBottomColor="$borderColor"
+          {/* Feature Comparison (non-Premium only) */}
+          {!isPremium ? (
+            <YStack
+              borderRadius="$6"
+              borderWidth={1}
+              borderColor="$borderColor"
+              overflow="hidden"
             >
-              <YStack
-                width={36}
-                height={36}
-                borderRadius="$4"
+              <XStack
+                paddingHorizontal="$5"
+                paddingVertical="$4"
                 alignItems="center"
-                justifyContent="center"
-                backgroundColor="$color2"
+                gap="$3"
+                borderBottomWidth={1}
+                borderBottomColor="$borderColor"
               >
-                <Text fontSize={16}>📊</Text>
-              </YStack>
-              <YStack flex={1}>
-                <Paragraph size="$4" color="$color" fontWeight="600">
-                  What's Included
-                </Paragraph>
-                <Paragraph size="$2" color="$colorPress">
-                  Free vs Premium feature comparison
-                </Paragraph>
-              </YStack>
-            </XStack>
-
-            <YStack padding="$5" gap="$1">
-              <XStack paddingHorizontal="$2" paddingBottom="$3">
-                <Text flex={1} fontSize="$3" color="$colorSubtle" />
-                <Text
-                  width={60}
-                  textAlign="center"
-                  fontSize="$3"
-                  color="$colorSubtle"
-                  fontWeight="600"
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius="$4"
+                  alignItems="center"
+                  justifyContent="center"
+                  backgroundColor="$color2"
                 >
-                  Free
-                </Text>
-                <Text
-                  width={80}
-                  textAlign="center"
-                  fontSize="$3"
-                  color={brand.gold}
-                  fontWeight="600"
-                >
-                  Premium
-                </Text>
+                  <Text fontSize={16}>📊</Text>
+                </YStack>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    What's Included
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Free vs Premium feature comparison
+                  </Paragraph>
+                </YStack>
               </XStack>
-              {PREMIUM_FEATURES.map((feature, i) => (
-                <React.Fragment key={feature.label}>
-                  {i > 0 ? <Separator /> : null}
-                  <XStack
-                    paddingVertical="$3"
-                    paddingHorizontal="$2"
-                    alignItems="center"
+
+              <YStack padding="$5" gap="$1">
+                <XStack paddingHorizontal="$2" paddingBottom="$3">
+                  <Text flex={1} fontSize="$3" color="$colorSubtle" />
+                  <Text
+                    width={60}
+                    textAlign="center"
+                    fontSize="$3"
+                    color="$colorSubtle"
+                    fontWeight="600"
                   >
-                    <Text flex={1} fontSize="$3" color="$color">
-                      {feature.label}
-                    </Text>
-                    <Text width={60} textAlign="center" fontSize="$4">
-                      {feature.free ? '✓' : '—'}
-                    </Text>
-                    <Text
-                      width={80}
-                      textAlign="center"
-                      fontSize="$4"
-                      color={brand.gold}
+                    Free
+                  </Text>
+                  <Text
+                    width={80}
+                    textAlign="center"
+                    fontSize="$3"
+                    color={brand.gold}
+                    fontWeight="600"
+                  >
+                    Premium
+                  </Text>
+                </XStack>
+                {PREMIUM_FEATURES.map((feature, i) => (
+                  <React.Fragment key={feature.label}>
+                    {i > 0 ? <Separator /> : null}
+                    <XStack
+                      paddingVertical="$3"
+                      paddingHorizontal="$2"
+                      alignItems="center"
                     >
-                      {feature.premium ? '✓' : '—'}
-                    </Text>
-                  </XStack>
-                </React.Fragment>
-              ))}
+                      <Text flex={1} fontSize="$3" color="$color">
+                        {feature.label}
+                      </Text>
+                      <Text width={60} textAlign="center" fontSize="$4">
+                        {feature.free ? '✓' : '—'}
+                      </Text>
+                      <Text
+                        width={80}
+                        textAlign="center"
+                        fontSize="$4"
+                        color={brand.gold}
+                      >
+                        {feature.premium ? '✓' : '—'}
+                      </Text>
+                    </XStack>
+                  </React.Fragment>
+                ))}
+              </YStack>
             </YStack>
-          </YStack>
+          ) : null}
 
           {/* Restore Purchases (iOS only) */}
           {Platform.OS === 'ios' ? (

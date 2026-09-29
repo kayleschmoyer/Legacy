@@ -246,8 +246,8 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
   // (see useSubscription.ts), so the plan label must render "Premium" for
   // premium subscribers. Before the fix, 'premium' matched no switch case and
   // fell through to the "Free" default. The "Free"/"Premium" feature-comparison
-  // column headers always render once each, so the plan label adds a second
-  // occurrence of whichever word matches the current tier.
+  // column headers render once each for non-Premium users only, so a free user
+  // sees the plan label as a second occurrence of "Free".
   it('labels a premium subscriber as Premium, not Free', () => {
     mockUseSubscription.mockReturnValue({
       subscription: { status: 'active' },
@@ -259,10 +259,10 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
 
     render(<SubscriptionSettingsScreen />);
 
-    // Plan label "Premium" + the "Premium" feature-comparison header.
-    expect(screen.getAllByText('Premium')).toHaveLength(2);
-    // Only the "Free" feature-comparison header — the plan label is NOT "Free".
-    expect(screen.getAllByText('Free')).toHaveLength(1);
+    // Only the plan label — the feature-comparison card is hidden for Premium.
+    expect(screen.getAllByText('Premium')).toHaveLength(1);
+    expect(screen.queryByText('Free')).toBeNull();
+    expect(screen.queryByText("What's Included")).toBeNull();
   });
 
   it('labels a free user as Free', () => {
