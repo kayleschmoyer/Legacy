@@ -22,6 +22,7 @@ type SubscriptionMock = {
   tier: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  trialEndsAt?: string | null;
   gracePeriodEndsAt?: string | null;
 };
 
@@ -235,6 +236,65 @@ describe('SubscriptionPage — Manage Subscription gating (LS-5176)', () => {
     renderPage();
 
     expect(screen.getByText('Manage Subscription')).toBeInTheDocument();
+  });
+});
+
+describe('SubscriptionPage — trialing status (LS-7391)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  function mockSubscription(overrides: Partial<SubscriptionMock>) {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'trialing',
+          tier: 'premium',
+          currentPeriodEnd: '2026-08-01T12:00:00.000Z',
+          cancelAtPeriodEnd: false,
+          trialEndsAt: null,
+          ...overrides,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('labels a trialing subscription "Trial" and shows the trial end date', () => {
+    mockSubscription({ trialEndsAt: '2026-07-15T12:00:00.000Z' });
+
+    renderPage();
+
+    expect(screen.getByText('Trial')).toBeInTheDocument();
+    expect(screen.getByText('Trial ends')).toBeInTheDocument();
+    expect(screen.getByText('July 15, 2026')).toBeInTheDocument();
+  });
+
+  it('omits the trial end row when trialEndsAt is absent', () => {
+    mockSubscription({ trialEndsAt: null });
+
+    renderPage();
+
+    expect(screen.getByText('Trial')).toBeInTheDocument();
+    expect(screen.queryByText('Trial ends')).not.toBeInTheDocument();
+  });
+
+  it('does not show the trial end row for a paid active subscription', () => {
+    mockSubscription({
+      status: 'active',
+      trialEndsAt: '2026-07-15T12:00:00.000Z',
+    });
+
+    renderPage();
+
+    expect(screen.queryByText('Trial ends')).not.toBeInTheDocument();
   });
 });
 

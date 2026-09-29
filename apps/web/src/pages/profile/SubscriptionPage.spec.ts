@@ -2,9 +2,11 @@ import {
   ACTIVATION_MAX_POLLS,
   ACTIVATION_POLL_INTERVAL_MS,
   deriveIsPremium,
+  getStatusAccent,
   getTierLabel,
   shouldContinueActivationPolling,
 } from './SubscriptionPage';
+import { AMBER, BLUE, EMERALD, RED } from '../../constants/colors';
 
 // LS-5189: the subscriptions table stores only `free` or `premium` for `tier`.
 // The previous implementation switched on `monthly`/`annual` (Stripe billing
@@ -57,6 +59,29 @@ describe('deriveIsPremium', () => {
     expect(deriveIsPremium(null)).toBe(false);
     expect(deriveIsPremium(undefined)).toBe(false);
     expect(deriveIsPremium({ tier: null })).toBe(false);
+  });
+});
+
+// LS-7391: a trialing subscription satisfies the tier-derived isPremium check,
+// so the badge used to fall through to the same green as paid Premium. Each
+// status now maps to a distinct accent.
+describe('getStatusAccent', () => {
+  it('gives trialing its own blue, distinct from active/past_due/canceled', () => {
+    expect(getStatusAccent('trialing')).toBe(BLUE);
+    expect(getStatusAccent('trialing')).not.toBe(getStatusAccent('active'));
+    expect(getStatusAccent('trialing')).not.toBe(getStatusAccent('past_due'));
+    expect(getStatusAccent('trialing')).not.toBe(getStatusAccent('canceled'));
+  });
+
+  it('keeps the existing amber / red / emerald states unchanged', () => {
+    expect(getStatusAccent('past_due')).toBe(AMBER);
+    expect(getStatusAccent('canceled')).toBe(RED);
+    expect(getStatusAccent('active')).toBe(EMERALD);
+  });
+
+  it('falls back to emerald for a missing status', () => {
+    expect(getStatusAccent(null)).toBe(EMERALD);
+    expect(getStatusAccent(undefined)).toBe(EMERALD);
   });
 });
 

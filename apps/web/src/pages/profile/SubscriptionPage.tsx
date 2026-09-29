@@ -30,6 +30,7 @@ import { env } from '../../config/environment';
 import {
   AMBER,
   BG_DARK,
+  BLUE,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_GOLD_PRESS,
@@ -221,6 +222,23 @@ function getStatusLabel(status: string): string {
       return 'Trial';
     default:
       return status;
+  }
+}
+
+// LS-7391: accent color for the status badge (background/border tint, dot, and
+// text). Keyed on subscription *status*, not tier: a grace-period user is both
+// premium and past_due (LS-5177), so past_due/canceled take precedence, and
+// `trialing` gets its own blue so a trial never reads as paid Premium (green).
+export function getStatusAccent(status: string | null | undefined): string {
+  switch (status) {
+    case 'past_due':
+      return AMBER;
+    case 'canceled':
+      return RED;
+    case 'trialing':
+      return BLUE;
+    default:
+      return EMERALD;
   }
 }
 
@@ -626,6 +644,8 @@ const SubscriptionPage: React.FC = () => {
   const isPremium = deriveIsPremium(subscription);
   const isPastDue = subscription?.status === 'past_due';
   const isCanceled = subscription?.status === 'canceled';
+  const isTrialing = subscription?.status === 'trialing';
+  const statusAccent = getStatusAccent(subscription?.status);
   const isFree = !subscription || subscription.status === null;
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
@@ -934,40 +954,29 @@ const SubscriptionPage: React.FC = () => {
                     </YStack>
 
                     <BadgeTag
-                      backgroundColor={
-                        // The badge reflects subscription *status*, not tier, so
-                        // status checks take precedence: with `isPremium` now
-                        // tier-derived (LS-5177), a grace-period user is both
-                        // premium and past_due — past_due must still read amber.
-                        isPastDue
-                          ? withAlpha(AMBER, 0.12)
-                          : isCanceled
-                            ? withAlpha(RED, 0.1)
-                            : withAlpha(EMERALD, 0.12)
-                      }
-                      borderColor={
-                        isPastDue
-                          ? withAlpha(AMBER, 0.35)
-                          : isCanceled
-                            ? withAlpha(RED, 0.3)
-                            : withAlpha(EMERALD, 0.35)
-                      }
+                      // The badge reflects subscription *status*, not tier — see
+                      // getStatusAccent for the precedence (past_due > canceled >
+                      // trialing > active).
+                      backgroundColor={withAlpha(
+                        statusAccent,
+                        isCanceled ? 0.1 : 0.12,
+                      )}
+                      borderColor={withAlpha(
+                        statusAccent,
+                        isCanceled ? 0.3 : 0.35,
+                      )}
                     >
                       <YStack
                         width={8}
                         height={8}
                         borderRadius={4}
-                        backgroundColor={
-                          isPastDue ? AMBER : isCanceled ? RED : EMERALD
-                        }
+                        backgroundColor={statusAccent}
                         flexShrink={0}
                       />
                       <Paragraph
                         size="$3"
                         fontWeight="600"
-                        style={{
-                          color: isPastDue ? AMBER : isCanceled ? RED : EMERALD,
-                        }}
+                        style={{ color: statusAccent }}
                       >
                         {getStatusLabel(subscription?.status ?? '')}
                       </Paragraph>
@@ -978,6 +987,26 @@ const SubscriptionPage: React.FC = () => {
 
                   {/* Billing Details */}
                   <YStack gap="$3">
+                    {isTrialing && subscription?.trialEndsAt && (
+                      <XStack
+                        data-testid="subscription-trial-ends"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        $sm={{
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          gap: '$1',
+                        }}
+                      >
+                        <Paragraph size="$3" color="$colorPress">
+                          Trial ends
+                        </Paragraph>
+                        <Paragraph size="$3" fontWeight="600" color={BLUE}>
+                          {formatDate(subscription.trialEndsAt)}
+                        </Paragraph>
+                      </XStack>
+                    )}
+
                     {subscription?.currentPeriodEnd && (
                       <XStack
                         alignItems="center"
