@@ -516,7 +516,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 </XStack>
               ) : null}
 
-              {subscription?.cancelAtPeriodEnd ? (
+              {subscription?.cancelAtPeriodEnd ||
+              subscription?.gracePeriodEndsAt ? (
                 <XStack
                   alignItems="flex-start"
                   gap="$3"
@@ -528,27 +529,25 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 >
                   <Text fontSize={14}>⚠️</Text>
                   <Paragraph size="$3" color={brand.seamRed} flex={1}>
-                    Your subscription is set to cancel at the end of the current
-                    billing period.
-                  </Paragraph>
-                </XStack>
-              ) : null}
-
-              {subscription?.gracePeriodEndsAt ? (
-                <XStack
-                  alignItems="flex-start"
-                  gap="$3"
-                  padding="$3"
-                  borderRadius="$4"
-                  borderWidth={1}
-                  borderColor={`${brand.seamRed}44`}
-                  backgroundColor={`${brand.seamRed}1A`}
-                >
-                  <Text fontSize={14}>⚠️</Text>
-                  <Paragraph size="$3" color={brand.seamRed} flex={1}>
-                    Payment issue detected. Access continues until{' '}
-                    {formatDate(subscription.gracePeriodEndsAt)}. Please update
-                    your payment method.
+                    {subscription.cancelAtPeriodEnd &&
+                    subscription.gracePeriodEndsAt ? (
+                      <>
+                        Subscription is past due and set to cancel — update your
+                        payment to renew, or it will be canceled on{' '}
+                        {formatDate(subscription.currentPeriodEnd)}.
+                      </>
+                    ) : subscription.cancelAtPeriodEnd ? (
+                      <>
+                        Your subscription is set to cancel at the end of the
+                        current billing period.
+                      </>
+                    ) : (
+                      <>
+                        Payment issue detected. Access continues until{' '}
+                        {formatDate(subscription.gracePeriodEndsAt)}. Please
+                        update your payment method.
+                      </>
+                    )}
                   </Paragraph>
                 </XStack>
               ) : null}

@@ -460,3 +460,72 @@ describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
     expect(screen.getByText(/^Upgrade —/)).toBeTruthy();
   });
 });
+
+describe('SubscriptionSettingsScreen — combined cancel/past-due banner (LS-7390)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  function renderWith(overrides: {
+    cancelAtPeriodEnd: boolean;
+    gracePeriodEndsAt: string | null;
+  }) {
+    mockUseSubscription.mockReturnValue({
+      subscription: {
+        status: overrides.gracePeriodEndsAt ? 'past_due' : 'active',
+        currentPeriodEnd: '2026-08-15T00:00:00.000Z',
+        ...overrides,
+      },
+      isPremium: true,
+      tier: 'premium',
+      loading: false,
+      refetch: mockRefetch,
+    });
+    render(<SubscriptionSettingsScreen />);
+  }
+
+  it('renders only the cancel banner when only cancelAtPeriodEnd is set', () => {
+    renderWith({ cancelAtPeriodEnd: true, gracePeriodEndsAt: null });
+
+    expect(screen.getAllByText('⚠️')).toHaveLength(1);
+    expect(
+      screen.getByText(/Your subscription is set to cancel at the end/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Payment issue detected/)).toBeNull();
+  });
+
+  it('renders only the payment-issue banner when only gracePeriodEndsAt is set', () => {
+    renderWith({
+      cancelAtPeriodEnd: false,
+      gracePeriodEndsAt: '2026-08-20T00:00:00.000Z',
+    });
+
+    expect(screen.getAllByText('⚠️')).toHaveLength(1);
+    expect(screen.getByText(/Payment issue detected/)).toBeTruthy();
+    expect(screen.queryByText(/set to cancel/)).toBeNull();
+  });
+
+  it('renders exactly one combined banner when both are set', () => {
+    renderWith({
+      cancelAtPeriodEnd: true,
+      gracePeriodEndsAt: '2026-08-20T00:00:00.000Z',
+    });
+
+    expect(screen.getAllByText('⚠️')).toHaveLength(1);
+    expect(
+      screen.getByText(/past due and set to cancel.*canceled on/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Payment issue detected/)).toBeNull();
+    expect(
+      screen.queryByText(/Your subscription is set to cancel at the end/),
+    ).toBeNull();
+  });
+
+  it('renders no status banner when neither is set', () => {
+    renderWith({ cancelAtPeriodEnd: false, gracePeriodEndsAt: null });
+
+    expect(screen.queryByText('⚠️')).toBeNull();
+    expect(screen.getByText('Renews on')).toBeTruthy();
+  });
+});
