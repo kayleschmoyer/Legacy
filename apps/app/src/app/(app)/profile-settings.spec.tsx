@@ -170,14 +170,22 @@ jest.mock('tamagui', () => {
       children,
       onPress,
       testID,
+      accessibilityLabel,
+      accessibilityState,
     }: {
       children?: React.ReactNode;
       onPress?: () => void;
       testID?: string;
+      accessibilityLabel?: string;
+      accessibilityState?: { expanded?: boolean };
       [key: string]: unknown;
     }) => {
       if (onPress) {
-        return React.createElement(Pressable, { testID, onPress }, children);
+        return React.createElement(
+          Pressable,
+          { testID, onPress, accessibilityLabel, accessibilityState },
+          children,
+        );
       }
       return React.createElement(View, { testID }, children);
     },
@@ -264,6 +272,17 @@ describe('ProfileSettingsScreen', () => {
     it('renders the avatar image', () => {
       render(<ProfileSettingsScreen />);
       expect(screen.getByTestId('avatar-image')).toBeTruthy();
+    });
+
+    it('exposes the expanded state on the Edit avatar button', () => {
+      render(<ProfileSettingsScreen />);
+      const button = screen.getByLabelText('Edit avatar');
+      expect(button.props.accessibilityState).toEqual({ expanded: false });
+      fireEvent.press(button);
+      expect(screen.getByTestId('avatar-picker')).toBeTruthy();
+      expect(
+        screen.getByLabelText('Edit avatar').props.accessibilityState,
+      ).toEqual({ expanded: true });
     });
   });
 

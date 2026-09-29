@@ -112,6 +112,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
 
   const handleAvatarSelect = useCallback(
     async (url: string | null) => {
+      if (updatingAvatar) return;
       try {
         await updateAvatar({ variables: { avatarUrl: url } });
         await refetchUser();
@@ -120,7 +121,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
         LOGGER.error('Failed to update avatar:', String(err));
       }
     },
-    [updateAvatar, refetchUser],
+    [updateAvatar, updatingAvatar, refetchUser],
   );
 
   const userName = user?.username ?? currentUser?.username ?? '';
@@ -196,6 +197,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 onPress={() => setShowAvatarPicker(!showAvatarPicker)}
                 accessibilityRole="button"
                 accessibilityLabel="Edit avatar"
+                accessibilityState={{ expanded: showAvatarPicker }}
               >
                 <AvatarImage
                   url={avatarUrl}
