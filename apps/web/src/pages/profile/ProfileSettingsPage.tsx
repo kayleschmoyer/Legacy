@@ -326,8 +326,11 @@ const ProfileSettingsPage: React.FC = () => {
     setUsernameError(null);
     void updateUsername({
       variables: { username: trimmed },
-      onCompleted: () => {
-        auth.updateUserProfile({ username: trimmed });
+      onCompleted: (data) => {
+        // Mirror the server-confirmed username (not the locally typed value)
+        // into the auth context, which the header/home read from the JWT.
+        const confirmed = data.updateUsername?.username;
+        if (confirmed) auth.updateUserProfile({ username: confirmed });
         setIsEditingUsername((editing) => {
           if (editing) void refetchUser();
           return false;
