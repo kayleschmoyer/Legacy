@@ -486,7 +486,6 @@ const ProfileSettingsPage: React.FC = () => {
                       src={userImage}
                       alt={userName}
                       referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
                       style={{
                         width: '100%',
                         height: '100%',

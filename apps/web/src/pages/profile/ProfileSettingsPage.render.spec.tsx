@@ -1,0 +1,125 @@
+/**
+ * Regression tests for LS-7232: the profile-card avatar `<img>` must NOT set
+ * `crossOrigin`. `crossOrigin="anonymous"` forces a CORS-mode fetch, and some
+ * lh3.googleusercontent.com variants don't answer it with CORS headers, so the
+ * load fails, `onError` fires and the initial-letter fallback shows even though
+ * the photo URL is valid. `referrerPolicy="no-referrer"` must stay.
+ */
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import ProfileSettingsPage from './ProfileSettingsPage';
+
+type ChildrenProps = { children?: React.ReactNode };
+
+const GOOGLE_PHOTO = 'https://lh3.googleusercontent.com/a/photo=s96-c';
+
+type AuthMock = {
+  config: Record<string, never>;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    picture: string | null;
+    accessLevel: string;
+  };
+};
+
+const mockUseAuth = jest.fn<AuthMock, []>();
+
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => jest.fn(),
+  useSearchParams: () => [new URLSearchParams()],
+}));
+
+jest.mock('@legacy-sports/shared-components/ui', () => {
+  const Passthrough = ({ children }: ChildrenProps) => <div>{children}</div>;
+  return {
+    AvatarPicker: () => null,
+    H1: Passthrough,
+    Paragraph: Passthrough,
+    Separator: () => <hr />,
+    XStack: Passthrough,
+    YStack: Passthrough,
+  };
+});
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  AuthService: jest.fn(),
+  useAuth: () => mockUseAuth(),
+  useMfa: () => ({}),
+}));
+
+jest.mock('@legacy-sports/shared-components/icons', () => ({
+  BrandIcon: () => null,
+}));
+
+jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
+  styled: <T,>(Component: T) => Component,
+  Input: () => <input />,
+  ScrollView: ({ children }: ChildrenProps) => <div>{children}</div>,
+  Spinner: () => null,
+}));
+
+jest.mock('@legacy-sports/graphql', () => ({
+  useGetUserByIdQuery: () => ({ data: undefined, refetch: jest.fn() }),
+  useMyIdentitiesQuery: () => ({
+    data: undefined,
+    loading: false,
+    refetch: jest.fn(),
+  }),
+  useSetCanonicalEmailMutation: () => [jest.fn(), { loading: false }],
+  useUpdateUserAvatarMutation: () => [jest.fn(), { loading: false }],
+  useUpdateUsernameMutation: () => [jest.fn(), { loading: false }],
+}));
+
+jest.mock('../../components/profile/TwoFactorSection', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock('../../components/PageMeta', () => ({
+  PageMeta: () => null,
+}));
+
+function renderPage(picture: string | null) {
+  mockUseAuth.mockReturnValue({
+    config: {},
+    user: {
+      id: 1,
+      username: 'casey',
+      email: 'casey@example.com',
+      picture,
+      accessLevel: 'user',
+    },
+  });
+  return render(<ProfileSettingsPage />);
+}
+
+describe('ProfileSettingsPage avatar (LS-7232)', () => {
+  it('renders the profile photo without a crossOrigin attribute', () => {
+    renderPage(GOOGLE_PHOTO);
+
+    const img = screen.getByAltText('casey');
+    expect(img).toHaveAttribute('src', GOOGLE_PHOTO);
+    expect(img).not.toHaveAttribute('crossorigin');
+  });
+
+  it('keeps referrerPolicy="no-referrer" on the profile photo', () => {
+    renderPage(GOOGLE_PHOTO);
+
+    expect(screen.getByAltText('casey')).toHaveAttribute(
+      'referrerpolicy',
+      'no-referrer',
+    );
+  });
+
+  it('still falls back to the initial letter when the image errors', () => {
+    renderPage(GOOGLE_PHOTO);
+
+    fireEvent.error(screen.getByAltText('casey'));
+
+    expect(screen.queryByAltText('casey')).not.toBeInTheDocument();
+    expect(screen.getAllByText('C').length).toBeGreaterThan(0);
+  });
+});
