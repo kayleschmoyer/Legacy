@@ -20,6 +20,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import { requireLeagueId } from '../league-draft';
 
 // ── Helpers shared by setDraftOrder / randomizeDraftOrder ────────────────────
 
@@ -120,6 +121,7 @@ builder.mutationField('setDraftOrder', (t) =>
           if (!draft) {
             throw UserInputError('Draft not found');
           }
+          const leagueId = requireLeagueId(draft);
 
           const [league] = await tx
             .select({
@@ -127,7 +129,7 @@ builder.mutationField('setDraftOrder', (t) =>
               draftStatus: PublicSchema.leagues.draftStatus,
             })
             .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, draft.leagueId))
+            .where(eq(PublicSchema.leagues.id, leagueId))
             .limit(1);
 
           if (!league) {
@@ -151,7 +153,7 @@ builder.mutationField('setDraftOrder', (t) =>
             .from(PublicSchema.leagueMembers)
             .where(
               and(
-                eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+                eq(PublicSchema.leagueMembers.leagueId, leagueId),
                 eq(PublicSchema.leagueMembers.userId, userId),
               ),
             )
@@ -191,7 +193,7 @@ builder.mutationField('setDraftOrder', (t) =>
           // constraint on (draft_id, draft_order).
           await setLeagueDraftSeatOrder(tx, draftId, teamIds);
 
-          return draft.leagueId;
+          return leagueId;
         });
 
         LOGGER.info('Commissioner set draft order', {
@@ -284,6 +286,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           if (!draft) {
             throw UserInputError('Draft not found');
           }
+          const leagueId = requireLeagueId(draft);
 
           const [league] = await tx
             .select({
@@ -291,7 +294,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
               draftStatus: PublicSchema.leagues.draftStatus,
             })
             .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, draft.leagueId))
+            .where(eq(PublicSchema.leagues.id, leagueId))
             .limit(1);
 
           if (!league) {
@@ -315,7 +318,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
             .from(PublicSchema.leagueMembers)
             .where(
               and(
-                eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+                eq(PublicSchema.leagueMembers.leagueId, leagueId),
                 eq(PublicSchema.leagueMembers.userId, userId),
               ),
             )
@@ -350,7 +353,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           // Permute the seats in place — see setDraftOrder above (LS-10074).
           await setLeagueDraftSeatOrder(tx, draftId, shuffled);
 
-          return draft.leagueId;
+          return leagueId;
         });
 
         LOGGER.info('Commissioner randomized draft order', {

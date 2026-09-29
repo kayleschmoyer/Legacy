@@ -22,7 +22,8 @@ const badgeService = createBadgeService(getDbOptions());
 export interface PickEffectsParams {
   db: PublicDb;
   notificationService: WebSocketNotificationService | null | undefined;
-  draftLeagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  draftLeagueId: number | null;
   draftId: number;
   selectionMethod: string;
   /** When true, skips matchup creation and badge evaluation (mock draft). */
@@ -33,14 +34,16 @@ export interface PickEffectsParams {
     autoPickReason: string;
     isDraftComplete: boolean;
     currentPickInfo: {
-      teamId: number;
+      teamId: number | null;
+      participantId: number;
       round: number;
       pickNumber: number;
       overallPick: number;
     };
     nextPickInfo:
       | {
-          teamId: number;
+          teamId: number | null;
+          participantId: number;
           round: number;
           pickNumber: number;
           overallPick: number;
@@ -108,15 +111,18 @@ export async function executePickEffects(
       }
     }
 
-    // Mock drafts skip matchup creation and badge evaluation — the league is
-    // ephemeral and rosters are not persisted, so neither would be meaningful.
-    if (!isMockDraft) {
+    // Mock drafts skip matchup creation and badge evaluation — no rosters
+    // are persisted, so neither would be meaningful.
+    if (!isMockDraft && draftLeagueId !== null) {
       await handleDraftCompletion(db, draftLeagueId);
     }
   }
 
-  // Record auto-pick in the activity log (fire-and-forget, non-fatal)
-  logAutoPick(db, draftLeagueId, pickResult);
+  // Record auto-pick in the activity log (fire-and-forget, non-fatal). The
+  // activity log is a league feed; a mock draft has none (LS-10076).
+  if (draftLeagueId !== null) {
+    logAutoPick(db, draftLeagueId, pickResult);
+  }
 
   return { draftsCompleted };
 }
@@ -125,7 +131,7 @@ export async function executePickEffects(
 
 async function sendPickNotifications(
   notificationService: WebSocketNotificationService,
-  draftLeagueId: number,
+  draftLeagueId: number | null,
   draftId: number,
   pickResult: PickEffectsParams['pickResult'],
 ): Promise<void> {
@@ -134,6 +140,7 @@ async function sendPickNotifications(
     draftId,
     pickResult.draftPick.id,
     pickResult.currentPickInfo.teamId,
+    pickResult.currentPickInfo.participantId,
     pickResult.autoPlayerId,
     pickResult.currentPickInfo.round,
     pickResult.currentPickInfo.pickNumber,
@@ -141,6 +148,7 @@ async function sendPickNotifications(
     pickResult.nextPickInfo
       ? {
           teamId: pickResult.nextPickInfo.teamId,
+          participantId: pickResult.nextPickInfo.participantId,
           round: pickResult.nextPickInfo.round,
           pickNumber: pickResult.nextPickInfo.pickNumber,
           overallPick: pickResult.nextPickInfo.overallPick,

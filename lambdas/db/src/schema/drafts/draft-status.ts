@@ -78,6 +78,50 @@ export async function setLeagueDraftStatus(
 }
 
 /**
+ * Move any draft to `status`: {@link setLeagueDraftStatus} for a league
+ * draft, a `drafts`-only write for a draft-first mock draft (LS-10076), which
+ * has no league row to keep in step. `leaguePhase` is ignored for a mock
+ * draft for the same reason.
+ *
+ * Must run inside the caller's transaction.
+ */
+export async function setDraftStatus(
+  tx: PublicDb,
+  params: {
+    draftId: number;
+    leagueId: number | null;
+    status: DraftLifecycleStatus;
+    leaguePhase?: LeaguePhase;
+    expectedStatus?: DraftLifecycleStatus;
+  },
+): Promise<void> {
+  const { draftId, leagueId, status, leaguePhase, expectedStatus } = params;
+
+  if (leagueId !== null) {
+    await setLeagueDraftStatus(tx, {
+      draftId,
+      leagueId,
+      status,
+      leaguePhase,
+      expectedLeagueStatus: expectedStatus,
+    });
+    return;
+  }
+
+  await tx
+    .update(PublicSchema.drafts)
+    .set({ status, updatedAt: new Date() })
+    .where(
+      expectedStatus
+        ? and(
+            eq(PublicSchema.drafts.id, draftId),
+            eq(PublicSchema.drafts.status, expectedStatus),
+          )
+        : eq(PublicSchema.drafts.id, draftId),
+    );
+}
+
+/**
  * The draft's own lifecycle status — the draft room's source of truth.
  *
  * Returns `null` when the draft does not exist.

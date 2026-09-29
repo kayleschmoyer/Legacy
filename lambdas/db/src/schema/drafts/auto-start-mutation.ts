@@ -118,7 +118,9 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
         const scheduledDrafts = await context.db
           .select({
             draftId: PublicSchema.drafts.id,
-            leagueId: PublicSchema.drafts.leagueId,
+            // The inner join below keeps this to league drafts, so read the
+            // non-null league id rather than the nullable drafts.league_id.
+            leagueId: PublicSchema.leagues.id,
             draftMode: PublicSchema.drafts.draftMode,
             selectionMethod: PublicSchema.drafts.selectionMethod,
             draftOrder: PublicSchema.drafts.draftOrder,

@@ -6,7 +6,7 @@
  * invite-code display of its own.
  *
  * Pure presentational, cross-platform (Tamagui only) — consumers own the
- * `initializeMockDraft` call and navigation via `onContinue`.
+ * `createMockDraft` call and navigation via `onContinue`.
  */
 import React from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';

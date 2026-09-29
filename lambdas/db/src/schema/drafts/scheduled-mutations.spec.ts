@@ -287,6 +287,15 @@ describe('isLockWaitTimeout (LS-8398)', () => {
   });
 });
 
+/**
+ * The minimum of a candidate pool these retry tests need: the locked
+ * transaction reads the draft's owning league off `rules.leagueId` before it
+ * opens the transaction the tests stub out (LS-10076).
+ */
+const LEAGUE_CANDIDATE_POOL = {
+  rules: { leagueId: 11817 },
+} as unknown as CandidatePool;
+
 describe('runAutoPickLockedTransaction deadlock retry (LS-9690)', () => {
   /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
   function pgError(message: string, code: string): Error {
@@ -310,9 +319,10 @@ describe('runAutoPickLockedTransaction deadlock retry (LS-9690)', () => {
       runAutoPickLockedTransaction({
         db: db as never,
         draftId: 11479,
-        draftLeagueId: 11817,
         pickTimeLimitSeconds: 30,
-        candidatePool: {} as CandidatePool,
+        // The owning league is read off the pool's rules since LS-10076 —
+        // there is no draftLeagueId parameter any more.
+        candidatePool: LEAGUE_CANDIDATE_POOL,
         predicted: null,
       }),
     );
@@ -336,9 +346,8 @@ describe('runAutoPickLockedTransaction deadlock retry (LS-9690)', () => {
         runAutoPickLockedTransaction({
           db: db as never,
           draftId: 11479,
-          draftLeagueId: 11817,
           pickTimeLimitSeconds: 30,
-          candidatePool: {} as CandidatePool,
+          candidatePool: LEAGUE_CANDIDATE_POOL,
           predicted: null,
         }),
       ),

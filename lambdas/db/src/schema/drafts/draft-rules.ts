@@ -8,13 +8,16 @@
  * loader that both draft kinds can answer.
  *
  * {@link loadDraftRules} is that loader. For `kind = 'league'` it projects the
- * league's settings onto {@link DraftRules}; the `kind = 'mock'` branch lands
- * in slice 4 and throws until then. Nothing about the league branch's values
- * changes — this slice is behavior-neutral, so every field below is the same
- * column the previous call site read.
+ * league's settings onto {@link DraftRules}, reading the same columns the
+ * previous call sites read. For `kind = 'mock'` (LS-10076) it projects
+ * `mock_draft_settings` and derives the roster from the sport defaults.
  */
 
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  GAMES_PER_MATCHUP_BY_SPORT,
+  getDefaultRosterPositions,
+} from '@legacy-sports/utils';
 import { asc, eq } from 'drizzle-orm';
 
 type LeagueRow = typeof PublicSchema.leagues.$inferSelect;
@@ -49,9 +52,8 @@ export interface DraftRules {
   gamesPerMatchup: LeagueRow['gamesPerMatchup'];
   pitcherStartsPerMatchup: LeagueRow['pitcherStartsPerMatchup'];
   /**
-   * True for a draft whose picks are never persisted to rosters — today the
-   * legacy `leagues.is_mock_draft` lobbies (LS-9181), from slice 4 also
-   * `drafts.kind = 'mock'`.
+   * True for a draft whose picks are never persisted to rosters:
+   * `drafts.kind = 'mock'` (LS-10076).
    */
   isMock: boolean;
   mockMode: DraftRow['mockMode'];
@@ -89,8 +91,8 @@ export class DraftNotFoundError extends Error {
  * league's roster positions. Safe inside a transaction — `db` may be a `tx`.
  *
  * @throws {DraftNotFoundError} when no `drafts` row has this id.
- * @throws {Error} for a `kind = 'mock'` draft — the mock branch lands in
- *   LS-10076 (slice 4). No writer creates such a row yet.
+ * @throws {Error} when a draft is missing the settings row its kind requires
+ *   (a data-integrity failure, not a client mistake).
  */
 export async function loadDraftRules(
   db: PublicDb,
@@ -100,6 +102,7 @@ export async function loadDraftRules(
     .select({
       draftId: PublicSchema.drafts.id,
       kind: PublicSchema.drafts.kind,
+      sport: PublicSchema.drafts.sport,
       leagueId: PublicSchema.drafts.leagueId,
       mockMode: PublicSchema.drafts.mockMode,
       controlAllTeams: PublicSchema.drafts.controlAllTeams,
@@ -117,13 +120,28 @@ export async function loadDraftRules(
         minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
         gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
         pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
-        isMockDraft: PublicSchema.leagues.isMockDraft,
+      },
+      mock: {
+        draftId: PublicSchema.mockDraftSettings.draftId,
+        playerPool: PublicSchema.mockDraftSettings.playerPool,
+        rosterSize: PublicSchema.mockDraftSettings.rosterSize,
+        defensiveFormat: PublicSchema.mockDraftSettings.defensiveFormat,
+        eraFilter: PublicSchema.mockDraftSettings.eraFilter,
+        hofOnly: PublicSchema.mockDraftSettings.hofOnly,
+        customEraStartYear: PublicSchema.mockDraftSettings.customEraStartYear,
+        customEraEndYear: PublicSchema.mockDraftSettings.customEraEndYear,
+        minCareerGames: PublicSchema.mockDraftSettings.minCareerGames,
+        minCareerSeasons: PublicSchema.mockDraftSettings.minCareerSeasons,
       },
     })
     .from(PublicSchema.drafts)
     .leftJoin(
       PublicSchema.leagues,
       eq(PublicSchema.leagues.id, PublicSchema.drafts.leagueId),
+    )
+    .leftJoin(
+      PublicSchema.mockDraftSettings,
+      eq(PublicSchema.mockDraftSettings.draftId, PublicSchema.drafts.id),
     )
     .where(eq(PublicSchema.drafts.id, draftId))
     .limit(1);
@@ -133,13 +151,39 @@ export async function loadDraftRules(
   }
 
   if (row.kind === 'mock') {
-    // Guard rather than silently returning league-shaped defaults: a mock
-    // draft that fell through to league rules would draft from the wrong pool
-    // against the wrong roster. Tested for 'mock' specifically, not
-    // "not 'league'": the column is NOT NULL DEFAULT 'league'.
-    throw new Error(
-      `loadDraftRules: draft ${String(draftId)} is a mock draft — the mock branch lands in LS-10076`,
-    );
+    const { mock } = row;
+    if (!mock) {
+      throw new Error(
+        `loadDraftRules: mock draft ${String(draftId)} has no mock_draft_settings row`,
+      );
+    }
+    return {
+      draftId: row.draftId,
+      kind: row.kind,
+      leagueId: null,
+      sport: row.sport,
+      playerPool: mock.playerPool,
+      maxRosterSize: mock.rosterSize,
+      defensiveFormat: mock.defensiveFormat,
+      baseballEraFilter: mock.eraFilter,
+      customEraStartYear: mock.customEraStartYear,
+      customEraEndYear: mock.customEraEndYear,
+      baseballHofOnly: mock.hofOnly,
+      minCareerGames: mock.minCareerGames,
+      minCareerSeasons: mock.minCareerSeasons,
+      // A mock draft never plays a matchup; these only scale the projected
+      // per-matchup value the board ranks by, so use a new league's defaults.
+      gamesPerMatchup: GAMES_PER_MATCHUP_BY_SPORT[row.sport].default,
+      pitcherStartsPerMatchup: 1,
+      isMock: true,
+      mockMode: row.mockMode,
+      controlAllTeams: row.controlAllTeams,
+      // league_positions is league-scoped; a mock draft mirrors a new league
+      // of its sport (LS-10086), so the depth chart fills starters first.
+      rosterPositions: [
+        ...getDefaultRosterPositions(row.sport, mock.defensiveFormat),
+      ],
+    };
   }
 
   const { league } = row;
@@ -174,7 +218,7 @@ export async function loadDraftRules(
     minCareerSeasons: league.minCareerSeasons,
     gamesPerMatchup: league.gamesPerMatchup,
     pitcherStartsPerMatchup: league.pitcherStartsPerMatchup,
-    isMock: league.isMockDraft,
+    isMock: false,
     mockMode: row.mockMode,
     controlAllTeams: row.controlAllTeams,
     rosterPositions: positionRows.map((p) => p.positionType),

@@ -145,20 +145,17 @@ export const leagues = pgTable(
     medianGameEnabled: boolean('median_game_enabled').notNull().default(false),
     /** Persistent commissioner notes visible to all league members */
     lmNotes: text('lm_notes'),
-    /** True for ephemeral mock drafts created via initializeMockDraft (LS-470).
-     *  Rosters are NOT persisted and matchups are NOT created when isMockDraft=true. */
+    /** Legacy flag for the league-backed mock drafts retired by LS-10076 — no
+     *  row carries it any more (the migration deleted every one) and no writer
+     *  sets it. A mock draft is now a league-less `drafts` row with
+     *  `kind = 'mock'`. The column itself is dropped by LS-10080. */
     isMockDraft: boolean('is_mock_draft').notNull().default(false),
-    /** True for mock drafts started in "Offline" mode (LS-9144): a single
-     *  person practicing solo with no pick-clock pressure — the drafter's own
-     *  turns never expire, but AI opponent teams still auto-pick immediately.
-     *  Only meaningful when isMockDraft=true. */
+    /** Legacy companion to `isMockDraft`, retired the same way (LS-10076): the
+     *  offline mode now lives on `drafts.mock_mode`. Dropped by LS-10080. */
     isOfflineDraft: boolean('is_offline_draft').notNull().default(false),
-    /** True for mock drafts started in "Control All Teams" mode (LS-9253,
-     *  premium-gated): the human user makes every pick for every team — no
-     *  CPU auto-picker anywhere on the board. Implies isOfflineDraft (no
-     *  pick-clock pressure) and pairs with drafts.autoPickDisabled=true so
-     *  autoProcessDraftPicks never fires for the draft. Only meaningful when
-     *  isMockDraft=true. */
+    /** Legacy companion to `isMockDraft`, retired the same way (LS-10076):
+     *  Control All Teams now lives on `drafts.control_all_teams`, still paired
+     *  with `drafts.auto_pick_disabled`. Dropped by LS-10080. */
     controlAllTeams: boolean('control_all_teams').notNull().default(false),
     /** Client-generated key from a single create-league form submission attempt
      *  (LS-6063). Lets createLeague dedupe a resubmission (double-click, retry,
@@ -290,10 +287,9 @@ export const drafts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
-    /** Nullable in the database since LS-10073 — CHECK drafts_kind_league_ck
-     *  allows NULL only for kind = 'mock'. Typed non-null until a writer can
-     *  create a league-less draft (draft-first slices, epic LS-9252). */
-    leagueId: integer('league_id').notNull(),
+    /** CHECK drafts_kind_league_ck (LS-10073): NULL exactly for kind = 'mock'
+     *  — a draft-first mock draft has no league (LS-10076). */
+    leagueId: integer('league_id'),
     /** 'league' drafts belong to leagueId; 'mock' drafts stand alone (LS-10073). */
     kind: draftKind('kind').notNull().default('league'),
     /** Draft lifecycle status (LS-10073). Mirrors leagues.draft_status for
@@ -604,9 +600,8 @@ export const draftPicks = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    /** Nullable in the database since LS-10073 (mock-draft picks will have a
-     *  seat but no team). Typed non-null until a writer can omit it. */
-    teamId: integer('team_id').notNull(),
+    /** NULL for a mock-draft pick: the seat has no team (LS-10073, LS-10076). */
+    teamId: integer('team_id'),
     /** The seat that made the pick (LS-10073). Optional on insert: the
      *  draft_picks_fill_participant_id trigger resolves it from
      *  (draft_id, team_id) when omitted. */
@@ -684,7 +679,8 @@ export const draftQueue = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    teamId: integer('team_id').notNull(),
+    /** NULL for a mock-draft queue, which belongs to a seat alone (LS-10076). */
+    teamId: integer('team_id'),
     /** The queue owner's seat (LS-10073). Filled from (draft_id, team_id) by
      *  trigger when omitted. */
     participantId: integer('participant_id'),
@@ -723,6 +719,18 @@ export const draftQueue = pgTable(
       draftQueueUkDraftTeamPriority: unique(
         'draft_queue_uk_draft_team_priority',
       ).on(table.draftId, table.teamId, table.priority),
+      // The team-keyed uniques above never match a NULL team_id, so seat-keyed
+      // mock-draft queues get their own (LS-10076).
+      draftQueueUkDraftParticipantPlayer: uniqueIndex(
+        'draft_queue_uk_draft_participant_player',
+      )
+        .on(table.draftId, table.participantId, table.playerId)
+        .where(sql`team_id IS NULL`),
+      draftQueueUkDraftParticipantPriority: uniqueIndex(
+        'draft_queue_uk_draft_participant_priority',
+      )
+        .on(table.draftId, table.participantId, table.priority)
+        .where(sql`team_id IS NULL`),
       draftQueueDraftTeamIdx: index('draft_queue_draft_team_idx').on(
         table.draftId,
         table.teamId,

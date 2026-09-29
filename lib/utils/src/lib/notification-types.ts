@@ -25,6 +25,10 @@ export const WireNotificationType = {
   DRAFT_PICK_UNDONE: 'DRAFT_PICK_UNDONE',
   DRAFT_PAUSED: 'DRAFT_PAUSED',
   DRAFT_RESUMED: 'DRAFT_RESUMED',
+  /** A mock draft's lobby changed: a seat was claimed, freed, kicked, or its settings/host changed (LS-10076). */
+  DRAFT_LOBBY_UPDATED: 'DRAFT_LOBBY_UPDATED',
+  /** A chat message posted in a mock draft's own chat (`draft_messages`, LS-10076). */
+  DRAFT_CHAT_MESSAGE: 'DRAFT_CHAT_MESSAGE',
   PLAYER_STATS_LOADING: 'PLAYER_STATS_LOADING',
   PLAYER_STATS_UPDATED: 'PLAYER_STATS_UPDATED',
   MATCHUP_STATS_COMPLETE: 'MATCHUP_STATS_COMPLETE',
@@ -69,6 +73,8 @@ export const ClientNotificationType = {
   DRAFT_PICK_UNDONE: 'draft-pick-undone',
   DRAFT_PAUSED: 'draft-paused',
   DRAFT_RESUMED: 'draft-resumed',
+  DRAFT_LOBBY_UPDATED: 'draft-lobby-updated',
+  DRAFT_CHAT_MESSAGE: 'draft-chat-message',
   PLAYER_STATS_LOADING: 'player-stats-loading',
   PLAYER_STATS_UPDATED: 'player-stats-updated',
   MATCHUP_STATS_COMPLETE: 'matchup-stats-complete',

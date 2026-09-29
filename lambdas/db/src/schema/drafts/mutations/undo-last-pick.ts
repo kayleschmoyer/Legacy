@@ -8,6 +8,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { DraftPick } from '../types';
 import { builder } from '../../builder';
+import { requireLeagueId } from '../league-draft';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -61,7 +62,7 @@ builder.mutationField('undoLastDraftPick', (t) =>
           const draft = draftRows.rows[0] as
             | {
                 id: number;
-                league_id: number;
+                league_id: number | null;
                 current_pick: number;
                 pick_time_limit_seconds: number;
               }
@@ -71,13 +72,17 @@ builder.mutationField('undoLastDraftPick', (t) =>
             throw UserInputError('Draft not found');
           }
 
+          // Undo is a commissioner tool, so it is league-only: a mock draft
+          // has no commissioner to run it (LS-10076).
+          const leagueId = requireLeagueId({ leagueId: draft.league_id });
+
           // Verify user is league commissioner
           const [membership] = await tx
             .select()
             .from(PublicSchema.leagueMembers)
             .where(
               and(
-                eq(PublicSchema.leagueMembers.leagueId, draft.league_id),
+                eq(PublicSchema.leagueMembers.leagueId, leagueId),
                 eq(PublicSchema.leagueMembers.userId, userId),
               ),
             )
@@ -104,17 +109,20 @@ builder.mutationField('undoLastDraftPick', (t) =>
             .delete(PublicSchema.draftPicks)
             .where(eq(PublicSchema.draftPicks.id, lastPick.id));
 
-          // Remove the corresponding team roster entry
-          await tx
-            .delete(PublicSchema.teamMembers)
-            .where(
-              and(
-                eq(PublicSchema.teamMembers.teamId, lastPick.teamId),
-                eq(PublicSchema.teamMembers.leagueId, draft.league_id),
-                eq(PublicSchema.teamMembers.playerId, lastPick.playerId),
-                eq(PublicSchema.teamMembers.acquisitionType, 'draft'),
-              ),
-            );
+          // Remove the corresponding team roster entry. A mock draft never
+          // wrote one — its picks live only in draft_picks (LS-10076).
+          if (draft.league_id !== null && lastPick.teamId !== null) {
+            await tx
+              .delete(PublicSchema.teamMembers)
+              .where(
+                and(
+                  eq(PublicSchema.teamMembers.teamId, lastPick.teamId),
+                  eq(PublicSchema.teamMembers.leagueId, draft.league_id),
+                  eq(PublicSchema.teamMembers.playerId, lastPick.playerId),
+                  eq(PublicSchema.teamMembers.acquisitionType, 'draft'),
+                ),
+              );
+          }
 
           // Restore currentPick to one before the undone pick
           const restoredCurrentPick = lastPick.overallPick - 1;
@@ -139,19 +147,19 @@ builder.mutationField('undoLastDraftPick', (t) =>
           const [league] = await tx
             .select()
             .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, draft.league_id))
+            .where(eq(PublicSchema.leagues.id, leagueId))
             .limit(1);
 
           if (league?.draftStatus === 'completed') {
             await tx
               .update(PublicSchema.leagues)
               .set({ draftStatus: 'in-progress' })
-              .where(eq(PublicSchema.leagues.id, draft.league_id));
+              .where(eq(PublicSchema.leagues.id, leagueId));
           }
 
           return {
             undonePickId: lastPick.id,
-            leagueId: draft.league_id,
+            leagueId,
             lastPick,
             restoredCurrentPick,
             newPickDeadline,

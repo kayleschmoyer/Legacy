@@ -31,7 +31,7 @@ import {
   getUnfilledPositionTypes,
 } from './helpers';
 import { type CandidatePool, fetchCandidatePool } from './candidate-pool';
-import { getSeatForTeam } from './participants';
+import { getSeatById } from './participants';
 import { guardConcurrentPick, selectAutoPickPlayer } from './auto-pick-scorer';
 import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
@@ -134,7 +134,6 @@ export interface PredictedAutoPick {
 export async function predictAutoPick(
   db: PublicDb,
   draftId: number,
-  draftLeagueId: number,
   candidatePool: CandidatePool,
 ): Promise<PredictedAutoPick | null> {
   try {
@@ -144,7 +143,7 @@ export async function predictAutoPick(
     const unfilledPositionTypes = await getUnfilledPositionTypes(
       db,
       draftId,
-      currentPickInfo.teamId,
+      currentPickInfo.participantId,
       candidatePool.rules,
     );
 
@@ -158,7 +157,7 @@ export async function predictAutoPick(
         bestBenchPick: candidatePool.bestBenchPick,
         currentPickInfo,
         unfilledPositionTypes,
-        sport: candidatePool.league.sport,
+        sport: candidatePool.rules.sport,
       });
 
     return {
@@ -216,20 +215,14 @@ export type AutoPickCommitResult = {
 export async function runAutoPickLockedTransaction(params: {
   db: PublicDb;
   draftId: number;
-  draftLeagueId: number;
   pickTimeLimitSeconds: number;
   candidatePool: CandidatePool;
   predicted: PredictedAutoPick | null;
 }): Promise<AutoPickCommitResult> {
-  const {
-    db,
-    draftId,
-    draftLeagueId,
-    pickTimeLimitSeconds,
-    candidatePool,
-    predicted,
-  } = params;
-  const { league } = candidatePool;
+  const { db, draftId, pickTimeLimitSeconds, candidatePool, predicted } =
+    params;
+  const { rules } = candidatePool;
+  const draftLeagueId = rules.leagueId;
 
   return db.transaction(async (tx) => {
     // Surface lock waits as errors rather than silent hangs
@@ -244,7 +237,7 @@ export async function runAutoPickLockedTransaction(params: {
     const draft = draftRows.rows[0] as
       | {
           id: number;
-          league_id: number;
+          league_id: number | null;
           status: string;
           current_pick: number;
           current_pick_deadline: Date | null;
@@ -301,7 +294,8 @@ export async function runAutoPickLockedTransaction(params: {
 
     const predictionStillValid =
       predicted !== null &&
-      predicted.currentPickInfo.teamId === currentPickInfo.teamId &&
+      predicted.currentPickInfo.participantId ===
+        currentPickInfo.participantId &&
       predicted.currentPickInfo.overallPick === currentPickInfo.overallPick;
 
     let unfilledPositionTypes: string[];
@@ -330,7 +324,7 @@ export async function runAutoPickLockedTransaction(params: {
         '[autoProcessDraftPicks] Reusing Phase 1 prediction (LS-9319)',
         {
           draftId,
-          teamId: currentPickInfo.teamId,
+          participantId: currentPickInfo.participantId,
           overallPick: currentPickInfo.overallPick,
         },
       );
@@ -340,9 +334,9 @@ export async function runAutoPickLockedTransaction(params: {
           '[autoProcessDraftPicks] Phase 1 prediction stale — falling back to full in-lock computation (LS-9319)',
           {
             draftId,
-            predictedTeamId: predicted.currentPickInfo.teamId,
+            predictedParticipantId: predicted.currentPickInfo.participantId,
             predictedOverallPick: predicted.currentPickInfo.overallPick,
-            actualTeamId: currentPickInfo.teamId,
+            actualParticipantId: currentPickInfo.participantId,
             actualOverallPick: currentPickInfo.overallPick,
           },
         );
@@ -352,21 +346,21 @@ export async function runAutoPickLockedTransaction(params: {
       unfilledPositionTypes = await getUnfilledPositionTypes(
         tx,
         draftId,
-        currentPickInfo.teamId,
+        currentPickInfo.participantId,
         candidatePool.rules,
       );
 
-      LOGGER.info('[autoProcessDraftPicks] Unfilled position types for team', {
+      LOGGER.info('[autoProcessDraftPicks] Unfilled position types for seat', {
         draftId,
-        teamId: currentPickInfo.teamId,
+        participantId: currentPickInfo.participantId,
         unfilledPositionTypes,
         eligibleCount: candidatePool.rankedEligibleIds.length,
         eligibilityFilters: {
-          playerPool: league.playerPool,
-          minCareerGames: league.minCareerGames,
-          minCareerSeasons: league.minCareerSeasons,
-          baseballHofOnly: league.baseballHofOnly,
-          eraFilter: league.baseballEraFilter,
+          playerPool: rules.playerPool,
+          minCareerGames: rules.minCareerGames,
+          minCareerSeasons: rules.minCareerSeasons,
+          baseballHofOnly: rules.baseballHofOnly,
+          eraFilter: rules.baseballEraFilter,
         },
       });
 
@@ -380,30 +374,34 @@ export async function runAutoPickLockedTransaction(params: {
         bestBenchPick: candidatePool.bestBenchPick,
         currentPickInfo,
         unfilledPositionTypes,
-        sport: league.sport,
+        sport: rules.sport,
       });
       autoPlayerId = selected.playerId;
       autoPickReason = selected.reason;
     }
 
-    // Validate roster limit
-    const [rosterCount] = await tx
-      .select({ count: count() })
-      .from(PublicSchema.teamMembers)
-      .where(
-        and(
-          eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
-          eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
-        ),
-      );
+    // Validate roster limit. League drafts only — a mock draft persists no
+    // roster rows to count, and its seats are bounded by the draft's own
+    // total-picks arithmetic (LS-10076).
+    if (draftLeagueId !== null && currentPickInfo.teamId !== null) {
+      const [rosterCount] = await tx
+        .select({ count: count() })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
+            eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
+          ),
+        );
 
-    if (
-      rosterCount &&
-      Number(rosterCount.count) >= candidatePool.rules.maxRosterSize
-    ) {
-      throw new Error(
-        `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
-      );
+      if (
+        rosterCount &&
+        Number(rosterCount.count) >= candidatePool.rules.maxRosterSize
+      ) {
+        throw new Error(
+          `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
+        );
+      }
     }
 
     // Commit the pick: insert pick row, advance draft state, add player to roster.
@@ -422,21 +420,24 @@ export async function runAutoPickLockedTransaction(params: {
       maxRosterSize: candidatePool.rules.maxRosterSize,
       pickTimeLimitSeconds,
       deadlineBaseTime: expiredDeadline,
-      isMockDraft: candidatePool.rules.isMock,
     });
 
     // Mark this team as auto-pick going forward, but only if
     // unmanaged (no GM or commissioner). Reuses the same guard as
     // initialization-time enableAutoPickForUnmanagedTeams (LS-4286).
-    await enableAutoPickForUnmanagedTeams(tx, draftLeagueId, draftId, [
-      currentPickInfo.teamId,
-    ]);
+    // League drafts only: a mock draft's seats are either AI already or held
+    // by a human who is simply away from the board (LS-10076).
+    if (draftLeagueId !== null && currentPickInfo.teamId !== null) {
+      await enableAutoPickForUnmanagedTeams(tx, draftLeagueId, draftId, [
+        currentPickInfo.teamId,
+      ]);
+    }
 
     // If the next team has auto-pick enabled, immediately expire
     // their deadline so the inner loop chains right away (LS-427).
     let effectiveNextDeadline = nextDeadline;
     if (nextPickInfo && !isDraftComplete) {
-      const nextSeat = await getSeatForTeam(tx, draftId, nextPickInfo.teamId);
+      const nextSeat = await getSeatById(tx, nextPickInfo.participantId);
       if (nextSeat?.autoPick) {
         effectiveNextDeadline = new Date(pickNow.getTime() - 1);
         await tx
@@ -444,8 +445,8 @@ export async function runAutoPickLockedTransaction(params: {
           .set({ currentPickDeadline: effectiveNextDeadline })
           .where(eq(PublicSchema.drafts.id, draftId));
         LOGGER.info(
-          '[autoProcessDraftPicks] Next team has auto-pick — expiring deadline immediately',
-          { draftId, nextTeamId: nextPickInfo.teamId },
+          '[autoProcessDraftPicks] Next seat has auto-pick — expiring deadline immediately',
+          { draftId, nextParticipantId: nextPickInfo.participantId },
         );
       }
     }
@@ -468,6 +469,45 @@ export async function runAutoPickLockedTransaction(params: {
  * The mutation itself is fully idempotent — it only processes picks whose
  * deadline has actually passed, so there is no abuse vector.
  */
+/**
+ * Authorize a nudge that may name a draft rather than a league (LS-10076).
+ *
+ * A mock draft has no `league_members` row to check, so a seat holder in the
+ * named draft is the equivalent check. Everything else defers to
+ * {@link assertLeagueMemberOrSystem}.
+ */
+export async function assertDraftNudgeAllowed(
+  context: Context,
+  leagueId: number | null | undefined,
+  draftId: number | null | undefined,
+): Promise<void> {
+  if (context.isSystemRequest || context.user?.isAdmin) return;
+
+  if (!context.user) {
+    throw AuthenticationError();
+  }
+
+  if (!leagueId && draftId) {
+    const [seat] = await context.db
+      .select({ id: PublicSchema.draftParticipants.id })
+      .from(PublicSchema.draftParticipants)
+      .where(
+        and(
+          eq(PublicSchema.draftParticipants.draftId, draftId),
+          eq(PublicSchema.draftParticipants.userId, context.user.id),
+        ),
+      )
+      .limit(1);
+
+    if (!seat) {
+      throw ForbiddenError('You do not have a seat in this draft');
+    }
+    return;
+  }
+
+  await assertLeagueMemberOrSystem(context, leagueId);
+}
+
 export async function assertLeagueMemberOrSystem(
   context: Context,
   leagueId: number | null | undefined,
@@ -563,11 +603,17 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
         description:
           'Optional: restrict to a single league. Required for non-system callers (any league member can nudge).',
       }),
+      draftId: t.arg.int({
+        required: false,
+        description:
+          'Optional: restrict to a single draft. The only handle a mock draft has — it belongs to no league (LS-10076).',
+      }),
     },
     description:
       'Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback.',
     resolve: async (_parent, args, context) => {
       const leagueId = args.leagueId ?? null;
+      const onlyDraftId = args.draftId ?? null;
 
       const result: AutoProcessDraftPicksResultShape = {
         draftsProcessed: 0,
@@ -584,7 +630,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
       // semantics — a non-member trying to nudge another league's draft is a
       // genuine authorization failure that callers should see as such.
       try {
-        await assertLeagueMemberOrSystem(context, leagueId);
+        await assertDraftNudgeAllowed(context, leagueId, onlyDraftId);
       } catch (authError) {
         const isUnauthenticated =
           authError instanceof GraphQLError &&
@@ -615,6 +661,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
             AND d.current_pick_deadline <= ${now}
             AND d.auto_pick_disabled = FALSE
             ${leagueId ? sql`AND d.league_id = ${leagueId}` : sql``}
+            ${onlyDraftId ? sql`AND d.id = ${onlyDraftId}` : sql``}
           ORDER BY d.current_pick_deadline ASC
         `;
 
@@ -649,7 +696,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
 
         for (const row of expiredDrafts.rows) {
           const draftId = row.draft_id as number;
-          const draftLeagueId = row.league_id as number;
+          const draftLeagueId = row.league_id as number | null;
           const pickTimeLimitSeconds = row.pick_time_limit_seconds as number;
 
           try {
@@ -678,11 +725,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               const candidatePool = await fetchCandidatePool(
                 context.db,
                 draftId,
-                draftLeagueId,
               );
               if (!candidatePool) break;
-
-              const { league } = candidatePool;
 
               // LS-9319: speculatively predict currentPickInfo /
               // unfilledPositionTypes / autoPlayerId outside the lock, so
@@ -691,7 +735,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               const predicted = await predictAutoPick(
                 context.db,
                 draftId,
-                draftLeagueId,
                 candidatePool,
               );
 
@@ -709,7 +752,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   runAutoPickLockedTransaction({
                     db: context.db,
                     draftId,
-                    draftLeagueId,
                     pickTimeLimitSeconds,
                     candidatePool,
                     predicted,
@@ -739,7 +781,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 draftId,
                 leagueId: draftLeagueId,
                 playerId: pickResult.autoPlayerId,
-                teamId: pickResult.currentPickInfo.teamId,
+                participantId: pickResult.currentPickInfo.participantId,
                 overallPick: pickResult.currentPickInfo.overallPick,
                 isDraftComplete: pickResult.isDraftComplete,
               });
@@ -753,7 +795,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 draftLeagueId,
                 draftId,
                 selectionMethod: (row.selection_method as string) ?? 'standard',
-                isMockDraft: league.isMockDraft,
+                isMockDraft: candidatePool.rules.isMock,
                 pickResult,
               });
               result.draftsCompleted += effects.draftsCompleted;

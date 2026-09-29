@@ -1,6 +1,9 @@
 /**
  * LS-9181 — JoinMockDraftPage wires the shared JoinMockDraftForm to the
  * joinMockDraft mutation and navigates into the draft room on success.
+ *
+ * LS-10076: a mock draft no longer has a league, so the mutation returns a
+ * `draftId`/`seatId` pair and the room lives at /:sport/mock-draft/:draftId.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -75,7 +78,7 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
 
 let mockJoinResult: () => Promise<unknown> = () =>
   Promise.resolve({
-    data: { joinMockDraft: { team: { leagueId: 42 }, sport: 'baseball' } },
+    data: { joinMockDraft: { draftId: 42, seatId: 7, sport: 'baseball' } },
   });
 const mockJoinMockDraft = jest.fn(() => mockJoinResult());
 
@@ -109,7 +112,7 @@ describe('JoinMockDraftPage', () => {
     });
     expect(await screen.findByText(/Join Mock Draft/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: /Join Draft/i });
-    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft/42');
   });
 
   // LS-9480: joining a football mock draft previously always landed on the
@@ -118,21 +121,21 @@ describe('JoinMockDraftPage', () => {
   it('joins a football mock draft and navigates to the football draft room, not baseball', async () => {
     mockJoinResult = () =>
       Promise.resolve({
-        data: { joinMockDraft: { team: { leagueId: 99 }, sport: 'football' } },
+        data: { joinMockDraft: { draftId: 99, seatId: 3, sport: 'football' } },
       });
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Join Draft/i }));
 
     await screen.findByRole('button', { name: /Join Draft/i });
-    expect(mockNavigate).toHaveBeenCalledWith('/football/league/99/draft');
-    expect(mockNavigate).not.toHaveBeenCalledWith('/baseball/league/99/draft');
+    expect(mockNavigate).toHaveBeenCalledWith('/football/mock-draft/99');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/baseball/mock-draft/99');
   });
 
   it('surfaces a navigation error and does not navigate when sport is missing from the response', async () => {
     mockJoinResult = () =>
       Promise.resolve({
-        data: { joinMockDraft: { team: { leagueId: 42 }, sport: null } },
+        data: { joinMockDraft: { draftId: 42, seatId: 7, sport: null } },
       });
     renderPage();
 

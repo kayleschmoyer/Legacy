@@ -3,12 +3,14 @@ import { LOGGER } from '@legacy-sports/logging';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { useApolloClient, useQuery } from '@apollo/client/react';
 import {
+  DraftKind,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
   GetDraftFootballPlayerStats as GET_DRAFT_FOOTBALL_PLAYER_STATS,
   GetDraftPicks as GET_DRAFT_PICKS,
   GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
+  GetDraftRoom as GET_DRAFT_ROOM,
   GetDraftTeamAutoPickStatuses as GET_DRAFT_TEAM_AUTO_PICK_STATUSES,
   GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
   GetLeagueById as GET_LEAGUE_BY_ID,
@@ -25,6 +27,8 @@ import {
   type GetDraftPicksQueryVariables,
   type GetDraftPitchingStatsQuery,
   type GetDraftPlayerStatsQuery,
+  type GetDraftRoomQuery,
+  type GetDraftRoomQueryVariables,
   type GetDraftTeamAutoPickStatusesQuery,
   type GetDraftTeamAutoPickStatusesQueryVariables,
   type GetDraftTeamOrderQuery,
@@ -36,6 +40,7 @@ import {
   type GetMyDraftQueueQueryVariables,
   type GetPositionsForLeagueQuery,
   type GetPositionsForLeagueQueryVariables,
+  MockDraftMode,
   Sport,
 } from '@legacy-sports/graphql';
 import { isUpstreamUnreachableError } from '../../leagues/submitError';
@@ -53,6 +58,13 @@ const PLAYER_PAGE_SIZE = 200;
 
 interface UseDraftQueriesParams {
   leagueId: number | null;
+  /**
+   * Draft-room mode (LS-10076): load the board from `draftRoom(draftId)`
+   * instead of the league queries. This is how a mock draft renders at all —
+   * it has no league to read a name, teams, roster slots or draft status from.
+   * When set, `leagueId` is ignored and the league queries are skipped.
+   */
+  draftId?: number | null;
   playerSearch: string;
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
@@ -64,11 +76,31 @@ interface UseDraftQueriesParams {
 
 export function useDraftQueries({
   leagueId,
+  draftId: roomDraftId = null,
   playerSearch,
   selectedPosition,
   viewMode,
   isCompact = false,
 }: UseDraftQueriesParams) {
+  // Draft-room mode is chosen by the caller, not discovered: the mock-draft
+  // route knows its draftId, and the league route resolves one from its
+  // league. Both then render the same board off the same derived values.
+  const isRoomMode = roomDraftId != null;
+
+  // ---- Draft room (LS-10076) ----
+  const {
+    data: roomData,
+    loading: roomLoading,
+    error: roomError,
+    refetch: refetchRoom,
+  } = useQuery<GetDraftRoomQuery, GetDraftRoomQueryVariables>(GET_DRAFT_ROOM, {
+    variables: { draftId: roomDraftId ?? 0 },
+    skip: !isRoomMode,
+    errorPolicy: 'all',
+  });
+
+  const room = roomData?.draftRoom ?? null;
+
   // ---- League Data ----
   const {
     data: leagueData,
@@ -77,12 +109,12 @@ export function useDraftQueries({
     refetch: refetchLeague,
   } = useQuery<GetLeagueByIdQuery>(GET_LEAGUE_BY_ID, {
     variables: { id: leagueId },
-    skip: !leagueId,
+    skip: !leagueId || isRoomMode,
   });
 
   const { data: teamsData } = useQuery<GetLeagueTeamsQuery>(GET_LEAGUE_TEAMS, {
     variables: { leagueId },
-    skip: !leagueId,
+    skip: !leagueId || isRoomMode,
   });
 
   // ---- League roster-slot config (My Depth Chart tab, LS-8785) ----
@@ -94,22 +126,50 @@ export function useDraftQueries({
     GetPositionsForLeagueQueryVariables
   >(GET_POSITIONS_FOR_LEAGUE, {
     variables: { leagueId: leagueId ?? 0 },
-    skip: !leagueId,
+    skip: !leagueId || isRoomMode,
   });
 
-  const leaguePositions = useMemo(
-    () =>
-      (positionsData?.leaguePositions ?? [])
-        .filter(
-          (p): p is { id: number; positionType: string } =>
-            p.id != null && p.positionType != null,
-        )
-        .map((p) => ({ id: p.id, positionType: p.positionType })),
-    [positionsData],
-  );
+  const leaguePositions = useMemo(() => {
+    // A mock draft's slots are the sport defaults, delivered with its rules
+    // (LS-10086) — there is no league_positions row to read them from.
+    if (isRoomMode) {
+      return (room?.rules?.rosterPositions ?? []).map(
+        (positionType, index) => ({
+          id: index + 1,
+          positionType,
+        }),
+      );
+    }
+
+    return (positionsData?.leaguePositions ?? [])
+      .filter(
+        (p): p is { id: number; positionType: string } =>
+          p.id != null && p.positionType != null,
+      )
+      .map((p) => ({ id: p.id, positionType: p.positionType }));
+  }, [isRoomMode, room, positionsData]);
 
   const league = leagueData?.league;
-  const leagueTeams: LeagueTeam[] = useMemo(
+
+  /**
+   * Seats rendered as "teams" (LS-10076). A mock-draft seat has no team, so
+   * the board keys on `participant_id` instead — the same id every pick,
+   * queue entry and auto-pick status carries for a mock draft. The two id
+   * spaces never mix inside one draft: a league draft's rows always carry a
+   * team id, a mock draft's never do.
+   */
+  const seatTeams: LeagueTeam[] = useMemo(
+    () =>
+      (room?.seats ?? []).map((seat) => ({
+        id: String(seat.id),
+        name: seat.seatName ?? `Seat ${String(seat.slot)}`,
+        leagueId: 0,
+        managerId: seat.userId ?? undefined,
+      })),
+    [room],
+  );
+
+  const leagueTeamsFromLeague: LeagueTeam[] = useMemo(
     () =>
       (teamsData?.leagueTeams ?? [])
         .filter(
@@ -131,6 +191,8 @@ export function useDraftQueries({
     [teamsData],
   );
 
+  const leagueTeams = isRoomMode ? seatTeams : leagueTeamsFromLeague;
+
   const permLevel = league?.userMembership?.permissionLevel as
     | string
     | undefined;
@@ -138,17 +200,28 @@ export function useDraftQueries({
   // general_manager role. Do not use this to gate commissioner-only UI
   // (pause/resume, commissioner-pick, initialize draft); use isCommissioner
   // for that (LS-8841).
-  const isOwner =
+  const leagueIsOwner =
     permLevel === 'owner' ||
     permLevel === 'commissioner' ||
     permLevel === 'general_manager';
-  const isCommissioner = permLevel === 'owner' || permLevel === 'commissioner';
+  const leagueIsCommissioner =
+    permLevel === 'owner' || permLevel === 'commissioner';
+  // In room mode permissions come from the room's viewer, which answers for
+  // both draft kinds (LS-10076): the host runs the draft, a seat holder plays.
+  const isOwner = isRoomMode ? (room?.viewer?.canPick ?? false) : leagueIsOwner;
+  const isCommissioner = isRoomMode
+    ? (room?.viewer?.canHost ?? false)
+    : leagueIsCommissioner;
   // Draft-queue resolver restricts reads to permissionLevel === 'general_manager'
   // (lambdas/db/src/schema/drafts/queries.ts getMyDraftQueue). Surface the bit so
   // the UI can skip the query for co-managers / assistants instead of firing it
   // and swallowing a FORBIDDEN (LS-4804).
-  const isGeneralManager = permLevel === 'general_manager';
-  const myTeamId = normalizeTeamId(league?.userMembership?.teamId);
+  const isGeneralManager = isRoomMode
+    ? room?.viewer?.seatId != null
+    : permLevel === 'general_manager';
+  const myTeamId = isRoomMode
+    ? normalizeTeamId(room?.viewer?.seatId)
+    : normalizeTeamId(league?.userMembership?.teamId);
 
   const teamNameById = useCallback(
     (teamId: number | null | undefined): string => {
@@ -166,15 +239,43 @@ export function useDraftQueries({
     refetch: refetchDraft,
   } = useQuery<GetLiveDraftLeagueDraftQuery>(GET_LEAGUE_DRAFT, {
     variables: { leagueId },
-    skip: !leagueId,
+    skip: !leagueId || isRoomMode,
     errorPolicy: 'all',
   });
 
   const leagueDraft = draftData?.getLeagueDraft;
-  const draftId: number | null = leagueDraft?.id
-    ? Number(leagueDraft.id)
-    : null;
-  const isAuctionDraft = leagueDraft?.selectionMethod === 'auction';
+  const draftId: number | null = isRoomMode
+    ? roomDraftId
+    : leagueDraft?.id
+      ? Number(leagueDraft.id)
+      : null;
+  // A mock draft is never an auction (createMockDraft writes 'standard').
+  const isAuctionDraft =
+    !isRoomMode && leagueDraft?.selectionMethod === 'auction';
+
+  // ---- Values the board reads, from whichever source this mode has ----
+  const draftStatus = isRoomMode
+    ? (room?.status ?? null)
+    : (league?.draftStatus ?? null);
+  const maxRosterSize = isRoomMode
+    ? room?.rules?.maxRosterSize
+    : league?.maxRosterSize;
+  // These three were league columns while a mock draft *was* a league. No
+  // league row carries them any more (LS-10076 deleted every one and no writer
+  // sets them), so in league mode they are simply false — the room is the only
+  // place a mock draft can come from now.
+  const isMockDraft = isRoomMode && room?.kind === DraftKind.Mock;
+  const isOfflineDraft =
+    isRoomMode && room?.draft?.mockMode === MockDraftMode.Offline;
+  const controlAllTeams = isRoomMode && (room?.draft?.controlAllTeams ?? false);
+  const draftSport = isRoomMode ? room?.sport : league?.sport;
+  const draftTitle = isRoomMode
+    ? isMockDraft
+      ? 'Mock Draft'
+      : room?.draft?.id != null
+        ? `Draft #${String(room.draft.id)}`
+        : 'Draft'
+    : league?.name;
 
   useEffect(() => {
     if (!draftError) return;
@@ -222,10 +323,12 @@ export function useDraftQueries({
 
   const currentPickInfo: CurrentDraftPickInfo | null = useMemo(() => {
     const raw = currentPickData?.getCurrentDraftPick;
+    // A mock-draft pick has no team, so the seat is the key (LS-10076).
+    const pickTeamId = raw?.teamId ?? raw?.participantId ?? null;
     if (
       !raw ||
       raw.draftId == null ||
-      raw.teamId == null ||
+      pickTeamId == null ||
       raw.round == null ||
       raw.pickNumber == null ||
       raw.overallPick == null ||
@@ -235,7 +338,7 @@ export function useDraftQueries({
     }
     return {
       draftId: raw.draftId,
-      teamId: raw.teamId,
+      teamId: pickTeamId,
       round: raw.round,
       pickNumber: raw.pickNumber,
       overallPick: raw.overallPick,
@@ -265,7 +368,7 @@ export function useDraftQueries({
             p.pickNumber != null &&
             p.overallPick != null &&
             p.pickedAt != null &&
-            p.teamId != null &&
+            (p.teamId ?? p.participantId) != null &&
             p.playerId != null,
         )
         .map((p) => ({
@@ -275,7 +378,7 @@ export function useDraftQueries({
           pickNumber: p.pickNumber as number,
           overallPick: p.overallPick as number,
           pickedAt: p.pickedAt as string,
-          teamId: p.teamId as number,
+          teamId: (p.teamId ?? p.participantId) as number,
           playerId: p.playerId as number,
           adp: p.adp ?? null,
           player:
@@ -514,7 +617,7 @@ export function useDraftQueries({
     GetDraftTeamAutoPickStatusesQueryVariables
   >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId || isAuctionDraft,
+    skip: !draftId || isAuctionDraft || isRoomMode,
     fetchPolicy: 'cache-and-network',
   });
 
@@ -527,17 +630,22 @@ export function useDraftQueries({
   // draft went live). Still skipped for other desktop views (grid/list/compact/table)
   // once the draft is live, to avoid firing an unused query throughout an
   // active draft.
-  const isPreDraft =
-    league?.draftStatus !== 'in-progress' && league?.draftStatus !== 'paused';
+  const isPreDraft = draftStatus !== 'in-progress' && draftStatus !== 'paused';
   const { data: draftTeamOrderData, refetch: refetchDraftTeamOrder } = useQuery<
     GetDraftTeamOrderQuery,
     GetDraftTeamOrderQueryVariables
   >(GET_DRAFT_TEAM_ORDER, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId || (viewMode !== 'board' && !isPreDraft && !isCompact),
+    skip:
+      !draftId ||
+      // getDraftTeamOrder joins `teams`, so it answers nothing for a mock
+      // draft; `draftRoom`'s seats already arrive in slot order (LS-10076).
+      isRoomMode ||
+      (viewMode !== 'board' && !isPreDraft && !isCompact),
   });
 
   const boardOrderedTeams = useMemo<LeagueTeam[]>(() => {
+    if (isRoomMode) return seatTeams;
     const slotOrder = draftTeamOrderData?.getDraftTeamOrder;
     if (!slotOrder || slotOrder.length === 0) return leagueTeams;
     const slotMap = new Map<string, number>();
@@ -551,15 +659,21 @@ export function useDraftQueries({
       const slotB = slotMap.get(String(b.id)) ?? Infinity;
       return slotA - slotB;
     });
-  }, [leagueTeams, draftTeamOrderData]);
+  }, [isRoomMode, seatTeams, leagueTeams, draftTeamOrderData]);
 
   const autoPickTeamIds = useMemo<ReadonlySet<string>>(() => {
     const ids = new Set<string>();
+    if (isRoomMode) {
+      for (const seat of room?.seats ?? []) {
+        if (seat.autoPick) ids.add(String(seat.id));
+      }
+      return ids;
+    }
     for (const entry of allAutoPickData?.getDraftTeamAutoPickStatuses ?? []) {
       if (entry.autoPick && entry.teamId != null) ids.add(String(entry.teamId));
     }
     return ids;
-  }, [allAutoPickData]);
+  }, [isRoomMode, room, allAutoPickData]);
 
   // ---- Draft Queue ----
   const { data: queueData, refetch: refetchQueue } = useQuery<
@@ -631,14 +745,26 @@ export function useDraftQueries({
   ]);
 
   return {
+    // Room (LS-10076) — present only in draft-room mode.
+    room,
+    isRoomMode,
+    refetchRoom,
+    // Values the board renders from, whichever mode produced them
+    draftStatus,
+    maxRosterSize,
+    isMockDraft,
+    isOfflineDraft,
+    controlAllTeams,
+    draftSport,
+    draftTitle,
     // League
     league,
     leagueData,
-    leagueLoading,
-    leagueError,
+    leagueLoading: isRoomMode ? roomLoading : leagueLoading,
+    leagueError: isRoomMode ? roomError : leagueError,
     leagueTeams,
     leaguePositions,
-    refetchLeague,
+    refetchLeague: isRoomMode ? refetchRoom : refetchLeague,
     permLevel,
     isOwner,
     isCommissioner,

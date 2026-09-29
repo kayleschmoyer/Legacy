@@ -21,6 +21,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import { requireLeagueId } from '../league-draft';
 
 // ── commissionerSetDraftAutoPickDisabled ─────────────────────────────────────
 
@@ -57,6 +58,7 @@ builder.mutationField('commissionerSetDraftAutoPickDisabled', (t) =>
       if (!draft) {
         throw UserInputError('Draft not found');
       }
+      const leagueId = requireLeagueId(draft);
 
       // Verify caller is the league commissioner
       const [membership] = await context.db
@@ -64,7 +66,7 @@ builder.mutationField('commissionerSetDraftAutoPickDisabled', (t) =>
         .from(PublicSchema.leagueMembers)
         .where(
           and(
-            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
             eq(PublicSchema.leagueMembers.userId, userId),
           ),
         )
@@ -80,7 +82,7 @@ builder.mutationField('commissionerSetDraftAutoPickDisabled', (t) =>
       const [league] = await context.db
         .select({ draftStatus: PublicSchema.leagues.draftStatus })
         .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draft.leagueId))
+        .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
 
       if (!league || league.draftStatus !== 'in-progress') {
@@ -99,7 +101,7 @@ builder.mutationField('commissionerSetDraftAutoPickDisabled', (t) =>
         '[commissionerSetDraftAutoPickDisabled] Auto-pick disabled flag set',
         {
           draftId,
-          leagueId: draft.leagueId,
+          leagueId: leagueId,
           userId,
           disabled,
         },

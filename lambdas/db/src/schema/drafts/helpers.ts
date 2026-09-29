@@ -16,7 +16,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { SportKind } from './strategies';
 import type { DraftRules } from './draft-rules';
-import { setLeagueDraftStatus } from './draft-status';
+import { setDraftStatus } from './draft-status';
 import { getDraftSeats, setSeatAutoPick } from './participants';
 import { addPlayerToRoster } from '../../services/roster-service';
 
@@ -36,9 +36,16 @@ export const MOCK_DRAFT_FREE_WEEKLY_LIMIT = 2;
 export const MOCK_DRAFT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Count how many mock-draft leagues the given user has created within the
- * trailing {@link MOCK_DRAFT_WINDOW_MS}. Used both to enforce the free-tier
- * weekly mock-draft cap and to surface remaining usage in the UI.
+ * Count how many mock drafts the given user has created within the trailing
+ * {@link MOCK_DRAFT_WINDOW_MS}. Used both to enforce the free-tier weekly
+ * mock-draft cap and to surface remaining usage in the UI.
+ *
+ * Counts `drafts WHERE kind = 'mock' AND created_by = user` (LS-10076) —
+ * joining someone else's lobby is free, and an expired lobby still counts (the
+ * lobby-expiry job keeps its row until it has aged out of this window). The
+ * legacy league-backed mock
+ * drafts are gone (deleted by the LS-10076 migration), so there is no second
+ * leg to count.
  */
 export async function countRecentMockDrafts(
   db: PublicDb,
@@ -47,12 +54,12 @@ export async function countRecentMockDrafts(
   const windowStart = new Date(Date.now() - MOCK_DRAFT_WINDOW_MS);
   const [{ mockDraftCount }] = await db
     .select({ mockDraftCount: count() })
-    .from(PublicSchema.leagues)
+    .from(PublicSchema.drafts)
     .where(
       and(
-        eq(PublicSchema.leagues.owner, userId),
-        eq(PublicSchema.leagues.isMockDraft, true),
-        gte(PublicSchema.leagues.createdAt, windowStart),
+        eq(PublicSchema.drafts.kind, 'mock'),
+        eq(PublicSchema.drafts.createdBy, userId),
+        gte(PublicSchema.drafts.createdAt, windowStart),
       ),
     );
   // Drizzle's count() can surface as a string/bigint depending on the driver;
@@ -67,12 +74,18 @@ export interface CommitDraftPickParams {
   /** Drizzle transaction (or plain db) to run writes inside. */
   tx: PublicDb;
   draftId: number;
-  leagueId: number;
+  /**
+   * The owning league, or `null` for a draft-first mock draft (LS-10076). A
+   * league-less draft writes no roster rows and no league status/phase — its
+   * picks live only in `draft_picks`.
+   */
+  leagueId: number | null;
   /** Current pick slot being filled, as returned by getCurrentDraftPickInfo. */
   pickInfo: {
-    teamId: number;
+    /** The seat's league team, or `null` for a mock-draft seat. */
+    teamId: number | null;
     /** Seat filling this pick (`draft_participants.id`) — LS-10074. */
-    participantId?: number | null;
+    participantId: number;
     round: number;
     pickNumber: number;
     overallPick: number;
@@ -93,11 +106,6 @@ export interface CommitDraftPickParams {
    * should pass this as true.
    */
   setStartedAt?: boolean;
-  /**
-   * When true, skips the addPlayerToRoster call so no teamMembers row is
-   * persisted. Mock drafts record picks in draft_picks but never persist rosters.
-   */
-  isMockDraft?: boolean;
 }
 
 export interface CommitDraftPickResult {
@@ -129,7 +137,9 @@ export type DraftPositionRules = Pick<DraftRules, 'sport' | 'rosterPositions'>;
 
 /**
  * Determine which of the draft's roster slot types still need a player on the
- * given team. Works inside any transaction (tx: PublicDb).
+ * given seat (`draft_participants.id` — keyed by seat rather than team since
+ * LS-10076, so a mock-draft seat with no team works the same way). Works
+ * inside any transaction (tx: PublicDb).
  *
  * Shared by autoProcessDraftPicks (scheduled-mutations.ts), the makeDraftPick
  * auto-pick chain, and the draft board's pickability filter.
@@ -147,7 +157,7 @@ export type DraftPositionRules = Pick<DraftRules, 'sport' | 'rosterPositions'>;
 export async function getUnfilledPositionTypes(
   tx: PublicDb,
   draftId: number,
-  teamId: number,
+  participantId: number,
   rules: DraftPositionRules,
 ): Promise<string[]> {
   // 1. The draft's roster slot requirements
@@ -162,9 +172,9 @@ export async function getUnfilledPositionTypes(
     slotsNeeded.set(positionType, (slotsNeeded.get(positionType) ?? 0) + 1);
   }
 
-  // 2. Team's already-drafted player IDs in this draft
+  // 2. Seat's already-drafted player IDs in this draft
   const teamPicksResult = await tx.execute(
-    sql`SELECT player_id FROM draft_picks WHERE draft_id = ${draftId} AND team_id = ${teamId}`,
+    sql`SELECT player_id FROM draft_picks WHERE draft_id = ${draftId} AND participant_id = ${participantId}`,
   );
   const teamPlayerIds = teamPicksResult.rows.map((r) => r.player_id as number);
 
@@ -438,11 +448,15 @@ export function resolvePickAssignment(params: {
    * now `draft_participants`). `id` is the seat's `participant_id`; it is
    * optional so the pure-arithmetic tests can pass team ids alone.
    */
-  seats: { teamId: number; id?: number }[];
+  seats: { teamId: number | null; id?: number }[];
   isSnake: boolean;
+  /**
+   * `teamId:round` keys. Forfeits are a keeper-league concept, so a seat with
+   * no team (a mock-draft seat, LS-10076) never forfeits.
+   */
   forfeited: Set<string>;
 }): {
-  teamId: number;
+  teamId: number | null;
   participantId: number | undefined;
   round: number;
   pickNumber: number;
@@ -456,7 +470,9 @@ export function resolvePickAssignment(params: {
     const active =
       forfeited.size === 0
         ? ordered
-        : ordered.filter((s) => !forfeited.has(`${s.teamId}:${round}`));
+        : ordered.filter(
+            (s) => s.teamId === null || !forfeited.has(`${s.teamId}:${round}`),
+          );
 
     if (overallPick <= cumulative + active.length) {
       const idxInRound = overallPick - cumulative - 1;
@@ -500,9 +516,14 @@ export async function getCurrentDraftPickInfo(
   draftId: number,
 ): Promise<{
   draftId: number;
-  teamId: number;
-  /** Seat filling this pick (`draft_participants.id`) — LS-10074. */
-  participantId: number | undefined;
+  /** The seat's league team, or `null` for a mock-draft seat (LS-10076). */
+  teamId: number | null;
+  /**
+   * Seat filling this pick (`draft_participants.id`) — LS-10074. The turn is
+   * the seat's, not the team's: every "whose pick is it" comparison keys on
+   * this (LS-10076).
+   */
+  participantId: number;
   round: number;
   pickNumber: number;
   overallPick: number;
@@ -519,20 +540,17 @@ export async function getCurrentDraftPickInfo(
     return null;
   }
 
-  const allSeats = await getDraftSeats(db, draftId);
+  const seats = await getDraftSeats(db, draftId);
 
-  if (allSeats.length === 0) {
+  if (seats.length === 0) {
     // Message preserved verbatim: isDraftNotYetInitialized (scheduled-mutations)
     // and the DRAFT_TEAMS_NOT_CONFIGURED mapping in the getCurrentDraftPick
     // resolver both match on it (LS-4853).
     throw new Error('No teams configured for this draft');
   }
 
-  // League seats always hold a team. A seat without one belongs to an unclaimed
-  // mock-draft lobby slot (slice 4) and cannot be assigned a pick.
-  const seats = allSeats.filter(
-    (s): s is typeof s & { teamId: number } => s.teamId !== null,
-  );
+  // League seats always hold a team; mock-draft seats never do (LS-10076).
+  // Every seat drafts — a mock draft's open lobby seats become AI at start.
 
   const currentOverallPick = draft.currentPick + 1;
   const isSnake =
@@ -554,7 +572,7 @@ export async function getCurrentDraftPickInfo(
     forfeited,
   });
 
-  if (!assignment) {
+  if (!assignment?.participantId) {
     throw new Error('Could not determine team for current pick');
   }
 
@@ -598,23 +616,20 @@ export async function commitDraftPick(
     pickTimeLimitSeconds,
     deadlineBaseTime,
     setStartedAt = false,
-    isMockDraft = false,
   } = params;
 
   const now = new Date();
 
   // Insert the draft pick record. `team_id` is still written for league
-  // drafts — roster and pick-history readers join on it (LS-10074) — and
-  // `participant_id` now names the seat directly rather than leaving the
-  // LS-10073 bridge trigger to resolve it from the team.
+  // drafts — roster and pick-history readers join on it (LS-10074) — and is
+  // NULL for a mock-draft seat (LS-10076). `participant_id` names the seat
+  // directly rather than leaving the LS-10073 bridge trigger to resolve it.
   const [draftPick] = await tx
     .insert(PublicSchema.draftPicks)
     .values({
       draftId,
       teamId: pickInfo.teamId,
-      ...(pickInfo.participantId != null
-        ? { participantId: pickInfo.participantId }
-        : {}),
+      participantId: pickInfo.participantId,
       playerId,
       round: pickInfo.round,
       pickNumber: pickInfo.pickNumber,
@@ -657,11 +672,12 @@ export async function commitDraftPick(
     })
     .where(eq(PublicSchema.drafts.id, draftId));
 
-  // Mark the draft completed when the last pick is made. Dual-writes
-  // drafts.status and leagues.draft_status (+ league_phase, as before) in this
-  // same transaction — LS-10074.
+  // Mark the draft completed when the last pick is made. A league draft
+  // dual-writes drafts.status and leagues.draft_status (+ league_phase, as
+  // before) in this same transaction — LS-10074. A mock draft has no league
+  // row to move (LS-10076).
   if (isDraftComplete) {
-    await setLeagueDraftStatus(tx, {
+    await setDraftStatus(tx, {
       draftId,
       leagueId,
       status: 'completed',
@@ -669,10 +685,9 @@ export async function commitDraftPick(
     });
   }
 
-  // Add the drafted player to the team's roster.
-  // Skipped for mock drafts — picks are recorded in draft_picks but rosters
-  // are never persisted (isMockDraft=true leagues are ephemeral).
-  if (!isMockDraft) {
+  // Add the drafted player to the team's roster. A mock draft has no team or
+  // roster — its picks live only in draft_picks (LS-10076).
+  if (leagueId !== null && pickInfo.teamId !== null) {
     await addPlayerToRoster(tx, {
       teamId: pickInfo.teamId,
       leagueId,
@@ -693,8 +708,9 @@ export async function commitDraftPick(
 }
 
 /**
- * Return the first player from a team's draft queue that is still available
- * (not yet drafted) in the given draft.
+ * Return the first player from a seat's draft queue that is still available
+ * (not yet drafted) in the given draft. Keyed by seat since LS-10076: a
+ * mock-draft queue has no team.
  *
  * Returns `null` if:
  *  - the queue is empty
@@ -702,10 +718,10 @@ export async function commitDraftPick(
  *
  * Used by both auto-pick paths (scheduled-mutations.ts and make-draft-pick.ts).
  */
-export async function getFirstQueuedPlayerForTeam(
+export async function getFirstQueuedPlayerForSeat(
   db: PublicDb,
   draftId: number,
-  teamId: number,
+  participantId: number,
 ): Promise<number | null> {
   // Fetch the queue ordered by priority
   const queueRows = await db
@@ -714,7 +730,7 @@ export async function getFirstQueuedPlayerForTeam(
     .where(
       and(
         eq(PublicSchema.draftQueue.draftId, draftId),
-        eq(PublicSchema.draftQueue.teamId, teamId),
+        eq(PublicSchema.draftQueue.participantId, participantId),
       ),
     )
     .orderBy(asc(PublicSchema.draftQueue.priority));

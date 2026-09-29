@@ -264,13 +264,33 @@ const mockPublicSchema = {
   matchups: { id: 'id', leagueId: 'leagueId' },
   leagues: { id: 'id', isPublic: 'isPublic' },
   drafts: { id: 'id', leagueId: 'leagueId', kind: 'kind' },
+  draftParticipants: { draftId: 'draftId', userId: 'userId' },
+  invitations: {
+    draftId: 'draftId',
+    invitedUserId: 'invitedUserId',
+    status: 'status',
+  },
 };
 
-/** draftId -> its row, for the LS-10075 draft-channel access lookup. */
+/**
+ * draftId -> its row, for the LS-10075 draft-channel access lookup. A mock
+ * draft (LS-10076) also carries the lobby fields the preview branch reads.
+ */
 const mockDrafts = new Map<
   number,
-  { leagueId: number; kind: 'league' | 'mock' }
+  {
+    leagueId: number | null;
+    kind: 'league' | 'mock';
+    status?: string;
+    isPublic?: boolean;
+    lobbyExpiresAt?: Date | null;
+  }
 >();
+
+/** `${userId}:${draftId}` pairs holding a seat in a mock draft (LS-10076). */
+const mockDraftSeats = new Set<string>();
+/** `${userId}:${draftId}` pairs holding a pending invitation (LS-10076). */
+const mockDraftInvitations = new Set<string>();
 
 /** `${userId}:${leagueId}` pairs treated as league members by the fake DB. */
 const mockLeagueMembers = new Set<string>();
@@ -316,7 +336,30 @@ const mockRunWithPublicClient = jest.fn(
               }
               if (table === mockPublicSchema.drafts) {
                 const draft = mockDrafts.get(values['id'] as number);
-                return Promise.resolve(draft ? [draft] : []);
+                return Promise.resolve(
+                  draft
+                    ? [
+                        {
+                          status: 'in-progress',
+                          isPublic: false,
+                          lobbyExpiresAt: null,
+                          ...draft,
+                        },
+                      ]
+                    : [],
+                );
+              }
+              if (table === mockPublicSchema.draftParticipants) {
+                const key = `${String(values['userId'])}:${String(values['draftId'])}`;
+                return Promise.resolve(
+                  mockDraftSeats.has(key) ? [{ id: 1 }] : [],
+                );
+              }
+              if (table === mockPublicSchema.invitations) {
+                const key = `${String(values['invitedUserId'])}:${String(values['draftId'])}`;
+                return Promise.resolve(
+                  mockDraftInvitations.has(key) ? [{ expiresAt: null }] : [],
+                );
               }
               return Promise.resolve([]);
             },
@@ -449,6 +492,8 @@ describe('WebSocket fan-out (LS-8856)', () => {
     mockMatchupLeague.clear();
     mockLeagueVisibility.clear();
     mockDrafts.clear();
+    mockDraftSeats.clear();
+    mockDraftInvitations.clear();
     mockJwtUsers.clear();
     nextUserId = 1;
 
@@ -507,6 +552,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       /* draftId */ 5,
       /* pickId */ 9,
       teamA.userId,
+      /* participantId */ 5151,
       /* playerId */ 4242,
       /* round */ 1,
       /* pickNumber */ 2,
@@ -547,6 +593,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       1,
       commissioner.userId,
+      /* participantId */ 5151,
       777,
       1,
       1,
@@ -618,6 +665,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       1,
       sender.userId,
+      /* participantId */ 5151,
       1,
       1,
       1,
@@ -639,6 +687,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       2,
       sender.userId,
+      /* participantId */ 5151,
       2,
       1,
       2,
@@ -787,6 +836,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       1,
       senderA.userId,
+      /* participantId */ 5151,
       1,
       1,
       1,
@@ -825,6 +875,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       1,
       senderA.userId,
+      /* participantId */ 5151,
       1,
       1,
       1,
@@ -850,6 +901,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       2,
       senderA.userId,
+      /* participantId */ 5151,
       2,
       1,
       2,
@@ -869,6 +921,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       1,
       1,
       senderB.userId,
+      /* participantId */ 5151,
       3,
       1,
       1,
@@ -912,6 +965,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
         1,
         1,
         sender.userId,
+        /* participantId */ 5151,
         1,
         1,
         1,
@@ -954,6 +1008,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
         1,
         1,
         sender.userId,
+        /* participantId */ 5151,
         999,
         1,
         1,
@@ -1011,6 +1066,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
         6,
         10,
         stableViewer.userId,
+        /* participantId */ 5151,
         5151,
         1,
         3,
@@ -1034,6 +1090,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       6,
       11,
       stableViewer.userId,
+      /* participantId */ 5151,
       5252,
       1,
       4,
@@ -1075,6 +1132,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
         7,
         20 + i,
         commissioner.userId,
+        /* participantId */ 5151,
         6000 + i,
         1,
         i + 1,
@@ -1138,6 +1196,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       /* draftId */ 8,
       /* pickId */ 30,
       member.userId,
+      /* participantId */ 5151,
       /* playerId */ 8888,
       /* round */ 1,
       /* pickNumber */ 5,
@@ -1261,6 +1320,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       draftId,
       /* pickId */ 1,
       oldApp.userId,
+      /* participantId */ 5151,
       /* playerId */ 4242,
       1,
       1,
@@ -1312,6 +1372,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       draftId,
       1,
       1,
+      /* participantId */ 5151,
       /* playerId */ 5151,
       1,
       1,
@@ -1352,14 +1413,15 @@ describe('WebSocket fan-out (LS-8856)', () => {
     ).toBe(200);
   });
 
-  it('refuses a mock draft, an unknown draft, and a draftId mixed with league context (LS-10075)', async () => {
+  it('refuses an unknown draft and a draftId mixed with league context (LS-10075)', async () => {
     const leagueId = 903;
     const user = registerUser('draft-edge-eve');
     grantLeagueMembership(user.userId, leagueId);
-    mockDrafts.set(93, { leagueId, kind: 'mock' });
+    mockDrafts.set(93, { leagueId: null, kind: 'mock' });
     mockDrafts.set(94, { leagueId, kind: 'league' });
 
-    // Mock drafts wait for LS-10076's authorizeDraft mock branch.
+    // League membership grants nothing in a mock draft — access is the seat
+    // (LS-10076), and this user holds none.
     expect(
       await connectStatus('ls-10075-mock', {
         token: user.token,
@@ -1386,6 +1448,104 @@ describe('WebSocket fan-out (LS-8856)', () => {
         viewContext: 'league',
       }),
     ).toBe(400);
+  });
+
+  describe('mock-draft channel access (LS-10076)', () => {
+    // These mirror `authorizeDraft`'s mock branch, which the websocket lambda
+    // cannot call (it is bound to the GraphQL context). The two must stay
+    // equivalent, so the same matrix is asserted on both sides.
+    it('lets a seat holder in and keeps every non-holder out', async () => {
+      const draftId = 96;
+      const holder = registerUser('mock-seat-sam');
+      const outsider = registerUser('mock-outsider-ozzy');
+      mockDrafts.set(draftId, { leagueId: null, kind: 'mock' });
+      mockDraftSeats.add(`${String(holder.userId)}:${String(draftId)}`);
+
+      expect(
+        await connectStatus('ls-10076-holder', {
+          token: holder.token,
+          draftId: String(draftId),
+        }),
+      ).toBe(200);
+      expect(
+        await connectStatus('ls-10076-outsider', {
+          token: outsider.token,
+          draftId: String(draftId),
+        }),
+      ).toBe(403);
+    });
+
+    it('previews a public lobby but not a private one', async () => {
+      const publicDraftId = 97;
+      const privateDraftId = 98;
+      const stranger = registerUser('mock-lurker-lou');
+      mockDrafts.set(publicDraftId, {
+        leagueId: null,
+        kind: 'mock',
+        status: 'not-started',
+        isPublic: true,
+      });
+      mockDrafts.set(privateDraftId, {
+        leagueId: null,
+        kind: 'mock',
+        status: 'not-started',
+        isPublic: false,
+      });
+
+      expect(
+        await connectStatus('ls-10076-public-preview', {
+          token: stranger.token,
+          draftId: String(publicDraftId),
+          viewContext: 'draft-preview',
+        }),
+      ).toBe(200);
+      expect(
+        await connectStatus('ls-10076-private-preview', {
+          token: stranger.token,
+          draftId: String(privateDraftId),
+          viewContext: 'draft-preview',
+        }),
+      ).toBe(403);
+    });
+
+    it('previews a private lobby for a pending invitee', async () => {
+      const draftId = 99;
+      const invitee = registerUser('mock-invitee-ivy');
+      mockDrafts.set(draftId, {
+        leagueId: null,
+        kind: 'mock',
+        status: 'not-started',
+        isPublic: false,
+      });
+      mockDraftInvitations.add(`${String(invitee.userId)}:${String(draftId)}`);
+
+      expect(
+        await connectStatus('ls-10076-invited-preview', {
+          token: invitee.token,
+          draftId: String(draftId),
+          viewContext: 'draft-preview',
+        }),
+      ).toBe(200);
+    });
+
+    it('refuses a preview of a lobby that has already started', async () => {
+      const draftId = 100;
+      const stranger = registerUser('mock-late-larry');
+      mockDrafts.set(draftId, {
+        leagueId: null,
+        kind: 'mock',
+        status: 'in-progress',
+        isPublic: true,
+      });
+
+      expect(
+        await connectStatus('ls-10076-started-preview', {
+          token: stranger.token,
+          draftId: String(draftId),
+          viewContext: 'draft-preview',
+        }),
+      ).toBe(403);
+    });
   });
 
   it('keeps pick events from a lobby-preview connection while the draft room receives them (LS-10075)', async () => {
@@ -1423,6 +1583,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       draftId,
       1,
       drafter.userId,
+      /* participantId */ 5151,
       6262,
       1,
       1,

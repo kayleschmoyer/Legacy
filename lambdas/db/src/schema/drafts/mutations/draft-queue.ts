@@ -19,6 +19,8 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { DraftQueueEntry } from '../types';
 import { builder } from '../../builder';
+import { requireLeagueId } from '../league-draft';
+import { getSeatForTeam, getSeatForUser } from '../participants';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -27,17 +29,30 @@ import {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function resolveTeamIdForDraft(
+async function resolveSeatForDraft(
   db: PublicDb,
   draftId: number,
   userId: number,
-): Promise<{ teamId: number; leagueId: number }> {
+): Promise<{ participantId: number; teamId: number | null }> {
   const [draft] = await db
-    .select({ leagueId: PublicSchema.drafts.leagueId })
+    .select({
+      kind: PublicSchema.drafts.kind,
+      leagueId: PublicSchema.drafts.leagueId,
+    })
     .from(PublicSchema.drafts)
     .where(eq(PublicSchema.drafts.id, draftId))
     .limit(1);
   if (!draft) throw UserInputError('Draft not found');
+
+  // A mock draft has no league members to check: the seat is the caller's
+  // claim on the queue, and every seat holder manages their own (LS-10076).
+  if (draft.kind === 'mock') {
+    const seat = await getSeatForUser(db, draftId, userId);
+    if (!seat) throw ForbiddenError('You do not have a seat in this draft');
+    return { participantId: seat.id, teamId: null };
+  }
+
+  const leagueId = requireLeagueId(draft);
 
   const [membership] = await db
     .select({
@@ -47,7 +62,7 @@ async function resolveTeamIdForDraft(
     .from(PublicSchema.leagueMembers)
     .where(
       and(
-        eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
         eq(PublicSchema.leagueMembers.userId, userId),
       ),
     )
@@ -60,7 +75,14 @@ async function resolveTeamIdForDraft(
       'Only the team general manager can modify this draft queue',
     );
 
-  return { teamId: membership.teamId, leagueId: draft.leagueId };
+  const seat = await getSeatForTeam(db, draftId, membership.teamId);
+  if (!seat) {
+    throw UserInputError(
+      'This draft has no seats yet — the draft order is set when the draft starts',
+    );
+  }
+
+  return { participantId: seat.id, teamId: membership.teamId };
 }
 
 // ── setDraftQueue ─────────────────────────────────────────────────────────────
@@ -87,7 +109,7 @@ builder.mutationField('setDraftQueue', (t) =>
       const { draftId, playerIds } = args;
       const userId = context.user.id;
 
-      const { teamId } = await resolveTeamIdForDraft(
+      const { participantId, teamId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -124,7 +146,7 @@ builder.mutationField('setDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
             ),
           );
 
@@ -134,6 +156,7 @@ builder.mutationField('setDraftQueue', (t) =>
         const insertValues = deduped.map((playerId, idx) => ({
           draftId,
           teamId,
+          participantId,
           playerId,
           priority: idx + 1,
         }));
@@ -180,7 +203,7 @@ builder.mutationField('addToDraftQueue', (t) =>
       const { draftId, playerId } = args;
       const userId = context.user.id;
 
-      const { teamId } = await resolveTeamIdForDraft(
+      const { participantId, teamId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -203,7 +226,7 @@ builder.mutationField('addToDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
               eq(PublicSchema.draftQueue.playerId, playerId),
             ),
           )
@@ -217,7 +240,7 @@ builder.mutationField('addToDraftQueue', (t) =>
             .where(
               and(
                 eq(PublicSchema.draftQueue.draftId, draftId),
-                eq(PublicSchema.draftQueue.teamId, teamId),
+                eq(PublicSchema.draftQueue.participantId, participantId),
               ),
             );
 
@@ -233,6 +256,7 @@ builder.mutationField('addToDraftQueue', (t) =>
           await tx.insert(PublicSchema.draftQueue).values({
             draftId,
             teamId,
+            participantId,
             playerId,
             priority: maxPriority + 1,
           });
@@ -244,7 +268,7 @@ builder.mutationField('addToDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
             ),
           )
           .orderBy(asc(PublicSchema.draftQueue.priority));
@@ -283,7 +307,7 @@ builder.mutationField('removeFromDraftQueue', (t) =>
       const { draftId, playerId } = args;
       const userId = context.user.id;
 
-      const { teamId } = await resolveTeamIdForDraft(
+      const { participantId, teamId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -296,7 +320,7 @@ builder.mutationField('removeFromDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
               eq(PublicSchema.draftQueue.playerId, playerId),
             ),
           );
@@ -308,7 +332,7 @@ builder.mutationField('removeFromDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
             ),
           )
           .orderBy(asc(PublicSchema.draftQueue.priority));
@@ -363,7 +387,7 @@ builder.mutationField('reorderDraftQueue', (t) =>
       const { draftId, playerIds } = args;
       const userId = context.user.id;
 
-      const { teamId } = await resolveTeamIdForDraft(
+      const { participantId, teamId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -377,7 +401,7 @@ builder.mutationField('reorderDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
             ),
           );
 
@@ -429,7 +453,7 @@ builder.mutationField('reorderDraftQueue', (t) =>
           .where(
             and(
               eq(PublicSchema.draftQueue.draftId, draftId),
-              eq(PublicSchema.draftQueue.teamId, teamId),
+              eq(PublicSchema.draftQueue.participantId, participantId),
             ),
           )
           .orderBy(asc(PublicSchema.draftQueue.priority));

@@ -115,6 +115,22 @@
   color: "e11d48"
   description: "CI failed due to GraphQL schema out of sync"
 
+# Consumed (not applied) by .github/workflows/check-schema.yml's contract gate:
+# an author adds it to acknowledge an intentional breaking schema change whose
+# clients and integration specs are updated in the same PR. It was live in the
+# repo but absent from this file, so the exhaustive sync deleted it and the
+# gate's own documented remedy stopped working — the 2026-07-07 ground-truth
+# audit called this out, and LS-10076 hit it (first intentional break since).
+- name: schema-breaking-ok
+  color: "0e8a16"
+  description: "Intentional breaking GraphQL change — clients and specs updated in this PR"
+
+# Applied by scripts/lint-touch-map.js. Listed here for the same reason: the
+# sync would otherwise delete a label CI applies.
+- name: "docs: touch-map gap"
+  color: "fbca04"
+  description: "A changed file's documentation touch-map row has no matching doc update"
+
 # Applied by ci-orchestrator.yml when a self-hosted runner shuts down mid-run.
 # Cleared automatically at the start of the next CI run.
 - name: "CI: Runner Flake"

@@ -74,7 +74,7 @@ describe('DraftCompleteView', () => {
     const { getByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        league={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMockDraft: true, name: 'Test League' }}
       />,
     );
     expect(
@@ -92,7 +92,7 @@ describe('DraftCompleteView', () => {
     const { getByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        league={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMockDraft: true, name: 'Test League' }}
       />,
     );
     expect(getByText('Practice Again')).toBeTruthy();
@@ -120,7 +120,7 @@ describe('DraftCompleteView', () => {
     const { getByText, getAllByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        league={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMockDraft: true, name: 'Test League' }}
         pickHistory={picks}
         myTeam={players}
         myTeamPicks={picks}

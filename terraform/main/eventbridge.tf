@@ -244,6 +244,97 @@ resource "aws_lambda_permission" "draft_scheduler_tick_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.draft_scheduler_tick.arn
 }
 
+# ─── Mock-draft maintenance (LS-10076) ────────────────────────────────────────
+#
+# A mock draft is its own root — no league to cascade from — so two sweeps keep
+# the table honest. They are deliberately NOT folded into the minute tick above:
+# both are cheap but wholly time-insensitive, and running them 1,440 times a day
+# to do nothing 1,439 of them is the cost the tick's own comment warns about.
+#
+#   * hourly  — expire unstarted lobbies past lobby_expires_at (their pending
+#     invitations expire, their seat holders are notified), and delete the ones
+#     old enough to have left the weekly-quota window.
+#   * daily   — purge offline mock drafts with no pick in 30 days.
+#
+# Both mutations are system-only and wrap their body in their own try/catch, so
+# a failure surfaces in the response rather than throwing.
+
+resource "aws_cloudwatch_event_rule" "mock_draft_lobby_expiry" {
+  name                = "${local.name_prefix}-mock-draft-lobby-expiry"
+  description         = "Expire unstarted mock-draft lobbies past their 24h deadline"
+  schedule_expression = "rate(1 hour)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "mock_draft_lobby_expiry" {
+  rule      = aws_cloudwatch_event_rule.mock_draft_lobby_expiry.name
+  target_id = "mock-draft-lobby-expiry"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { expireMockDraftLobbies { lobbiesExpired draftsDeleted } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "mock_draft_lobby_expiry_eventbridge" {
+  statement_id  = "AllowEventBridgeMockDraftLobbyExpiry"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.mock_draft_lobby_expiry.arn
+}
+
+resource "aws_cloudwatch_event_rule" "mock_draft_stale_purge" {
+  name                = "${local.name_prefix}-mock-draft-stale-purge"
+  description         = "Delete offline mock drafts abandoned for 30 days"
+  schedule_expression = "cron(30 8 * * ? *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "mock_draft_stale_purge" {
+  rule      = aws_cloudwatch_event_rule.mock_draft_stale_purge.name
+  target_id = "mock-draft-stale-purge"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { purgeStaleOfflineMockDrafts { lobbiesExpired draftsDeleted } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "mock_draft_stale_purge_eventbridge" {
+  statement_id  = "AllowEventBridgeMockDraftStalePurge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.mock_draft_stale_purge.arn
+}
+
 # ── Discord Score Alerts ───────────────────────────────────────────
 # Posts matchup score summaries and close-game alerts to league Discord channels.
 # Runs every 4 hours during active seasons. Short-circuits quickly when no

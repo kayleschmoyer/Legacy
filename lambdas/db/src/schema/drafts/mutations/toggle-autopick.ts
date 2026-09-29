@@ -6,10 +6,50 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 
+import type { PublicDb } from '@legacy-sports/db-client';
 import { getCurrentDraftPickInfo } from '../helpers';
-import { getSeatForTeam, setSeatAutoPick } from '../participants';
+import {
+  type DraftSeat,
+  getSeatForTeam,
+  getSeatForUser,
+  setSeatAutoPickById,
+} from '../participants';
+import { requireLeagueId } from '../league-draft';
 import { builder } from '../../builder';
-import { UserInputError } from '../../graphql-errors';
+import { ForbiddenError, UserInputError } from '../../graphql-errors';
+
+/**
+ * The seat the caller's league team holds in this draft.
+ *
+ * @throws when the caller has no team in the league, or the team has no seat.
+ */
+async function resolveLeagueSeat(
+  db: PublicDb,
+  draft: { leagueId: number | null },
+  draftId: number,
+  userId: number,
+): Promise<DraftSeat | null> {
+  const leagueId = requireLeagueId(draft);
+
+  const [membership] = await db
+    .select({ teamId: PublicSchema.leagueMembers.teamId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!membership?.teamId) {
+    throw ForbiddenError(
+      'You are not a member of this league or do not own a team',
+    );
+  }
+
+  return getSeatForTeam(db, draftId, membership.teamId);
+}
 
 // ── toggleDraftAutoPick ───────────────────────────────────────────────────────
 
@@ -50,6 +90,7 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
         const [draft] = await context.db
           .select({
             id: PublicSchema.drafts.id,
+            kind: PublicSchema.drafts.kind,
             leagueId: PublicSchema.drafts.leagueId,
             status: PublicSchema.drafts.status,
             autoPickDisabled: PublicSchema.drafts.autoPickDisabled,
@@ -77,44 +118,24 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           );
         }
 
-        // Resolve the user's team in this draft via league membership
-        const [membership] = await context.db
-          .select({ teamId: PublicSchema.leagueMembers.teamId })
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (!membership?.teamId) {
-          throw new Error(
-            'You are not a member of this league or do not own a team',
-          );
-        }
-
-        const teamId = membership.teamId;
-
-        // Verify the team holds a seat in this draft
-        const seat = await getSeatForTeam(context.db, draftId, teamId);
+        // Resolve the caller's seat: a mock-draft seat is held by the user
+        // directly, a league seat by their team (LS-10076).
+        const seat =
+          draft.kind === 'mock'
+            ? await getSeatForUser(context.db, draftId, userId)
+            : await resolveLeagueSeat(context.db, draft, draftId, userId);
 
         if (!seat) {
-          throw new Error('Your team is not participating in this draft');
+          throw ForbiddenError('You are not participating in this draft');
         }
 
         // Update auto-pick preference
-        await setSeatAutoPick(context.db, {
-          draftId,
-          leagueId: draft.leagueId,
-          teamIds: [teamId],
-          autoPick: enable,
-        });
+        await setSeatAutoPickById(context.db, seat.id, enable);
 
         LOGGER.info('[toggleDraftAutoPick] Auto-pick toggled', {
           draftId,
-          teamId,
+          participantId: seat.id,
+          teamId: seat.teamId,
           userId,
           enable,
         });
@@ -129,15 +150,15 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           if (
             currentPickInfo &&
             !currentPickInfo.isComplete &&
-            currentPickInfo.teamId === teamId
+            currentPickInfo.participantId === seat.id
           ) {
             await context.db
               .update(PublicSchema.drafts)
               .set({ currentPickDeadline: new Date(Date.now() - 1) })
               .where(eq(PublicSchema.drafts.id, draftId));
             LOGGER.info(
-              "[toggleDraftAutoPick] It is this team's turn — expiring deadline immediately",
-              { draftId, teamId },
+              "[toggleDraftAutoPick] It is this seat's turn — expiring deadline immediately",
+              { draftId, participantId: seat.id },
             );
           }
         }

@@ -14,7 +14,9 @@ import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
-import { getSeatForTeam } from '../participants';
+import { loadDraftRules } from '../draft-rules';
+import { assertCallerIsOnTheClock } from '../pick-authorization';
+import { getSeatById } from '../participants';
 import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
@@ -24,11 +26,7 @@ import {
   isPlayerOnRoster,
 } from '../../../services/roster-service';
 import { triggerAutoProcessDraftPicks } from '../trigger-auto-process';
-import {
-  AuthenticationError,
-  ForbiddenError,
-  UserInputError,
-} from '../../graphql-errors';
+import { AuthenticationError, UserInputError } from '../../graphql-errors';
 import {
   describeDbError,
   formatDbError,
@@ -52,6 +50,42 @@ const lockRetryDelay = (attempt: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, 50 * attempt));
 
 const badgeService = createBadgeService(getDbOptions());
+
+/** The `drafts` columns both phases read off the raw row. */
+interface DraftPickRow {
+  id: number;
+  league_id: number | null;
+  kind: 'league' | 'mock';
+  status: string;
+  created_by: number;
+  control_all_teams: boolean;
+  current_pick: number;
+  pick_time_limit_seconds: number;
+  selection_method: string;
+}
+
+function toAuthorizationDraft(row: DraftPickRow) {
+  return {
+    kind: row.kind,
+    leagueId: row.league_id,
+    createdBy: row.created_by,
+    controlAllTeams: row.control_all_teams,
+  };
+}
+
+/** @throws `BAD_USER_INPUT` unless the draft is running. */
+function assertDraftInProgress(status: string): void {
+  if (status === 'paused') {
+    throw UserInputError(
+      'Draft is currently paused. Wait for the commissioner to resume.',
+    );
+  }
+  if (status !== 'in-progress') {
+    throw UserInputError(
+      `Draft is not in progress (current status: ${status || 'unknown'})`,
+    );
+  }
+}
 
 /**
  * Mutation: Make a draft pick
@@ -94,43 +128,25 @@ builder.mutationField('makeDraftPick', (t) =>
         // drafts row under concurrent pick traffic (queryid 4044566576106028777
         // and the correlated draft_picks INSERT tail).
         const draftPreRows = await context.db.execute(
-          sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId}`,
+          sql`SELECT id, league_id, kind, status, created_by, control_all_teams,
+                     current_pick, pick_time_limit_seconds, selection_method
+              FROM drafts WHERE id = ${draftId}`,
         );
-        const draftPre = draftPreRows.rows[0] as
-          | {
-              id: number;
-              league_id: number;
-              current_pick: number;
-              pick_time_limit_seconds: number;
-              selection_method: string;
-            }
+        const draftPre = draftPreRows.rows[0] as unknown as
+          | DraftPickRow
           | undefined;
 
         if (!draftPre) {
           throw UserInputError('Draft not found');
         }
 
-        const [leaguePre] = await context.db
-          .select()
-          .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draftPre.league_id))
-          .limit(1);
+        // Status comes off the draft row, not the league (LS-10074): a mock
+        // draft has no league row to read it from (LS-10076).
+        assertDraftInProgress(draftPre.status);
 
-        if (!leaguePre) {
-          throw UserInputError('League not found');
-        }
-
-        if (leaguePre.draftStatus === 'paused') {
-          throw UserInputError(
-            'Draft is currently paused. Wait for the commissioner to resume.',
-          );
-        }
-
-        if (leaguePre.draftStatus !== 'in-progress') {
-          throw UserInputError(
-            `Draft is not in progress (current status: ${leaguePre.draftStatus ?? 'unknown'})`,
-          );
-        }
+        // One loader for both draft kinds — the league's settings, or the
+        // mock draft's own (LS-10076).
+        const rules = await loadDraftRules(context.db, draftId);
 
         const currentPickInfoPre = await getCurrentDraftPickInfo(
           context.db,
@@ -145,25 +161,16 @@ builder.mutationField('makeDraftPick', (t) =>
           throw UserInputError('Draft is already complete');
         }
 
-        // Verify user owns the team whose turn it is. The user→team mapping
-        // does not change mid-draft, so this is safe outside the lock; the
-        // teamId is re-verified against the authoritative locked state below.
-        const [membership] = await context.db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, draftPre.league_id),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (!membership || membership.teamId !== currentPickInfoPre.teamId) {
-          throw ForbiddenError(
-            'Not authorized: It is not your turn to pick or you do not own this team',
-          );
-        }
+        // Verify the caller is on the clock — their team for a league draft,
+        // their seat for a mock draft (LS-10076). Neither mapping changes
+        // mid-draft, so this is safe outside the lock; the seat is re-verified
+        // against the authoritative locked state below.
+        await assertCallerIsOnTheClock(context.db, {
+          draftId,
+          draft: toAuthorizationDraft(draftPre),
+          userId,
+          pickInfo: currentPickInfoPre,
+        });
 
         // Player existence + league-static eligibility filters. These depend
         // only on (playerId, league config) and not on any draft pick state.
@@ -185,14 +192,14 @@ builder.mutationField('makeDraftPick', (t) =>
           context.db,
           playerId,
           {
-            playerPool: leaguePre.playerPool,
-            minCareerGames: leaguePre.minCareerGames,
-            minCareerSeasons: leaguePre.minCareerSeasons,
-            baseballHofOnly: leaguePre.baseballHofOnly,
-            baseballEraFilter: leaguePre.baseballEraFilter,
-            customEraStartYear: leaguePre.customEraStartYear,
-            customEraEndYear: leaguePre.customEraEndYear,
-            sport: leaguePre.sport,
+            playerPool: rules.playerPool,
+            minCareerGames: rules.minCareerGames,
+            minCareerSeasons: rules.minCareerSeasons,
+            baseballHofOnly: rules.baseballHofOnly,
+            baseballEraFilter: rules.baseballEraFilter,
+            customEraStartYear: rules.customEraStartYear,
+            customEraEndYear: rules.customEraEndYear,
+            sport: rules.sport,
           },
         );
         if (failedRule) {
@@ -209,45 +216,21 @@ builder.mutationField('makeDraftPick', (t) =>
             await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
             const draftRows = await tx.execute(
-              sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
+              sql`SELECT id, league_id, kind, status, created_by, control_all_teams,
+                         current_pick, pick_time_limit_seconds, selection_method
+                  FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
             );
-            const draft = draftRows.rows[0] as
-              | {
-                  id: number;
-                  league_id: number;
-                  current_pick: number;
-                  pick_time_limit_seconds: number;
-                  selection_method: string;
-                }
+            const draft = draftRows.rows[0] as unknown as
+              | DraftPickRow
               | undefined;
 
             if (!draft) {
               throw UserInputError('Draft not found');
             }
 
-            // TOCTOU re-verify league status — could have flipped to paused
-            // between Phase 1 and Phase 2.
-            const [league] = await tx
-              .select()
-              .from(PublicSchema.leagues)
-              .where(eq(PublicSchema.leagues.id, draft.league_id))
-              .limit(1);
-
-            if (!league) {
-              throw UserInputError('League not found');
-            }
-
-            if (league.draftStatus === 'paused') {
-              throw UserInputError(
-                'Draft is currently paused. Wait for the commissioner to resume.',
-              );
-            }
-
-            if (league.draftStatus !== 'in-progress') {
-              throw UserInputError(
-                `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
-              );
-            }
+            // TOCTOU re-verify status off the locked row — it could have
+            // flipped to paused between Phase 1 and Phase 2.
+            assertDraftInProgress(draft.status);
 
             // Authoritative pick info from the locked draft row
             const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
@@ -265,7 +248,8 @@ builder.mutationField('makeDraftPick', (t) =>
             // team/slot). Surface as a user error so the client refetches and
             // retries against the new state.
             if (
-              currentPickInfo.teamId !== currentPickInfoPre.teamId ||
+              currentPickInfo.participantId !==
+                currentPickInfoPre.participantId ||
               currentPickInfo.overallPick !== currentPickInfoPre.overallPick
             ) {
               throw UserInputError(
@@ -283,7 +267,10 @@ builder.mutationField('makeDraftPick', (t) =>
                 and(
                   eq(PublicSchema.draftPicks.draftId, draftId),
                   eq(PublicSchema.draftPicks.playerId, playerId),
-                  eq(PublicSchema.draftPicks.teamId, currentPickInfo.teamId),
+                  eq(
+                    PublicSchema.draftPicks.participantId,
+                    currentPickInfo.participantId,
+                  ),
                   eq(
                     PublicSchema.draftPicks.overallPick,
                     currentPickInfo.overallPick,
@@ -314,7 +301,7 @@ builder.mutationField('makeDraftPick', (t) =>
                 draftPick: existingOwnPick,
                 isDraftComplete: false,
                 leagueId: draft.league_id,
-                isMockDraft: league.isMockDraft,
+                isMockDraft: rules.isMock,
                 selectionMethod: draft.selection_method,
                 currentPickInfo,
                 nextPickInfo: idempotentNextPickInfo,
@@ -339,27 +326,32 @@ builder.mutationField('makeDraftPick', (t) =>
               throw UserInputError('Player has already been drafted');
             }
 
-            // LS-8674: a kept player is rostered (team_members) before the
-            // first pick with no draft_picks row — the check above alone
-            // would miss it.
-            if (await isPlayerOnRoster(tx, draft.league_id, playerId)) {
-              throw UserInputError(
-                'Player is already rostered as a keeper in this league',
-              );
-            }
+            // Roster checks are league-only: a mock draft writes no roster
+            // rows at all, and its seats can never exceed the roster size
+            // because the draft ends at seats × roster size (LS-10076).
+            if (draft.league_id !== null && currentPickInfo.teamId !== null) {
+              // LS-8674: a kept player is rostered (team_members) before the
+              // first pick with no draft_picks row — the check above alone
+              // would miss it.
+              if (await isPlayerOnRoster(tx, draft.league_id, playerId)) {
+                throw UserInputError(
+                  'Player is already rostered as a keeper in this league',
+                );
+              }
 
-            // Validate roster limit (race-sensitive)
-            const { isFull: rosterFull } = await checkRosterCapacity(
-              tx,
-              currentPickInfo.teamId,
-              draft.league_id,
-              league.maxRosterSize,
-            );
-
-            if (rosterFull) {
-              throw UserInputError(
-                `Team roster is full (${league.maxRosterSize} players maximum)`,
+              // Validate roster limit (race-sensitive)
+              const { isFull: rosterFull } = await checkRosterCapacity(
+                tx,
+                currentPickInfo.teamId,
+                draft.league_id,
+                rules.maxRosterSize,
               );
+
+              if (rosterFull) {
+                throw UserInputError(
+                  `Team roster is full (${rules.maxRosterSize} players maximum)`,
+                );
+              }
             }
 
             // Commit the pick: insert pick row, advance draft state, and add player to roster.
@@ -371,17 +363,16 @@ builder.mutationField('makeDraftPick', (t) =>
                 leagueId: draft.league_id,
                 pickInfo: currentPickInfo,
                 playerId,
-                maxRosterSize: league.maxRosterSize,
+                maxRosterSize: rules.maxRosterSize,
                 pickTimeLimitSeconds: draft.pick_time_limit_seconds,
                 setStartedAt: draft.current_pick === 0,
-                isMockDraft: league.isMockDraft,
               });
 
             return {
               draftPick,
               isDraftComplete,
               leagueId: draft.league_id,
-              isMockDraft: league.isMockDraft,
+              isMockDraft: rules.isMock,
               selectionMethod: draft.selection_method,
               currentPickInfo,
               nextPickInfo,
@@ -419,7 +410,7 @@ builder.mutationField('makeDraftPick', (t) =>
         LOGGER.info('Draft pick made successfully', {
           draftId,
           playerId,
-          teamId: result.currentPickInfo.teamId,
+          participantId: result.currentPickInfo.participantId,
           round: result.currentPickInfo.round,
           pick: result.currentPickInfo.pickNumber,
           overallPick: result.currentPickInfo.overallPick,
@@ -438,6 +429,7 @@ builder.mutationField('makeDraftPick', (t) =>
             draftId,
             result.draftPick.id,
             result.currentPickInfo.teamId,
+            result.currentPickInfo.participantId,
             playerId,
             result.currentPickInfo.round,
             result.currentPickInfo.pickNumber,
@@ -445,6 +437,7 @@ builder.mutationField('makeDraftPick', (t) =>
             result.nextPickInfo
               ? {
                   teamId: result.nextPickInfo.teamId,
+                  participantId: result.nextPickInfo.participantId,
                   round: result.nextPickInfo.round,
                   pickNumber: result.nextPickInfo.pickNumber,
                   overallPick: result.nextPickInfo.overallPick,
@@ -477,10 +470,9 @@ builder.mutationField('makeDraftPick', (t) =>
           result.nextPickInfo
         ) {
           try {
-            const upcomingSeat = await getSeatForTeam(
+            const upcomingSeat = await getSeatById(
               context.db,
-              draftId,
-              result.nextPickInfo.teamId,
+              result.nextPickInfo.participantId,
             );
 
             if (upcomingSeat?.autoPick) {
@@ -492,14 +484,19 @@ builder.mutationField('makeDraftPick', (t) =>
                 .where(eq(PublicSchema.drafts.id, draftId));
 
               // Set-and-forget: dispatch the nudge without awaiting it.
-              triggerAutoProcessDraftPicks(result.leagueId);
+              // Nudged by draft id so a league-less mock draft is reachable
+              // too (LS-10076).
+              triggerAutoProcessDraftPicks({
+                leagueId: result.leagueId,
+                draftId,
+              });
 
               LOGGER.info(
                 '[LS-8107] Offloaded chained auto-picks to autoProcessDraftPicks',
                 {
                   draftId,
                   leagueId: result.leagueId,
-                  nextTeamId: result.nextPickInfo.teamId,
+                  nextParticipantId: result.nextPickInfo.participantId,
                 },
               );
             }
@@ -520,11 +517,16 @@ builder.mutationField('makeDraftPick', (t) =>
         // handles matchup creation and the completion notification instead.
         // Skipped for mock drafts — the league is ephemeral and rosters are not
         // persisted, so matchups and badge evaluation would be meaningless.
-        if (result.isDraftComplete && !result.isMockDraft) {
+        if (
+          result.isDraftComplete &&
+          !result.isMockDraft &&
+          result.leagueId !== null
+        ) {
+          const completedLeagueId = result.leagueId;
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,
-              result.leagueId,
+              completedLeagueId,
             );
             LOGGER.info('Auto-created matchups after draft completion', {
               leagueId: result.leagueId,
@@ -543,7 +545,7 @@ builder.mutationField('makeDraftPick', (t) =>
 
           // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
           badgeService
-            .evaluateDraftBadges(result.leagueId)
+            .evaluateDraftBadges(completedLeagueId)
             .catch((err: unknown) => {
               LOGGER.warn('Badge evaluation after draft failed (non-fatal)', {
                 leagueId: result.leagueId,
@@ -564,16 +566,21 @@ builder.mutationField('makeDraftPick', (t) =>
           );
         }
 
-        // Record draft pick in the activity log (fire-and-forget, non-fatal)
-        void logDraftPickActivity(context, {
-          leagueId: result.leagueId,
-          teamId: result.currentPickInfo?.teamId ?? null,
-          actorUserId: userId,
-          playerId,
-          round: result.currentPickInfo?.round,
-          pickNumber: result.currentPickInfo?.pickNumber,
-          overallPick: result.currentPickInfo?.overallPick,
-        });
+        // Record draft pick in the activity log (fire-and-forget, non-fatal).
+        // League drafts only: the activity log is a league feed, and a mock
+        // draft has no league to write it to (LS-10076).
+        const activityLeagueId = result.leagueId;
+        if (activityLeagueId !== null) {
+          void logDraftPickActivity(context, {
+            leagueId: activityLeagueId,
+            teamId: result.currentPickInfo?.teamId ?? null,
+            actorUserId: userId,
+            playerId,
+            round: result.currentPickInfo?.round,
+            pickNumber: result.currentPickInfo?.pickNumber,
+            overallPick: result.currentPickInfo?.overallPick,
+          });
+        }
 
         return result.draftPick;
       } catch (error) {

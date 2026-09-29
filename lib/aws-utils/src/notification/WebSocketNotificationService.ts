@@ -33,7 +33,8 @@ interface DynamoDBItem {
 
 export interface DraftCompletedNotification {
   type: typeof WireNotificationType.DRAFT_COMPLETED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   /** `null` only for automated-draft SQS messages queued before LS-10075. */
   draftId: number | null;
   selectionMethod: string;
@@ -42,7 +43,8 @@ export interface DraftCompletedNotification {
 
 export interface DraftStartedNotification {
   type: typeof WireNotificationType.DRAFT_STARTED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   draftId: number;
   draftOrder: string;
   teamCount: number;
@@ -53,10 +55,14 @@ export interface DraftStartedNotification {
 
 export interface DraftPickNotification {
   type: typeof WireNotificationType.DRAFT_PICK_MADE;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   draftId: number;
   pickId: number;
-  teamId: number;
+  /** `null` for a mock-draft seat: key on `participantId` (LS-10076). */
+  teamId: number | null;
+  /** The seat that made the pick — present for every draft kind (LS-10076). */
+  participantId: number;
   playerId: number;
   round: number;
   pickNumber: number;
@@ -66,7 +72,8 @@ export interface DraftPickNotification {
   autoPickReason: string | null;
   currentPickDeadline: string | null;
   nextPick?: {
-    teamId: number;
+    teamId: number | null;
+    participantId: number;
     round: number;
     pickNumber: number;
     overallPick: number;
@@ -75,7 +82,7 @@ export interface DraftPickNotification {
 
 export interface DraftPausedNotification {
   type: typeof WireNotificationType.DRAFT_PAUSED;
-  leagueId: number;
+  leagueId: number | null;
   /** `null` when the league has no draft row to pause (LS-10075). */
   draftId: number | null;
   pausedAt: string;
@@ -83,11 +90,11 @@ export interface DraftPausedNotification {
 
 export interface DraftPickUndoneNotification {
   type: typeof WireNotificationType.DRAFT_PICK_UNDONE;
-  leagueId: number;
+  leagueId: number | null;
   draftId: number;
   undonePickId: number;
   playerId: number;
-  teamId: number;
+  teamId: number | null;
   overallPick: number;
   newCurrentPick: number;
   newPickDeadline: string;
@@ -96,10 +103,43 @@ export interface DraftPickUndoneNotification {
 
 export interface DraftResumedNotification {
   type: typeof WireNotificationType.DRAFT_RESUMED;
-  leagueId: number;
+  leagueId: number | null;
   draftId: number;
   currentPickDeadline: string;
   resumedAt: string;
+}
+
+/**
+ * A mock draft's lobby changed (LS-10076): a seat was claimed, freed or
+ * kicked, the settings or visibility changed, or the host moved. The payload
+ * is deliberately thin — the client refetches `draftRoom` for the new state.
+ */
+export interface DraftLobbyUpdatedNotification {
+  type: typeof WireNotificationType.DRAFT_LOBBY_UPDATED;
+  draftId: number;
+  reason:
+    | 'seat-claimed'
+    | 'seat-freed'
+    | 'seat-kicked'
+    | 'settings'
+    | 'host'
+    | 'expired';
+  /** Seats currently held by a user, for the lobby's seat counter. */
+  filledSeats: number;
+  totalSeats: number;
+  updatedAt: string;
+}
+
+/** A chat message in a mock draft's own chat (LS-10076). */
+export interface DraftChatMessageNotification {
+  type: typeof WireNotificationType.DRAFT_CHAT_MESSAGE;
+  draftId: number;
+  messageId: number;
+  senderId: number;
+  senderUsername: string;
+  messageText: string;
+  gifUrl: string | null;
+  timestamp: string;
 }
 
 export interface PlayerStatsLoadingNotification {
@@ -561,6 +601,20 @@ export class WebSocketNotificationService {
    * lobby-preview connections — those receive seat-count/lobby events only,
    * never picks or draft lifecycle events.
    */
+  private async getAllDraftConnections(draftId: number): Promise<string[]> {
+    const items = await this.queryAllPages({
+      TableName: this.connectionsTableName,
+      IndexName: 'DraftIdIndex',
+      KeyConditionExpression: 'draftId = :draftId',
+      ExpressionAttributeValues: { ':draftId': { N: draftId.toString() } },
+      ProjectionExpression: 'connectionId',
+    });
+
+    return items
+      .map((item: DynamoDBItem) => item['connectionId']?.S)
+      .filter((id: string | undefined): id is string => !!id);
+  }
+
   private async getDraftConnections(draftId: number): Promise<string[]> {
     const items = await this.queryAllPages({
       TableName: this.connectionsTableName,
@@ -596,7 +650,7 @@ export class WebSocketNotificationService {
    */
   private async broadcastToDraft(
     message: NotificationMessage,
-    leagueId: number,
+    leagueId: number | null,
     draftId: number | null,
   ): Promise<{ sent: number; failed: number }> {
     if (!this.websocketEndpoint) {
@@ -604,7 +658,11 @@ export class WebSocketNotificationService {
       return { sent: 0, failed: 0 };
     }
 
-    const connectionIds = new Set(await this.getConnections(leagueId));
+    // A mock draft has no league channel to dual-broadcast on (LS-10076) —
+    // its clients only ever connect by draftId.
+    const connectionIds = new Set(
+      leagueId === null ? [] : await this.getConnections(leagueId),
+    );
 
     if (draftId !== null) {
       try {
@@ -698,7 +756,7 @@ export class WebSocketNotificationService {
    *   draft queued before LS-10075); the event then reaches the league only.
    */
   async notifyDraftCompleted(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number | null,
     selectionMethod: string,
   ): Promise<void> {
@@ -730,7 +788,7 @@ export class WebSocketNotificationService {
    * Send draft started notification on the draft's channels
    */
   async notifyDraftStarted(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number,
     draftOrder: string,
     teamCount: number,
@@ -770,16 +828,18 @@ export class WebSocketNotificationService {
    * Send draft pick notification on the draft's channels
    */
   async notifyDraftPickMade(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number,
     pickId: number,
-    teamId: number,
+    teamId: number | null,
+    participantId: number,
     playerId: number,
     round: number,
     pickNumber: number,
     overallPick: number,
     nextPick?: {
-      teamId: number;
+      teamId: number | null;
+      participantId: number;
       round: number;
       pickNumber: number;
       overallPick: number;
@@ -796,6 +856,7 @@ export class WebSocketNotificationService {
       draftId,
       pickId,
       teamId,
+      participantId,
       playerId,
       round,
       pickNumber,
@@ -831,7 +892,7 @@ export class WebSocketNotificationService {
    * Send draft paused notification on the draft's channels
    */
   async notifyDraftPaused(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number | null,
   ): Promise<void> {
     const notification: DraftPausedNotification = {
@@ -855,11 +916,11 @@ export class WebSocketNotificationService {
    * Informs all clients that the last pick has been rolled back.
    */
   async notifyDraftPickUndone(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number,
     undonePickId: number,
     playerId: number,
-    teamId: number,
+    teamId: number | null,
     overallPick: number,
     newCurrentPick: number,
     newPickDeadline: string,
@@ -897,7 +958,7 @@ export class WebSocketNotificationService {
    * Send draft resumed notification on the draft's channels
    */
   async notifyDraftResumed(
-    leagueId: number,
+    leagueId: number | null,
     draftId: number,
     currentPickDeadline: string,
   ): Promise<void> {
@@ -1121,6 +1182,64 @@ export class WebSocketNotificationService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Tell a mock draft's lobby that its seats or settings changed (LS-10076).
+   *
+   * Goes out on the draft channel only — a mock draft has no league channel —
+   * and deliberately reaches lobby-preview connections too, which is the one
+   * event class they are authorized for.
+   */
+  async notifyDraftLobbyUpdated(
+    payload: Omit<DraftLobbyUpdatedNotification, 'type' | 'updatedAt'>,
+  ): Promise<void> {
+    const notification: DraftLobbyUpdatedNotification = {
+      type: WireNotificationType.DRAFT_LOBBY_UPDATED,
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft lobby update notification', payload);
+
+    if (!this.websocketEndpoint) {
+      LOGGER.warn('WebSocket endpoint not configured, skipping broadcast');
+      return;
+    }
+
+    const connectionIds = await this.getAllDraftConnections(payload.draftId);
+    await this.sendToConnections(
+      connectionIds,
+      { type: 'notification', data: notification },
+      { draftId: payload.draftId },
+    );
+  }
+
+  /**
+   * Broadcast a mock draft's own chat message on the draft channel (LS-10076).
+   *
+   * Lobby-preview connections are excluded — they are authorized at
+   * `preview`, which does not include chat.
+   */
+  async notifyDraftChatMessage(
+    payload: Omit<DraftChatMessageNotification, 'type'>,
+  ): Promise<void> {
+    const notification: DraftChatMessageNotification = {
+      type: WireNotificationType.DRAFT_CHAT_MESSAGE,
+      ...payload,
+    };
+
+    LOGGER.info('Sending draft chat message notification', {
+      draftId: payload.draftId,
+      messageId: payload.messageId,
+      senderId: payload.senderId,
+    });
+
+    await this.broadcastToDraft(
+      { type: 'notification', data: notification },
+      null,
+      payload.draftId,
+    );
   }
 
   /**

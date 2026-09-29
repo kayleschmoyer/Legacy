@@ -29,10 +29,12 @@ jest.mock('@legacy-sports/db-client', () => ({
   },
 }));
 
-const getSeatForTeamMock = jest.fn().mockResolvedValue(null);
+const getSeatByIdMock = jest.fn().mockResolvedValue(null);
 
+// The chaining check reads the next seat by its `draft_participants.id`
+// (LS-10076) — a mock-draft seat has no team to look it up by.
 jest.mock('./participants', () => ({
-  getSeatForTeam: (...args: unknown[]) => getSeatForTeamMock(...args),
+  getSeatById: (...args: unknown[]) => getSeatByIdMock(...args),
 }));
 
 const getCurrentDraftPickInfoMock = jest.fn();
@@ -96,11 +98,9 @@ function makeFootballCandidatePool(): CandidatePool {
     playerDraftInfo: new Map(),
     rankedEligibleIds: [1, 2],
     bestBenchPick: undefined,
-    league: {
-      id: 10,
-      sport: 'football',
-      maxRosterSize: 25,
-    } as unknown as CandidatePool['league'],
+    // The pool carries DraftRules rather than a league row (LS-10076): the
+    // sport, the roster and the eligibility settings all come from there, for
+    // a league draft and a league-less mock draft alike.
     rules: {
       draftId: 100,
       kind: 'league',
@@ -121,6 +121,7 @@ describe('predictAutoPick — sport threading (LS-9523)', () => {
   it('passes the football league sport to getUnfilledPositionTypes and selectAutoPickPlayer', async () => {
     getCurrentDraftPickInfoMock.mockResolvedValue({
       teamId: 5,
+      participantId: 55,
       overallPick: 1,
       isComplete: false,
     });
@@ -128,14 +129,15 @@ describe('predictAutoPick — sport threading (LS-9523)', () => {
     const candidatePool = makeFootballCandidatePool();
     const db = {} as never;
 
-    const result = await predictAutoPick(db, 100, 10, candidatePool);
+    const result = await predictAutoPick(db, 100, candidatePool);
 
     // Positional awareness routes through DraftRules rather than a leagueId +
     // sport pair (LS-10074 / LS-10086) — the rules carry the sport.
     expect(getUnfilledPositionTypesMock).toHaveBeenCalledWith(
       db,
       100,
-      5,
+      // Roster needs are keyed by seat, not team, since LS-10074.
+      55,
       candidatePool.rules,
     );
     expect(selectAutoPickPlayerMock).toHaveBeenCalledWith(
@@ -149,6 +151,7 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
   it('passes the football league sport through the in-lock fallback recomputation', async () => {
     getCurrentDraftPickInfoMock.mockResolvedValue({
       teamId: 5,
+      participantId: 55,
       overallPick: 1,
       isComplete: false,
     });
@@ -216,7 +219,8 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
     const pickResult = await runAutoPickLockedTransaction({
       db: db as never,
       draftId: 100,
-      draftLeagueId: 10,
+      // No draftLeagueId parameter since LS-10076 — the owning league (or
+      // `null`) comes off the pool's rules.
       pickTimeLimitSeconds: 60,
       candidatePool,
       predicted: null, // forces the full in-lock recomputation branch
@@ -226,7 +230,7 @@ describe('runAutoPickLockedTransaction — sport threading (LS-9523)', () => {
     expect(getUnfilledPositionTypesMock).toHaveBeenCalledWith(
       tx,
       100,
-      5,
+      55,
       candidatePool.rules,
     );
     expect(selectAutoPickPlayerMock).toHaveBeenCalledWith(

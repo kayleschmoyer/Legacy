@@ -616,15 +616,45 @@ input CreateMatchupInput {
 }
 
 """
+Identifiers for a newly created mock draft (LS-10076).
+"""
+type CreateMockDraftResult {
+  draftId: Int
+
+  """
+  Code another user redeems via joinMockDraft. Only useful for an ONLINE lobby that has not started — an offline draft has no open seats.
+  """
+  inviteCode: String
+
+  """
+  False if the draft-started WebSocket notification failed to send. The draft exists either way; when false the client should poll immediately rather than wait for an event that will never arrive.
+  """
+  webSocketReady: Boolean
+}
+
+"""
 Information about the current draft pick
 """
 type CurrentDraftPick {
   draftId: Int
   isComplete: Boolean
   overallPick: Int
+
+  """
+  The seat that made (or is on the clock for) this pick — `draft_participants.id`. Present for every draft kind (LS-10076).
+  """
+  participantId: Int
   pickNumber: Int
   round: Int
+
+  """
+  The seat's league team. Null for a mock draft (LS-10076).
+  """
   team: Team
+
+  """
+  The picking seat's league team. Null for a mock draft, whose seats have no team — key on participantId instead (LS-10076).
+  """
   teamId: Int
 }
 
@@ -783,14 +813,24 @@ type DonationPaymentLinkResult {
 }
 
 """
-A draft event for a league
+A draft: a league draft, or a league-less mock draft
 """
 type Draft {
   """
   When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481).
   """
   autoPickDisabled: Boolean
+
+  """
+  Mock drafts only: the host makes every pick for every seat (LS-9253).
+  """
+  controlAllTeams: Boolean
   createdAt: String
+
+  """
+  The creator — for a mock draft, its host.
+  """
+  createdBy: Int
   currentPick: Int
   currentPickDeadline: String
   date: String
@@ -799,7 +839,32 @@ type Draft {
   draftOrder: String
   draftStartedAt: String
   id: Int
+
+  """
+  Mock drafts only: the code others redeem via joinMockDraft. Only the host and seat holders can load a mock draft, so this is not exposed to anyone who could not already share it.
+  """
+  inviteCode: String
+
+  """
+  Online mock drafts only: the lobby is joinable by id.
+  """
+  isPublic: Boolean
+  kind: DraftKind
+
+  """
+  The owning league. Null for a mock draft (LS-10076).
+  """
   leagueId: Int
+
+  """
+  Online mock drafts only: when an unstarted lobby expires (24h after creation).
+  """
+  lobbyExpiresAt: String
+
+  """
+  OFFLINE (solo vs AI) or ONLINE (lobby). Null for a league draft.
+  """
+  mockMode: MockDraftMode
   pickTimeLimitSeconds: Int
 
   """
@@ -807,6 +872,12 @@ type Draft {
   """
   scheduledAt: String
   selectionMethod: String
+  sport: Sport
+
+  """
+  Lifecycle status: 'not-started' | 'in-progress' | 'paused' | 'completed'.
+  """
+  status: String
   updatedAt: String
 }
 
@@ -851,6 +922,33 @@ type DraftFootballPlayerStats {
   rushYds: Int
 }
 
+enum DraftKind {
+  LEAGUE
+  MOCK
+}
+
+"""
+A chat message in a mock draft's own chat (LS-10076).
+"""
+type DraftMessage {
+  """
+  Server-side profanity check result, as on LeagueMessage (LS-6296).
+  """
+  containsProfanity: Boolean
+  createdAt: String
+  draftId: Int
+  gifUrl: String
+  id: Int
+  messageText: String
+  messageType: String
+  user: User
+
+  """
+  Null once the sender deletes their account.
+  """
+  userId: Int
+}
+
 """
 A single pick made during a draft
 """
@@ -864,6 +962,11 @@ type DraftPick {
   draftId: Int
   id: Int
   overallPick: Int
+
+  """
+  The seat that made (or is on the clock for) this pick — `draft_participants.id`. Present for every draft kind (LS-10076).
+  """
+  participantId: Int
   pickNumber: Int
   pickedAt: String
 
@@ -873,7 +976,15 @@ type DraftPick {
   player: Player
   playerId: Int
   round: Int
+
+  """
+  The seat's league team. Null for a mock draft (LS-10076).
+  """
   team: Team
+
+  """
+  The picking seat's league team. Null for a mock draft, whose seats have no team — key on participantId instead (LS-10076).
+  """
   teamId: Int
 }
 
@@ -927,9 +1038,18 @@ A prioritised entry in a team's draft queue. Auto-pick picks the first available
 type DraftQueueEntry {
   draftId: Int
   id: Int
+
+  """
+  The queue owner's seat. Null only for a league queue row written before LS-10073.
+  """
+  participantId: Int
   player: Player
   playerId: Int
   priority: Int
+
+  """
+  Null for a mock draft, whose queue belongs to a seat (LS-10076).
+  """
   teamId: Int
 }
 
@@ -969,6 +1089,69 @@ type DraftRecommendationStat {
 }
 
 """
+Everything the draft board needs for one draft, league or mock (LS-10076).
+"""
+type DraftRoom {
+  draft: Draft
+  kind: DraftKind
+
+  """
+  The owning league, or null for a mock draft (LS-10076). The league draft route loads the league itself through GetLeagueById; the draft room deliberately carries only the id, so the board renders from one league-independent shape.
+  """
+  leagueId: Int
+  rules: DraftRulesInfo
+  seats: [DraftSeat!]
+  sport: String
+  status: String
+  viewer: DraftViewer
+}
+
+"""
+The settings a draft runs under, whether they came from a league or from mock_draft_settings (LS-10074, LS-10076).
+"""
+type DraftRulesInfo {
+  defensiveFormat: String
+  isMock: Boolean
+  maxRosterSize: Int
+  playerPool: String
+
+  """
+  The starter slot list this draft fills, in order — the depth chart and the slot strip read it from here (LS-10086).
+  """
+  rosterPositions: [String!]
+  sport: String
+}
+
+"""
+One seat in a draft (`draft_participants`). A league seat holds a team; a mock-draft seat holds a user, the CPU, or nobody yet (LS-10076).
+"""
+type DraftSeat {
+  autoPick: Boolean
+
+  """
+  'user' | 'ai' | 'open'.
+  """
+  controller: String
+  id: Int
+  seatName: String
+
+  """
+  1-based draft position.
+  """
+  slot: Int
+
+  """
+  Null for a mock-draft seat.
+  """
+  teamId: Int
+
+  """
+  The seat holder, for a mock draft.
+  """
+  userId: Int
+}
+
+"""
 A proposal to swap two teams’ draft pick slots before the draft starts
 """
 type DraftSlotTrade {
@@ -998,6 +1181,27 @@ type DraftTeamOrderEntry {
   draftOrder: Int
   teamId: Int
   teamName: String
+}
+
+"""
+What the calling user may do in this draft room.
+"""
+type DraftViewer {
+  """
+  Host controls: start, kick, lobby settings, commissioner tools.
+  """
+  canHost: Boolean
+
+  """
+  The caller holds a seat, so they may make its picks. Control All Teams makes the host able to pick for every seat.
+  """
+  canPick: Boolean
+  role: String
+
+  """
+  The caller’s own seat, or null when they hold none.
+  """
+  seatId: Int
 }
 
 input EditMatchupScoreInput {
@@ -1746,14 +1950,20 @@ type JoinLeaguePayload {
 }
 
 """
-The team claimed by joinMockDraft, plus the league sport.
+The seat claimed by joinMockDraft (LS-10076).
 """
 type JoinMockDraftResult {
+  draftId: Int
+
   """
-  Sport of the joined mock draft — lets the client route to /football/... or /baseball/... without guessing (LS-9480).
+  The claimed seat's `draft_participants.id`.
+  """
+  seatId: Int
+
+  """
+  Sport of the joined draft — an invite code carries no sport hint, so the client cannot route to /baseball or /football without it (LS-9480).
   """
   sport: Sport
-  team: Team
 }
 
 """
@@ -2132,6 +2342,22 @@ type LeagueSeasonSummary {
   totalMatchups: Int
 }
 
+"""
+The outcome of leaving a mock draft (LS-10076).
+"""
+type LeaveMockDraftResult {
+  """
+  True when the host left an empty lobby, which deletes the draft.
+  """
+  draftDeleted: Boolean
+  draftId: Int
+
+  """
+  Set when leaving transferred the host role to another seat.
+  """
+  newHostUserId: Int
+}
+
 input LineupPositionInput {
   matchupPlayerId: Int!
   positionId: Int
@@ -2481,21 +2707,27 @@ type MinigamesStats {
 }
 
 """
-Identifiers for a newly created mock draft session
+What a mock-draft maintenance sweep did (LS-10076).
 """
-type MockDraftInit {
-  draftId: Int
+type MockDraftMaintenanceResult {
+  draftsDeleted: Int
 
   """
-  Invite code other real users can redeem via joinMockDraft to be seated into an open slot (LS-9181). Always present, but only useful for a Shared (non-offline) mock draft that has not yet been started — offline drafts and already-started drafts have no open slots left to join.
+  Lobbies that passed their expiry in this sweep.
   """
-  inviteCode: String
-  leagueId: Int
+  lobbiesExpired: Int
+}
+
+enum MockDraftMode {
+  """
+  Solo practice against AI seats.
+  """
+  OFFLINE
 
   """
-  False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive.
+  A lobby other users can join.
   """
-  webSocketReady: Boolean
+  ONLINE
 }
 
 """
@@ -2571,6 +2803,11 @@ type Mutation {
   Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback.
   """
   autoProcessDraftPicks(
+    """
+    Optional: restrict to a single draft. The only handle a mock draft has — it belongs to no league (LS-10076).
+    """
+    draftId: Int
+
     """
     Optional: restrict to a single league. Required for non-system callers (any league member can nudge).
     """
@@ -2683,6 +2920,57 @@ type Mutation {
     input: CreateLeagueAndTeamsInput!
   ): CreateLeagueAndTeamsPayload
   createMatchup(input: CreateMatchupInput!): Matchup
+
+  """
+  Create a mock draft. OFFLINE practices solo against AI seats and starts immediately; ONLINE opens a lobby other users join via joinMockDraft. Picks are recorded but no roster, league or team is ever written.
+  """
+  createMockDraft(
+    """
+    Premium (LS-9253): the host makes every seat's pick. Implies OFFLINE and requires the mock_draft_control_all_teams entitlement.
+    """
+    controlAllTeams: Boolean
+
+    """
+    "snake" (default) or "linear".
+    """
+    draftOrder: String
+
+    """
+    ONLINE only: the lobby is listed publicly and joinable by draft id without an invite code.
+    """
+    isPublic: Boolean
+
+    """
+    OFFLINE (default) or ONLINE.
+    """
+    mode: MockDraftMode
+
+    """
+    Total number of seats (2–12).
+    """
+    numTeams: Int!
+
+    """
+    The 1-based slot the creator's own seat takes.
+    """
+    pickPosition: Int!
+
+    """
+    Seconds per pick for an ONLINE draft (10–300, default 30). Ignored for OFFLINE.
+    """
+    pickTimeLimitSeconds: Int
+
+    """
+    Baseball: "all" (default), "nl", "al". Football: "all", "nfl", "afc", "nfc".
+    """
+    playerPool: String
+
+    """
+    Deprecated and ignored (LS-10086). A mock draft always uses the sport's default roster size so every starting slot can be filled. Retained so older clients keep working.
+    """
+    rosterSize: Int
+    sport: Sport
+  ): CreateMockDraftResult
   createPlayoffBracket(
     format: String!
     leagueId: Int!
@@ -2735,9 +3023,14 @@ type Mutation {
   ): Boolean
 
   """
-  Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted.
+  Host-only: delete a mock draft. Its seats, picks and chat cascade with it.
   """
-  deleteMyMockDraftLeagues: Int
+  deleteMockDraft(draftId: Int!): Boolean
+
+  """
+  Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Replaces deleteMyMockDraftLeagues, which reset the weekly cap by deleting the throwaway leagues the old path created (LS-8238).
+  """
+  deleteMyMockDrafts: Int
 
   """
   Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673)
@@ -2759,6 +3052,11 @@ type Mutation {
   Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication.
   """
   evaluateMatchupBadges(matchupId: Int!): EvaluateBadgesResult
+
+  """
+  System: expire unstarted mock-draft lobbies past lobby_expires_at, and delete the ones old enough to have left the weekly-quota window.
+  """
+  expireMockDraftLobbies: MockDraftMaintenanceResult
 
   """
   Downgrade premium subscriptions whose grace_period_ends_at has passed. System / admin only. Triggered hourly by EventBridge.
@@ -2801,70 +3099,41 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): Draft
-
-  """
-  Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league.
-  """
-  initializeMockDraft(
-    """
-    Premium (LS-9253): when true, seats every team as human-controlled — no CPU auto-picker anywhere on the board, and the user makes every pick for every team. Implies isOffline (no pick-clock pressure) and requires the mock_draft_control_all_teams entitlement. Default: false.
-    """
-    controlAllTeams: Boolean
-
-    """
-    Draft order style: "snake" (default) or "linear"
-    """
-    draftOrder: String
-
-    """
-    When true, starts an "Offline" mock draft (LS-9144): a single-person practice session with no pick-clock pressure on the human's own turns. AI opponents still auto-pick immediately. Ignores pickTimeLimitSeconds. Default: false.
-    """
-    isOffline: Boolean
-
-    """
-    Total number of teams in the mock draft (2–12)
-    """
-    numTeams: Int!
-
-    """
-    Seconds per pick (default: 30 for mock drafts)
-    """
-    pickTimeLimitSeconds: Int
-
-    """
-    Player pool to draft from. Baseball: "all" (default), "nl" (NL only), "al" (AL only). Football: "all", "nfl", "afc" (AFC only), "nfc" (NFC only).
-    """
-    playerPool: String
-
-    """
-    Deprecated and ignored (LS-10086). A mock draft always uses the sport's full default roster size so every configured starting slot can actually be filled. Retained as an optional argument so older clients keep working.
-    """
-    rosterSize: Int
-
-    """
-    Sport for the mock draft league: "baseball" (default) or "football" (LS-9040).
-    """
-    sport: String
-
-    """
-    The 1-based draft slot the human user will draft from
-    """
-    userPickPosition: Int!
-  ): MockDraftInit
   inviteAssistantManager(teamId: Int!, username: String!): LeagueMember
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
 
   """
-  Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then.
+  Join an ONLINE mock draft lobby, claiming an open seat that would otherwise be filled by AI when the host starts the draft. A private lobby requires its invite code; a public one can be joined by draft id. Fails once the draft has started or the lobby has expired.
   """
-  joinMockDraft(inviteCode: String!, teamName: String!): JoinMockDraftResult
+  joinMockDraft(
+    """
+    Joins a public lobby directly. Ignored when a code is given.
+    """
+    draftId: Int
+
+    """
+    Required for a private lobby.
+    """
+    inviteCode: String
+    teamName: String!
+  ): JoinMockDraftResult
   joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
 
   """
   Join a Season Draft Game via invite code. Returns the game ID.
   """
   joinSeasonDraftGame(inviteCode: String!): Int
+
+  """
+  Host-only: free another user's seat before the draft starts. The seat reopens for a new joiner.
+  """
+  kickMockDraftSeat(draftId: Int!, participantId: Int!): Boolean
+
+  """
+  Give up your seat. Before the draft starts the seat reopens; afterwards it becomes an AI auto-picker so the draft can still finish. A host who leaves hands off to the earliest joiner, or deletes an empty lobby.
+  """
+  leaveMockDraft(draftId: Int!): LeaveMockDraftResult
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
 
   """
@@ -2939,6 +3208,11 @@ type Mutation {
     receivingTeamId: Int!
     requestingPlayerIds: [Int!]!
   ): TradeOffer
+
+  """
+  System: delete offline mock drafts with no pick in the last 30 days.
+  """
+  purgeStaleOfflineMockDrafts: MockDraftMaintenanceResult
   randomizeDraftOrder(draftId: Int!): Draft
 
   """
@@ -3070,6 +3344,15 @@ type Mutation {
   sendDiscordWeeklyRecaps(leagueId: Int): SendDiscordWeeklyRecapsResult
 
   """
+  Post a message to a mock draft's chat. Seat holders only.
+  """
+  sendDraftMessage(
+    draftId: Int!
+    gifUrl: String
+    messageText: String!
+  ): DraftMessage
+
+  """
   Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge.
   """
   sendDuesReminders(leagueId: Int): SendDuesRemindersResult
@@ -3153,6 +3436,11 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): League
+
+  """
+  Host-only: start an ONLINE mock draft. Open seats become AI auto-pickers, pending invitations expire, and the draft goes on the clock.
+  """
+  startMockDraft(draftId: Int!): Draft
   startSeason(leagueId: Int!): League
 
   """
@@ -3273,6 +3561,17 @@ type Mutation {
     reason: String
     status: MatchupStatus!
   ): Matchup
+
+  """
+  Host-only: change an unstarted lobby’s settings or visibility.
+  """
+  updateMockDraftLobby(
+    draftId: Int!
+    draftOrder: String
+    isPublic: Boolean
+    pickTimeLimitSeconds: Int
+    playerPool: String
+  ): Boolean
   updateNotificationPreferences(
     input: NotificationPreferenceInput!
   ): NotificationPreference
@@ -3971,6 +4270,30 @@ type Query {
   Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured.
   """
   donationPaymentLink: DonationPaymentLinkResult
+
+  """
+  A mock draft's chat, oldest first. Seat holders only — there are no spectators in a mock draft.
+  """
+  draftMessages(
+    """
+    Page backwards: only messages with a lower id.
+    """
+    beforeId: Int
+    draftId: Int!
+    limit: Int
+  ): [DraftMessage!]
+
+  """
+  Load a draft room by draft id. Seat holders read their own draft; a mock draft has no spectators. An invite code (or a public lobby) grants the pre-join lobby view.
+  """
+  draftRoom(
+    draftId: Int!
+
+    """
+    Grants the pre-join lobby view of a private mock draft.
+    """
+    inviteCode: String
+  ): DraftRoom
 
   """
   Get a complete export of all personal data for the authenticated user

@@ -10,7 +10,7 @@ import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 
-import { getFirstQueuedPlayerForTeam } from './helpers';
+import { getFirstQueuedPlayerForSeat } from './helpers';
 import type { BestBenchPick, PlayerDraftInfo } from './candidate-pool';
 import { selectStrategy, type SportKind } from './strategies';
 
@@ -30,7 +30,7 @@ export interface AutoPickParams {
   rankedEligibleIds: number[];
   bestBenchPick: BestBenchPick | undefined;
   /** Current pick info from getCurrentDraftPickInfo. */
-  currentPickInfo: { teamId: number };
+  currentPickInfo: { teamId: number | null; participantId: number };
   /** Unfilled roster position slot types for the current team. */
   unfilledPositionTypes: string[];
   /**
@@ -95,17 +95,17 @@ export async function selectAutoPickPlayer(
 
   // ── Draft queue check (LS-473) ──────────────────────────────────────
   const eligibleIdSet = new Set(eligibleIds);
-  const queuedPlayerId = await getFirstQueuedPlayerForTeam(
+  const queuedPlayerId = await getFirstQueuedPlayerForSeat(
     tx,
     draftId,
-    currentPickInfo.teamId,
+    currentPickInfo.participantId,
   );
   if (queuedPlayerId !== null && eligibleIdSet.has(queuedPlayerId)) {
     autoPlayerId = queuedPlayerId;
     autoPickReason = `Draft queue pick — player ${queuedPlayerId} (user's next queued selection)`;
     LOGGER.info('[LS-473] autoProcessDraftPicks: using draft queue selection', {
       draftId,
-      teamId: currentPickInfo.teamId,
+      participantId: currentPickInfo.participantId,
       playerId: autoPlayerId,
     });
   }

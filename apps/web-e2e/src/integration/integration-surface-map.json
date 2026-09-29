@@ -104,7 +104,10 @@
     ],
     "apps/web-e2e/src/integration/tests/mock-draft-simulator-ui.integration.spec.ts": [
       "apps/web/src/pages/draft/**",
-      "lambdas/draft-processor/**"
+      "lambdas/draft-processor/**",
+      "apps/web/src/components/MockDraftBoard.tsx",
+      "lib/shared-components/src/features/elite-draft/**",
+      "lambdas/db/src/schema/drafts/**"
     ],
     "apps/web-e2e/src/integration/tests/player-search-stats-ui.integration.spec.ts": [
       "apps/web/src/pages/players/**",

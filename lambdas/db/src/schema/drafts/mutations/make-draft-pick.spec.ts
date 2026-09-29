@@ -24,6 +24,8 @@ interface DraftPickRow {
   id: number;
   draftId: number;
   teamId: number;
+  /** `draft_participants.id` — picks are keyed by seat since LS-10074. */
+  participantId: number;
   playerId: number;
   overallPick: number;
   round: number;
@@ -79,7 +81,8 @@ function setupResolver(options: {
   existingOwnPick?: DraftPickRow | null;
   nextPickInfoForIdempotent?: {
     draftId: number;
-    teamId: number;
+    teamId: number | null;
+    participantId: number;
     round: number;
     pickNumber: number;
     overallPick: number;
@@ -108,19 +111,29 @@ function setupResolver(options: {
   const mockNotifyDraftPickMade = jest.fn().mockResolvedValue(undefined);
   const mockTriggerAutoProcessDraftPicks = jest.fn();
 
-  // Phase-1 draft row
+  // The raw `drafts` row both phases read. Since LS-10074 it carries the
+  // draft's own lifecycle status and kind — `leagues.draft_status` is no
+  // longer what gates a pick — plus the host / control-all-teams columns the
+  // mock-draft turn rule needs (LS-10076).
   const draftRow = {
     id: 1,
     league_id: 10,
+    kind: 'league',
+    status: 'in-progress',
+    created_by: 7,
+    control_all_teams: false,
     current_pick: 0,
     pick_time_limit_seconds: 60,
     selection_method: 'standard',
   };
 
-  // League row
-  const leagueRow = {
-    id: 10,
-    draftStatus: 'in-progress',
+  // The draft's rules. These used to be a `leagues` SELECT inside the
+  // resolver; since LS-10074 they come from loadDraftRules, which answers for
+  // a league draft and a league-less mock draft alike.
+  const draftRules = {
+    draftId: 1,
+    kind: 'league',
+    leagueId: 10,
     playerPool: 'all',
     baseballHofOnly: false,
     baseballEraFilter: 'all',
@@ -129,16 +142,20 @@ function setupResolver(options: {
     minCareerGames: 0,
     minCareerSeasons: 0,
     maxRosterSize: 26,
-    isMockDraft: false,
+    isMock: false,
     sport: 'baseball',
     gamesPerMatchup: 5,
     pitcherStartsPerMatchup: 1,
+    rosterPositions: [],
   };
 
-  // Current pick info (Phase 1 & Phase 2)
+  // Current pick info (Phase 1 & Phase 2). The seat (`participantId`) is what
+  // every "whose turn is it" comparison keys on since LS-10074; `teamId` is
+  // the league team sitting in that seat.
   const currentPickInfo = {
     draftId: 1,
     teamId: 5,
+    participantId: 55,
     round: 1,
     pickNumber: 1,
     overallPick: 1,
@@ -150,6 +167,7 @@ function setupResolver(options: {
     id: 99,
     draftId: 1,
     teamId: 5,
+    participantId: 55,
     playerId: 42,
     overallPick: 1,
     round: 1,
@@ -169,6 +187,7 @@ function setupResolver(options: {
   const nextPickInfo = options.nextPickInfoForIdempotent ?? {
     draftId: 1,
     teamId: 6,
+    participantId: 66,
     round: 1,
     pickNumber: 2,
     overallPick: 2,
@@ -201,6 +220,7 @@ function setupResolver(options: {
     nextPickInfo: {
       draftId: 1,
       teamId: 6,
+      participantId: 66,
       round: 1,
       pickNumber: 2,
       overallPick: 2,
@@ -240,11 +260,16 @@ function setupResolver(options: {
     findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
     PublicSchema: {
       leagues: { id: 'id', draftStatus: 'draftStatus' },
-      leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
+      leagueMembers: {
+        leagueId: 'leagueId',
+        userId: 'userId',
+        teamId: 'teamId',
+      },
       draftPicks: {
         draftId: 'draftId',
         playerId: 'playerId',
         teamId: 'teamId',
+        participantId: 'participantId',
         overallPick: 'overallPick',
       },
       drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
@@ -255,20 +280,27 @@ function setupResolver(options: {
 
   jest.doMock('../types', () => ({ DraftPick: {} }));
 
-  // LS-8107's offload looks up whether the next team's seat auto-picks. Seats
-  // live in draft_participants since LS-10074 and are read through this
+  // LS-8107's offload looks up whether the seat on the clock next auto-picks
+  // — by seat id rather than by team, since a mock-draft seat has no team
+  // (LS-10076). Seats live in draft_participants and are read through this
   // module, which has its own coverage.
   jest.doMock('../participants', () => ({
-    getSeatForTeam: jest
+    getSeatById: jest
       .fn()
       .mockResolvedValue({ autoPick: options.nextTeamAutoPick ?? false }),
+  }));
+
+  // Settings come from the rules loader rather than a leagues SELECT
+  // (LS-10074); it has its own coverage.
+  jest.doMock('../draft-rules', () => ({
+    loadDraftRules: jest.fn().mockResolvedValue(draftRules),
   }));
 
   jest.doMock('../helpers', () => ({
     ALLOWED_POSITIONS_FOR_AUTO_PICK: {},
     commitDraftPick: mockCommitDraftPick,
     getCurrentDraftPickInfo: mockGetCurrentDraftPickInfo,
-    getFirstQueuedPlayerForTeam: jest.fn().mockResolvedValue(null),
+    getFirstQueuedPlayerForSeat: jest.fn().mockResolvedValue(null),
     getUnfilledPositionTypes: jest.fn().mockResolvedValue([]),
   }));
 
@@ -325,12 +357,11 @@ function setupResolver(options: {
   }));
 
   // Build a mock transaction that simulates the idempotent-pick inner path.
-  // The tx.select().from().where().limit() chain is called multiple times:
-  //   1. Lock the draft row (execute)
-  //   2. Re-fetch league (select chain)
-  //   3. getCurrentDraftPickInfo (via helpers mock — handled by mockGetCurrentDraftPickInfo)
-  //   4. existingOwnPick check — returns idempotentPick or []
-  //   5. existingPick (player already drafted) — unreachable if existingOwnPick found
+  // Phase 2 runs, in order:
+  //   1. Lock the draft row (execute) — its `status` is the in-progress gate
+  //   2. getCurrentDraftPickInfo (via helpers mock — handled by mockGetCurrentDraftPickInfo)
+  //   3. existingOwnPick check (select) — returns idempotentPick or []
+  //   4. existingPick (player already drafted) — unreachable if existingOwnPick found
 
   const mockTx = {
     execute: jest.fn().mockImplementation((sql: unknown) => {
@@ -344,13 +375,13 @@ function setupResolver(options: {
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       limit: jest.fn().mockImplementation(() => {
-        // Phase-2 select-chain order (no member lookup happens here — that's
-        // Phase 1): 1) re-fetch league under lock, 2) existingOwnPick
-        // (idempotency re-check), 3) existingPick (player-already-drafted).
+        // Phase-2 select-chain order (no member or league lookup happens here
+        // — membership is checked in Phase 1, and the settings come from the
+        // rules loader): 1) existingOwnPick (idempotency re-check),
+        // 2) existingPick (player-already-drafted).
         const call = mockTx.select.mock.calls.length;
-        if (call === 1) return Promise.resolve([leagueRow]);
         // existingOwnPick lookup
-        if (call === 2)
+        if (call === 1)
           return Promise.resolve(
             options.existingOwnPick !== undefined
               ? options.existingOwnPick
@@ -385,11 +416,14 @@ function setupResolver(options: {
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       limit: jest.fn().mockImplementation(() => {
+        // Phase-1 select-chain order: 1) the caller's league membership, read
+        // by assertCallerIsOnTheClock's league branch (LS-10076), then 2) the
+        // player row. The leagues SELECT that used to lead is gone — settings
+        // come from the mocked rules loader.
         const call = mockDb.select.mock.calls.length;
-        if (call === 1) return Promise.resolve([leagueRow]);
-        if (call === 2) return Promise.resolve([memberRow]);
-        if (call === 3) return Promise.resolve([playerRow]);
-        // The LS-8107 offload's next-team auto-pick lookup no longer runs
+        if (call === 1) return Promise.resolve([memberRow]);
+        if (call === 2) return Promise.resolve([playerRow]);
+        // The LS-8107 offload's next-seat auto-pick lookup no longer runs
         // here — it goes through the mocked participants module (LS-10074).
         return Promise.resolve([]);
       }),
@@ -461,6 +495,7 @@ describe('makeDraftPick — idempotent pick re-notification (LS-7977)', () => {
     const nextPickInfo = {
       draftId: 1,
       teamId: 6,
+      participantId: 66,
       round: 1,
       pickNumber: 2,
       overallPick: 2,
@@ -472,20 +507,24 @@ describe('makeDraftPick — idempotent pick re-notification (LS-7977)', () => {
 
     await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
 
-    // notifyDraftPickMade's 9th argument is the nextPick object.
-    // It must reflect the real next pick — not undefined (which would cause
-    // the frontend to prematurely set draftComplete=true, LS-4286).
+    // notifyDraftPickMade's 10th argument is the nextPick object (the pick's
+    // own seat was added as the 5th, LS-10074). It must reflect the real next
+    // pick — not undefined (which would cause the frontend to prematurely set
+    // draftComplete=true, LS-4286) — and carry the seat, which is the only
+    // identifier a mock draft's next pick has.
     expect(mockNotifyDraftPickMade).toHaveBeenCalledWith(
       expect.anything(), // leagueId
       expect.anything(), // draftId
       expect.anything(), // pickId
       expect.anything(), // teamId
+      expect.anything(), // participantId
       expect.anything(), // playerId
       expect.anything(), // round
       expect.anything(), // pickNumber
       expect.anything(), // overallPick
       expect.objectContaining({
         teamId: nextPickInfo.teamId,
+        participantId: nextPickInfo.participantId,
         round: nextPickInfo.round,
         pickNumber: nextPickInfo.pickNumber,
         overallPick: nextPickInfo.overallPick,
@@ -532,7 +571,12 @@ describe('makeDraftPick — asynchronous auto-pick offload (LS-8107)', () => {
 
     expect(mockCommitDraftPick).toHaveBeenCalledTimes(1); // human pick only
     expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledTimes(1);
-    expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledWith(10); // leagueId
+    // Nudged by draft id as well as league id since LS-10076, so a
+    // league-less mock draft is reachable too.
+    expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledWith({
+      leagueId: 10,
+      draftId: 1,
+    });
   });
 
   it('expires the next team deadline and nudges autoProcessDraftPicks when the next team auto-picks', async () => {

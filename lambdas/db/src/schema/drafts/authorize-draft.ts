@@ -8,14 +8,22 @@
  *
  * {@link authorizeDraft} is that guard. Its league branch reproduces the two
  * league helpers exactly — same lookups, same `ForbiddenError` messages — so
- * this slice is behavior-neutral for league drafts. The mock branch lands in
- * LS-10076 (slice 4).
+ * this slice is behavior-neutral for league drafts.
+ *
+ * The mock branch (LS-10076) has no league to consult: access is the seat.
+ * A mock draft has no spectators — only a seat holder may read it — and only
+ * its creator (`drafts.created_by`) may host. `preview` is the pre-join lobby
+ * view: a public lobby, a valid invite code, or a pending invitation.
+ *
+ * The websocket lambda cannot call this (it is bound to the GraphQL
+ * `Context`); `validateDraftAccess` in lambdas/websocket mirrors the mock
+ * branch and must stay equivalent to it.
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
-import { type DraftSeat, getSeatForTeam } from './participants';
+import { type DraftSeat, getSeatForTeam, getSeatForUser } from './participants';
 import {
   isCommissionerOrOwner,
   type LeagueMembership,
@@ -35,8 +43,9 @@ type DraftRow = typeof PublicSchema.drafts.$inferSelect;
  * What the caller is about to do, in increasing order of privilege.
  *
  * - `preview` / `read` — read-only draft state. Members read; so do spectators
- *   of a public league and admins (LS-8939). `preview` exists for the pre-join
- *   lobby view slice 4 adds; today it behaves exactly like `read`.
+ *   of a public league and admins (LS-8939). For a league draft `preview`
+ *   behaves exactly like `read`; for a mock draft it is the pre-join lobby
+ *   view (LS-10076).
  * - `participate` — act as a drafter (queue, recommendations, a board filtered
  *   to your own roster needs). Members only; spectators are refused.
  * - `host` — run the draft (order, pause/resume, commissioner picks).
@@ -47,10 +56,22 @@ export type DraftAccessNeed = 'preview' | 'read' | 'participate' | 'host';
 /** How the caller relates to this draft. */
 export type DraftRole = 'host' | 'participant' | 'spectator';
 
-/** A draft authorization for `participate`/`host`, where membership is proven. */
-export type SeatedDraftAuthorization = DraftAuthorization & {
-  membership: LeagueMembership;
-};
+/**
+ * A draft authorization for `participate`/`host`: league membership is proven
+ * for a league draft, and a seat is proven for a mock draft.
+ */
+export type SeatedDraftAuthorization =
+  | (DraftAuthorization & { membership: LeagueMembership })
+  | (DraftAuthorization & { membership: null; seat: DraftSeat });
+
+/** Options for {@link authorizeDraft}. */
+export interface AuthorizeDraftOptions {
+  /**
+   * An invite code the caller presented. A matching `drafts.invite_code`
+   * grants `preview` on a mock-draft lobby (LS-10076).
+   */
+  inviteCode?: string | null;
+}
 
 export interface DraftAuthorization {
   draft: DraftRow;
@@ -75,6 +96,46 @@ function resolveRole(membership: LeagueMembership | null): DraftRole {
   return isCommissionerOrOwner(membership) ? 'host' : 'participant';
 }
 
+/** `true` for a mock-draft lobby that can still be previewed or joined. */
+export function isOpenMockLobby(
+  draft: DraftRow,
+  now: Date = new Date(),
+): boolean {
+  return (
+    draft.kind === 'mock' &&
+    draft.status === 'not-started' &&
+    (draft.lobbyExpiresAt === null || draft.lobbyExpiresAt > now)
+  );
+}
+
+/** `true` when `userId` holds a pending, unexpired invitation to `draftId`. */
+export async function hasPendingDraftInvitation(
+  db: Context['db'],
+  draftId: number,
+  userId: number,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const [invitation] = await db
+    .select({
+      id: PublicSchema.invitations.id,
+      expiresAt: PublicSchema.invitations.expiresAt,
+    })
+    .from(PublicSchema.invitations)
+    .where(
+      and(
+        eq(PublicSchema.invitations.draftId, draftId),
+        eq(PublicSchema.invitations.invitedUserId, userId),
+        eq(PublicSchema.invitations.status, 'pending'),
+      ),
+    )
+    .limit(1);
+
+  return (
+    invitation !== undefined &&
+    (invitation.expiresAt === null || invitation.expiresAt > now)
+  );
+}
+
 /**
  * Authorize `context.user` for `draftId` at the given access level.
  *
@@ -86,16 +147,19 @@ export async function authorizeDraft(
   context: Context,
   draftId: number,
   need: 'participate' | 'host',
+  options?: AuthorizeDraftOptions,
 ): Promise<SeatedDraftAuthorization>;
 export async function authorizeDraft(
   context: Context,
   draftId: number,
   need: DraftAccessNeed,
+  options?: AuthorizeDraftOptions,
 ): Promise<DraftAuthorization>;
 export async function authorizeDraft(
   context: Context,
   draftId: number,
   need: DraftAccessNeed,
+  options: AuthorizeDraftOptions = {},
 ): Promise<DraftAuthorization> {
   if (!context.user) {
     throw AuthenticationError();
@@ -111,7 +175,7 @@ export async function authorizeDraft(
     throw UserInputError('Draft not found');
   }
 
-  return authorizeLoadedDraft(context, draft, need);
+  return authorizeLoadedDraft(context, draft, need, options);
 }
 
 /**
@@ -125,39 +189,39 @@ export async function authorizeLoadedDraft(
   context: Context,
   draft: DraftRow,
   need: 'participate' | 'host',
+  options?: AuthorizeDraftOptions,
 ): Promise<SeatedDraftAuthorization>;
 export async function authorizeLoadedDraft(
   context: Context,
   draft: DraftRow,
   need: DraftAccessNeed,
+  options?: AuthorizeDraftOptions,
 ): Promise<DraftAuthorization>;
 export async function authorizeLoadedDraft(
   context: Context,
   draft: DraftRow,
   need: DraftAccessNeed,
+  options: AuthorizeDraftOptions = {},
 ): Promise<DraftAuthorization> {
   const user = context.user;
   if (!user) {
     throw AuthenticationError();
   }
 
-  const draftId = draft.id;
-
+  // Tested for 'mock' specifically, not "not 'league'": the column is NOT
+  // NULL DEFAULT 'league', so anything else is a league draft.
   if (draft.kind === 'mock') {
-    // No writer creates a kind='mock' draft yet — LS-10073 was purely
-    // additive — so this is unreachable today. Guarding beats silently
-    // falling through to the league branch, which assumes a league_id.
-    // The test is for 'mock' specifically, not "not 'league'": the column is
-    // NOT NULL DEFAULT 'league', so anything else is a league draft.
-    throw new Error(
-      `authorizeDraft: draft ${String(draftId)} is a mock draft — the mock branch lands in LS-10076`,
-    );
+    return authorizeMockDraft(context, user.id, draft, need, options);
   }
 
   // A league draft always has a league_id (CHECK drafts_kind_league_ck,
-  // LS-10073); the column is nullable in the DB only so slice 4's mock drafts
-  // can omit it, and stays typed non-null until a writer can create one.
+  // LS-10073).
   const leagueId = draft.leagueId;
+  if (leagueId === null) {
+    throw new Error(
+      `authorizeDraft: league draft ${String(draft.id)} has no league_id`,
+    );
+  }
 
   let membership: LeagueMembership | null;
   if (isReadOnlyNeed(need)) {
@@ -183,6 +247,53 @@ export async function authorizeLoadedDraft(
       : null;
 
   return { draft, seat, role: resolveRole(membership), membership };
+}
+
+/**
+ * The mock branch of {@link authorizeLoadedDraft} (LS-10076).
+ *
+ * - A seat holder may `preview`, `read` and `participate`.
+ * - Only the host (`drafts.created_by`, moved on host transfer) may `host`.
+ * - Anyone else may only `preview` an open lobby that is public, whose invite
+ *   code they present, or to which they hold a pending invitation. There are
+ *   no spectators: admins included, a non-holder never reads a mock draft.
+ */
+async function authorizeMockDraft(
+  context: Context,
+  userId: number,
+  draft: DraftRow,
+  need: DraftAccessNeed,
+  options: AuthorizeDraftOptions,
+): Promise<DraftAuthorization> {
+  const seat = await getSeatForUser(context.db, draft.id, userId);
+  const isHost = draft.createdBy === userId;
+
+  if (seat) {
+    if (need === 'host' && !isHost) {
+      throw ForbiddenError('Only the mock draft host can perform this action');
+    }
+    return {
+      draft,
+      seat,
+      role: isHost ? 'host' : 'participant',
+      membership: null,
+    };
+  }
+
+  if (need === 'preview' && isOpenMockLobby(draft)) {
+    const presentedCode = options.inviteCode?.trim().toUpperCase();
+    const codeMatches =
+      !!presentedCode && presentedCode === draft.inviteCode?.toUpperCase();
+    if (
+      draft.isPublic ||
+      codeMatches ||
+      (await hasPendingDraftInvitation(context.db, draft.id, userId))
+    ) {
+      return { draft, seat: null, role: 'spectator', membership: null };
+    }
+  }
+
+  throw ForbiddenError('You do not have a seat in this mock draft');
 }
 
 /**

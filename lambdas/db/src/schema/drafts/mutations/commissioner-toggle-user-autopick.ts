@@ -19,6 +19,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import { requireLeagueId } from '../league-draft';
 
 // ── commissionerToggleUserAutoPick ───────────────────────────────────────────
 
@@ -57,6 +58,7 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
       if (!draft) {
         throw UserInputError('Draft not found');
       }
+      const leagueId = requireLeagueId(draft);
 
       // Verify caller is the league commissioner
       const [membership] = await context.db
@@ -64,7 +66,7 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
         .from(PublicSchema.leagueMembers)
         .where(
           and(
-            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
             eq(PublicSchema.leagueMembers.userId, userId),
           ),
         )
@@ -94,7 +96,7 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
       // Apply the change
       await setSeatAutoPick(context.db, {
         draftId,
-        leagueId: draft.leagueId,
+        leagueId: leagueId,
         teamIds: [teamId],
         autoPick: enable,
       });
@@ -122,7 +124,7 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
       const [chatMsg] = await context.db
         .insert(PublicSchema.leagueMessages)
         .values({
-          leagueId: draft.leagueId,
+          leagueId: leagueId,
           userId: null,
           messageText,
           messageType: 'system',
@@ -131,8 +133,8 @@ builder.mutationField('commissionerToggleUserAutoPick', (t) =>
 
       if (context.notificationService) {
         context.notificationService
-          .notifyLeagueChatMessage(draft.leagueId, {
-            leagueId: draft.leagueId,
+          .notifyLeagueChatMessage(leagueId, {
+            leagueId: leagueId,
             messageId: chatMsg.id,
             senderId: null,
             senderUsername: commissionerName,

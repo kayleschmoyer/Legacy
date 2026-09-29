@@ -30,7 +30,11 @@ interface UseDraftTimerParams {
   readOnly?: boolean;
   /** Required unless `readOnly` is true — spectators mount no mutations. */
   nudgeExpiredDraftPick?: (opts: {
-    variables: { leagueId: number };
+    /**
+     * A mock draft has no league, so it is nudged by draft id instead
+     * (LS-10076). Exactly one of the two is sent.
+     */
+    variables: { leagueId?: number | null; draftId?: number | null };
   }) => Promise<unknown>;
   refetchDraft: () => unknown;
   refetchCurrentPick: (vars: { draftId: number }) => unknown;
@@ -148,7 +152,7 @@ export function useDraftTimer({
 
   useEffect(() => {
     if (untimed || readOnly || !nudgeExpiredDraftPick) return;
-    if (!leagueId || !draftId || draftComplete || draftPaused) return;
+    if (!draftId || draftComplete || draftPaused) return;
     if (!deadlineEverObservedRef.current) return;
     if (timeRemaining > 0) return;
 
@@ -158,7 +162,11 @@ export function useDraftTimer({
     const timer = setTimeout(() => {
       if (nudgeAttemptRef.current === pickNumber) return;
       nudgeAttemptRef.current = pickNumber;
-      void nudgeExpiredDraftPick({ variables: { leagueId } })
+      // League drafts keep nudging by league (one call covers every draft in
+      // it); a league-less mock draft is reachable only by its own id.
+      void nudgeExpiredDraftPick({
+        variables: leagueId ? { leagueId } : { draftId },
+      })
         .then(() => {
           void refetchDraft();
           if (draftId) void refetchCurrentPick({ draftId });

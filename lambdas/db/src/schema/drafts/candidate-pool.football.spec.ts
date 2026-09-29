@@ -21,9 +21,16 @@
  * exercised, not stubbed.
  */
 
-async function loadCandidatePoolModule(): Promise<
-  typeof import('./candidate-pool')
-> {
+/**
+ * Loads a fresh copy of the module under test with `loadDraftRules` stubbed to
+ * report `rosterPositions` — the slot list the draft is filling. It used to be
+ * read from `league_positions` inside `computeBestBenchPick`; since LS-10076 it
+ * arrives on `DraftRules`, so a league-less mock draft can supply it from the
+ * sport defaults.
+ */
+async function loadCandidatePoolModule(
+  rosterPositions: string[],
+): Promise<typeof import('./candidate-pool')> {
   jest.resetModules();
 
   jest.doMock('@legacy-sports/logging', () => ({
@@ -50,9 +57,11 @@ async function loadCandidatePoolModule(): Promise<
     ),
   }));
 
-  // fetchCandidatePool attaches the draft's DraftRules (LS-10074). Those
-  // come from their own loader with its own coverage; stub it so this suite
-  // keeps asserting only the candidate-pool queries it is about.
+  // fetchCandidatePool reads the draft's DraftRules (LS-10074/LS-10076) — the
+  // sport, the eligibility settings and the roster slot list — rather than the
+  // `leagues` row it used to select. Those come from their own loader with its
+  // own coverage; stub it so this suite keeps asserting only the
+  // candidate-pool queries it is about.
   jest.doMock('./draft-rules', () => ({
     loadDraftRules: jest.fn(async () => ({
       draftId: DRAFT_ID,
@@ -60,8 +69,10 @@ async function loadCandidatePoolModule(): Promise<
       leagueId: LEAGUE_ID,
       sport: 'football',
       maxRosterSize: 25,
+      gamesPerMatchup: 1,
+      pitcherStartsPerMatchup: 0,
       isMock: false,
-      rosterPositions: ['QB', 'RB'],
+      rosterPositions,
     })),
   }));
 
@@ -86,38 +97,21 @@ function selectChain(result: unknown) {
   return chain;
 }
 
-type FootballLeagueRow = {
-  id: number;
-  sport: 'football';
-  draftStatus: string;
-  gamesPerMatchup: number | null;
-  pitcherStartsPerMatchup: number | null;
-};
-
-const footballLeague: FootballLeagueRow = {
-  id: LEAGUE_ID,
-  sport: 'football',
-  draftStatus: 'in-progress',
-  gamesPerMatchup: 1,
-  pitcherStartsPerMatchup: 0,
-};
-
 /**
  * Builds a db stub for the full football fetchCandidatePool path:
  *   execute #1: deadline pre-check (drafts row)
- *   select  #1: league lookup
  *   execute #2: fetchUndraftedCandidates
  *   execute #3: computePlayerDraftInfo stats query
- *   select  #2: computePlayerDraftInfo positions query
- *   execute #4: computeBestBenchPick total-slots scalar
- *   execute #5: computeBestBenchPick league_positions rows (football branch)
+ *   select  #1: computePlayerDraftInfo positions query
+ *
+ * The league lookup and `computeBestBenchPick`'s two `league_positions`
+ * queries are gone since LS-10076: the settings and the roster slot list both
+ * come off `DraftRules` (stubbed in `loadCandidatePoolModule`).
  */
 function makeFootballDb(opts: {
   undraftedRows: Array<{ id: number; fpg: number }>;
   statsRows: Array<{ player_id: number; projected_fpg: number }>;
   positionRows: Array<{ playerId: number; position: string }>;
-  totalSlots: number;
-  leaguePositionRows: Array<{ position_type: string }>;
 }) {
   const executeCalls: unknown[] = [];
   let executeCall = 0;
@@ -145,10 +139,6 @@ function makeFootballDb(opts: {
         return Promise.resolve({ rows: opts.undraftedRows });
       case 3:
         return Promise.resolve({ rows: opts.statsRows });
-      case 4:
-        return Promise.resolve({ rows: [{ total_slots: opts.totalSlots }] });
-      case 5:
-        return Promise.resolve({ rows: opts.leaguePositionRows });
       default:
         throw new Error(`Unexpected db.execute call #${executeCall}`);
     }
@@ -156,8 +146,7 @@ function makeFootballDb(opts: {
 
   const select = jest.fn(() => {
     selectCall += 1;
-    if (selectCall === 1) return selectChain([footballLeague]);
-    if (selectCall === 2) return selectChain(opts.positionRows);
+    if (selectCall === 1) return selectChain(opts.positionRows);
     throw new Error(`Unexpected db.select call #${selectCall}`);
   });
 
@@ -166,7 +155,7 @@ function makeFootballDb(opts: {
 
 describe('fetchCandidatePool — football (LS-9483, LS-9484)', () => {
   it('ranks candidates by real cached FPG, not always 0', async () => {
-    const { fetchCandidatePool } = await loadCandidatePoolModule();
+    const { fetchCandidatePool } = await loadCandidatePoolModule(['QB', 'RB']);
     const { db } = makeFootballDb({
       undraftedRows: [
         { id: 1, fpg: 22.5 },
@@ -180,11 +169,9 @@ describe('fetchCandidatePool — football (LS-9483, LS-9484)', () => {
         { playerId: 1, position: 'QB' },
         { playerId: 2, position: 'RB' },
       ],
-      totalSlots: 9,
-      leaguePositionRows: [{ position_type: 'QB' }, { position_type: 'RB' }],
     });
 
-    const pool = await fetchCandidatePool(db as never, DRAFT_ID, LEAGUE_ID);
+    const pool = await fetchCandidatePool(db as never, DRAFT_ID);
 
     expect(pool).not.toBeNull();
     expect(pool?.playerDraftInfo.get(1)?.fpg).toBe(22.5);
@@ -192,25 +179,23 @@ describe('fetchCandidatePool — football (LS-9483, LS-9484)', () => {
   });
 
   it('counts an IDP DL player against exactly its own DL slots, not 0 and not other slots', async () => {
-    const { fetchCandidatePool } = await loadCandidatePoolModule();
     // Single candidate (DL-only) so bestBenchPick unambiguously reflects its
-    // own slotsCoverable. League has 2 DL slots + 1 QB slot the player is
-    // NOT eligible for — pre-fix this was always 0 (LS-9483: the baseline
-    // slots-coverable query never matched any football row); the fix must
-    // land on exactly 2, not 0 and not 3 (over-counting the QB slot too).
+    // own slotsCoverable. The draft's roster has 2 DL slots + 1 QB slot the
+    // player is NOT eligible for — pre-fix this was always 0 (LS-9483: the
+    // baseline slots-coverable query never matched any football row); the fix
+    // must land on exactly 2, not 0 and not 3 (over-counting the QB slot too).
+    const { fetchCandidatePool } = await loadCandidatePoolModule([
+      'QB',
+      'DL',
+      'DL',
+    ]);
     const { db } = makeFootballDb({
       undraftedRows: [{ id: 1, fpg: 8 }],
       statsRows: [{ player_id: 1, projected_fpg: 8 }],
       positionRows: [{ playerId: 1, position: 'DL' }],
-      totalSlots: 3,
-      leaguePositionRows: [
-        { position_type: 'QB' },
-        { position_type: 'DL' },
-        { position_type: 'DL' },
-      ],
     });
 
-    const pool = await fetchCandidatePool(db as never, DRAFT_ID, LEAGUE_ID);
+    const pool = await fetchCandidatePool(db as never, DRAFT_ID);
 
     expect(pool?.bestBenchPick).toEqual({
       playerId: 1,
@@ -227,10 +212,10 @@ describe('fetchCandidatePool — football (LS-9483, LS-9484)', () => {
   // differently-scored, differently-versatile candidates must resolve to a
   // real, non-tied winner rather than an arbitrary Map-iteration-order pick.
   it('does not produce a flat tie across distinct football candidates', async () => {
-    const { fetchCandidatePool } = await loadCandidatePoolModule();
     // Player 1: WR, fpg 13 — covers only the WR slot (benchScore 13 * 1.15 = 14.95).
     // Player 2: QB, fpg 24 — covers only the QB slot (benchScore 24 * 1.15 = 27.6).
     // Player 2 must win: distinctly, not by a degenerate 0-vs-0 coincidence.
+    const { fetchCandidatePool } = await loadCandidatePoolModule(['WR', 'QB']);
     const { db } = makeFootballDb({
       undraftedRows: [
         { id: 1, fpg: 13 },
@@ -244,11 +229,9 @@ describe('fetchCandidatePool — football (LS-9483, LS-9484)', () => {
         { playerId: 1, position: 'WR' },
         { playerId: 2, position: 'QB' },
       ],
-      totalSlots: 2,
-      leaguePositionRows: [{ position_type: 'WR' }, { position_type: 'QB' }],
     });
 
-    const pool = await fetchCandidatePool(db as never, DRAFT_ID, LEAGUE_ID);
+    const pool = await fetchCandidatePool(db as never, DRAFT_ID);
 
     expect(pool?.bestBenchPick?.playerId).toBe(2);
     expect(pool?.bestBenchPick?.fpg).not.toBe(0);

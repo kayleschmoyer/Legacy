@@ -10,7 +10,7 @@
  * Page-level chrome stays with each consumer: web wraps this in its gradient
  * background + "Practice Mode" card and supplies premium gating + data fetching;
  * native wraps it in a ScrollView and passes its Premium upsell via `header`.
- * Both supply navigation and the `initializeMockDraft` wiring through `onStart`
+ * Both supply navigation and the `createMockDraft` wiring through `onStart`
  * / `onCancel`, keeping this component purely presentational and platform-safe
  * (Tamagui primitives only — no DOM-only constructs).
  */
@@ -60,6 +60,11 @@ export interface MockDraftSettings {
   /** Premium (LS-9253): the user makes every pick for every team — no CPU
    *  auto-picker anywhere on the board. Always untimed regardless of `mode`. */
   controlAllTeams: boolean;
+  /**
+   * Shared mode only (LS-10076): a public lobby is joinable by anyone who has
+   * its link, without an invite code. Ignored for Offline.
+   */
+  isPublic: boolean;
 }
 
 export interface MockDraftSetupProps {
@@ -95,7 +100,7 @@ export interface MockDraftSetupProps {
    * Whether the current user's plan grants Control All Teams (LS-9253).
    * Defaults to false. When false the option is still shown (an upgrade
    * surface, not hidden) but selecting it calls `onControlAllTeamsUpgrade`
-   * instead of enabling the setting — server-side `initializeMockDraft`
+   * instead of enabling the setting — server-side `createMockDraft`
    * enforces the real gate regardless of this prop.
    */
   isControlAllTeamsEntitled?: boolean;
@@ -129,6 +134,12 @@ const DRAFT_MODE_OPTIONS: {
   },
 ];
 
+/** Shared-lobby visibility (LS-10076). */
+const VISIBILITY_OPTIONS: { label: string; value: boolean }[] = [
+  { label: 'Private', value: false },
+  { label: 'Public', value: true },
+];
+
 const CONTROL_ALL_TEAMS_OPTIONS: {
   label: string;
   value: boolean;
@@ -155,7 +166,7 @@ interface PlayerPoolOption {
 /**
  * Player Pool choices per sport (LS-9470). Selecting a sport swaps the whole
  * option set — a baseball league can never be created with an AFC/NFC pool
- * (and vice versa), which is exactly what `initializeMockDraft` enforces
+ * (and vice versa), which is exactly what `createMockDraft` enforces
  * server-side.
  */
 const PLAYER_POOL_OPTIONS_BY_SPORT: Record<MockDraftSport, PlayerPoolOption[]> =
@@ -242,6 +253,7 @@ interface OptionButtonProps {
    * selection handler).
    */
   locked?: boolean;
+  testID?: string;
 }
 
 function OptionButton({
@@ -251,6 +263,7 @@ function OptionButton({
   onPress,
   width,
   locked = false,
+  testID,
 }: OptionButtonProps): React.JSX.Element {
   return (
     <Button
@@ -267,6 +280,7 @@ function OptionButton({
       pressStyle={{ scale: 0.96 }}
       aria-pressed={selected}
       aria-label={locked ? `${label} (requires Premium)` : undefined}
+      testID={testID}
     >
       <XStack alignItems="center" gap="$1.5">
         {locked && (
@@ -316,6 +330,7 @@ export function MockDraftSetup({
   const [sport, setSport] = React.useState<MockDraftSport>('baseball');
   const [mode, setMode] = React.useState<MockDraftMode>('shared');
   const [controlAllTeams, setControlAllTeams] = React.useState(false);
+  const [isPublic, setIsPublic] = React.useState(false);
 
   // Changing sport resets the pool to the sport-neutral 'all' so a stale
   // baseball pool (nl/al) can never be submitted with sport=football — the
@@ -337,6 +352,9 @@ export function MockDraftSetup({
       // Control All Teams is always untimed — no CPU opponents to wait on.
       mode: controlAllTeams ? 'offline' : mode,
       controlAllTeams,
+      // Only a Shared lobby can be public — an offline draft has no one to
+      // join it (server CHECK drafts_public_mock_ck).
+      isPublic: !controlAllTeams && mode === 'shared' && isPublic,
     });
   };
 
@@ -405,6 +423,26 @@ export function MockDraftSetup({
             />
           ))}
         </XStack>
+        {mode === 'shared' && (
+          <XStack
+            gap="$2"
+            flexWrap="wrap"
+            justifyContent="center"
+            marginTop="$2"
+          >
+            {VISIBILITY_OPTIONS.map((opt) => (
+              <OptionButton
+                key={String(opt.value)}
+                label={opt.label}
+                selected={isPublic === opt.value}
+                accent={EMERALD}
+                onPress={() => setIsPublic(opt.value)}
+                width={140}
+                testID={`mock-draft-visibility-${opt.label.toLowerCase()}`}
+              />
+            ))}
+          </XStack>
+        )}
         {mode === 'shared' && onJoinInstead && (
           <XStack justifyContent="center" marginTop="$2">
             <Button
@@ -431,7 +469,7 @@ export function MockDraftSetup({
       {/* Control All Teams — premium (LS-9253). Visible to free users but
           gated: selecting "On" without the entitlement routes to the upgrade
           CTA instead of enabling the setting (AC2) — server-side
-          initializeMockDraft is the real enforcement (AC3) regardless. */}
+          createMockDraft is the real enforcement (AC3) regardless. */}
       <FieldSection
         label="Control All Teams"
         labelId="control-all-teams-label"

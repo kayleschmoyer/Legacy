@@ -13,7 +13,7 @@ import { graphql } from './graphql';
  * the standard cleanup sweeps never reap them, so the count never resets within
  * the window and the spec stays red for up to a week.
  *
- * Uses the `deleteMyMockDraftLeagues` mutation (LS-8238), which deletes ONLY the
+ * Uses the `deleteMyMockDrafts` mutation (LS-8238), which deletes ONLY the
  * caller's own mock leagues (`owner = caller AND is_mock_draft = true`).
  *
  * It deliberately does NOT use `deleteAllLeagues`. The integration specs all run
@@ -37,9 +37,9 @@ import { graphql } from './graphql';
 export async function resetMockDraftUsage(
   api: APIRequestContext,
 ): Promise<void> {
-  const result = await graphql<{ deleteMyMockDraftLeagues: number | null }>(
+  const result = await graphql<{ deleteMyMockDrafts: number | null }>(
     api,
-    'mutation { deleteMyMockDraftLeagues }',
+    'mutation { deleteMyMockDrafts }',
   );
 
   if (result.errors?.length) {
@@ -49,21 +49,21 @@ export async function resetMockDraftUsage(
     // error for the unknown field is expected on the introducing PR's run and
     // must not fail the spec; any other error is a real failure.
     if (
-      /deleteMyMockDraftLeagues/.test(message) &&
+      /deleteMyMockDrafts/.test(message) &&
       /field|Cannot query|Unknown/i.test(message)
     ) {
       LOGGER.warn(
-        `[resetMockDraftUsage] deleteMyMockDraftLeagues not yet deployed; ` +
+        `[resetMockDraftUsage] deleteMyMockDrafts not yet deployed; ` +
           `skipping reset (expected only on the introducing PR): ${message}`,
       );
       return;
     }
     throw new Error(
-      `[resetMockDraftUsage] deleteMyMockDraftLeagues failed: ${message}`,
+      `[resetMockDraftUsage] deleteMyMockDrafts failed: ${message}`,
     );
   }
 
   LOGGER.info(
-    `[resetMockDraftUsage] deleted ${result.data?.deleteMyMockDraftLeagues ?? 0} mock-draft league(s)`,
+    `[resetMockDraftUsage] deleted ${result.data?.deleteMyMockDrafts ?? 0} mock draft(s)`,
   );
 }

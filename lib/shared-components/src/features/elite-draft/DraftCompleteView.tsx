@@ -10,7 +10,11 @@ import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { BaseballCard } from './BaseballCard';
 
 interface DraftCompleteViewProps {
-  league: { isMockDraft?: boolean; name?: string } | null | undefined;
+  /**
+   * What this draft was, for the copy and CTAs. A mock draft has no league
+   * (LS-10076), so this is the draft's own summary rather than a league row.
+   */
+  draftSummary: { isMockDraft?: boolean; name?: string } | null | undefined;
   leagueId: number | null;
   pickHistory: DraftPickRecord[];
   myTeamId: number | null;
@@ -82,7 +86,7 @@ function RosterCardGrid({
 }
 
 export function DraftCompleteView({
-  league,
+  draftSummary,
   leagueId,
   pickHistory,
   myTeamId,
@@ -198,13 +202,13 @@ export function DraftCompleteView({
           lineHeight={21}
           textAlign="center"
         >
-          {league?.isMockDraft
+          {draftSummary?.isMockDraft
             ? `All ${pickHistory.length} picks have been made. No rosters were saved — this was a practice draft.`
             : `All ${pickHistory.length} picks have been made. Your roster is set!`}
         </Text>
 
         {/* Action buttons — shown for real (non-mock) drafts */}
-        {!league?.isMockDraft && (
+        {!draftSummary?.isMockDraft && (
           <XStack
             gap="$3"
             flexWrap="wrap"
@@ -245,7 +249,7 @@ export function DraftCompleteView({
         )}
 
         {/* Mock draft buttons */}
-        {league?.isMockDraft && (
+        {draftSummary?.isMockDraft && (
           <XStack
             gap="$3"
             flexWrap="wrap"

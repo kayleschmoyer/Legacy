@@ -79,7 +79,8 @@ export function buildDraftAdpCte({
   leagueSport,
   poolConditions,
 }: {
-  leagueId: number;
+  /** `null` for a mock draft: only the league-less default cache applies. */
+  leagueId: number | null;
   leagueSport: DraftSport;
   poolConditions: SQL[];
 }): SQL {
@@ -130,7 +131,8 @@ export function buildDraftAdpPoolConditions({
   league,
 }: {
   draftId: number;
-  leagueId: number;
+  /** `null` for a mock draft, which rosters nobody (LS-10076). */
+  leagueId: number | null;
   leagueSport: DraftSport;
   league: DraftAdpLeagueSettings | undefined;
 }): SQL[] {
@@ -157,16 +159,22 @@ export function buildDraftAdpPoolConditions({
     // So players rostered *by this draft's own picks* stay in the window. The
     // window is then the pool as it stood when the draft began: keepers and
     // other prior rosterings excluded, this draft's picks still ranked.
-    sql`(
-      NOT EXISTS (
-        SELECT 1 FROM public.team_members tm
-        WHERE tm.league_id = ${leagueId} AND tm.player_id = p.id
-      )
-      OR EXISTS (
-        SELECT 1 FROM public.draft_picks dp
-        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
-      )
-    )`,
+    // A mock draft has no league and writes no roster rows, so nothing is
+    // excluded — the window is the whole eligible pool (LS-10076).
+    ...(leagueId === null
+      ? []
+      : [
+          sql`(
+          NOT EXISTS (
+            SELECT 1 FROM public.team_members tm
+            WHERE tm.league_id = ${leagueId} AND tm.player_id = p.id
+          )
+          OR EXISTS (
+            SELECT 1 FROM public.draft_picks dp
+            WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+          )
+        )`,
+        ]),
     ...buildEligibilityConditions({
       sport: leagueSport,
       playerPool: league?.playerPool ?? 'all',
@@ -206,7 +214,10 @@ export async function loadDraftedPlayerAdp(
 ): Promise<Map<number, number>> {
   const [draft] = await withPoolTimeoutRetry(() =>
     db
-      .select({ leagueId: PublicSchema.drafts.leagueId })
+      .select({
+        leagueId: PublicSchema.drafts.leagueId,
+        sport: PublicSchema.drafts.sport,
+      })
       .from(PublicSchema.drafts)
       .where(eq(PublicSchema.drafts.id, draftId))
       .limit(1),
@@ -214,32 +225,60 @@ export async function loadDraftedPlayerAdp(
 
   if (!draft) return new Map();
 
-  const [league] = await withPoolTimeoutRetry(() =>
-    db
-      .select({
-        sport: PublicSchema.leagues.sport,
-        playerPool: PublicSchema.leagues.playerPool,
-        minCareerGames: PublicSchema.leagues.minCareerGames,
-        minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
-        baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
-        baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
-        customEraStartYear: PublicSchema.leagues.customEraStartYear,
-        customEraEndYear: PublicSchema.leagues.customEraEndYear,
-      })
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, draft.leagueId))
-      .limit(1),
-  );
+  const leagueId = draft.leagueId;
+  const [settings] =
+    leagueId === null
+      ? // A mock draft's pool lives on mock_draft_settings (LS-10076).
+        await withPoolTimeoutRetry(() =>
+          db
+            .select({
+              sport: PublicSchema.drafts.sport,
+              playerPool: PublicSchema.mockDraftSettings.playerPool,
+              minCareerGames: PublicSchema.mockDraftSettings.minCareerGames,
+              minCareerSeasons: PublicSchema.mockDraftSettings.minCareerSeasons,
+              baseballHofOnly: PublicSchema.mockDraftSettings.hofOnly,
+              baseballEraFilter: PublicSchema.mockDraftSettings.eraFilter,
+              customEraStartYear:
+                PublicSchema.mockDraftSettings.customEraStartYear,
+              customEraEndYear: PublicSchema.mockDraftSettings.customEraEndYear,
+            })
+            .from(PublicSchema.mockDraftSettings)
+            .innerJoin(
+              PublicSchema.drafts,
+              eq(
+                PublicSchema.drafts.id,
+                PublicSchema.mockDraftSettings.draftId,
+              ),
+            )
+            .where(eq(PublicSchema.mockDraftSettings.draftId, draftId))
+            .limit(1),
+        )
+      : await withPoolTimeoutRetry(() =>
+          db
+            .select({
+              sport: PublicSchema.leagues.sport,
+              playerPool: PublicSchema.leagues.playerPool,
+              minCareerGames: PublicSchema.leagues.minCareerGames,
+              minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+              baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+              baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
+              customEraStartYear: PublicSchema.leagues.customEraStartYear,
+              customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            })
+            .from(PublicSchema.leagues)
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .limit(1),
+        );
 
-  const leagueSport = league?.sport ?? 'baseball';
+  const leagueSport = settings?.sport ?? draft.sport;
   const cte = buildDraftAdpCte({
-    leagueId: draft.leagueId,
+    leagueId,
     leagueSport,
     poolConditions: buildDraftAdpPoolConditions({
       draftId,
-      leagueId: draft.leagueId,
+      leagueId,
       leagueSport,
-      league,
+      league: settings,
     }),
   });
 

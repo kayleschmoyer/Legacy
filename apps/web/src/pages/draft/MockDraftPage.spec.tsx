@@ -163,16 +163,20 @@ let mockUsageResult: {
   loading: boolean;
 } = { data: undefined, loading: false };
 
-const mockInitializeMockDraft = jest.fn(() =>
-  Promise.resolve({ data: { initializeMockDraft: { leagueId: 42 } } }),
+// LS-10076: mock drafts no longer create a league, so the mutation is
+// `createMockDraft` and it returns a `draftId` rather than a `leagueId`.
+const mockCreateMockDraft = jest.fn(() =>
+  Promise.resolve({ data: { createMockDraft: { draftId: 42 } } }),
 );
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMyMockDraftUsageQuery: () => mockUsageResult,
-  useInitializeMockDraftMutation: () => [
-    mockInitializeMockDraft,
+  useCreateMockDraftMutation: () => [
+    mockCreateMockDraft,
     { loading: false, error: undefined },
   ],
+  Sport: { Baseball: 'baseball', Football: 'football' },
+  MockDraftMode: { Offline: 'OFFLINE', Online: 'ONLINE' },
 }));
 
 // ---------------------------------------------------------------------------
@@ -262,7 +266,7 @@ describe('MockDraftPage — weekly limit reflected in UI (LS-5178)', () => {
 describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('forwards sport to initializeMockDraft and navigates to the baseball draft board', async () => {
+  it('forwards sport to createMockDraft and navigates to the baseball draft room', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
@@ -276,12 +280,16 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
 
     await screen.findByRole('button', { name: /Start Mock Draft/i });
-    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+    expect(mockCreateMockDraft).toHaveBeenCalledWith(
       expect.objectContaining({
-        variables: expect.objectContaining({ sport: 'baseball' }),
+        // `userPickPosition` from the form is sent as `pickPosition` (LS-10076).
+        variables: expect.objectContaining({
+          sport: 'baseball',
+          pickPosition: 1,
+        }),
       }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft/42');
   });
 
   it('does not send a rosterSize — the server uses the sport default (LS-10086)', async () => {
@@ -298,12 +306,12 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
 
     await screen.findByRole('button', { name: /Start Mock Draft/i });
-    expect(
-      mockInitializeMockDraft.mock.calls[0][0].variables,
-    ).not.toHaveProperty('rosterSize');
+    expect(mockCreateMockDraft.mock.calls[0][0].variables).not.toHaveProperty(
+      'rosterSize',
+    );
   });
 
-  it('forwards sport=football to initializeMockDraft and navigates to the football draft board', async () => {
+  it('forwards sport=football to createMockDraft and navigates to the football draft room', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
@@ -317,7 +325,7 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
 
     await screen.findByRole('button', { name: /Start Mock Draft/i });
-    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+    expect(mockCreateMockDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         variables: expect.objectContaining({
           sport: 'football',
@@ -325,14 +333,14 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
         }),
       }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/football/league/42/draft');
+    expect(mockNavigate).toHaveBeenCalledWith('/football/mock-draft/42');
   });
 });
 
-describe('MockDraftPage — offline mode threading (LS-9144)', () => {
+describe('MockDraftPage — draft mode threading (LS-9144, LS-10076)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('forwards isOffline=true and omits pickTimeLimitSeconds when mode is offline', async () => {
+  it('forwards mode=OFFLINE and omits pickTimeLimitSeconds when mode is offline', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
@@ -341,23 +349,24 @@ describe('MockDraftPage — offline mode threading (LS-9144)', () => {
       playerPool: 'all',
       sport: 'baseball',
       mode: 'offline',
+      isPublic: false,
     };
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
 
     await screen.findByRole('button', { name: /Start Mock Draft/i });
-    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+    expect(mockCreateMockDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         variables: expect.objectContaining({
-          isOffline: true,
+          mode: 'OFFLINE',
           pickTimeLimitSeconds: undefined,
         }),
       }),
     );
   });
 
-  it('forwards isOffline=false and a 90s time limit when mode is shared', async () => {
+  it('forwards mode=ONLINE, a 90s time limit and the lobby visibility when mode is shared', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
@@ -366,17 +375,20 @@ describe('MockDraftPage — offline mode threading (LS-9144)', () => {
       playerPool: 'all',
       sport: 'baseball',
       mode: 'shared',
+      isPublic: true,
     };
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
 
     await screen.findByRole('button', { name: /Start Mock Draft/i });
-    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+    expect(mockCreateMockDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         variables: expect.objectContaining({
-          isOffline: false,
+          mode: 'ONLINE',
           pickTimeLimitSeconds: 90,
+          // Shared lobbies carry the Private/Public choice through (LS-10076).
+          isPublic: true,
         }),
       }),
     );
@@ -396,9 +408,9 @@ describe('MockDraftPage — Shared-mode invite pause (LS-9181)', () => {
       sport: 'baseball',
       mode: 'shared',
     };
-    mockInitializeMockDraft.mockResolvedValueOnce({
+    mockCreateMockDraft.mockResolvedValueOnce({
       data: {
-        initializeMockDraft: { leagueId: 42, inviteCode: 'ABC12XYZ' },
+        createMockDraft: { draftId: 42, inviteCode: 'ABC12XYZ' },
       },
     });
     renderPage();
@@ -414,7 +426,7 @@ describe('MockDraftPage — Shared-mode invite pause (LS-9181)', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /Continue to Draft Room/i }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft/42');
   });
 
   it('navigates to the join-by-code screen when "Join instead" is pressed', () => {

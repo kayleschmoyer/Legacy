@@ -6,6 +6,11 @@
     "types": ["node"],
     "resolveJsonModule": true
   },
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/*.testkit.ts"
+  ],
   "include": ["src/**/*.ts"]
 }

@@ -68,9 +68,10 @@ jest.mock('../_screenErrorBoundary', () => ({
   ScreenErrorBoundary: () => null,
 }));
 
-// GraphQL mutation + usage query
-const mockInitMutate = jest.fn();
-let mockInitState: { loading: boolean; error?: { message: string } } = {
+// GraphQL mutation + usage query. LS-10076: a mock draft no longer creates a
+// league, so `createMockDraft` returns a bare `draftId`.
+const mockCreateMutate = jest.fn();
+let mockCreateState: { loading: boolean; error?: { message: string } } = {
   loading: false,
   error: undefined,
 };
@@ -83,8 +84,10 @@ interface MockDraftUsage {
 let mockUsageData: { getMyMockDraftUsage: MockDraftUsage | null } | undefined =
   undefined;
 jest.mock('@legacy-sports/graphql', () => ({
-  useInitializeMockDraftMutation: () => [mockInitMutate, mockInitState],
+  useCreateMockDraftMutation: () => [mockCreateMutate, mockCreateState],
   useGetMyMockDraftUsageQuery: () => ({ data: mockUsageData }),
+  Sport: { Baseball: 'baseball', Football: 'football' },
+  MockDraftMode: { Offline: 'OFFLINE', Online: 'ONLINE' },
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -93,12 +96,12 @@ describe('MockDraftPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack = true;
-    mockInitState = { loading: false, error: undefined };
+    mockCreateState = { loading: false, error: undefined };
     mockUsageData = undefined;
     mockUseFeatureIsOn.mockReturnValue(false);
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
-    mockInitMutate.mockResolvedValue({
-      data: { initializeMockDraft: { leagueId: 42, draftId: 7 } },
+    mockCreateMutate.mockResolvedValue({
+      data: { createMockDraft: { draftId: 42 } },
     });
   });
 
@@ -159,43 +162,46 @@ describe('MockDraftPage', () => {
   });
 
   describe('starting a mock draft', () => {
-    it('calls initializeMockDraft with the default settings', async () => {
+    it('calls createMockDraft with the default settings', async () => {
       render(<MockDraftPage />);
       fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));
 
       await waitFor(() => {
-        expect(mockInitMutate).toHaveBeenCalledWith({
+        expect(mockCreateMutate).toHaveBeenCalledWith({
           variables: {
             // No rosterSize (LS-10086) — the server always uses the sport's
             // full default roster for a mock draft.
             numTeams: 8,
-            userPickPosition: 1,
+            pickPosition: 1,
             pickTimeLimitSeconds: 90,
             draftOrder: 'snake',
             playerPool: 'all',
             sport: 'baseball',
-            isOffline: false,
+            // Shared mode maps to an ONLINE lobby, private by default
+            // (LS-10076).
+            mode: 'ONLINE',
             controlAllTeams: false,
+            isPublic: false,
           },
         });
       });
     });
 
-    it('navigates to the draft board on success', async () => {
+    it('navigates to the mock draft room on success', async () => {
       render(<MockDraftPage />);
       fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));
 
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith({
-          pathname: '/DraftBoardPage',
-          params: { leagueId: '42' },
+          pathname: '/mock-draft/[draftId]',
+          params: { draftId: '42' },
         });
       });
     });
 
-    it('shows an error when no leagueId is returned', async () => {
-      mockInitMutate.mockResolvedValue({
-        data: { initializeMockDraft: null },
+    it('shows an error when no draftId is returned', async () => {
+      mockCreateMutate.mockResolvedValue({
+        data: { createMockDraft: null },
       });
       render(<MockDraftPage />);
       fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));
@@ -208,7 +214,7 @@ describe('MockDraftPage', () => {
 
   describe('error surfacing', () => {
     it('renders the mutation error (e.g. the 2/week limit message)', () => {
-      mockInitState = {
+      mockCreateState = {
         loading: false,
         error: {
           message:
@@ -336,13 +342,9 @@ describe('MockDraftPage', () => {
 
   describe('Shared-mode invite pause (LS-9181)', () => {
     it('shows the invite card instead of navigating when a Shared draft returns an inviteCode', async () => {
-      mockInitMutate.mockResolvedValue({
+      mockCreateMutate.mockResolvedValue({
         data: {
-          initializeMockDraft: {
-            leagueId: 42,
-            draftId: 7,
-            inviteCode: 'ABC12XYZ',
-          },
+          createMockDraft: { draftId: 42, inviteCode: 'ABC12XYZ' },
         },
       });
       render(<MockDraftPage />);
@@ -355,8 +357,8 @@ describe('MockDraftPage', () => {
 
       fireEvent.press(screen.getByText('Continue to Draft Room'));
       expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/DraftBoardPage',
-        params: { leagueId: '42' },
+        pathname: '/mock-draft/[draftId]',
+        params: { draftId: '42' },
       });
     });
 

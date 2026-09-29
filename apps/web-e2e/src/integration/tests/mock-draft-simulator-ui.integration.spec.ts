@@ -27,7 +27,6 @@
 
 import { expect } from '@playwright/test';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
-import { cleanupLeague } from '../helpers/cleanup-league';
 import { resetMockDraftUsage } from '../helpers/reset-mock-draft-usage';
 import { test } from '../fixtures/ui';
 import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
@@ -37,7 +36,7 @@ import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 // ---------------------------------------------------------------------------
 
 interface MockDraftState {
-  leagueId: number;
+  draftId: number;
   numTeams: number;
   rosterSize: number;
 }
@@ -56,7 +55,7 @@ test.describe
     // rosterSize is no longer a setting the form collects (LS-10086) — every
     // mock draft runs the sport's full default roster, so this mirrors
     // DEFAULT_ROSTER_SIZE_BY_SPORT.baseball rather than a chosen value.
-    state = { leagueId: 0, numTeams: 4, rosterSize: 25 };
+    state = { draftId: 0, numTeams: 4, rosterSize: 25 };
     // Reset the per-spec commissioner's free-tier weekly mock-draft usage so
     // MockDraftPage renders the setup form (not LimitReachedScreen) regardless
     // of leftover mock-draft leagues from prior runs (LS-7872).
@@ -74,8 +73,10 @@ test.describe
   // test body throws — Playwright still runs afterAll on test failure. Process
   // crashes are caught by global-teardown (Layer 3) and the next run's
   // pre-run sweep in global-setup (Layer 1).
+  // Layer-2 per-spec cleanup, draft-scoped since a mock draft has no league
+  // to delete (LS-10076). `deleteMyMockDrafts` is scoped to the caller.
   test.afterAll(async ({ apiCommissioner }) => {
-    await cleanupLeague(apiCommissioner, state.leagueId);
+    await resetMockDraftUsage(apiCommissioner);
   });
 
   // -----------------------------------------------------------------
@@ -204,20 +205,21 @@ test.describe
       await startBtn.click();
     });
 
-    await test.step('Wait for redirect to the draft board', async () => {
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+\/draft/, {
+    await test.step('Wait for redirect to the mock draft room', async () => {
+      // A mock draft has its own route now — it creates no league (LS-10076).
+      await expect(page).toHaveURL(/\/baseball\/mock-draft\/\d+/, {
         timeout: 30_000,
       });
     });
 
-    await test.step('Extract league ID from URL', () => {
+    await test.step('Extract draft ID from URL', () => {
       const url = page.url();
-      const match = url.match(/\/baseball\/league\/(\d+)\/draft/);
+      const match = url.match(/\/baseball\/mock-draft\/(\d+)/);
       expect(match).toBeTruthy();
       if (match) {
-        state.leagueId = Number(match[1]);
+        state.draftId = Number(match[1]);
       }
-      expect(state.leagueId).toBeGreaterThan(0);
+      expect(state.draftId).toBeGreaterThan(0);
     });
 
     await test.step('Verify draft board rendered (not an error page)', async () => {
@@ -253,7 +255,7 @@ test.describe
     // no-op until the server-side deadline actually expires, so polling every
     // 5 seconds is safe.
     async function nudgeDraftPick(): Promise<void> {
-      if (!state.leagueId) return;
+      if (!state.draftId) return;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8_000);
       try {
@@ -266,10 +268,10 @@ test.describe
           autoProcessDraftPicks?: { picksAutoMade: number };
         }>(
           commissionerJwt,
-          `mutation NudgeExpiredDraftPick($leagueId: Int!) {
-            autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade }
+          `mutation NudgeExpiredDraftPick($draftId: Int!) {
+            autoProcessDraftPicks(draftId: $draftId) { picksAutoMade }
           }`,
-          { leagueId: state.leagueId },
+          { draftId: state.draftId },
           { signal: controller.signal },
         );
       } catch {
@@ -280,12 +282,12 @@ test.describe
     }
 
     await test.step('Navigate to draft board', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/draft`);
+      await page.goto(`/baseball/mock-draft/${String(state.draftId)}`);
       await page.waitForLoadState('load');
       await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
         timeout: 30_000,
       });
-      // Gate on the backend `getLeagueDraft.currentPick` being non-null —
+      // Gate on the backend `draftRoom.draft.currentPick` being non-null —
       // confirms the draft engine has initialised the first pick turn so
       // Apollo polling will surface it on its next cycle (replaces a fixed
       // 3s WebSocket-settle wait; antipattern #3/#9 in e2e-determinism.md;
@@ -295,20 +297,20 @@ test.describe
         .poll(
           async () => {
             const data = await gqlFetch<{
-              getLeagueDraft?: { currentPick?: number | null } | null;
+              draftRoom?: { draft?: { currentPick?: number | null } } | null;
             }>(
               commissionerJwt,
-              `query DraftPickReady($leagueId: Int!) {
-                getLeagueDraft(leagueId: $leagueId) { currentPick }
+              `query DraftPickReady($draftId: Int!) {
+                draftRoom(draftId: $draftId) { draft { currentPick } }
               }`,
-              { leagueId: state.leagueId },
+              { draftId: state.draftId },
             ).catch(() => null);
-            return data?.getLeagueDraft?.currentPick ?? null;
+            return data?.draftRoom?.draft?.currentPick ?? null;
           },
           {
             timeout: 30_000,
             intervals: [500, 1_000, 2_000],
-            message: `Mock draft did not enter pick-ready state for league ${state.leagueId}`,
+            message: `Mock draft ${String(state.draftId)} did not enter pick-ready state`,
           },
         )
         .not.toBeNull();
@@ -579,7 +581,7 @@ test.describe
     commissionerPage: page,
   }) => {
     // Each test gets a fresh page context, so navigate to the draft board
-    await page.goto(`/baseball/league/${state.leagueId}/draft`);
+    await page.goto(`/baseball/mock-draft/${String(state.draftId)}`);
     await page.waitForLoadState('load');
 
     await test.step('Verify "Draft Complete!" heading is shown', async () => {

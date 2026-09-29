@@ -543,15 +543,29 @@ export type CreateMatchupInput = {
   weekNumber: Scalars['Int']['input'];
 };
 
+/** Identifiers for a newly created mock draft (LS-10076). */
+export type CreateMockDraftResult = {
+  __typename?: 'CreateMockDraftResult';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  /** Code another user redeems via joinMockDraft. Only useful for an ONLINE lobby that has not started — an offline draft has no open seats. */
+  inviteCode?: Maybe<Scalars['String']['output']>;
+  /** False if the draft-started WebSocket notification failed to send. The draft exists either way; when false the client should poll immediately rather than wait for an event that will never arrive. */
+  webSocketReady?: Maybe<Scalars['Boolean']['output']>;
+};
+
 /** Information about the current draft pick */
 export type CurrentDraftPick = {
   __typename?: 'CurrentDraftPick';
   draftId?: Maybe<Scalars['Int']['output']>;
   isComplete?: Maybe<Scalars['Boolean']['output']>;
   overallPick?: Maybe<Scalars['Int']['output']>;
+  /** The seat that made (or is on the clock for) this pick — `draft_participants.id`. Present for every draft kind (LS-10076). */
+  participantId?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
+  /** The seat's league team. Null for a mock draft (LS-10076). */
   team?: Maybe<Team>;
+  /** The picking seat's league team. Null for a mock draft, whose seats have no team — key on participantId instead (LS-10076). */
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -668,12 +682,16 @@ export type DonationPaymentLinkResult = {
   url: Scalars['String']['output'];
 };
 
-/** A draft event for a league */
+/** A draft: a league draft, or a league-less mock draft */
 export type Draft = {
   __typename?: 'Draft';
   /** When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481). */
   autoPickDisabled?: Maybe<Scalars['Boolean']['output']>;
+  /** Mock drafts only: the host makes every pick for every seat (LS-9253). */
+  controlAllTeams?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
+  /** The creator — for a mock draft, its host. */
+  createdBy?: Maybe<Scalars['Int']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
   currentPickDeadline?: Maybe<Scalars['String']['output']>;
   date?: Maybe<Scalars['String']['output']>;
@@ -682,11 +700,24 @@ export type Draft = {
   draftOrder?: Maybe<Scalars['String']['output']>;
   draftStartedAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** Mock drafts only: the code others redeem via joinMockDraft. Only the host and seat holders can load a mock draft, so this is not exposed to anyone who could not already share it. */
+  inviteCode?: Maybe<Scalars['String']['output']>;
+  /** Online mock drafts only: the lobby is joinable by id. */
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
+  kind?: Maybe<DraftKind>;
+  /** The owning league. Null for a mock draft (LS-10076). */
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Online mock drafts only: when an unstarted lobby expires (24h after creation). */
+  lobbyExpiresAt?: Maybe<Scalars['String']['output']>;
+  /** OFFLINE (solo vs AI) or ONLINE (lobby). Null for a league draft. */
+  mockMode?: Maybe<MockDraftMode>;
   pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   /** ISO-8601 timestamp when the draft is scheduled to auto-start (LS-423). Null means no scheduled start. */
   scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
+  sport?: Maybe<Sport>;
+  /** Lifecycle status: 'not-started' | 'in-progress' | 'paused' | 'completed'. */
+  status?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
@@ -710,6 +741,27 @@ export type DraftFootballPlayerStats = {
   rushYds?: Maybe<Scalars['Int']['output']>;
 };
 
+export enum DraftKind {
+  League = 'LEAGUE',
+  Mock = 'MOCK',
+}
+
+/** A chat message in a mock draft's own chat (LS-10076). */
+export type DraftMessage = {
+  __typename?: 'DraftMessage';
+  /** Server-side profanity check result, as on LeagueMessage (LS-6296). */
+  containsProfanity?: Maybe<Scalars['Boolean']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  gifUrl?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  messageText?: Maybe<Scalars['String']['output']>;
+  messageType?: Maybe<Scalars['String']['output']>;
+  user?: Maybe<User>;
+  /** Null once the sender deletes their account. */
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A single pick made during a draft */
 export type DraftPick = {
   __typename?: 'DraftPick';
@@ -722,13 +774,17 @@ export type DraftPick = {
   draftId?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   overallPick?: Maybe<Scalars['Int']['output']>;
+  /** The seat that made (or is on the clock for) this pick — `draft_participants.id`. Present for every draft kind (LS-10076). */
+  participantId?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
   /** The drafted player. Enables the draft board to render pick names without a secondary lookup. */
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
+  /** The seat's league team. Null for a mock draft (LS-10076). */
   team?: Maybe<Team>;
+  /** The picking seat's league team. Null for a mock draft, whose seats have no team — key on participantId instead (LS-10076). */
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -760,9 +816,12 @@ export type DraftQueueEntry = {
   __typename?: 'DraftQueueEntry';
   draftId?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** The queue owner's seat. Null only for a league queue row written before LS-10073. */
+  participantId?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   priority?: Maybe<Scalars['Int']['output']>;
+  /** Null for a mock draft, whose queue belongs to a seat (LS-10076). */
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -794,6 +853,48 @@ export type DraftRecommendationStat = {
   value?: Maybe<Scalars['String']['output']>;
 };
 
+/** Everything the draft board needs for one draft, league or mock (LS-10076). */
+export type DraftRoom = {
+  __typename?: 'DraftRoom';
+  draft?: Maybe<Draft>;
+  kind?: Maybe<DraftKind>;
+  /** The owning league, or null for a mock draft (LS-10076). The league draft route loads the league itself through GetLeagueById; the draft room deliberately carries only the id, so the board renders from one league-independent shape. */
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  rules?: Maybe<DraftRulesInfo>;
+  seats?: Maybe<Array<DraftSeat>>;
+  sport?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  viewer?: Maybe<DraftViewer>;
+};
+
+/** The settings a draft runs under, whether they came from a league or from mock_draft_settings (LS-10074, LS-10076). */
+export type DraftRulesInfo = {
+  __typename?: 'DraftRulesInfo';
+  defensiveFormat?: Maybe<Scalars['String']['output']>;
+  isMock?: Maybe<Scalars['Boolean']['output']>;
+  maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  /** The starter slot list this draft fills, in order — the depth chart and the slot strip read it from here (LS-10086). */
+  rosterPositions?: Maybe<Array<Scalars['String']['output']>>;
+  sport?: Maybe<Scalars['String']['output']>;
+};
+
+/** One seat in a draft (`draft_participants`). A league seat holds a team; a mock-draft seat holds a user, the CPU, or nobody yet (LS-10076). */
+export type DraftSeat = {
+  __typename?: 'DraftSeat';
+  autoPick?: Maybe<Scalars['Boolean']['output']>;
+  /** 'user' | 'ai' | 'open'. */
+  controller?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  seatName?: Maybe<Scalars['String']['output']>;
+  /** 1-based draft position. */
+  slot?: Maybe<Scalars['Int']['output']>;
+  /** Null for a mock-draft seat. */
+  teamId?: Maybe<Scalars['Int']['output']>;
+  /** The seat holder, for a mock draft. */
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A proposal to swap two teams’ draft pick slots before the draft starts */
 export type DraftSlotTrade = {
   __typename?: 'DraftSlotTrade';
@@ -821,6 +922,18 @@ export type DraftTeamOrderEntry = {
   draftOrder?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
+};
+
+/** What the calling user may do in this draft room. */
+export type DraftViewer = {
+  __typename?: 'DraftViewer';
+  /** Host controls: start, kick, lobby settings, commissioner tools. */
+  canHost?: Maybe<Scalars['Boolean']['output']>;
+  /** The caller holds a seat, so they may make its picks. Control All Teams makes the host able to pick for every seat. */
+  canPick?: Maybe<Scalars['Boolean']['output']>;
+  role?: Maybe<Scalars['String']['output']>;
+  /** The caller’s own seat, or null when they hold none. */
+  seatId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type EditMatchupScoreInput = {
@@ -1472,12 +1585,14 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
-/** The team claimed by joinMockDraft, plus the league sport. */
+/** The seat claimed by joinMockDraft (LS-10076). */
 export type JoinMockDraftResult = {
   __typename?: 'JoinMockDraftResult';
-  /** Sport of the joined mock draft — lets the client route to /football/... or /baseball/... without guessing (LS-9480). */
+  draftId?: Maybe<Scalars['Int']['output']>;
+  /** The claimed seat's `draft_participants.id`. */
+  seatId?: Maybe<Scalars['Int']['output']>;
+  /** Sport of the joined draft — an invite code carries no sport hint, so the client cannot route to /baseball or /football without it (LS-9480). */
   sport?: Maybe<Sport>;
-  team?: Maybe<Team>;
 };
 
 /** A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673) */
@@ -1768,6 +1883,16 @@ export type LeagueSeasonSummary = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The outcome of leaving a mock draft (LS-10076). */
+export type LeaveMockDraftResult = {
+  __typename?: 'LeaveMockDraftResult';
+  /** True when the host left an empty lobby, which deletes the draft. */
+  draftDeleted?: Maybe<Scalars['Boolean']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  /** Set when leaving transferred the host role to another seat. */
+  newHostUserId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type LineupPositionInput = {
   matchupPlayerId: Scalars['Int']['input'];
   positionId?: InputMaybe<Scalars['Int']['input']>;
@@ -2035,16 +2160,20 @@ export type MinigamesStats = {
   playersTracked?: Maybe<Scalars['Int']['output']>;
 };
 
-/** Identifiers for a newly created mock draft session */
-export type MockDraftInit = {
-  __typename?: 'MockDraftInit';
-  draftId?: Maybe<Scalars['Int']['output']>;
-  /** Invite code other real users can redeem via joinMockDraft to be seated into an open slot (LS-9181). Always present, but only useful for a Shared (non-offline) mock draft that has not yet been started — offline drafts and already-started drafts have no open slots left to join. */
-  inviteCode?: Maybe<Scalars['String']['output']>;
-  leagueId?: Maybe<Scalars['Int']['output']>;
-  /** False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive. */
-  webSocketReady?: Maybe<Scalars['Boolean']['output']>;
+/** What a mock-draft maintenance sweep did (LS-10076). */
+export type MockDraftMaintenanceResult = {
+  __typename?: 'MockDraftMaintenanceResult';
+  draftsDeleted?: Maybe<Scalars['Int']['output']>;
+  /** Lobbies that passed their expiry in this sweep. */
+  lobbiesExpired?: Maybe<Scalars['Int']['output']>;
 };
+
+export enum MockDraftMode {
+  /** Solo practice against AI seats. */
+  Offline = 'OFFLINE',
+  /** A lobby other users can join. */
+  Online = 'ONLINE',
+}
 
 /** The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit. */
 export type MockDraftUsage = {
@@ -2116,6 +2245,8 @@ export type Mutation = {
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
+  /** Create a mock draft. OFFLINE practices solo against AI seats and starts immediately; ONLINE opens a lobby other users join via joinMockDraft. Picks are recorded but no roster, league or team is ever written. */
+  createMockDraft?: Maybe<CreateMockDraftResult>;
   createPlayoffBracket?: Maybe<PlayoffBracket>;
   /** Create a new Season Draft Game. The creator is added automatically; others join via invite link. */
   createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
@@ -2127,8 +2258,10 @@ export type Mutation = {
   deleteLeagueAnnouncement?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a season award from a league. Commissioner / General Manager access required. */
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
-  /** Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted. */
-  deleteMyMockDraftLeagues?: Maybe<Scalars['Int']['output']>;
+  /** Host-only: delete a mock draft. Its seats, picks and chat cascade with it. */
+  deleteMockDraft?: Maybe<Scalars['Boolean']['output']>;
+  /** Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Replaces deleteMyMockDraftLeagues, which reset the weekly cap by deleting the throwaway leagues the old path created (LS-8238). */
+  deleteMyMockDrafts?: Maybe<Scalars['Int']['output']>;
   /** Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673) */
   designateKeeper?: Maybe<KeeperDesignation>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -2138,6 +2271,8 @@ export type Mutation = {
   evaluateDraftBadges?: Maybe<EvaluateBadgesResult>;
   /** Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication. */
   evaluateMatchupBadges?: Maybe<EvaluateBadgesResult>;
+  /** System: expire unstarted mock-draft lobbies past lobby_expires_at, and delete the ones old enough to have left the weekly-quota window. */
+  expireMockDraftLobbies?: Maybe<MockDraftMaintenanceResult>;
   /** Downgrade premium subscriptions whose grace_period_ends_at has passed. System / admin only. Triggered hourly by EventBridge. */
   expireSubscriptionGracePeriods?: Maybe<ExpireSubscriptionGracePeriodsResult>;
   /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
@@ -2151,16 +2286,18 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
-  /** Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league. */
-  initializeMockDraft?: Maybe<MockDraftInit>;
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
-  /** Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then. */
+  /** Join an ONLINE mock draft lobby, claiming an open seat that would otherwise be filled by AI when the host starts the draft. A private lobby requires its invite code; a public one can be joined by draft id. Fails once the draft has started or the lobby has expired. */
   joinMockDraft?: Maybe<JoinMockDraftResult>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   /** Join a Season Draft Game via invite code. Returns the game ID. */
   joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
+  /** Host-only: free another user's seat before the draft starts. The seat reopens for a new joiner. */
+  kickMockDraftSeat?: Maybe<Scalars['Boolean']['output']>;
+  /** Give up your seat. Before the draft starts the seat reopens; afterwards it becomes an AI auto-picker so the draft can still finish. A host who leaves hands off to the earliest joiner, or deletes an empty lobby. */
+  leaveMockDraft?: Maybe<LeaveMockDraftResult>;
   makeDraftPick?: Maybe<DraftPick>;
   /** Make a draft pick in a Season Draft Game */
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
@@ -2187,6 +2324,8 @@ export type Mutation = {
   proposeDraftSlotTrade?: Maybe<DraftSlotTrade>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
+  /** System: delete offline mock drafts with no pick in the last 30 days. */
+  purgeStaleOfflineMockDrafts?: Maybe<MockDraftMaintenanceResult>;
   randomizeDraftOrder?: Maybe<Draft>;
   /** Commissioner: recalculate all matchup scores for a league (or a specific week) using the current scoring profile. */
   recalculateLeagueMatchupScores?: Maybe<RecalculateMatchupScoresResult>;
@@ -2231,6 +2370,8 @@ export type Mutation = {
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   /** Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement. */
   sendDiscordWeeklyRecaps?: Maybe<SendDiscordWeeklyRecapsResult>;
+  /** Post a message to a mock draft's chat. Seat holders only. */
+  sendDraftMessage?: Maybe<DraftMessage>;
   /** Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge. */
   sendDuesReminders?: Maybe<SendDuesRemindersResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
@@ -2256,6 +2397,8 @@ export type Mutation = {
   /** Start a new progressive disclosure game session. Returns session ID and total clue count. */
   startDisclosureGame?: Maybe<StartDisclosureGameResult>;
   startDraft?: Maybe<League>;
+  /** Host-only: start an ONLINE mock draft. Open seats become AI auto-pickers, pending invitations expire, and the draft goes on the clock. */
+  startMockDraft?: Maybe<Draft>;
   startSeason?: Maybe<League>;
   /** Start a Season Draft Game (move from setup to drafting) */
   startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
@@ -2294,6 +2437,8 @@ export type Mutation = {
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
+  /** Host-only: change an unstarted lobby’s settings or visibility. */
+  updateMockDraftLobby?: Maybe<Scalars['Boolean']['output']>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
   updateRosterPositions?: Maybe<League>;
@@ -2359,6 +2504,7 @@ export type MutationAutoAdvanceMatchupsArgs = {
 };
 
 export type MutationAutoProcessDraftPicksArgs = {
+  draftId?: InputMaybe<Scalars['Int']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -2470,6 +2616,19 @@ export type MutationCreateMatchupArgs = {
   input: CreateMatchupInput;
 };
 
+export type MutationCreateMockDraftArgs = {
+  controlAllTeams?: InputMaybe<Scalars['Boolean']['input']>;
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  isPublic?: InputMaybe<Scalars['Boolean']['input']>;
+  mode?: InputMaybe<MockDraftMode>;
+  numTeams: Scalars['Int']['input'];
+  pickPosition: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  rosterSize?: InputMaybe<Scalars['Int']['input']>;
+  sport?: InputMaybe<Sport>;
+};
+
 export type MutationCreatePlayoffBracketArgs = {
   format: Scalars['String']['input'];
   leagueId: Scalars['Int']['input'];
@@ -2516,6 +2675,10 @@ export type MutationDeleteLeagueSeasonAwardArgs = {
   awardType: Scalars['String']['input'];
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type MutationDeleteMockDraftArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationDesignateKeeperArgs = {
@@ -2567,18 +2730,6 @@ export type MutationInitializeDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type MutationInitializeMockDraftArgs = {
-  controlAllTeams?: InputMaybe<Scalars['Boolean']['input']>;
-  draftOrder?: InputMaybe<Scalars['String']['input']>;
-  isOffline?: InputMaybe<Scalars['Boolean']['input']>;
-  numTeams: Scalars['Int']['input'];
-  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
-  playerPool?: InputMaybe<Scalars['String']['input']>;
-  rosterSize?: InputMaybe<Scalars['Int']['input']>;
-  sport?: InputMaybe<Scalars['String']['input']>;
-  userPickPosition: Scalars['Int']['input'];
-};
-
 export type MutationInviteAssistantManagerArgs = {
   teamId: Scalars['Int']['input'];
   username: Scalars['String']['input'];
@@ -2595,7 +2746,8 @@ export type MutationJoinLeagueByCodeArgs = {
 };
 
 export type MutationJoinMockDraftArgs = {
-  inviteCode: Scalars['String']['input'];
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  inviteCode?: InputMaybe<Scalars['String']['input']>;
   teamName: Scalars['String']['input'];
 };
 
@@ -2606,6 +2758,15 @@ export type MutationJoinPublicLeagueArgs = {
 
 export type MutationJoinSeasonDraftGameArgs = {
   inviteCode: Scalars['String']['input'];
+};
+
+export type MutationKickMockDraftSeatArgs = {
+  draftId: Scalars['Int']['input'];
+  participantId: Scalars['Int']['input'];
+};
+
+export type MutationLeaveMockDraftArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationMakeDraftPickArgs = {
@@ -2790,6 +2951,12 @@ export type MutationSendDiscordWeeklyRecapsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSendDraftMessageArgs = {
+  draftId: Scalars['Int']['input'];
+  gifUrl?: InputMaybe<Scalars['String']['input']>;
+  messageText: Scalars['String']['input'];
+};
+
 export type MutationSendDuesRemindersArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2861,6 +3028,10 @@ export type MutationStartDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationStartMockDraftArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationStartSeasonArgs = {
@@ -2987,6 +3158,14 @@ export type MutationUpdateMatchupStatusArgs = {
   matchupId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
   status: MatchupStatus;
+};
+
+export type MutationUpdateMockDraftLobbyArgs = {
+  draftId: Scalars['Int']['input'];
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  isPublic?: InputMaybe<Scalars['Boolean']['input']>;
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationUpdateNotificationPreferencesArgs = {
@@ -3459,6 +3638,10 @@ export type Query = {
   disclosureGameSession?: Maybe<DisclosureGameSession>;
   /** Return the Stripe Payment Link URL for one-time donations. No authentication required. Returns null when not configured. */
   donationPaymentLink?: Maybe<DonationPaymentLinkResult>;
+  /** A mock draft's chat, oldest first. Seat holders only — there are no spectators in a mock draft. */
+  draftMessages?: Maybe<Array<DraftMessage>>;
+  /** Load a draft room by draft id. Seat holders read their own draft; a mock draft has no spectators. An invite code (or a public lobby) grants the pre-join lobby view. */
+  draftRoom?: Maybe<DraftRoom>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   /** Fetch a single football player by ID (LS-255) */
@@ -3740,6 +3923,17 @@ export type QueryCommissionerAuditLogsArgs = {
 
 export type QueryDisclosureGameSessionArgs = {
   sessionId: Scalars['Int']['input'];
+};
+
+export type QueryDraftMessagesArgs = {
+  beforeId?: InputMaybe<Scalars['Int']['input']>;
+  draftId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryDraftRoomArgs = {
+  draftId: Scalars['Int']['input'];
+  inviteCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryFootballPlayerArgs = {

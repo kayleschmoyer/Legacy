@@ -14,6 +14,9 @@ import './queries';
 // Mutation fields
 import './mutations';
 
+// Mock drafts v2 — league-less mock draft mutations, draft room, chat, jobs
+import './mock';
+
 // Scheduled (system) mutation fields
 import './scheduled-mutations';
 import './auto-start-mutation';

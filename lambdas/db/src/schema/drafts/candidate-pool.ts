@@ -15,7 +15,7 @@ import {
 } from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 
 import { type DraftRules, loadDraftRules } from './draft-rules';
 
@@ -45,11 +45,9 @@ export interface CandidatePool {
   rankedEligibleIds: number[];
   /** Best bench candidate (versatility + matchup pts). */
   bestBenchPick: BestBenchPick | undefined;
-  /** League settings snapshot (needed for position mapping in scorer). */
-  league: typeof PublicSchema.leagues.$inferSelect;
   /**
-   * The draft's rules — the league-independent view of the same settings, plus
-   * the roster slot list auto-pick's positional awareness needs (LS-10074).
+   * The draft's rules — pool, sport and roster slot list, for a league draft
+   * and a league-less mock draft alike (LS-10074, LS-10076).
    */
   rules: DraftRules;
 }
@@ -80,7 +78,6 @@ function isCandidatePoolSport(sport: string): sport is CandidatePoolSport {
 export async function fetchCandidatePool(
   db: PublicDb,
   draftId: number,
-  draftLeagueId: number,
 ): Promise<CandidatePool | null> {
   // Fast bail-out: check deadline without acquiring any lock
   const preCheckRows = await db.execute(
@@ -89,7 +86,7 @@ export async function fetchCandidatePool(
   const preCheckDraft = preCheckRows.rows[0] as
     | {
         id: number;
-        league_id: number;
+        league_id: number | null;
         status: string;
         current_pick: number;
         current_pick_deadline: Date | null;
@@ -124,42 +121,30 @@ export async function fetchCandidatePool(
     return null;
   }
 
-  const [league] = await db
-    .select()
-    .from(PublicSchema.leagues)
-    .where(eq(PublicSchema.leagues.id, draftLeagueId))
-    .limit(1);
-
-  if (!league) {
-    LOGGER.info(
-      `[autoProcessDraftPicks] League ${draftLeagueId} not found, skipping draft ${draftId}`,
-    );
-    return null;
-  }
+  // Rules rather than the league row (LS-10076): a mock draft has no league.
+  const rules = await loadDraftRules(db, draftId);
 
   // Guard the sport discriminator once, up front — every downstream query
-  // below narrows on `league.sport === 'football'` and silently falls back to
-  // the baseball branch for anything else, which would fetch the wrong
-  // candidate pool rather than fail loudly (LS-9040 review).
-  const rawSport: string = league.sport;
+  // below narrows on `sport === 'football'` and silently falls back to the
+  // baseball branch for anything else, which would fetch the wrong candidate
+  // pool rather than fail loudly (LS-9040 review).
+  const rawSport: string = rules.sport;
   if (!isCandidatePoolSport(rawSport)) {
     throw new Error(
-      `League ${draftLeagueId} has an unexpected sport value: ${rawSport}`,
+      `Draft ${draftId} has an unexpected sport value: ${rawSport}`,
     );
   }
 
   const settings: LeagueSettings = {
-    gamesPerMatchup: league.gamesPerMatchup ?? 5,
-    pitcherStartsPerMatchup: league.pitcherStartsPerMatchup ?? 1,
+    gamesPerMatchup: rules.gamesPerMatchup ?? 5,
+    pitcherStartsPerMatchup: rules.pitcherStartsPerMatchup ?? 1,
   };
-
-  const rules = await loadDraftRules(db, draftId);
 
   // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected FPG
   const eligibleIds = await fetchUndraftedCandidates(
     db,
     draftId,
-    league,
+    rules,
     settings,
   );
   if (eligibleIds.length === 0) {
@@ -171,17 +156,17 @@ export async function fetchCandidatePool(
     db,
     eligibleIds,
     settings,
-    league.sport,
-    league.id,
+    rules.sport,
+    rules.leagueId,
   );
 
   // 3. Pre-compute bench versatility
   const bestBenchPick = await computeBestBenchPick(
     db,
-    draftLeagueId,
+    rules.rosterPositions,
     eligibleIds,
     playerDraftInfo,
-    league.sport,
+    rules.sport,
   );
 
   return {
@@ -189,7 +174,6 @@ export async function fetchCandidatePool(
     playerDraftInfo,
     rankedEligibleIds,
     bestBenchPick,
-    league,
     rules,
   };
 }
@@ -203,10 +187,23 @@ export async function fetchCandidatePool(
 async function fetchUndraftedCandidates(
   db: PublicDb,
   draftId: number,
-  league: typeof PublicSchema.leagues.$inferSelect,
+  rules: DraftRules,
   settings: LeagueSettings,
 ): Promise<number[]> {
   const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
+  const leagueId = rules.leagueId;
+  // Exclude players already rostered in the league (LS-8674: keeper
+  // designations are applied to rosters before the draft's first pick, so
+  // kept players must not appear in the draftable pool). A no-op for redraft
+  // leagues, whose rosters are empty at draft time, and skipped entirely for
+  // a mock draft, which has no league (LS-10076).
+  const notRostered =
+    leagueId === null
+      ? sql``
+      : sql`AND NOT EXISTS (
+          SELECT 1 FROM team_members tm
+          WHERE tm.league_id = ${leagueId} AND tm.player_id = p.id
+        )`;
 
   // Football ranks by projected FPG from football_player_scoring_cache
   // (LS-9484), falling back to the projections/ADP pipeline's
@@ -218,24 +215,21 @@ async function fetchUndraftedCandidates(
   // update, so this avoids the 11-term CASE-WHEN over career_batting /
   // career_pitching / career_fielding at query time (LS-4689).
   const undraftedRows =
-    league.sport === 'football'
+    rules.sport === 'football'
       ? await db.execute(
           sql`SELECT p.id,
         COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric, 0) AS fpg
       FROM players p
       LEFT JOIN public.football_player_scoring_cache cs_league
-        ON cs_league.player_id = p.id AND cs_league.league_id = ${league.id}
+        ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueId}
       LEFT JOIN public.football_player_scoring_cache cs_default
         ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
       WHERE NOT EXISTS (
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )
-      AND NOT EXISTS (
-        SELECT 1 FROM team_members tm
-        WHERE tm.league_id = ${league.id} AND tm.player_id = p.id
-      )
-      AND p.sport = ${league.sport}
+      ${notRostered}
+      AND p.sport = ${rules.sport}
       ORDER BY fpg DESC
       LIMIT 1000`,
         )
@@ -253,15 +247,8 @@ async function fetchUndraftedCandidates(
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )
-      -- Exclude players already rostered in this league (LS-8674: keeper
-      -- designations are applied to rosters before the draft's first pick,
-      -- so kept players must not appear in the draftable pool). A no-op for
-      -- redraft leagues, whose rosters are empty at draft time.
-      AND NOT EXISTS (
-        SELECT 1 FROM team_members tm
-        WHERE tm.league_id = ${league.id} AND tm.player_id = p.id
-      )
-      AND p.sport = ${league.sport}
+      ${notRostered}
+      AND p.sport = ${rules.sport}
       ORDER BY fpg DESC
       LIMIT 1000`,
         );
@@ -272,14 +259,14 @@ async function fetchUndraftedCandidates(
     db,
     undraftedIds,
     {
-      playerPool: league.playerPool,
-      minCareerGames: league.minCareerGames ?? 0,
-      minCareerSeasons: league.minCareerSeasons ?? 0,
-      baseballHofOnly: league.baseballHofOnly ?? false,
-      baseballEraFilter: league.baseballEraFilter ?? 'all',
-      customEraStartYear: league.customEraStartYear ?? null,
-      customEraEndYear: league.customEraEndYear ?? null,
-      sport: league.sport,
+      playerPool: rules.playerPool,
+      minCareerGames: rules.minCareerGames ?? 0,
+      minCareerSeasons: rules.minCareerSeasons ?? 0,
+      baseballHofOnly: rules.baseballHofOnly ?? false,
+      baseballEraFilter: rules.baseballEraFilter ?? 'all',
+      customEraStartYear: rules.customEraStartYear ?? null,
+      customEraEndYear: rules.customEraEndYear ?? null,
+      sport: rules.sport,
     },
   );
 
@@ -296,7 +283,8 @@ async function computePlayerDraftInfo(
   eligibleIds: number[],
   settings: LeagueSettings,
   sport: 'baseball' | 'football',
-  leagueId: number,
+  /** `null` for a mock draft: only the default scoring cache applies. */
+  leagueId: number | null,
 ): Promise<{
   playerDraftInfo: Map<number, PlayerDraftInfo>;
   rankedEligibleIds: number[];
@@ -402,18 +390,14 @@ async function computePlayerDraftInfo(
  */
 async function computeBestBenchPick(
   db: PublicDb,
-  draftLeagueId: number,
+  rosterPositions: DraftRules['rosterPositions'],
   eligibleIds: number[],
   playerDraftInfo: Map<number, PlayerDraftInfo>,
   sport: 'baseball' | 'football',
 ): Promise<BestBenchPick | undefined> {
-  // Step 1: total roster slots for this league (scalar)
-  const totalSlotsResult = await db.execute(
-    sql`SELECT COUNT(*)::int AS total_slots
-        FROM league_positions
-        WHERE league_id = ${draftLeagueId}`,
-  );
-  const benchTotalSlots = Number(totalSlotsResult.rows[0]?.total_slots ?? 0);
+  // Step 1: total roster slots for this draft, off DraftRules rather than
+  // league_positions (LS-10076): a mock draft's slots are the sport defaults.
+  const benchTotalSlots = rosterPositions.length;
 
   // Step 2: slots_coverable per eligible player.
   //
@@ -435,16 +419,10 @@ async function computeBestBenchPick(
   // DST and IDP alike) per league_positions row (LS-9483).
   const slotsCoverableMap = new Map<number, number>();
   if (sport === 'football') {
-    const leaguePositionRows = await db.execute(
-      sql`SELECT position_type::text AS position_type
-          FROM league_positions
-          WHERE league_id = ${draftLeagueId}`,
-    );
     const allowedPositions = ALLOWED_POSITIONS_BY_SPORT.football;
     for (const [id, info] of playerDraftInfo) {
       let slotsCoverable = 0;
-      for (const row of leaguePositionRows.rows) {
-        const slotType = row.position_type as string;
+      for (const slotType of rosterPositions) {
         const eligibleStatPositions = allowedPositions[slotType] ?? [];
         if (eligibleStatPositions.some((pos) => info.positions.includes(pos))) {
           slotsCoverable += 1;
@@ -462,10 +440,10 @@ async function computeBestBenchPick(
       SELECT
         ep.player_id,
         COUNT(DISTINCT lp.id)::int AS slots_coverable
-      FROM league_positions lp
-      JOIN position_slot_mapping pm ON pm.slot_type = lp.position_type::text
+      FROM unnest(${sql.param(rosterPositions)}::text[])
+        WITH ORDINALITY AS lp(position_type, id)
+      JOIN position_slot_mapping pm ON pm.slot_type = lp.position_type
       JOIN eligible_players ep ON ep.position = pm.stat_pos
-      WHERE lp.league_id = ${draftLeagueId}
       GROUP BY ep.player_id`,
     );
     for (const row of benchVersatilityRows.rows) {

@@ -19,6 +19,23 @@ jest.mock('@legacy-sports/logging', () => ({
 
 type Resolver = (...args: unknown[]) => Promise<unknown>;
 
+/**
+ * The seat the caller's team holds in the draft. Queue rows are keyed on
+ * `draft_participants.id` since LS-10076, so every mutation resolves one
+ * before it touches `draft_queue`.
+ */
+const SEAT_ROW = {
+  id: 4411,
+  draftId: 5810,
+  slot: 2,
+  teamId: 25363,
+  leagueId: 99,
+  userId: null,
+  controller: 'user',
+  seatName: 'Team 25363',
+  autoPick: false,
+};
+
 // ── Module loader ─────────────────────────────────────────────────────────────
 
 function captureDraftQueueResolvers(): Record<string, Resolver> {
@@ -43,17 +60,35 @@ function captureDraftQueueResolvers(): Record<string, Resolver> {
 
   jest.doMock('@legacy-sports/db-client', () => ({
     PublicSchema: {
-      drafts: { id: 'drafts.id', leagueId: 'drafts.leagueId' },
+      drafts: {
+        id: 'drafts.id',
+        kind: 'drafts.kind',
+        leagueId: 'drafts.leagueId',
+      },
       leagueMembers: {
         leagueId: 'leagueMembers.leagueId',
         userId: 'leagueMembers.userId',
         teamId: 'leagueMembers.teamId',
         permissionLevel: 'leagueMembers.permissionLevel',
       },
+      // The queue is keyed on the seat since LS-10076 — a mock draft's queue
+      // has no team behind it.
+      draftParticipants: {
+        id: 'draftParticipants.id',
+        draftId: 'draftParticipants.draftId',
+        slot: 'draftParticipants.slot',
+        teamId: 'draftParticipants.teamId',
+        leagueId: 'draftParticipants.leagueId',
+        userId: 'draftParticipants.userId',
+        controller: 'draftParticipants.controller',
+        seatName: 'draftParticipants.seatName',
+        autoPick: 'draftParticipants.autoPick',
+      },
       draftQueue: {
         id: 'draftQueue.id',
         draftId: 'draftQueue.draftId',
         teamId: 'draftQueue.teamId',
+        participantId: 'draftQueue.participantId',
         playerId: 'draftQueue.playerId',
         priority: 'draftQueue.priority',
       },
@@ -83,13 +118,14 @@ function makeTxWrapper(tx: unknown) {
 
 /**
  * Build an outer db.select chain that returns successive row-sets for each
- * chained .limit(1) call (used by resolveTeamIdForDraft outside the tx).
+ * chained .limit(1) call (used by resolveSeatForDraft outside the tx).
  */
 function makeOuterDb(limitResultSets: unknown[][], txWrapper: jest.Mock) {
   let call = 0;
   const chain = {
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
     limit: jest.fn(() => Promise.resolve(limitResultSets[call++] ?? [])),
   };
   return {
@@ -143,8 +179,9 @@ describe('setDraftQueue', () => {
     const tx = buildTx(false);
     const outerDb = makeOuterDb(
       [
-        [{ leagueId: 99 }], // resolveTeamIdForDraft: draft query
-        [{ teamId: 25363, permissionLevel: 'general_manager' }], // resolveTeamIdForDraft: membership query
+        [{ kind: 'league', leagueId: 99 }], // resolveSeatForDraft: draft query
+        [{ teamId: 25363, permissionLevel: 'general_manager' }], // resolveSeatForDraft: membership query
+        [SEAT_ROW], // resolveSeatForDraft: the team's seat (LS-10076)
       ],
       makeTxWrapper(tx),
     );
@@ -164,8 +201,9 @@ describe('setDraftQueue', () => {
     const tx = buildTx(true);
     const outerDb = makeOuterDb(
       [
-        [{ leagueId: 99 }],
+        [{ kind: 'league', leagueId: 99 }],
         [{ teamId: 25363, permissionLevel: 'general_manager' }],
+        [SEAT_ROW],
       ],
       makeTxWrapper(tx),
     );
@@ -223,8 +261,9 @@ describe('addToDraftQueue', () => {
     const tx = buildTx(false, false);
     const outerDb = makeOuterDb(
       [
-        [{ leagueId: 99 }],
+        [{ kind: 'league', leagueId: 99 }],
         [{ teamId: 25363, permissionLevel: 'general_manager' }],
+        [SEAT_ROW],
       ],
       makeTxWrapper(tx),
     );
@@ -244,8 +283,9 @@ describe('addToDraftQueue', () => {
     const tx = buildTx(true, true);
     const outerDb = makeOuterDb(
       [
-        [{ leagueId: 99 }],
+        [{ kind: 'league', leagueId: 99 }],
         [{ teamId: 25363, permissionLevel: 'general_manager' }],
+        [SEAT_ROW],
       ],
       makeTxWrapper(tx),
     );
@@ -287,7 +327,7 @@ describe('non-GM authorization (LS-4737)', () => {
       const transaction = jest.fn();
       const outerDb = makeOuterDb(
         [
-          [{ leagueId: 99 }], // resolveTeamIdForDraft: draft query
+          [{ kind: 'league', leagueId: 99 }], // resolveSeatForDraft: draft query
           [{ teamId: 25363, permissionLevel: 'assistant_manager' }], // membership query
         ],
         transaction,

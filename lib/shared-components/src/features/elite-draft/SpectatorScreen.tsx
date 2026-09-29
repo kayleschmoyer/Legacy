@@ -163,7 +163,7 @@ export function SpectatorScreen({
   ) {
     return (
       <DraftCompleteView
-        league={
+        draftSummary={
           data.league
             ? {
                 isMockDraft: data.league.isMockDraft ?? undefined,

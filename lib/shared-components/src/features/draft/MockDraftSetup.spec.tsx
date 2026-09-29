@@ -45,6 +45,8 @@ describe('MockDraftSetup', () => {
       sport: 'baseball',
       mode: 'shared',
       controlAllTeams: false,
+      // Shared lobbies default to private (LS-10076).
+      isPublic: false,
     });
   });
 
@@ -198,6 +200,7 @@ describe('MockDraftSetup', () => {
       sport: 'football',
       mode: 'shared',
       controlAllTeams: false,
+      isPublic: false,
     });
   });
 
@@ -233,7 +236,7 @@ describe('MockDraftSetup', () => {
     );
 
     // Pick an AL-only baseball pool, then switch sports: the stale 'al' value
-    // would be rejected by initializeMockDraft, so it must reset to 'all'.
+    // would be rejected by createMockDraft, so it must reset to 'all'.
     fireEvent.click(getByText('AL Only'));
     fireEvent.click(getByText('🏈 Football'));
     fireEvent.click(getByText('Start Mock Draft'));
@@ -261,6 +264,40 @@ describe('MockDraftSetup', () => {
     expect(
       queryByText("Have an invite code? Join a friend's draft →"),
     ).toBeNull();
+  });
+
+  // LS-10076 — a Shared lobby can be opened up so anyone with the link can
+  // join without an invite code. Offline drafts have no lobby, so the toggle
+  // only exists in Shared mode.
+  it('reflects the Public lobby selection in the onStart payload (LS-10076)', () => {
+    const onStart = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} />,
+    );
+
+    fireEvent.click(getByText('Public'));
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'shared', isPublic: true }),
+    );
+  });
+
+  it('hides the visibility toggle in Offline mode and reports isPublic=false (LS-10076)', () => {
+    const onStart = jest.fn();
+    const { getByText, queryByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} />,
+    );
+
+    fireEvent.click(getByText('Public'));
+    fireEvent.click(getByText('Offline'));
+    expect(queryByText('Public')).toBeNull();
+    expect(queryByText('Private')).toBeNull();
+
+    fireEvent.click(getByText('Start Mock Draft'));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'offline', isPublic: false }),
+    );
   });
 
   it('hides the join-instead link when onJoinInstead is not provided', () => {

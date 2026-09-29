@@ -72,8 +72,8 @@ const MOCK_POSITIONS = [
 async function setupGraphQL(
   page: import('@playwright/test').Page,
   /** LS-9253: when provided, records the variables of the last
-   *  initializeMockDraft request the client sent, for assertions. */
-  capture?: { initializeMockDraftVariables?: Record<string, unknown> },
+   *  createMockDraft request the client sent, for assertions. */
+  capture?: { createMockDraftVariables?: Record<string, unknown> },
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const operation = extractOperationName(route).toLowerCase();
@@ -131,21 +131,25 @@ async function setupGraphQL(
           },
         }),
       });
-    } else if (operation === 'initializemockdraft') {
+    } else if (operation === 'createmockdraft') {
+      // LS-10076: a mock draft is a league-less `drafts` row, so the mutation
+      // answers with a draftId and the page routes to /baseball/mock-draft/:id.
       if (capture) {
         const body = route.request().postDataJSON() as {
           variables?: Record<string, unknown>;
         };
-        capture.initializeMockDraftVariables = body.variables;
+        capture.createMockDraftVariables = body.variables;
       }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-            initializeMockDraft: {
-              leagueId: MOCK_LEAGUE.id,
+            createMockDraft: {
+              __typename: 'CreateMockDraftResult',
               draftId: 1,
+              inviteCode: 'ABCD2345',
+              webSocketReady: true,
             },
           },
         }),
@@ -254,11 +258,10 @@ test.describe('Mock Draft Simulator @regression', () => {
     ).toBeVisible();
   });
 
-  test('starting a draft with Control All Teams on sends controlAllTeams:true to initializeMockDraft (LS-9253)', async ({
+  test('starting a draft with Control All Teams on sends controlAllTeams:true to createMockDraft (LS-9253)', async ({
     page,
   }) => {
-    const capture: { initializeMockDraftVariables?: Record<string, unknown> } =
-      {};
+    const capture: { createMockDraftVariables?: Record<string, unknown> } = {};
     await setupGraphQL(page, capture);
     await page.goto('/baseball/mock-draft');
     await page.waitForLoadState('load');
@@ -269,9 +272,11 @@ test.describe('Mock Draft Simulator @regression', () => {
     await page.getByRole('button', { name: 'On', exact: true }).click();
     await page.getByRole('button', { name: /Start Mock Draft/i }).click();
 
+    // Control All Teams still forces the untimed offline mode (LS-9253); the
+    // mode now travels as the MockDraftMode enum rather than an isOffline flag.
     await expect
-      .poll(() => capture.initializeMockDraftVariables)
-      .toMatchObject({ controlAllTeams: true, isOffline: true });
+      .poll(() => capture.createMockDraftVariables)
+      .toMatchObject({ controlAllTeams: true, mode: 'OFFLINE' });
   });
 
   test('draft position buttons update when team count changes', async ({

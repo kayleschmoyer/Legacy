@@ -17,6 +17,7 @@ import {
 } from './draft-recommendation-signals';
 import { authorizeDraft, authorizeLoadedDraft } from './authorize-draft';
 import { loadDraftRules } from './draft-rules';
+import { requireLeagueId } from './league-draft';
 import {
   countRecentMockDrafts,
   eligibleStatPositionsForUnfilledSlots,
@@ -335,7 +336,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // board can be filtered by the team's remaining roster requirements.
       // 'participate' reproduces verifyLeagueMembership exactly — spectators
       // of a public league are refused, as they were before (LS-10074).
-      const { draft, membership } = await authorizeDraft(
+      const { draft, seat } = await authorizeDraft(
         context,
         draftId,
         'participate',
@@ -452,11 +453,11 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Both helpers are sport-aware (LS-9479) — football reads
       // football_player_eligible_positions and ALLOWED_POSITIONS_BY_SPORT.football
       // instead of the baseball-only equivalents, matching the EXISTS clause below.
-      if (membership.teamId != null) {
+      if (seat) {
         const unfilledPositionTypes = await getUnfilledPositionTypes(
           context.db,
           draftId,
-          membership.teamId,
+          seat.id,
           rules,
         );
         const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
@@ -883,7 +884,7 @@ builder.queryField('getMyDraftTeamAutoPick', (t) =>
         .from(PublicSchema.leagueMembers)
         .where(
           and(
-            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.leagueId, requireLeagueId(draft)),
             eq(PublicSchema.leagueMembers.userId, context.user.id),
           ),
         )
@@ -1261,11 +1262,18 @@ builder.queryField('getDraftRecommendations', (t) =>
         'participate',
       );
 
+      // Recommendations are keyed by league team, so they exist only for a
+      // league draft (LS-10076).
+      const leagueId = requireLeagueId(draft);
+
       // Recommendations expose a team's projected draft strategy and positional
       // needs. Only the team's own member — or a league commissioner/owner —
       // may view them; otherwise any league member could poll for every
       // opposing team during the draft (LS-2495).
-      if (membership.teamId !== teamId && !isCommissionerOrOwner(membership)) {
+      if (
+        !membership ||
+        (membership.teamId !== teamId && !isCommissionerOrOwner(membership))
+      ) {
         throw ForbiddenError(
           'Cannot view draft recommendations for another team',
         );
@@ -1295,7 +1303,7 @@ builder.queryField('getDraftRecommendations', (t) =>
           defensiveFormat: PublicSchema.leagues.defensiveFormat,
         })
         .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draft.leagueId))
+        .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
       if (!league) {
         // draft.leagueId is a foreign key into leagues — a draft that
@@ -1315,7 +1323,7 @@ builder.queryField('getDraftRecommendations', (t) =>
         return getFootballDraftRecommendations(
           context.db,
           draftId,
-          draft.leagueId,
+          leagueId,
           teamPickedIds,
           league.defensiveFormat,
         );
@@ -1692,7 +1700,7 @@ builder.queryField('getMyDraftQueue', (t) =>
         .from(PublicSchema.leagueMembers)
         .where(
           and(
-            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.leagueId, requireLeagueId(draft)),
             eq(PublicSchema.leagueMembers.userId, context.user.id),
           ),
         )

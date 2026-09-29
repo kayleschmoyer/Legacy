@@ -64,7 +64,11 @@ function ChatTabConnector({
   userId,
   onNewMessage,
 }: DraftChatTabRenderProps): React.JSX.Element {
-  const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
+  // League drafts always carry a league id; the mock-draft room has its own
+  // chat connector (MockDraftBoard.tsx) and never mounts this one (LS-10076).
+  const { messages, loading, sending, sendMessage } = useLeagueChat(
+    leagueId ?? 0,
+  );
   // null until the first sync so loading the existing message history never
   // counts as a "new" message for the unread dot — only counts up from there.
   const prevCountRef = useRef<number | null>(null);

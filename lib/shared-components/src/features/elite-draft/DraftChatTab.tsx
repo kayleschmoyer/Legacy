@@ -34,7 +34,10 @@ export interface DraftChatTabProps {
  * that to work (see EliteDraftBoardScreen's display:none rendering of it).
  */
 export interface DraftChatTabRenderProps {
-  leagueId: number;
+  /** Null for a mock draft, which chats on its own draft_messages (LS-10076). */
+  leagueId: number | null;
+  /** Set for a mock draft; null for a league draft, which uses league chat. */
+  draftId?: number | null;
   userId: number;
   onNewMessage: () => void;
 }

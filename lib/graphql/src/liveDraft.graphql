@@ -97,8 +97,8 @@ query GetDraftTeamOrder($draftId: Int!) {
   }
 }
 
-mutation NudgeExpiredDraftPick($leagueId: Int!) {
-  autoProcessDraftPicks(leagueId: $leagueId) {
+mutation NudgeExpiredDraftPick($leagueId: Int, $draftId: Int) {
+  autoProcessDraftPicks(leagueId: $leagueId, draftId: $draftId) {
     draftsProcessed
     picksAutoMade
   }
@@ -267,6 +267,7 @@ query GetCurrentDraftPick($draftId: Int!) {
   getCurrentDraftPick(draftId: $draftId) {
     draftId
     teamId
+    participantId
     round
     pickNumber
     overallPick
@@ -283,6 +284,7 @@ query GetDraftPicks($draftId: Int!) {
     overallPick
     pickedAt
     teamId
+    participantId
     playerId
     adp
     player {
@@ -455,39 +457,174 @@ query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
   }
 }
 
-mutation InitializeMockDraft(
+mutation CreateMockDraft(
+  $sport: Sport
   $numTeams: Int!
-  $userPickPosition: Int!
+  $pickPosition: Int!
   $pickTimeLimitSeconds: Int
   $draftOrder: String
   $playerPool: String
-  $sport: String
-  $isOffline: Boolean
+  $mode: MockDraftMode
   $controlAllTeams: Boolean
+  $isPublic: Boolean
 ) {
-  initializeMockDraft(
+  createMockDraft(
+    sport: $sport
     numTeams: $numTeams
-    userPickPosition: $userPickPosition
+    pickPosition: $pickPosition
     pickTimeLimitSeconds: $pickTimeLimitSeconds
     draftOrder: $draftOrder
     playerPool: $playerPool
-    sport: $sport
-    isOffline: $isOffline
+    mode: $mode
     controlAllTeams: $controlAllTeams
+    isPublic: $isPublic
   ) {
-    leagueId
     draftId
     inviteCode
+    webSocketReady
   }
 }
 
-mutation JoinMockDraft($inviteCode: String!, $teamName: String!) {
-  joinMockDraft(inviteCode: $inviteCode, teamName: $teamName) {
-    team {
-      id
-      name
-      leagueId
-    }
+mutation JoinMockDraft($inviteCode: String, $draftId: Int, $teamName: String!) {
+  joinMockDraft(
+    inviteCode: $inviteCode
+    draftId: $draftId
+    teamName: $teamName
+  ) {
+    draftId
+    seatId
     sport
+  }
+}
+
+mutation StartMockDraft($draftId: Int!) {
+  startMockDraft(draftId: $draftId) {
+    id
+    status
+    currentPickDeadline
+    pickTimeLimitSeconds
+  }
+}
+
+mutation LeaveMockDraft($draftId: Int!) {
+  leaveMockDraft(draftId: $draftId) {
+    draftId
+    draftDeleted
+    newHostUserId
+  }
+}
+
+mutation KickMockDraftSeat($draftId: Int!, $participantId: Int!) {
+  kickMockDraftSeat(draftId: $draftId, participantId: $participantId)
+}
+
+mutation UpdateMockDraftLobby(
+  $draftId: Int!
+  $isPublic: Boolean
+  $draftOrder: String
+  $playerPool: String
+  $pickTimeLimitSeconds: Int
+) {
+  updateMockDraftLobby(
+    draftId: $draftId
+    isPublic: $isPublic
+    draftOrder: $draftOrder
+    playerPool: $playerPool
+    pickTimeLimitSeconds: $pickTimeLimitSeconds
+  )
+}
+
+mutation DeleteMockDraft($draftId: Int!) {
+  deleteMockDraft(draftId: $draftId)
+}
+
+query GetDraftRoom($draftId: Int!, $inviteCode: String) {
+  draftRoom(draftId: $draftId, inviteCode: $inviteCode) {
+    kind
+    status
+    sport
+    leagueId
+    draft {
+      id
+      leagueId
+      status
+      sport
+      mockMode
+      controlAllTeams
+      isPublic
+      inviteCode
+      lobbyExpiresAt
+      createdBy
+      draftOrder
+      currentPick
+      pickTimeLimitSeconds
+      currentPickDeadline
+      draftStartedAt
+      draftCompletedAt
+      scheduledAt
+      autoPickDisabled
+    }
+    rules {
+      sport
+      playerPool
+      maxRosterSize
+      defensiveFormat
+      rosterPositions
+      isMock
+    }
+    seats {
+      id
+      slot
+      teamId
+      userId
+      controller
+      seatName
+      autoPick
+    }
+    viewer {
+      role
+      seatId
+      canPick
+      canHost
+    }
+  }
+}
+
+query GetDraftMessages($draftId: Int!, $limit: Int, $beforeId: Int) {
+  draftMessages(draftId: $draftId, limit: $limit, beforeId: $beforeId) {
+    id
+    draftId
+    userId
+    messageText
+    messageType
+    gifUrl
+    containsProfanity
+    createdAt
+    user {
+      id
+      username
+      avatarUrl
+    }
+  }
+}
+
+mutation SendDraftMessage(
+  $draftId: Int!
+  $messageText: String!
+  $gifUrl: String
+) {
+  sendDraftMessage(
+    draftId: $draftId
+    messageText: $messageText
+    gifUrl: $gifUrl
+  ) {
+    id
+    draftId
+    userId
+    messageText
+    messageType
+    gifUrl
+    containsProfanity
+    createdAt
   }
 }

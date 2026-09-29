@@ -397,12 +397,7 @@ builder.queryField('userLeagues', (t) =>
             PublicSchema.leagueMembers,
             eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
           )
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.userId, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          )
+          .where(and(eq(PublicSchema.leagueMembers.userId, userId)))
           .orderBy(
             desc(PublicSchema.leagues.createdAt),
             desc(PublicSchema.leagues.id),
@@ -496,12 +491,7 @@ builder.queryField('userLeagueCount', (t) =>
             PublicSchema.leagueMembers,
             eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
           )
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.userId, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          );
+          .where(and(eq(PublicSchema.leagueMembers.userId, userId)));
 
         return Number(result[0]?.total ?? 0);
       } catch (error) {
@@ -539,7 +529,6 @@ builder.queryField('myLeagues', (t) =>
       try {
         const conditions: SQL[] = [
           eq(PublicSchema.leagueMembers.userId, userId),
-          eq(PublicSchema.leagues.isMockDraft, false),
         ];
         if (sportFilter != null) {
           conditions.push(eq(PublicSchema.leagues.sport, sportFilter));
@@ -1714,7 +1703,6 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           and(
             eq(PublicSchema.leagueMembers.userId, userId),
             ne(PublicSchema.leagues.leaguePhase, 'offseason'),
-            eq(PublicSchema.leagues.isMockDraft, false),
           ),
         )
         .orderBy(PublicSchema.leagues.id);
@@ -1945,7 +1933,6 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
           and(
             eq(PublicSchema.leagueMembers.userId, userId),
             eq(PublicSchema.leagues.leaguePhase, 'offseason'),
-            eq(PublicSchema.leagues.isMockDraft, false),
           ),
         )
         .orderBy(PublicSchema.leagues.id);
@@ -2083,7 +2070,6 @@ builder.queryField('getUserLeagueStandings', (t) =>
           and(
             eq(PublicSchema.leagueMembers.userId, userId),
             eq(PublicSchema.leagues.leaguePhase, 'active'),
-            eq(PublicSchema.leagues.isMockDraft, false),
           ),
         )
         .orderBy(PublicSchema.leagues.id);

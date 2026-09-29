@@ -131,15 +131,10 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
         'guardConcurrentPick',
       );
 
-      const candidatePool = await fetchCandidatePool(db, draft.id, league.id);
+      const candidatePool = await fetchCandidatePool(db, draft.id);
       expect(candidatePool).not.toBeNull();
 
-      const predicted = await predictAutoPick(
-        db,
-        draft.id,
-        league.id,
-        candidatePool!,
-      );
+      const predicted = await predictAutoPick(db, draft.id, candidatePool!);
       expect(predicted).not.toBeNull();
       expect(predicted!.currentPickInfo.teamId).toBe(teamFix[0].id);
       expect(predicted!.currentPickInfo.overallPick).toBe(1);
@@ -155,7 +150,6 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
       const pickResult = await runAutoPickLockedTransaction({
         db,
         draftId: draft.id,
-        draftLeagueId: league.id,
         pickTimeLimitSeconds: 60,
         candidatePool: candidatePool!,
         predicted,
@@ -202,16 +196,11 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
         'selectAutoPickPlayer',
       );
 
-      const candidatePool = await fetchCandidatePool(db, draft.id, league.id);
+      const candidatePool = await fetchCandidatePool(db, draft.id);
       expect(candidatePool).not.toBeNull();
 
       // Phase 1: predict for the CURRENT state (team[0], overallPick 1).
-      const predicted = await predictAutoPick(
-        db,
-        draft.id,
-        league.id,
-        candidatePool!,
-      );
+      const predicted = await predictAutoPick(db, draft.id, candidatePool!);
       expect(predicted).not.toBeNull();
       expect(predicted!.currentPickInfo.teamId).toBe(teamFix[0].id);
       expect(predicted!.currentPickInfo.overallPick).toBe(1);
@@ -238,7 +227,6 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
         playerId: concurrentPlayerId,
         maxRosterSize: league.maxRosterSize,
         pickTimeLimitSeconds: 60,
-        isMockDraft: true,
       });
 
       // The concurrent commit set a future deadline for team[1] (now + 60s).
@@ -255,7 +243,6 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
       const pickResult = await runAutoPickLockedTransaction({
         db,
         draftId: draft.id,
-        draftLeagueId: league.id,
         pickTimeLimitSeconds: 60,
         candidatePool: candidatePool!,
         predicted,

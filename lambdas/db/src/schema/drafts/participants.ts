@@ -76,6 +76,47 @@ export async function getDraftSeats(
     .orderBy(asc(PublicSchema.draftParticipants.slot));
 }
 
+/** One seat by its `draft_participants.id`, or `null` when it is gone. */
+export async function getSeatById(
+  db: PublicDb,
+  participantId: number,
+): Promise<DraftSeat | null> {
+  const [seat] = await db
+    .select(seatColumns())
+    .from(PublicSchema.draftParticipants)
+    .where(eq(PublicSchema.draftParticipants.id, participantId))
+    .limit(1);
+
+  return seat ?? null;
+}
+
+/**
+ * The seat a user holds in a draft, or `null` when they hold none.
+ *
+ * A mock-draft seat is held by its `user_id` (LS-10076). A league seat holds a
+ * team rather than a user, so this only ever matches mock-draft seats; league
+ * drafts resolve a seat through the caller's team ({@link getSeatForTeam}).
+ */
+export async function getSeatForUser(
+  db: PublicDb,
+  draftId: number,
+  userId: number,
+): Promise<DraftSeat | null> {
+  const [seat] = await db
+    .select(seatColumns())
+    .from(PublicSchema.draftParticipants)
+    .where(
+      and(
+        eq(PublicSchema.draftParticipants.draftId, draftId),
+        eq(PublicSchema.draftParticipants.userId, userId),
+      ),
+    )
+    .orderBy(asc(PublicSchema.draftParticipants.slot))
+    .limit(1);
+
+  return seat ?? null;
+}
+
 /** The seat a league team holds in a draft, or `null` when it holds none. */
 export async function getSeatForTeam(
   db: PublicDb,
@@ -341,6 +382,25 @@ export async function setSeatAutoPick(
         ),
       );
   }
+}
+
+/**
+ * Turn auto-pick on or off for one seat, by seat id.
+ *
+ * The by-team variant above resolves `controller` from league membership; a
+ * mock-draft seat has none, so its controller is whatever it already is — a
+ * human who turned auto-pick on is still `user`-controlled, they have just
+ * stepped away from the board (LS-10076).
+ */
+export async function setSeatAutoPickById(
+  tx: PublicDb,
+  participantId: number,
+  autoPick: boolean,
+): Promise<void> {
+  await tx
+    .update(PublicSchema.draftParticipants)
+    .set({ autoPick, updatedAt: new Date() })
+    .where(eq(PublicSchema.draftParticipants.id, participantId));
 }
 
 /**

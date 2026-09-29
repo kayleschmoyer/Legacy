@@ -7,8 +7,27 @@ import {
   type DraftRecommendationSignal,
 } from './draft-recommendation-signals';
 import { builder } from '../builder';
-import { Team } from '../leagues/types';
+import { SportKindEnum, Team } from '../leagues/types';
 import { CareerBattingRef } from '../statistics';
+
+/** `drafts.kind` (LS-10073). */
+export const DraftKindEnum = builder.enumType('DraftKind', {
+  values: {
+    LEAGUE: { value: 'league' },
+    MOCK: { value: 'mock' },
+  } as const,
+});
+
+/** `drafts.mock_mode` (LS-10073). */
+export const MockDraftModeEnum = builder.enumType('MockDraftMode', {
+  values: {
+    OFFLINE: {
+      value: 'offline',
+      description: 'Solo practice against AI seats.',
+    },
+    ONLINE: { value: 'online', description: 'A lobby other users can join.' },
+  } as const,
+});
 
 /**
  * DraftPick - Represents a single draft pick
@@ -16,7 +35,8 @@ import { CareerBattingRef } from '../statistics';
 export const DraftPick = builder.objectRef<{
   id: number;
   draftId: number;
-  teamId: number;
+  teamId: number | null;
+  participantId: number;
   playerId: number;
   round: number;
   pickNumber: number;
@@ -29,7 +49,17 @@ DraftPick.implement({
   fields: (t) => ({
     id: t.exposeInt('id'),
     draftId: t.exposeInt('draftId'),
-    teamId: t.exposeInt('teamId'),
+    teamId: t.exposeInt('teamId', {
+      nullable: true,
+      description:
+        "The picking seat's league team. Null for a mock draft, whose seats " +
+        'have no team — key on participantId instead (LS-10076).',
+    }),
+    participantId: t.exposeInt('participantId', {
+      description:
+        'The seat that made (or is on the clock for) this pick — ' +
+        '`draft_participants.id`. Present for every draft kind (LS-10076).',
+    }),
     playerId: t.exposeInt('playerId'),
     round: t.exposeInt('round'),
     pickNumber: t.exposeInt('pickNumber'),
@@ -39,9 +69,13 @@ DraftPick.implement({
     }),
     team: t.field({
       type: Team,
+      nullable: true,
+      description: "The seat's league team. Null for a mock draft (LS-10076).",
       resolve: (parent, _args, context) => {
-        return context.loaders.teams.load(parent.teamId).then((team) => {
-          if (!team) throw new Error(`Team ${parent.teamId} not found`);
+        if (parent.teamId === null) return null;
+        const teamId = parent.teamId;
+        return context.loaders.teams.load(teamId).then((team) => {
+          if (!team) throw new Error(`Team ${teamId} not found`);
           return team;
         });
       },
@@ -84,7 +118,16 @@ DraftPick.implement({
  */
 export const Draft = builder.objectRef<{
   id: number;
-  leagueId: number;
+  leagueId: number | null;
+  kind: 'league' | 'mock';
+  status: string;
+  sport: 'baseball' | 'football';
+  mockMode: 'offline' | 'online' | null;
+  controlAllTeams: boolean;
+  isPublic: boolean;
+  inviteCode: string | null;
+  lobbyExpiresAt: Date | null;
+  createdBy: number;
   draftMode: string;
   selectionMethod: string;
   draftOrder: string;
@@ -101,10 +144,53 @@ export const Draft = builder.objectRef<{
 }>('Draft');
 
 Draft.implement({
-  description: 'A draft event for a league',
+  description: 'A draft: a league draft, or a league-less mock draft',
   fields: (t) => ({
     id: t.exposeInt('id'),
-    leagueId: t.exposeInt('leagueId'),
+    leagueId: t.exposeInt('leagueId', {
+      nullable: true,
+      description: 'The owning league. Null for a mock draft (LS-10076).',
+    }),
+    kind: t.field({
+      type: DraftKindEnum,
+      resolve: (draft) => draft.kind,
+    }),
+    status: t.exposeString('status', {
+      description:
+        "Lifecycle status: 'not-started' | 'in-progress' | 'paused' | 'completed'.",
+    }),
+    sport: t.field({ type: SportKindEnum, resolve: (draft) => draft.sport }),
+    mockMode: t.field({
+      type: MockDraftModeEnum,
+      nullable: true,
+      description:
+        'OFFLINE (solo vs AI) or ONLINE (lobby). Null for a league draft.',
+      resolve: (draft) => draft.mockMode,
+    }),
+    controlAllTeams: t.exposeBoolean('controlAllTeams', {
+      description:
+        'Mock drafts only: the host makes every pick for every seat (LS-9253).',
+    }),
+    isPublic: t.exposeBoolean('isPublic', {
+      description: 'Online mock drafts only: the lobby is joinable by id.',
+    }),
+    inviteCode: t.string({
+      nullable: true,
+      description:
+        'Mock drafts only: the code others redeem via joinMockDraft. Only ' +
+        'the host and seat holders can load a mock draft, so this is not ' +
+        'exposed to anyone who could not already share it.',
+      resolve: (draft) => draft.inviteCode,
+    }),
+    lobbyExpiresAt: t.string({
+      nullable: true,
+      description:
+        'Online mock drafts only: when an unstarted lobby expires (24h after creation).',
+      resolve: (draft) => draft.lobbyExpiresAt?.toISOString() ?? null,
+    }),
+    createdBy: t.exposeInt('createdBy', {
+      description: 'The creator — for a mock draft, its host.',
+    }),
     draftMode: t.exposeString('draftMode'),
     selectionMethod: t.exposeString('selectionMethod'),
     draftOrder: t.exposeString('draftOrder'),
@@ -147,7 +233,8 @@ Draft.implement({
  */
 export const CurrentDraftPick = builder.objectRef<{
   draftId: number;
-  teamId: number;
+  teamId: number | null;
+  participantId: number;
   round: number;
   pickNumber: number;
   overallPick: number;
@@ -158,16 +245,30 @@ CurrentDraftPick.implement({
   description: 'Information about the current draft pick',
   fields: (t) => ({
     draftId: t.exposeInt('draftId'),
-    teamId: t.exposeInt('teamId'),
+    teamId: t.exposeInt('teamId', {
+      nullable: true,
+      description:
+        "The picking seat's league team. Null for a mock draft, whose seats " +
+        'have no team — key on participantId instead (LS-10076).',
+    }),
+    participantId: t.exposeInt('participantId', {
+      description:
+        'The seat that made (or is on the clock for) this pick — ' +
+        '`draft_participants.id`. Present for every draft kind (LS-10076).',
+    }),
     round: t.exposeInt('round'),
     pickNumber: t.exposeInt('pickNumber'),
     overallPick: t.exposeInt('overallPick'),
     isComplete: t.exposeBoolean('isComplete'),
     team: t.field({
       type: Team,
+      nullable: true,
+      description: "The seat's league team. Null for a mock draft (LS-10076).",
       resolve: (parent, _args, context) => {
-        return context.loaders.teams.load(parent.teamId).then((team) => {
-          if (!team) throw new Error(`Team ${parent.teamId} not found`);
+        if (parent.teamId === null) return null;
+        const teamId = parent.teamId;
+        return context.loaders.teams.load(teamId).then((team) => {
+          if (!team) throw new Error(`Team ${teamId} not found`);
           return team;
         });
       },
@@ -442,7 +543,7 @@ DraftRecommendation.implement({
 // Payload for draft settings update — returns the updated draft record
 export const UpdateDraftSettingsPayload = builder.objectRef<{
   id: number;
-  leagueId: number;
+  leagueId: number | null;
   draftMode: string;
   selectionMethod: string;
   draftOrder: string;
@@ -461,7 +562,7 @@ UpdateDraftSettingsPayload.implement({
   description: 'Result of updating draft settings',
   fields: (t) => ({
     id: t.exposeInt('id'),
-    leagueId: t.exposeInt('leagueId'),
+    leagueId: t.exposeInt('leagueId', { nullable: true }),
     draftMode: t.exposeString('draftMode'),
     selectionMethod: t.exposeString('selectionMethod'),
     draftOrder: t.exposeString('draftOrder'),
@@ -490,7 +591,8 @@ UpdateDraftSettingsPayload.implement({
 export const DraftQueueEntry = builder.objectRef<{
   id: number;
   draftId: number;
-  teamId: number;
+  teamId: number | null;
+  participantId: number | null;
   playerId: number;
   priority: number;
 }>('DraftQueueEntry');
@@ -501,7 +603,16 @@ DraftQueueEntry.implement({
   fields: (t) => ({
     id: t.exposeInt('id'),
     draftId: t.exposeInt('draftId'),
-    teamId: t.exposeInt('teamId'),
+    teamId: t.exposeInt('teamId', {
+      nullable: true,
+      description:
+        'Null for a mock draft, whose queue belongs to a seat (LS-10076).',
+    }),
+    participantId: t.exposeInt('participantId', {
+      nullable: true,
+      description:
+        "The queue owner's seat. Null only for a league queue row written before LS-10073.",
+    }),
     playerId: t.exposeInt('playerId'),
     priority: t.exposeInt('priority'),
     player: t.field({

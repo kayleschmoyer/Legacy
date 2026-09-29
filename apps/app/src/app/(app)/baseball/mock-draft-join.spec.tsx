@@ -47,10 +47,9 @@ describe('JoinMockDraftScreen', () => {
     jest.clearAllMocks();
     mockJoinMockDraft.mockResolvedValue({
       data: {
-        joinMockDraft: {
-          team: { leagueId: 42, id: 55, name: 'My Team' },
-          sport: 'baseball',
-        },
+        // LS-10076: the joiner claims a seat in a league-less draft, so the
+        // mutation returns draftId/seatId instead of a team.
+        joinMockDraft: { draftId: 42, seatId: 7, sport: 'baseball' },
       },
     });
   });
@@ -62,7 +61,7 @@ describe('JoinMockDraftScreen', () => {
     expect(screen.getByPlaceholderText('Enter your team name')).toBeTruthy();
   });
 
-  it('joins and navigates to the draft board on success', async () => {
+  it('joins and navigates to the mock draft room on success', async () => {
     render(<JoinMockDraftScreen />);
 
     fireEvent.changeText(
@@ -81,8 +80,8 @@ describe('JoinMockDraftScreen', () => {
       });
     });
     expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/DraftBoardPage',
-      params: { leagueId: '42' },
+      pathname: '/mock-draft/[draftId]',
+      params: { draftId: '42' },
     });
   });
 

@@ -14,6 +14,7 @@ import {
   NotFoundError,
 } from '../graphql-errors';
 import { builder } from '../builder';
+import { requireLeagueId } from '../drafts/league-draft';
 
 // ── AuctionState type ─────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ builder.queryField('auctionBudgets', (t) =>
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
       if (!draftRow) return [];
+      const leagueId = requireLeagueId(draftRow);
 
       const [leagueRow] = await context.db
         .select({
@@ -151,7 +153,7 @@ builder.queryField('auctionBudgets', (t) =>
           auctionMinBid: PublicSchema.leagues.auctionMinBid,
         })
         .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draftRow.leagueId))
+        .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
 
       const maxRosterSize = leagueRow?.maxRosterSize ?? 25;
@@ -232,11 +234,15 @@ builder.mutationField('nominatePlayer', (t) =>
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
+      if (!draftRow) {
+        throw NotFoundError('Draft not found');
+      }
+      const leagueId = requireLeagueId(draftRow);
 
       const [leagueRow] = await context.db
         .select({ auctionMinBid: PublicSchema.leagues.auctionMinBid })
         .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draftRow.leagueId))
+        .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
 
       const minBid = leagueRow?.auctionMinBid ?? 1;
@@ -314,13 +320,17 @@ builder.mutationField('placeBid', (t) =>
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
+      if (!draftRow) {
+        throw NotFoundError('Draft not found');
+      }
+      const leagueId = requireLeagueId(draftRow);
 
       const [membership] = await context.db
         .select({ teamId: PublicSchema.leagueMembers.teamId })
         .from(PublicSchema.leagueMembers)
         .where(
           and(
-            eq(PublicSchema.leagueMembers.leagueId, draftRow.leagueId),
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
             eq(PublicSchema.leagueMembers.userId, context.user.id),
           ),
         )
@@ -349,7 +359,7 @@ builder.mutationField('placeBid', (t) =>
           auctionMinBid: PublicSchema.leagues.auctionMinBid,
         })
         .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, draftRow.leagueId))
+        .where(eq(PublicSchema.leagues.id, leagueId))
         .limit(1);
 
       const maxRosterSize = leagueRow?.maxRosterSize ?? 25;

@@ -16,6 +16,7 @@ import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
+import { requireLeagueId } from '../league-draft';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
 import {
@@ -97,13 +98,18 @@ builder.mutationField('commissionerPick', (t) =>
           throw UserInputError('Draft not found');
         }
 
+        // Commissioner picks are a league tool: a mock draft has no
+        // commissioner, and its Control All Teams host picks through
+        // makeDraftPick for every seat instead (LS-10076).
+        const leagueId = requireLeagueId({ leagueId: draftPre.league_id });
+
         // Verify user is league commissioner
         const [membership] = await context.db
           .select()
           .from(PublicSchema.leagueMembers)
           .where(
             and(
-              eq(PublicSchema.leagueMembers.leagueId, draftPre.league_id),
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
             ),
           )
@@ -118,7 +124,7 @@ builder.mutationField('commissionerPick', (t) =>
         const [leaguePre] = await context.db
           .select()
           .from(PublicSchema.leagues)
-          .where(eq(PublicSchema.leagues.id, draftPre.league_id))
+          .where(eq(PublicSchema.leagues.id, leagueId))
           .limit(1);
 
         if (!leaguePre) {
@@ -179,7 +185,7 @@ builder.mutationField('commissionerPick', (t) =>
             const draft = draftRows.rows[0] as
               | {
                   id: number;
-                  league_id: number;
+                  league_id: number | null;
                   pick_time_limit_seconds: number;
                   selection_method: string;
                 }
@@ -189,12 +195,14 @@ builder.mutationField('commissionerPick', (t) =>
               throw UserInputError('Draft not found');
             }
 
+            const txLeagueId = requireLeagueId({ leagueId: draft.league_id });
+
             // TOCTOU re-verify league status — could have flipped between
             // Phase 1 and Phase 2.
             const [league] = await tx
               .select()
               .from(PublicSchema.leagues)
-              .where(eq(PublicSchema.leagues.id, draft.league_id))
+              .where(eq(PublicSchema.leagues.id, txLeagueId))
               .limit(1);
 
             if (!league) {
@@ -235,17 +243,25 @@ builder.mutationField('commissionerPick', (t) =>
             // LS-8674: a kept player is rostered (team_members) before the
             // first pick with no draft_picks row — the check above alone
             // would miss it.
-            if (await isPlayerOnRoster(tx, draft.league_id, playerId)) {
+            if (await isPlayerOnRoster(tx, txLeagueId, playerId)) {
               throw UserInputError(
                 'Player is already rostered as a keeper in this league',
               );
             }
 
             // Validate roster limit — count existing team members
+            // A league seat always holds a team (CHECK drafts_kind_league_ck).
+            const pickTeamId = currentPickInfo.teamId;
+            if (pickTeamId === null) {
+              throw new Error(
+                `commissionerPick: league draft ${String(draftId)} seat ${String(currentPickInfo.participantId)} has no team`,
+              );
+            }
+
             const { isFull: rosterFull } = await checkRosterCapacity(
               tx,
-              currentPickInfo.teamId,
-              draft.league_id,
+              pickTeamId,
+              txLeagueId,
               league.maxRosterSize,
             );
 
@@ -261,19 +277,18 @@ builder.mutationField('commissionerPick', (t) =>
               await commitDraftPick({
                 tx,
                 draftId,
-                leagueId: draft.league_id,
+                leagueId: txLeagueId,
                 pickInfo: currentPickInfo,
                 playerId,
                 maxRosterSize: league.maxRosterSize,
                 pickTimeLimitSeconds: draft.pick_time_limit_seconds,
-                isMockDraft: league.isMockDraft,
               });
 
             return {
               draftPick,
               isDraftComplete,
-              leagueId: draft.league_id,
-              isMockDraft: league.isMockDraft,
+              leagueId: txLeagueId,
+              isMockDraft: false,
               selectionMethod: draft.selection_method,
               currentPickInfo,
               nextPickInfo,
@@ -321,6 +336,7 @@ builder.mutationField('commissionerPick', (t) =>
             draftId,
             result.draftPick.id,
             result.currentPickInfo.teamId,
+            result.currentPickInfo.participantId,
             playerId,
             result.currentPickInfo.round,
             result.currentPickInfo.pickNumber,
@@ -328,6 +344,7 @@ builder.mutationField('commissionerPick', (t) =>
             result.nextPickInfo
               ? {
                   teamId: result.nextPickInfo.teamId,
+                  participantId: result.nextPickInfo.participantId,
                   round: result.nextPickInfo.round,
                   pickNumber: result.nextPickInfo.pickNumber,
                   overallPick: result.nextPickInfo.overallPick,

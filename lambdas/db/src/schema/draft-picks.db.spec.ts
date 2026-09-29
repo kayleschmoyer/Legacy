@@ -6,7 +6,7 @@
  * (whose turn it is) is exercised by the GraphQL resolver unit tests.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { PublicDb } from '@legacy-sports/db-client';
 import {
   commitDraftPick,
@@ -120,6 +120,24 @@ describe('Draft Picks - DB Integration Tests', () => {
       draft,
       players: insertedPlayers,
     };
+  }
+
+  /**
+   * The seat (`draft_participants.id`) a team drafts from. The draft_teams
+   * bridge trigger (LS-10073) creates one per draft_teams row; a hand-built
+   * pickInfo must name it since picks are seat-keyed (LS-10076).
+   */
+  async function seatIdFor(draftId: number, teamId: number): Promise<number> {
+    const [seat] = await db
+      .select({ id: draftParticipants.id })
+      .from(draftParticipants)
+      .where(
+        and(
+          eq(draftParticipants.draftId, draftId),
+          eq(draftParticipants.teamId, teamId),
+        ),
+      );
+    return seat.id;
   }
 
   // ---------------------------------------------------------------------------
@@ -451,7 +469,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       jest.clearAllMocks();
     });
 
-    it('mock draft: creates draft_picks row but skips team_members insertion', async () => {
+    it('league-less (mock) pick: creates draft_picks row but skips team_members insertion', async () => {
       const {
         league,
         teams: teamFix,
@@ -459,12 +477,15 @@ describe('Draft Picks - DB Integration Tests', () => {
         players: playerFix,
       } = await seedDraftFixture(2);
 
+      // A mock draft has no league (LS-10076): leagueId null is what skips
+      // the roster write now that the isMockDraft flag is gone.
       await commitDraftPick({
         tx: db,
         draftId: draft.id,
-        leagueId: league.id,
+        leagueId: null,
         pickInfo: {
-          teamId: teamFix[0].id,
+          teamId: null,
+          participantId: await seatIdFor(draft.id, teamFix[0].id),
           round: 1,
           pickNumber: 1,
           overallPick: 1,
@@ -472,7 +493,6 @@ describe('Draft Picks - DB Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: true,
       });
 
       const picks = await db
@@ -511,6 +531,7 @@ describe('Draft Picks - DB Integration Tests', () => {
           isDraftComplete: true,
           currentPickInfo: {
             teamId: teamFix[0].id,
+            participantId: await seatIdFor(draft.id, teamFix[0].id),
             round: 2,
             pickNumber: 2,
             overallPick: 4,
@@ -548,6 +569,7 @@ describe('Draft Picks - DB Integration Tests', () => {
         leagueId: league.id,
         pickInfo: {
           teamId: teamFix[0].id,
+          participantId: await seatIdFor(draft.id, teamFix[0].id),
           round: 2,
           pickNumber: 2,
           overallPick: 4,
@@ -555,7 +577,6 @@ describe('Draft Picks - DB Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: true,
       });
 
       const [updatedDraft] = await db
@@ -585,6 +606,7 @@ describe('Draft Picks - DB Integration Tests', () => {
         leagueId: league.id,
         pickInfo: {
           teamId: teamFix[1].id,
+          participantId: await seatIdFor(draft.id, teamFix[1].id),
           round: 2,
           pickNumber: 1,
           overallPick: 3,
@@ -592,7 +614,6 @@ describe('Draft Picks - DB Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: true,
       });
 
       const [updatedDraft] = await db
@@ -664,7 +685,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
 
         const [updatedDraft] = await db
@@ -803,6 +823,7 @@ describe('Draft Picks - DB Integration Tests', () => {
         leagueId: league.id,
         pickInfo: {
           teamId: teamFix[0].id,
+          participantId: await seatIdFor(draft.id, teamFix[0].id),
           round: 2,
           pickNumber: 2,
           overallPick: 4,
@@ -810,7 +831,6 @@ describe('Draft Picks - DB Integration Tests', () => {
         playerId: playerFix[0].id,
         maxRosterSize: 2,
         pickTimeLimitSeconds: 60,
-        isMockDraft: true,
       });
 
       const pickInfo = await getCurrentDraftPickInfo(publicDb(), draft.id);
@@ -841,7 +861,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
 
         const afterPick = await getCurrentDraftPickInfo(publicDb(), draft.id);
@@ -879,7 +898,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
 
         const [draftRow] = await db
@@ -946,7 +964,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
 
         const isLastPick = i === 7;
@@ -1236,7 +1253,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
 
         expect(result.isDraftComplete).toBe(i === 3);
@@ -1282,7 +1298,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: PICK_TIMER,
-          isMockDraft: true,
         });
         const after = Date.now();
 
@@ -1363,7 +1378,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
       }
 
@@ -1411,7 +1425,6 @@ describe('Draft Picks - DB Integration Tests', () => {
           playerId: playerFix[i].id,
           maxRosterSize: 2,
           pickTimeLimitSeconds: 60,
-          isMockDraft: true,
         });
         commitCount++;
 

@@ -189,6 +189,14 @@ export async function cleanupTestData(): Promise<void> {
   await db.execute(sql`
     DELETE FROM leagues WHERE owner BETWEEN 100 AND 119
   `);
+  // Mock drafts (LS-10076) have no league to cascade from — they are their own
+  // root — so a league-less draft created by a test user has to be deleted
+  // directly or it leaks into every later suite's counts.
+  await db.execute(sql`
+    DELETE FROM drafts
+    WHERE kind = 'mock'
+      AND (created_by IN (1, 2, 3) OR created_by BETWEEN 100 AND 119)
+  `);
   // Remove bulk test users themselves (created by leagues.db.spec bulk test)
   await db.execute(sql`
     DELETE FROM app_internal.users WHERE id BETWEEN 100 AND 119

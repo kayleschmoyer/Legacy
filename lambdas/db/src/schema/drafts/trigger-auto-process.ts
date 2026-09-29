@@ -28,7 +28,15 @@ import { getSystemApiKey } from '../../server/context';
 const GRAPHQL_SELF_URL = process.env['GRAPHQL_SELF_URL'] || '';
 
 const AUTO_PROCESS_MUTATION =
-  'mutation AutoProcess($leagueId: Int) { autoProcessDraftPicks(leagueId: $leagueId) { draftsProcessed picksAutoMade draftsCompleted errors } }';
+  'mutation AutoProcess($leagueId: Int, $draftId: Int) { autoProcessDraftPicks(leagueId: $leagueId, draftId: $draftId) { draftsProcessed picksAutoMade draftsCompleted errors } }';
+
+/** Which draft(s) the nudge should process. */
+export interface AutoProcessNudgeTarget {
+  /** `null` for a mock draft, which belongs to no league (LS-10076). */
+  leagueId: number | null;
+  /** The draft to process — the only handle a league-less draft has. */
+  draftId: number;
+}
 
 /**
  * Fire a set-and-forget HTTP request that nudges `autoProcessDraftPicks` for
@@ -38,25 +46,28 @@ const AUTO_PROCESS_MUTATION =
  * No-ops when `GRAPHQL_SELF_URL` is not configured so local dev and unit
  * tests do not attempt a network call.
  */
-export function triggerAutoProcessDraftPicks(leagueId: number): void {
+export function triggerAutoProcessDraftPicks(
+  target: AutoProcessNudgeTarget,
+): void {
   if (!GRAPHQL_SELF_URL) {
     LOGGER.info(
       '[LS-8107] GRAPHQL_SELF_URL unset — skipping auto-process nudge (EventBridge fallback handles it)',
-      { leagueId },
+      target,
     );
     return;
   }
 
-  void dispatchNudge(leagueId);
+  void dispatchNudge(target);
 }
 
-async function dispatchNudge(leagueId: number): Promise<void> {
+async function dispatchNudge(target: AutoProcessNudgeTarget): Promise<void> {
+  const { leagueId, draftId } = target;
   try {
     const systemApiKey = await getSystemApiKey();
     if (!systemApiKey) {
       LOGGER.warn(
         '[LS-8107] System API key unavailable — skipping auto-process nudge (EventBridge fallback handles it)',
-        { leagueId },
+        { leagueId, draftId },
       );
       return;
     }
@@ -69,18 +80,21 @@ async function dispatchNudge(leagueId: number): Promise<void> {
       },
       body: JSON.stringify({
         query: AUTO_PROCESS_MUTATION,
-        variables: { leagueId },
+        variables: { leagueId, draftId },
       }),
     });
 
-    LOGGER.info('[LS-8107] Auto-process nudge dispatched', { leagueId });
+    LOGGER.info('[LS-8107] Auto-process nudge dispatched', {
+      leagueId,
+      draftId,
+    });
   } catch (err) {
     // Non-fatal: the human's pick is already committed and EventBridge will
     // process the auto-picks within its ≤60 s cycle.
     LOGGER.warn(
       '[LS-8107] Auto-process nudge request failed (non-fatal)',
       err instanceof Error ? err : new Error(String(err)),
-      { leagueId },
+      { leagueId, draftId },
     );
   }
 }

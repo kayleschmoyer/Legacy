@@ -116,6 +116,13 @@ const MockDraftPage = lazyWithRetry(() =>
     default: m.MockDraftPage,
   })),
 );
+
+// The mock draft room (LS-10076) — league-less, so it loads by draft id.
+const MockDraftBoardScreen = lazyWithRetry(() =>
+  import('../components/MockDraftBoard').then((m) => ({
+    default: m.MockDraftBoardScreen,
+  })),
+);
 const JoinMockDraftPage = lazyWithRetry(() =>
   import('../pages/draft/JoinMockDraftPage').then((m) => ({
     default: m.JoinMockDraftPage,
@@ -863,6 +870,16 @@ function App() {
               element={<EliteDraftSpectatorScreen />}
             />
             <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
+            {/* A mock draft has no league, so it has its own room route
+                (LS-10076). */}
+            <Route
+              path="/baseball/mock-draft/:draftId"
+              element={<MockDraftBoardScreen />}
+            />
+            <Route
+              path="/football/mock-draft/:draftId"
+              element={<MockDraftBoardScreen />}
+            />
             <Route
               path="/baseball/mock-draft/join"
               element={<JoinMockDraftPage />}

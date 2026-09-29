@@ -16,8 +16,10 @@ import {
 } from '@legacy-sports/shared-components/draft';
 import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import {
+  MockDraftMode,
+  Sport,
+  useCreateMockDraftMutation,
   useGetMyMockDraftUsageQuery,
-  useInitializeMockDraftMutation,
 } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { UpgradeModal } from '../../components/UpgradeModal';
@@ -102,7 +104,7 @@ const SPORT_CHROME: Record<
  * Mode" card) wrapping the shared {@link MockDraftSetup} form (LS-7711). The
  * interactive settings live in shared-components so web and native render the
  * same battle-tested form; web owns the surrounding presentation, premium
- * gating, navigation, and the `initializeMockDraft` wiring.
+ * gating, navigation, and the `createMockDraft` wiring.
  */
 function SetupScreen({
   onStart,
@@ -279,7 +281,7 @@ interface LimitReachedScreenProps {
 /**
  * Disabled state shown to free-tier users who have exhausted their weekly mock
  * drafts (LS-5178). Previously these users saw the full setup form and only
- * discovered the limit when `initializeMockDraft` failed with PREMIUM_REQUIRED;
+ * discovered the limit when `createMockDraft` failed with PREMIUM_REQUIRED;
  * now the limit is reflected up front with an upgrade path.
  */
 function LimitReachedScreen({
@@ -428,9 +430,8 @@ export function MockDraftPage(): React.JSX.Element {
   const isControlAllTeamsEntitled = useHasEntitlement(
     ENTITLEMENTS.mock_draft_control_all_teams,
   );
-  const [initializeMockDraft, { loading, error }] =
-    useInitializeMockDraftMutation();
-  const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
+  const [createMockDraft, { loading, error }] = useCreateMockDraftMutation();
+  const [missingDraftIdError, setMissingDraftIdError] = React.useState<
     string | null
   >(null);
   // Mirrors the shared form's own Sport state so the page chrome (badge, copy,
@@ -442,7 +443,7 @@ export function MockDraftPage(): React.JSX.Element {
   // before entering the draft room lobby (LS-9181). Offline drafts navigate
   // straight through, unchanged.
   const [pendingInvite, setPendingInvite] = React.useState<{
-    leagueId: number;
+    draftId: number;
     inviteCode: string;
     sport: MockDraftSettings['sport'];
   } | null>(null);
@@ -468,42 +469,44 @@ export function MockDraftPage(): React.JSX.Element {
     orderParam === 'linear' || orderParam === 'snake' ? orderParam : undefined;
 
   const handleStart = async (s: MockDraftSettings) => {
-    setMissingLeagueIdError(null);
+    setMissingDraftIdError(null);
     // Control All Teams always implies offline (LS-9253) — the server forces
     // this too, but computing it client-side keeps pickTimeLimitSeconds correct.
     const isOffline = s.mode === 'offline' || s.controlAllTeams === true;
-    const result = await initializeMockDraft({
+    const result = await createMockDraft({
       variables: {
         numTeams: s.numTeams,
         // rosterSize is deliberately omitted (LS-10086) — mock drafts always
         // run the sport's full default roster, derived server-side.
-        userPickPosition: s.userPickPosition,
+        pickPosition: s.userPickPosition,
         // Offline mode ignores this and uses its own untimed sentinel server-side.
         pickTimeLimitSeconds: isOffline ? undefined : 90,
         draftOrder: s.draftOrder,
         playerPool: s.playerPool,
-        sport: s.sport,
-        isOffline,
+        sport: s.sport === 'football' ? Sport.Football : Sport.Baseball,
+        mode: isOffline ? MockDraftMode.Offline : MockDraftMode.Online,
         controlAllTeams: s.controlAllTeams,
+        isPublic: s.isPublic,
       },
     });
-    const initialized = result.data?.initializeMockDraft;
-    const leagueId = initialized?.leagueId;
-    if (!leagueId) {
-      setMissingLeagueIdError("Couldn't start mock draft — please try again.");
+    const created = result.data?.createMockDraft;
+    const draftId = created?.draftId;
+    if (!draftId) {
+      setMissingDraftIdError("Couldn't start mock draft — please try again.");
       return;
     }
-    if (!isOffline && initialized.inviteCode) {
+    if (!isOffline && created.inviteCode) {
       // Pause on the invite screen instead of navigating straight into the
-      // draft room lobby (LS-9181).
+      // lobby (LS-9181), so the creator can share the code first.
       setPendingInvite({
-        leagueId,
-        inviteCode: initialized.inviteCode,
+        draftId,
+        inviteCode: created.inviteCode,
         sport: s.sport,
       });
       return;
     }
-    navigate(`/${s.sport}/league/${leagueId}/draft`);
+    // A mock draft has no league, so it has its own route (LS-10076).
+    navigate(`/${s.sport}/mock-draft/${String(draftId)}`);
   };
 
   // Render a neutral skeleton while the usage query resolves on first load so
@@ -560,7 +563,7 @@ export function MockDraftPage(): React.JSX.Element {
             inviteCode={pendingInvite.inviteCode}
             onContinue={() =>
               navigate(
-                `/${pendingInvite.sport}/league/${pendingInvite.leagueId}/draft`,
+                `/${pendingInvite.sport}/mock-draft/${String(pendingInvite.draftId)}`,
               )
             }
           />
@@ -580,7 +583,7 @@ export function MockDraftPage(): React.JSX.Element {
           void handleStart(s);
         }}
         loading={loading}
-        error={error?.message ?? missingLeagueIdError}
+        error={error?.message ?? missingDraftIdError}
         footballMockEnabled={footballMockEnabled}
         initialNumTeams={initialNumTeams}
         initialDraftOrder={initialDraftOrder}

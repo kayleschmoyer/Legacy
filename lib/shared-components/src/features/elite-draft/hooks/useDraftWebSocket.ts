@@ -174,7 +174,11 @@ export function useDraftWebSocket({
 
   const handleDraftPickMade = useCallback(
     (notification: DraftPickNotification) => {
-      const pickTeamId = normalizeTeamId(notification.teamId);
+      // A mock-draft pick carries no team — the seat is its key, and the
+      // board's "team" ids are seat ids in that mode (LS-10076).
+      const pickTeamId = normalizeTeamId(
+        notification.teamId ?? notification.participantId,
+      );
       const isMyTeamPick = pickTeamId !== null && pickTeamId === myTeamId;
 
       const pickKey = notification.overallPick;
@@ -255,7 +259,8 @@ export function useDraftWebSocket({
       );
 
       if (notification.nextPick) {
-        const nextTeamIdRaw = notification.nextPick.teamId;
+        const nextTeamIdRaw =
+          notification.nextPick.teamId ?? notification.nextPick.participantId;
         const nextTeamId = normalizeTeamId(
           typeof nextTeamIdRaw === 'number'
             ? nextTeamIdRaw

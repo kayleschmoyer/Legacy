@@ -10,7 +10,8 @@ import { ClientNotificationType } from '@legacy-sports/utils';
  */
 export interface DraftCompletedNotification {
   type: typeof ClientNotificationType.DRAFT_COMPLETED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   /** Absent from servers before LS-10075; `null` for a legacy queued draft. */
   draftId?: number | null;
   selectionMethod: string;
@@ -19,7 +20,8 @@ export interface DraftCompletedNotification {
 
 export interface DraftStartedNotification {
   type: typeof ClientNotificationType.DRAFT_STARTED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   draftId: number;
   draftOrder: string;
   teamCount: number;
@@ -30,10 +32,14 @@ export interface DraftStartedNotification {
 
 export interface DraftPickNotification {
   type: typeof ClientNotificationType.DRAFT_PICK_MADE;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   draftId: number;
   pickId: number;
-  teamId: number;
+  /** `null` for a mock-draft seat: key on `participantId` (LS-10076). */
+  teamId: number | null;
+  /** The seat that made the pick. Absent from servers before LS-10076. */
+  participantId?: number;
   playerId: number;
   round: number;
   pickNumber: number;
@@ -43,7 +49,8 @@ export interface DraftPickNotification {
   autoPickReason: string | null;
   currentPickDeadline: string | null;
   nextPick?: {
-    teamId: number;
+    teamId: number | null;
+    participantId?: number;
     round: number;
     pickNumber: number;
     overallPick: number;
@@ -52,7 +59,8 @@ export interface DraftPickNotification {
 
 export interface DraftPausedNotification {
   type: typeof ClientNotificationType.DRAFT_PAUSED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   /** Absent from servers before LS-10075. */
   draftId?: number | null;
   pausedAt: string;
@@ -60,11 +68,12 @@ export interface DraftPausedNotification {
 
 export interface DraftPickUndoneNotification {
   type: typeof ClientNotificationType.DRAFT_PICK_UNDONE;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   draftId: number;
   undonePickId: number;
   playerId: number;
-  teamId: number;
+  teamId: number | null;
   overallPick: number;
   newCurrentPick: number;
   newPickDeadline: string;
@@ -73,11 +82,43 @@ export interface DraftPickUndoneNotification {
 
 export interface DraftResumedNotification {
   type: typeof ClientNotificationType.DRAFT_RESUMED;
-  leagueId: number;
+  /** `null` for a mock draft, which has no league (LS-10076). */
+  leagueId: number | null;
   /** Absent from servers before LS-10075. */
   draftId?: number;
   currentPickDeadline: string;
   resumedAt: string;
+}
+
+/**
+ * A mock draft's lobby changed (LS-10076). The payload is thin on purpose —
+ * refetch `draftRoom` for the new seat list.
+ */
+export interface DraftLobbyUpdatedNotification {
+  type: typeof ClientNotificationType.DRAFT_LOBBY_UPDATED;
+  draftId: number;
+  reason:
+    | 'seat-claimed'
+    | 'seat-freed'
+    | 'seat-kicked'
+    | 'settings'
+    | 'host'
+    | 'expired';
+  filledSeats: number;
+  totalSeats: number;
+  updatedAt: string;
+}
+
+/** A chat message in a mock draft's own chat (LS-10076). */
+export interface DraftChatMessageNotification {
+  type: typeof ClientNotificationType.DRAFT_CHAT_MESSAGE;
+  draftId: number;
+  messageId: number;
+  senderId: number;
+  senderUsername: string;
+  messageText: string;
+  gifUrl: string | null;
+  timestamp: string;
 }
 
 export interface PlayerStatsLoadingNotification {
@@ -275,6 +316,8 @@ export type NotificationData =
   | DraftPickUndoneNotification
   | DraftPausedNotification
   | DraftResumedNotification
+  | DraftLobbyUpdatedNotification
+  | DraftChatMessageNotification
   | PlayerStatsLoadingNotification
   | PlayerStatsUpdatedNotification
   | MatchupStatsCompleteNotification

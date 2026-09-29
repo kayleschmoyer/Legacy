@@ -23,6 +23,8 @@ const verifyLeagueMembership = jest.fn();
 // reference in the query can come from the LS-8065 positional filter. Held at
 // module scope so tests can assert the settings the resolver passes through.
 const buildEligibilityConditions = jest.fn(() => [] as unknown[]);
+/** `draft_participants.id` of the seat the caller's team holds (LS-10076). */
+const SEAT_ID = 900;
 
 /**
  * The league settings the resolver sees. Since LS-10074 they arrive as
@@ -116,14 +118,23 @@ async function captureResolver(): Promise<
   // The board guards on the draft since LS-10074. authorizeDraft's
   // 'participate' branch *is* verifyLeagueMembership, so the stub delegates to
   // the same mock the tests below drive — membership drives the caller's team,
-  // exactly as before.
+  // exactly as before, and the authorization resolves that team's seat
+  // (LS-10076: the board's roster needs are keyed by seat, not team).
   jest.doMock('./authorize-draft', () => ({
-    authorizeDraft: jest.fn(async () => ({
-      draft: { id: 100, leagueId: 7, kind: 'league' },
-      seat: null,
-      role: 'participant',
-      membership: (await verifyLeagueMembership()) as unknown,
-    })),
+    authorizeDraft: jest.fn(async () => {
+      const membership = (await verifyLeagueMembership()) as {
+        teamId: number | null;
+      } | null;
+      return {
+        draft: { id: 100, leagueId: 7, kind: 'league' },
+        seat:
+          membership?.teamId == null
+            ? null
+            : { id: SEAT_ID, draftId: 100, teamId: membership.teamId },
+        role: 'participant',
+        membership,
+      };
+    }),
     authorizeLoadedDraft: jest.fn(),
   }));
 
@@ -225,14 +236,15 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
-    // Unfilled positions are computed for the caller's own team, sport-aware
-    // (LS-9479).
+    // Unfilled positions are computed for the caller's own seat, sport-aware
+    // (LS-9479). The seat (`draft_participants.id`), not the team, is what
+    // keys a draft's picks since LS-10076.
     // Positional requirements route through DraftRules since LS-10074 /
     // LS-10086 — the rules carry both the roster and the sport.
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
       db,
       100,
-      11,
+      SEAT_ID,
       expect.objectContaining({ sport: 'baseball', rosterPositions: ['C'] }),
     );
     expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(
@@ -245,14 +257,14 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     expect(params).toEqual(expect.arrayContaining(['SP', 'P']));
   });
 
-  it('does not filter when the caller has no team (spectator/commissioner)', async () => {
+  it('does not filter when the caller holds no seat (spectator/commissioner)', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: null });
     const db = makeDb();
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
-    // No team ⇒ never compute requirements, never add the predicate.
+    // No team ⇒ no seat ⇒ never compute requirements, never add the predicate.
     expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
@@ -287,7 +299,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
       db,
       100,
-      11,
+      SEAT_ID,
       expect.objectContaining({ sport: 'baseball', rosterPositions: ['C'] }),
     );
     const { sql: text } = serializeExecutedQuery(db);
@@ -310,7 +322,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
       db,
       100,
-      11,
+      SEAT_ID,
       expect.objectContaining({ sport: 'football' }),
     );
     expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(

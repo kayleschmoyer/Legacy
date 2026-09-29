@@ -29,11 +29,11 @@ export default function JoinMockDraftScreen(): React.JSX.Element {
       const result = await joinMockDraft({
         variables: { inviteCode, teamName },
       });
-      const leagueId = result.data?.joinMockDraft?.team?.leagueId;
-      if (leagueId != null) {
+      const draftId = result.data?.joinMockDraft?.draftId;
+      if (draftId != null) {
         router.navigate({
-          pathname: '/DraftBoardPage',
-          params: { leagueId: String(leagueId) },
+          pathname: '/mock-draft/[draftId]',
+          params: { draftId: String(draftId) },
         });
       }
     } catch (err) {

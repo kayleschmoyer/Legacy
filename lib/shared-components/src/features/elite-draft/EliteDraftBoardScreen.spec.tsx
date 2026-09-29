@@ -112,6 +112,25 @@ jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
+// LS-10076 — a mock draft's pre-draft view is MockDraftLobby, driven by the
+// lobby mutations in `useMockDraftLobby`. The hook calls useMutation directly,
+// so it needs a double here the way the other draft hooks do.
+jest.mock('./hooks/useMockDraftLobby', () => ({
+  useMockDraftLobby: jest.fn(() => ({
+    error: null,
+    starting: false,
+    handleStart: jest.fn(),
+    handleKick: jest.fn(),
+    handleToggleVisibility: jest.fn(),
+    handleLeave: jest.fn(),
+  })),
+}));
+jest.mock('./MockDraftLobby', () => ({
+  MockDraftLobby: ({ inviteCode }: { inviteCode?: string | null }) => (
+    <div data-testid="mock-draft-lobby" data-invite-code={inviteCode ?? ''} />
+  ),
+}));
+
 jest.mock('./auction/AuctionDraftRoom', () => ({
   AuctionDraftRoom: () => <div data-testid="auction-draft-room" />,
 }));
@@ -574,9 +593,35 @@ function makeBaseUI(
   } as unknown as ReturnType<typeof useDraftUIState>;
 }
 
+/** Shape of the `league` fixture the derived values below are read from. */
+type LeagueFixture = {
+  draftStatus?: string | null;
+  isMockDraft?: boolean | null;
+  isOfflineDraft?: boolean | null;
+  controlAllTeams?: boolean | null;
+  maxRosterSize?: number | null;
+  sport?: string | null;
+  name?: string | null;
+} | null;
+
 function makeBaseQueries(
   overrides: Partial<ReturnType<typeof useDraftQueries>> = {},
 ) {
+  // LS-10076: the board no longer reads status/roster size/mock-ness off
+  // `league` — `useDraftQueries` derives them from whichever source it loaded
+  // (the league, or `draftRoom` in draft-room mode). In league mode they
+  // mirror the league, so derive them from the fixture here and let a test
+  // still override any of them explicitly.
+  const league =
+    'league' in overrides
+      ? (overrides.league as LeagueFixture)
+      : {
+          draftStatus: 'in-progress',
+          isMockDraft: false,
+          sport: null,
+          name: 'Test League',
+        };
+
   return {
     leagueLoading: false,
     availablePlayersLoading: false,
@@ -629,6 +674,18 @@ function makeBaseQueries(
     refetchQueue: jest.fn(),
     refetchAutoPickStatuses: jest.fn(),
     handleLoadMorePlayers: jest.fn(),
+    // Draft-room mode is off by default — these tests cover the league draft.
+    room: null,
+    isRoomMode: false,
+    refetchRoom: jest.fn(),
+    // Derived board values (LS-10076).
+    draftStatus: league?.draftStatus ?? null,
+    maxRosterSize: league?.maxRosterSize ?? null,
+    isMockDraft: league?.isMockDraft === true,
+    isOfflineDraft: league?.isOfflineDraft === true,
+    controlAllTeams: league?.controlAllTeams === true,
+    draftSport: league?.sport ?? null,
+    draftTitle: league?.name ?? null,
     ...overrides,
   } as unknown as ReturnType<typeof useDraftQueries>;
 }
@@ -1539,7 +1596,9 @@ function setupCompactLiveDraft({
   mockUseDraftViewportTier.mockReturnValue('phone');
   mockUseDraftUIState.mockReturnValue({ ...makeBaseUI(), ...ui });
   mockUseDraftQueries.mockReturnValue({
-    ...makeBaseQueries(),
+    // Passed through makeBaseQueries so a `league` override still drives the
+    // derived board values (draftStatus, isMockDraft, …) (LS-10076).
+    ...makeBaseQueries(queries),
     leagueTeams: TEAMS,
     boardOrderedTeams: TEAMS,
     myTeamId: 1,
@@ -1750,7 +1809,10 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
   // LS-9253: Control All Teams — every team's turn is pickable, not just the
   // human's own seat, routed through commissionerPick (not makeDraftPick)
   // since the current-clock team isn't the human's own registered team.
-  it("offers a first-class DRAFT action (not ASSIGN) on another team's turn when Control All Teams is on, and routes the pick through commissionerPick", () => {
+  // LS-10076: a mock draft has no commissioner, so a Control All Teams pick
+  // for another seat goes through makeDraftPick (whose turn check recognises
+  // the host) rather than the league-only commissionerPick tool.
+  it("offers a first-class DRAFT action (not ASSIGN) on another team's turn when Control All Teams is on, and routes the pick through makeDraftPick", () => {
     const handleMakePick = jest.fn();
     const handleCommissionerPick = jest.fn();
     setupCompactLiveDraft({
@@ -1780,8 +1842,8 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(browser.getAttribute('data-draft-action-label')).toBe('DRAFT');
     fireEvent.click(screen.getByText('draft-player'));
 
-    expect(handleCommissionerPick).toHaveBeenCalledWith(7);
-    expect(handleMakePick).not.toHaveBeenCalled();
+    expect(handleMakePick).toHaveBeenCalledWith(7);
+    expect(handleCommissionerPick).not.toHaveBeenCalled();
   });
 
   it('labels a real commissioner override ASSIGN and routes it through commissionerPick', () => {

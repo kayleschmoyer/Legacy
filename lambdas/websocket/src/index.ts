@@ -322,26 +322,56 @@ function isDraftViewContext(viewContext: string | undefined): boolean {
  * `lambdas/db/src/schema/drafts/authorize-draft.ts`. That guard is bound to
  * the GraphQL `Context` inside the db lambda, so it can't be called from
  * here; its league branch is the league channel's read check, which is
- * reused rather than restated. Mock drafts are refused, as `authorizeDraft`
- * refuses them, until LS-10076 lands the mock branch in both places.
+ * reused rather than restated.
  *
- * @returns the draft's league, which presence payloads carry.
+ * The mock branch (LS-10076) mirrors `authorizeDraft`'s: a seat holder reads
+ * the draft, and nobody else does — a mock draft has no spectators. A
+ * lobby-preview connection additionally accepts an open public lobby or a
+ * pending invitation. It cannot accept an invite code, which the socket
+ * handshake does not carry; a code holder loads `draftRoom` over GraphQL
+ * first and joins a seat before opening the socket. **The two checks must
+ * stay equivalent** — that is the whole reason this comment exists.
+ *
+ * @returns the draft's league, which presence payloads carry. `null` for a
+ *   mock draft, which has none.
  */
 async function validateDraftAccess(
   userId: number,
   draftId: number,
+  viewContext?: string,
 ): Promise<{ hasAccess: boolean; leagueId: number | null }> {
   return runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
     const [draft] = await db
       .select({
         leagueId: PublicSchema.drafts.leagueId,
         kind: PublicSchema.drafts.kind,
+        status: PublicSchema.drafts.status,
+        isPublic: PublicSchema.drafts.isPublic,
+        lobbyExpiresAt: PublicSchema.drafts.lobbyExpiresAt,
       })
       .from(PublicSchema.drafts)
       .where(eq(PublicSchema.drafts.id, draftId))
       .limit(1);
 
-    if (!draft || draft.kind === 'mock') {
+    if (!draft) {
+      return { hasAccess: false, leagueId: null };
+    }
+
+    if (draft.kind === 'mock') {
+      return {
+        hasAccess: await hasMockDraftReadAccess(
+          db,
+          userId,
+          draftId,
+          draft,
+          viewContext,
+        ),
+        leagueId: null,
+      };
+    }
+
+    if (draft.leagueId === null) {
+      // CHECK drafts_kind_league_ck makes this unreachable for a league draft.
       return { hasAccess: false, leagueId: null };
     }
 
@@ -350,6 +380,61 @@ async function validateDraftAccess(
       leagueId: draft.leagueId,
     };
   });
+}
+
+/**
+ * The mock-draft equivalent of {@link hasLeagueReadAccess} (LS-10076): access
+ * is the seat, plus the pre-join lobby view for a lobby-preview connection.
+ */
+async function hasMockDraftReadAccess(
+  db: PublicDb,
+  userId: number,
+  draftId: number,
+  draft: {
+    status: string;
+    isPublic: boolean;
+    lobbyExpiresAt: Date | null;
+  },
+  viewContext: string | undefined,
+): Promise<boolean> {
+  const seat = await db
+    .select({ id: PublicSchema.draftParticipants.id })
+    .from(PublicSchema.draftParticipants)
+    .where(
+      and(
+        eq(PublicSchema.draftParticipants.draftId, draftId),
+        eq(PublicSchema.draftParticipants.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (seat.length > 0) return true;
+
+  if (viewContext !== DRAFT_PREVIEW_VIEW_CONTEXT) return false;
+
+  const lobbyOpen =
+    draft.status === 'not-started' &&
+    (draft.lobbyExpiresAt === null || draft.lobbyExpiresAt > new Date());
+
+  if (!lobbyOpen) return false;
+  if (draft.isPublic) return true;
+
+  const invitation = await db
+    .select({ expiresAt: PublicSchema.invitations.expiresAt })
+    .from(PublicSchema.invitations)
+    .where(
+      and(
+        eq(PublicSchema.invitations.draftId, draftId),
+        eq(PublicSchema.invitations.invitedUserId, userId),
+        eq(PublicSchema.invitations.status, 'pending'),
+      ),
+    )
+    .limit(1);
+
+  return (
+    invitation.length > 0 &&
+    (invitation[0].expiresAt === null || invitation[0].expiresAt > new Date())
+  );
 }
 
 /**
@@ -561,7 +646,7 @@ async function handleConnect(
         };
       }
 
-      const access = await validateDraftAccess(userId, draftId);
+      const access = await validateDraftAccess(userId, draftId, viewContext);
       if (!access.hasAccess) {
         LOGGER.warn('User does not have access to draft', { userId, draftId });
         return {
@@ -1056,7 +1141,11 @@ async function handleUpdateContext(
         };
       }
 
-      const access = await validateDraftAccess(userId, data.draftId);
+      const access = await validateDraftAccess(
+        userId,
+        data.draftId,
+        effectiveViewContext,
+      );
       if (!access.hasAccess) {
         LOGGER.warn('User does not have access to draft in updateContext', {
           userId,
