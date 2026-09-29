@@ -892,21 +892,29 @@ export default function PricingPage() {
                       />
                     ))}
                   </XStack>
-                  <Paragraph
-                    size="$3"
-                    color="$gray11"
-                    fontStyle="italic"
-                    marginBottom={0}
-                  >
-                    &ldquo;{t.quote}&rdquo;
-                  </Paragraph>
-                  <YStack gap="$0.5">
-                    <Paragraph size="$3" fontWeight="700" marginBottom={0}>
-                      {t.author}
+                  <YStack tag="blockquote" gap="$3" margin={0}>
+                    <Paragraph
+                      size="$3"
+                      color="$gray11"
+                      fontStyle="italic"
+                      marginBottom={0}
+                    >
+                      &ldquo;{t.quote}&rdquo;
                     </Paragraph>
-                    <Paragraph size="$2" color="$gray10" marginBottom={0}>
-                      {t.meta}
-                    </Paragraph>
+                    <YStack gap="$0.5">
+                      <Paragraph
+                        tag="cite"
+                        size="$3"
+                        fontWeight="700"
+                        fontStyle="normal"
+                        marginBottom={0}
+                      >
+                        {t.author}
+                      </Paragraph>
+                      <Paragraph size="$2" color="$gray10" marginBottom={0}>
+                        {t.meta}
+                      </Paragraph>
+                    </YStack>
                   </YStack>
                 </TestimonialCard>
               ))}

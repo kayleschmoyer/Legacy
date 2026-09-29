@@ -77,9 +77,10 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
     H3: ({ children, ...rest }: ChildrenProps) => (
       <h3 {...mockDomProps(rest)}>{children}</h3>
     ),
-    Paragraph: ({ children, ...rest }: ChildrenProps) => (
-      <p {...mockDomProps(rest)}>{children}</p>
-    ),
+    Paragraph: ({ children, tag, ...rest }: ChildrenProps) => {
+      const Tag = (typeof tag === 'string' ? tag : 'p') as 'p';
+      return <Tag {...mockDomProps(rest)}>{children}</Tag>;
+    },
     XStack: PassThrough,
     YStack: PassThrough,
   };
@@ -189,6 +190,30 @@ describe('PricingPage — Help Center link (LS-7186)', () => {
     expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('href', '/help');
     expect(link).toHaveTextContent('Visit our Help Center');
+  });
+});
+
+// LS-7201: testimonials must use blockquote + cite semantics for a11y/SEO.
+describe('PricingPage — testimonial semantics (LS-7201)', () => {
+  it('renders each testimonial as a blockquote with the author in a cite', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    const { container } = render(<PricingPage />);
+
+    const quotes = container.querySelectorAll('blockquote');
+    expect(quotes.length).toBeGreaterThan(0);
+    quotes.forEach((quote) => {
+      const cite = quote.querySelector('cite');
+      expect(cite).not.toBeNull();
+      expect(cite?.textContent?.trim()).not.toBe('');
+      expect(quote.querySelector('p')?.textContent).toMatch(/^“.+”$/);
+    });
   });
 });
 
