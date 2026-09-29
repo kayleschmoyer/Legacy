@@ -26,6 +26,7 @@ import {
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
+import { useImageLoadError } from '../../hooks/useImageLoadError';
 import { trackSignOut } from '../../utils/analytics';
 
 /** Preset avatars are stored as relative paths; the API requires absolute HTTPS URLs. */
@@ -241,9 +242,10 @@ const ProfileSettingsPage: React.FC = () => {
     () => new AuthService(auth.config),
     [auth.config],
   );
-  const [imageError, setImageError] = useState(false);
   const userName = user?.username ?? '';
   const userImage = user?.picture ?? null;
+  const { hasError: imageError, onError: onImageError } =
+    useImageLoadError(userImage);
   const accessLevel = user?.accessLevel ?? 'none';
 
   const mfa = useMfa(authService);
@@ -497,8 +499,7 @@ const ProfileSettingsPage: React.FC = () => {
                         borderRadius: '50%',
                         objectFit: 'cover',
                       }}
-                      onError={() => setImageError(true)}
-                      onLoad={() => setImageError(false)}
+                      onError={onImageError}
                     />
                   ) : (
                     <Paragraph
