@@ -5,6 +5,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { randomBytes } from 'node:crypto';
 import { builder } from './builder';
 import { requireAdmin, requireAuth } from './authorization';
+import { validateAvatarUrl } from './validate-avatar-url';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -472,10 +473,7 @@ builder.mutationField('updateUserAvatar', (t) =>
         throw AuthenticationError();
       }
 
-      const url = avatarUrl ?? null;
-      if (url !== null && url.length > 2048) {
-        throw new Error('Avatar URL cannot exceed 2048 characters');
-      }
+      const url = validateAvatarUrl(avatarUrl);
 
       const updated = await dbService.users.updateUserAvatar(
         context.user.id,
