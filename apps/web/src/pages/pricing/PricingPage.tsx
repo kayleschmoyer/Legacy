@@ -919,6 +919,7 @@ export default function PricingPage() {
                     role="button"
                     tabIndex={0}
                     aria-expanded={openFaq === i}
+                    aria-controls={`faq-panel-${i}`}
                     onKeyDown={(e: React.KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -941,7 +942,7 @@ export default function PricingPage() {
                     )}
                   </FAQQuestion>
                   {openFaq === i && (
-                    <FAQAnswer>
+                    <FAQAnswer id={`faq-panel-${i}`} role="region">
                       <Paragraph size="$3" color="$gray11" marginBottom={0}>
                         {item.answer}
                       </Paragraph>

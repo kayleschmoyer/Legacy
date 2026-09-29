@@ -162,6 +162,24 @@ test.describe('Pricing page — FAQ section @regression', () => {
       timeout: 3_000,
     });
   });
+
+  // LS-7175: the question's aria-controls must point at the answer region.
+  test('FAQ question is linked to its answer panel via aria-controls', async ({
+    page,
+  }) => {
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    const firstFaq = page.getByTestId('pricing-faq-item-0');
+    await expect(firstFaq).toBeVisible({ timeout: 10_000 });
+
+    const question = firstFaq.getByRole('button', { expanded: false });
+    await expect(question).toHaveAttribute('aria-controls', 'faq-panel-0');
+
+    await question.click();
+    const panel = page.locator('#faq-panel-0');
+    await expect(panel).toHaveAttribute('role', 'region', { timeout: 3_000 });
+  });
 });
 
 // ---------------------------------------------------------------------------
