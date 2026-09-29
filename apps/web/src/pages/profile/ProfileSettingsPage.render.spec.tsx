@@ -35,6 +35,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
   const Passthrough = ({ children }: ChildrenProps) => <div>{children}</div>;
   return {
     AvatarPicker: () => null,
+    Dialog: () => null,
     H1: Passthrough,
     Paragraph: Passthrough,
     Separator: () => <hr />,
