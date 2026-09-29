@@ -105,8 +105,15 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
       setEditingUsername(false);
       setUsernameError(null);
     } catch (err) {
-      LOGGER.error('Failed to update username:', String(err));
-      setUsernameError('Failed to update username. It may already be taken.');
+      LOGGER.error(
+        'Failed to update username:',
+        err instanceof Error ? err : String(err),
+      );
+      setUsernameError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to update username. Please try again.',
+      );
     }
   }, [usernameInput, updateUsername, refetchUser]);
 

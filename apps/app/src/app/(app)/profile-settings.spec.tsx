@@ -332,6 +332,31 @@ describe('ProfileSettingsScreen', () => {
         });
       });
     });
+
+    it('shows the server error message when the updateUsername mutation rejects', async () => {
+      mockUpdateUsername.mockRejectedValueOnce(new Error('Username is taken'));
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Edit'));
+      fireEvent.changeText(screen.getByDisplayValue('testuser'), 'newusername');
+      fireEvent.press(screen.getByText('Save'));
+      await waitFor(() => {
+        expect(screen.getByText('Username is taken')).toBeTruthy();
+      });
+      expect(screen.queryByText(/may already be taken/)).toBeNull();
+    });
+
+    it('falls back to a generic message when the rejection is not an Error', async () => {
+      mockUpdateUsername.mockRejectedValueOnce('boom');
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Edit'));
+      fireEvent.changeText(screen.getByDisplayValue('testuser'), 'newusername');
+      fireEvent.press(screen.getByText('Save'));
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to update username. Please try again.'),
+        ).toBeTruthy();
+      });
+    });
   });
 
   describe('sign out', () => {
