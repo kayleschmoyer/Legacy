@@ -29,6 +29,16 @@ import { PageMeta } from '../../components/PageMeta';
 const resolvePresetUrl = (url: string): string =>
   `${window.location.origin}${url}`;
 
+/**
+ * LS-7231: initial shown in the avatar circle when there is no (loadable)
+ * image. A transiently empty username (signup / partial load) must not render
+ * an invisible avatar, so fall back username → email → '?'.
+ */
+export function getAvatarInitial(userName: string, userEmail: string): string {
+  const source = userName.trim() || userEmail.trim();
+  return source.charAt(0).toUpperCase() || '?';
+}
+
 /* ─── Styled Components ─── */
 
 const PageContainer = styled(YStack, {
@@ -490,7 +500,7 @@ const ProfileSettingsPage: React.FC = () => {
                         lineHeight: '1' as unknown as number,
                       }}
                     >
-                      {userName.charAt(0).toUpperCase()}
+                      {getAvatarInitial(userName, userEmail)}
                     </Paragraph>
                   )}
                 </AvatarCircle>
