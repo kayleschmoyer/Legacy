@@ -44,6 +44,15 @@ describe('deriveIsPremium', () => {
     expect(deriveIsPremium({ tier: 'free' })).toBe(false);
   });
 
+  // LS-7389: corrupt row (e.g. a partial write left `status` active after the
+  // tier was downgraded). `tier` alone decides, so a stale `status` can never
+  // inflate access. Do NOT "fix" this by also requiring an active/trialing
+  // status — that reintroduces the LS-5177 grace-period bug (past_due + premium).
+  it('LS-7389: returns false for a corrupt row with status active but tier free', () => {
+    const corruptRow = { status: 'active', tier: 'free' };
+    expect(deriveIsPremium(corruptRow)).toBe(false);
+  });
+
   it('returns false when there is no subscription', () => {
     expect(deriveIsPremium(null)).toBe(false);
     expect(deriveIsPremium(undefined)).toBe(false);
