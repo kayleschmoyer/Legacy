@@ -33,6 +33,7 @@ import {
   useUpdateNotificationPreferencesMutation,
   useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
+import { lightSurface } from '@legacy-sports/design-tokens';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
 import { useCoalescedSave } from './useCoalescedSave';
 import { PageMeta } from '../../components/PageMeta';
@@ -513,17 +514,17 @@ function getCardStyle(isDark: boolean, navyStop = 100): React.CSSProperties {
 
 function getSystemSwatchStyle(): React.CSSProperties {
   return {
-    background: 'linear-gradient(90deg, #0A0F1A 50%, #F5F7FA 50%)',
+    background: `linear-gradient(90deg, ${BG_DARK} 50%, ${lightSurface.surfaceCard} 50%)`,
   };
 }
 
 function getLightSwatchStyle(): React.CSSProperties {
-  return { background: '#F5F7FA' };
+  return { background: lightSurface.surfaceCard };
 }
 
 function getDarkSwatchStyle(): React.CSSProperties {
   return {
-    background: `linear-gradient(135deg, #0A0F1A 30%, ${withAlpha(BRAND_NAVY, 0.45)} 100%)`,
+    background: `linear-gradient(135deg, ${BG_DARK} 30%, ${withAlpha(BRAND_NAVY, 0.45)} 100%)`,
   };
 }
 
