@@ -754,7 +754,13 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                       <Text flex={1} fontSize="$3" color="$color">
                         {feature.label}
                       </Text>
-                      <Text width={60} textAlign="center" fontSize="$4">
+                      <Text
+                        width={60}
+                        textAlign="center"
+                        fontSize="$4"
+                        accessibilityRole="text"
+                        accessibilityLabel={`${feature.label}: ${feature.free ? 'Included' : 'Not included'} on Free`}
+                      >
                         {feature.free ? '✓' : '—'}
                       </Text>
                       <Text
@@ -762,6 +768,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                         textAlign="center"
                         fontSize="$4"
                         color={brand.gold}
+                        accessibilityRole="text"
+                        accessibilityLabel={`${feature.label}: ${feature.premium ? 'Included' : 'Not included'} on Premium`}
                       >
                         {feature.premium ? '✓' : '—'}
                       </Text>

@@ -11,7 +11,11 @@ import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Component under test ─────────────────────────────────────────────────────
 import SubscriptionSettingsScreen from './SubscriptionSettingsScreen';
-import { ACTIVATION_MAX_POLLS, ACTIVATION_POLL_INTERVAL_MS } from './constants';
+import {
+  ACTIVATION_MAX_POLLS,
+  ACTIVATION_POLL_INTERVAL_MS,
+  PREMIUM_FEATURES,
+} from './constants';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 type RNComponents = {
@@ -98,8 +102,21 @@ jest.mock('tamagui', () => {
       <Text>{children}</Text>
     ),
     Separator: passthrough('separator'),
-    Text: ({ children }: { children?: React.ReactNode }) => (
-      <Text>{children}</Text>
+    Text: ({
+      children,
+      accessibilityLabel,
+      accessibilityRole,
+    }: {
+      children?: React.ReactNode;
+      accessibilityLabel?: string;
+      accessibilityRole?: 'text';
+    }) => (
+      <Text
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={accessibilityRole}
+      >
+        {children}
+      </Text>
     ),
     XStack: passthrough(),
     YStack: passthrough(),
@@ -280,6 +297,47 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
     expect(screen.getAllByText('Free')).toHaveLength(2);
     // Only the "Premium" feature-comparison header.
     expect(screen.getAllByText('Premium')).toHaveLength(1);
+  });
+});
+
+describe('SubscriptionSettingsScreen — comparison table a11y (LS-7395)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+    // The comparison card only renders for non-Premium users.
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium: false,
+      tier: 'free',
+      loading: false,
+      refetch: mockRefetch,
+    });
+  });
+
+  it('gives every Free/Premium indicator cell a column- and state-aware label', () => {
+    render(<SubscriptionSettingsScreen />);
+
+    for (const feature of PREMIUM_FEATURES) {
+      const free = `${feature.label}: ${feature.free ? 'Included' : 'Not included'} on Free`;
+      const premium = `${feature.label}: ${feature.premium ? 'Included' : 'Not included'} on Premium`;
+      expect(screen.getByLabelText(free)).toHaveTextContent(
+        feature.free ? '✓' : '—',
+      );
+      expect(screen.getByLabelText(premium)).toHaveTextContent(
+        feature.premium ? '✓' : '—',
+      );
+    }
+  });
+
+  it('distinguishes a Free-excluded, Premium-included feature', () => {
+    render(<SubscriptionSettingsScreen />);
+
+    expect(
+      screen.getByLabelText('Salary cap leagues: Not included on Free'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Salary cap leagues: Included on Premium'),
+    ).toBeTruthy();
   });
 });
 
