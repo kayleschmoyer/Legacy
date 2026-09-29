@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  Dialog,
   H1,
   Paragraph,
   Separator,
@@ -279,6 +280,9 @@ const ProfileSettingsPage: React.FC = () => {
     string | null
   >(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
+  const [pendingUnlinkProvider, setPendingUnlinkProvider] = useState<
+    'discord' | 'google' | 'apple' | null
+  >(null);
 
   useEffect(() => {
     if (!isEditingUsername) {
@@ -390,12 +394,7 @@ const ProfileSettingsPage: React.FC = () => {
 
   const handleUnlinkProvider = useCallback(
     async (provider: 'discord' | 'google' | 'apple') => {
-      if (
-        !window.confirm(
-          `Are you sure you want to disconnect your ${provider.charAt(0).toUpperCase() + provider.slice(1)} account?`,
-        )
-      )
-        return;
+      setPendingUnlinkProvider(null);
       setUnlinkLoadingProvider(provider);
       setUnlinkError(null);
       try {
@@ -413,6 +412,11 @@ const ProfileSettingsPage: React.FC = () => {
     },
     [authService, refetchUser, refetchIdentities],
   );
+
+  const pendingUnlinkLabel = pendingUnlinkProvider
+    ? pendingUnlinkProvider.charAt(0).toUpperCase() +
+      pendingUnlinkProvider.slice(1)
+    : 'account';
 
   if (!user) {
     return null;
@@ -892,7 +896,7 @@ const ProfileSettingsPage: React.FC = () => {
                           {identity.provider !== 'local' ? (
                             <EditButton
                               onPress={() =>
-                                void handleUnlinkProvider(
+                                setPendingUnlinkProvider(
                                   identity.provider as
                                     | 'discord'
                                     | 'google'
@@ -934,6 +938,25 @@ const ProfileSettingsPage: React.FC = () => {
                   {unlinkError}
                 </Paragraph>
               ) : null}
+
+              <Dialog
+                open={pendingUnlinkProvider !== null}
+                onOpenChange={(open) => {
+                  if (!open) setPendingUnlinkProvider(null);
+                }}
+                eyebrow="Connected accounts"
+                title={`Disconnect ${pendingUnlinkLabel}?`}
+                description={`You will no longer be able to sign in with ${pendingUnlinkLabel}. You can reconnect it at any time from this page.`}
+                confirmLabel="Disconnect"
+                cancelLabel="Keep connected"
+                destructive
+                onCancel={() => setPendingUnlinkProvider(null)}
+                onConfirm={() => {
+                  if (pendingUnlinkProvider) {
+                    void handleUnlinkProvider(pendingUnlinkProvider);
+                  }
+                }}
+              />
 
               {/* Legacy Discord connect button when no identities loaded yet */}
               {auth.config.discordClientId &&
