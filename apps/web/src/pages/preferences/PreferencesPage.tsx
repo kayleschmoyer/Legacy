@@ -1589,8 +1589,7 @@ const PreferencesPage: React.FC = () => {
                       Stats format
                     </Paragraph>
                     <Paragraph size="$3" color="$colorPress">
-                      Standard shows the headlines. Expanded adds advanced
-                      metrics like wRC+, BABIP, and split splits.
+                      How statistics are presented in player and team views.
                     </Paragraph>
                   </PrefLabel>
                   <Segmented<StatsFormat>
