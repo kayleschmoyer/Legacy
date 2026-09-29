@@ -23,6 +23,7 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
+import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
 
@@ -1069,7 +1070,7 @@ const ProfileSettingsPage: React.FC = () => {
                   role="button"
                   tabIndex={0}
                   onPress={() => {
-                    void auth.logout?.();
+                    signOut(auth);
                   }}
                   onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
                     if (e.repeat) {
@@ -1079,7 +1080,7 @@ const ProfileSettingsPage: React.FC = () => {
                       if (e.key === ' ') {
                         e.preventDefault();
                       }
-                      void auth.logout?.();
+                      signOut(auth);
                     }
                   }}
                 >
