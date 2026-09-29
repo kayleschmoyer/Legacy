@@ -782,19 +782,37 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
           marginBottom="$2"
         >
           {STEPS.map((s, i) => (
-            <YStack
+            // Native <button> gives Tab focus plus Enter/Space activation; the
+            // padding enlarges the 4px bar into a usable click target.
+            <button
               key={s.id}
-              height={4}
-              borderRadius="$10"
+              type="button"
+              data-testid={`onboarding-dot-${i + 1}`}
+              aria-label={`Go to step ${i + 1}`}
+              aria-current={i === currentStep ? 'step' : undefined}
+              onClick={() => setCurrentStep(i)}
               style={{
                 flex: i === currentStep ? 2 : 1,
-                background:
-                  i <= currentStep
-                    ? `linear-gradient(90deg, ${BRAND_SEAM_RED} 0%, ${BRAND_GOLD} 100%)`
-                    : withAlpha(BRAND_NAVY_LIGHT, 0.3),
-                transition: 'flex 0.3s ease, background 0.3s ease',
+                padding: '8px 0',
+                margin: 0,
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                transition: 'flex 0.3s ease',
               }}
-            />
+            >
+              <YStack
+                height={4}
+                borderRadius="$10"
+                style={{
+                  background:
+                    i <= currentStep
+                      ? `linear-gradient(90deg, ${BRAND_SEAM_RED} 0%, ${BRAND_GOLD} 100%)`
+                      : withAlpha(BRAND_NAVY_LIGHT, 0.3),
+                  transition: 'background 0.3s ease',
+                }}
+              />
+            </button>
           ))}
         </XStack>
 

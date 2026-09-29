@@ -155,6 +155,46 @@ test.describe('Onboarding Tutorial — navigation @regression', () => {
   });
 });
 
+// ── Tests: Progress dots (LS-6906) ────────────────────────────────────────────
+
+test.describe('Onboarding Tutorial — progress dots @regression', () => {
+  test('clicking a progress dot jumps to that step', async ({ page }) => {
+    await openTutorial(page);
+
+    await page.getByRole('button', { name: 'Go to step 4' }).click();
+    await expect(page.getByText(/step 4 of 6/i)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Dots also jump backwards.
+    await page.getByRole('button', { name: 'Go to step 2' }).click();
+    await expect(page.getByText(/step 2 of 6/i)).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test('progress dots are keyboard operable and mark the current step', async ({
+    page,
+  }) => {
+    await openTutorial(page);
+
+    const dot3 = page.getByRole('button', { name: 'Go to step 3' });
+    await dot3.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText(/step 3 of 6/i)).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(dot3).toHaveAttribute('aria-current', 'step');
+
+    const dot5 = page.getByRole('button', { name: 'Go to step 5' });
+    await dot5.focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByText(/step 5 of 6/i)).toBeVisible({
+      timeout: 10000,
+    });
+  });
+});
+
 // ── Tests: Skip / Close ───────────────────────────────────────────────────────
 
 test.describe('Onboarding Tutorial — skip and close @regression', () => {
