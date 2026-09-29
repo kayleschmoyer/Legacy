@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import {
@@ -25,6 +25,12 @@ const TOOLTIP_WIDTH = 260;
 const VIEWPORT_MARGIN = 12;
 /** Gap (px) between the anchor's top edge and the bottom of the tooltip */
 const TOOLTIP_GAP = 8;
+/**
+ * Grace period (ms) before the tooltip hides after the pointer leaves the
+ * anchor or the card.  Bridges the TOOLTIP_GAP between them so the pointer can
+ * travel from the anchor onto the card (to select its text) without closing it.
+ */
+const HIDE_DELAY_MS = 150;
 
 interface TooltipPos {
   top: number;
@@ -71,6 +77,26 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
     });
   };
 
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerOverCardRef = useRef(false);
+
+  const cancelHide = () => {
+    if (hideTimerRef.current !== null) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+
+  const scheduleHide = () => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => {
+      hideTimerRef.current = null;
+      setVisible(false);
+    }, HIDE_DELAY_MS);
+  };
+
+  useEffect(() => cancelHide, []);
+
   const tooltipId = `tooltip-${term.replace(/\s+/g, '-')}`;
 
   return (
@@ -90,15 +116,23 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
           display: 'inline',
         }}
         onMouseEnter={() => {
+          cancelHide();
           computePos();
           setVisible(true);
         }}
-        onMouseLeave={() => setVisible(false)}
+        onMouseLeave={scheduleHide}
         onFocus={() => {
+          cancelHide();
           computePos();
           setVisible(true);
         }}
-        onBlur={() => setVisible(false)}
+        onBlur={() => {
+          // Pressing the mouse on the card (to select its text) blurs a
+          // focused anchor; keep the card open while the pointer is on it.
+          if (pointerOverCardRef.current) return;
+          cancelHide();
+          setVisible(false);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             if (!visible) computePos();
@@ -115,6 +149,14 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
           <YStack
             id={tooltipId}
             role="tooltip"
+            onMouseEnter={() => {
+              pointerOverCardRef.current = true;
+              cancelHide();
+            }}
+            onMouseLeave={() => {
+              pointerOverCardRef.current = false;
+              scheduleHide();
+            }}
             style={{
               position: 'fixed',
               top: pos.top,
@@ -128,7 +170,10 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
               borderRadius: 10,
               padding: '10px 14px',
-              pointerEvents: 'none',
+              // Interactive so the text can be selected/copied/translated;
+              // hover handlers above keep the card open while it is hovered.
+              pointerEvents: 'auto',
+              cursor: 'text',
               boxShadow: `0 8px 32px ${withAlpha(BLACK, 0.5)}`,
             }}
           >
