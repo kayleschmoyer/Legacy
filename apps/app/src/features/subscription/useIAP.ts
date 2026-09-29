@@ -91,6 +91,35 @@ const iapErrorListener = purchaseErrorListener as unknown as (
   cb: (e: IAPPurchaseError) => void,
 ) => PurchaseListenerHandle;
 
+/** Longest we wait on StoreKit before giving up on a restore. */
+const RESTORE_PURCHASES_TIMEOUT_MS = 30_000;
+const RESTORE_TIMEOUT_MESSAGE = 'Restore timed out. Please try again.';
+
+class RestoreTimeoutError extends Error {}
+
+/**
+ * Races `promise` against a timer that rejects with a RestoreTimeoutError.
+ * The timer is always cleared once the race settles.
+ */
+async function withRestoreTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new RestoreTimeoutError(RESTORE_TIMEOUT_MESSAGE));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  }
+}
+
 // Product IDs as configured in App Store Connect
 export const IAP_PRODUCTS = {
   MONTHLY: 'com.legacysports.app.premium.monthly',
@@ -282,7 +311,10 @@ export function useIAP(): UseIAPResult {
     setError(null);
 
     try {
-      const rawPurchases = await iapRestore();
+      const rawPurchases = await withRestoreTimeout(
+        iapRestore(),
+        RESTORE_PURCHASES_TIMEOUT_MS,
+      );
       const purchases = rawPurchases as IAPAvailablePurchase[];
 
       const subscriptionPurchases = purchases.filter((p) =>
@@ -316,8 +348,12 @@ export function useIAP(): UseIAPResult {
       } else {
         setError('Restore failed. Please try again or contact support.');
       }
-    } catch (_err) {
-      setError('Restore failed. Please try again or contact support.');
+    } catch (err) {
+      setError(
+        err instanceof RestoreTimeoutError
+          ? RESTORE_TIMEOUT_MESSAGE
+          : 'Restore failed. Please try again or contact support.',
+      );
     } finally {
       setLoading(false);
     }
