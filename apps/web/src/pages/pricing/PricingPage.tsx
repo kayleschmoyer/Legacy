@@ -415,11 +415,32 @@ const TESTIMONIALS = [
 
 /* ─── Component ─── */
 
+const onSelectKey = (select: () => void) => (e: React.KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    select();
+  }
+};
+
 export default function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // LS-7167: the billing toggle is a two-option radiogroup. Enter/Space select
+  // the focused option (handled per option); arrow keys move selection and
+  // focus between Monthly and Annual, per the WAI-ARIA radio pattern.
+  const handleBillingKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const toAnnual = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    const toMonthly = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!toAnnual && !toMonthly) return;
+    e.preventDefault();
+    setIsAnnual(toAnnual);
+    const radios =
+      e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios[toAnnual ? 1 : 0]?.focus();
+  };
 
   // EnhancedAuthGuard sits outside BrowserRouter and only re-checks
   // window.location.pathname when it re-renders — it does not subscribe
@@ -512,10 +533,18 @@ export default function PricingPage() {
             </Paragraph>
 
             {/* Billing toggle */}
-            <ToggleContainer>
+            <ToggleContainer
+              role="radiogroup"
+              aria-label="Billing period"
+              onKeyDown={handleBillingKeyDown}
+            >
               <ToggleOption
                 active={!isAnnual}
                 onPress={() => setIsAnnual(false)}
+                role="radio"
+                aria-checked={!isAnnual}
+                tabIndex={!isAnnual ? 0 : -1}
+                onKeyDown={onSelectKey(() => setIsAnnual(false))}
               >
                 <Paragraph
                   marginBottom={0}
@@ -526,7 +555,14 @@ export default function PricingPage() {
                   Monthly
                 </Paragraph>
               </ToggleOption>
-              <ToggleOption active={isAnnual} onPress={() => setIsAnnual(true)}>
+              <ToggleOption
+                active={isAnnual}
+                onPress={() => setIsAnnual(true)}
+                role="radio"
+                aria-checked={isAnnual}
+                tabIndex={isAnnual ? 0 : -1}
+                onKeyDown={onSelectKey(() => setIsAnnual(true))}
+              >
                 <Paragraph
                   marginBottom={0}
                   fontWeight="600"

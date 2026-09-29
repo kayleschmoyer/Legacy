@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import PricingPage from './PricingPage';
 
@@ -20,12 +21,19 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 type ChildrenProps = { children?: React.ReactNode; [key: string]: unknown };
 type ButtonProps = ChildrenProps & { onPress?: () => void };
 
-// Only forward data-* attributes (used as test selectors) to the underlying
-// DOM node — Tamagui style props (fontWeight, alignItems, $sm, etc.) are not
-// valid DOM attributes and would otherwise spam React "unknown prop" warnings.
+// Only forward data-* attributes (used as test selectors) and the a11y/keyboard
+// props (role, aria-*, tabIndex, onKeyDown) to the underlying DOM node —
+// Tamagui style props (fontWeight, alignItems, $sm, etc.) are not valid DOM
+// attributes and would otherwise spam React "unknown prop" warnings.
+const FORWARDED_PROPS = new Set(['role', 'tabIndex', 'onKeyDown']);
 function mockDomProps(rest: ChildrenProps): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(rest).filter(([key]) => key.startsWith('data-')),
+    Object.entries(rest).filter(
+      ([key]) =>
+        key.startsWith('data-') ||
+        key.startsWith('aria-') ||
+        FORWARDED_PROPS.has(key),
+    ),
   );
 }
 
@@ -139,5 +147,66 @@ describe('PricingPage — Premium plan price loading state (LS-8813)', () => {
 
     expect(screen.getByTestId('plan-price-annual')).toHaveTextContent('3.33');
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+// LS-7167: the Monthly/Annual toggle must be keyboard operable.
+describe('PricingPage — billing toggle keyboard accessibility (LS-7167)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 9.99,
+      annualTotal: 99.99,
+      annualSavingsPct: '17%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  it('exposes a radiogroup with Annual checked by default and a roving tabindex', () => {
+    render(<PricingPage />);
+
+    expect(
+      screen.getByRole('radiogroup', { name: 'Billing period' }),
+    ).toBeInTheDocument();
+    const monthly = screen.getByRole('radio', { name: /Monthly/ });
+    const annual = screen.getByRole('radio', { name: /Annual/ });
+    expect(annual).toHaveAttribute('aria-checked', 'true');
+    expect(monthly).toHaveAttribute('aria-checked', 'false');
+    expect(annual).toHaveAttribute('tabindex', '0');
+    expect(monthly).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('selects the focused option with Enter and Space', async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+    const monthly = screen.getByRole('radio', { name: /Monthly/ });
+    const annual = screen.getByRole('radio', { name: /Annual/ });
+
+    monthly.focus();
+    await user.keyboard('{Enter}');
+    expect(monthly).toHaveAttribute('aria-checked', 'true');
+    expect(annual).toHaveAttribute('aria-checked', 'false');
+
+    annual.focus();
+    await user.keyboard(' ');
+    expect(annual).toHaveAttribute('aria-checked', 'true');
+    expect(monthly).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('moves selection and focus between options with the arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+    const monthly = screen.getByRole('radio', { name: /Monthly/ });
+    const annual = screen.getByRole('radio', { name: /Annual/ });
+
+    annual.focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(monthly).toHaveAttribute('aria-checked', 'true');
+    expect(monthly).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(annual).toHaveAttribute('aria-checked', 'true');
+    expect(annual).toHaveFocus();
   });
 });
