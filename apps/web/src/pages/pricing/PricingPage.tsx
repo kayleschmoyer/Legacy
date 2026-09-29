@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
   H1,
@@ -891,14 +891,19 @@ export default function PricingPage() {
               </H2>
               <Paragraph textAlign="center" color="$gray11">
                 Still have questions?{' '}
-                <Text
-                  color={BRAND_GOLD_LIGHT}
-                  cursor="pointer"
-                  onPress={() => navigate('/help')}
-                  hoverStyle={{ color: BRAND_GOLD }}
+                <Link
+                  to="/help"
+                  data-testid="pricing-help-center-link"
+                  style={{ textDecoration: 'none' }}
                 >
-                  Visit our Help Center
-                </Text>
+                  <Text
+                    color={BRAND_GOLD_LIGHT}
+                    cursor="pointer"
+                    hoverStyle={{ color: BRAND_GOLD }}
+                  >
+                    Visit our Help Center
+                  </Text>
+                </Link>
               </Paragraph>
             </SectionHeader>
 

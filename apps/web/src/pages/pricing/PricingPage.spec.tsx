@@ -8,6 +8,24 @@ import PricingPage from './PricingPage';
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
+  Link: ({
+    to,
+    children,
+    ...rest
+  }: {
+    to: string;
+    children?: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a
+      href={to}
+      {...Object.fromEntries(
+        Object.entries(rest).filter(([key]) => key.startsWith('data-')),
+      )}
+    >
+      {children}
+    </a>
+  ),
 }));
 
 jest.mock('../../components/PageMeta', () => ({
@@ -147,6 +165,27 @@ describe('PricingPage — Premium plan price loading state (LS-8813)', () => {
 
     expect(screen.getByTestId('plan-price-annual')).toHaveTextContent('3.33');
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+// LS-7186: the Help Center link must be a real anchor so middle-click,
+// open-in-new-tab and crawlers work.
+describe('PricingPage — Help Center link (LS-7186)', () => {
+  it('renders "Visit our Help Center" as an anchor pointing at /help', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    render(<PricingPage />);
+
+    const link = screen.getByTestId('pricing-help-center-link');
+    expect(link.tagName).toBe('A');
+    expect(link).toHaveAttribute('href', '/help');
+    expect(link).toHaveTextContent('Visit our Help Center');
   });
 });
 
