@@ -31,4 +31,17 @@ describe('derivePricing', () => {
     expect(result.annualTotal).toBe(0);
     expect(result.annualSavingsPct).toBe('0%');
   });
+
+  it('clamps savings to 0% when annual is more expensive than monthly * 12', () => {
+    // 1 - 6900 / (499 * 12) = -15%
+    const result = derivePricing(499, 6900);
+
+    expect(result.annualSavingsPct).toBe('0%');
+  });
+
+  it('clamps savings to 100% at most', () => {
+    const result = derivePricing(499, 0);
+
+    expect(result.annualSavingsPct).toBe('100%');
+  });
 });

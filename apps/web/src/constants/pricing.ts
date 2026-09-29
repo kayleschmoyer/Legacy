@@ -17,9 +17,10 @@ export function derivePricing(
   const annualSavings = hasValidSavingsInputs
     ? 1 - annualTotalCents / (monthlyPriceCents * 12)
     : 0;
-  const annualSavingsPct = Number.isFinite(annualSavings)
-    ? `${Math.round(annualSavings * 100)}%`
-    : '0%';
+  const annualSavingsPctValue = Number.isFinite(annualSavings)
+    ? Math.min(100, Math.max(0, Math.round(annualSavings * 100)))
+    : 0;
+  const annualSavingsPct = `${annualSavingsPctValue}%`;
 
   const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
 
