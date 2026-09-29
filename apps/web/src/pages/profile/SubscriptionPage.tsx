@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -749,7 +749,13 @@ const SubscriptionPage: React.FC = () => {
     onDismiss: onStepUpDismiss,
   } = useStepUpGate();
 
+  // LS-7406: identifies the most recent handleUpgradeAction call so a slower,
+  // earlier call cannot write a stale checkoutError after a newer call started.
+  const upgradeRequestIdRef = useRef(0);
+
   const handleUpgradeAction = async () => {
+    const requestId = ++upgradeRequestIdRef.current;
+    const isLatestRequest = () => upgradeRequestIdRef.current === requestId;
     setCheckoutError(null);
     const priceId = billingCycle === 'annual' ? annualPriceId : monthlyPriceId;
 
@@ -779,6 +785,7 @@ const SubscriptionPage: React.FC = () => {
         window.location.href = url;
         return;
       }
+      if (!isLatestRequest()) return;
       setCheckoutError(
         'Could not start checkout — please try again or contact support.',
       );
@@ -787,6 +794,7 @@ const SubscriptionPage: React.FC = () => {
         'Failed to create checkout session',
         error instanceof Error ? error : new Error(String(error)),
       );
+      if (!isLatestRequest()) return;
       setCheckoutError(
         'Could not start checkout — please try again or contact support.',
       );

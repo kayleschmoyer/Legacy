@@ -11,7 +11,7 @@
  * `SubscriptionPage.spec` basename collides in TypeScript module resolution.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SubscriptionPage from './SubscriptionPage';
 
@@ -133,11 +133,15 @@ jest.mock('../../utils/analytics', () => ({
   trackSubscriptionStarted: jest.fn(),
 }));
 
+const mockCreateCheckoutSession = jest.fn();
 const mockUseGetMySubscriptionQuery = jest.fn<MySubscriptionQueryMock, []>();
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (): MySubscriptionQueryMock =>
     mockUseGetMySubscriptionQuery(),
-  useCreateCheckoutSessionMutation: () => [jest.fn(), { loading: false }],
+  useCreateCheckoutSessionMutation: () => [
+    mockCreateCheckoutSession,
+    { loading: false },
+  ],
   useCreateBillingPortalSessionMutation: () => [jest.fn(), { loading: false }],
 }));
 
@@ -171,6 +175,14 @@ jest.mock('@legacy-sports/shared-components/auth', () => {
   return {
     ...actual,
     useAuth: jest.fn(() => ({ user: { id: 1 }, token: 'test-token' })),
+    // Fresh step-up: run the action immediately, like the real hook does when
+    // isStepUpFresh() is true (no de-duplication of repeat calls).
+    useStepUpGate: () => ({
+      isPrompting: false,
+      requireStepUp: (action: () => void | Promise<void>) => void action(),
+      onVerified: jest.fn(),
+      onDismiss: jest.fn(),
+    }),
   };
 });
 
@@ -465,6 +477,118 @@ describe('SubscriptionPage — price loading state (LS-8813)', () => {
 
     expect(screen.getByText('$39.99')).toBeInTheDocument();
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+// LS-7406: two overlapping handleUpgradeAction calls (fresh step-up runs the
+// action synchronously with no de-duplication) must only surface the latest
+// call's outcome in checkoutError — a slower, earlier call settling late is a
+// no-op.
+describe('SubscriptionPage — overlapping upgrade attempts (LS-7406)', () => {
+  const COULD_NOT_START =
+    'Could not start checkout — please try again or contact support.';
+
+  // Let promise continuations queued by the mocked mutation settle in act().
+  const flushPromises = () => act(() => Promise.resolve());
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateCheckoutSession.mockReset();
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch: jest.fn(),
+    });
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  function clickUpgrade() {
+    fireEvent.click(screen.getByText(/Upgrade to Premium — /));
+  }
+
+  it('still shows the error for a single failed attempt', async () => {
+    mockCreateCheckoutSession.mockRejectedValueOnce(new Error('boom'));
+
+    renderPage();
+    act(() => {
+      clickUpgrade();
+    });
+    await flushPromises();
+
+    expect(screen.getByText(COULD_NOT_START)).toBeInTheDocument();
+  });
+
+  it('ignores a stale error from an earlier in-flight call while a newer call is pending', async () => {
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    mockCreateCheckoutSession
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    renderPage();
+    act(() => {
+      clickUpgrade();
+      clickUpgrade();
+    });
+    await flushPromises();
+    expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(2);
+
+    // The earlier (slower) call fails after the newer one started.
+    act(() => {
+      first.reject(new Error('stale failure'));
+    });
+    await flushPromises();
+    expect(screen.queryByText(COULD_NOT_START)).not.toBeInTheDocument();
+
+    // The newer call's own outcome is still reported.
+    act(() => {
+      second.resolve({ data: { createCheckoutSession: { url: null } } });
+    });
+    await flushPromises();
+    expect(screen.getByText(COULD_NOT_START)).toBeInTheDocument();
+  });
+
+  it('does not let an earlier call overwrite the latest call after it settles', async () => {
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    mockCreateCheckoutSession
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    renderPage();
+    act(() => {
+      clickUpgrade();
+      clickUpgrade();
+    });
+    await flushPromises();
+
+    // Newer call settles first with an error, then the older one settles with
+    // an empty result — the error must remain (latest wins, no clearing).
+    act(() => {
+      second.reject(new Error('latest failure'));
+    });
+    await flushPromises();
+    expect(screen.getByText(COULD_NOT_START)).toBeInTheDocument();
+    act(() => {
+      first.resolve({ data: { createCheckoutSession: { url: null } } });
+    });
+    await flushPromises();
+    expect(screen.getByText(COULD_NOT_START)).toBeInTheDocument();
   });
 });
 
