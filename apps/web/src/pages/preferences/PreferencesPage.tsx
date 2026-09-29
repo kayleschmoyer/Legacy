@@ -34,6 +34,12 @@ import {
   useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { lightSurface } from '@legacy-sports/design-tokens';
+import {
+  clampCloseGame,
+  CLOSE_GAME_DEFAULT,
+  CLOSE_GAME_MAX,
+  CLOSE_GAME_MIN,
+} from './closeGameThreshold';
 import { CollapsibleBody } from './CollapsibleBody';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
 import { useCoalescedSave } from './useCoalescedSave';
@@ -101,10 +107,6 @@ type NotificationPatch = Partial<
   Record<NotificationToggleField, boolean> & { closeGameThreshold: number }
 >;
 
-const CLOSE_GAME_MIN = 1;
-const CLOSE_GAME_MAX = 200;
-const CLOSE_GAME_DEFAULT = 50;
-
 function loadPrefs(): UserPreferences {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
@@ -124,11 +126,6 @@ function savePrefs(prefs: UserPreferences): void {
   } catch {
     // Best-effort persistence; ignore storage errors (private mode, quota).
   }
-}
-
-function clampCloseGame(n: number): number {
-  if (Number.isNaN(n)) return CLOSE_GAME_DEFAULT;
-  return Math.min(CLOSE_GAME_MAX, Math.max(CLOSE_GAME_MIN, Math.round(n)));
 }
 
 /* ─── Collapsible section helpers ─── */
