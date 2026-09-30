@@ -137,7 +137,8 @@ export function requireCheckoutEmail(email: string | null | undefined): string {
 }
 
 // Allowlist of valid Stripe Price IDs for subscription plans.
-// When populated, only these IDs are accepted in createCheckoutSession.
+// Only these IDs are accepted in createCheckoutSession; an empty set rejects
+// every ID (fail closed, LS-7421).
 const STRIPE_ALLOWED_PRICE_IDS: ReadonlySet<string> = new Set(
   [
     process.env['STRIPE_MONTHLY_PRICE_ID'],
@@ -716,10 +717,25 @@ builder.mutationField('createCheckoutSession', (t) =>
         );
       }
 
-      if (
-        STRIPE_ALLOWED_PRICE_IDS.size > 0 &&
-        !STRIPE_ALLOWED_PRICE_IDS.has(args.priceId)
-      ) {
+      // Fail closed (LS-7421): an empty allowlist means the env is
+      // misconfigured, so reject every price ID rather than accept any
+      // well-formed string. Checked at call time, not module load, so an
+      // unrelated resolver in this schema never fails because of it.
+      if (STRIPE_ALLOWED_PRICE_IDS.size === 0) {
+        LOGGER.error(
+          'createCheckoutSession: STRIPE_ALLOWED_PRICE_IDS is empty; rejecting all price IDs',
+          { priceId: args.priceId },
+        );
+        captureWarning(
+          new Error('createCheckoutSession — Stripe price allowlist is empty'),
+          { priceId: args.priceId, operation: 'createCheckoutSession' },
+        );
+        throw new Error(
+          'Stripe price ID allowlist is not configured: set STRIPE_MONTHLY_PRICE_ID and STRIPE_ANNUAL_PRICE_ID',
+        );
+      }
+
+      if (!STRIPE_ALLOWED_PRICE_IDS.has(args.priceId)) {
         throw UserInputError(
           'The provided price ID is not a recognized subscription plan. Please contact support if this issue persists.',
         );

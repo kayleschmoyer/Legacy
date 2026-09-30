@@ -764,10 +764,174 @@ describe('Google Play mutation validation (LS-5121)', () => {
     });
   });
 
+  // LS-7421: createCheckoutSession must fail closed when the price allowlist
+  // (built once at module load from env) is empty.
+  describe('createCheckoutSession price allowlist (LS-7421)', () => {
+    const ENV_KEYS = ['STRIPE_MONTHLY_PRICE_ID', 'STRIPE_ANNUAL_PRICE_ID'];
+    const savedEnv: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+      for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
+    });
+
+    afterEach(() => {
+      for (const key of ENV_KEYS) {
+        if (savedEnv[key] === undefined) delete process.env[key];
+        else process.env[key] = savedEnv[key];
+      }
+    });
+
+    /** The allowlist is computed at module load, so re-import the schema
+     *  after changing env. doMock registrations survive resetModules. */
+    async function loadSchemaWithEnv(
+      monthly: string | undefined,
+      annual: string | undefined,
+    ): Promise<jest.Mock> {
+      for (const [key, value] of [
+        ['STRIPE_MONTHLY_PRICE_ID', monthly],
+        ['STRIPE_ANNUAL_PRICE_ID', annual],
+      ] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      jest.resetModules();
+      schema = (await import('./index')).schema;
+      return jest.requireMock('../server/stripe').getStripeClient;
+    }
+
+    const checkoutArgs = (priceId: string) => ({
+      priceId,
+      successUrl: 'https://app.legacy-fantasy.com/success',
+      cancelUrl: 'https://app.legacy-fantasy.com/cancel',
+    });
+
+    it('throws a config error and never reaches Stripe when the allowlist is empty', async () => {
+      const getStripeClient = await loadSchemaWithEnv(undefined, undefined);
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_anything123'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Stripe price ID allowlist is not configured');
+
+      expect(getStripeClient).not.toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalled();
+      expect(mockCaptureWarning).toHaveBeenCalled();
+    });
+
+    it('treats empty-string env vars as an empty allowlist', async () => {
+      const getStripeClient = await loadSchemaWithEnv('', '');
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_anything123'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Stripe price ID allowlist is not configured');
+      expect(getStripeClient).not.toHaveBeenCalled();
+    });
+
+    it('does not report the empty-allowlist config error as a user input error', async () => {
+      await loadSchemaWithEnv(undefined, undefined);
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_anything123'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.not.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
+    it('lets an allowlisted price ID past the gate when the allowlist is populated', async () => {
+      const getStripeClient = await loadSchemaWithEnv(
+        'price_monthly_test',
+        'price_annual_test',
+      );
+      getStripeClient.mockRejectedValue(new Error('past-allowlist-gate'));
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_annual_test'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('past-allowlist-gate');
+      expect(getStripeClient).toHaveBeenCalledTimes(1);
+    });
+
+    it('still rejects a non-allowlisted price ID with UserInputError when populated', async () => {
+      const getStripeClient = await loadSchemaWithEnv(
+        'price_monthly_test',
+        'price_annual_test',
+      );
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_other'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('not a recognized subscription plan'),
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(getStripeClient).not.toHaveBeenCalled();
+    });
+
+    it('accepts a single configured price ID (either env var populates the allowlist)', async () => {
+      const getStripeClient = await loadSchemaWithEnv(
+        'price_monthly_test',
+        undefined,
+      );
+      getStripeClient.mockRejectedValue(new Error('past-allowlist-gate'));
+
+      const resolve = getResolver('createCheckoutSession');
+      await expect(
+        resolve(
+          {},
+          checkoutArgs('price_monthly_test'),
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('past-allowlist-gate');
+    });
+  });
+
   // LS-7426: the already-subscribed Billing Portal branch of
   // createCheckoutSession must return to portalReturnUrl, not cancelUrl (which
   // would land the user on ?checkout=canceled after a normal portal visit).
   describe('createCheckoutSession billing-portal branch (LS-7426)', () => {
+    // LS-7421: an empty price allowlist now fails closed, so the price used
+    // below must be allowlisted. The allowlist is read at module load, so
+    // re-import the schema after setting the env var.
+    const savedMonthly = process.env['STRIPE_MONTHLY_PRICE_ID'];
+
+    beforeEach(async () => {
+      process.env['STRIPE_MONTHLY_PRICE_ID'] = 'price_123';
+      jest.resetModules();
+      schema = (await import('./index')).schema;
+    });
+
+    afterEach(() => {
+      if (savedMonthly === undefined)
+        delete process.env['STRIPE_MONTHLY_PRICE_ID'];
+      else process.env['STRIPE_MONTHLY_PRICE_ID'] = savedMonthly;
+    });
+
     it('uses portalReturnUrl, not cancelUrl, as the portal return_url', async () => {
       const mockDb = {
         select: () => ({
