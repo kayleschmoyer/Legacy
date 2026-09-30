@@ -4,9 +4,12 @@
  * cannot fire two refetches.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { NetworkStatus } from '@apollo/client';
-import { useGetUserNotificationPreferencesQuery } from '@legacy-sports/graphql';
+import {
+  useGetUserNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
+} from '@legacy-sports/graphql';
 import PreferencesPage from './PreferencesPage';
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
@@ -19,6 +22,9 @@ interface MockProps {
   onPress?: () => void;
   disabled?: boolean;
   'aria-busy'?: boolean;
+  'aria-checked'?: boolean;
+  'aria-label'?: string;
+  role?: string;
 }
 function MockButton({
   children,
@@ -38,8 +44,25 @@ function MockParagraph({ children }: MockProps): React.ReactElement {
 function MockSeparator(): React.ReactElement {
   return <hr />;
 }
-function MockBox({ children }: MockProps): React.ReactElement {
-  return <div>{children}</div>;
+// Only the toggle switches are made interactive; other roles stay unexposed so
+// the section-header buttons don't collide with the Retry-button queries below.
+function MockBox({
+  children,
+  onPress,
+  role,
+  'aria-checked': ariaChecked,
+  'aria-label': ariaLabel,
+}: MockProps): React.ReactElement {
+  return (
+    <div
+      onClick={onPress}
+      role={role === 'switch' ? role : undefined}
+      aria-checked={ariaChecked}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </div>
+  );
 }
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   Button: MockButton,
@@ -93,6 +116,52 @@ function mockQueryState(
     refetch,
   });
 }
+
+describe('PreferencesPage notification save failure (LS-7082)', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('tells the user a save failed, keeps the toggle, and retries instead of reverting', async () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    const updateQuery = jest.fn();
+    mockUseQuery.mockReturnValue({
+      data: {
+        getUserNotificationPreferences: {
+          __typename: 'NotificationPreferences',
+          pushEnabled: true,
+        },
+      },
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch,
+      updateQuery,
+    });
+    const updatePrefs = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ data: undefined });
+    (useUpdateNotificationPreferencesMutation as jest.Mock).mockReturnValue([
+      updatePrefs,
+    ]);
+
+    render(<PreferencesPage />);
+    fireEvent.click(screen.getByRole('switch', { name: 'Push notifications' }));
+    await act(() => jest.advanceTimersByTimeAsync(300));
+
+    expect(updatePrefs).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/couldn.t save — retrying/i)).toBeTruthy();
+    // The failure must not revert the UI by refetching the server state.
+    expect(refetch).not.toHaveBeenCalled();
+
+    await act(() => jest.advanceTimersByTimeAsync(2000));
+    expect(updatePrefs).toHaveBeenCalledTimes(2);
+    expect(updatePrefs.mock.calls[1][0].variables.input).toEqual({
+      pushEnabled: false,
+    });
+    expect(screen.queryByText(/couldn.t save/i)).toBeNull();
+  });
+});
 
 describe('PreferencesPage notifications Retry (LS-7095)', () => {
   it('requests network-status updates so refetch state is observable', () => {

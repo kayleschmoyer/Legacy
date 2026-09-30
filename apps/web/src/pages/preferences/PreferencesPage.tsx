@@ -43,6 +43,7 @@ import {
 import { CollapsibleBody } from './CollapsibleBody';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
 import { useCoalescedSave } from './useCoalescedSave';
+import { useRetryingSave } from './useRetryingSave';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -93,6 +94,8 @@ function getDefaultPrefs(): UserPreferences {
 
 // Trailing-edge debounce for notification-preference saves (LS-7081).
 const NOTIFICATION_SAVE_DEBOUNCE_MS = 300;
+const NOTIFICATION_SAVE_MAX_AUTO_RETRIES = 3;
+const NOTIFICATION_SAVE_RETRY_BASE_MS = 2000;
 
 type NotificationToggleField =
   | 'matchupStartedEnabled'
@@ -472,6 +475,11 @@ const SaveBanner = styled(XStack, {
   shadowRadius: 18,
   elevation: 12,
   pointerEvents: 'auto',
+  variants: {
+    failed: {
+      true: { borderColor: '$red8' },
+    },
+  } as const,
 });
 
 const SaveBannerTick = styled(YStack, {
@@ -901,8 +909,8 @@ function NotificationPreferencesSection({
   const saveRef = useRef<{ hasPending: () => boolean }>({
     hasPending: () => false,
   });
-  const save = useCallback(
-    (input: NotificationPatch) => {
+  const send = useCallback(
+    (input: NotificationPatch) =>
       updatePrefs({
         variables: { input },
         update(cache, { data: mutationData }) {
@@ -920,13 +928,21 @@ function NotificationPreferencesSection({
             });
           }
         },
-      }).then(
-        () => onSaved(),
-        () => void refetch(),
-      );
-    },
-    [updatePrefs, onSaved, refetch],
+      }),
+    [updatePrefs],
   );
+  // A failed save keeps the optimistic value on screen and is retried instead
+  // of being reverted by a refetch, so the user is told and nothing is lost
+  // silently (LS-7082).
+  const {
+    save,
+    retryNow,
+    status: saveStatus,
+  } = useRetryingSave<NotificationPatch>(send, {
+    maxAutoRetries: NOTIFICATION_SAVE_MAX_AUTO_RETRIES,
+    baseDelayMs: NOTIFICATION_SAVE_RETRY_BASE_MS,
+    onSaved,
+  });
   const coalesced = useCoalescedSave<NotificationPatch>(
     save,
     NOTIFICATION_SAVE_DEBOUNCE_MS,
@@ -1089,6 +1105,47 @@ function NotificationPreferencesSection({
 
   return (
     <SectionCard style={cardStyle}>
+      {saveStatus !== 'idle' && (
+        <SaveBannerWrap role="alert">
+          <SaveBanner failed data-testid="prefs-save-error-banner">
+            <Paragraph
+              fontFamily={FONT_DISPLAY}
+              fontWeight="700"
+              fontSize={12}
+              letterSpacing={1.4}
+              textTransform="uppercase"
+              color="$red10"
+            >
+              {saveStatus === 'retrying'
+                ? 'Couldn’t save — retrying'
+                : 'Couldn’t save your changes'}
+            </Paragraph>
+            {saveStatus === 'failed' && (
+              <Button
+                size="$2"
+                backgroundColor="transparent"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                borderRadius="$3"
+                onPress={retryNow}
+                hoverStyle={{ borderColor: '$brandGold' }}
+                pressStyle={{ scale: 0.97 }}
+              >
+                <Paragraph
+                  fontFamily={FONT_DISPLAY}
+                  fontWeight="700"
+                  fontSize={11}
+                  letterSpacing={1.2}
+                  textTransform="uppercase"
+                  color="$color"
+                >
+                  Retry
+                </Paragraph>
+              </Button>
+            )}
+          </SaveBanner>
+        </SaveBannerWrap>
+      )}
       {headerNode(<SectionMeta>Push &amp; email · Matchup alerts</SectionMeta>)}
       <CollapsibleBody isCollapsed={isCollapsed}>
         <SectionBody>
