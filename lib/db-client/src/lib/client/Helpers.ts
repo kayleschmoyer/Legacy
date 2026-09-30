@@ -34,7 +34,7 @@ const isLambda = Boolean(
 );
 
 /** Whether this process should keep connections open between calls. */
-function shouldReuseConnection(): boolean {
+export function shouldReuseConnection(): boolean {
   return isDevelopment || isLambda;
 }
 
@@ -300,6 +300,11 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
 
     let initializationFailed = false;
     let recoverableError = false;
+    // True when the cached connection can no longer be trusted. A pool-timeout
+    // alone does not qualify: the pool is merely saturated, and ending it would
+    // fail every other in-flight query on the shared pool with "Cannot use a
+    // pool after calling end on the pool" (LS-10304).
+    let discardConnection = false;
 
     // LS-10196: a cached connection is shared by every concurrent runWithClient
     // call (and by their still-running queries). Track users so a call that
@@ -337,6 +342,8 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
         isTransientConnectionError(err) ||
         isPoolTimeoutError(err) ||
         authFailure;
+      discardConnection =
+        pgCode !== undefined || isTransientConnectionError(err) || authFailure;
 
       if (authFailure) {
         // Almost certainly a credential rotation that happened inside the
@@ -375,7 +382,7 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
         inFlightUsers.delete(connection);
       }
 
-      if (!reuseConnection || initializationFailed || recoverableError) {
+      if (!reuseConnection || initializationFailed || discardConnection) {
         if (reuseConnection) {
           // Evict now so new callers get a fresh connection, but only if the
           // slot still holds this connection (a sibling may have replaced it).

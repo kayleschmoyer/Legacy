@@ -26,7 +26,11 @@ import {
   createSubscriptionService,
   SubscriptionService,
 } from './SubscriptionService';
-import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
+import {
+  type GenericDatabase,
+  getPublicDbConnection,
+  shouldReuseConnection,
+} from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
 export {
   handleSubscriptionDowngrade,
@@ -99,6 +103,11 @@ export class DatabaseService {
   private _dbConnectionPromise: Promise<
     GenericDatabase<typeof PublicSchema>
   > | null = null;
+  // The connection `_dbConnectionPromise` was built from. runWithClient evicts
+  // and ends the shared cached connection on a severed socket; holding on to
+  // its `db` afterwards leaves every later request on this warm Lambda failing
+  // with "Cannot use a pool after calling end on the pool" (LS-10304).
+  private _dbConnection: unknown = null;
 
   constructor(private options: DbOptions) {
     this.users = createUserService(options);
@@ -126,9 +135,19 @@ export class DatabaseService {
    * Useful for GraphQL context to share connections across resolvers
    */
   async getDb(): Promise<GenericDatabase<typeof PublicSchema>> {
+    // Where connections are cached, a different object than the one we
+    // initialized means the old one was evicted (and its pool ended).
+    if (
+      this._dbConnectionPromise &&
+      shouldReuseConnection() &&
+      getPublicDbConnection(this.options) !== this._dbConnection
+    ) {
+      this._dbConnectionPromise = null;
+    }
     if (!this._dbConnectionPromise) {
+      const connection = getPublicDbConnection(this.options);
+      this._dbConnection = connection;
       this._dbConnectionPromise = (async () => {
-        const connection = getPublicDbConnection(this.options);
         await connection.initialize();
         return connection.db;
       })();
