@@ -5,23 +5,28 @@ import { useIAP } from './useIAP';
 // ── Mocks (hoisted before imports) ───────────────────────────────────────────
 
 const mockGetAvailablePurchases = jest.fn();
+const mockFinishTransaction = jest.fn();
+const mockPurchaseUpdatedListener = jest.fn();
 jest.mock('react-native-iap', () => ({
   fetchProducts: jest.fn().mockResolvedValue([]),
-  finishTransaction: jest.fn(),
+  finishTransaction: (...args: unknown[]): unknown =>
+    mockFinishTransaction(...args),
   getAvailablePurchases: (...args: unknown[]): unknown =>
     mockGetAvailablePurchases(...args),
   initConnection: jest.fn().mockResolvedValue(undefined),
   purchaseErrorListener: jest.fn(() => ({ remove: jest.fn() })),
-  purchaseUpdatedListener: jest.fn(() => ({ remove: jest.fn() })),
+  purchaseUpdatedListener: (...args: unknown[]): unknown =>
+    mockPurchaseUpdatedListener(...args),
   requestPurchase: jest.fn(),
 }));
 
 const mockRefetchSubscription = jest.fn();
 const mockRestoreMutation = jest.fn();
+const mockVerifyMutation = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: () => ({ refetch: mockRefetchSubscription }),
   useRestoreApplePurchasesMutation: () => [mockRestoreMutation],
-  useVerifyApplePurchaseMutation: () => [jest.fn()],
+  useVerifyApplePurchaseMutation: () => [mockVerifyMutation],
 }));
 
 const MONTHLY = 'com.legacysports.app.premium.monthly';
@@ -30,6 +35,7 @@ const TIMEOUT_MS = 30_000;
 describe('useIAP — restorePurchases (LS-7413)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPurchaseUpdatedListener.mockReturnValue({ remove: jest.fn() });
   });
 
   afterEach(() => {
@@ -150,5 +156,107 @@ describe('useIAP — restorePurchases (LS-7413)', () => {
     });
     expect(result.current.loading).toBe(false);
     expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe('useIAP — purchase-updated dedup across instances (LS-7419)', () => {
+  type PurchaseCb = (purchase: unknown) => void;
+  const purchase = { purchaseToken: 'jws-1', productId: MONTHLY };
+  let listeners: PurchaseCb[];
+  let removers: jest.Mock[];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    listeners = [];
+    removers = [];
+    mockPurchaseUpdatedListener.mockImplementation((cb: PurchaseCb) => {
+      const remove = jest.fn();
+      listeners.push(cb);
+      removers.push(remove);
+      return { remove };
+    });
+    mockVerifyMutation.mockResolvedValue({
+      data: { verifyApplePurchase: { success: true } },
+    });
+    mockFinishTransaction.mockResolvedValue(undefined);
+  });
+
+  // The library invokes every registered listener for each native event.
+  const fireEvent = (): void => {
+    void act(() => {
+      listeners.forEach((cb) => cb(purchase));
+    });
+  };
+
+  it('verifies and finishes once when two instances are mounted, and settles both', async () => {
+    const first = renderHook(() => useIAP());
+    const second = renderHook(() => useIAP());
+    expect(listeners).toHaveLength(2);
+
+    fireEvent();
+
+    await waitFor(() => {
+      expect(first.result.current.isSubscribed).toBe(true);
+      expect(second.result.current.isSubscribed).toBe(true);
+    });
+    expect(mockVerifyMutation).toHaveBeenCalledTimes(1);
+    expect(mockFinishTransaction).toHaveBeenCalledTimes(1);
+    expect(first.result.current.loading).toBe(false);
+    expect(second.result.current.loading).toBe(false);
+  });
+
+  it('surfaces a failed verification in every mounted instance', async () => {
+    mockVerifyMutation.mockResolvedValue({
+      data: { verifyApplePurchase: { success: false } },
+    });
+    const first = renderHook(() => useIAP());
+    const second = renderHook(() => useIAP());
+
+    fireEvent();
+
+    await waitFor(() => {
+      expect(first.result.current.error).toBe(
+        'Purchase verification failed. Please contact support.',
+      );
+      expect(second.result.current.error).toBe(
+        'Purchase verification failed. Please contact support.',
+      );
+    });
+    expect(mockVerifyMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps handling purchases in the remaining instance after the other unmounts', async () => {
+    const first = renderHook(() => useIAP());
+    const second = renderHook(() => useIAP());
+
+    first.unmount();
+    expect(removers[0]).toHaveBeenCalledTimes(1);
+    expect(removers[1]).not.toHaveBeenCalled();
+
+    void act(() => {
+      listeners[1]?.(purchase);
+    });
+
+    await waitFor(() => {
+      expect(second.result.current.isSubscribed).toBe(true);
+    });
+    expect(mockVerifyMutation).toHaveBeenCalledTimes(1);
+    expect(mockFinishTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('verifies again for a later, distinct transaction', async () => {
+    const { result } = renderHook(() => useIAP());
+
+    fireEvent();
+    await waitFor(() => {
+      expect(result.current.isSubscribed).toBe(true);
+    });
+
+    void act(() => {
+      listeners[0]?.({ purchaseToken: 'jws-2', productId: MONTHLY });
+    });
+    await waitFor(() => {
+      expect(mockVerifyMutation).toHaveBeenCalledTimes(2);
+    });
   });
 });

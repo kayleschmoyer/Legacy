@@ -10,6 +10,12 @@
  * After a successful purchase the hook verifies the transaction server-side
  * via the `verifyApplePurchase` GraphQL mutation before finishing the
  * StoreKit transaction. This prevents fraudulent receipts from granting premium.
+ *
+ * react-native-iap fans every purchase-updated event out to all registered
+ * listeners, and several screens may mount this hook at once. Each instance
+ * keeps its own listener (so unmounting one never stops another), but the
+ * verify + finish work is deduplicated per transaction via a module-level
+ * in-flight map: the first instance performs it, the rest await its result.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -90,6 +96,13 @@ const iapUpdateListener = purchaseUpdatedListener;
 const iapErrorListener = purchaseErrorListener as unknown as (
   cb: (e: IAPPurchaseError) => void,
 ) => PurchaseListenerHandle;
+
+/**
+ * Verifications currently in flight, keyed by purchaseToken (JWS transaction).
+ * Shared across every useIAP instance so a purchase-updated event delivered to
+ * several mounted instances is verified and finished exactly once.
+ */
+const inFlightVerifications = new Map<string, Promise<boolean>>();
 
 /** Longest we wait on StoreKit before giving up on a restore. */
 const RESTORE_PURCHASES_TIMEOUT_MS = 30_000;
@@ -187,22 +200,40 @@ export function useIAP(): UseIAPResult {
       try {
         setLoading(true);
 
-        const result = await verifyApplePurchase({
-          variables: { jwsTransaction: purchaseToken },
-        });
+        // react-native-iap delivers each event to every mounted useIAP
+        // instance. Only the first instance to see a transaction verifies and
+        // finishes it; the others await that same result so their own
+        // loading/error/isSubscribed state still settles.
+        let verification = inFlightVerifications.get(purchaseToken);
+        if (!verification) {
+          verification = (async (): Promise<boolean> => {
+            try {
+              const result = await verifyApplePurchase({
+                variables: { jwsTransaction: purchaseToken },
+              });
 
-        // Always finish the StoreKit transaction regardless of verification
-        // result or mounted state. Leaving it unfinished causes repeated
-        // re-delivery on every app launch and auto-refunds after 3 days.
-        // Premium access is only granted when the server confirms success.
-        await iapFinish({
-          purchase: event,
-          isConsumable: false,
-        });
+              // Always finish the StoreKit transaction regardless of
+              // verification result or mounted state. Leaving it unfinished
+              // causes repeated re-delivery on every app launch and
+              // auto-refunds after 3 days. Premium access is only granted
+              // when the server confirms success.
+              await iapFinish({
+                purchase: event,
+                isConsumable: false,
+              });
+
+              return result.data?.verifyApplePurchase?.success === true;
+            } finally {
+              inFlightVerifications.delete(purchaseToken);
+            }
+          })();
+          inFlightVerifications.set(purchaseToken, verification);
+        }
+        const verified = await verification;
 
         if (!mountedRef.current) return;
 
-        if (result.data?.verifyApplePurchase?.success) {
+        if (verified) {
           setIsSubscribed(true);
           void refetchSubscription();
         } else {
