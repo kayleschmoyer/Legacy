@@ -579,6 +579,8 @@ function CollapseChevron({ isCollapsed }: { isCollapsed: boolean }) {
   );
 }
 
+const noop = (): void => undefined;
+
 function onToggleKeyDown(
   toggle: () => void,
 ): React.KeyboardEventHandler<Element> {
@@ -963,13 +965,22 @@ function NotificationPreferencesSection({
     [queueChange],
   );
 
+  // LS-7093: a failed load must stay visible. Collapsing the error card would
+  // let the user forget the failure and trust the fallback defaults, so the
+  // section is forced open (the stored collapse preference is untouched and
+  // reapplies once the query recovers).
+  const showError = Boolean(error) && (!loading || isRefetching);
+  const sectionCollapsed = isCollapsed && !showError;
+  const toggleCollapse = showError ? noop : onToggleCollapse;
+
   const headerNode = (meta: React.ReactNode, trailing?: React.ReactNode) => (
     <SectionHeader
-      expanded={!isCollapsed}
-      onPress={onToggleCollapse}
-      onKeyDown={onToggleKeyDown(onToggleCollapse)}
+      expanded={!sectionCollapsed}
+      onPress={toggleCollapse}
+      onKeyDown={onToggleKeyDown(toggleCollapse)}
       {...sectionToggleA11yProps}
-      aria-expanded={!isCollapsed}
+      aria-expanded={!sectionCollapsed}
+      aria-disabled={showError}
     >
       <SectionIconBox>
         <Bell size={18} color="$brandGoldLight" strokeWidth={1.8} />
@@ -979,7 +990,7 @@ function NotificationPreferencesSection({
         {meta}
       </YStack>
       {trailing}
-      <CollapseChevron isCollapsed={isCollapsed} />
+      <CollapseChevron isCollapsed={sectionCollapsed} />
     </SectionHeader>
   );
 
@@ -998,7 +1009,7 @@ function NotificationPreferencesSection({
     );
   }
 
-  if (error && (!loading || isRefetching)) {
+  if (showError) {
     return (
       <SectionCard style={cardStyle}>
         {headerNode(
@@ -1008,7 +1019,7 @@ function NotificationPreferencesSection({
             </Paragraph>
           </SectionMeta>,
         )}
-        <CollapsibleBody isCollapsed={isCollapsed}>
+        <CollapsibleBody isCollapsed={false}>
           <SectionBody>
             <YStack
               padding="$4"
