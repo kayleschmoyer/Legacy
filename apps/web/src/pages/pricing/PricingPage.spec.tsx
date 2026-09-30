@@ -111,6 +111,11 @@ jest.mock('@tamagui/lucide-icons', () => ({
   Zap: () => null,
 }));
 
+const mockUseIsPremium = jest.fn<boolean, []>();
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: (): boolean => mockUseIsPremium(),
+}));
+
 const mockUseStripePrices = jest.fn();
 jest.mock('../../hooks/useStripePrices', () => ({
   useStripePrices: (): unknown => mockUseStripePrices(),
@@ -384,5 +389,48 @@ describe('PricingPage — feature comparison table semantics (LS-7180)', () => {
     rows.slice(1).forEach((row) => {
       expect(within(row).getAllByRole('cell')).toHaveLength(3);
     });
+  });
+});
+
+// LS-7185: Premium users already include the Free tier, so the Free card must
+// not offer a "Get Started Free" CTA that silently navigates home.
+describe('PricingPage — Free plan card CTA for Premium users (LS-7185)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  it('shows the Get Started Free CTA on the Free card for non-premium users', () => {
+    mockUseIsPremium.mockReturnValue(false);
+
+    render(<PricingPage />);
+
+    const freeCard = screen.getByTestId('plan-card-free');
+    expect(
+      within(freeCard).getByRole('button', { name: 'Get Started Free' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('free-plan-included-badge'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('replaces the Free card CTA with a disabled "Includes Free tier" badge for premium users', () => {
+    mockUseIsPremium.mockReturnValue(true);
+
+    render(<PricingPage />);
+
+    const freeCard = screen.getByTestId('plan-card-free');
+    expect(
+      within(freeCard).queryByRole('button', { name: 'Get Started Free' }),
+    ).not.toBeInTheDocument();
+    const badge = within(freeCard).getByTestId('free-plan-included-badge');
+    expect(badge).toHaveTextContent('Includes Free tier');
+    expect(badge).toHaveAttribute('aria-disabled', 'true');
   });
 });

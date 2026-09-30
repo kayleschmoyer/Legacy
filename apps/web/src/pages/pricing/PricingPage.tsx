@@ -30,6 +30,7 @@ import {
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import { useStripePrices } from '../../hooks/useStripePrices';
 
 /* ─── Styled Components ─── */
@@ -491,6 +492,7 @@ const onSelectKey = (select: () => void) => (e: React.KeyboardEvent) => {
 export default function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const isPremium = useIsPremium();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -676,9 +678,22 @@ export default function PricingPage() {
                 </Paragraph>
               </PlanHeader>
 
-              <OutlineButton onPress={navigateToHome}>
-                Get Started Free
-              </OutlineButton>
+              {isPremium ? (
+                // LS-7185: Premium already includes everything in Free, and
+                // "Get Started Free" would silently navigate home as if it
+                // downgraded the plan. Show a non-interactive badge instead.
+                <OutlineButton
+                  disabled
+                  aria-disabled="true"
+                  data-testid="free-plan-included-badge"
+                >
+                  Includes Free tier
+                </OutlineButton>
+              ) : (
+                <OutlineButton onPress={navigateToHome}>
+                  Get Started Free
+                </OutlineButton>
+              )}
 
               <Separator />
 
