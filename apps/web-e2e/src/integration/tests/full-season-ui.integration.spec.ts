@@ -2,7 +2,9 @@
  * Full-Season Live UI E2E Test
  *
  * Drives the **real** web UI through every major team-manager action from
- * league creation to season-end, hitting the **live** backend (no mocks).
+ * league creation through the first week-advancement step, hitting the
+ * **live** backend (no mocks). Season end & renewal lives in
+ * season-renewal-migration-ui.integration.spec.ts (LS-4513).
  *
  * Almost every action is performed through browser interactions
  * (clicking buttons, filling forms, navigating pages). For actions
@@ -20,7 +22,6 @@
  */
 
 import { expect } from '@playwright/test';
-import { advanceWeek } from '../helpers/advance-week';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { gqlFetch } from '../helpers/gql-fetch';
@@ -32,14 +33,14 @@ import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { test } from '../fixtures/ui';
 
 /**
- * Season-length config — drives Phase 10 and Phase 13 cycle counts.
+ * Season-length config.
  *
- * Picked to exercise every UI mechanic in the spec without burning the test
- * budget on stats hydration: 3 games/matchup forces the `Select Game N of M`
- * loop, and 3 total weeks lets Phase 10 advance week 1 → 2 while Phase 13
- * drives the remaining transitions to season-complete. Playoffs are disabled
- * so the renewal UI surfaces immediately after the final advance — matching
- * the season-renewal-migration-ui pattern (LS-755).
+ * 3 games/matchup gives Phase 10 a `Select Game N of M` button to drive, and
+ * a short season with playoffs disabled keeps the league cheap for the nightly
+ * autoSelectGames cron if the cleanup in afterAll is ever skipped. The season
+ * is not driven to completion here — season-complete → `Start New Season`
+ * renewal is covered by season-renewal-migration-ui.integration.spec.ts
+ * (LS-755), which pre-completes a 1-week season via API (LS-4513).
  */
 const GAMES_PER_MATCHUP = 3;
 const TOTAL_MATCHUPS = 3;
@@ -104,11 +105,8 @@ test.describe
 
     await test.step(`Shorten season to ${TOTAL_MATCHUPS} weeks × ${GAMES_PER_MATCHUP} games and disable playoffs`, async () => {
       // Set before the draft so createAllMatchupsForLeague builds the season
-      // with the test-sized config. Phase 10 + Phase 13 then need ~9 select-
-      // game cycles total to drive the season to "Start New Season", which
-      // fits in the test budget given typical CloudWatch p90 ~78s per cycle.
-      // Disabling playoffs ensures the season completes cleanly
-      // (currentMatchup → null) rather than transitioning to a bracket.
+      // with the test-sized config that Phase 10's `Select Game N of M`
+      // assertion is keyed to.
       //
       // Retry on API Gateway 5xx: createLeagueAndTeams warmed one Lambda
       // instance but the follow-up mutation can land on a cold instance and
@@ -960,32 +958,66 @@ test.describe
   });
 
   // -----------------------------------------------------------------
-  // PHASE 10 — WEEK ADVANCEMENT (Commissioner panel UI)
+  // PHASE 10 — WEEK ADVANCEMENT UI MECHANICS (Commissioner panel UI)
+  //
+  // Verifies one `Select Game` cycle through the commissioner panel — button,
+  // confirm dialog, and the server accepting the selection — without waiting
+  // on stats hydration (LS-4513). Each hydration cycle downloads per-player
+  // game logs and takes 60–300 s against the live backend, so driving whole
+  // weeks here was timing-bound, not behaviour-bound. The multi-week
+  // select → hydrate → advance pipeline is covered API-side by
+  // season-lifecycle.integration.spec.ts (LS-1646).
   // -----------------------------------------------------------------
 
   test('Phase 10: Week advancement', async ({ commissionerPage: page }) => {
-    // GAMES_PER_MATCHUP cycles × advance-week.ts per-cycle budget (150 s
-    // worst-case: 90 s WS-driven fast path + 60 s reload-driven fallback)
-    // plus advance-week mutation overhead. Sized for cold-cache stats
-    // hydration (CloudWatch p90 ~78 s warm-cache, ~30 s mean) with headroom
-    // for the LS-4534 fallback path when MATCHUP_STATS_COMPLETE is dropped.
-    test.setTimeout(540_000);
+    // The nightly autoSelectGames cron may have already queued a game for this
+    // league, in which case the button reads `Game Selection In Progress...`
+    // until that cycle hydrates. Budget one worst-case cycle for that.
+    test.setTimeout(420_000);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
     });
 
-    await test.step('Drive Select Game loop and advance week 1 → 2', async () => {
-      // advanceWeek loops the `Select Game N of M` button GAMES_PER_MATCHUP
-      // times, then clicks `Advance League Week`. Fast path is WS-driven:
-      // the commissioner page subscribes to MATCHUP_STATS_COMPLETE (v1
-      // LeagueDetailPage.tsx:754, v2 Commish.tsx after LS-4515) and refetches
-      // matchups automatically, so the NextStepControl button label updates
-      // in-place as each stats-hydration cycle completes. If a WS event is
-      // dropped (LS-4534), the helper falls back to page.reload() + fresh
-      // GraphQL fetch within the same cycle budget.
-      await advanceWeek(page, GAMES_PER_MATCHUP);
+    let gameNumber = 0;
+
+    await test.step('Select the next game via the confirm dialog', async () => {
+      const selectBtn = page.getByRole('button', {
+        name: new RegExp(`Select Game \\d+ of ${GAMES_PER_MATCHUP}`, 'i'),
+      });
+      await reloadUntilVisible(page, selectBtn, { budgetMs: 330_000 });
+      await expect(selectBtn).toBeEnabled();
+      const label = (await selectBtn.textContent()) ?? '';
+      gameNumber = Number(/Select Game (\d+) of/i.exec(label)?.[1] ?? 0);
+      expect(gameNumber).toBeGreaterThan(0);
+      await selectBtn.click();
+
+      const confirmBtn = page.getByTestId('confirm-next-step');
+      await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
+      await confirmBtn.click();
+      // The dialog closes once autoSelectGames returns.
+      await expect(confirmBtn).toBeHidden({ timeout: 30_000 });
+    });
+
+    await test.step('Game selection is accepted by the server', async () => {
+      // autoSelectGames writes statsLoadingStatus='queued' before it returns
+      // and reports failures (e.g. SQS misconfig) without throwing, leaving
+      // the prior status in place. So the selection is proven accepted when
+      // the `Game Selection:` pill reads queued/loading (hydration pending),
+      // or — if hydration already finished — the selected-games count has
+      // reached the game we clicked. A pre-existing `completed` pill from an
+      // earlier cron cycle alone is not accepted, and `failed` never is.
+      const inFlight = page
+        .getByText('Game Selection:')
+        .locator('xpath=following-sibling::*[1]')
+        .filter({ hasText: /^(queued|loading)$/i });
+      const hydrated = page.getByText(
+        `Games Selected: ${gameNumber} of ${GAMES_PER_MATCHUP}`,
+      );
+      await reloadUntilVisible(page, inFlight.or(hydrated).first(), {
+        budgetMs: 45_000,
+      });
     });
   });
 
@@ -1076,72 +1108,6 @@ test.describe
       await expect(
         page.locator('[role="log"]').getByText('Who wants to trade?'),
       ).toBeVisible({ timeout: 10000 });
-    });
-  });
-
-  // -----------------------------------------------------------------
-  // PHASE 13 — SEASON END & RENEWAL (Commissioner panel UI)
-  // -----------------------------------------------------------------
-
-  test('Phase 13: Season end & renewal', async ({ commissionerPage: page }) => {
-    // (TOTAL_MATCHUPS - 1) advanceWeek calls × GAMES_PER_MATCHUP cycles each
-    // (each cycle: up to 150 s — 90 s WS fast path + 60 s reload fallback),
-    // plus the renewal mutation. Sized to cover cold-cache stats hydration
-    // and the LS-4534 fallback path when MATCHUP_STATS_COMPLETE is dropped.
-    test.setTimeout(960_000);
-
-    await test.step('Navigate to commissioner panel', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-      await page.waitForLoadState('load');
-    });
-
-    await test.step('Advance remaining weeks until the season completes', async () => {
-      // Phase 10 advanced week 1 → 2. Drive the remaining TOTAL_MATCHUPS - 1
-      // weeks so the commissioner panel transitions to `Start New Season`.
-      // With playoffEnabled=false, isSeasonComplete fires after the final
-      // advanceMatchups call clears currentMatchup (NextStepControl.tsx:152).
-      const remainingWeeks = TOTAL_MATCHUPS - 1;
-      for (let i = 0; i < remainingWeeks; i++) {
-        await advanceWeek(page, GAMES_PER_MATCHUP);
-      }
-    });
-
-    await test.step('Start new season from commissioner panel', async () => {
-      // Once the season has completed (asserted in the prior step), the
-      // commissioner panel surfaces "Start New Season" as the next action.
-      const renewBtn = page.getByRole('button', {
-        name: /Start New Season/i,
-      });
-
-      await expect(renewBtn).toBeVisible({ timeout: 30_000 });
-      await renewBtn.click();
-
-      // The dialog asks about rosters: select "Hold a new draft".
-      const newDraftOption = page.getByText(
-        /Hold a new draft.*start with empty rosters/i,
-      );
-      await expect(newDraftOption).toBeVisible({ timeout: 5_000 });
-      await newDraftOption.click();
-
-      // Click "Confirm New Season"
-      const confirmBtn = page.getByRole('button', {
-        name: /Confirm New Season/i,
-      });
-      await expect(confirmBtn).toBeVisible({ timeout: 5000 });
-      await confirmBtn.click();
-
-      // The renewal dialog closes once the startNewSeason mutation
-      // returns. Waiting for it replaces a 5s wall-clock wait with a
-      // deterministic mutation-completion signal (LS-4457).
-      await expect(confirmBtn).toBeHidden({ timeout: 60_000 });
-    });
-
-    await test.step('Verify league overview still loads', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/overview`);
-      await page.waitForLoadState('load');
-      await expect(page.locator('body')).not.toContainText(
-        'Unexpected Application Error',
-      );
     });
   });
 });
