@@ -5,6 +5,8 @@ export { PremiumGate } from './PremiumGate';
 export type { PremiumGateProps } from './PremiumGate';
 export { default as SubscriptionSettingsScreen } from './SubscriptionSettingsScreen';
 export { useSubscription } from './useSubscription';
+export { getSubscriptionWarning } from './subscriptionWarning';
+export type { SubscriptionWarning } from './subscriptionWarning';
 export { PREMIUM_FEATURES } from './constants';
 export { AndroidSubscriptionScreen } from './AndroidSubscriptionScreen';
 export { withPremiumScreen } from './withPremiumScreen';

@@ -72,8 +72,17 @@ jest.mock('../../common/auth/AuthHooks', () => ({
     mockUseCurrentUserInfo(...args),
 }));
 
+let mockSubscriptionState: {
+  isPremium: boolean;
+  tier: string | null;
+  subscription: Record<string, unknown> | null;
+} = { isPremium: false, tier: null, subscription: null };
+
 jest.mock('../../features/subscription', () => ({
-  useSubscription: () => ({ isPremium: false, tier: null }),
+  useSubscription: () => mockSubscriptionState,
+  getSubscriptionWarning: jest.requireActual<
+    typeof import('../../features/subscription/subscriptionWarning')
+  >('../../features/subscription/subscriptionWarning').getSubscriptionWarning,
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -159,14 +168,20 @@ jest.mock('tamagui', () => {
       children,
       onPress,
       testID,
+      accessibilityLabel,
     }: {
       children?: React.ReactNode;
       onPress?: () => void;
       testID?: string;
+      accessibilityLabel?: string;
       [key: string]: unknown;
     }) => {
       if (onPress) {
-        return React.createElement(Pressable, { testID, onPress }, children);
+        return React.createElement(
+          Pressable,
+          { testID, onPress, accessibilityLabel },
+          children,
+        );
       }
       return React.createElement(View, { testID }, children);
     },
@@ -201,6 +216,11 @@ jest.mock('tamagui', () => {
 describe('ProfileSettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSubscriptionState = {
+      isPremium: false,
+      tier: null,
+      subscription: null,
+    };
     mockLogout.mockResolvedValue(undefined);
     mockUpdateUsername.mockResolvedValue({});
     mockUpdateAvatar.mockResolvedValue({});
@@ -424,6 +444,70 @@ describe('ProfileSettingsScreen', () => {
           expect(backHandlers).toHaveLength(0);
         });
       });
+    });
+  });
+
+  describe('subscription grace state (LS-7228)', () => {
+    const premium = {
+      isPremium: true,
+      tier: 'monthly',
+    };
+    const baseSubscription = {
+      status: 'active',
+      tier: 'monthly',
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      gracePeriodEndsAt: null,
+      trialEndsAt: null,
+    };
+
+    it('shows no warning for a premium account in good standing', () => {
+      mockSubscriptionState = { ...premium, subscription: baseSubscription };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('Premium (Monthly)')).toBeTruthy();
+      expect(screen.queryByText(/Payment failed/)).toBeNull();
+      expect(screen.queryByText(/Cancels/)).toBeNull();
+      expect(
+        screen.getByLabelText('Subscription and billing settings'),
+      ).toBeTruthy();
+    });
+
+    it('warns with the billing deadline when the payment failed', () => {
+      mockSubscriptionState = {
+        ...premium,
+        subscription: {
+          ...baseSubscription,
+          status: 'past_due',
+          gracePeriodEndsAt: '2099-01-15T12:00:00.000Z',
+        },
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('Premium (Monthly)')).toBeTruthy();
+      expect(
+        screen.getByText('Payment failed \u2014 update billing by Jan 15'),
+      ).toBeTruthy();
+      // The pressable's accessibilityLabel overrides its children for screen
+      // readers, so the warning has to be part of the label itself.
+      expect(
+        screen.getByLabelText(
+          'Subscription and billing settings. Payment failed \u2014 update billing by Jan 15',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('warns when the subscription is set to cancel at period end', () => {
+      mockSubscriptionState = {
+        ...premium,
+        subscription: {
+          ...baseSubscription,
+          cancelAtPeriodEnd: true,
+          currentPeriodEnd: new Date(
+            Date.now() + 4.5 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        },
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('Cancels in 5 days')).toBeTruthy();
     });
   });
 

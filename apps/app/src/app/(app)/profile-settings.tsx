@@ -28,7 +28,10 @@ import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
-import { useSubscription } from '../../features/subscription';
+import {
+  getSubscriptionWarning,
+  useSubscription,
+} from '../../features/subscription';
 import { trackSignOut } from '../../utils/analytics';
 import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 
@@ -48,7 +51,8 @@ function getAccessLevelLabel(level: string): string {
 export default function ProfileSettingsScreen(): React.JSX.Element {
   const { data: currentUser } = useCurrentUserInfo();
   const { logout } = useAuthHandlers();
-  const { isPremium, tier } = useSubscription();
+  const { isPremium, tier, subscription } = useSubscription();
+  const subscriptionWarning = getSubscriptionWarning(subscription, isPremium);
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -491,7 +495,11 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               onPress={() => router.navigate('subscription-settings')}
               pressStyle={{ backgroundColor: '$gray3' }}
               accessibilityRole="button"
-              accessibilityLabel="Subscription and billing settings"
+              accessibilityLabel={
+                subscriptionWarning
+                  ? `Subscription and billing settings. ${subscriptionWarning.message}`
+                  : 'Subscription and billing settings'
+              }
             >
               <YStack
                 width={36}
@@ -512,6 +520,26 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                     ? `Premium (${tier === 'annual' ? 'Annual' : 'Monthly'})`
                     : 'Free plan \u2014 tap to upgrade'}
                 </Paragraph>
+                {subscriptionWarning ? (
+                  <XStack
+                    alignSelf="flex-start"
+                    alignItems="center"
+                    gap="$1.5"
+                    marginTop="$1.5"
+                    paddingHorizontal="$2"
+                    paddingVertical="$1"
+                    borderRadius="$10"
+                    borderWidth={1}
+                    borderColor={`${brand.seamRed}44`}
+                    backgroundColor={`${brand.seamRed}1A`}
+                    testID="subscription-warning-chip"
+                  >
+                    <Text fontSize={12}>{'\u26A0\uFE0F'}</Text>
+                    <Paragraph size="$1" color={brand.seamRed} fontWeight="600">
+                      {subscriptionWarning.message}
+                    </Paragraph>
+                  </XStack>
+                ) : null}
               </YStack>
               <Text fontSize="$4" color="$colorSubtle">
                 {'\u203A'}
