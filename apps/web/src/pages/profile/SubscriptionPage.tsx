@@ -749,6 +749,9 @@ const SubscriptionPage: React.FC = () => {
     if (!activating) return;
     if (!shouldContinueActivationPolling(isPremium, pollAttempt)) {
       setActivating(false);
+      // Re-arm the one-shot flag so a later checkout return in this same
+      // session flips it false -> true again and reopens the window (LS-7424).
+      setCheckoutJustCompleted(false);
       return;
     }
     const timer = setTimeout(() => {

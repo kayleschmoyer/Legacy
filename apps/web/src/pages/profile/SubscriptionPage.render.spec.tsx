@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import SubscriptionPage from './SubscriptionPage';
 
 type ChildrenProps = { children?: React.ReactNode };
@@ -703,5 +703,86 @@ describe('SubscriptionPage — league-cap comparison row (LS-7394)', () => {
 
     expect(screen.getByText('Unlimited active leagues')).toBeInTheDocument();
     expect(screen.getByText('Salary cap leagues')).toBeInTheDocument();
+  });
+});
+
+// LS-7424: checkoutJustCompleted was a one-shot flag — once true it never reset,
+// so a second ?checkout=success in the same mounted page set it true again (a
+// no-op) and never reopened the activation window (no refetch, no polling).
+describe('SubscriptionPage — repeat checkout return in one session (LS-7424)', () => {
+  const POLL_INTERVAL_MS = 2000;
+  const POLL_BUDGET_TICKS = 8;
+  let navigateTo: (to: string) => void = () => undefined;
+
+  function NavigatorProbe() {
+    navigateTo = useNavigate();
+    return null;
+  }
+
+  // Each poll timer is scheduled by an effect that only re-runs after the
+  // previous tick's state update renders, so advance one interval per act().
+  function advancePollTicks(ticks: number) {
+    for (let i = 0; i < ticks; i += 1) {
+      act(() => {
+        jest.advanceTimersByTime(POLL_INTERVAL_MS);
+      });
+    }
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    sessionStorage.clear();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('reopens the activation window (immediate refetch + polling) for a second checkout return', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch,
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          '/profile/subscription?checkout=success&session_id=abc',
+        ]}
+      >
+        <NavigatorProbe />
+        <SubscriptionPage />
+      </MemoryRouter>,
+    );
+
+    // First checkout: immediate refetch, then the poll loop runs to exhaustion
+    // (premium never shows up) and closes the activation window.
+    expect(refetch).toHaveBeenCalledTimes(1);
+    advancePollTicks(POLL_BUDGET_TICKS);
+    const callsAfterFirstWindow = refetch.mock.calls.length;
+    expect(callsAfterFirstWindow).toBe(1 + POLL_BUDGET_TICKS);
+
+    // No further polling once the window has closed.
+    advancePollTicks(POLL_BUDGET_TICKS);
+    expect(refetch).toHaveBeenCalledTimes(callsAfterFirstWindow);
+
+    // Second checkout return in the same mounted page.
+    act(() => {
+      navigateTo('/profile/subscription?checkout=success&session_id=def');
+    });
+    expect(refetch).toHaveBeenCalledTimes(callsAfterFirstWindow + 1);
+
+    // ...and it polls again.
+    advancePollTicks(1);
+    expect(refetch).toHaveBeenCalledTimes(callsAfterFirstWindow + 2);
   });
 });
