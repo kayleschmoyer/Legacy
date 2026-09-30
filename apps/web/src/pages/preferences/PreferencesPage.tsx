@@ -15,6 +15,10 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  PREFS_STORAGE_KEY,
+  USER_PREFERENCES_CHANGED_EVENT,
+} from '@legacy-sports/shared-components/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { Bell } from '@tamagui/lucide-icons/icons/Bell';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
@@ -60,7 +64,6 @@ const FONT_DISPLAY = "'Big Shoulders Display', 'Oswald', system-ui, sans-serif";
 
 /* ─── Storage keys ─── */
 
-const PREFS_STORAGE_KEY = 'ls_user_preferences';
 const COLLAPSED_SECTIONS_KEY = 'ls_prefs_sections_collapsed';
 
 /* ─── Types ─── */
@@ -126,6 +129,8 @@ function loadPrefs(): UserPreferences {
 function savePrefs(prefs: UserPreferences): void {
   try {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    // Same-tab consumers (useReducedMotion, LS-7073) don't get a `storage` event.
+    window.dispatchEvent(new Event(USER_PREFERENCES_CHANGED_EVENT));
   } catch {
     // Best-effort persistence; ignore storage errors (private mode, quota).
   }
