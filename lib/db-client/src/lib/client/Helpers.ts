@@ -263,6 +263,10 @@ function isAuthFailure(err: unknown): boolean {
   );
 }
 
+// LS-10196: in-flight users per connection, and connections awaiting close.
+const inFlightUsers = new WeakMap<object, number>();
+const discardedConnections = new WeakSet<object>();
+
 /**
  * Open a database connection, run `callback`, and close the connection.
  *
@@ -296,6 +300,11 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
 
     let initializationFailed = false;
     let recoverableError = false;
+
+    // LS-10196: a cached connection is shared by every concurrent runWithClient
+    // call (and by their still-running queries). Track users so a call that
+    // discards the connection cannot end the pool under its siblings.
+    inFlightUsers.set(connection, (inFlightUsers.get(connection) ?? 0) + 1);
 
     try {
       // Only initialize if not already initialized (important for cached connections)
@@ -359,12 +368,34 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
       // Close (and evict from the cache) whenever the connection cannot be
       // trusted for the next call, so the following iteration — or the next
       // invocation — always starts from a fresh one.
+      const remainingUsers = (inFlightUsers.get(connection) ?? 1) - 1;
+      if (remainingUsers > 0) {
+        inFlightUsers.set(connection, remainingUsers);
+      } else {
+        inFlightUsers.delete(connection);
+      }
+
       if (!reuseConnection || initializationFailed || recoverableError) {
+        if (reuseConnection) {
+          // Evict now so new callers get a fresh connection, but only if the
+          // slot still holds this connection (a sibling may have replaced it).
+          const cacheKey = getCacheKey(options, schema);
+          if (connectionCache.get(cacheKey) === connection) {
+            connectionCache.delete(cacheKey);
+          }
+        }
+        discardedConnections.add(connection);
+      } else {
+        LOGGER.debug('Keeping connection open for reuse');
+      }
+
+      // Close a discarded connection only once its last in-flight user is done;
+      // ending the pool earlier fails siblings with "Cannot use a pool after
+      // calling end on the pool".
+      if (remainingUsers === 0 && discardedConnections.has(connection)) {
+        discardedConnections.delete(connection);
         try {
           LOGGER.debug('Disconnecting client');
-          if (reuseConnection) {
-            connectionCache.delete(getCacheKey(options, schema));
-          }
           await connection.close();
           LOGGER.debug('Client disconnected');
         } catch (err) {
@@ -373,8 +404,6 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
             LOGGER.debug(err.message);
           }
         }
-      } else {
-        LOGGER.debug('Keeping connection open for reuse');
       }
     }
     // Reaches here only when: recoverableError=true AND attempt < MAX_QUERY_RETRIES

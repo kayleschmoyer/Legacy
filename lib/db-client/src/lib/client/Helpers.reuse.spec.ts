@@ -219,6 +219,44 @@ describe('runWithClient — connection reuse in Lambda (LS-9530)', () => {
     });
   });
 
+  it('does not end a shared pool while a concurrent call is still using it (LS-10196)', async () => {
+    const { runWithClient } = await loadHelpers();
+
+    // Warm the cached connection.
+    await runWithClient(OPTIONS, PUBLIC_SCHEMA, () => Promise.resolve('warm'));
+
+    let releaseSibling!: () => void;
+    const siblingGate = new Promise<void>((resolve) => {
+      releaseSibling = resolve;
+    });
+    const closedWhileSiblingRunning: boolean[] = [];
+
+    // Sibling A is mid-query on the shared connection.
+    const sibling = runWithClient(OPTIONS, PUBLIC_SCHEMA, async () => {
+      await siblingGate;
+      closedWhileSiblingRunning.push(mockClose.mock.calls.length > 0);
+      return 'sibling';
+    });
+
+    // Caller B hits a severed socket on its health check and discards the
+    // connection; it must not close the pool A is still using.
+    mockExecute
+      .mockRejectedValueOnce(new Error('Connection terminated unexpectedly'))
+      .mockResolvedValue([]);
+    await expect(
+      runWithClient(OPTIONS, PUBLIC_SCHEMA, () => Promise.resolve('b')),
+    ).resolves.toBe('b');
+
+    expect(mockClose).not.toHaveBeenCalled();
+
+    releaseSibling();
+    await expect(sibling).resolves.toBe('sibling');
+
+    expect(closedWhileSiblingRunning).toEqual([false]);
+    // Closed exactly once, after the last in-flight user finished.
+    expect(mockClose).toHaveBeenCalledTimes(1);
+  });
+
   describe('credential rotation', () => {
     afterEach(() => {
       delete process.env.DB_SECRET_NAME;
