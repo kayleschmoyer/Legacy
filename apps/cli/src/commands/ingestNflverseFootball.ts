@@ -84,6 +84,28 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
+/**
+ * Fetch one season's weekly stats CSV, or `null` when nflverse has no file for
+ * it (HTTP 404). Any other failure still throws.
+ *
+ * A 404 is a normal outcome, not an error (LS-10223): nflverse's series has
+ * gaps inside 1999-present (2002 returns 404 while 1999 and 2003 both exist),
+ * and the in-progress season's file is only posted once the season is under way.
+ */
+export async function fetchWeeklyStatsCsv(
+  season: number,
+  fetchImpl: (url: string) => Promise<string> = fetchText,
+): Promise<string | null> {
+  try {
+    return await fetchImpl(weeklyStatsUrl(season));
+  } catch (error) {
+    if (error instanceof HttpStatusError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Season range
 // ---------------------------------------------------------------------------
@@ -111,8 +133,8 @@ export type SeasonRange =
  * Unlike Retrosheet (LS-10232), nflverse publishes the current season's weekly
  * stats *during* the season, so the default upper bound is the current season
  * rather than last year. Seasons beyond it cannot exist and are clamped away;
- * a season whose file is not posted yet 404s and the season loop skips it with
- * a warning.
+ * a season with no file (not posted yet, or a gap year such as 2002) 404s and
+ * the season loop skips it (see `fetchWeeklyStatsCsv`).
  */
 export function resolveSeasonRange(
   args: Pick<IngestNflverseFootballArgs, 'from' | 'to'>,
@@ -233,25 +255,27 @@ export async function handleIngestNflverseFootball(
   let totalTeamObjects = 0;
   let totalSkipped = 0;
   let totalUnmapped = 0;
-  const unpublishedSeasons: number[] = [];
+  const missingSeasons: number[] = [];
+  const currentSeason = currentNflSeason(new Date());
 
   for (let season = from; season <= to; season++) {
-    const url = weeklyStatsUrl(season);
-    let weeklyCsv: string;
+    let weeklyCsv: string | null;
     try {
-      weeklyCsv = await fetchText(url);
+      weeklyCsv = await fetchWeeklyStatsCsv(season);
     } catch (error) {
-      // nflverse posts the current season's weekly file once the season is
-      // under way; before that it 404s. That is expected, not a failure.
-      if (error instanceof HttpStatusError && error.status === 404) {
-        unpublishedSeasons.push(season);
-        LOGGER.warn(
-          `Season ${season}: weekly stats not published yet (404 at ${url}), skipping`,
-          error,
-        );
-        continue;
-      }
       LOGGER.error(`Season ${season}: download failed`, error as Error);
+      continue;
+    }
+    if (weeklyCsv === null) {
+      // Expected, not a failure: no error object is logged. A past season with
+      // no file is a permanent gap in nflverse's series; only the in-progress
+      // season can simply be "not posted yet".
+      missingSeasons.push(season);
+      LOGGER.info(
+        season >= currentSeason
+          ? `Season ${season}: weekly stats not published yet, skipping`
+          : `Season ${season}: nflverse has no weekly stats file for this season, skipping`,
+      );
       continue;
     }
 
@@ -340,11 +364,11 @@ export async function handleIngestNflverseFootball(
     `Ingest complete: ${totalPlayerObjects} player objects, ${totalTeamObjects} team-defense objects, ` +
       `${totalSkipped} skipped (already present), ${totalUnmapped} distinct unmapped nflverse players (no pfr_id crosswalk)`,
   );
-  if (unpublishedSeasons.length > 0) {
+  if (missingSeasons.length > 0) {
     // Name them: a season silently absent from the corpus is indistinguishable
     // from one that was never requested when reading only the summary line.
-    LOGGER.warn(
-      `Season(s) not yet published by nflverse, ingested nothing: ${unpublishedSeasons.join(', ')}`,
+    LOGGER.info(
+      `Season(s) with no nflverse weekly stats file, ingested nothing: ${missingSeasons.join(', ')}`,
     );
   }
 }

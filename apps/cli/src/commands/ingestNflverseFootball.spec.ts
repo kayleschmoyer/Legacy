@@ -1,5 +1,6 @@
 import {
   currentNflSeason,
+  fetchWeeklyStatsCsv,
   FIRST_SEASON,
   resolveSeasonRange,
 } from './ingestNflverseFootball';
@@ -72,5 +73,41 @@ describe('resolveSeasonRange', () => {
       ok: false,
       error: '--from must be a whole year (got: NaN)',
     });
+  });
+});
+
+describe('fetchWeeklyStatsCsv (LS-10223)', () => {
+  const realFetch = global.fetch;
+  const respond = (status: number, body = '') =>
+    jest
+      .fn<Promise<Response>, [string]>()
+      .mockResolvedValue(new Response(body, { status }));
+
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it('returns null for a season nflverse has no file for (2002 is a gap year)', async () => {
+    const fetchMock = respond(404);
+    global.fetch = fetchMock;
+
+    await expect(fetchWeeklyStatsCsv(2002)).resolves.toBeNull();
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://github.com/nflverse/nflverse-data/releases/download/player_stats/stats_player_week_2002.csv',
+    );
+  });
+
+  it('returns the CSV body when the season exists', async () => {
+    global.fetch = respond(200, 'season,week\n2003,1\n');
+
+    await expect(fetchWeeklyStatsCsv(2003)).resolves.toBe(
+      'season,week\n2003,1\n',
+    );
+  });
+
+  it('still throws on non-404 HTTP failures', async () => {
+    global.fetch = respond(500);
+
+    await expect(fetchWeeklyStatsCsv(2003)).rejects.toThrow('failed: 500');
   });
 });
