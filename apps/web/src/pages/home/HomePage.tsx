@@ -20,6 +20,7 @@ import {
   type UserLeagueSummaryFragment,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
+import { migrateLegacyOnboardingFlag } from './onboardingStorage';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
@@ -195,14 +196,7 @@ export function HomePage(): React.JSX.Element {
     if (!hasLeagues && !summariesLoading) {
       const key = getOnboardingKey(userId);
       try {
-        const legacyDone = window.localStorage.getItem(
-          'ls_onboarding_complete',
-        );
-        if (legacyDone !== null && (JSON.parse(legacyDone) as boolean)) {
-          window.localStorage.setItem(key, JSON.stringify(true));
-          window.localStorage.removeItem('ls_onboarding_complete');
-          return;
-        }
+        if (migrateLegacyOnboardingFlag(window.localStorage, key)) return;
         const stored = window.localStorage.getItem(key);
         const completed =
           stored !== null ? (JSON.parse(stored) as boolean) : false;
