@@ -641,8 +641,22 @@ module "github_runners_android" {
     }
   })
 
-  runner_boot_time_in_minutes     = 2
-  minimum_running_time_in_minutes = 2
+  # NOT mirrored from the default pool. Its 2-minute window is justified by a
+  # ~30s boot for the Playwright AMI; the Android AMI is a 60 GB image with the
+  # SDK/emulator baked in and takes >2.5 min to boot and register. At 2 min the
+  # scale-down Lambda's orphan check (instance older than boot time, not yet
+  # registered in GitHub) reaped every freshly launched Android runner
+  # (LS-10327: i-0f851c2f0e79135eb tagged orphan 2026-09-22 17:07:19Z,
+  # i-053059f8cc76221fd tagged 2026-09-29 02:08:18Z — both ~2.7 min after
+  # launch). The queued APK job then sat for GitHub's 24h cap, and Deploy's
+  # `deploy-main` concurrency group cancelled every later push-to-main deploy
+  # (58 on 2026-09-29). The only observed success (2026-09-20) registered in
+  # ~3 min, i.e. won the race by one scale-down tick. 8 minutes gives a
+  # 3× margin over the observed registration time; the minimum-running floor
+  # matches it so a runner is never eligible for idle termination before it
+  # could have registered.
+  runner_boot_time_in_minutes     = 8
+  minimum_running_time_in_minutes = 8
 
   # AMI filter selects the "android" Packer source's name prefix — see
   # terraform/runners/packer/runner-ami.pkr.hcl's source.amazon-ebs.runner_android.
