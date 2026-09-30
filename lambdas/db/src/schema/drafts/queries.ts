@@ -168,20 +168,54 @@ builder.queryField('getCurrentDraftPick', (t) =>
         throw AuthenticationError();
       }
 
-      const [draft] = await context.db
-        .select()
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, args.draftId))
-        .limit(1);
-
-      if (!draft) return null;
-
-      // Members, spectators of public leagues, and admins may read (LS-8939)
-      await authorizeLoadedDraft(context, draft, 'read');
+      const { draftId } = args;
+      const userId = context.user.id;
 
       try {
-        return await getCurrentDraftPickInfo(context.db, args.draftId);
+        // Polled on every pick event alongside getDraftPicks, so it races
+        // the concurrent makeDraftPick write and shares the DB with slow
+        // sibling queries (Rollbar #260: masked "Internal server error"
+        // right after a 504 on GetAvailableDraftPlayers). Retry transient
+        // Postgres failures silently (LS-10303, mirroring LS-8397).
+        const [draft] = await withTransientRetry(
+          () =>
+            context.db
+              .select()
+              .from(PublicSchema.drafts)
+              .where(eq(PublicSchema.drafts.id, draftId))
+              .limit(1),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn('Retrying current pick draft lookup', {
+                draftId,
+                attempt,
+                dbError: formatDbError(detail),
+              }),
+          },
+        );
+
+        if (!draft) return null;
+
+        // Members, spectators of public leagues, and admins may read (LS-8939)
+        await authorizeLoadedDraft(context, draft, 'read');
+
+        return await withTransientRetry(
+          () => getCurrentDraftPickInfo(context.db, draftId),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn('Retrying current pick read', {
+                draftId,
+                attempt,
+                dbError: formatDbError(detail),
+              }),
+          },
+        );
       } catch (error) {
+        // Preserve typed client-facing errors (UNAUTHENTICATED / FORBIDDEN /
+        // BAD_USER_INPUT) so the client still receives the intended code.
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         // draft_teams is empty between league creation (which creates the
         // drafts row) and initializeDraft running (which populates
         // draft_teams) — an expected transient state while the commissioner
@@ -199,7 +233,33 @@ builder.queryField('getCurrentDraftPick', (t) =>
             extensions: { code: 'DRAFT_TEAMS_NOT_CONFIGURED' },
           });
         }
-        throw error;
+        const err = error instanceof Error ? error : new Error(String(error));
+        // A draft-state logic error (not a DB failure): log the real cause
+        // and rethrow unchanged.
+        if (err.message === 'Could not determine team for current pick') {
+          LOGGER.error('Failed to resolve current draft pick', err, {
+            draftId,
+            userId,
+          });
+          throw err;
+        }
+        // A DB failure that survived the bounded retry (connection drop,
+        // statement timeout, ...) would otherwise be masked by the formatter
+        // as a generic "Internal server error" (Rollbar #260 / #212,
+        // LS-10303). Log the real cause and re-throw with a stable,
+        // client-facing code carrying the SQLSTATE (not the raw SQL).
+        const detail = describeDbError(error);
+        LOGGER.error('Failed to load current draft pick', err, {
+          draftId,
+          userId,
+          dbError: formatDbError(detail),
+        });
+        throw new GraphQLError(
+          detail.code
+            ? `Failed to load current draft pick (database error ${detail.code})`
+            : 'Failed to load current draft pick',
+          { extensions: { code: 'DRAFT_CURRENT_PICK_LOAD_FAILED' } },
+        );
       }
     },
   }),

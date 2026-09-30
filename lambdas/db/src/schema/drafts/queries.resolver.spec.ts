@@ -697,6 +697,83 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
 
     expect(result).toEqual(pickInfo);
   });
+
+  // LS-10303 (Rollbar #260 / #212): a DB failure inside getCurrentDraftPick
+  // used to be re-thrown as a plain Error, which formatError scrubbed to a
+  // generic "Internal server error" with no way to diagnose it.
+  /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
+  function pgError(message: string, code: string): Error {
+    return Object.assign(new Error(message), { code });
+  }
+
+  function mockAuthorizedCaller() {
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 11 },
+      ])
+      .mockResolvedValueOnce([
+        { id: 900, draftId: 100, slot: 1, teamId: 11, autoPick: true },
+      ]);
+  }
+
+  it('re-throws a DB failure with a diagnosable client-facing code (no mask)', async () => {
+    mockAuthorizedCaller();
+    mockGetCurrentDraftPickInfo.mockRejectedValueOnce(
+      pgError('canceling statement due to statement timeout', '57014'),
+    );
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'Failed to load current draft pick (database error 57014)',
+      extensions: { code: 'DRAFT_CURRENT_PICK_LOAD_FAILED' },
+    });
+    // Non-transient error must NOT be retried.
+    expect(mockGetCurrentDraftPickInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a transient DB error and recovers without surfacing an error', async () => {
+    const pickInfo = {
+      draftId: 100,
+      teamId: 11,
+      round: 1,
+      pickNumber: 1,
+      overallPick: 1,
+      isComplete: false,
+    };
+    mockAuthorizedCaller();
+    mockGetCurrentDraftPickInfo
+      .mockRejectedValueOnce(pgError('deadlock detected', '40P01'))
+      .mockResolvedValueOnce(pickInfo);
+
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { draftId: 100 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual(pickInfo);
+    expect(mockGetCurrentDraftPickInfo).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects unauthenticated callers with UNAUTHENTICATED', async () => {
+    const resolve = getResolver();
+
+    await expect(
+      resolve(
+        {},
+        { draftId: 100 },
+        { user: null, db: mockDb },
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+  });
 });
 
 /**

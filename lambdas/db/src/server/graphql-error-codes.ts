@@ -53,6 +53,13 @@ export const CLIENT_FACING_CODES = new Set([
   // client-side Rollbar occurrence just becomes self-diagnosing (LS-8397,
   // mirroring LS-8287).
   'DRAFT_PICKS_LOAD_FAILED',
+  // getCurrentDraftPick re-throws a DB failure that survived its bounded
+  // transient retry with this stable code (carrying the SQLSTATE, not the raw
+  // SQL) instead of letting the formatter mask it as a generic "Internal
+  // server error". The resolver still LOGGER.errors the real cause, so nothing
+  // is hidden — the client-side Rollbar occurrence just becomes
+  // self-diagnosing (LS-10303, Rollbar #260; mirroring LS-8397).
+  'DRAFT_CURRENT_PICK_LOAD_FAILED',
   // scoreboard re-throws a sanitized error when the upstream MLB data
   // provider fails (e.g. a BallDontLie API timeout with no stale cache to
   // fall back on). The resolver already LOGGER.errors the real cause
