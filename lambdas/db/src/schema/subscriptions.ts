@@ -36,10 +36,60 @@ import {
   type VerifiedAppleTransactionPayload,
 } from '../apple-jws';
 
-// Number of trial days to apply on new subscriptions, or undefined if no trial.
-const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
-  ? parseInt(process.env['STRIPE_TRIAL_PERIOD_DAYS'], 10)
-  : undefined;
+const MAX_TRIAL_PERIOD_DAYS = 90;
+
+/**
+ * Parse the `STRIPE_TRIAL_PERIOD_DAYS` env value into a trial length clamped to
+ * [0, 90] days (LS-7425). Missing or non-numeric input yields `undefined` (no
+ * trial). A parsed value outside the range is clamped and a warning is logged so
+ * a misconfigured env var is visible rather than silently granting a bad trial.
+ *
+ * Exported for unit testing.
+ */
+export function parseTrialPeriodDays(
+  raw: string | undefined,
+): number | undefined {
+  if (!raw) return undefined;
+  const parsed = parseInt(raw, 10);
+  if (Number.isNaN(parsed)) {
+    LOGGER.warn('Ignoring non-numeric STRIPE_TRIAL_PERIOD_DAYS', { raw });
+    return undefined;
+  }
+  const clamped = Math.min(Math.max(parsed, 0), MAX_TRIAL_PERIOD_DAYS);
+  if (clamped !== parsed) {
+    LOGGER.warn('Clamped out-of-range STRIPE_TRIAL_PERIOD_DAYS', {
+      raw,
+      clamped,
+    });
+  }
+  return clamped;
+}
+
+// Number of trial days (clamped to [0, 90]) to apply on new subscriptions, or
+// undefined if no trial.
+const STRIPE_TRIAL_PERIOD_DAYS = parseTrialPeriodDays(
+  process.env['STRIPE_TRIAL_PERIOD_DAYS'],
+);
+
+/**
+ * Audit-log the trial length applied to a checkout session (LS-7425).
+ *
+ * Exported for unit testing.
+ */
+export function logCheckoutTrial(
+  userId: number,
+  trialParams: ReturnType<typeof buildCheckoutTrialParams>,
+): void {
+  const trialPeriodDays = trialParams.subscription.trial_period_days;
+  if (trialPeriodDays === undefined) {
+    LOGGER.info('Creating checkout session with no trial', { userId });
+    return;
+  }
+  LOGGER.info('Creating checkout session with trial', {
+    userId,
+    trialPeriodDays,
+  });
+}
 
 /**
  * Build the trial-dependent fragments of a Stripe Checkout Session.
@@ -678,6 +728,7 @@ builder.mutationField('createCheckoutSession', (t) =>
       );
 
       const trialParams = buildCheckoutTrialParams(STRIPE_TRIAL_PERIOD_DAYS);
+      logCheckoutTrial(userId, trialParams);
 
       let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
       try {

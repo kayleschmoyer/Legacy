@@ -90,6 +90,8 @@ import {
   getCachedAdminRevenueStats,
   getOrCreateStripeCustomer,
   getSubscriptionForUser,
+  logCheckoutTrial,
+  parseTrialPeriodDays,
   shouldRedirectToBillingPortal,
 } from './subscriptions';
 
@@ -550,6 +552,63 @@ describe('buildCheckoutTrialParams', () => {
     expect(buildCheckoutTrialParams(0)).toEqual({
       session: {},
       subscription: {},
+    });
+  });
+});
+
+describe('parseTrialPeriodDays (LS-7425)', () => {
+  const { warn } = jest.requireMock<{ LOGGER: { warn: jest.Mock } }>(
+    '@legacy-sports/logging',
+  ).LOGGER;
+  beforeEach(() => warn.mockClear());
+
+  it.each([
+    ['0', 0],
+    ['14', 14],
+    ['90', 90],
+  ])('passes in-range %s through without warning', (raw, expected) => {
+    expect(parseTrialPeriodDays(raw)).toBe(expected);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('clamps negative values to 0 and warns', () => {
+    expect(parseTrialPeriodDays('-5')).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['91', '999999'])('clamps %s to 90 and warns', (raw) => {
+    expect(parseTrialPeriodDays(raw)).toBe(90);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined for non-numeric input', () => {
+    expect(parseTrialPeriodDays('abc')).toBeUndefined();
+  });
+
+  it('returns undefined for missing or empty input', () => {
+    expect(parseTrialPeriodDays(undefined)).toBeUndefined();
+    expect(parseTrialPeriodDays('')).toBeUndefined();
+  });
+});
+
+describe('logCheckoutTrial (LS-7425)', () => {
+  const { info } = jest.requireMock<{ LOGGER: { info: jest.Mock } }>(
+    '@legacy-sports/logging',
+  ).LOGGER;
+  beforeEach(() => info.mockClear());
+
+  it('logs the applied trial days with userId', () => {
+    logCheckoutTrial(7, buildCheckoutTrialParams(14));
+    expect(info).toHaveBeenCalledWith(expect.any(String), {
+      userId: 7,
+      trialPeriodDays: 14,
+    });
+  });
+
+  it('explicitly logs when no trial is applied', () => {
+    logCheckoutTrial(7, buildCheckoutTrialParams(undefined));
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('no trial'), {
+      userId: 7,
     });
   });
 });
