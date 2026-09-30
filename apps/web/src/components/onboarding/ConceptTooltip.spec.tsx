@@ -115,4 +115,60 @@ describe('ConceptTooltip', () => {
 
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
+
+  describe('repositioning while visible (LS-6889)', () => {
+    const mockAnchorTop = (anchor: HTMLElement, top: number) => {
+      const el = anchor.parentElement as HTMLElement;
+      el.getBoundingClientRect = () =>
+        ({
+          top,
+          left: 400,
+          width: 40,
+          height: 20,
+          right: 440,
+          bottom: top + 20,
+        }) as DOMRect;
+    };
+
+    it('follows the anchor when an ancestor scrolls while the tooltip is visible', () => {
+      renderTooltip();
+      const anchor = getAnchor();
+      mockAnchorTop(anchor, 300);
+      fireEvent.focus(anchor);
+      expect(screen.getByRole('tooltip').style.top).toBe('292px');
+
+      mockAnchorTop(anchor, 200);
+      fireEvent.scroll(document.body);
+
+      expect(screen.getByRole('tooltip').style.top).toBe('192px');
+    });
+
+    it('recomputes the position when the window is resized', () => {
+      renderTooltip();
+      const anchor = getAnchor();
+      mockAnchorTop(anchor, 300);
+      fireEvent.focus(anchor);
+
+      mockAnchorTop(anchor, 250);
+      fireEvent(window, new Event('resize'));
+
+      expect(screen.getByRole('tooltip').style.top).toBe('242px');
+    });
+
+    it('stops listening once the tooltip is hidden', () => {
+      const removeSpy = jest.spyOn(window, 'removeEventListener');
+      renderTooltip();
+      const anchor = getAnchor();
+      fireEvent.focus(anchor);
+      fireEvent.blur(anchor);
+
+      expect(removeSpy).toHaveBeenCalledWith(
+        'scroll',
+        expect.any(Function),
+        true,
+      );
+      expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+      removeSpy.mockRestore();
+    });
+  });
 });

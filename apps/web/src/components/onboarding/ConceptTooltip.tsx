@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import {
@@ -54,7 +54,7 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
 
-  const computePos = () => {
+  const computePos = useCallback(() => {
     if (!anchorRef.current) return;
 
     const rect = anchorRef.current.getBoundingClientRect();
@@ -75,7 +75,32 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
       left: anchorCenterX + hOffset,
       hOffset,
     });
-  };
+  }, []);
+
+  // While visible, keep the card anchored if the anchor moves (an ancestor
+  // scrolls, the window resizes, or surrounding layout shifts).  Scroll is
+  // listened for in the capture phase because scroll events do not bubble, and
+  // the scrolling element is usually an ancestor container such as the
+  // OnboardingTutorial modal body rather than the window.
+  useEffect(() => {
+    if (!visible) return undefined;
+
+    computePos();
+    window.addEventListener('scroll', computePos, true);
+    window.addEventListener('resize', computePos);
+
+    let resizeObserver: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined' && anchorRef.current) {
+      resizeObserver = new ResizeObserver(computePos);
+      resizeObserver.observe(anchorRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', computePos, true);
+      window.removeEventListener('resize', computePos);
+      resizeObserver?.disconnect();
+    };
+  }, [visible, computePos]);
 
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerOverCardRef = useRef(false);
