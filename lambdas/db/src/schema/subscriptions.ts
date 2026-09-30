@@ -687,6 +687,11 @@ builder.mutationField('createCheckoutSession', (t) =>
           line_items: [{ price: args.priceId, quantity: 1 }],
           success_url: args.successUrl,
           cancel_url: args.cancelUrl,
+          // The webhook lives in a separate lambda: lambdas/stripe-webhook/src/index.ts
+          // (handleCheckoutSessionCompleted) reads this metadata.userId, verifies it
+          // against the Stripe customer via verifyCheckoutOwnership, and upserts the
+          // subscription row idempotently (event.id claim + stripeSubscriptionId
+          // conflict target). The same applies to subscription_data.metadata below.
           metadata: { userId: String(userId) },
           // When a trial is configured, defer card collection so the trial is
           // genuinely "no credit card required" (matches the pricing copy).

@@ -317,6 +317,66 @@ describe('stripe-webhook event handlers', () => {
       );
     });
 
+    it('writes the subscription row keyed on stripeSubscriptionId with userId from session metadata, so a replayed event upserts instead of duplicating (LS-7427)', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          created: 300,
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      const valuesFn = jest.fn();
+      const onConflictDoUpdateFn = jest.fn(() => Promise.resolve());
+      valuesFn.mockImplementation(() => ({
+        onConflictDoUpdate: onConflictDoUpdateFn,
+      }));
+      const writeDb = {
+        insert: jest.fn(() => ({ values: valuesFn })),
+        update: jest.fn(() => ({
+          set: jest.fn(() => ({ where: jest.fn(() => Promise.resolve()) })),
+        })),
+      };
+
+      setupNotProcessed();
+      setupOwnershipDbCheck();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb([])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(writeDb),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(valuesFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 42,
+          stripeCustomerId: 'cus_123',
+          stripeSubscriptionId: 'sub_123',
+          tier: 'premium',
+          lastEventTimestamp: 300,
+        }),
+      );
+      // Conflict target is the Stripe subscription id: re-running the same
+      // checkout event updates the existing row rather than inserting a second.
+      expect(onConflictDoUpdateFn).toHaveBeenCalledWith(
+        expect.objectContaining({ target: 'stripeSubscriptionId' }),
+      );
+    });
+
     it('applies the checkout upgrade even when a sibling event already wrote the same-second lastEventTimestamp (LS-9136)', async () => {
       // A single checkout fires customer.subscription.created/updated and
       // checkout.session.completed concurrently; Stripe's whole-second
