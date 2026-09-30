@@ -298,6 +298,20 @@ const ProfileSettingsPage: React.FC = () => {
     }
   }, [dbUsername, isEditingUsername]);
 
+  // LS-7237: closing/reloading the tab while the username save is in flight
+  // would abandon the request with no signal of whether the server applied it.
+  // Prompt the browser's native "leave site?" dialog until the mutation settles.
+  useEffect(() => {
+    if (!usernameLoading) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Required for the prompt to appear; modern browsers ignore the value.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [usernameLoading]);
+
   useEffect(() => {
     if (searchParams.get('discord_linked') === '1') {
       void refetchUser();

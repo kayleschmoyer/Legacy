@@ -25,6 +25,8 @@ type AuthMock = {
 };
 
 const mockUseAuth = jest.fn<AuthMock, []>();
+// Prefixed `mock` so jest's hoisted factory below may close over it.
+let mockUsernameLoading = false;
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
@@ -71,7 +73,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   }),
   useSetCanonicalEmailMutation: () => [jest.fn(), { loading: false }],
   useUpdateUserAvatarMutation: () => [jest.fn(), { loading: false }],
-  useUpdateUsernameMutation: () => [jest.fn(), { loading: false }],
+  useUpdateUsernameMutation: () => [
+    jest.fn(),
+    { loading: mockUsernameLoading },
+  ],
 }));
 
 jest.mock('../../components/profile/TwoFactorSection', () => ({
@@ -122,5 +127,41 @@ describe('ProfileSettingsPage avatar (LS-7232)', () => {
 
     expect(screen.queryByAltText('casey')).not.toBeInTheDocument();
     expect(screen.getAllByText('C').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ProfileSettingsPage username save in flight (LS-7237)', () => {
+  afterEach(() => {
+    mockUsernameLoading = false;
+  });
+
+  function fireBeforeUnload() {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event;
+  }
+
+  it('blocks tab close while the username save is in flight', () => {
+    mockUsernameLoading = true;
+    renderPage(null);
+
+    expect(fireBeforeUnload().defaultPrevented).toBe(true);
+  });
+
+  it('does not block tab close when no username save is pending', () => {
+    renderPage(null);
+
+    expect(fireBeforeUnload().defaultPrevented).toBe(false);
+  });
+
+  it('stops blocking tab close once the save settles', () => {
+    mockUsernameLoading = true;
+    const { rerender } = renderPage(null);
+    expect(fireBeforeUnload().defaultPrevented).toBe(true);
+
+    mockUsernameLoading = false;
+    rerender(<ProfileSettingsPage />);
+
+    expect(fireBeforeUnload().defaultPrevented).toBe(false);
   });
 });
