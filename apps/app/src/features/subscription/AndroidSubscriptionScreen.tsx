@@ -7,7 +7,7 @@
  *
  * Only renders on Android (Platform.OS === 'android').
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, Platform } from 'react-native';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { useGooglePlayBilling } from './useGooglePlayBilling';
@@ -30,24 +30,46 @@ export function AndroidSubscriptionScreen({
     clearError,
   } = useGooglePlayBilling();
 
+  // Track whether the current isSubscribed=true transition was triggered by a
+  // purchase or restore initiated in this component instance. isSubscribed is
+  // set asynchronously (purchase: via purchaseUpdatedListener ->
+  // handlePurchaseUpdate after verifyGooglePurchase; restore: via
+  // setIsSubscribed inside restorePurchases), so checking it synchronously
+  // after await always reads the stale closure value.
+  const purchaseInitiated = useRef(false);
+  const restoreInitiated = useRef(false);
+
+  useEffect(() => {
+    if (isSubscribed) {
+      if (purchaseInitiated.current) {
+        purchaseInitiated.current = false;
+        onSubscriptionComplete?.();
+      } else if (restoreInitiated.current) {
+        restoreInitiated.current = false;
+        Alert.alert(
+          'Purchases Restored',
+          'Your subscription has been restored successfully.',
+          [{ text: 'OK', onPress: () => onSubscriptionComplete?.() }],
+        );
+      }
+    } else if (error) {
+      // The purchase/restore failed without subscribing; drop the pending
+      // intent so a later, unrelated isSubscribed flip can't misfire.
+      purchaseInitiated.current = false;
+      restoreInitiated.current = false;
+    }
+  }, [isSubscribed, error, onSubscriptionComplete]);
+
   const handlePurchase = async (productId: GooglePlayProductId) => {
     clearError();
+    purchaseInitiated.current = true;
     await purchase(productId);
-    if (isSubscribed) {
-      onSubscriptionComplete?.();
-    }
   };
 
   const handleRestore = async () => {
     clearError();
+    restoreInitiated.current = true;
     await restorePurchases();
-    if (isSubscribed) {
-      Alert.alert(
-        'Purchases Restored',
-        'Your subscription has been restored successfully.',
-        [{ text: 'OK', onPress: () => onSubscriptionComplete?.() }],
-      );
-    }
   };
 
   if (Platform.OS !== 'android') {
