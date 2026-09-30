@@ -13,6 +13,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
   let mockFetchGoogleSubscription: jest.Mock;
   let mockIsActiveGoogleSubscription: jest.Mock;
   let mockCaptureWarning: jest.Mock;
+  let mockCheckAndIncrementRateLimit: jest.Mock;
   let mockLogger: {
     info: jest.Mock;
     warn: jest.Mock;
@@ -23,6 +24,7 @@ describe('Google Play mutation validation (LS-5121)', () => {
   const mockContext = {
     user: { id: 1, isAdmin: false },
     isImpersonating: false,
+    db: {},
   };
 
   beforeEach(async () => {
@@ -58,6 +60,13 @@ describe('Google Play mutation validation (LS-5121)', () => {
     }));
 
     jest.doMock('../server/stripe', () => ({ getStripeClient: jest.fn() }));
+
+    mockCheckAndIncrementRateLimit = jest.fn().mockResolvedValue({
+      allowed: true,
+    });
+    jest.doMock('./rate-limit', () => ({
+      checkAndIncrementRateLimit: mockCheckAndIncrementRateLimit,
+    }));
 
     jest.doMock('stripe', () => ({
       default: jest.fn().mockImplementation(() => ({})),
@@ -705,6 +714,9 @@ describe('Google Play mutation validation (LS-5121)', () => {
   // no manageable Stripe subscription, so free / IAP users get a clean 4xx-style
   // error instead of an opaque 500.
   describe('createBillingPortalSession (LS-5176)', () => {
+    const BILLING_PORTAL_UNAVAILABLE =
+      'Unable to open billing portal for this account.';
+
     /** Stub the single-row subscription lookup performed via
      *  runWithInternalClient → getSubscriptionForUser. */
     function installSubscriptionLookup(rows: unknown[]): void {
@@ -739,9 +751,13 @@ describe('Google Play mutation validation (LS-5121)', () => {
           undefined as never,
         ),
       ).rejects.toMatchObject({
-        message: expect.stringContaining('No subscription found'),
+        message: BILLING_PORTAL_UNAVAILABLE,
         extensions: { code: 'BAD_USER_INPUT' },
       });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Billing portal unavailable for user',
+        { userId: 1, reason: 'no_subscription' },
+      );
     });
 
     it('throws UserInputError (BAD_USER_INPUT) when the subscription is not Stripe-managed', async () => {
@@ -758,8 +774,67 @@ describe('Google Play mutation validation (LS-5121)', () => {
           undefined as never,
         ),
       ).rejects.toMatchObject({
-        message: expect.stringContaining('App Store'),
+        message: BILLING_PORTAL_UNAVAILABLE,
         extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Billing portal unavailable for user',
+        { userId: 1, reason: 'not_stripe_managed' },
+      );
+    });
+
+    // LS-7401: the limiter runs before the DB/Stripe and is keyed per user.
+    it('rejects with RATE_LIMITED without touching the DB or Stripe once the limit is exceeded', async () => {
+      mockCheckAndIncrementRateLimit.mockResolvedValue({ allowed: false });
+      installSubscriptionLookup([
+        { id: 1, status: 'active', tier: 'premium', stripeCustomerId: 'cus_1' },
+      ]);
+
+      const resolve = getResolver('createBillingPortalSession');
+      await expect(
+        resolve(
+          {},
+          { returnUrl: 'https://app.legacy-fantasy.com/profile/subscription' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'RATE_LIMITED' } });
+
+      expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledWith(
+        mockContext.db,
+        expect.objectContaining({
+          bucket: 'create_billing_portal_session',
+          userId: 1,
+        }),
+      );
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      expect(dbClient.runWithInternalClient).not.toHaveBeenCalled();
+    });
+
+    it('creates a portal session for a Stripe-managed subscriber within the limit', async () => {
+      installSubscriptionLookup([
+        { id: 1, status: 'active', tier: 'premium', stripeCustomerId: 'cus_1' },
+      ]);
+      const create = jest
+        .fn()
+        .mockResolvedValue({ url: 'https://portal.test' });
+      const stripeModule = jest.requireMock('../server/stripe');
+      stripeModule.getStripeClient.mockResolvedValue({
+        billingPortal: { sessions: { create } },
+      });
+
+      const resolve = getResolver('createBillingPortalSession');
+      await expect(
+        resolve(
+          {},
+          { returnUrl: 'https://app.legacy-fantasy.com/profile/subscription' },
+          mockContext,
+          undefined as never,
+        ),
+      ).resolves.toEqual({ url: 'https://portal.test' });
+      expect(create).toHaveBeenCalledWith({
+        customer: 'cus_1',
+        return_url: 'https://app.legacy-fantasy.com/profile/subscription',
       });
     });
   });

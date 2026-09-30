@@ -16,8 +16,10 @@ import { builder } from './builder';
 import {
   AuthenticationError,
   ForbiddenError,
+  RateLimitedError,
   UserInputError,
 } from './graphql-errors';
+import { checkAndIncrementRateLimit } from './rate-limit';
 import {
   getSubscriptionTier,
   requireAdmin,
@@ -829,6 +831,12 @@ builder.mutationField('createCheckoutSession', (t) =>
   }),
 );
 
+const BILLING_PORTAL_RATE_LIMIT_BUCKET = 'create_billing_portal_session';
+const BILLING_PORTAL_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const BILLING_PORTAL_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const BILLING_PORTAL_UNAVAILABLE_MESSAGE =
+  'Unable to open billing portal for this account.';
+
 builder.mutationField('createBillingPortalSession', (t) =>
   t.field({
     type: BillingPortalSessionResultRef,
@@ -842,17 +850,26 @@ builder.mutationField('createBillingPortalSession', (t) =>
       if (!context.user) throw AuthenticationError();
       requireNotImpersonating(context);
 
-      const subscription = await getSubscriptionForUser(context.user.id);
-      if (!subscription) {
-        throw UserInputError(
-          'No subscription found — cannot open billing portal without an active subscription.',
-        );
+      // LS-7401: cap attempts per user before touching the DB or Stripe.
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: BILLING_PORTAL_RATE_LIMIT_BUCKET,
+        userId: context.user.id,
+        limit: BILLING_PORTAL_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: BILLING_PORTAL_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
       }
 
-      if (!subscription.stripeCustomerId) {
-        throw UserInputError(
-          'Subscription is not managed by Stripe — use the App Store to manage this subscription.',
-        );
+      // LS-7401: both failure branches return the same client message so the
+      // response cannot reveal which condition failed; the real reason is logged.
+      const subscription = await getSubscriptionForUser(context.user.id);
+      if (!subscription || !subscription.stripeCustomerId) {
+        LOGGER.info('Billing portal unavailable for user', {
+          userId: context.user.id,
+          reason: subscription ? 'not_stripe_managed' : 'no_subscription',
+        });
+        throw UserInputError(BILLING_PORTAL_UNAVAILABLE_MESSAGE);
       }
 
       const stripe = await getStripeClient();
