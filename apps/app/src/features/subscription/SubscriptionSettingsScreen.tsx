@@ -347,6 +347,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
           priceId,
           successUrl: CHECKOUT_SUCCESS_URL,
           cancelUrl: CHECKOUT_CANCEL_URL,
+          portalReturnUrl: BILLING_PORTAL_RETURN_URL,
         },
       });
       const url = result.data?.createCheckoutSession?.url;

@@ -2598,6 +2598,7 @@ export type MutationCreateBillingPortalSessionArgs = {
 
 export type MutationCreateCheckoutSessionArgs = {
   cancelUrl: Scalars['String']['input'];
+  portalReturnUrl: Scalars['String']['input'];
   priceId: Scalars['String']['input'];
   successUrl: Scalars['String']['input'];
 };

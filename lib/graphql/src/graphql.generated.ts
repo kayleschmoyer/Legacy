@@ -2604,6 +2604,7 @@ export type MutationCreateBillingPortalSessionArgs = {
 
 export type MutationCreateCheckoutSessionArgs = {
   cancelUrl: Scalars['String']['input'];
+  portalReturnUrl: Scalars['String']['input'];
   priceId: Scalars['String']['input'];
   successUrl: Scalars['String']['input'];
 };
@@ -9388,6 +9389,7 @@ export type CreateCheckoutSessionMutationVariables = Exact<{
   priceId: Scalars['String']['input'];
   successUrl: Scalars['String']['input'];
   cancelUrl: Scalars['String']['input'];
+  portalReturnUrl: Scalars['String']['input'];
 }>;
 
 export type CreateCheckoutSessionMutation = {
@@ -23385,11 +23387,13 @@ export const CreateCheckoutSession = gql`
     $priceId: String!
     $successUrl: String!
     $cancelUrl: String!
+    $portalReturnUrl: String!
   ) {
     createCheckoutSession(
       priceId: $priceId
       successUrl: $successUrl
       cancelUrl: $cancelUrl
+      portalReturnUrl: $portalReturnUrl
     ) {
       url
     }
@@ -23416,6 +23420,7 @@ export type CreateCheckoutSessionMutationFn = MutationFunction<
  *      priceId: // value for 'priceId'
  *      successUrl: // value for 'successUrl'
  *      cancelUrl: // value for 'cancelUrl'
+ *      portalReturnUrl: // value for 'portalReturnUrl'
  *   },
  * });
  */

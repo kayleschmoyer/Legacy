@@ -27,11 +27,13 @@ mutation CreateCheckoutSession(
   $priceId: String!
   $successUrl: String!
   $cancelUrl: String!
+  $portalReturnUrl: String!
 ) {
   createCheckoutSession(
     priceId: $priceId
     successUrl: $successUrl
     cancelUrl: $cancelUrl
+    portalReturnUrl: $portalReturnUrl
   ) {
     url
   }

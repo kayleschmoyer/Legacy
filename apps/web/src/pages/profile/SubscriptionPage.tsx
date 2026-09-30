@@ -855,6 +855,7 @@ const SubscriptionPage: React.FC = () => {
           priceId,
           successUrl: `${origin}/profile/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${origin}/profile/subscription?checkout=canceled`,
+          portalReturnUrl: `${origin}/profile/subscription`,
         },
       });
 

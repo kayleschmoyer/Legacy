@@ -763,4 +763,67 @@ describe('Google Play mutation validation (LS-5121)', () => {
       });
     });
   });
+
+  // LS-7426: the already-subscribed Billing Portal branch of
+  // createCheckoutSession must return to portalReturnUrl, not cancelUrl (which
+  // would land the user on ?checkout=canceled after a normal portal visit).
+  describe('createCheckoutSession billing-portal branch (LS-7426)', () => {
+    it('uses portalReturnUrl, not cancelUrl, as the portal return_url', async () => {
+      const mockDb = {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              orderBy: () => ({
+                limit: async () => [
+                  {
+                    id: 1,
+                    status: 'active',
+                    tier: 'premium',
+                    stripeCustomerId: 'cus_123',
+                  },
+                ],
+              }),
+            }),
+          }),
+        }),
+      };
+      const dbClient = jest.requireMock('@legacy-sports/db-client');
+      dbClient.runWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: typeof mockDb) => unknown) =>
+          cb(mockDb),
+      );
+
+      const portalCreate = jest
+        .fn()
+        .mockResolvedValue({ url: 'https://billing.stripe.com/p/session' });
+      const checkoutCreate = jest.fn();
+      jest.requireMock('../server/stripe').getStripeClient.mockResolvedValue({
+        billingPortal: { sessions: { create: portalCreate } },
+        checkout: { sessions: { create: checkoutCreate } },
+      });
+
+      const resolve = getResolver('createCheckoutSession');
+      const result = await resolve(
+        {},
+        {
+          priceId: 'price_123',
+          successUrl:
+            'https://app.legacy-fantasy.com/profile/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+          cancelUrl:
+            'https://app.legacy-fantasy.com/profile/subscription?checkout=canceled',
+          portalReturnUrl:
+            'https://app.legacy-fantasy.com/profile/subscription',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({ url: 'https://billing.stripe.com/p/session' });
+      expect(portalCreate).toHaveBeenCalledWith({
+        customer: 'cus_123',
+        return_url: 'https://app.legacy-fantasy.com/profile/subscription',
+      });
+      expect(checkoutCreate).not.toHaveBeenCalled();
+    });
+  });
 });

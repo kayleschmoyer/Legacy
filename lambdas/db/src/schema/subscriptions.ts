@@ -702,6 +702,9 @@ builder.mutationField('createCheckoutSession', (t) =>
       priceId: t.arg.string({ required: true }),
       successUrl: t.arg.string({ required: true }),
       cancelUrl: t.arg.string({ required: true }),
+      // Neutral return URL for the already-subscribed Billing Portal branch;
+      // cancelUrl/successUrl carry checkout semantics and must not be reused.
+      portalReturnUrl: t.arg.string({ required: true }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
@@ -735,7 +738,7 @@ builder.mutationField('createCheckoutSession', (t) =>
         });
         const portal = await stripe.billingPortal.sessions.create({
           customer: existing.stripeCustomerId,
-          return_url: args.cancelUrl,
+          return_url: args.portalReturnUrl,
         });
         return { url: portal.url };
       }

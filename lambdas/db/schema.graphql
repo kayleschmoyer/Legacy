@@ -2912,6 +2912,7 @@ type Mutation {
   """
   createCheckoutSession(
     cancelUrl: String!
+    portalReturnUrl: String!
     priceId: String!
     successUrl: String!
   ): CheckoutSessionResult

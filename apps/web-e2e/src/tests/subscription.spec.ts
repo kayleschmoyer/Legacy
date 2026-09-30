@@ -421,6 +421,15 @@ test.describe('Subscription upgrade flow @critical', () => {
     // Verify createCheckoutSession was called with the correct price ID.
     const checkoutRequest = await checkoutSent;
     expect(checkoutRequest.postData()).toContain('price_annual_test');
+
+    // LS-7426: the already-subscribed Billing Portal branch returns to a neutral
+    // URL (no checkout= query), not the checkout-cancelled URL.
+    const variables = (
+      JSON.parse(checkoutRequest.postData() ?? '{}') as {
+        variables?: { portalReturnUrl?: string };
+      }
+    ).variables;
+    expect(variables?.portalReturnUrl).toMatch(/\/profile\/subscription$/);
   });
 
   test('upgrade button shows unavailable banner when GetStripePrices returns null', async ({
