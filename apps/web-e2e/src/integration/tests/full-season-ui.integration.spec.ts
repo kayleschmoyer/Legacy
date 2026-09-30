@@ -536,72 +536,79 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Resolve a specific hitter free agent up front. The Free Agents UI
-    // paginates by `hitterAvgPointsPerGame` DESC and applies a client-side
-    // taken-player filter, so after the smart auto-draft fills the top
-    // hitters across all four teams the first page can render zero rows
-    // (LS-4325). Looking up a known free agent via the backend `freeAgents`
-    // query and searching by last name makes the assertion deterministic
-    // regardless of which players the draft consumed.
-    const PITCHER_POSITIONS: ReadonlySet<string> = new Set(['SP', 'RP', 'P']);
-    // Mirror buildFreeAgentAriaLabel in LeagueFreeAgents — the UI builds the
-    // accessible name by filtering empty/null parts and joining with a single
-    // space, so a player with only one of firstName/lastName populated (a
-    // common data-quality state in the historical player table — see LS-3853)
-    // still gets a matchable `aria-label="Add <name>"`.
+    // The claim step can spend up to its 60s reload budget recovering a
+    // starved free-agents query (below) on top of the API lookup, navigation,
+    // the claim modal and the commissioner waiver run — more than the 120s
+    // config default leaves room for.
+    test.setTimeout(180_000);
+
+    // Resolve the claim target from the same `players` query the Free Agents
+    // UI renders on its default Hitters tab (HITTER filter, rostered players
+    // excluded server-side, ordered by `hitterAvgPointsPerGame` DESC, first
+    // page), so the picked player is guaranteed to be a row the UI can show.
+    //
+    // LS-10308: this used to take the first hitter from the backend
+    // `freeAgents` query, which sorts by `last_name ASC` and caps at 200 rows.
+    // The dev player table holds ~370 historical stub rows with an empty
+    // last_name (e.g. id 77: firstName "Adams", lastName "", one 1942 NAL
+    // game, no eligible positions), and '' sorts first — so every run picked
+    // one of those stubs and searched the UI for the bare surname "Adams".
     const buildAriaName = (
       firstName?: string | null,
       lastName?: string | null,
     ) =>
+      // Mirror buildFreeAgentAriaLabel in LeagueDetailFreeAgentsTab — the UI
+      // builds the accessible name by dropping empty/null parts and joining
+      // with a single space.
       [firstName, lastName]
         .filter((s): s is string => Boolean(s?.trim()))
         .join(' ');
     let freeAgentAriaName = '';
     let freeAgentSearchTerm = '';
 
-    await test.step('Resolve a known hitter free agent via the API', async () => {
+    await test.step('Resolve a hitter free agent shown on the default tab', async () => {
       const data = await graphqlOk<{
-        freeAgents: Array<{
-          firstName: string;
-          lastName: string;
-          eligiblePositions: string[] | null;
+        players: Array<{
+          id: number;
+          firstName: string | null;
+          lastName: string | null;
         }>;
       }>(
         apiCommissioner,
-        `query GetFreeAgents($leagueId: Int!) {
-          freeAgents(leagueId: $leagueId) {
+        `query FullSeasonFreeAgentHitters($leagueId: Int!) {
+          players(
+            limit: 50
+            orderBy: "hitterAvgPointsPerGame"
+            orderDirection: "desc"
+            position: "HITTER"
+            leagueId: $leagueId
+            excludeRostered: true
+          ) {
+            id
             firstName
             lastName
-            eligiblePositions
           }
         }`,
         { leagueId: state.leagueId },
       );
 
-      // The Free Agents UI defaults to the Hitters tab and excludes pure
-      // pitchers from that view, so picking a pitcher would still fail with
-      // a missing Add-button error. Require a hitter with at least one
-      // non-empty name part so the aria-label match below succeeds for the
-      // common case where only one of firstName/lastName is populated.
-      const picked = data.freeAgents.find((p) => {
-        const positions = p.eligiblePositions ?? [];
-        const isHitter =
-          positions.length === 0 ||
-          positions.some((pos) => !PITCHER_POSITIONS.has(pos));
-        return isHitter && buildAriaName(p.firstName, p.lastName).length > 0;
-      });
+      // Prefer a player with both name parts populated: the full name is a
+      // selective search term (the UI's search matches `first || ' ' || last`)
+      // and avoids the surname-only stub rows described above.
+      const picked =
+        data.players.find(
+          (p) => Boolean(p.firstName?.trim()) && Boolean(p.lastName?.trim()),
+        ) ??
+        data.players.find(
+          (p) => buildAriaName(p.firstName, p.lastName).length > 0,
+        );
       expect(
         picked,
-        'Expected at least one named hitter free agent after the draft',
+        'Expected at least one named hitter on the first page of free agents after the draft',
       ).toBeTruthy();
       if (!picked) return; // narrows TS — expect above throws
       freeAgentAriaName = buildAriaName(picked.firstName, picked.lastName);
-      // The UI's search input applies a `fullName ILIKE %term%` match, so the
-      // longer of the two name parts is the most selective search term that
-      // still finds the row even when one part is empty.
-      const first = picked.firstName?.trim() ?? '';
-      const last = picked.lastName?.trim() ?? '';
-      freeAgentSearchTerm = last.length >= first.length ? last : first;
+      freeAgentSearchTerm = freeAgentAriaName;
     });
 
     await test.step('Navigate to Free Agents', async () => {
@@ -611,21 +618,39 @@ test.describe
     });
 
     await test.step('Claim a free agent via the UI', async () => {
-      // Search by the player's most selective name part to surface their row
-      // even when the unfiltered first page is empty (top hitters by PPG were
-      // drafted).
       const searchInput = page.getByPlaceholder(/search players/i);
       await expect(searchInput).toBeVisible({ timeout: 15000 });
       await searchInput.fill(freeAgentSearchTerm);
-      // The 300ms debounce + GQL round-trip + re-render is absorbed by
-      // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
-      // condition will only resolve once the filtered row has rendered.
-      const exactAddBtn = page.locator(
-        `button[aria-label="Add ${freeAgentAriaName}"]`,
-      );
-      await exactAddBtn.waitFor({ state: 'attached', timeout: 15000 });
+
+      // The Free Agents list is rendered by a browser-side query that can be
+      // throttled or slow under nightly integration load, leaving the list
+      // empty so the Add button never mounts (LS-10308; same failure mode the
+      // waiver-processing-ui claim helper recovers from — LS-8138/LS-8211).
+      // Wait for the row, and if the query was starved, reload and re-search
+      // within a bounded budget. The 300ms search debounce + GQL round-trip +
+      // re-render are absorbed by the poll itself, so no fixed sleeps.
+      // `.first()`: two historical players can share a full name, and any
+      // free agent carrying the picked name is a valid claim for this phase —
+      // without it the strict-mode visibility check would throw on 2 matches.
+      const exactAddBtn = page
+        .locator(`button[aria-label="Add ${freeAgentAriaName}"]`)
+        .first();
+      await reloadUntilVisible(page, exactAddBtn, {
+        budgetMs: 60_000,
+        pollTimeoutMs: 15_000,
+        finalTimeoutMs: 15_000,
+        cooldownMs: 0,
+        afterReload: async () => {
+          // A reload that fails to render the search box is left for the
+          // next poll to catch rather than failing the recovery loop outright.
+          const searchReady = await searchInput
+            .waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true)
+            .catch(() => false);
+          if (searchReady) await searchInput.fill(freeAgentSearchTerm);
+        },
+      });
       await exactAddBtn.scrollIntoViewIfNeeded();
-      await expect(exactAddBtn).toBeVisible({ timeout: 5000 });
       await exactAddBtn.click();
 
       // The WaiverClaimModal opens
