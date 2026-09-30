@@ -25,6 +25,7 @@ import {
 } from './constants';
 import { useStripePrices } from './useStripePrices';
 import { useIAP } from './useIAP';
+import { useGooglePlayBilling } from './useGooglePlayBilling';
 import { StepUpModal } from './StepUpModal';
 import { useCurrentUserInfo } from '../../common/auth/AuthHooks';
 
@@ -180,13 +181,20 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     onDismiss: onStepUpDismiss,
   } = useStepUpGate();
 
+  // Both hooks are called unconditionally (rules of hooks); each is a no-op off
+  // its own platform. Pick the restore bindings for the running platform so the
+  // loading/success/error handling below stays platform-agnostic.
+  const iapRestore = useIAP();
+  const googlePlayRestore = useGooglePlayBilling();
+  const isAndroid = Platform.OS === 'android';
   const {
     restorePurchases,
     loading: restoreLoading,
     error: restoreError,
     isSubscribed: restoreSubscribed,
     clearError: clearRestoreError,
-  } = useIAP();
+  } = isAndroid ? googlePlayRestore : iapRestore;
+  const restoreSupported = Platform.OS === 'ios' || isAndroid;
 
   // isSubscribed and error are set asynchronously inside restorePurchases, so
   // reading them synchronously after the await always sees the stale closure
@@ -392,16 +400,18 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   };
 
   const handleRestorePurchases = async () => {
-    if (Platform.OS !== 'ios') {
+    if (!restoreSupported) {
       Alert.alert(
         'Restore Purchases',
-        'Purchase restoration is only available on iOS. On other platforms, your subscription is automatically linked to your account.',
+        'Purchase restoration is only available in the iOS and Android apps. On other platforms, your subscription is automatically linked to your account.',
       );
       return;
     }
-    // Restore via StoreKit and sync the receipt server-side through the
+    // iOS: restore via StoreKit and sync the receipt server-side through the
     // restoreApplePurchases mutation. Opening the Apple subscriptions website
     // (the previous behavior) never restored premium access on this account.
+    // Android: restore via Google Play Billing and sync the purchase token
+    // server-side through restoreGooglePurchases.
     clearRestoreError();
     restoreInitiated.current = true;
     await restorePurchases();
@@ -796,8 +806,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             </YStack>
           ) : null}
 
-          {/* Restore Purchases (iOS only) */}
-          {Platform.OS === 'ios' ? (
+          {/* Restore Purchases (iOS App Store / Android Google Play) */}
+          {restoreSupported ? (
             <YStack
               borderRadius="$6"
               borderWidth={1}
@@ -834,7 +844,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
               <YStack padding="$5" gap="$3">
                 <Paragraph size="$3" color="$colorPress">
-                  If you previously subscribed via the App Store on another
+                  If you previously subscribed via the{' '}
+                  {isAndroid ? 'Google Play Store' : 'App Store'} on another
                   device, tap below to restore your access.
                 </Paragraph>
                 <Button
@@ -847,8 +858,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 </Button>
                 <Text fontSize="$2" color="$color10" textAlign="center">
                   Subscriptions auto-renew unless canceled at least 24 hours
-                  before the end of the billing period. Manage in your Apple ID
-                  settings.
+                  before the end of the billing period. Manage in your{' '}
+                  {isAndroid ? 'Google Play' : 'Apple ID'} settings.
                 </Text>
               </YStack>
             </YStack>

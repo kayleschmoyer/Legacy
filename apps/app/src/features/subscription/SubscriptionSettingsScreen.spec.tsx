@@ -159,6 +159,19 @@ jest.mock('./useIAP', () => ({
   useIAP: () => mockIapState,
 }));
 
+const mockGoogleRestorePurchases = jest.fn();
+const mockGoogleClearError = jest.fn();
+let mockGoogleState: {
+  restorePurchases: jest.Mock;
+  loading: boolean;
+  error: string | null;
+  isSubscribed: boolean;
+  clearError: jest.Mock;
+};
+jest.mock('./useGooglePlayBilling', () => ({
+  useGooglePlayBilling: () => mockGoogleState,
+}));
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const mockRefetch = jest.fn();
@@ -184,6 +197,13 @@ function resetMocks() {
     error: null,
     isSubscribed: false,
     clearError: mockClearError,
+  };
+  mockGoogleState = {
+    restorePurchases: mockGoogleRestorePurchases,
+    loading: false,
+    error: null,
+    isSubscribed: false,
+    clearError: mockGoogleClearError,
   };
 }
 
@@ -250,6 +270,102 @@ describe('SubscriptionSettingsScreen — Restore Purchases (LS-5192)', () => {
       );
     });
     expect(mockClearError).toHaveBeenCalled();
+  });
+});
+
+describe('SubscriptionSettingsScreen — Android Restore Purchases (LS-7579)', () => {
+  const originalOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOS });
+    jest.restoreAllMocks();
+  });
+
+  it('renders the Restore Purchases card with Google Play copy', () => {
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getAllByText('Restore Purchases').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Google Play Store/)).toBeTruthy();
+    expect(screen.queryByText(/App Store/)).toBeNull();
+    expect(screen.queryByText(/Apple ID/)).toBeNull();
+  });
+
+  it('invokes the Google Play restore flow, not the iOS one or the iOS-only alert', () => {
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+
+    render(<SubscriptionSettingsScreen />);
+    fireEvent.press(screen.getAllByText('Restore Purchases').slice(-1)[0]);
+
+    expect(mockGoogleClearError).toHaveBeenCalledTimes(1);
+    expect(mockGoogleRestorePurchases).toHaveBeenCalledTimes(1);
+    expect(mockRestorePurchases).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the loading label while the Google Play restore is in flight', () => {
+    mockGoogleState = { ...mockGoogleState, loading: true };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Restoring…')).toBeTruthy();
+  });
+
+  it('surfaces a confirmation alert once the restore succeeds', async () => {
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    fireEvent.press(screen.getAllByText('Restore Purchases').slice(-1)[0]);
+
+    mockGoogleState = { ...mockGoogleState, isSubscribed: true };
+    rerender(<SubscriptionSettingsScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Purchases Restored',
+        'Your subscription has been restored successfully.',
+      );
+    });
+  });
+
+  it('surfaces an error alert when the restore fails', async () => {
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    fireEvent.press(screen.getAllByText('Restore Purchases').slice(-1)[0]);
+
+    mockGoogleState = {
+      ...mockGoogleState,
+      error: 'No previous purchases found for this Google account.',
+    };
+    rerender(<SubscriptionSettingsScreen />);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Restore Purchases',
+        'No previous purchases found for this Google account.',
+      );
+    });
+    expect(mockGoogleClearError).toHaveBeenCalled();
+  });
+
+  it('does not render the Restore Purchases card on unsupported platforms', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'web' });
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText('Restore Purchases')).toBeNull();
   });
 });
 
