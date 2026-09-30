@@ -92,8 +92,10 @@ import {
   getSubscriptionForUser,
   logCheckoutTrial,
   parseTrialPeriodDays,
+  requireCheckoutEmail,
   shouldRedirectToBillingPortal,
 } from './subscriptions';
+import { builder } from './builder';
 
 type NotifyMock = jest.Mock<
   Promise<void>,
@@ -763,5 +765,110 @@ describe('getCachedAdminRevenueStats', () => {
     const result = await getCachedAdminRevenueStats();
     expect(result).toEqual(fakeStats);
     expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── createCheckoutSession email validation (LS-7422) ────────────────────────
+
+describe('requireCheckoutEmail', () => {
+  it('returns a valid email trimmed', () => {
+    expect(requireCheckoutEmail('  user@example.com ')).toBe(
+      'user@example.com',
+    );
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty string', ''],
+    ['whitespace-only string', '   \t '],
+    ['no @', 'not-an-email'],
+    ['no dot after @', 'user@localhost'],
+    ['inner whitespace', 'us er@example.com'],
+    ['multiple @', 'a@b@example.com'],
+  ])('throws UserInputError for %s', (_label, value) => {
+    expect(() => requireCheckoutEmail(value)).toThrow(
+      expect.objectContaining({
+        extensions: expect.objectContaining({ code: 'BAD_USER_INPUT' }),
+      }),
+    );
+  });
+});
+
+describe('createCheckoutSession resolver email guard (LS-7422)', () => {
+  const PRICE_ID = 'price_test';
+
+  function getResolver() {
+    const field = builder.toSchema().getMutationType()?.getFields()[
+      'createCheckoutSession'
+    ];
+    if (!field?.resolve) throw new Error('createCheckoutSession not found');
+    const resolve = field.resolve;
+    return (email: string | undefined, existing: unknown = null) => {
+      const limit = jest.fn(() => Promise.resolve(existing ? [existing] : []));
+      const db = {
+        select: () => ({
+          from: () => ({ where: () => ({ orderBy: () => ({ limit }) }) }),
+        }),
+      };
+      mockRunWithInternalClient.mockImplementation(
+        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+      );
+      return resolve(
+        undefined,
+        {
+          priceId: PRICE_ID,
+          successUrl: 'https://example.com/ok',
+          cancelUrl: 'https://example.com/cancel',
+        },
+        { user: { id: 7, email } },
+        {} as never,
+      );
+    };
+  }
+
+  function stubStripe() {
+    const stripe = {
+      customers: { create: jest.fn(), retrieve: jest.fn() },
+      checkout: { sessions: { create: jest.fn() } },
+      billingPortal: {
+        sessions: {
+          create: jest.fn().mockResolvedValue({ url: 'https://portal' }),
+        },
+      },
+    };
+    (getStripeClient as jest.Mock).mockResolvedValue(stripe);
+    return stripe;
+  }
+
+  it.each([
+    ['undefined', undefined],
+    ['empty', ''],
+    ['whitespace-only', '   '],
+    ['malformed', 'not-an-email'],
+  ])('rejects %s email without calling Stripe', async (_label, email) => {
+    const stripe = stubStripe();
+    const resolve = getResolver();
+
+    await expect(resolve(email)).rejects.toMatchObject({
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+
+    expect(stripe.customers.create).not.toHaveBeenCalled();
+    expect(stripe.customers.retrieve).not.toHaveBeenCalled();
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('still redirects to the billing portal for a subscribed user with no email', async () => {
+    const stripe = stubStripe();
+    const resolve = getResolver();
+
+    const result = await resolve(undefined, {
+      status: 'active',
+      stripeCustomerId: 'cus_existing',
+    });
+
+    expect(result).toEqual({ url: 'https://portal' });
+    expect(stripe.customers.create).not.toHaveBeenCalled();
   });
 });

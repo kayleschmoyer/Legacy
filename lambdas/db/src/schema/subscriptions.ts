@@ -116,6 +116,26 @@ export function buildCheckoutTrialParams(trialPeriodDays: number | undefined): {
   return { session: {}, subscription: {} };
 }
 
+// Basic shape check only: something@something.tld with no whitespace.
+const CHECKOUT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Return the trimmed account email, or throw a UserInputError when it is
+ * missing, blank, or not email-shaped (LS-7422). Stripe would otherwise create
+ * the customer without an email and billing receipts would never be delivered.
+ *
+ * Exported for unit testing.
+ */
+export function requireCheckoutEmail(email: string | null | undefined): string {
+  const trimmed = email?.trim() ?? '';
+  if (!CHECKOUT_EMAIL_PATTERN.test(trimmed)) {
+    throw UserInputError(
+      'Please add a valid email address to your account before subscribing.',
+    );
+  }
+  return trimmed;
+}
+
 // Allowlist of valid Stripe Price IDs for subscription plans.
 // When populated, only these IDs are accepted in createCheckoutSession.
 const STRIPE_ALLOWED_PRICE_IDS: ReadonlySet<string> = new Set(
@@ -720,10 +740,16 @@ builder.mutationField('createCheckoutSession', (t) =>
         return { url: portal.url };
       }
 
+      // Reject before any Stripe customer is created so a missing or malformed
+      // email can't silently produce a customer with no receipt destination
+      // (LS-7422). Deliberately after the billing-portal redirect above, which
+      // never touches email.
+      const checkoutEmail = requireCheckoutEmail(email);
+
       const customer = await getOrCreateStripeCustomer(
         stripe,
         userId,
-        email ?? '',
+        checkoutEmail,
         existing?.stripeCustomerId,
       );
 
