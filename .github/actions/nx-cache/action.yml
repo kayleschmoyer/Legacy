@@ -1,11 +1,20 @@
 name: "Nx Remote Cache Management"
-description: "Restore Nx cache from base branch and save outputs for future runs"
+description: "Restore the Nx task cache from the base branch and point Nx at it (restore-only, see note below)"
+
+# LS-10333 — why there is no save step:
+#
+# This is a composite action, and composite actions have no post-job phase.
+# Every step here runs at the point the job `uses:` it — i.e. during setup,
+# BEFORE a single Nx task has executed. The former "Save Nx Cache" step
+# therefore always ran against an empty (or not-yet-created) `.nx-cache`,
+# hit actions/cache/save's "Path Validation Error" and saved nothing — which
+# is why the repo never had a single `nx-cache-*` entry despite the step
+# existing for months. Saving Nx outputs correctly requires a save step at
+# the END of each job that runs Nx (or a non-composite action with a `post`
+# hook); that is tracked separately and is out of scope here. Until then this
+# action is restore-only, and the restore is a harmless no-op.
 
 inputs:
-  restore-only:
-    description: "Only restore cache, don't save (useful for PR builds)"
-    required: false
-    default: "false"
   base-branch:
     description: "Base branch to restore cache from (typically 'main')"
     required: false
@@ -70,27 +79,18 @@ runs:
         DEPS_HASH="${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}"
         NX_CONFIG_HASH="${{ hashFiles('nx.json', 'tsconfig.base.json') }}"
 
-        # Current branch cache key (used as a restore-keys prefix; never saved as-is)
+        # Current branch cache key
         CURRENT_KEY="nx-cache-${HEAD_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"
-
-        # Save key: GH Actions cache keys are immutable, so a fixed key per
-        # lockfile epoch means save becomes a permanent no-op after the first
-        # run. Suffixing the commit sha gives every run a fresh key to save,
-        # while CURRENT_KEY (and the restore-keys below) still let restores
-        # fall back to the newest cache with a matching prefix.
-        SAVE_KEY="${CURRENT_KEY}-${{ github.sha }}"
 
         # Base branch cache key (for restoring on PRs)
         BASE_KEY="nx-cache-${BASE_REF}-${DEPS_HASH}-${NX_CONFIG_HASH}"
 
         echo "current-key=$CURRENT_KEY" >> $GITHUB_OUTPUT
-        echo "save-key=$SAVE_KEY" >> $GITHUB_OUTPUT
         echo "base-key=$BASE_KEY" >> $GITHUB_OUTPUT
         echo "deps-hash=$DEPS_HASH" >> $GITHUB_OUTPUT
 
         echo "✅ Cache Keys Generated:"
         echo "  Current: $CURRENT_KEY"
-        echo "  Save:    $SAVE_KEY"
         echo "  Base:    $BASE_KEY"
 
     - name: "Restore Nx Cache from Base Branch"
@@ -114,7 +114,7 @@ runs:
         path: |
           .nx-cache
           node_modules/.cache/nx
-        key: ${{ steps.cache-keys.outputs.save-key }}
+        key: ${{ steps.cache-keys.outputs.current-key }}
         restore-keys: |
           nx-cache-${{ steps.determine-source.outputs.head-ref }}-${{ steps.cache-keys.outputs.deps-hash }}-
           nx-cache-${{ steps.determine-source.outputs.head-ref }}-
@@ -153,23 +153,6 @@ runs:
           CACHE_SIZE=$(du -sh .nx-cache 2>/dev/null | cut -f1 || echo "unknown")
           echo "📦 Cache size: $CACHE_SIZE"
         fi
-
-    - name: "Save Nx Cache"
-      # Only save cache if:
-      # 1. Not restore-only mode
-      # 2. This is a push to main, a successful merge, or a PR build (each
-      #    save-key is unique per commit, so PR saves can't collide with or
-      #    freeze the main-branch cache; worst case is eviction pressure at
-      #    the repo's cache quota, not extra spend)
-      if: |
-        inputs.restore-only != 'true' &&
-        (github.event_name == 'push' || github.event_name == 'merge_group' || github.event_name == 'pull_request')
-      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-      with:
-        path: |
-          .nx-cache
-          node_modules/.cache/nx
-        key: ${{ steps.cache-keys.outputs.save-key }}
 
     - name: "Configure Nx for Remote Cache"
       shell: bash

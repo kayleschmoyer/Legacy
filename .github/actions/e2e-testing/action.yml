@@ -134,9 +134,15 @@ runs:
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         echo "Playwright version: $VERSION"
 
-    - name: "Cache Playwright browsers"
+    # Restore/save are split (LS-10333): Actions caches are scoped to the ref
+    # that saved them, so a copy saved from refs/pull/N/merge is only ever
+    # reusable by that same PR — while every PR paid ~250 MB of upload for it
+    # and the repo blew past its 10 GB cache quota. PR runs now only restore
+    # (they can read main's copy); only non-PR runs on main save.
+    - name: "Restore Playwright browsers"
       if: inputs.should-run-e2e == 'true'
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      id: playwright-cache
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
       with:
         path: ~/.cache/ms-playwright
         key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ inputs.browser }}
@@ -446,6 +452,21 @@ runs:
         fi
 
         echo "::endgroup::"
+
+    # Save only from non-PR runs on main (see the restore step above). Runs
+    # after the install inside the e2e-tests step, whether or not the tests
+    # passed — the browser binaries are valid either way.
+    - name: "Save Playwright browsers"
+      if: |
+        !cancelled()
+        && inputs.should-run-e2e == 'true'
+        && github.event_name != 'pull_request'
+        && github.ref == 'refs/heads/main'
+        && steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
 
     # LS-8550: paired with the pre-test snapshot above — comparing the two
     # shows whether memory/load drifted meaningfully over the run (e.g. leaked

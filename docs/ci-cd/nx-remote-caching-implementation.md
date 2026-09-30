@@ -11,7 +11,7 @@ We've implemented **GitHub Actions-based remote caching** for Nx that provides s
 A reusable GitHub Action that:
 
 - Restores Nx build cache from the base branch (main) on PRs
-- Saves cache after successful builds on main
+- **Restore-only as of LS-10333.** The former save step lived inside this composite action, so it ran during job setup — before any Nx task executed — and never captured a single output (zero `nx-cache-*` entries ever existed). A working save needs an end-of-job step in each Nx-running job; until that lands the restore is a harmless no-op.
 - Uses smart cache keys based on dependencies and configuration
 - Provides fallback strategies for partial cache hits
 
