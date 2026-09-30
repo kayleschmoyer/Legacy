@@ -52,23 +52,21 @@ export const testEntitlements = {
   controlAllTeams: true,
 };
 
-/** A `t` field-builder stand-in: every DSL call returns its own options. */
+/**
+ * A `t` field-builder stand-in: every DSL call returns its own options, and
+ * every property (`t.arg.int`, `t.exposeBoolean`, ...) is another such call.
+ * Total rather than enumerated, because the mock-draft modules transitively
+ * import other schema modules whose fields use DSL calls this kit never lists.
+ */
 function fieldBuilder(): unknown {
   const passthrough = (options?: unknown): unknown => options ?? {};
-  return {
-    field: passthrough,
-    int: passthrough,
-    string: passthrough,
-    exposeInt: passthrough,
-    exposeString: passthrough,
-    exposeBoolean: passthrough,
-    exposeStringList: passthrough,
-    arg: Object.assign(passthrough, {
-      int: passthrough,
-      string: passthrough,
-      boolean: passthrough,
-    }),
-  };
+  return new Proxy(passthrough, { get: () => fieldBuilder() });
+}
+
+/** An inert type ref: `implement` chains, nothing is registered. */
+function inertRef(): { implement: () => unknown } {
+  const ref = { implement: (): unknown => ref };
+  return ref;
 }
 
 /**
@@ -90,19 +88,18 @@ export async function captureMockDraftResolvers(): Promise<CapturedMockDraftReso
     }
   };
 
-  const objectRefStub = (): { implement: () => unknown } => {
-    const ref = { implement: (): unknown => ref };
-    return ref;
+  // Only root fields are recorded. Every other builder call — objectRef,
+  // inputType, enumType, scalarType, ... from the transitively imported schema
+  // modules (drafts/types -> leagues/types -> scoring) — returns an inert ref,
+  // so a new builder method anywhere in that graph cannot break the import.
+  const recorded: Record<string, unknown> = {
+    queryField: registerField,
+    mutationField: registerField,
   };
-
   jest.doMock('../../builder', () => ({
-    builder: {
-      objectRef: objectRefStub,
-      objectType: () => undefined,
-      enumType: () => ({}),
-      queryField: registerField,
-      mutationField: registerField,
-    },
+    builder: new Proxy(recorded, {
+      get: (target, prop: string) => (prop in target ? target[prop] : inertRef),
+    }),
   }));
 
   jest.doMock('../../authorization', () => ({

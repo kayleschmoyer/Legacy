@@ -8,7 +8,7 @@
  */
 
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 
 import type { Context } from '../../builder';
@@ -166,10 +166,14 @@ export async function lockMockDraft(
   tx: PublicDb,
   draftId: number,
 ): Promise<DraftRow> {
-  const locked = await tx.execute(
-    sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
-  );
-  const row = locked.rows[0] as unknown as DraftRow | undefined;
+  // Typed select, not raw `SELECT *`: a raw row carries snake_case keys, so
+  // camelCase reads (createdBy, mockMode, lobbyExpiresAt) came back undefined
+  // and every host/lobby check refused (LS-10272).
+  const [row] = await tx
+    .select()
+    .from(PublicSchema.drafts)
+    .where(eq(PublicSchema.drafts.id, draftId))
+    .for('update');
 
   if (!row) {
     throw UserInputError('Draft not found');

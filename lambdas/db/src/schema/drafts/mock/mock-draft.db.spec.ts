@@ -37,8 +37,12 @@ const {
   leagueMembers,
   leagues,
   mockDraftSettings,
+  players,
   teams,
 } = integrationTestSchema;
+
+/** Baseball players enough to draft a 2-seat mock draft to completion. */
+const MOCK_DRAFT_PLAYER_POOL = 60;
 
 type Db = Awaited<ReturnType<typeof getTestDatabase>>;
 
@@ -49,6 +53,24 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
   beforeAll(async () => {
     db = await getTestDatabase();
     resolvers = await captureMockDraftResolvers();
+
+    // The shared setup seeds only 8 players; drafting a 2-seat mock draft to
+    // completion takes 2 x the sport-default roster (25) picks. Players are
+    // never cleaned up, and the `test_` bref prefix marks them as fixtures.
+    const brefIds = Array.from(
+      { length: MOCK_DRAFT_PLAYER_POOL },
+      (_, i) => `test_m${String(i + 1).padStart(3, '0')}`,
+    );
+    await db
+      .insert(players)
+      .values(
+        brefIds.map((brefId) => ({
+          firstName: 'Mock',
+          lastName: brefId,
+          brefId,
+        })),
+      )
+      .onConflictDoNothing({ target: players.brefId });
   });
 
   beforeEach(async () => {
@@ -129,7 +151,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('offline draft', () => {
     it('completes with zero leagues, teams or league_members rows', async () => {
-      const host = getUser(1);
+      const host = getUser(0);
       const before = await leagueRowCounts();
 
       const created = await resolvers.createMockDraft(
@@ -196,8 +218,8 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('online draft', () => {
     it('is joined, started and completed without a league', async () => {
-      const host = getUser(1);
-      const joiner = getUser(2);
+      const host = getUser(0);
+      const joiner = getUser(1);
       const before = await leagueRowCounts();
 
       const created = await resolvers.createMockDraft(
@@ -251,8 +273,8 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
     });
 
     it('rejects a join once the draft has started', async () => {
-      const host = getUser(1);
-      const latecomer = getUser(3);
+      const host = getUser(0);
+      const latecomer = getUser(2);
 
       const created = await resolvers.createMockDraft(
         {},
@@ -273,7 +295,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
     });
 
     it('seats AI on the slots still open when the host starts', async () => {
-      const host = getUser(1);
+      const host = getUser(0);
 
       const created = await resolvers.createMockDraft(
         {},
@@ -297,9 +319,9 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('concurrency', () => {
     it('gives the last seat to exactly one of two racing joiners', async () => {
-      const host = getUser(1);
-      const joinerA = getUser(2);
-      const joinerB = getUser(3);
+      const host = getUser(0);
+      const joinerA = getUser(1);
+      const joinerB = getUser(2);
 
       // Two seats: the host holds slot 1, so exactly one seat is claimable.
       const created = await resolvers.createMockDraft(
@@ -343,7 +365,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('weekly quota', () => {
     it('counts the caller’s own mock drafts, not leagues', async () => {
-      const host = getUser(1);
+      const host = getUser(0);
       const { countRecentMockDrafts, MOCK_DRAFT_FREE_WEEKLY_LIMIT } =
         await import('../helpers');
 
@@ -370,13 +392,13 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
       ).rejects.toThrow(/mock drafts per week/i);
 
       // Joining someone else's draft is free.
-      const other = getUser(2);
+      const other = getUser(1);
       expect(await countRecentMockDrafts(db, other.id)).toBe(0);
     });
 
     it('deleteMyMockDrafts removes only the caller’s drafts', async () => {
-      const host = getUser(1);
-      const other = getUser(2);
+      const host = getUser(0);
+      const other = getUser(1);
 
       await resolvers.createMockDraft(
         {},
@@ -407,8 +429,8 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('chat', () => {
     it('stores a seat holder’s message and refuses a non-holder', async () => {
-      const host = getUser(1);
-      const outsider = getUser(3);
+      const host = getUser(0);
+      const outsider = getUser(2);
 
       const created = await resolvers.createMockDraft(
         {},
@@ -442,7 +464,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
   describe('maintenance jobs', () => {
     it('expires a lobby past its deadline and keeps it until it leaves the quota window', async () => {
-      const host = getUser(1);
+      const host = getUser(0);
 
       const created = await resolvers.createMockDraft(
         {},
@@ -488,7 +510,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
     });
 
     it('purges an offline draft with no pick for 30 days', async () => {
-      const host = getUser(1);
+      const host = getUser(0);
 
       const created = await resolvers.createMockDraft(
         {},
@@ -519,7 +541,7 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
 
     it('refuses a non-system caller', async () => {
       await expect(
-        resolvers.expireMockDraftLobbies({}, {}, contextFor(getUser(1).id)),
+        resolvers.expireMockDraftLobbies({}, {}, contextFor(getUser(0).id)),
       ).rejects.toThrow(/system/i);
     });
   });

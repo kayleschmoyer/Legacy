@@ -201,6 +201,127 @@ export async function syncCurrentMatchupPositions(
 }
 
 /**
+ * The transactional body of `swapTeamMemberPositions`. Must run inside a
+ * transaction (`tx`).
+ *
+ * A caller working from stale client state can ask for a slot that a THIRD
+ * member of the team holds — clearing only A and B then made the assign step
+ * violate `team_members_uk_team_position` UNIQUE(team_id, position_id) and
+ * surface as an opaque 500 (LS-10245 / LS-10246). Mirror
+ * `updateTeamMemberPosition`'s clear-then-assign: bench any such incumbent
+ * first, and mirror that bench onto matchup_players.
+ */
+export async function swapTeamMemberPositionsInTx(
+  tx: PublicDb,
+  args: {
+    teamMemberIdA: number;
+    positionIdA?: number | null;
+    teamMemberIdB: number;
+    positionIdB?: number | null;
+  },
+) {
+  const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB } = args;
+
+  // Step 1: Clear both positions to avoid unique constraint violation
+  const cleared = await tx
+    .update(PublicSchema.teamMembers)
+    .set({ positionId: null })
+    .where(inArray(PublicSchema.teamMembers.id, [teamMemberIdA, teamMemberIdB]))
+    .returning({ teamId: PublicSchema.teamMembers.teamId });
+
+  // Step 1b: Bench any other member of these teams holding a target slot.
+  const targetPositionIds = [positionIdA, positionIdB].filter(
+    (id): id is number => id != null,
+  );
+  const teamIds = [
+    ...new Set(
+      cleared.map((c) => c.teamId).filter((id): id is number => id != null),
+    ),
+  ];
+  const displaced =
+    targetPositionIds.length > 0 && teamIds.length > 0
+      ? await tx
+          .update(PublicSchema.teamMembers)
+          .set({ positionId: null })
+          .where(
+            and(
+              inArray(PublicSchema.teamMembers.teamId, teamIds),
+              inArray(PublicSchema.teamMembers.positionId, targetPositionIds),
+              ne(PublicSchema.teamMembers.id, teamMemberIdA),
+              ne(PublicSchema.teamMembers.id, teamMemberIdB),
+            ),
+          )
+          .returning({
+            teamId: PublicSchema.teamMembers.teamId,
+            playerId: PublicSchema.teamMembers.playerId,
+          })
+      : [];
+
+  // Step 2: Assign new positions
+  const updatedA = await tx
+    .update(PublicSchema.teamMembers)
+    .set({ positionId: positionIdA ?? null })
+    .where(eq(PublicSchema.teamMembers.id, teamMemberIdA))
+    .returning({
+      id: PublicSchema.teamMembers.id,
+      teamId: PublicSchema.teamMembers.teamId,
+      leagueId: PublicSchema.teamMembers.leagueId,
+      playerId: PublicSchema.teamMembers.playerId,
+      positionId: PublicSchema.teamMembers.positionId,
+      onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+    });
+
+  const updatedB = await tx
+    .update(PublicSchema.teamMembers)
+    .set({ positionId: positionIdB ?? null })
+    .where(eq(PublicSchema.teamMembers.id, teamMemberIdB))
+    .returning({
+      id: PublicSchema.teamMembers.id,
+      teamId: PublicSchema.teamMembers.teamId,
+      leagueId: PublicSchema.teamMembers.leagueId,
+      playerId: PublicSchema.teamMembers.playerId,
+      positionId: PublicSchema.teamMembers.positionId,
+      onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+    });
+
+  if (updatedA.length === 0 || updatedB.length === 0) {
+    throw new Error('Failed to update one or both team member positions');
+  }
+
+  // Mirror all position changes onto matchup_players for the active week, in
+  // the SAME transaction as the team_members update above. Uses memberA's
+  // leagueId — both members belong to the same league. A sync failure rolls
+  // back the whole mutation instead of silently diverging team_members from
+  // matchup_players (LS-6034).
+  const [memberA, memberB] = [updatedA[0], updatedB[0]];
+  if (memberA.teamId && memberB.teamId) {
+    await syncCurrentMatchupPositions(tx, memberA.leagueId, [
+      {
+        teamId: memberA.teamId,
+        playerId: memberA.playerId,
+        positionId: positionIdA ?? null,
+      },
+      {
+        teamId: memberB.teamId,
+        playerId: memberB.playerId,
+        positionId: positionIdB ?? null,
+      },
+      ...displaced
+        .filter(
+          (d): d is { teamId: number; playerId: number } => d.teamId != null,
+        )
+        .map((d) => ({
+          teamId: d.teamId,
+          playerId: d.playerId,
+          positionId: null,
+        })),
+    ]);
+  }
+
+  return [memberA, memberB];
+}
+
+/**
  * Posts a system message to league chat when a commissioner edits a roster
  * they don't own after lock (LS-6443 / `allowCommissionerLockOverride`). This
  * is how the action is made visible to the league — never silent — so the
@@ -469,75 +590,9 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
 
         try {
           // Perform the swap atomically inside a transaction
-          const results = await db.transaction(async (tx) => {
-            // Step 1: Clear both positions to avoid unique constraint violation
-            await tx
-              .update(PublicSchema.teamMembers)
-              .set({ positionId: null })
-              .where(
-                inArray(PublicSchema.teamMembers.id, [
-                  teamMemberIdA,
-                  teamMemberIdB,
-                ]),
-              );
-
-            // Step 2: Assign new positions
-            const updatedA = await tx
-              .update(PublicSchema.teamMembers)
-              .set({ positionId: positionIdA ?? null })
-              .where(eq(PublicSchema.teamMembers.id, teamMemberIdA))
-              .returning({
-                id: PublicSchema.teamMembers.id,
-                teamId: PublicSchema.teamMembers.teamId,
-                leagueId: PublicSchema.teamMembers.leagueId,
-                playerId: PublicSchema.teamMembers.playerId,
-                positionId: PublicSchema.teamMembers.positionId,
-                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
-              });
-
-            const updatedB = await tx
-              .update(PublicSchema.teamMembers)
-              .set({ positionId: positionIdB ?? null })
-              .where(eq(PublicSchema.teamMembers.id, teamMemberIdB))
-              .returning({
-                id: PublicSchema.teamMembers.id,
-                teamId: PublicSchema.teamMembers.teamId,
-                leagueId: PublicSchema.teamMembers.leagueId,
-                playerId: PublicSchema.teamMembers.playerId,
-                positionId: PublicSchema.teamMembers.positionId,
-                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
-              });
-
-            if (updatedA.length === 0 || updatedB.length === 0) {
-              throw new Error(
-                'Failed to update one or both team member positions',
-              );
-            }
-
-            // Mirror both position changes onto matchup_players for the
-            // active week, in the SAME transaction as the team_members
-            // update above. Uses memberA's leagueId — both members belong to
-            // the same league. A sync failure now rolls back the whole
-            // mutation instead of silently diverging team_members from
-            // matchup_players (LS-6034).
-            const [memberA, memberB] = [updatedA[0], updatedB[0]];
-            if (memberA.teamId && memberB.teamId) {
-              await syncCurrentMatchupPositions(tx, memberA.leagueId, [
-                {
-                  teamId: memberA.teamId,
-                  playerId: memberA.playerId,
-                  positionId: positionIdA ?? null,
-                },
-                {
-                  teamId: memberB.teamId,
-                  playerId: memberB.playerId,
-                  positionId: positionIdB ?? null,
-                },
-              ]);
-            }
-
-            return [updatedA[0], updatedB[0]];
-          });
+          const results = await db.transaction((tx) =>
+            swapTeamMemberPositionsInTx(tx, args),
+          );
 
           if (meta.isCommissionerLockOverride) {
             await announceCommissionerLockOverride(context, {
