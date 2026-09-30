@@ -13,7 +13,10 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
-import SubscriptionPage from './SubscriptionPage';
+import SubscriptionPage, {
+  ACTIVATION_MAX_POLLS,
+  getActivationPollDelayMs,
+} from './SubscriptionPage';
 
 type ChildrenProps = { children?: React.ReactNode };
 
@@ -710,8 +713,7 @@ describe('SubscriptionPage — league-cap comparison row (LS-7394)', () => {
 // so a second ?checkout=success in the same mounted page set it true again (a
 // no-op) and never reopened the activation window (no refetch, no polling).
 describe('SubscriptionPage — repeat checkout return in one session (LS-7424)', () => {
-  const POLL_INTERVAL_MS = 2000;
-  const POLL_BUDGET_TICKS = 8;
+  const POLL_BUDGET_TICKS = ACTIVATION_MAX_POLLS;
   let navigateTo: (to: string) => void = () => undefined;
 
   function NavigatorProbe() {
@@ -720,11 +722,12 @@ describe('SubscriptionPage — repeat checkout return in one session (LS-7424)',
   }
 
   // Each poll timer is scheduled by an effect that only re-runs after the
-  // previous tick's state update renders, so advance one interval per act().
+  // previous tick's state update renders, so advance one backoff delay per
+  // act() (LS-7423: the delay grows with the attempt number).
   function advancePollTicks(ticks: number) {
     for (let i = 0; i < ticks; i += 1) {
       act(() => {
-        jest.advanceTimersByTime(POLL_INTERVAL_MS);
+        jest.advanceTimersByTime(getActivationPollDelayMs(i));
       });
     }
   }

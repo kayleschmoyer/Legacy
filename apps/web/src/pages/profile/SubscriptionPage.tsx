@@ -268,11 +268,33 @@ export function deriveIsPremium(
 // to premium once the (asynchronous) Stripe webhook reaches our Lambda and
 // updates the DB. Cold Lambda delivery takes 5-15s, so a single 3s refetch
 // frequently lands before the webhook and leaves the buyer staring at "Free
-// Plan". Poll at 2s intervals across the full cold-delivery window instead.
-export const ACTIVATION_POLL_INTERVAL_MS = 2000;
-// 8 polls × 2s = 16s of coverage, comfortably past the documented 5-15s cold
-// webhook delivery ceiling (the old behaviour covered only 3s).
+// Plan". Poll with a capped exponential backoff across the full delivery window
+// instead. LS-7423: under load the webhook can take up to ~30s, so the window
+// must cover at least that long (a flat 8 × 2s = 16s budget fell short).
+export const ACTIVATION_POLL_BASE_DELAY_MS = 1000;
+export const ACTIVATION_POLL_MAX_DELAY_MS = 5000;
+// Delays are 1s, 2s, 4s, then 5s: 8 polls = 1+2+4+5×5 = 32s of coverage.
 export const ACTIVATION_MAX_POLLS = 8;
+
+// Delay before poll number `pollAttempt` (0-based): base × 2^attempt, capped.
+// Pure so the schedule is unit-testable without timers.
+export function getActivationPollDelayMs(pollAttempt: number): number {
+  return Math.min(
+    ACTIVATION_POLL_BASE_DELAY_MS * 2 ** Math.max(0, pollAttempt),
+    ACTIVATION_POLL_MAX_DELAY_MS,
+  );
+}
+
+// Total elapsed time covered by the first `maxPolls` polls.
+export function getActivationTotalBudgetMs(
+  maxPolls: number = ACTIVATION_MAX_POLLS,
+): number {
+  let total = 0;
+  for (let attempt = 0; attempt < maxPolls; attempt += 1) {
+    total += getActivationPollDelayMs(attempt);
+  }
+  return total;
+}
 
 // Decide whether the post-checkout activation poll should fire again. Polling
 // stops as soon as the subscription reports premium (the webhook landed) or the
@@ -351,6 +373,31 @@ function ActivatingState() {
         <Paragraph size="$3" color="$colorPress">
           We&apos;re confirming your payment with Stripe. This usually takes a
           few seconds.
+        </Paragraph>
+      </YStack>
+    </XStack>
+  );
+}
+
+// LS-7423: shown once the activation poll budget is spent and the tier is still
+// not premium. Deliberately NOT the Free/Upgrade CTA — the payment may well have
+// succeeded, so we must not invite a duplicate checkout.
+function ActivationTimedOutState() {
+  return (
+    <XStack
+      data-testid="subscription-activation-timed-out"
+      alignItems="center"
+      gap="$3"
+    >
+      <AlertTriangle size={20} color={AMBER} flexShrink={0} />
+      <YStack flex={1} gap="$1">
+        <Paragraph size="$5" fontWeight="700" style={{ color: AMBER }}>
+          Still confirming your payment
+        </Paragraph>
+        <Paragraph size="$3" color="$colorPress">
+          Your payment may still be processing. Please don&apos;t purchase again
+          — refresh this page in a few minutes, or contact support if Premium
+          doesn&apos;t appear.
         </Paragraph>
       </YStack>
     </XStack>
@@ -707,6 +754,8 @@ const SubscriptionPage: React.FC = () => {
   // misleading "Free Plan" view. `pollAttempt` counts the delayed retries.
   const [activating, setActivating] = useState(false);
   const [pollAttempt, setPollAttempt] = useState(0);
+  // LS-7423: true once the poll budget is spent without the tier going premium.
+  const [activationTimedOut, setActivationTimedOut] = useState(false);
 
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
@@ -738,17 +787,22 @@ const SubscriptionPage: React.FC = () => {
     if (!checkoutJustCompleted) return;
     setActivating(true);
     setPollAttempt(0);
+    setActivationTimedOut(false);
     void refetch();
   }, [checkoutJustCompleted, refetch]);
 
-  // LS-5204: poll the subscription at 2s intervals until the premium tier shows
-  // up (the Stripe webhook landed) or the retry budget is exhausted. Cold Lambda
-  // webhook delivery takes 5-15s, so the previous single 3s refetch routinely
-  // resolved to "Free Plan" before the webhook arrived.
+  // LS-7423: budget spent but the tier is still not premium — render "still
+  // confirming" instead of the Free/Upgrade CTA.
+  const awaitingActivation = activationTimedOut && !isPremium;
+
+  // LS-5204 / LS-7423: poll the subscription with capped exponential backoff
+  // until the premium tier shows up (the Stripe webhook landed) or the retry
+  // budget (>= 30s) is exhausted, in which case `activationTimedOut` is set.
   useEffect(() => {
     if (!activating) return;
     if (!shouldContinueActivationPolling(isPremium, pollAttempt)) {
       setActivating(false);
+      setActivationTimedOut(!isPremium);
       // Re-arm the one-shot flag so a later checkout return in this same
       // session flips it false -> true again and reopens the window (LS-7424).
       setCheckoutJustCompleted(false);
@@ -757,7 +811,7 @@ const SubscriptionPage: React.FC = () => {
     const timer = setTimeout(() => {
       void refetch();
       setPollAttempt((attempt) => attempt + 1);
-    }, ACTIVATION_POLL_INTERVAL_MS);
+    }, getActivationPollDelayMs(pollAttempt));
     return () => clearTimeout(timer);
   }, [activating, isPremium, pollAttempt, refetch]);
 
@@ -926,6 +980,8 @@ const SubscriptionPage: React.FC = () => {
             <SectionBody>
               {activating && !isPremium ? (
                 <ActivatingState />
+              ) : awaitingActivation ? (
+                <ActivationTimedOutState />
               ) : loading ? (
                 <Paragraph size="$3" color="$colorPress">
                   Loading subscription details…
@@ -1124,8 +1180,9 @@ const SubscriptionPage: React.FC = () => {
             </SectionBody>
           </SectionCard>
 
-          {/* ── Upgrade Section (free users only; hidden while activating) ── */}
-          {(isFree || isCanceled) && !activating && (
+          {/* ── Upgrade Section (free users only; hidden while activating or
+              while a timed-out activation is still unconfirmed) ── */}
+          {(isFree || isCanceled) && !activating && !awaitingActivation && (
             <SectionCard style={goldCardStyle}>
               <SectionHeader
                 style={

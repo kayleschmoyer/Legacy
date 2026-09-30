@@ -1,7 +1,9 @@
 import {
   ACTIVATION_MAX_POLLS,
-  ACTIVATION_POLL_INTERVAL_MS,
+  ACTIVATION_POLL_MAX_DELAY_MS,
   deriveIsPremium,
+  getActivationPollDelayMs,
+  getActivationTotalBudgetMs,
   getStatusAccent,
   getTierLabel,
   shouldContinueActivationPolling,
@@ -116,12 +118,33 @@ describe('shouldContinueActivationPolling', () => {
     expect(shouldContinueActivationPolling(false, 3, 3)).toBe(false);
   });
 
-  it('covers the documented 5-15s cold webhook delivery window', () => {
-    // The old behaviour only refetched at 0s and 3s. The poll budget must now
-    // reach past the 15s ceiling described in the bug report.
-    expect(
-      ACTIVATION_MAX_POLLS * ACTIVATION_POLL_INTERVAL_MS,
-    ).toBeGreaterThanOrEqual(15000);
-    expect(ACTIVATION_POLL_INTERVAL_MS).toBe(2000);
+  it('covers the 30s under-load webhook delivery tail (LS-7423)', () => {
+    // A flat 8 × 2s = 16s budget expired before slow webhooks landed.
+    expect(getActivationTotalBudgetMs()).toBeGreaterThanOrEqual(30000);
+  });
+});
+
+// LS-7423: backoff schedule — fast early polls for the common case, capped so a
+// slow webhook is still polled at a sensible cadence until the budget is spent.
+describe('getActivationPollDelayMs', () => {
+  it('backs off exponentially from 1s', () => {
+    expect(getActivationPollDelayMs(0)).toBe(1000);
+    expect(getActivationPollDelayMs(1)).toBe(2000);
+    expect(getActivationPollDelayMs(2)).toBe(4000);
+  });
+
+  it('caps the delay', () => {
+    expect(getActivationPollDelayMs(3)).toBe(ACTIVATION_POLL_MAX_DELAY_MS);
+    expect(getActivationPollDelayMs(50)).toBe(ACTIVATION_POLL_MAX_DELAY_MS);
+  });
+
+  it('treats a negative attempt as the first poll', () => {
+    expect(getActivationPollDelayMs(-1)).toBe(1000);
+  });
+
+  it('sums the budget across the configured poll count', () => {
+    expect(getActivationTotalBudgetMs(3)).toBe(1000 + 2000 + 4000);
+    expect(getActivationTotalBudgetMs(0)).toBe(0);
+    expect(getActivationTotalBudgetMs(ACTIVATION_MAX_POLLS)).toBe(32000);
   });
 });
