@@ -24,10 +24,14 @@ export type LeaguePhase = LeagueRow['leaguePhase'];
 /**
  * Move a league draft to `status`, writing both the draft row and its league.
  *
- * Order matters only for economy, not correctness: the draft row is written
- * first, then the league. The LS-10073 `leagues_sync_draft_status` trigger
- * fires on the league write and re-asserts the same value on `drafts.status`,
- * which its `IS DISTINCT FROM` guard turns into a no-op.
+ * Lock order matters (LS-10176): the league row is written first, then the
+ * draft. The LS-10073 `leagues_sync_draft_status` trigger fires on the league
+ * write and updates `drafts.status`, so any writer that touches `leagues`
+ * (e.g. the draft-processor's `updateLeagueDraftStatus`) locks league → draft.
+ * Writing the draft first here locked draft → league and deadlocked against
+ * those writers ("deadlock detected"). The explicit draft write after the
+ * league write re-asserts the value the trigger already set and stamps
+ * `updated_at`.
  *
  * Must run inside the caller's transaction so the two rows commit together.
  *
@@ -49,19 +53,7 @@ export async function setLeagueDraftStatus(
   const { draftId, leagueId, status, leaguePhase, expectedLeagueStatus } =
     params;
 
-  await tx
-    .update(PublicSchema.drafts)
-    .set({ status, updatedAt: new Date() })
-    .where(
-      expectedLeagueStatus
-        ? and(
-            eq(PublicSchema.drafts.id, draftId),
-            eq(PublicSchema.drafts.status, expectedLeagueStatus),
-          )
-        : eq(PublicSchema.drafts.id, draftId),
-    );
-
-  await tx
+  const updatedLeagues = await tx
     .update(PublicSchema.leagues)
     .set({
       draftStatus: status,
@@ -74,7 +66,19 @@ export async function setLeagueDraftStatus(
             eq(PublicSchema.leagues.draftStatus, expectedLeagueStatus),
           )
         : eq(PublicSchema.leagues.id, leagueId),
-    );
+    )
+    .returning({ id: PublicSchema.leagues.id });
+
+  // The compare-and-set lost: the league already moved on, so the draft row
+  // must not be dragged along with it.
+  if (expectedLeagueStatus && updatedLeagues.length === 0) {
+    return;
+  }
+
+  await tx
+    .update(PublicSchema.drafts)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(PublicSchema.drafts.id, draftId));
 }
 
 /**
