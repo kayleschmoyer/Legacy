@@ -8,8 +8,10 @@ import {
   type CommandRunner,
   ERROR_LINE_PATTERN,
   extractErrorLines,
+  FILTER_PAGE_SIZE,
   logsTail,
   MAX_BATCH_FUNCTIONS,
+  MAX_FILTER_PAGES,
   RECENT_LINES,
   renderLogsAsMarkdown,
   truncateToByteLimit,
@@ -52,99 +54,195 @@ const baseParams = {
 };
 
 describe('logsTail time-window (startTime / endTime)', () => {
-  it('passes --start-time epoch ms instead of --since when startTime is set', async () => {
-    const runner: CommandRunner = jest.fn().mockResolvedValue('line1');
-    await logsTail(
-      {
-        ...baseParams,
-        function: 'graphql',
-        startTime: '2025-06-01T00:00:00.000Z',
-      },
-      runner,
-    );
-    const [, args] = (runner as jest.Mock).mock.calls[0] as [
+  const START = '2025-06-01T00:00:00.000Z';
+  const END = '2025-06-01T01:00:00.000Z';
+  const NL = String.fromCharCode(10);
+
+  /** Build one `aws logs filter-log-events --output json` page. */
+  function page(
+    messages: string[],
+    NextToken?: string,
+    baseTs = new Date(START).getTime(),
+  ): string {
+    return JSON.stringify({
+      events: messages.map((message, i) => ({
+        timestamp: baseTs + i * 1000,
+        message,
+        logStreamName: 'stream',
+      })),
+      ...(NextToken ? { NextToken } : {}),
+    });
+  }
+
+  function argsOfCall(runner: CommandRunner, call = 0): string[] {
+    const [, args] = (runner as jest.Mock).mock.calls[call] as [
       string,
       string[],
       string,
     ];
-    expect(args).toContain('--start-time');
-    expect(args).toContain(
-      String(new Date('2025-06-01T00:00:00.000Z').getTime()),
+    return args;
+  }
+
+  it('routes startTime through filter-log-events, never aws logs tail --start-time (LS-10339)', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page(['a']));
+    await logsTail(
+      { ...baseParams, function: 'graphql', startTime: START },
+      runner,
     );
+    const args = argsOfCall(runner);
+    expect(args.slice(0, 2)).toEqual(['logs', 'filter-log-events']);
+    expect(args).not.toContain('tail');
     expect(args).not.toContain('--since');
+    expect(args).toContain('--log-group-name');
+    expect(args).toContain('/aws/lambda/legacy-sports-dev-graphql');
+    expect(args).toContain('--start-time');
+    expect(args).toContain(String(new Date(START).getTime()));
+    expect(args).toContain('--max-items');
+    expect(args).toContain(String(FILTER_PAGE_SIZE));
+    expect(args).not.toContain('--end-time');
+    expect(args).not.toContain('--starting-token');
   });
 
   it('passes --end-time epoch ms when endTime is also set', async () => {
-    const runner: CommandRunner = jest.fn().mockResolvedValue('line1');
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page(['a']));
+    await logsTail(
+      { ...baseParams, function: 'graphql', startTime: START, endTime: END },
+      runner,
+    );
+    const args = argsOfCall(runner);
+    expect(args).toContain('--end-time');
+    expect(args).toContain(String(new Date(END).getTime()));
+  });
+
+  it('forwards filter as --filter-pattern on the windowed path', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page(['a']));
     await logsTail(
       {
         ...baseParams,
         function: 'graphql',
-        startTime: '2025-06-01T00:00:00.000Z',
-        endTime: '2025-06-01T01:00:00.000Z',
+        startTime: START,
+        filter: 'ERROR',
       },
       runner,
     );
-    const [, args] = (runner as jest.Mock).mock.calls[0] as [
-      string,
-      string[],
-      string,
-    ];
-    expect(args).toContain('--end-time');
-    expect(args).toContain(
-      String(new Date('2025-06-01T01:00:00.000Z').getTime()),
+    const args = argsOfCall(runner);
+    const idx = args.indexOf('--filter-pattern');
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe('ERROR');
+  });
+
+  it('renders events as "<ISO timestamp> <message>" lines in order', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockResolvedValue(page(['first', `second${NL}`]));
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, function: 'graphql', startTime: START },
+        runner,
+      ),
     );
+    expect(body.logs).toBe(
+      [
+        '2025-06-01T00:00:00.000Z first',
+        '2025-06-01T00:00:01.000Z second',
+      ].join(NL),
+    );
+    expect(body.truncated).toBe(false);
+  });
+
+  it('follows NextToken with --starting-token and concatenates pages', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockResolvedValueOnce(page(['p1-a', 'p1-b'], 'tok-1'))
+      .mockResolvedValueOnce(page(['p2-a'], 'tok-2', new Date(END).getTime()))
+      .mockResolvedValueOnce(page(['p3-a']));
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, function: 'graphql', startTime: START },
+        runner,
+      ),
+    );
+    expect(runner).toHaveBeenCalledTimes(3);
+    expect(argsOfCall(runner, 0)).not.toContain('--starting-token');
+    const second = argsOfCall(runner, 1);
+    expect(second[second.indexOf('--starting-token') + 1]).toBe('tok-1');
+    const third = argsOfCall(runner, 2);
+    expect(third[third.indexOf('--starting-token') + 1]).toBe('tok-2');
+    const lines = (body.logs as string).split(NL);
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain('p1-a');
+    expect(lines[3]).toContain('p3-a');
+    expect(body.truncated).toBe(false);
+  });
+
+  it(`stops after ${MAX_FILTER_PAGES} pages and flags the result truncated`, async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockImplementation(() => Promise.resolve(page(['x'], 'more')));
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, function: 'graphql', startTime: START },
+        runner,
+      ),
+    );
+    expect(runner).toHaveBeenCalledTimes(MAX_FILTER_PAGES);
+    expect(body.truncated).toBe(true);
+    expect(body.truncationNotice).toContain('filter-log-events pages');
   });
 
   it('still applies maxLines cap to time-windowed results', async () => {
-    const manyLines = Array.from({ length: 600 }, (_, i) => `line ${i}`).join(
-      '\n',
-    );
-    const runner: CommandRunner = jest.fn().mockResolvedValue(manyLines);
+    const many = Array.from({ length: 600 }, (_, i) => `line ${i}`);
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page(many));
     const { body } = unwrap(
       await logsTail(
         {
           ...baseParams,
           maxLines: 100,
           function: 'graphql',
-          startTime: '2025-06-01T00:00:00.000Z',
-          endTime: '2025-06-01T01:00:00.000Z',
+          startTime: START,
+          endTime: END,
         },
         runner,
       ),
     );
-    expect((body.logs as string).split('\n').length).toBeLessThanOrEqual(100);
+    const lines = (body.logs as string).split(NL);
+    expect(lines.length).toBeLessThanOrEqual(100);
+    expect(lines[lines.length - 1]).toContain('line 599');
     expect(body.truncated).toBe(true);
   });
 
-  it('surfaces startTime in the result payload', async () => {
-    const runner: CommandRunner = jest.fn().mockResolvedValue('ok');
+  it('substitutes the empty placeholder when the window has no events', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page([]));
     const { body } = unwrap(
       await logsTail(
-        {
-          ...baseParams,
-          function: 'graphql',
-          startTime: '2025-06-01T00:00:00.000Z',
-          endTime: '2025-06-01T01:00:00.000Z',
-        },
+        { ...baseParams, function: 'graphql', startTime: START, endTime: END },
         runner,
       ),
     );
-    expect(body.startTime).toBe('2025-06-01T00:00:00.000Z');
-    expect(body.endTime).toBe('2025-06-01T01:00:00.000Z');
+    expect(body.logs).toBe('(no log events found in the given time range)');
   });
 
-  it('falls back to --since when startTime is absent', async () => {
+  it('surfaces startTime/endTime in the result payload', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue(page(['ok']));
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, function: 'graphql', startTime: START, endTime: END },
+        runner,
+      ),
+    );
+    expect(body.startTime).toBe(START);
+    expect(body.endTime).toBe(END);
+  });
+
+  it('falls back to aws logs tail --since when startTime is absent', async () => {
     const runner: CommandRunner = jest.fn().mockResolvedValue('ok');
     await logsTail({ ...baseParams, function: 'graphql', since: '2h' }, runner);
-    const [, args] = (runner as jest.Mock).mock.calls[0] as [
-      string,
-      string[],
-      string,
-    ];
+    const args = argsOfCall(runner);
+    expect(args.slice(0, 2)).toEqual(['logs', 'tail']);
     expect(args).toContain('--since');
     expect(args).toContain('2h');
     expect(args).not.toContain('--start-time');
+    expect(args).not.toContain('filter-log-events');
   });
 });
 

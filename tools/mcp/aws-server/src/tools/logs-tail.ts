@@ -54,6 +54,21 @@ export const DEFAULT_MAX_BYTES = 150_000;
 const CLI_MAX_BUFFER = 20 * 1024 * 1024;
 
 /**
+ * Events fetched per `aws logs filter-log-events` page on the windowed
+ * (`startTime`/`endTime`) path. `aws logs tail` only understands `--since`,
+ * so an absolute window has to go through `filter-log-events`, which the CLI
+ * pages with `--max-items` / `--starting-token`.
+ */
+export const FILTER_PAGE_SIZE = 5_000;
+
+/**
+ * Hard cap on `filter-log-events` pages fetched for one window, so a very
+ * busy log group cannot turn one tool call into an unbounded crawl. When hit,
+ * the result is flagged `truncated` with an explanatory notice.
+ */
+export const MAX_FILTER_PAGES = 10;
+
+/**
  * Lines matching this pattern are extracted into the markdown `### Errors`
  * section. Covers AWS Lambda runtime errors (`ERROR`, `Error:`), warnings
  * (`WARN`), and thrown exception traces (`Exception`).
@@ -254,6 +269,85 @@ export function truncateToByteLimit(text: string, maxBytes: number): string {
   return firstNewline === -1 ? decoded : decoded.slice(firstNewline + 1);
 }
 
+interface AwsFilterEvent {
+  timestamp?: number;
+  message?: string;
+}
+
+interface AwsFilterPage {
+  events?: AwsFilterEvent[];
+  /** Emitted by the CLI's client-side pagination when `--max-items` truncates. */
+  NextToken?: string;
+  nextToken?: string;
+}
+
+/** Render one `filter-log-events` event in the same `<ISO ts> <message>` line shape `aws logs tail` prints. */
+function formatFilterEvent(event: AwsFilterEvent): string {
+  const ts =
+    event.timestamp != null ? new Date(event.timestamp).toISOString() : '';
+  const message = (event.message ?? '').trimEnd();
+  return ts ? `${ts} ${message}` : message;
+}
+
+interface WindowedFetch {
+  rawText: string;
+  /** True when {@link MAX_FILTER_PAGES} was reached with more pages remaining. */
+  pagesExhausted: boolean;
+}
+
+/**
+ * Fetch an absolute `startTime`/`endTime` window via
+ * `aws logs filter-log-events`, following `--starting-token` pagination up to
+ * {@link MAX_FILTER_PAGES} pages. Returns the events as newline-joined text so
+ * the caller can apply the same maxLines/maxBytes capping as the tail path.
+ */
+async function fetchWindowed(
+  logGroup: string,
+  params: CommonParams & { startTime: string },
+  runner: CommandRunner,
+  repoRoot: string,
+): Promise<WindowedFetch> {
+  const lines: string[] = [];
+  let startingToken: string | undefined;
+  let pages = 0;
+  do {
+    const args = [
+      'logs',
+      'filter-log-events',
+      '--log-group-name',
+      logGroup,
+      '--start-time',
+      String(new Date(params.startTime).getTime()),
+    ];
+    if (params.endTime) {
+      args.push('--end-time', String(new Date(params.endTime).getTime()));
+    }
+    if (params.filter) {
+      args.push('--filter-pattern', params.filter);
+    }
+    args.push('--max-items', String(FILTER_PAGE_SIZE));
+    if (startingToken) {
+      args.push('--starting-token', startingToken);
+    }
+    args.push('--output', 'json', '--no-cli-pager');
+
+    const output = await runner('aws', args, repoRoot, CLI_MAX_BUFFER);
+    const page: AwsFilterPage = output
+      ? (JSON.parse(output) as AwsFilterPage)
+      : {};
+    for (const event of page.events ?? []) {
+      lines.push(formatFilterEvent(event));
+    }
+    startingToken = page.NextToken ?? page.nextToken;
+    pages++;
+  } while (startingToken && pages < MAX_FILTER_PAGES);
+
+  return {
+    rawText: lines.join('\n'),
+    pagesExhausted: Boolean(startingToken),
+  };
+}
+
 async function fetchOne(
   fn: string,
   params: CommonParams,
@@ -262,21 +356,28 @@ async function fetchOne(
   const repoRoot = getRepoRoot();
   const logGroup = toLogGroup(fn, params.environment);
 
-  const args = ['logs', 'tail', logGroup, '--no-cli-pager'];
-  if (params.startTime) {
-    args.push('--start-time', String(new Date(params.startTime).getTime()));
-    if (params.endTime) {
-      args.push('--end-time', String(new Date(params.endTime).getTime()));
-    }
-  } else {
-    args.push('--since', params.since);
-  }
-  if (params.filter) {
-    args.push('--filter-pattern', params.filter);
-  }
-
   try {
-    const output = await runner('aws', args, repoRoot, CLI_MAX_BUFFER);
+    let output: string;
+    let pagesExhausted = false;
+    if (params.startTime) {
+      // `aws logs tail` rejects --start-time/--end-time; route absolute windows
+      // through filter-log-events instead (LS-10339).
+      const windowed = await fetchWindowed(
+        logGroup,
+        { ...params, startTime: params.startTime },
+        runner,
+        repoRoot,
+      );
+      output = windowed.rawText;
+      pagesExhausted = windowed.pagesExhausted;
+    } else {
+      const args = ['logs', 'tail', logGroup, '--no-cli-pager'];
+      args.push('--since', params.since);
+      if (params.filter) {
+        args.push('--filter-pattern', params.filter);
+      }
+      output = await runner('aws', args, repoRoot, CLI_MAX_BUFFER);
+    }
     const rawText = output || '(no log events found in the given time range)';
     const MAX_LINES = params.maxLines;
     const MAX_BYTES = params.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -288,7 +389,7 @@ async function fetchOne(
     const totalLines = lines.length;
 
     let logsText = lineLimited.join('\n');
-    let truncated = truncatedByLines;
+    let truncated = truncatedByLines || pagesExhausted;
     let truncatedByBytes = false;
     if (Buffer.byteLength(logsText, 'utf8') > MAX_BYTES) {
       logsText = truncateToByteLimit(logsText, MAX_BYTES);
@@ -298,6 +399,11 @@ async function fetchOne(
     const shownLines = logsText.split('\n').length;
 
     const noticeParts: string[] = [];
+    if (pagesExhausted) {
+      noticeParts.push(
+        `stopped after ${MAX_FILTER_PAGES} filter-log-events pages (${FILTER_PAGE_SIZE} events each); narrow the window to see the rest`,
+      );
+    }
     if (truncatedByLines) {
       noticeParts.push(`capped to last ${MAX_LINES} lines of ${totalLines}`);
     }

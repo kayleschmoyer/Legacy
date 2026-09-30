@@ -184,7 +184,7 @@ Git worktree management for parallel ticket work:
 
 AWS CloudWatch logs and SSO authentication health:
 
-- **aws_logs_tail** — Fetch recent CloudWatch logs for a Lambda function (wraps `aws logs tail`; auto-sets `AWS_PAGER=""` and `PYTHONIOENCODING=utf-8`)
+- **aws_logs_tail** — Fetch recent CloudWatch logs for a Lambda function (wraps `aws logs tail`, or `aws logs filter-log-events` for a `startTime`/`endTime` window; auto-sets `AWS_PAGER=""` and `PYTHONIOENCODING=utf-8`)
 - **aws_sso_status** — Check AWS SSO authentication status via `aws sts get-caller-identity`; returns caller identity or a structured remedy on failure
 
 See `.agents/skills/infrastructure/SKILL.md` for context.
