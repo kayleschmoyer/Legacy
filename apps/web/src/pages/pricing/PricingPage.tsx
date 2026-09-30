@@ -30,7 +30,7 @@ import {
   SURFACE_PANEL,
   withAlpha,
 } from '../../constants/colors';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { useStripePrices } from '../../hooks/useStripePrices';
 
 /* ─── Styled Components ─── */
@@ -492,7 +492,7 @@ const onSelectKey = (select: () => void) => (e: React.KeyboardEvent) => {
 export default function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const isPremium = useIsPremium();
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -512,17 +512,19 @@ export default function PricingPage() {
 
   // EnhancedAuthGuard sits outside BrowserRouter and only re-checks
   // window.location.pathname when it re-renders — it does not subscribe
-  // to React Router navigation events.  Unauthenticated users therefore
-  // need a full-page navigation so the guard fires on the new path and
-  // shows the login page.  Authenticated users use navigate() to stay
-  // in the SPA without losing in-memory state.
+  // to React Router navigation events.  The Free CTA is only rendered for
+  // unauthenticated users (LS-7184), so it needs a full-page navigation for
+  // the guard to fire on the new path and show the login page.
   const navigateToHome = () => {
-    if (isAuthenticated) {
-      navigate('/');
-    } else {
-      window.location.assign('/');
-    }
+    window.location.assign('/');
   };
+
+  // LS-7184: authenticated users are already past "get started", so the Free
+  // CTA is only for signed-out visitors. Free users see a disabled "Current
+  // plan" marker instead; premium users (and users whose tier is still
+  // loading) see no Free CTA at all.
+  const showFreeCta = !isAuthenticated;
+  const showCurrentPlan = isAuthenticated && !premiumLoading && !isPremium;
 
   const prices = useStripePrices();
   const monthlyPrice = prices.monthlyPrice;
@@ -678,7 +680,17 @@ export default function PricingPage() {
                 </Paragraph>
               </PlanHeader>
 
-              {isPremium ? (
+              {showFreeCta && (
+                <OutlineButton onPress={navigateToHome}>
+                  Get Started Free
+                </OutlineButton>
+              )}
+              {showCurrentPlan && (
+                <OutlineButton disabled data-testid="free-plan-current">
+                  Current plan
+                </OutlineButton>
+              )}
+              {isPremium && (
                 // LS-7185: Premium already includes everything in Free, and
                 // "Get Started Free" would silently navigate home as if it
                 // downgraded the plan. Show a non-interactive badge instead.
@@ -688,10 +700,6 @@ export default function PricingPage() {
                   data-testid="free-plan-included-badge"
                 >
                   Includes Free tier
-                </OutlineButton>
-              ) : (
-                <OutlineButton onPress={navigateToHome}>
-                  Get Started Free
                 </OutlineButton>
               )}
 
@@ -1101,9 +1109,11 @@ export default function PricingPage() {
               >
                 Upgrade to Premium
               </ActionButton>
-              <OutlineButton onPress={navigateToHome} width={180}>
-                Get Started Free
-              </OutlineButton>
+              {showFreeCta && (
+                <OutlineButton onPress={navigateToHome} width={180}>
+                  Get Started Free
+                </OutlineButton>
+              )}
             </XStack>
           </YStack>
         </ContentContainer>

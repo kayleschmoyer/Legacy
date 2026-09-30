@@ -34,8 +34,14 @@ jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+const mockUseAuth = jest.fn();
 jest.mock('@legacy-sports/shared-components/auth', () => ({
-  useAuth: () => ({ isAuthenticated: false }),
+  useAuth: (): unknown => mockUseAuth(),
+}));
+
+const mockUseIsPremiumStatus = jest.fn();
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: (): unknown => mockUseIsPremiumStatus(),
 }));
 
 type ChildrenProps = { children?: React.ReactNode; [key: string]: unknown };
@@ -111,15 +117,18 @@ jest.mock('@tamagui/lucide-icons', () => ({
   Zap: () => null,
 }));
 
-const mockUseIsPremium = jest.fn<boolean, []>();
-jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremium: (): boolean => mockUseIsPremium(),
-}));
-
 const mockUseStripePrices = jest.fn();
 jest.mock('../../hooks/useStripePrices', () => ({
   useStripePrices: (): unknown => mockUseStripePrices(),
 }));
+
+beforeEach(() => {
+  mockUseAuth.mockReturnValue({ isAuthenticated: false });
+  mockUseIsPremiumStatus.mockReturnValue({
+    isPremium: false,
+    isLoading: false,
+  });
+});
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -392,11 +401,9 @@ describe('PricingPage — feature comparison table semantics (LS-7180)', () => {
   });
 });
 
-// LS-7185: Premium users already include the Free tier, so the Free card must
-// not offer a "Get Started Free" CTA that silently navigates home.
-describe('PricingPage — Free plan card CTA for Premium users (LS-7185)', () => {
+// LS-7184 / LS-7185: the Free plan card CTA depends on who is viewing the page.
+describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockUseStripePrices.mockReturnValue({
       monthlyPrice: 4.99,
       annualTotal: 39.99,
@@ -406,22 +413,40 @@ describe('PricingPage — Free plan card CTA for Premium users (LS-7185)', () =>
     });
   });
 
-  it('shows the Get Started Free CTA on the Free card for non-premium users', () => {
-    mockUseIsPremium.mockReturnValue(false);
-
+  it('shows "Get Started Free" (card and bottom CTA) to unauthenticated visitors', () => {
     render(<PricingPage />);
 
-    const freeCard = screen.getByTestId('plan-card-free');
     expect(
-      within(freeCard).getByRole('button', { name: 'Get Started Free' }),
-    ).toBeInTheDocument();
+      screen.getAllByRole('button', { name: /get started free/i }),
+    ).toHaveLength(2);
+    expect(screen.queryByText('Current plan')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('free-plan-included-badge'),
     ).not.toBeInTheDocument();
   });
 
-  it('replaces the Free card CTA with a disabled "Includes Free tier" badge for premium users', () => {
-    mockUseIsPremium.mockReturnValue(true);
+  it('shows a disabled "Current plan" marker instead for authenticated free users', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+
+    render(<PricingPage />);
+
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('free-plan-current')).toHaveTextContent(
+      'Current plan',
+    );
+    expect(
+      screen.queryByTestId('free-plan-included-badge'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('replaces the Free card CTA with a disabled "Includes Free tier" badge for premium users (LS-7185)', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
 
     render(<PricingPage />);
 
@@ -432,5 +457,24 @@ describe('PricingPage — Free plan card CTA for Premium users (LS-7185)', () =>
     const badge = within(freeCard).getByTestId('free-plan-included-badge');
     expect(badge).toHaveTextContent('Includes Free tier');
     expect(badge).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByText('Current plan')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not claim "Current plan" while the tier is still loading', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: true,
+    });
+
+    render(<PricingPage />);
+
+    expect(screen.queryByText('Current plan')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
   });
 });

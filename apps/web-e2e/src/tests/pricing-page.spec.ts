@@ -5,7 +5,7 @@
  * - Page load: heading, billing toggle, plan cards
  * - Default state: annual toggle active, premium price shown
  * - Billing toggle: switching monthly / annual updates price display
- * - Free plan card: $0, "Get Started Free" button visible
+ * - Free plan card: $0; "Get Started Free" for signed-out visitors only (LS-7184)
  * - Premium plan card: "Upgrade to Premium" button, "Most Popular" badge
  * - Feature comparison table: "Compare plans" heading, key rows present
  * - FAQ section: heading visible
@@ -38,9 +38,13 @@ test.describe('Pricing page – page load @regression', () => {
       timeout: 10_000,
     });
     await expect(page.getByText('$0')).toBeVisible();
+
+    // LS-7184: signed-in users never see the "Get Started Free" CTA — it would
+    // just bounce them to Home. Signed-out visitors still do (see unauthTest
+    // coverage below).
     await expect(
-      page.getByRole('button', { name: /get started free/i }).first(),
-    ).toBeVisible();
+      page.getByRole('button', { name: /get started free/i }),
+    ).toHaveCount(0);
 
     // Premium plan
     await expect(page.getByText('PREMIUM').first()).toBeVisible();
@@ -244,42 +248,46 @@ unauthTest.describe(
 // LS-3562: /faq is a common alias that users and crawlers reach.
 // It must redirect to /pricing (which contains the FAQ accordion + CTA buttons)
 // so that "Get Started Free" is always reachable via a valid route.
-test.describe('/faq redirect @regression', () => {
-  test('redirects /faq to /pricing', async ({ page }) => {
+unauthTest.describe('/faq redirect @regression', () => {
+  unauthTest('redirects /faq to /pricing', async ({ page }) => {
     await page.goto('/faq');
     await page.waitForLoadState('load');
 
     await expect(page).toHaveURL(/\/pricing/);
   });
 
-  test('"Get Started Free" button is visible after /faq redirect', async ({
-    page,
-  }) => {
-    await page.goto('/faq');
-    // Wait for the client-side redirect to complete before asserting on
-    // page content — avoids a race between React Router's <Navigate> and
-    // the element check.
-    await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+  unauthTest(
+    '"Get Started Free" button is visible after /faq redirect',
+    async ({ page }) => {
+      await page.goto('/faq');
+      // Wait for the client-side redirect to complete before asserting on
+      // page content — avoids a race between React Router's <Navigate> and
+      // the element check.
+      await page.waitForURL(/\/pricing/, { timeout: 10_000 });
 
-    await expect(
-      page.getByRole('button', { name: /get started free/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
-  });
+      await expect(
+        page.getByRole('button', { name: /get started free/i }).first(),
+      ).toBeVisible({ timeout: 10_000 });
+    },
+  );
 
-  test('"Get Started Free" button is clickable after /faq redirect', async ({
-    page,
-  }) => {
-    await page.goto('/faq');
-    // Wait for the client-side redirect to complete before interacting.
-    await page.waitForURL(/\/pricing/, { timeout: 10_000 });
+  unauthTest(
+    '"Get Started Free" button is clickable after /faq redirect',
+    async ({ page }) => {
+      await page.goto('/faq');
+      // Wait for the client-side redirect to complete before interacting.
+      await page.waitForURL(/\/pricing/, { timeout: 10_000 });
 
-    const btn = page.getByRole('button', { name: /get started free/i }).first();
-    await expect(btn).toBeVisible({ timeout: 10_000 });
-    await btn.click();
-    // The button navigates to / — confirm the URL change so we know the click
-    // worked and the navigation settles before teardown.
-    await page.waitForURL('/');
-  });
+      const btn = page
+        .getByRole('button', { name: /get started free/i })
+        .first();
+      await expect(btn).toBeVisible({ timeout: 10_000 });
+      await btn.click();
+      // The button navigates to / — confirm the URL change so we know the click
+      // worked and the navigation settles before teardown.
+      await page.waitForURL('/');
+    },
+  );
 });
 
 // LS-3561: /pricing must be accessible without authentication so that
