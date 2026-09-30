@@ -38,6 +38,10 @@ const BILLING_PORTAL_RETURN_URL = `${APP_SCHEME}://subscription/portal-return`;
 // Apple subscription management deep link.
 const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
+// Google Play subscription management page.
+const GOOGLE_PLAY_SUBSCRIPTIONS_URL =
+  'https://play.google.com/store/account/subscriptions';
+
 function tierLabel(tier: string | null): string {
   switch (tier) {
     case 'premium':
@@ -380,6 +384,25 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
         // subscribed through the App Store (LS-835).
       }
       await Linking.openURL(APPLE_SUBSCRIPTIONS_URL);
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        const result = await createBillingPortalSession({
+          variables: { returnUrl: BILLING_PORTAL_RETURN_URL },
+        });
+        const url = result.data?.createBillingPortalSession?.url;
+        if (url) {
+          await Linking.openURL(url);
+          return;
+        }
+      } catch {
+        // Fall through to the Play Store subscriptions page for Android users
+        // who subscribed through Google Play, which has no Stripe customer so
+        // the billing portal rejects them (LS-7404).
+      }
+      await Linking.openURL(GOOGLE_PLAY_SUBSCRIPTIONS_URL);
       return;
     }
 

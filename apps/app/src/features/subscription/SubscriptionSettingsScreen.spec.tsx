@@ -613,6 +613,85 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
     expect(mockCreatePortal).not.toHaveBeenCalled();
   });
 
+  describe('Android manage subscription fallback (LS-7404)', () => {
+    const originalOS = Platform.OS;
+    const PLAY_URL = 'https://play.google.com/store/account/subscriptions';
+    let openUrlSpy: jest.SpyInstance;
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      mockRequireStepUp.mockImplementation((action: () => void) => action());
+      openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    });
+
+    afterEach(() => {
+      Object.defineProperty(Platform, 'OS', { value: originalOS });
+      openUrlSpy.mockRestore();
+      alertSpy.mockRestore();
+    });
+
+    it('opens the Play Store subscriptions page when the billing portal rejects', async () => {
+      const mockCreatePortal = jest.fn().mockRejectedValue(new Error('no'));
+      mockUseBillingPortalSession.mockReturnValue([
+        mockCreatePortal,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Manage Subscription'));
+        await Promise.resolve();
+      });
+
+      expect(mockCreatePortal).toHaveBeenCalledTimes(1);
+      expect(openUrlSpy).toHaveBeenCalledWith(PLAY_URL);
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+
+    it('opens the Play Store subscriptions page when the portal returns no URL', async () => {
+      const mockCreatePortal = jest.fn().mockResolvedValue({
+        data: { createBillingPortalSession: { url: null } },
+      });
+      mockUseBillingPortalSession.mockReturnValue([
+        mockCreatePortal,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Manage Subscription'));
+        await Promise.resolve();
+      });
+
+      expect(openUrlSpy).toHaveBeenCalledWith(PLAY_URL);
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+
+    it('still opens the Stripe portal URL on Android when the portal succeeds', async () => {
+      const mockCreatePortal = jest.fn().mockResolvedValue({
+        data: {
+          createBillingPortalSession: { url: 'https://billing.stripe.com/p/x' },
+        },
+      });
+      mockUseBillingPortalSession.mockReturnValue([
+        mockCreatePortal,
+        { loading: false },
+      ]);
+
+      render(<SubscriptionSettingsScreen />);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Manage Subscription'));
+        await Promise.resolve();
+      });
+
+      expect(openUrlSpy).toHaveBeenCalledTimes(1);
+      expect(openUrlSpy).toHaveBeenCalledWith('https://billing.stripe.com/p/x');
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+  });
+
   it('renders the StepUpModal when isStepUpPrompting is true', () => {
     mockIsStepUpPrompting = true;
 
