@@ -93,6 +93,46 @@ test.describe('Pricing page — billing toggle @regression', () => {
       timeout: 10_000,
     });
   });
+
+  // LS-7169 (PRC-009): every "Save X%" string must read the one derived
+  // annualSavingsPct, so a hardcoded/precomputed copy can't drift from it.
+  test('every "Save X%" instance on the page shows the same percentage', async ({
+    page,
+  }) => {
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    const main = page.getByTestId('main-content');
+    // The toggle badge renders a skeleton until prices load.
+    await expect(main.getByText(/save \d+%/i).first()).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const collectSavePercentages = async (): Promise<string[]> => {
+      const text = await main.innerText();
+      return [...text.matchAll(/save\s+(\d+)%/gi)].map((m) => m[1]);
+    };
+
+    // Annual (default): toggle badge + "save X% vs monthly" card subtext.
+    const annual = await collectSavePercentages();
+    expect(annual.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(annual).size).toBe(1);
+
+    // Monthly: toggle badge + "switch to annual and save X%" card subtext.
+    await page
+      .getByText(/^monthly$/i)
+      .first()
+      .click();
+    await expect(main.getByText(/switch to annual and save/i)).toBeVisible({
+      timeout: 5_000,
+    });
+    const monthly = await collectSavePercentages();
+    expect(monthly.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(monthly).size).toBe(1);
+
+    // The percentage is the same in both billing states.
+    expect(monthly[0]).toBe(annual[0]);
+  });
 });
 
 test.describe('Pricing page — feature comparison @smoke', () => {
