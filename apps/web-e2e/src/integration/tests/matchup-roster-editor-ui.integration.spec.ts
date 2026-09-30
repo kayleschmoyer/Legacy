@@ -31,6 +31,10 @@ import { expect, type Page } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
@@ -179,9 +183,9 @@ test.describe
 
   test('Phase 3: Automated draft and season activation', async ({
     commissionerPage: page,
-    commissionerJwt,
+    apiCommissioner,
   }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -244,55 +248,16 @@ test.describe
       await confirmBtn.click();
     });
 
-    await test.step('Wait for draft to complete via API poll', async () => {
-      // Poll the GraphQL API directly for draftStatus === 'completed' rather
-      // than navigating the browser to the commissioner URL on every iteration.
-      // Browser-based polling was unreliable because the SPA occasionally
-      // renders "This league does not exist" during the automated draft's async
-      // status transition — the getLeagueById query returns null transiently
-      // while the backend is updating the league record.  A direct API poll
-      // avoids that rendering race condition entirely.
-      //
-      // The poll callback returns null on errors so expect.poll retries on
-      // assertion failure rather than throwing (antipattern #1 in
-      // e2e-determinism.md). LS-4457 replaced the hand-rolled
-      // Date.now()+while-loop with this expect.poll formulation.
-      await expect
-        .poll(
-          async () => {
-            const data = await gqlFetch<{
-              league: { draftStatus: string } | null;
-            }>(
-              commissionerJwt,
-              `query GetLeagueDraftStatus($id: Int!) {
-                league(id: $id) { draftStatus }
-              }`,
-              { id: state.leagueId },
-            ).catch(() => null);
-            return data?.league?.draftStatus ?? null;
-          },
-          {
-            timeout: 180_000,
-            intervals: [5_000],
-            message: `league.draftStatus did not reach 'completed' within 3 minutes for league ${state.leagueId}`,
-          },
-        )
-        .toBe('completed');
-    });
-
-    await test.step('Season Active chip is visible in UI', async () => {
-      // Navigate to the commissioner panel exactly once after the API confirms
-      // the draft is complete.  The "Season Active" chip is rendered by
-      // LeagueHero (top of LeagueDetailPageV2) whenever draftStatus is
-      // 'active' or 'completed', so it is visible on any tab.
-      await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-      // The auto-retrying visibility assertion below is the deterministic gate
-      // (levers #3/#9). A prior networkidle load-state gate was removed
-      // (LS-7845): on a live app with Apollo polling networkidle never settles,
-      // so the call burned its full timeout before the .catch() — dead
-      // wall-clock that compounded shard-2's load pressure.
-      await expect(page.getByText('Season Active')).toBeVisible({
-        timeout: 15_000,
+    await test.step('Wait for Season Active status', async () => {
+      // Shared draft-completion wait (LS-10179). This spec previously ran its
+      // own 180 s `draftStatus === 'completed'` poll, shorter than one SQS
+      // redelivery of the draft-processor, which is how league 13360 failed
+      // here. The helper polls `league.draftStatus` over the API (no
+      // per-iteration navigation — the SPA can transiently render "This
+      // league does not exist" mid-transition), reports the status timeline
+      // on timeout, then asserts the Season Active chip once.
+      await waitForSeasonActive(page, state.leagueId, {
+        api: apiCommissioner,
       });
     });
   });

@@ -357,6 +357,58 @@ test.describe('Commissioner — deterministic api-polling path (LS-4344)', () =>
   });
 });
 
+// ── waitForSeasonActive timeout diagnostics (LS-10179) ──────────────────────
+//
+// A live-backend timeout must say where the draft stalled. Two nightly
+// failures (leagues 13360, 13724) reported only "never reached
+// active/completed", which cannot distinguish a draft-processor that failed
+// and reset the league (stuck at 'not-started'/'queued') from one running
+// slow ('in-progress'). The helper appends every distinct status it saw.
+
+test.describe('Commissioner — waitForSeasonActive timeout diagnostics (LS-10179)', () => {
+  test('timeout message carries the league id and draftStatus timeline', async ({
+    page,
+  }) => {
+    // First poll: a GraphQL errors[] response (must be recorded and retried,
+    // not abort the wait); then in-progress; then not-started (the
+    // draft-processor's error-recovery reset).
+    const responses: Array<Record<string, unknown>> = [
+      { errors: [{ message: 'transient' }] },
+      { data: { league: { draftStatus: 'in-progress' } } },
+      { data: { league: { draftStatus: 'not-started' } } },
+    ];
+    let apiPollCount = 0;
+    const apiStub = {
+      post: () => {
+        const payload = responses[Math.min(apiPollCount, responses.length - 1)];
+        apiPollCount += 1;
+        const body = JSON.stringify(payload);
+        return Promise.resolve({
+          ok: () => true,
+          status: () => 200,
+          json: () => Promise.resolve(payload),
+          text: () => Promise.resolve(body),
+        });
+      },
+    } as unknown as APIRequestContext;
+
+    const error = await waitForSeasonActive(page, 4242, {
+      api: apiStub,
+      deadlineMs: 10_000,
+    }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message).toContain('for league 4242');
+    expect(message).toMatch(
+      /timeline for league 4242: error@\d+s → in-progress@\d+s → not-started@\d+s/,
+    );
+  });
+});
+
 // ── Draft mode save-completion guard (LS-4352) ────────────────────────────────
 //
 // Guards against the race condition where a fixed 1s wait after "Save Draft

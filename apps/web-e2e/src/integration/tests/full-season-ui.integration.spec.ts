@@ -28,7 +28,10 @@ import { gqlFetch } from '../helpers/gql-fetch';
 import { graphqlOk } from '../helpers/graphql';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { test } from '../fixtures/ui';
 
@@ -308,8 +311,8 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Automated drafts can take 80–180s; allow generous time for Lambda cold starts.
-    test.setTimeout(360_000);
+    // Draft budget + setup/badge headroom, justified in wait-for-season-active.ts (LS-10179).
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
@@ -378,7 +381,6 @@ test.describe
       // UI binds to) before asserting the badge — eliminates the Apollo
       // cache/render race that produced the LS-4237→LS-4321 flake cluster.
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 180_000,
         api: apiCommissioner,
       });
     });

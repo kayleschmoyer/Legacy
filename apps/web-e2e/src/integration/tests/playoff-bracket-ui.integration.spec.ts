@@ -27,7 +27,10 @@ import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -178,11 +181,8 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Automated drafts can take 80–150s under normal load, but sequential
-    // integration runs stress the backend and push draft + league-visibility time
-    // past 150s. Use 420s to cover the default waitForSeasonActive deadline
-    // (300s) plus setup headroom.
-    test.setTimeout(420_000);
+    // Draft budget + setup/badge headroom, justified in wait-for-season-active.ts (LS-10179).
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);

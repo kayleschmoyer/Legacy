@@ -34,7 +34,10 @@ import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -197,7 +200,7 @@ test.describe
     // Automated random drafts can take 150–240s (single Lambda batch).
     // This phase also triggers createAllMatchupsForLeague, which now creates
     // exactly 1 week because we set totalMatchups = 1 in Phase 1.
-    test.setTimeout(300_000);
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -261,7 +264,6 @@ test.describe
 
     await test.step('Wait for Season Active badge', async () => {
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 240_000,
         api: apiCommissioner,
       });
     });

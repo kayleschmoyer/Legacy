@@ -27,7 +27,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
@@ -158,7 +161,7 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -219,7 +222,6 @@ test.describe
 
     await test.step('Wait for draft to complete', async () => {
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 180_000,
         api: apiCommissioner,
       });
     });

@@ -170,7 +170,7 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // 600 s = 300 s draft deadline + 300 s buffer for setup steps and cold starts
+    // 600 s ≥ AUTOMATED_DRAFT_TEST_TIMEOUT_MS (420 s draft budget + setup headroom)
     test.setTimeout(600_000);
 
     await test.step('Navigate to commissioner panel', async () => {
@@ -259,12 +259,10 @@ test.describe
     });
 
     await test.step('Wait for draft to complete', async () => {
-      // 300 s covers Lambda cold-start + random-draft processing time.
-      // The 900 s budget was an artefact of masking the start-draft race
-      // condition fixed in LS-4375; the draft now reliably initiates so
-      // a shorter deadline is appropriate.
+      // Default budget: covers one draft-processor SQS redelivery (LS-10179,
+      // see wait-for-season-active.ts). The earlier 900 s budget masked the
+      // start-draft race fixed in LS-4375.
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 300_000,
         api: apiCommissioner,
       });
     });

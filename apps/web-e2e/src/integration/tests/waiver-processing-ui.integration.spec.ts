@@ -47,7 +47,10 @@ import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -289,7 +292,7 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -358,7 +361,6 @@ test.describe
       // UI-render race documented in LS-4237 → LS-4321 (LS-4457).
       await waitForSeasonActive(page, state.leagueId, {
         api: apiCommissioner,
-        deadlineMs: 180_000,
       });
     });
   });

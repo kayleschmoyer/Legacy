@@ -29,7 +29,10 @@ import type { Page } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
-import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import {
+  AUTOMATED_DRAFT_TEST_TIMEOUT_MS,
+  waitForSeasonActive,
+} from '../helpers/wait-for-season-active';
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
@@ -276,8 +279,8 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // Automated drafts can take 120–240s; allow generous time for Lambda cold starts
-    test.setTimeout(360_000);
+    // Draft budget + setup/badge headroom, justified in wait-for-season-active.ts (LS-10179).
+    test.setTimeout(AUTOMATED_DRAFT_TEST_TIMEOUT_MS);
 
     await test.step('Navigate to commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
@@ -340,7 +343,6 @@ test.describe
 
     await test.step('Wait for Season Active status', async () => {
       await waitForSeasonActive(page, state.leagueId, {
-        deadlineMs: 240_000,
         api: apiCommissioner,
       });
     });
