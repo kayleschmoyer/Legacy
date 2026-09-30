@@ -1045,11 +1045,27 @@ builder.mutationField('setActiveLeagues', (t) =>
 // behind the bundled schema by even a single column (LS-4297). Explicit
 // projection keeps the query forward-compatible with future column additions.
 //
-// Order by created_at DESC (with id DESC as a deterministic tiebreaker for rows
-// sharing a timestamp) so we always return the most recent subscription row. A
-// user who resubscribes after cancellation has both the old canceled row and a
-// new active row; without ordering, `.limit(1)` could return the stale canceled
-// row and leave a paying user appearing as free (LS-5201).
+// Order by entitlement priority first (active/trialing > past_due > everything
+// else), then current_period_end DESC (NULLs last), then id DESC as the final
+// deterministic tiebreaker. A user can legitimately hold several rows (one per
+// provider, or an old canceled row plus a resubscribe), and the newest row is
+// not necessarily the one carrying the user's entitlement — a newer canceled or
+// abandoned row must not shadow an older active one and leave a paying user
+// appearing as free. Unordered `.limit(1)` was the original bug (LS-5201);
+// created_at-only ordering was still not entitlement-aware (LS-7383).
+//
+// Built lazily (not at module scope) so importing this module never touches
+// the table definition — several specs mock `@legacy-sports/db-client` without
+// a `subscriptions` table.
+export function subscriptionStatusPriority() {
+  return sql`CASE ${InternalSchema.subscriptions.status}
+  WHEN 'active' THEN 3
+  WHEN 'trialing' THEN 3
+  WHEN 'past_due' THEN 2
+  ELSE 1
+END`;
+}
+
 export async function getSubscriptionForUser(userId: number) {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
@@ -1067,7 +1083,8 @@ export async function getSubscriptionForUser(userId: number) {
       .from(InternalSchema.subscriptions)
       .where(eq(InternalSchema.subscriptions.userId, userId))
       .orderBy(
-        desc(InternalSchema.subscriptions.createdAt),
+        desc(subscriptionStatusPriority()),
+        sql`${InternalSchema.subscriptions.currentPeriodEnd} DESC NULLS LAST`,
         desc(InternalSchema.subscriptions.id),
       )
       .limit(1);

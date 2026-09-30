@@ -80,6 +80,9 @@ jest.mock('drizzle-orm', () => ({
   desc: (col: unknown) => `${String(col)}-desc`,
 }));
 
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { SQL } from 'drizzle-orm';
+
 import {
   _resetAdminRevenueStatsCache,
   _resetStripePricesCache,
@@ -94,6 +97,7 @@ import {
   parseTrialPeriodDays,
   requireCheckoutEmail,
   shouldRedirectToBillingPortal,
+  subscriptionStatusPriority,
 } from './subscriptions';
 import { builder } from './builder';
 
@@ -615,7 +619,7 @@ describe('logCheckoutTrial (LS-7425)', () => {
   });
 });
 
-describe('getSubscriptionForUser (LS-5201)', () => {
+describe('getSubscriptionForUser (LS-5201, LS-7383)', () => {
   /**
    * Build a DB stub recording the SELECT chain. `.where()` returns an object
    * exposing `.orderBy()` and `.limit()` so we can assert the query is ordered
@@ -635,9 +639,11 @@ describe('getSubscriptionForUser (LS-5201)', () => {
     jest.clearAllMocks();
   });
 
-  it('orders by created_at DESC (id DESC tiebreaker) before limiting to one row', async () => {
-    const newActiveRow = { id: 2, status: 'active', tier: 'premium' };
-    const { db, orderBy, limit } = makeOrderedDb([newActiveRow]);
+  const renderSql = (chunk: SQL) => new PgDialect().sqlToQuery(chunk).sql;
+
+  it('orders by entitlement priority, period end, then id before limiting to one row (LS-7383)', async () => {
+    const activeRow = { id: 2, status: 'active', tier: 'premium' };
+    const { db, orderBy, limit } = makeOrderedDb([activeRow]);
     mockRunWithInternalClient.mockImplementation(
       async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
     );
@@ -646,16 +652,56 @@ describe('getSubscriptionForUser (LS-5201)', () => {
 
     // ORDER BY must be applied, and before the LIMIT.
     expect(orderBy).toHaveBeenCalledTimes(1);
-    expect(orderBy).toHaveBeenCalledWith(
-      'subscriptions.created_at-desc',
-      'subscriptions.id-desc',
-    );
+    const [priorityArg, periodEndArg, idArg] = orderBy.mock
+      .calls[0] as unknown as [string, SQL, string];
+    // 1st: entitlement priority, descending (desc() is mocked to a marker
+    // string; the CASE expression itself is asserted in the next test).
+    expect(priorityArg).toMatch(/-desc$/);
+    expect(priorityArg).not.toContain('subscriptions.');
+    // 2nd: current_period_end DESC with NULLs last, so a dated row beats an
+    // undated one within the same priority tier.
+    expect(renderSql(periodEndArg)).toBe('$1 DESC NULLS LAST');
+    // 3rd: id DESC as the final deterministic tiebreaker.
+    expect(idArg).toBe('subscriptions.id-desc');
     expect(limit).toHaveBeenCalledWith(1);
     expect(orderBy.mock.invocationCallOrder[0]).toBeLessThan(
       limit.mock.invocationCallOrder[0],
     );
-    // Returns the most recent row the ordered query yields.
-    expect(result).toBe(newActiveRow);
+    // Returns the row the ordered query yields.
+    expect(result).toBe(activeRow);
+  });
+
+  it('ranks active/trialing above past_due above canceled/inactive/other, so a newer canceled row cannot shadow an older active one', () => {
+    // The DB applies this expression, so the regression guard is on the
+    // expression itself rather than on pre-sorted fixtures.
+    const text = renderSql(subscriptionStatusPriority()).replace(/\s+/g, ' ');
+    expect(text).toBe(
+      "CASE $1 WHEN 'active' THEN 3 WHEN 'trialing' THEN 3 WHEN 'past_due' THEN 2 ELSE 1 END",
+    );
+  });
+
+  it('does not order by created_at, which would let a newer canceled row win', async () => {
+    const { db, orderBy } = makeOrderedDb([]);
+    mockRunWithInternalClient.mockImplementation(
+      async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+    );
+
+    await getSubscriptionForUser(42);
+
+    // Render SQL chunks (column mocks surface as bound params) so the check
+    // is not vacuous for the non-string ORDER BY arguments.
+    const args = orderBy.mock.calls[0] as unknown[];
+    const rendered = args
+      .map((arg) => {
+        if (typeof arg === 'string') {
+          return arg;
+        }
+        const query = new PgDialect().sqlToQuery(arg as SQL);
+        return `${query.sql} ${JSON.stringify(query.params)}`;
+      })
+      .join(' ');
+    expect(rendered).toContain('subscriptions.current_period_end');
+    expect(rendered).not.toContain('created_at');
   });
 
   it('returns null when the user has no subscription rows', async () => {
