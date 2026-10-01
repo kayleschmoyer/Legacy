@@ -1,10 +1,6 @@
 {
-  "_comment": "Per-server ceilings for MCP tool count and definition tokens (name + description + input schema). Enforced by `make lint-mcp-api-reference`. This is a RATCHET: when a consolidation lowers the measured value, lower the ceiling in the same PR. Raising a ceiling requires a justification in the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md.",
+  "_comment": "Per-server ceilings for MCP tool count and definition tokens (name + description + input schema). Enforced by `make lint-mcp-api-reference`. This is a RATCHET: when a consolidation lowers the measured value, lower the ceiling in the same PR. Raising a ceiling requires a justification in the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md. NEVER HAND-MERGE A CONFLICT IN THIS FILE: it is regenerated wholesale, and every PR touches it, so a conflict here is never a real semantic overlap. Re-run the regenerate command below against the merged source and commit its output — do not hand-edit conflict markers or take either side as-is, both silently drop the other side's ceilings (LS-9816). There is deliberately no \"total\" key: it was always exactly the sum of the per-server ceilings below, so storing it just gave every unrelated PR one more shared line to collide on.",
   "_regenerate": "node scripts/generate-mcp-api-reference.mjs --update-budget (or --update-budget=<server-id> to raise just one ceiling)",
-  "total": {
-    "tools": 274,
-    "tokens": 100188
-  },
   "servers": {
     "legacy-sports-android": {
       "tools": 5,
@@ -32,7 +28,7 @@
     },
     "legacy-sports-github": {
       "tools": 61,
-      "tokens": 21018
+      "tokens": 21014
     },
     "legacy-sports-jira": {
       "tools": 21,

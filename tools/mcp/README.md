@@ -34,6 +34,19 @@ adding, removing, or re-describing a tool and commit the result — CI's
 `custom-checks` job fails on drift (check locally with
 `make lint-mcp-api-reference`).
 
+**Never hand-merge a git conflict in these files, `docs/mcp/tool-budget.json`,
+or `lib/mcp-docs/src/pages/*.generated.ts`.** Every one of the 11+ MCP servers
+regenerates the same aggregate files, so two concurrently-open PRs touching
+different servers routinely conflict here even though there is no real
+semantic overlap — and picking either side (`--ours`/`--theirs`) or
+hand-resolving the markers silently drops the other PR's tools. After
+merging/rebasing, always resolve by re-running
+`node scripts/generate-mcp-api-reference.mjs` followed by
+`node scripts/generate-mcp-api-reference.mjs --update-budget` (both are
+required — the first doesn't touch the budget file, the second doesn't
+rewrite the HTML/JSON) against the merged source, then `--check` to confirm,
+then commit the regenerated output as-is.
+
 ## Tool-Definition Budget
 
 A tool definition (name + description + input schema) is advertised to the model

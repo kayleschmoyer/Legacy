@@ -17,9 +17,18 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ESCAPES[char]);
 }
 
-/** Embed JSON safely inside a <script> block. */
+/**
+ * Embed JSON safely inside a <script> block.
+ *
+ * Pretty-printed (not minified) so the per-server sections of the embedded
+ * model land on stable, non-overlapping line ranges \u2014 the same reason
+ * api-reference.json (also `JSON.stringify(model, null, 2)`) merges cleanly
+ * across two PRs that touch different servers, while a single unindented
+ * line here would force every edit onto the exact same line and conflict
+ * unconditionally (LS-9816).
+ */
 function jsonScript(value) {
-  return JSON.stringify(value)
+  return JSON.stringify(value, null, 2)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/\u2028/g, '\\u2028')
@@ -93,7 +102,12 @@ export function render(model, meta = {}) {
         <code>tools/mcp/</code> &mdash; names, descriptions, and full input schemas, read
         straight from the server sources.`;
 
-  return `<title>${escapeHtml(title)}</title>
+  return `<!-- GENERATED FILE — DO NOT EDIT, DO NOT HAND-MERGE.
+     Regenerate with \`make mcp-api-reference\`; never resolve a git conflict
+     here by hand-editing markers or picking a side — that silently drops the
+     other side's tools/servers (see docs/mcp/tool-budget.json's _comment and
+     LS-9816). -->
+<title>${escapeHtml(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">

@@ -17,6 +17,16 @@
  * The second direction is the point. A ceiling that is only ever compared
  * upward is not a ratchet — it is a one-time cap that erodes.
  *
+ * The file does NOT store a repo-wide total: it is always exactly the sum of
+ * the per-server ceilings, so persisting it means every PR — regardless of
+ * which server it touches — rewrites that one shared line and collides with
+ * every other concurrently-open MCP PR on it (LS-9816). `checkBudget` derives
+ * it from `budget.servers` instead. Never hand-add a `"total"` key back to
+ * docs/mcp/tool-budget.json when resolving a merge conflict there — always
+ * resolve by re-running `node scripts/generate-mcp-api-reference.mjs
+ * --update-budget` against the merged source and letting it regenerate the
+ * file, never by hand-picking one side's copy.
+ *
  * Token counts come from the same offline estimator the measurement harness
  * uses (scripts/mcp-token-measure). It is an approximation of BPE
  * tokenization, but it is deterministic and needs no network or API key, which
@@ -146,6 +156,12 @@ export function checkBudget(measured, budget, base) {
     );
   }
 
+  // NOTE (LS-9816): budgetFromMeasurement() below deliberately never writes a
+  // "total" key anymore — it was the shared line that collided across every
+  // concurrently-open MCP PR. This TOTAL-ceiling check (LS-10149) is kept as
+  // defensive dead code: `totalCeiling` is only ever a number if something
+  // hand-adds a "total" key to docs/mcp/tool-budget.json, which the regenerate
+  // command never does post-LS-9816.
   const totalCeiling = budget.total?.tokens;
   if (typeof totalCeiling === 'number' && measured.total > totalCeiling) {
     if (base) {
@@ -171,8 +187,8 @@ export function checkBudget(measured, budget, base) {
 }
 
 /**
- * Raise a single server's ceiling to its current measurement, recomputing
- * `total` to match, and leaving every other server's ceiling untouched.
+ * Raise a single server's ceiling to its current measurement, leaving every
+ * other server's ceiling untouched.
  *
  * This is the narrow counterpart to `budgetFromMeasurement`'s full re-seed:
  * a justified single-server raise shouldn't also silently absorb whatever
@@ -187,16 +203,8 @@ export function updateSingleServerBudget(measured, budget, serverId) {
     );
   }
 
-  const existing = budget.servers?.[serverId];
-  const prevTools = existing?.tools ?? 0;
-  const prevTokens = existing?.tokens ?? 0;
-
   return {
     ...budget,
-    total: {
-      tools: (budget.total?.tools ?? 0) - prevTools + actual.tools,
-      tokens: (budget.total?.tokens ?? 0) - prevTokens + actual.tokens,
-    },
     servers: {
       ...budget.servers,
       [serverId]: { tools: actual.tools, tokens: actual.tokens },
@@ -218,11 +226,16 @@ export function budgetFromMeasurement(measured) {
       'Per-server ceilings for MCP tool count and definition tokens (name + description + input schema). ' +
       'Enforced by `make lint-mcp-api-reference`. This is a RATCHET: when a consolidation lowers the ' +
       'measured value, lower the ceiling in the same PR. Raising a ceiling requires a justification in ' +
-      'the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md.',
+      'the PR description. See .agents/skills/create/references/mcp-tool-consolidation.md. ' +
+      'NEVER HAND-MERGE A CONFLICT IN THIS FILE: it is regenerated wholesale, and every PR touches it, ' +
+      'so a conflict here is never a real semantic overlap. Re-run the regenerate command below against ' +
+      'the merged source and commit its output — do not hand-edit conflict markers or take either side ' +
+      'as-is, both silently drop the other side\'s ceilings (LS-9816). There is deliberately no "total" ' +
+      'key: it was always exactly the sum of the per-server ceilings below, so storing it just gave every ' +
+      'unrelated PR one more shared line to collide on.',
     _regenerate:
       'node scripts/generate-mcp-api-reference.mjs --update-budget ' +
       '(or --update-budget=<server-id> to raise just one ceiling)',
-    total: { tools: measured.toolCount, tokens: measured.total },
     servers,
   };
 }

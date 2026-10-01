@@ -156,23 +156,19 @@ test('fails on a stale budget entry for a server that no longer exists', () => {
   );
 });
 
-test('fails when the repo-wide total exceeds its ceiling', () => {
+test('a seeded budget has no stored "total" — it is implied by the per-server ceilings', () => {
   const measured = measureDefinitionTokens(SAMPLE);
   const budget = budgetFromMeasurement(measured);
-  budget.total.tokens = measured.total - 1;
-
-  const { violations } = checkBudget(measured, budget);
-  assert.ok(violations.some((v) => /^TOTAL: /.test(v)));
+  assert.equal(budget.total, undefined);
 });
 
-test('updateSingleServerBudget raises only the named server and recomputes total', () => {
+test('updateSingleServerBudget raises only the named server', () => {
   const measured = measureDefinitionTokens(SAMPLE);
   const budget = budgetFromMeasurement(measured);
   const originalB = { ...budget.servers['srv-b'] };
 
   // Simulate srv-a growing past its committed ceiling (tool count unchanged).
   budget.servers['srv-a'].tokens = measured.servers['srv-a'].tokens - 50;
-  budget.total.tokens = budget.total.tokens - 50;
 
   const updated = updateSingleServerBudget(measured, budget, 'srv-a');
 
@@ -182,9 +178,8 @@ test('updateSingleServerBudget raises only the named server and recomputes total
   });
   // srv-b's ceiling is untouched.
   assert.deepEqual(updated.servers['srv-b'], originalB);
-  // total is recomputed to match the swap, not re-seeded from scratch.
-  assert.equal(updated.total.tokens, measured.total);
-  assert.equal(updated.total.tools, measured.toolCount);
+  // no "total" key is introduced — it stays implied by the per-server ceilings.
+  assert.equal(updated.total, undefined);
 
   const { violations } = checkBudget(measured, updated);
   assert.deepEqual(violations, []);
@@ -215,7 +210,7 @@ test('reports per-server headroom on every run, passing or failing', () => {
 test('TOTAL violation attributes the overage to an already-over-ceiling base, not the branch', () => {
   const measured = measureDefinitionTokens(SAMPLE);
   const budget = budgetFromMeasurement(measured);
-  budget.total.tokens = measured.total - 50; // ceiling sits below both base and branch
+  budget.total = { tokens: measured.total - 50 }; // ceiling sits below both base and branch
 
   const base = {
     ref: 'origin/main',
@@ -234,7 +229,7 @@ test('TOTAL violation attributes the overage to this branch when base is under c
   const measured = measureDefinitionTokens(SAMPLE);
   const budget = budgetFromMeasurement(measured);
   const baseTotal = measured.total - 10; // base sits comfortably under ceiling
-  budget.total.tokens = baseTotal + 2; // branch's +10 pushes total 8 over
+  budget.total = { tokens: baseTotal + 2 }; // branch's +10 pushes total 8 over
 
   const base = {
     ref: 'origin/main',
@@ -254,7 +249,7 @@ test('TOTAL violation attributes the overage to this branch when base is under c
 test('TOTAL violation falls back to the unattributed message when no base is given', () => {
   const measured = measureDefinitionTokens(SAMPLE);
   const budget = budgetFromMeasurement(measured);
-  budget.total.tokens = measured.total - 1;
+  budget.total = { tokens: measured.total - 1 };
 
   const { violations } = checkBudget(measured, budget);
   const totalLine = violations.find((v) => v.startsWith('TOTAL: '));

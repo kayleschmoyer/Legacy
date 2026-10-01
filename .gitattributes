@@ -41,4 +41,11 @@
 # postinstall) auto-resolves instead of conflicting; mcp-api-reference-sync.sh
 # still fails CI if the checked-in file drifts from a fresh regeneration, so
 # a stale "ours" pick can never land silently — see docs/mcp/api-reference.html.
-docs/mcp/api-reference.html merge=mcp-generated-ours
+#
+# Generated MCP tool docs (scripts/generate-mcp-api-reference.mjs). Never
+# hand-merge a conflict in these — regenerate from the merged source instead
+# (see tools/mcp/README.md and docs/mcp/tool-budget.json's _comment; LS-9816).
+docs/mcp/api-reference.html merge=mcp-generated-ours linguist-generated=true
+docs/mcp/api-reference.json linguist-generated=true
+docs/mcp/tool-budget.json linguist-generated=true
+lib/mcp-docs/src/pages/*.generated.ts linguist-generated=true

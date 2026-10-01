@@ -53,6 +53,8 @@ The same `tools/mcp/*-server` code deployed to AWS Lambda behind API Gateway, re
 **Auth**: per-user OAuth ("Track B") in Claude Code; Cognito machine bearers ("Track A") on Copilot. See [Auth Model](auth-and-routing.md#auth-model).
 
 > **Self-served tool reference (`GET /docs`, LS-9593)**: each of the five hosted servers exposes its own tool reference at `GET /docs`, behind the same Cognito bearer its other tools require, generated at build time and redeployed with the server. Fetch it with `make mcp-docs SERVER=<ci|github|jira|db-admin|rollbar>` (`scripts/mcp-docs.mjs`). For a no-token offline copy covering all eleven servers (stdio + hosted), see `docs/mcp/api-reference.html`.
+>
+> **Never hand-merge a git conflict in `docs/mcp/api-reference.*`, `docs/mcp/tool-budget.json`, or `lib/mcp-docs/src/pages/*.generated.ts`.** These are aggregates regenerated across every MCP server, so a conflict here is essentially never a real semantic overlap between two PRs — it just means both touched the shared file. Resolve by re-running `node scripts/generate-mcp-api-reference.mjs` then `node scripts/generate-mcp-api-reference.mjs --update-budget` (both required) against the merged source and committing the regenerated output, never by hand-editing conflict markers or taking either side as-is (see `tools/mcp/README.md` and LS-9816).
 
 ### Surface 3 — platform built-ins
 
