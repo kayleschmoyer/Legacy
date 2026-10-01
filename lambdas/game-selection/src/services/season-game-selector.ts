@@ -1,17 +1,6 @@
-import {
-  getCamelCaseScoringMultipliersForLeague,
-  getMatchupPlayerGameStats,
-  PublicDb,
-  PublicSchema,
-  updateMatchupScore,
-} from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  calculateMatchupScore,
-  getDefaultScoringSettings,
-  partitionMatchupPlayerGameStats,
-  type ScoringSettings,
-} from '@legacy-sports/scoring';
+import { scoreMatchup } from '@legacy-sports/scoring-utils';
 import {
   cryptoRandomFloat,
   cryptoRandomInt,
@@ -55,61 +44,32 @@ async function computeAndPersistMatchupScores(
   db: PublicDb,
   matchupId: number,
   leagueId: number,
-  team1Id: number | null,
-  team2Id: number | null,
-  gamesPerMatchup: number | null,
 ): Promise<void> {
   try {
-    // Multipliers must be camelCased before they reach the scoring engine —
-    // the raw form is keyed by snake_case source_column (LS-9532).
-    const multipliers = await getCamelCaseScoringMultipliersForLeague(
-      db,
-      leagueId,
-    );
-    const scoringSettings: ScoringSettings = multipliers
-      ? {
-          batting: multipliers.batting,
-          pitching: multipliers.pitching,
-          fielding: multipliers.fielding,
-        }
-      : getDefaultScoringSettings();
-
-    const statsRows = await getMatchupPlayerGameStats(db, matchupId);
-    const { team1PlayerStats: team1Stats, team2PlayerStats: team2Stats } =
-      partitionMatchupPlayerGameStats(statsRows, team1Id, team2Id);
-
-    const scores = calculateMatchupScore(
-      matchupId,
-      team1Id,
-      team2Id,
-      team1Stats,
-      team2Stats,
-      gamesPerMatchup ?? 5,
-      scoringSettings,
-    );
-
-    await updateMatchupScore(
-      db,
-      matchupId,
-      scores.team1Score?.totalScore ?? null,
-      scores.team2Score?.totalScore ?? null,
-    );
+    // The one shared scoring path (LS-9532). It reads the matchup, resolves
+    // and camel-cases this league's multipliers, and persists the result —
+    // this call site supplies no scoring settings of its own, which is what
+    // makes it impossible for it to drift from the other entry points.
+    const scores = await scoreMatchup(db, matchupId, leagueId, {
+      forceRecalculation: true,
+    });
 
     LOGGER.info(
       `Calculated scores for matchup ${matchupId} (all-cached path)`,
       {
-        team1Score: scores.team1Score?.totalScore ?? null,
-        team2Score: scores.team2Score?.totalScore ?? null,
+        team1Score: scores.team1Score,
+        team2Score: scores.team2Score,
       },
     );
   } catch (err) {
     // The matchup can be deleted concurrently between the existence check at
     // the top of selectGamesForMatchup and this later write (the same class of
     // race already handled non-retriably for the whole-matchup case in
-    // LS-8145 and the matchup_player case in LS-8244). updateMatchupScore
-    // throws a plain Error with this exact message when its UPDATE matches
-    // zero rows — treat it as a graceful skip rather than failing the batch
-    // and spamming Rollbar (LS-8427).
+    // LS-8145 and the matchup_player case in LS-8244). scoreMatchup throws a
+    // plain Error with this exact message when the matchup row is gone —
+    // whether it vanished before the read or between the read and the write —
+    // so treat it as a graceful skip rather than failing the batch and
+    // spamming Rollbar (LS-8427).
     if (
       err instanceof Error &&
       err.message === `Matchup ${matchupId} not found`
@@ -904,14 +864,7 @@ export async function selectGamesForMatchup(
   // same ordering guarantee enforced by LS-3817 in the uncached (stats-lambda)
   // path.
   if (playersNeedingStatsLoading.length === 0) {
-    await computeAndPersistMatchupScores(
-      db,
-      matchupId,
-      matchup.leagueId,
-      matchup.team1Id,
-      matchup.team2Id,
-      matchup.gamesPerMatchup,
-    );
+    await computeAndPersistMatchupScores(db, matchupId, matchup.leagueId);
 
     await db
       .update(PublicSchema.matchups)

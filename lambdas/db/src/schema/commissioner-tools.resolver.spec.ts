@@ -60,6 +60,21 @@ describe('Commissioner Tools Resolver', () => {
       set: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
       then: jest.fn((resolve) => resolve([])),
+      // Scoring moved behind the shared scoreMatchup function (LS-9532), which
+      // reads the matchup's teams and gamesPerMatchup itself rather than
+      // taking them from the recalculate query's projection.
+      query: {
+        matchups: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 1,
+            team1Id: 10,
+            team2Id: 20,
+            gamesPerMatchup: 5,
+            team1Score: null,
+            team2Score: null,
+          }),
+        },
+      },
     };
 
     jest.doMock('@legacy-sports/utils', () => ({

@@ -65,7 +65,8 @@ All are Nx projects whose project name equals the directory name. Import alias i
 | `pfr-client`        | `lib/pfr-client/src/`        | Pro Football Reference data client (players, career stats, IDP, team defense)                                                    |
 | `rollbar`           | `lib/rollbar/src/`           | Rollbar init/capture; per-platform entry points `@legacy-sports/rollbar{,/web,/native}`                                          |
 | `scheduling`        | `lib/scheduling/src/`        | Matchup scheduling algorithms; alias only (no package.json)                                                                      |
-| `scoring`           | `lib/scoring/src/`           | Fantasy scoring logic                                                                                                            |
+| `scoring`           | `lib/scoring/src/`           | Fantasy scoring logic — pure, no DB (bundled into web/mobile)                                                                    |
+| `scoring-utils`     | `lib/scoring-utils/src/`     | **The one way to score a matchup and persist it** (`scoreMatchup`); server-only, sits between `db-client` and `scoring`          |
 | `shared-components` | `lib/shared-components/src/` | Cross-platform Tamagui UI — see [shared-components-first](../shared-components-first/SKILL.md)                                   |
 | `tamagui-config`    | `lib/tamagui-config/src/`    | Tamagui theme/config                                                                                                             |
 | `test-fixtures`     | `lib/test-fixtures/src/`     | Shared test data / factories                                                                                                     |

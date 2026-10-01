@@ -31,23 +31,7 @@ jest.mock('@legacy-sports/utils', () => ({
   },
 }));
 
-const mockGetMatchupPlayerGameStats = jest.fn().mockResolvedValue([]);
-// Stands in for getCamelCaseScoringMultipliersForLeague — the camelCased form
-// every scoring caller must use (LS-9532).
-const mockGetScoringMultipliersForLeague = jest.fn().mockResolvedValue({
-  batting: {},
-  pitching: {},
-  fielding: {},
-});
-const mockUpdateMatchupScore = jest.fn().mockResolvedValue(undefined);
-
 jest.mock('@legacy-sports/db-client', () => ({
-  getMatchupPlayerGameStats: (...args: unknown[]) =>
-    mockGetMatchupPlayerGameStats(...args) as unknown,
-  getCamelCaseScoringMultipliersForLeague: (...args: unknown[]) =>
-    mockGetScoringMultipliersForLeague(...args) as unknown,
-  updateMatchupScore: (...args: unknown[]) =>
-    mockUpdateMatchupScore(...args) as unknown,
   PublicSchema: {
     gameBatting: {
       playerId: 'playerId',
@@ -89,24 +73,25 @@ jest.mock('@legacy-sports/db-client', () => ({
   },
 }));
 
-const mockCalculateMatchupScore = jest.fn().mockReturnValue({
-  matchupId: 1,
-  team1Score: { totalScore: 10.5, gamesSelected: 1 },
-  team2Score: { totalScore: 8.0, gamesSelected: 1 },
-  gamesPerMatchup: 2,
-});
-const mockGetDefaultScoringSettings = jest.fn().mockReturnValue({
-  batting: {},
-  pitching: {},
-  fielding: {},
-});
+// Scoring itself lives in one shared function that resolves the league's own
+// multipliers internally (LS-9532); this module's remaining responsibility is
+// to invoke it with the right matchup and league, and to do so *before*
+// statsLoadingStatus flips to 'completed'. What the numbers come out as is
+// covered by lib/scoring-utils' own spec.
+const mockScoreMatchup = jest.fn();
 
-jest.mock('@legacy-sports/scoring', () => ({
-  ...jest.requireActual<object>('@legacy-sports/scoring'),
-  calculateMatchupScore: (...args: unknown[]) =>
-    mockCalculateMatchupScore(...args) as unknown,
-  getDefaultScoringSettings: (...args: unknown[]) =>
-    mockGetDefaultScoringSettings(...args) as unknown,
+const SCORE_MATCHUP_RESULT = {
+  matchupId: 1,
+  team1Score: 12.5,
+  team2Score: 9.0,
+  team1GamesSelected: 2,
+  team2GamesSelected: 2,
+  gamesPerMatchup: 2,
+  updated: true,
+};
+
+jest.mock('@legacy-sports/scoring-utils', () => ({
+  scoreMatchup: (...args: unknown[]) => mockScoreMatchup(...args) as unknown,
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -123,7 +108,13 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 describe('season-game-selector', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // clearAllMocks resets recorded calls but not implementations, so the
+    // rejections the failure-path tests install would leak into every test
+    // that ran after them. Re-prime the happy path each time.
+    mockScoreMatchup.mockResolvedValue(SCORE_MATCHUP_RESULT);
+  });
 
   describe('selectGamesForMatchupPlayer', () => {
     it('should select a game when stats are cached', async () => {
@@ -635,18 +626,7 @@ describe('season-game-selector', () => {
       // was never called for that matchup.
 
       jest.clearAllMocks();
-      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
-      mockGetScoringMultipliersForLeague.mockResolvedValue({
-        batting: {},
-        pitching: {},
-        fielding: {},
-      });
-      mockCalculateMatchupScore.mockReturnValue({
-        matchupId: 1,
-        team1Score: { totalScore: 12.5, gamesSelected: 2 },
-        team2Score: { totalScore: 9.0, gamesSelected: 2 },
-        gamesPerMatchup: 2,
-      });
+      mockScoreMatchup.mockResolvedValue(SCORE_MATCHUP_RESULT);
 
       let selectIndex = 0;
       const mockUpdateSet = jest.fn().mockReturnValue({
@@ -711,20 +691,21 @@ describe('season-game-selector', () => {
       // All stats were cached → no players queued for loading
       expect(playersNeedingStatsLoading).toHaveLength(0);
 
-      // Score calculation must run before statsLoadingStatus is set to 'completed'
-      expect(mockGetMatchupPlayerGameStats).toHaveBeenCalledWith(mockDb, 1);
-      expect(mockCalculateMatchupScore).toHaveBeenCalled();
-      expect(mockUpdateMatchupScore).toHaveBeenCalledWith(mockDb, 1, 12.5, 9.0);
+      // Score calculation must run before statsLoadingStatus is set to
+      // 'completed'. The matchup's league is what the shared function resolves
+      // the scoring profile from, so passing it is this module's whole job.
+      expect(mockScoreMatchup).toHaveBeenCalledWith(mockDb, 1, 10, {
+        forceRecalculation: true,
+      });
 
       // statsLoadingStatus must be set to 'completed' after scores are persisted
       expect(mockUpdateSet).toHaveBeenCalledWith({
         statsLoadingStatus: 'completed',
       });
 
-      // Verify ordering: updateMatchupScore before the 'completed' status update.
+      // Verify ordering: scoreMatchup before the 'completed' status update.
       // Note: mockUpdateSet[0] is the 'loading' call at function start; [1] is 'completed'.
-      const updateScoreOrder =
-        mockUpdateMatchupScore.mock.invocationCallOrder[0];
+      const updateScoreOrder = mockScoreMatchup.mock.invocationCallOrder[0];
       const completedStatusIndex = (
         mockUpdateSet.mock.calls as Array<[Record<string, unknown>]>
       ).findIndex(([firstArg]) => firstArg?.statsLoadingStatus === 'completed');
@@ -736,7 +717,7 @@ describe('season-game-selector', () => {
     it('does not mark statsLoadingStatus completed when score calculation fails (regression: LS-4145)', async () => {
       jest.clearAllMocks();
       const calcError = new Error('DB connection failed');
-      mockGetMatchupPlayerGameStats.mockRejectedValue(calcError);
+      mockScoreMatchup.mockRejectedValue(calcError);
 
       let selectIndex = 0;
       const mockUpdateSet = jest.fn().mockReturnValue({
@@ -804,27 +785,13 @@ describe('season-game-selector', () => {
     it('skips gracefully when the matchup is deleted before scores can be persisted (LS-8427)', async () => {
       // Reproduces the race where the matchup is deleted between the initial
       // existence check at the top of selectGamesForMatchup and the later
-      // updateMatchupScore call in the all-cached path. updateMatchupScore
-      // throws `Matchup ${matchupId} not found` when its UPDATE matches zero
-      // rows; the function must treat this as a non-retriable skip (like the
-      // whole-matchup case in LS-8145 and the matchup_player case in
-      // LS-8244) instead of throwing and failing the batch.
+      // scoring call in the all-cached path. scoreMatchup throws
+      // `Matchup ${matchupId} not found` when the row is gone; the function
+      // must treat this as a non-retriable skip (like the whole-matchup case
+      // in LS-8145 and the matchup_player case in LS-8244) instead of throwing
+      // and failing the batch.
       jest.clearAllMocks();
-      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
-      mockGetScoringMultipliersForLeague.mockResolvedValue({
-        batting: {},
-        pitching: {},
-        fielding: {},
-      });
-      mockCalculateMatchupScore.mockReturnValue({
-        matchupId: 1,
-        team1Score: { totalScore: 12.5, gamesSelected: 2 },
-        team2Score: { totalScore: 9.0, gamesSelected: 2 },
-        gamesPerMatchup: 2,
-      });
-      mockUpdateMatchupScore.mockRejectedValue(
-        new Error('Matchup 1 not found'),
-      );
+      mockScoreMatchup.mockRejectedValue(new Error('Matchup 1 not found'));
 
       let selectIndex = 0;
       const mockUpdateSet = jest.fn().mockReturnValue({
@@ -881,7 +848,9 @@ describe('season-game-selector', () => {
       );
 
       expect(playersNeedingStatsLoading).toHaveLength(0);
-      expect(mockUpdateMatchupScore).toHaveBeenCalledWith(mockDb, 1, 12.5, 9.0);
+      expect(mockScoreMatchup).toHaveBeenCalledWith(mockDb, 1, 10, {
+        forceRecalculation: true,
+      });
     });
 
     it('skips a player when the insert fails with matchup_player FK violation (LS-8244)', async () => {
@@ -893,12 +862,6 @@ describe('season-game-selector', () => {
       // matchup.
 
       jest.clearAllMocks();
-      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
-      mockGetScoringMultipliersForLeague.mockResolvedValue({
-        batting: {},
-        pitching: {},
-        fielding: {},
-      });
 
       let selectIndex = 0;
       const fkError = Object.assign(

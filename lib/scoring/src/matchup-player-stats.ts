@@ -5,13 +5,16 @@
  * the matchup scoring engine consumes, partitioned by team.
  *
  * Extracted (LS-9532) from three byte-identical copies of this mapping that had
- * each been pasted alongside its own scoring setup:
- * `lambdas/stats-lambda/src/scoring-utils.ts`,
- * `lambdas/game-selection/src/services/season-game-selector.ts` and
- * `lambdas/db/src/schema/commissioner-tools.ts` (whose TODO asked for exactly
- * this). Copy-pasting the mapping while re-deriving the surrounding scoring
- * settings by hand is how the commissioner recalculate tool ended up feeding
- * snake_case multipliers into a camelCase lookup.
+ * each been pasted alongside its own scoring setup, in the stats-lambda, the
+ * game-selection season game selector and the commissioner recalculate tool
+ * (whose TODO asked for exactly this). Copy-pasting the mapping while
+ * re-deriving the surrounding scoring settings by hand is how that tool ended
+ * up feeding snake_case multipliers into a camelCase lookup.
+ *
+ * Those three call sites now share one scoring function —
+ * `@legacy-sports/scoring-utils` — which is this module's only caller in
+ * application code. It stays here, in the database-free scoring library, so
+ * the mapping can be unit-tested without a database.
  */
 
 import type { PlayerGameStats } from './matchup-scoring';

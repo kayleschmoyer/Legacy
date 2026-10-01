@@ -44,8 +44,6 @@ jest.mock('@legacy-sports/bref-client', () => ({
 }));
 
 const mockRunWithPublicClient = jest.fn();
-const mockGetScoringMultipliersForLeague = jest.fn();
-const mockGetCamelCaseScoringMultipliersForLeague = jest.fn();
 
 // Track the mock db's select/from/where chain for leagueId lookup
 const mockSelectFrom = {
@@ -79,10 +77,6 @@ const mockDb = {
 jest.mock('@legacy-sports/db-client', () => ({
   runWithPublicClient: (...args: unknown[]): unknown =>
     mockRunWithPublicClient(...args),
-  getScoringMultipliersForLeague: (...args: unknown[]): unknown =>
-    mockGetScoringMultipliersForLeague(...args),
-  getCamelCaseScoringMultipliersForLeague: (...args: unknown[]): unknown =>
-    mockGetCamelCaseScoringMultipliersForLeague(...args),
   PublicSchema: {
     matchups: { id: 'matchups.id', leagueId: 'matchups.league_id' },
     matchupPlayers: { matchupId: 'matchup_players.matchup_id' },
@@ -110,11 +104,10 @@ jest.mock('./game-state-manager', () => ({
     mockUpdateMatchupStatus(...args),
 }));
 
-const mockCalculateAndUpdateMatchupScores = jest.fn();
+const mockScoreMatchup = jest.fn();
 
-jest.mock('./scoring-utils', () => ({
-  calculateAndUpdateMatchupScores: (...args: unknown[]): unknown =>
-    mockCalculateAndUpdateMatchupScores(...args),
+jest.mock('@legacy-sports/scoring-utils', () => ({
+  scoreMatchup: (...args: unknown[]): unknown => mockScoreMatchup(...args),
 }));
 
 jest.mock('./retry-strategy', () => ({
@@ -182,43 +175,11 @@ describe('load-game score calculation trigger (LS-1762)', () => {
       },
     );
 
-    // Default: scoring multipliers for league. The raw accessor returns the DB's
-    // snake_case source_column keys; load-game must read through the camelCasing
-    // accessor instead, or outs_recorded / e_def silently score 0 (LS-9532).
-    mockGetScoringMultipliersForLeague.mockResolvedValue({
-      batting: {
-        h: 1,
-        hr: 3,
-        r: 1,
-        rbi: 1,
-        sb: 1,
-        cs: -1,
-        so: -0.5,
-        doubles: 1,
-        triples: 2,
-        hbp: 1,
-      },
-      pitching: {
-        w: 2,
-        l: -2,
-        sv: 3,
-        so: 1,
-        outs_recorded: 1,
-        h: -1,
-        er: -2,
-        bb: -1,
-      },
-      fielding: { e_def: -1 },
-    });
-    mockGetCamelCaseScoringMultipliersForLeague.mockResolvedValue(
-      expectedScoringSettings,
-    );
-
     // Default: all games complete
     mockCheckMatchupCompletion.mockResolvedValue('completed');
 
     // Default: score calculation succeeds
-    mockCalculateAndUpdateMatchupScores.mockResolvedValue({
+    mockScoreMatchup.mockResolvedValue({
       matchupId: 42,
       team1Score: 125.5,
       team2Score: 98.3,
@@ -229,47 +190,18 @@ describe('load-game score calculation trigger (LS-1762)', () => {
     });
   });
 
-  // Expected scoring settings after snake_case → camelCase conversion
-  const expectedScoringSettings = {
-    batting: {
-      h: 1,
-      hr: 3,
-      r: 1,
-      rbi: 1,
-      sb: 1,
-      cs: -1,
-      so: -0.5,
-      doubles: 1,
-      triples: 2,
-      hbp: 1,
-    },
-    pitching: {
-      w: 2,
-      l: -2,
-      sv: 3,
-      so: 1,
-      outsRecorded: 1,
-      h: -1,
-      er: -2,
-      bb: -1,
-    },
-    fielding: { eDef: -1 },
-  };
-
   it('calculates scores after stats loading completes for the final batch', async () => {
     const event = makeSqsEvent([makeMatchupMessage()]);
 
     await handler(event);
 
-    expect(mockCalculateAndUpdateMatchupScores).toHaveBeenCalledWith(
-      mockDb,
-      42,
-      expectedScoringSettings,
-      true, // forceRecalculation
-    );
-    // The raw accessor keys weights by snake_case source_column, which the
-    // scoring engine never matches (LS-9532).
-    expect(mockGetScoringMultipliersForLeague).not.toHaveBeenCalled();
+    // load-game's only scoring responsibility is handing the shared function
+    // the matchup and the league it belongs to. Resolving that league's
+    // multipliers happens inside the shared function, where no call site can
+    // get it wrong (LS-9532).
+    expect(mockScoreMatchup).toHaveBeenCalledWith(mockDb, 42, 100, {
+      forceRecalculation: true,
+    });
   });
 
   it('calculates scores when last batch of multi-batch message completes', async () => {
@@ -279,12 +211,9 @@ describe('load-game score calculation trigger (LS-1762)', () => {
 
     await handler(event);
 
-    expect(mockCalculateAndUpdateMatchupScores).toHaveBeenCalledWith(
-      mockDb,
-      42,
-      expectedScoringSettings,
-      true,
-    );
+    expect(mockScoreMatchup).toHaveBeenCalledWith(mockDb, 42, 100, {
+      forceRecalculation: true,
+    });
   });
 
   it('does not calculate scores for non-last batches', async () => {
@@ -294,7 +223,7 @@ describe('load-game score calculation trigger (LS-1762)', () => {
 
     await handler(event);
 
-    expect(mockCalculateAndUpdateMatchupScores).not.toHaveBeenCalled();
+    expect(mockScoreMatchup).not.toHaveBeenCalled();
   });
 
   it('does not calculate scores when stats loading fails for all players', async () => {
@@ -305,7 +234,7 @@ describe('load-game score calculation trigger (LS-1762)', () => {
     await handler(event);
 
     // All players failed => finalStatus is 'failed', not 'completed'
-    expect(mockCalculateAndUpdateMatchupScores).not.toHaveBeenCalled();
+    expect(mockScoreMatchup).not.toHaveBeenCalled();
   });
 
   it('still calculates scores on partial failure (some players succeed)', async () => {
@@ -338,18 +267,13 @@ describe('load-game score calculation trigger (LS-1762)', () => {
     await handler(event);
 
     // Partial success => finalStatus is 'completed' => scores calculated
-    expect(mockCalculateAndUpdateMatchupScores).toHaveBeenCalledWith(
-      mockDb,
-      42,
-      expectedScoringSettings,
-      true,
-    );
+    expect(mockScoreMatchup).toHaveBeenCalledWith(mockDb, 42, 100, {
+      forceRecalculation: true,
+    });
   });
 
   it('does not fail the SQS message if score calculation throws', async () => {
-    mockCalculateAndUpdateMatchupScores.mockRejectedValue(
-      new Error('scoring engine error'),
-    );
+    mockScoreMatchup.mockRejectedValue(new Error('scoring engine error'));
 
     const event = makeSqsEvent([makeMatchupMessage()]);
 
@@ -360,9 +284,7 @@ describe('load-game score calculation trigger (LS-1762)', () => {
   });
 
   it('does not report to Rollbar when matchup was deleted between enqueue and processing (LS-8086)', async () => {
-    mockCalculateAndUpdateMatchupScores.mockRejectedValue(
-      new Error('Matchup 42 not found'),
-    );
+    mockScoreMatchup.mockRejectedValue(new Error('Matchup 42 not found'));
 
     const event = makeSqsEvent([makeMatchupMessage()]);
     const result = await handler(event);
@@ -387,7 +309,7 @@ describe('load-game score calculation trigger (LS-1762)', () => {
     const event = makeSqsEvent([makeMatchupMessage()]);
     const result = await handler(event);
 
-    expect(mockCalculateAndUpdateMatchupScores).not.toHaveBeenCalled();
+    expect(mockScoreMatchup).not.toHaveBeenCalled();
     expect(result.batchItemFailures).toEqual([]);
     expect(mockCaptureError).not.toHaveBeenCalledWith(
       expect.any(Error),

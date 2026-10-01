@@ -33,6 +33,8 @@ const config: Config = {
     '^@legacy-sports/scheduling$':
       '<rootDir>/../../lib/scheduling/src/index.ts',
     '^@legacy-sports/scoring$': '<rootDir>/../../lib/scoring/src/index.ts',
+    '^@legacy-sports/scoring-utils$':
+      '<rootDir>/../../lib/scoring-utils/src/index.ts',
     '^@legacy-sports/rollbar$': '<rootDir>/../../lib/rollbar/src/index.ts',
     '^@legacy-sports/shared-components$':
       '<rootDir>/../../lib/shared-components/src/index.ts',

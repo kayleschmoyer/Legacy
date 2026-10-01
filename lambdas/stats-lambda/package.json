@@ -20,6 +20,7 @@
     "@legacy-sports/pfr-client": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/scoring": "workspace:*",
+    "@legacy-sports/scoring-utils": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*"
   },

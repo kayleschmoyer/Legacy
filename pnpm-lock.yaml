@@ -1150,6 +1150,9 @@ importers:
       '@legacy-sports/scoring':
         specifier: workspace:*
         version: link:../../lib/scoring
+      '@legacy-sports/scoring-utils':
+        specifier: workspace:*
+        version: link:../../lib/scoring-utils
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1236,9 +1239,9 @@ importers:
       '@legacy-sports/rollbar':
         specifier: workspace:*
         version: link:../../lib/rollbar
-      '@legacy-sports/scoring':
+      '@legacy-sports/scoring-utils':
         specifier: workspace:*
-        version: link:../../lib/scoring
+        version: link:../../lib/scoring-utils
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1624,6 +1627,9 @@ importers:
       '@legacy-sports/scoring':
         specifier: workspace:*
         version: link:../../lib/scoring
+      '@legacy-sports/scoring-utils':
+        specifier: workspace:*
+        version: link:../../lib/scoring-utils
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1919,6 +1925,15 @@ importers:
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../utils
+
+  lib/scoring-utils:
+    dependencies:
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../db-client
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../scoring
 
   lib/shared-components:
     dependencies:

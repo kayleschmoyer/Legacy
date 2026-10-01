@@ -11,18 +11,9 @@
  *   - Query the commissioner audit log
  */
 
-import {
-  getCamelCaseScoringMultipliersForLeague,
-  getMatchupPlayerGameStats,
-  PublicSchema,
-  updateMatchupScore,
-} from '@legacy-sports/db-client';
+import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  calculateMatchupScore,
-  partitionMatchupPlayerGameStats,
-  type ScoringSettings,
-} from '@legacy-sports/scoring';
+import { createLeagueMatchupScorer } from '@legacy-sports/scoring-utils';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { builder } from './builder';
@@ -758,13 +749,7 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
       }
 
       const matchups = await db
-        .select({
-          id: PublicSchema.matchups.id,
-          team1Id: PublicSchema.matchups.team1Id,
-          team2Id: PublicSchema.matchups.team2Id,
-          gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
-          weekNumber: PublicSchema.matchups.weekNumber,
-        })
+        .select({ id: PublicSchema.matchups.id })
         .from(PublicSchema.matchups)
         .where(and(...conditions));
 
@@ -780,19 +765,15 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
         };
       }
 
-      // 2. Get the league's current scoring multipliers. These must be
-      // camelCased before they reach the scoring engine — the raw form is keyed
-      // by snake_case source_column and silently scores those stats at 0
-      // (LS-9532).
-      const multipliers = await getCamelCaseScoringMultipliersForLeague(
-        db,
-        leagueId,
-      );
-      const scoringSettings: ScoringSettings = {
-        batting: multipliers.batting,
-        pitching: multipliers.pitching,
-        fielding: multipliers.fielding,
-      };
+      // 2. Bind a scorer to this league. It reads the scoring profile once and
+      // resolves it into the camelCase form the scoring engine reads — the
+      // step this resolver used to do by hand, and got wrong: passing
+      // `getScoringMultipliersForLeague`'s raw snake_case `source_column` keys
+      // meant `outs_recorded`, `e_def` and `dp_def` never matched and scored 0,
+      // systematically under-scoring every matchup the tool touched (LS-9532).
+      // Scoring lives in one shared function now, and it takes a league id
+      // rather than settings, so this resolver cannot reintroduce that.
+      const scorer = await createLeagueMatchupScorer(db, leagueId);
 
       // 3. Recalculate each matchup
       let recalculated = 0;
@@ -800,40 +781,17 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
 
       for (const matchup of matchups) {
         try {
-          const playerGameStatsResult = await getMatchupPlayerGameStats(
-            db,
-            matchup.id,
-          );
-
-          const { team1PlayerStats, team2PlayerStats } =
-            partitionMatchupPlayerGameStats(
-              playerGameStatsResult,
-              matchup.team1Id,
-              matchup.team2Id,
-            );
-
-          // Calculate new scores
-          const matchupScore = calculateMatchupScore(
-            matchup.id,
-            matchup.team1Id,
-            matchup.team2Id,
-            team1PlayerStats,
-            team2PlayerStats,
-            matchup.gamesPerMatchup ?? 5,
-            scoringSettings,
-          );
-
-          // Update matchup with new scores
-          await updateMatchupScore(
-            db,
-            matchup.id,
-            matchupScore.team1Score?.totalScore ?? null,
-            matchupScore.team2Score?.totalScore ?? null,
-          );
+          await scorer.scoreMatchup(matchup.id, {
+            // The point of the tool is to rewrite scores under the current
+            // profile, so an existing score must not short-circuit it.
+            forceRecalculation: true,
+          });
 
           recalculated++;
         } catch (err) {
           failed++;
+          // The Error goes in as the second argument, not folded into the
+          // context object — Rollbar drops the stack otherwise.
           LOGGER.error(
             'Failed to recalculate matchup score',
             err instanceof Error ? err : new Error(String(err)),

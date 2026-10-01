@@ -10,14 +10,10 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
-import {
-  getCamelCaseScoringMultipliersForLeague,
-  PublicSchema,
-  runWithPublicClient,
-} from '@legacy-sports/db-client';
+import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { cleanupCache, getCacheStats } from '@legacy-sports/bref-client';
+import { scoreMatchup } from '@legacy-sports/scoring-utils';
 
-import type { ScoringSettings } from '@legacy-sports/scoring';
 import type { LoadMatchupStatsMessage } from './load-game-types';
 import { PLAYER_PROCESSING_BUDGET_MS } from './load-game-types';
 
@@ -29,7 +25,6 @@ import {
   updateMatchupStatus,
 } from './game-state-manager';
 import { loadPlayerGameStats } from './player-stats-loader';
-import { calculateAndUpdateMatchupScores } from './scoring-utils';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -337,8 +332,9 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             // matchups.league_id is NOT NULL, so a null leagueId means the
             // lookup above failed or the matchup row is gone — the same benign
             // enqueue/delete race the catch below already tolerates. Either
-            // way we must not score: without the league's own multipliers,
-            // scoring would silently persist default-scored values (LS-9535).
+            // way we must not score: the league id is what the shared scoring
+            // function resolves the league's own multipliers from, and without
+            // it there is nothing to score against (LS-9535).
             const leagueIdUnavailableMessage = `Cannot calculate scores for matchup ${message.matchupId}: leagueId unavailable`;
 
             try {
@@ -346,24 +342,15 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                 throw new Error(leagueIdUnavailableMessage);
               }
 
-              // Fetch league-specific scoring multipliers, already converted
-              // from the DB's snake_case source_column keys to the camelCase
-              // keys the scoring engine looks weights up by (LS-9532).
-              const multipliers = await getCamelCaseScoringMultipliersForLeague(
-                db,
-                leagueId,
-              );
-              const scoringSettings: ScoringSettings = {
-                batting: multipliers.batting,
-                pitching: multipliers.pitching,
-                fielding: multipliers.fielding,
-              };
-
-              const scoreResult = await calculateAndUpdateMatchupScores(
+              // The one shared scoring path (LS-9532). It resolves and
+              // camel-cases this league's multipliers itself, so there is no
+              // scoring profile for this call site to get wrong.
+              const scoreResult = await scoreMatchup(
                 db,
                 message.matchupId,
-                scoringSettings,
-                true, // forceRecalculation — always recalculate on stats completion
+                leagueId,
+                // Always recalculate on stats completion.
+                { forceRecalculation: true },
               );
               LOGGER.info(
                 `Calculated scores for matchup ${message.matchupId}: team1=${scoreResult.team1Score}, team2=${scoreResult.team2Score}`,

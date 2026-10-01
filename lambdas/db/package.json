@@ -18,6 +18,7 @@
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/mlb-client": "workspace:*",
     "@legacy-sports/scoring": "workspace:*",
+    "@legacy-sports/scoring-utils": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/narrative": "workspace:*",
