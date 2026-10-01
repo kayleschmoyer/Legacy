@@ -23,6 +23,7 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 - **[ci-system-documentation.md](ci-system-documentation.md)** — Quick reference: workflows, trigger model, common operations
 - **[ci-troubleshooting-guide.md](ci-troubleshooting-guide.md)** — Diagnosing CI failures by label, fixing bot-review failures, merge queue issues
+- **[deploy-markers.md](deploy-markers.md)** — Per-target last-deployed markers: how Deploy decides what to ship, how to read and reset a marker
 - **[merge-queue-guide.md](merge-queue-guide.md)** — Full merge queue reference: conditions, labels, troubleshooting, authentication
 - **[github-apps-inventory.md](github-apps-inventory.md)** — All 6 installed GitHub Apps: client-ids, paired secrets, what uses each, and known/inferred permissions
 

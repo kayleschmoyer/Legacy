@@ -355,9 +355,9 @@ jobs:
           node-version: 22
           install-dependencies: true
 
-      # Read access to the last-uploaded-SHA marker (LS-10366), which only the
-      # nx-affected path below consults. Fail-open: without credentials the
-      # marker read comes back empty and detection falls back to NX_BASE.
+      # Read access to the lambdas last-deployed marker (LS-10369), which only
+      # the nx-affected path below consults. Fail-open: without credentials the
+      # marker read comes back unreadable and detection falls back to NX_BASE.
       - name: Configure AWS credentials
         if: inputs.lambda == '' && inputs['force-all'] != true
         continue-on-error: true
@@ -383,56 +383,25 @@ jobs:
           else
             echo "🔍 Detecting affected lambda projects..."
 
-            # nrwl/nx-set-shas sets NX_BASE via the Setup action, but in a
-            # workflow_call context (called from Deploy on push-to-main) the
-            # workflow-run lookup resolves against the *calling* workflow and
-            # may fail silently (error-on-no-successful-workflow: false),
-            # leaving NX_BASE unset or equal to HEAD.  When HEAD === NX_BASE,
-            # `nx affected` finds zero changes and no lambdas get deployed.
-            # Detect this and fall back to HEAD~1 (each push is one squash
-            # merge, so HEAD~1 is the correct prior state).
-            EFFECTIVE_BASE="${NX_BASE:-}"
-            HEAD_SHA=$(git rev-parse HEAD)
-
-            # Prefer the last SHA whose lambdas were actually UPLOADED
-            # (LS-10366) over NX_BASE, which is the last successful workflow
-            # run. The two diverge whenever a Deploy is cancelled or fails
-            # before the upload: the next Deploy's NX_BASE can sit past
-            # commits that never shipped, so `nx affected` no longer sees
-            # them and their lambda code is stranded with every run green.
-            # The marker only advances after a full successful upload (see
-            # "Record last-uploaded SHA"), so basing on it re-covers
-            # everything since. Missing, unreadable, unknown to this clone,
-            # equal to HEAD, or not an ancestor of HEAD → ignored, and the
-            # NX_BASE handling below applies unchanged.
-            MARKER_SHA=$(aws ssm get-parameter \
-              --name "/legacy-sports/${AWS_STAGE}/deploy/lambdas-last-uploaded-sha" \
-              --query "Parameter.Value" \
-              --output text \
-              --region "${AWS_REGION}" 2>/dev/null || echo "")
-            MARKER_RESOLVED=""
-            if [ -n "$MARKER_SHA" ]; then
-              MARKER_RESOLVED=$(git rev-parse --verify --quiet "${MARKER_SHA}^{commit}" 2>/dev/null || echo "")
-            fi
-            if [ -n "$MARKER_RESOLVED" ] && [ "$MARKER_RESOLVED" != "$HEAD_SHA" ] &&
-              git merge-base --is-ancestor "$MARKER_RESOLVED" "$HEAD_SHA" 2>/dev/null; then
-              echo "📍 Basing on last-uploaded marker $MARKER_RESOLVED (NX_BASE was ${NX_BASE:-unset})"
-              EFFECTIVE_BASE="$MARKER_RESOLVED"
-            else
-              echo "ℹ️ No usable last-uploaded marker (value: '${MARKER_SHA}') — using NX_BASE"
-            fi
-
-            RESOLVED_BASE=$(git rev-parse "$EFFECTIVE_BASE" 2>/dev/null || echo "")
-            if [ -z "$EFFECTIVE_BASE" ] || [ -z "$RESOLVED_BASE" ] || [ "$RESOLVED_BASE" = "$HEAD_SHA" ]; then
-              EFFECTIVE_BASE="HEAD~1"
-              echo "⚠️ NX_BASE unset, unresolvable, or same as HEAD — falling back to HEAD~1"
-            elif ! git merge-base --is-ancestor "$EFFECTIVE_BASE" "$HEAD_SHA" 2>/dev/null; then
-              # NX_BASE resolved but is not an ancestor of HEAD — this happens
-              # when two pushes merge quickly and nx-set-shas picks up the SHA
-              # of a concurrent/newer successful run as the "last success."
-              # Using a future commit as BASE causes `nx affected` to fail with
-              # "fatal: bad object", silently blocking all Lambda deploys.
-              echo "⚠️ NX_BASE ($EFFECTIVE_BASE) is not an ancestor of HEAD ($HEAD_SHA) — concurrent deploy race detected, falling back to HEAD~1"
+            # Base on the SHA lambdas were last DEPLOYED from (LS-10369) —
+            # the `last-deployed/lambdas` marker deploy.yml advances only
+            # after upload AND apply both succeed — rather than NX_BASE, the
+            # last successful workflow run. The two diverge whenever a Deploy
+            # is cancelled or fails: NX_BASE can sit past commits that never
+            # shipped, so `nx affected` no longer sees them and their lambda
+            # code is stranded with every run green.
+            #
+            # NX_BASE is the fallback when no marker is usable, with its
+            # guards intact: in a workflow_call context nrwl/nx-set-shas
+            # resolves against the *calling* workflow and may leave NX_BASE
+            # unset or equal to HEAD (`nx affected` then finds nothing), and
+            # two quick merges can hand back a SHA that is not an ancestor of
+            # HEAD (`nx affected` dies on "bad object"). Each of those falls
+            # back to HEAD~1 — every push is one squash merge. The resolution
+            # is resolveLambdaBase() in .github/scripts/deploy-markers.mjs.
+            EFFECTIVE_BASE=$(node "$GITHUB_WORKSPACE/.github/scripts/deploy-markers.mjs" lambda-base || echo "")
+            if [ -z "$EFFECTIVE_BASE" ]; then
+              echo "⚠️ Could not resolve a base — falling back to HEAD~1"
               EFFECTIVE_BASE="HEAD~1"
             fi
             # Export so the nx CLI reads the resolved value rather than the
@@ -728,41 +697,3 @@ jobs:
             exit 1
           fi
           echo "✅ All lambdas uploaded: $UPLOADED"
-
-      # Advance the marker "Detect affected lambdas" bases on (LS-10366).
-      # Reached only when every lambda in the matrix uploaded (the report step
-      # above fails the job otherwise), so a partial upload leaves the marker
-      # behind and the next run re-covers the gap. Not written for a
-      # single-lambda dispatch (the other lambdas were not considered) or off
-      # main. A write failure is a warning, not a failed upload: a stale
-      # marker only makes the next run build more, never less.
-      - name: Record last-uploaded SHA
-        if: success() && inputs.lambda == '' && github.ref == 'refs/heads/main'
-        run: |
-          PARAM="/legacy-sports/${AWS_STAGE}/deploy/lambdas-last-uploaded-sha"
-          HEAD_SHA=$(git rev-parse HEAD)
-          CURRENT=$(aws ssm get-parameter \
-            --name "$PARAM" \
-            --query "Parameter.Value" \
-            --output text \
-            --region "${AWS_REGION}" 2>/dev/null || echo "")
-
-          # Never move the marker backwards or sideways: if it already names
-          # a commit that is not an ancestor of this one (a newer run finished
-          # first), leave it.
-          if [ -n "$CURRENT" ] && git rev-parse --verify --quiet "${CURRENT}^{commit}" >/dev/null 2>&1 &&
-            ! git merge-base --is-ancestor "$CURRENT" "$HEAD_SHA" 2>/dev/null; then
-            echo "ℹ️ Marker ($CURRENT) is not an ancestor of $HEAD_SHA — leaving it unchanged"
-            exit 0
-          fi
-
-          if aws ssm put-parameter \
-            --name "$PARAM" \
-            --value "$HEAD_SHA" \
-            --type String \
-            --overwrite \
-            --region "${AWS_REGION}"; then
-            echo "📍 Last-uploaded marker set to $HEAD_SHA"
-          else
-            echo "::warning::Could not record the last-uploaded SHA marker — the next run will base on the previous marker (or NX_BASE)"
-          fi

@@ -4,8 +4,10 @@ name: Deploy
 # Umbrella Deploy Workflow
 # =============================================================================
 # Single entry point for all main-branch deploys. Detects which deployable
-# targets were affected by the push and calls per-target reusable child
-# workflows conditionally. A single rollup-status job aggregates results so
+# targets changed since each was LAST DEPLOYED (per-target SSM markers,
+# LS-10369 — a cancelled or failed Deploy is picked up by the next one of any
+# kind; runbook: docs/ci-cd/deploy-markers.md) and calls per-target reusable
+# child workflows conditionally. A single rollup-status job aggregates results so
 # humans (and Discord) see one unified "this is what shipped for commit X"
 # message instead of multiple independent workflow runs racing for attention.
 #
@@ -252,9 +254,9 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/force-cancel"
 
   # ---------------------------------------------------------------------------
-  # Detect which deploy targets are affected by this push.
-  # Uses dorny/paths-filter rather than the repo's heavier detect-changes
-  # composite action — this workflow only needs a coarse per-target boolean.
+  # Detect which deploy targets are owed a deploy (LS-10369): per target, did
+  # its paths change since the SHA it was last deployed from? The decision
+  # lives in .github/scripts/deploy-markers.mjs — see that file's header.
   # ---------------------------------------------------------------------------
   detect-changes:
     name: Detect Deploy Targets
@@ -288,103 +290,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Paths filter
-        id: filter
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+      # Read access to the per-target last-deployed markers (LS-10369).
+      # Fail-open: without credentials every marker reads as unreadable and
+      # the step below deploys every target.
+      - name: Configure AWS credentials
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
         with:
-          filters: |
-            lambdas:
-              - 'lambdas/**'
-              - 'lib/**'
-              - 'tools/mcp/**'
-              - 'tools/vite-configs/**'
-              - '.github/workflows/upload-lambdas.yml'
-              - '.github/workflows/lambda-terraform-apply.yml'
-              - '.github/workflows/deploy.yml'
-            # Infrastructure-only signal (LS-9871). Kept SEPARATE from
-            # `lambdas` on purpose: a terraform-only change ships no new
-            # lambda code, so forcing it through `lambdas` would rebuild and
-            # re-upload all 18 lambda bundles (~the slowest part of a deploy)
-            # to produce zero new SSM versions. Gating Apply Lambda
-            # Infrastructure on `lambdas || terraform` instead lets a
-            # terraform-only push apply directly, while a lambda push keeps
-            # the existing upload-then-apply ordering. Scoped to
-            # terraform/main/** because that is the only state
-            # lambda-terraform-apply.yml touches; terraform/runners/** has its
-            # own workflow (runner-terraform-apply.yml).
-            terraform:
-              - 'terraform/main/**'
-              - '.github/workflows/lambda-terraform-apply.yml'
-              - '.github/workflows/deploy.yml'
-            web:
-              - 'apps/web/**'
-              - 'lib/shared-components/**'
-              - '.github/workflows/deploy-web.yml'
-              - '.github/workflows/deploy.yml'
-            android:
-              - 'apps/app/**'
-              - 'lib/shared-components/**'
-              - 'lib/ui-abstractions/**'
-              - 'lib/utils/**'
-              - 'lib/api/**'
-              - 'lib/analytics/**'
-              - 'lib/websocket-client/**'
-              - 'lib/tamagui-config/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - '.github/workflows/build-android-app.yml'
-              - '.github/workflows/deploy.yml'
-            storybook:
-              - 'lib/shared-components/**'
-              - '.github/workflows/deploy-storybook.yml'
-              - '.github/workflows/deploy.yml'
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: us-east-1
 
-      - name: Combine with manual overrides
+      # A target is affected when its paths changed since the SHA it was last
+      # DEPLOYED from (its SSM marker), not since the previous push — so this
+      # run also ships whatever an earlier cancelled or failed Deploy dropped.
+      # A missing, unreadable, or non-ancestor marker deploys the target. The
+      # per-target path sets and the force-* handling (force-lambdas forces
+      # terraform too) live in the script, which also writes the summary table.
+      - name: Detect targets against last-deployed markers
         id: result
-        run: |
-          # Union paths-filter results with workflow_dispatch force-* inputs.
-          # force-* inputs are only defined on workflow_dispatch events; on push
-          # they resolve to the empty string and are a no-op.
-          LAMBDAS="${{ steps.filter.outputs.lambdas }}"
-          TERRAFORM="${{ steps.filter.outputs.terraform }}"
-          WEB="${{ steps.filter.outputs.web }}"
-          ANDROID="${{ steps.filter.outputs.android }}"
-          STORYBOOK="${{ steps.filter.outputs.storybook }}"
-
-          # force-lambdas forces the terraform apply too, so the manual
-          # `gh workflow run deploy.yml -f force-lambdas=true` escape hatch
-          # keeps applying infrastructure exactly as it did before LS-9871.
-          if [ "${{ inputs['force-lambdas'] }}" = "true" ]; then
-            LAMBDAS="true"
-            TERRAFORM="true"
-          fi
-          if [ "${{ inputs['force-web'] }}" = "true" ]; then
-            WEB="true"
-          fi
-          if [ "${{ inputs['force-android'] }}" = "true" ]; then
-            ANDROID="true"
-          fi
-          if [ "${{ inputs['force-storybook'] }}" = "true" ]; then
-            STORYBOOK="true"
-          fi
-
-          echo "lambdas=$LAMBDAS" >> "$GITHUB_OUTPUT"
-          echo "terraform=$TERRAFORM" >> "$GITHUB_OUTPUT"
-          echo "web=$WEB" >> "$GITHUB_OUTPUT"
-          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
-          echo "storybook=$STORYBOOK" >> "$GITHUB_OUTPUT"
-
-          {
-            echo "## 🎯 Deploy Targets"
-            echo ""
-            echo "| Target | Affected |"
-            echo "| --- | --- |"
-            echo "| Lambdas | $LAMBDAS |"
-            echo "| Terraform | $TERRAFORM |"
-            echo "| Web | $WEB |"
-            echo "| Android | $ANDROID |"
-            echo "| Storybook | $STORYBOOK |"
-          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          AWS_REGION: us-east-1
+          AWS_STAGE: dev
+          # force-* inputs are only defined on workflow_dispatch events; on
+          # push they resolve to the empty string and are a no-op.
+          FORCE_LAMBDAS: ${{ inputs['force-lambdas'] }}
+          FORCE_WEB: ${{ inputs['force-web'] }}
+          FORCE_ANDROID: ${{ inputs['force-android'] }}
+          FORCE_STORYBOOK: ${{ inputs['force-storybook'] }}
+        run: node .github/scripts/deploy-markers.mjs detect
 
   # ---------------------------------------------------------------------------
   # Child: Upload Lambdas
@@ -758,6 +691,40 @@ jobs:
               echo "> (**Apply Lambda Infrastructure** job, before Deploy Web started)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Advance the last-deployed marker of every target whose deploy
+      # succeeded (LS-10369) — lambdas only when upload AND apply both did.
+      # `always()` so targets that finished before a cancel still count; never
+      # allowed to fail the rollup, because a marker left behind only makes the
+      # next Deploy ship more, never less.
+      - name: Configure AWS credentials (deploy markers)
+        if: always()
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: us-east-1
+
+      - name: Record last-deployed markers
+        if: always()
+        continue-on-error: true
+        env:
+          AWS_REGION: us-east-1
+          AWS_STAGE: dev
+          DEPLOY_SHA: ${{ github.sha }}
+          LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
+          TERRAFORM_TARGETED: ${{ needs.detect-changes.outputs.terraform }}
+          WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
+          ANDROID_TARGETED: ${{ needs.detect-changes.outputs.android }}
+          STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
+          UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
+          APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
+          WEB_RESULT: ${{ needs.deploy-web.result }}
+          ANDROID_RESULT: ${{ needs.build-android.result }}
+          STORYBOOK_RESULT: ${{ needs.deploy-storybook.result }}
+          FORCE_LAMBDAS: ${{ inputs['force-lambdas'] }}
+          LAMBDAS_UPLOADED: ${{ needs.upload-lambdas.outputs.uploaded }}
+        run: node .github/scripts/deploy-markers.mjs record
 
       - name: Build deploy changelog
         id: changelog

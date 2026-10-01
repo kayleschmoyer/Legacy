@@ -269,6 +269,99 @@ jobs:
           exit 1
 
   # ---------------------------------------------------------------------------
+  # Signal 3 — merged but never deployed (LS-10369)
+  # ---------------------------------------------------------------------------
+  # Signal 1 compares the SSM `/version` parameter with the live function, so
+  # it sees "uploaded but not applied" and is blind to code that was merged and
+  # never uploaded at all. This job compares each deploy target's
+  # last-deployed marker (/legacy-sports/<stage>/deploy/last-deployed/<target>,
+  # written by deploy.yml's Rollup Status) with main: a target is behind when
+  # commits touching its paths have sat past the marker for longer than
+  # vars.DEPLOY_MARKER_STALE_MINUTES (default 60) with no Deploy queued or
+  # running. The next Deploy of any kind heals it, so this fires when that
+  # healing is not happening. Posts only when the set of behind targets
+  # changes (state in SSM), including one recovery post. Decision logic:
+  # .github/scripts/deploy-markers.mjs; runbook: docs/ci-cd/deploy-markers.md.
+  marker-drift:
+    name: "Check Deploy Marker Drift"
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: "Configure AWS credentials (write role — alert state)"
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: ${{ env.WRITE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: "Is a Deploy queued or running?"
+        id: deploys
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The Deploy run that triggered this check is already `completed`.
+          # A failed lookup reports `unknown`, which the script treats as
+          # "do not alert" — the next Deploy completion re-checks.
+          if ACTIVE=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/runs?branch=main&per_page=30" \
+            --jq '[.workflow_runs[] | select(.status != "completed")] | length'); then
+            if [ "$ACTIVE" = "0" ]; then
+              echo "active=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "active=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "active=unknown" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Compare last-deployed markers with main"
+        id: drift
+        env:
+          DEPLOY_ACTIVE: ${{ steps.deploys.outputs.active }}
+          STALE_MINUTES: ${{ vars.DEPLOY_MARKER_STALE_MINUTES || '60' }}
+          DRY_RUN: ${{ inputs['dry-run'] == true }}
+        run: node .github/scripts/deploy-markers.mjs drift
+
+      - name: "Discord alert — merged but not deployed"
+        if: steps.drift.outputs.post == 'true' && steps.drift.outputs.kind == 'drift'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Deploy Markers — main is ahead of what is deployed"
+          description: |
+            Commits on main that touch a deploy target have not been deployed,
+            and no Deploy is queued or running to pick them up
+            ([LS-10369](https://bkrupa.atlassian.net/browse/LS-10369)).
+
+            **Behind:**
+            ${{ steps.drift.outputs.report }}
+
+            **Fix**: run the `Deploy` workflow on main (no inputs needed — it
+            deploys everything since each marker). If that run fails, its
+            failure is the thing to fix. Runbook: `docs/ci-cd/deploy-markers.md`.
+
+            [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: "Discord — deploy markers caught up"
+        if: steps.drift.outputs.post == 'true' && steps.drift.outputs.kind == 'recovered'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: success
+          title: "Deploy Markers — caught up"
+          description: |
+            Every deploy target that was behind main has now been deployed.
+
+            [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  # ---------------------------------------------------------------------------
   # Signal 2 — recent Deploy runs that hit the Verify CI Status skip-chain
   # ---------------------------------------------------------------------------
   skip-chain-check:
