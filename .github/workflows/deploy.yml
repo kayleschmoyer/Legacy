@@ -48,6 +48,46 @@ name: Deploy
 # Upload Lambdas stays on `lambdas` alone — so a terraform-only push applies
 # infrastructure without rebuilding and re-uploading all 18 lambda bundles for
 # zero new SSM versions.
+#
+# Deploy Watchdog (LS-10328) — a stuck child must not wedge main deploys.
+# `deploy-main` keeps one running and one pending umbrella; a newer pending run
+# cancels the older pending one. So when a child job never gets a runner — on
+# 2026-09-29 `Build Android App / Build Android APK` queued for 1440 min because
+# the Android pool orphan-killed every runner it launched (LS-10327; ~same on
+# 09-22) — the running umbrella lives to GitHub's queued-job cap and EVERY later
+# push-to-main Deploy is cancelled while pending: 58 cancellations, nothing
+# shipped for ~26 h. `timeout-minutes` cannot bound this — it is rejected on
+# reusable-workflow caller jobs, and its clock only starts once a runner has
+# picked the job up, which is precisely what never happens.
+#
+# Options weighed (ticket LS-10328):
+#   (1) a watchdog job inside the umbrella that cancels the run once a child
+#       has waited too long — CHOSEN, see the `watchdog` job below;
+#   (2) `cancel-in-progress: true` with a guard for terraform — rejected: a
+#       workflow-level cancel tears down every job, and there is no hook that
+#       can exempt a running `Apply Lambda Infrastructure` (see
+#       lambda-terraform-apply.yml for why a half-done apply strands state);
+#   (3) move Build Android App out of the umbrella — rejected: Android is not
+#       the only pool that can wedge (any `runs-on` label can), and the
+#       LS-8765 ordering gate exists for a reason.
+#
+# How the watchdog works: it runs on a GitHub-hosted runner (which always has
+# capacity — the same reasoning as ci-orchestrator.yml's report-runner-shutdown
+# job, LS-9710), starts with the run, needs nothing, and polls this run's jobs
+# via .github/scripts/deploy-watchdog.js. It cancels the run ONLY when all of:
+#   - the run is older than WATCHDOG_DEADLINE_MINUTES (30 — the ~30 min AC), and
+#   - at least one child is still waiting for a runner (queued/waiting/pending), and
+#   - NO job is in progress. A running job has a runner and its own
+#     `timeout-minutes`; a running terraform apply is never interrupted.
+# Cancelling frees the `deploy-main` slot so the pending Deploy for the newest
+# main HEAD starts within the poll interval, and its freshly-queued jobs fire
+# new scale-up webhooks for the stuck pool. Discord is notified BEFORE the
+# cancel because a cancelled run's Rollup Status may never run. The job is
+# `continue-on-error` and the script fails open: a watchdog outage can never
+# turn a healthy deploy red. Cost: one GitHub-hosted job for the life of each
+# Deploy (~15–25 min) — accepted over a scheduled sweeper (the repo is
+# schedule-free by policy, LS-8487) and over an event-driven cross-run sweeper
+# (it cannot bound the wait when no later push arrives).
 # =============================================================================
 
 on:
@@ -97,11 +137,77 @@ permissions:
 # "N wasteful concurrent deploys" for "N deploys, later ones start later" —
 # it does not make any individual commit ship faster, since the old
 # concurrent behavior didn't guarantee every commit got its own deploy either.
+# The flip side — a run whose child never gets a runner holds this slot for
+# 24 h and starves every later deploy — is bounded by the `watchdog` job
+# (LS-10328, header above), NOT by flipping cancel-in-progress.
 concurrency:
   group: deploy-main
   cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Deploy Watchdog (LS-10328) — see the header for the full rationale.
+  # Bounds how long a child that never gets a runner can hold the `deploy-main`
+  # slot. Runs on ubuntu-latest so it is schedulable when a self-hosted pool is
+  # the thing that is wedged; has no `needs` so it starts with the run; is never
+  # a dependency of any other job (Rollup Status waits on the children, the
+  # watchdog waits on Rollup Status — a `needs` either way would deadlock).
+  # ---------------------------------------------------------------------------
+  watchdog:
+    name: Deploy Watchdog
+    runs-on: ubuntu-latest
+    # Must outlive the deadline plus the longest child that can legitimately be
+    # in progress when the deadline passes (Upload Lambdas' trigger-ci job is
+    # 60 min) — the watchdog never cancels while anything is running, so it has
+    # to still be alive once that work finishes and only queued jobs remain.
+    timeout-minutes: 120
+    # A safety net, not a gate: a watchdog failure/timeout must never fail the run.
+    continue-on-error: true
+    permissions:
+      actions: write # POST /actions/runs/{run_id}/cancel on this run
+      contents: read # checkout for the script + discord-notify action
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/deploy-watchdog.js
+            .github/actions/discord-notify
+          sparse-checkout-cone-mode: false
+
+      - name: Watch children for a runner that never comes
+        id: watch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Mirrored by DEFAULT_* in deploy-watchdog.js and pinned by
+          # .github/scripts/__tests__/deploy-watchdog.test.mjs.
+          WATCHDOG_DEADLINE_MINUTES: "30"
+          WATCHDOG_POLL_SECONDS: "30"
+          WATCHDOG_JOB_NAME: Deploy Watchdog
+          WATCHDOG_TERMINAL_JOB_NAME: Rollup Status
+        run: node .github/scripts/deploy-watchdog.js
+
+      # Rollup Status may never run once the cancel lands, so this is the only
+      # guaranteed human-visible signal that a deploy was cancelled by the
+      # watchdog rather than by a person or a newer pending run.
+      - name: Discord — deploy cancelled by watchdog
+        if: steps.watch.outputs.cancelled == 'true'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Deploy Watchdog — run cancelled"
+          description: ${{ steps.watch.outputs.summary }}
+
+      - name: Cancel this run
+        id: cancel
+        if: steps.watch.outputs.cancelled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Cancelling run ${GITHUB_RUN_ID}: ${{ steps.watch.outputs.stuck_jobs }} never got a runner after ${{ steps.watch.outputs.age_minutes }} min."
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/cancel"
+
   # ---------------------------------------------------------------------------
   # Detect which deploy targets are affected by this push.
   # Uses dorny/paths-filter rather than the repo's heavier detect-changes

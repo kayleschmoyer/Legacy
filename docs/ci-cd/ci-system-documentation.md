@@ -56,6 +56,8 @@ Review (bot) and CI run in **parallel**. Branch protection requires both before 
 
 Both Lambda and Web deploys are children of the umbrella `deploy.yml`. `lambda-terraform-apply.yml` runs synchronously (`workflow_call`) after `upload-lambdas.yml` and before `deploy-web.yml`, so a client build never ships ahead of a server schema change it depends on (LS-9374/LS-9369) — `deploy-web` only starts once the Lambda apply succeeds or is skipped (no Lambda changes in that push).
 
+The umbrella serialises main deploys through the `deploy-main` concurrency group (`cancel-in-progress: false`). A `Deploy Watchdog` job on a GitHub-hosted runner (`.github/scripts/deploy-watchdog.js`, LS-10328) bounds the failure mode where a child never gets a runner: once the run is older than 30 min, something is still waiting for a runner, and nothing is in progress, it posts to Discord and cancels the run so the pending Deploy for the newest `main` HEAD can start. It never cancels while any job is running, so a terraform apply is never interrupted mid-flight. Background: on 2026-09-29 a wedged Android runner pool held the slot for 24 h and 58 later Deploys were cancelled while pending.
+
 ## Common Operations
 
 ### Fix a failing CI check
