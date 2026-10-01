@@ -16,6 +16,7 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 ## Cost Analysis
 
+- **[mobile-e2e-pr-scope.md](mobile-e2e-pr-scope.md)** — LS-10332/LS-8893: maintainer decision on Mobile Chrome E2E scope — affected specs only on PRs (full sharded suite when the selection escalates to run-all), full suite on the nightly.
 - **[live-suite-cadence-cost-analysis.md](live-suite-cadence-cost-analysis.md)** — LS-8911/LS-8893: cost-vs-detection-latency analysis and recommendation for `FULL_SUITE_MIN_INTERVAL_HOURS` and the Mobile Safari daily/weekly cadence. Analysis only — no config changed.
 
 ## Operational Guides

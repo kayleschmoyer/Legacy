@@ -199,9 +199,9 @@ jobs:
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
   # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards,
-  #          chromium, all tests) + shared-live (1 shard) + the Mobile Chrome
-  #          (Pixel 5, LS-8457) and Mobile Safari (iPhone 12, LS-8502) device
-  #          projects over @critical (1 shard each).
+  #          chromium, all tests) + shared-live (1 shard) + Mobile Chrome
+  #          (Pixel 5, LS-8457) over the full suite (3 shards, LS-10332) +
+  #          Mobile Safari (iPhone 12, LS-8502) over @critical (1 shard).
   # Manual:  single suite, N shards (integration clamped to the ceiling),
   #          using workflow_dispatch inputs.
   # ---------------------------------------------------------------------------
@@ -291,18 +291,22 @@ jobs:
                 emit_shards integration "$INTEGRATION_SHARD_CEILING"
                 emit_shards e2e 3
                 emit_shards shared-live 1
-                # Mobile-device coverage (LS-8457): activate the dormant Pixel 5
-                # (Mobile Chrome) Playwright project on the automated full-suite
-                # run (and manual "all"). One shard over the @critical spec set —
-                # small and hermetic, a bounded add-on rather than a second full
-                # suite. This entry carries extra matrix keys (project/grep) the
-                # run-tests job reads; the chromium/integration/shared-live
-                # entries leave them empty.
-                jq -cn '{suite:"e2e", shard:"1/1", project:"Mobile Chrome", grep:"@critical"}'
+                # Mobile-device coverage (LS-8457): the Pixel 5 (Mobile Chrome)
+                # Playwright project on the automated full-suite run (and manual
+                # "all"). LS-10332: the FULL hermetic suite, no grep — PR CI now
+                # runs only the affected specs on Mobile Chrome unless the
+                # selection escalates to run-all, so this once-a-day run is the
+                # backstop that catches a mobile regression affected-selection
+                # missed. Sharded 3x like the chromium e2e entries above so the
+                # full suite fits the 60-minute per-job timeout. These entries
+                # carry an extra matrix key (project) the run-tests job reads;
+                # the chromium/integration/shared-live entries leave it empty.
+                emit_shards e2e 3 | jq -c '. + {project: "Mobile Chrome"}'
                 # Mobile Safari (iPhone 12 → webkit, LS-8502): now that webkit is
                 # baked into the runner AMI (LS-8500), re-add the matching
-                # matrix entry gated out by LS-8457. Same shape as Mobile Chrome
-                # above, plus an explicit `engine` key — Mobile Chrome runs on
+                # matrix entry gated out by LS-8457. Stays ONE shard over the
+                # @critical spec set (locked decision, LS-10332) via the `grep`
+                # key, plus an explicit `engine` key — Mobile Chrome runs on
                 # the nightly-like default (chromium) so it doesn't need one,
                 # but Mobile Safari must override the default to webkit (see
                 # the "Resolve Playwright config" step in run-tests below).
@@ -784,9 +788,9 @@ jobs:
             fi
           fi
 
-          # Mobile-device matrix entries (LS-8457) scope even nightly-like runs
-          # to their @critical spec set via a per-matrix grep, so the two device
-          # projects stay a bounded add-on rather than a full second suite.
+          # A matrix entry can scope even a nightly-like run via a per-matrix
+          # grep. Only Mobile Safari sets one (@critical, LS-8502); Mobile
+          # Chrome runs the full suite (LS-10332).
           if [ -n "${{ matrix.grep }}" ]; then
             PLAYWRIGHT_ARGS+=( "--grep=${{ matrix.grep }}" )
           fi

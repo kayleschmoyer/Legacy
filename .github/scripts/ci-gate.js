@@ -45,8 +45,11 @@ const MAX_DESCRIPTION_LENGTH = 140;
 // the failure-threshold set in .github/actions/collect-results (the existing
 // definition of overall pipeline success): lint (which also runs the format
 // check as of LS-8901 — the two share one job), test, build, custom-checks,
-// lockfile-check, e2e, e2e-mobile (LS-9411, full-parity sharded since
-// LS-9658). Pass semantics: `success` and `skipped` pass;
+// lockfile-check, e2e, e2e-mobile (LS-9411; LS-10332: full sharded suite on
+// run-all, one affected-spec shard on a narrow change, skipped when a narrow
+// change maps to no affected specs — the job-level `if` never skips it on
+// run-all, so `skipped` passing here cannot hide a run-all mobile gap).
+// Pass semantics: `success` and `skipped` pass;
 // `failure`, `timed_out`, or any missing/unknown value fail.
 //
 // `cancelled` is DELIBERATELY excluded from the verdict (LS-8219): a cancelled

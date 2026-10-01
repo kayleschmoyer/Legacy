@@ -35,6 +35,12 @@ Out of scope for this analysis, and not touched by any recommendation below:
 | 8   | Mobile Chrome `@critical` | 1      | Pixel 5 emulation, chromium engine, 60 min timeout                                                       |
 | 9   | Mobile Safari `@critical` | 1      | iPhone 12 emulation, **webkit** engine, 60 min timeout                                                   |
 
+> **Superseded in part (LS-10332, 2026-10-01):** row 8 is now the **full** Mobile Chrome suite on 3
+> shards, not one `@critical` shard — see [mobile-e2e-pr-scope.md](mobile-e2e-pr-scope.md). Each real
+> attempt therefore runs 11 jobs, and the per-attempt estimate below understates Mobile Chrome by
+> roughly a second hermetic e2e sweep (~60 runner-minutes by this document's own assumptions, in
+> place of the ~12 listed). The figures in this analysis are left as written.
+
 ### Current cost (rough estimate)
 
 I don't have exact Actions-billing runner-minutes for this session (self-hosted runner cost isn't
