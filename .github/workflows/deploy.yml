@@ -104,7 +104,7 @@ on:
   workflow_dispatch:
     inputs:
       force-lambdas:
-        description: "Force the lambda deploy child (bypass paths filter)"
+        description: "Force the lambda deploy child (bypass paths filter) and rebuild + upload EVERY lambda (bypass nx affected)"
         required: false
         default: false
         type: boolean
@@ -414,6 +414,13 @@ jobs:
       # though main is healthy, and this was previously unforwardable through
       # deploy.yml.
       skip-ci-check: ${{ inputs['skip-ci-check'] == true }}
+      # force-lambdas must force the upload itself, not just the child
+      # (LS-10366). Flipping the detect-changes output only makes the child
+      # RUN; its own "Detect Affected Lambdas" step still asked nx what
+      # changed since its base SHA, so a forced run dispatched to ship lambda
+      # code stranded by cancelled/failed Deploys found nothing affected,
+      # skipped the upload, and went green having shipped no lambda code.
+      force-all: ${{ inputs['force-lambdas'] == true }}
 
   # ---------------------------------------------------------------------------
   # Child: Apply Lambda Infrastructure
@@ -567,6 +574,8 @@ jobs:
           # the per-lambda visibility the old one-job-per-lambda matrix gave
           # for free survives the collapse. Empty when the upload was skipped.
           LAMBDAS_UPLOAD_RESULTS: ${{ needs.upload-lambdas.outputs.results }}
+          LAMBDAS_UPLOADED: ${{ needs.upload-lambdas.outputs.uploaded }}
+          FORCE_LAMBDAS: ${{ inputs['force-lambdas'] }}
           LAMBDAS_APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
           WEB_RESULT: ${{ needs.deploy-web.result }}
           ANDROID_RESULT: ${{ needs.build-android.result }}
@@ -575,7 +584,8 @@ jobs:
           set -euo pipefail
 
           # Translate child job results into a single rollup state.
-          # Each target is one of: success | failure | skipped | cancelled | not-targeted.
+          # Each target is one of: success | failure | skipped | cancelled | not-targeted
+          # (Lambdas can additionally be not-uploaded — see below).
           translate() {
             local targeted="$1"
             local result="$2"
@@ -598,7 +608,7 @@ jobs:
           # deploy did not fully complete.
           worse_of() {
             local a="$1" b="$2"
-            for state in failure cancelled skipped; do
+            for state in failure cancelled not-uploaded skipped; do
               if [ "$a" = "$state" ] || [ "$b" = "$state" ]; then
                 echo "$state"
                 return
@@ -618,6 +628,17 @@ jobs:
           fi
 
           LAMBDAS_UPLOAD_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_UPLOAD_RESULT")
+          # A forced lambda deploy that uploaded nothing is not a success
+          # (LS-10366). The child reports `success` whenever its detect job
+          # succeeds, even if its upload job was skipped for an empty matrix,
+          # so the result alone cannot tell "uploaded" from "ran and shipped
+          # nothing" — the `uploaded` output can. Counted as a failure below:
+          # the operator asked for a redeploy and did not get one.
+          if [ "$FORCE_LAMBDAS" = "true" ] && [ -z "$LAMBDAS_UPLOADED" ] &&
+            { [ "$LAMBDAS_UPLOAD_STATE" = "success" ] || [ "$LAMBDAS_UPLOAD_STATE" = "skipped" ]; }; then
+            LAMBDAS_UPLOAD_STATE="not-uploaded"
+            echo "::error::force-lambdas was set but Upload Lambdas uploaded nothing — no lambda code shipped in this run."
+          fi
           LAMBDAS_APPLY_STATE=$(translate "$INFRA_TARGETED" "$LAMBDAS_APPLY_RESULT")
           LAMBDAS_STATE=$(worse_of "$LAMBDAS_UPLOAD_STATE" "$LAMBDAS_APPLY_STATE")
           WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
@@ -646,7 +667,7 @@ jobs:
             ANY_SUCCESS=false
             for STATE in "$LAMBDAS_STATE" "$WEB_STATE" "$ANDROID_STATE" "$STORYBOOK_STATE"; do
               case "$STATE" in
-                failure)   ANY_FAILURE=true ;;
+                failure | not-uploaded) ANY_FAILURE=true ;;
                 cancelled) ANY_CANCELLED=true ;;
                 success)   ANY_SUCCESS=true ;;
               esac
@@ -685,6 +706,7 @@ jobs:
               failure)      echo "❌" ;;
               cancelled)    echo "⚠️" ;;
               skipped)      echo "⏭️" ;;
+              not-uploaded) echo "🚫" ;;
               not-targeted) echo "—" ;;
               *)            echo "❔" ;;
             esac
