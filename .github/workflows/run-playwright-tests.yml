@@ -410,9 +410,83 @@ jobs:
           description: ${{ steps.params.outputs.description }}
           thread-name: ${{ steps.params.outputs.thread_name }}
 
+  # ---------------------------------------------------------------------------
+  # Build the web app ONCE per run and share it with every e2e shard (LS-10329).
+  # Previously each of the 5 e2e matrix jobs (3 chromium shards + Mobile Chrome
+  # + Mobile Safari) rebuilt the app independently — 5× the build cost and,
+  # once the coverage-instrumented bundle outgrew the 4 GB heap, 5× the OOM.
+  # Mirrors ci-pipeline.yml: build → upload dist/apps/web to S3 (keyed by SHA
+  # via ./.github/actions/s3-artifact) → the matrix jobs download it.
+  # Skipped when the matrix carries no e2e entry (e.g. a manual
+  # integration-only dispatch), in which case run-tests proceeds without it.
+  # ---------------------------------------------------------------------------
+  build-web:
+    name: "Build Web Application"
+    needs: [prepare]
+    if: contains(needs.prepare.outputs.matrix, '"suite":"e2e"')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      # Same expression as run-tests below: automated full-suite runs and the
+      # on-demand repopulate lever instrument the build via vite-plugin-istanbul
+      # (LS-7849); ordinary manual dispatch is never instrumented.
+      COLLECT_COVERAGE: ${{ (github.event_name == 'workflow_run' || inputs['collect-coverage']) && '1' || '' }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Build Web Application"
+        shell: bash
+        env:
+          # The coverage-instrumented build (COLLECT_COVERAGE=1) needs more heap
+          # than the 4 GB every other web build in the repo uses (ci-pipeline.yml,
+          # deploy-web.yml, deploy-pr-preview.yml): LS-8278 raised it to 4 GB in
+          # June, and by 2026-09-29 the instrumented bundle had outgrown that too
+          # ("FATAL ERROR: Reached heap limit" on every automated run). 8 GB fits
+          # comfortably on the 16 GB self-hosted runners (LS-10329). Uninstrumented
+          # builds keep the repo-wide 4 GB.
+          NODE_OPTIONS: ${{ env.COLLECT_COVERAGE == '1' && '--max-old-space-size=8192' || '--max-old-space-size=4096' }}
+          VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
+          VITE_GIPHY_API_KEY: "e2e-placeholder-key"
+          # Placeholder so the conditional "Continue with Discord" CTA on
+          # PublicLandingPage renders in hermetic E2E builds (LS-3537, LS-3541).
+          # The real secret is never read during E2E — this only needs to be
+          # truthy so the button mounts and can be located via getByRole.
+          VITE_DISCORD_CLIENT_ID: "e2e-placeholder-discord-id"
+          # Required at build time so the TeamDetailPage upload handler
+          # doesn't throw "Image uploads are not configured" before ever
+          # calling fetch — the actual upload endpoint is always mocked by
+          # Playwright (LS-8349).
+          VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
+        run: |
+          export NX_NO_CLOUD=true
+          pnpm exec nx build web
+
+      - name: "Upload Web Build to S3"
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: upload
+          name: web-build
+          path: dist/apps/web
+          if-no-files-found: error
+
   run-tests:
     name: "Playwright ${{ matrix.suite }}${{ matrix.project && format(' [{0}]', matrix.project) || '' }} (${{ matrix.shard }})"
-    needs: [prepare]
+    needs: [prepare, build-web]
+    # build-web is skipped by design when the matrix has no e2e entry, so only
+    # a failed/cancelled build blocks the shards; a skipped one must not.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.build-web.result != 'failure' && needs.build-web.result != 'cancelled' }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     # Integration runs at a bounded shard count (LS-7867 concurrency ceiling)
     # with workers=1 per shard, so a single shard still runs the heaviest
@@ -559,33 +633,21 @@ jobs:
           echo "    All required AMI-baked browsers present."
 
       # =======================================================================
-      # E2E suite: build web app and start a local server
+      # E2E suite: fetch the shared web build and start a local server
       # =======================================================================
-      - name: "Build Web Application"
+      # The app is built once per run by the build-web job above (LS-10329)
+      # and shared via S3, keyed by commit SHA — every e2e shard downloads
+      # the same (coverage-instrumented, on automated runs) bundle instead of
+      # rebuilding it. if-no-files-found: error so a missing artifact fails
+      # loudly here rather than silently falling back to `nx serve` below.
+      - name: "Download Web Build from S3"
         if: matrix.suite == 'e2e'
-        shell: bash
-        env:
-          # Automated full-suite runs instrument this build for coverage
-          # (COLLECT_COVERAGE=1 → vite-plugin-istanbul), which pushes build-time
-          # heap past V8's default ~2 GB cap and OOMs (LS: nightly e2e build).
-          # Match the 4 GB heap every other web build in the repo already uses
-          # (ci-pipeline.yml, deploy-web.yml, deploy-pr-preview.yml).
-          NODE_OPTIONS: "--max-old-space-size=4096"
-          VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
-          VITE_GIPHY_API_KEY: "e2e-placeholder-key"
-          # Placeholder so the conditional "Continue with Discord" CTA on
-          # PublicLandingPage renders in hermetic E2E builds (LS-3537, LS-3541).
-          # The real secret is never read during E2E — this only needs to be
-          # truthy so the button mounts and can be located via getByRole.
-          VITE_DISCORD_CLIENT_ID: "e2e-placeholder-discord-id"
-          # Required at build time so the TeamDetailPage upload handler
-          # doesn't throw "Image uploads are not configured" before ever
-          # calling fetch — the actual upload endpoint is always mocked by
-          # Playwright (LS-8349).
-          VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
-        run: |
-          export NX_NO_CLOUD=true
-          pnpm exec nx build web
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: download
+          name: web-build
+          path: dist/apps/web
+          if-no-files-found: error
 
       - name: "Start Dev Server"
         if: matrix.suite == 'e2e'
@@ -1646,7 +1708,7 @@ jobs:
   # ---------------------------------------------------------------------------
   notify-nightly-finish:
     name: "Nightly Results"
-    needs: [gate, run-tests, deploy-report, notify-nightly-start]
+    needs: [gate, build-web, run-tests, deploy-report, notify-nightly-start]
     # Gate-aware: a debounced automated run must not post a spurious "failure"
     # (run-tests is skipped by design when the gate says no).
     if: always() && needs.gate.outputs.should-run == 'true' && (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
@@ -1728,6 +1790,7 @@ jobs:
           CHANGE_SUMMARY: ${{ steps.decide.outputs.summary }}
         run: |
           TESTS_RESULT="${{ needs.run-tests.result }}"
+          BUILD_RESULT="${{ needs.build-web.result }}"
 
           # Treat skipped/cancelled as failure — the nightly suite should always run
           case "$TESTS_RESULT" in
@@ -1791,7 +1854,14 @@ jobs:
           else
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
-              echo "No test report available (no blob reports were uploaded)."
+              if [ "$BUILD_RESULT" = "failure" ]; then
+                # The shared build-web job (LS-10329) failed, so every e2e
+                # shard was skipped before any test ran — say so instead of
+                # the generic "no report" line.
+                echo "**Web build failed** — e2e shards skipped (see the Build Web Application job)."
+              else
+                echo "No test report available (no blob reports were uploaded)."
+              fi
               echo ""
               echo "$SUMMARY_LINE1"
               echo "$SUMMARY_LINE2"
