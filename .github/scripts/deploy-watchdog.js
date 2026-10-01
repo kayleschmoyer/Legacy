@@ -26,9 +26,9 @@
  *
  *   - `done`   — the terminal job (`Rollup Status`, which `needs` every child
  *                with `if: always()`) has completed: the deploy is over.
- *   - `cancel` — the run is older than the deadline (30 min), at least one
- *                child is still waiting for a runner, and NO job is in
- *                progress. Only then is cancelling the run safe: nothing is
+ *   - `cancel` — at least one child has been waiting for a runner for the
+ *                deadline (30 min) AS OBSERVED BY THIS WATCHDOG, and NO job is
+ *                in progress. Only then is cancelling the run safe: nothing is
  *                mid-flight, so no terraform apply (or anything else) is torn
  *                down half-way. Cancelling frees the `deploy-main` slot so the
  *                pending Deploy for the newest main HEAD starts, and its
@@ -39,9 +39,25 @@
  *                `Apply Lambda Infrastructure` mid-apply can strand Terraform
  *                state (see lambda-terraform-apply.yml's concurrency comment).
  *
- * The decision is pure so it can be unit-tested; the loop, GitHub API calls,
- * and `$GITHUB_OUTPUT` writes live in `main()`. The script never cancels the
- * run itself — it reports `cancelled=true` and the workflow posts a Discord
+ * WHERE THE CLOCK STARTS (LS-10365)
+ * -------------------------------
+ * A job's wait is measured from the first poll on which THIS watchdog saw it
+ * waiting — never from the run's `run_started_at` / `created_at`. GitHub stamps
+ * `run_started_at` when the run is created, not when it is released from the
+ * `deploy-main` group, so a run that sat pending behind another Deploy has
+ * hours on that clock before any of its jobs is runnable. Run 36817980251
+ * (2026-10-01) was created 05:03Z, released 16:20Z, and the old run-age
+ * baseline cancelled it on the first poll for "waiting 676.8 min". The
+ * watchdog job only starts once the run is released, so what it observes is
+ * exactly the time a job has been runnable without a runner. Tracking the wait
+ * per job (`trackWaitingSince`) also means a job that has only just been
+ * dispatched late in a long deploy starts its own 30 min, rather than
+ * inheriting the age of the run.
+ *
+ * The decision is pure so it can be unit-tested, and the poll loop
+ * (`watchRun`) takes its clock, sleep and job lister as arguments for the same
+ * reason; GitHub API calls and `$GITHUB_OUTPUT` writes live in `main()`. The
+ * script never cancels the run itself — it reports `cancelled=true` and the workflow posts a Discord
  * notice before issuing the cancel, because a cancelled run's rollup job may
  * not get to run.
  *
@@ -80,30 +96,60 @@ const RUNNING_STATUS = 'in_progress';
 const WAITING_STATUSES = new Set(['queued', 'waiting', 'pending', 'requested']);
 
 /**
+ * Carry forward, per job name, the epoch ms at which this watchdog first saw
+ * the job waiting. A job seen waiting for the first time starts at `nowMs`; a
+ * job that is no longer waiting (it got a runner, or finished) is dropped, so
+ * a later wait starts a fresh clock. Job timestamps from the API are
+ * deliberately not read — see "WHERE THE CLOCK STARTS" in the header.
+ *
+ * @param {Record<string, number>} previous  Result of the previous poll ({} on the first).
+ * @param {Array<{name: string, status: string}>} jobs
+ * @param {number} nowMs
+ * @param {string} [selfJobName]
+ * @returns {Record<string, number>}
+ */
+function trackWaitingSince(
+  previous,
+  jobs,
+  nowMs,
+  selfJobName = DEFAULT_JOB_NAME,
+) {
+  const next = {};
+  for (const job of jobs ?? []) {
+    if (job.name === selfJobName || !WAITING_STATUSES.has(job.status)) continue;
+    next[job.name] = previous?.[job.name] ?? nowMs;
+  }
+  return next;
+}
+
+/**
  * Pure decision over one snapshot of the run's jobs.
  *
  * @param {object} args
  * @param {Array<{name: string, status: string, conclusion?: string|null}>} args.jobs
  *   The run's jobs as returned by GET /actions/runs/{id}/jobs (only `name` and
  *   `status` are read).
- * @param {number} args.runStartedMs   Epoch ms the current run attempt started.
+ * @param {Record<string, number>} args.waitingSinceMs  Per-job first-seen-waiting
+ *   epoch ms from `trackWaitingSince` for this same snapshot. A waiting job
+ *   missing from the map counts as having waited 0 min.
  * @param {number} args.nowMs          Epoch ms of this poll.
  * @param {number} [args.deadlineMinutes]
  * @param {string} [args.selfJobName]      Display name of the watchdog job itself.
  * @param {string} [args.terminalJobName]  Display name of the job whose completion
  *   means the deploy is over.
  * @returns {{action: string, reason: string, ageMinutes: number,
- *            waitingJobs: string[], runningJobs: string[]}}
+ *            waitingJobs: string[], stuckJobs: string[], runningJobs: string[]}}
+ *   `ageMinutes` is the longest any job has been observed waiting; `stuckJobs`
+ *   are the waiting jobs at or past the deadline.
  */
 function decideWatchdogAction({
   jobs,
-  runStartedMs,
+  waitingSinceMs,
   nowMs,
   deadlineMinutes = DEFAULT_DEADLINE_MINUTES,
   selfJobName = DEFAULT_JOB_NAME,
   terminalJobName = DEFAULT_TERMINAL_JOB_NAME,
 }) {
-  const ageMinutes = Math.max(0, (nowMs - runStartedMs) / 60_000);
   const others = (jobs ?? []).filter((job) => job.name !== selfJobName);
 
   const terminalDone = others.some(
@@ -116,7 +162,14 @@ function decideWatchdogAction({
     .filter((job) => WAITING_STATUSES.has(job.status))
     .map((job) => job.name);
 
-  const base = { ageMinutes, waitingJobs, runningJobs };
+  const waitedMinutes = (name) =>
+    Math.max(0, (nowMs - (waitingSinceMs?.[name] ?? nowMs)) / 60_000);
+  const ageMinutes = Math.max(0, ...waitingJobs.map(waitedMinutes));
+  const stuckJobs = waitingJobs.filter(
+    (name) => waitedMinutes(name) >= deadlineMinutes,
+  );
+
+  const base = { ageMinutes, waitingJobs, stuckJobs, runningJobs };
 
   if (terminalDone) {
     return {
@@ -145,13 +198,13 @@ function decideWatchdogAction({
     };
   }
 
-  if (ageMinutes < deadlineMinutes) {
+  if (stuckJobs.length === 0) {
     return {
       ...base,
       action: ACTION_WAIT,
       reason:
         `${waitingJobs.length} job(s) waiting for a runner (${waitingJobs.join(', ')}) ` +
-        `at ${ageMinutes.toFixed(1)} min — deadline is ${deadlineMinutes} min.`,
+        `for ${ageMinutes.toFixed(1)} min — deadline is ${deadlineMinutes} min.`,
     };
   }
 
@@ -159,10 +212,85 @@ function decideWatchdogAction({
     ...base,
     action: ACTION_CANCEL,
     reason:
-      `${waitingJobs.length} job(s) still waiting for a runner after ` +
+      `${stuckJobs.length} job(s) still waiting for a runner after ` +
       `${ageMinutes.toFixed(1)} min (deadline ${deadlineMinutes} min) with nothing ` +
-      `in progress: ${waitingJobs.join(', ')}.`,
+      `in progress: ${stuckJobs.join(', ')}.`,
   };
+}
+
+/**
+ * The poll loop: list jobs, decide, sleep, until the deploy is done, the run
+ * should be cancelled, or the API has failed too many times in a row
+ * (fail-open — returns `null`). The clock, sleep and job lister are injected
+ * so the loop is testable without GitHub or real time.
+ *
+ * @returns {Promise<ReturnType<typeof decideWatchdogAction> | null>}
+ */
+async function watchRun({
+  listJobs,
+  now = Date.now,
+  sleep = defaultSleep,
+  log = console.log,
+  warn = console.warn,
+  deadlineMinutes = DEFAULT_DEADLINE_MINUTES,
+  pollSeconds = DEFAULT_POLL_SECONDS,
+  selfJobName = DEFAULT_JOB_NAME,
+  terminalJobName = DEFAULT_TERMINAL_JOB_NAME,
+}) {
+  const armedMs = now();
+  let waitingSinceMs = {};
+  let consecutiveFailures = 0;
+  let lastLogged = '';
+  for (;;) {
+    let decision;
+    let nowMs;
+    try {
+      const jobs = await listJobs();
+      nowMs = now();
+      waitingSinceMs = trackWaitingSince(
+        waitingSinceMs,
+        jobs,
+        nowMs,
+        selfJobName,
+      );
+      decision = decideWatchdogAction({
+        jobs,
+        waitingSinceMs,
+        nowMs,
+        deadlineMinutes,
+        selfJobName,
+        terminalJobName,
+      });
+      consecutiveFailures = 0;
+    } catch (error) {
+      consecutiveFailures += 1;
+      warn(
+        `⚠️  poll failed (${consecutiveFailures}/${MAX_CONSECUTIVE_API_FAILURES}): ${error.message}`,
+      );
+      if (consecutiveFailures >= MAX_CONSECUTIVE_API_FAILURES) {
+        warn(
+          '::warning::deploy-watchdog: giving up after repeated API failures — this run is NOT guarded.',
+        );
+        return null;
+      }
+      await sleep(pollSeconds * 1000);
+      continue;
+    }
+
+    // Log only on change so a 25-minute deploy does not produce 50 identical
+    // lines. The prefix is minutes since the watchdog armed; the comparison
+    // skips it and the reason's own running minute count.
+    const body = `${decision.action}: ${decision.reason}`;
+    const key = body.replace(/\d+\.\d+ min/g, 'N min');
+    if (key !== lastLogged) {
+      log(`[${((nowMs - armedMs) / 60_000).toFixed(1)} min] ${body}`);
+      lastLogged = key;
+    }
+
+    if (decision.action !== ACTION_WAIT) return decision;
+
+    await sleep(pollSeconds * 1000);
+  }
 }
 
 // ── Runtime (GitHub Actions) ─────────────────────────────────────────────────
@@ -188,15 +316,6 @@ async function fetchJson(url, token) {
     throw new Error(`GET ${url} failed (HTTP ${response.status})`);
   }
   return response.json();
-}
-
-async function fetchRunStartedMs({ api, repo, runId, token }) {
-  const run = await fetchJson(
-    `${api}/repos/${repo}/actions/runs/${runId}`,
-    token,
-  );
-  const started = Date.parse(run.run_started_at ?? run.created_at ?? '');
-  return Number.isFinite(started) ? started : Date.now();
 }
 
 async function fetchJobs({ api, repo, runId, token }) {
@@ -235,7 +354,7 @@ function writeStepSummary(text) {
   fs.appendFileSync(target, `${text}\n`);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
   const token = process.env.GITHUB_TOKEN ?? '';
@@ -260,90 +379,48 @@ async function main() {
   }
 
   const ctx = { api, repo, runId, token };
-  let runStartedMs;
-  try {
-    runStartedMs = await fetchRunStartedMs(ctx);
-  } catch (error) {
-    console.warn(
-      `::warning::deploy-watchdog: could not read run start time (${error.message}); measuring from now.`,
-    );
-    runStartedMs = Date.now();
-  }
 
   console.log(
     `🐕 Deploy Watchdog armed: deadline ${deadlineMinutes} min, polling every ${pollSeconds}s, ` +
       `terminal job "${terminalJobName}".`,
   );
 
-  let consecutiveFailures = 0;
-  let lastLogged = '';
-  for (;;) {
-    let decision;
-    try {
-      const jobs = await fetchJobs(ctx);
-      decision = decideWatchdogAction({
-        jobs,
-        runStartedMs,
-        nowMs: Date.now(),
-        deadlineMinutes,
-        selfJobName,
-        terminalJobName,
-      });
-      consecutiveFailures = 0;
-    } catch (error) {
-      consecutiveFailures += 1;
-      console.warn(
-        `⚠️  poll failed (${consecutiveFailures}/${MAX_CONSECUTIVE_API_FAILURES}): ${error.message}`,
-      );
-      if (consecutiveFailures >= MAX_CONSECUTIVE_API_FAILURES) {
-        console.warn(
-          '::warning::deploy-watchdog: giving up after repeated API failures — this run is NOT guarded.',
-        );
-        writeOutputs({ cancelled: 'false' });
-        return;
-      }
-      await sleep(pollSeconds * 1000);
-      continue;
-    }
+  const decision = await watchRun({
+    listJobs: () => fetchJobs(ctx),
+    deadlineMinutes,
+    pollSeconds,
+    selfJobName,
+    terminalJobName,
+  });
 
-    // Log only on change so a 25-minute deploy does not produce 50 identical lines.
-    const line = `[${decision.ageMinutes.toFixed(1)} min] ${decision.action}: ${decision.reason}`;
-    if (line.slice(line.indexOf(']')) !== lastLogged) {
-      console.log(line);
-      lastLogged = line.slice(line.indexOf(']'));
-    }
-
-    if (decision.action === ACTION_DONE) {
-      writeOutputs({ cancelled: 'false' });
-      return;
-    }
-
-    if (decision.action === ACTION_CANCEL) {
-      const stuck = decision.waitingJobs.join(', ');
-      const summary =
-        `Deploy run cancelled by the watchdog after ${decision.ageMinutes.toFixed(0)} min: ` +
-        `${stuck} never got a runner (LS-10328). Nothing was in progress when it was cancelled. ` +
-        'The pending Deploy for the newest main HEAD will start now.';
-      console.log(`::error::${summary}`);
-      writeStepSummary(
-        `## 🐕 Deploy Watchdog — run cancelled\n\n${summary}\n\n` +
-          `Waiting jobs:\n${decision.waitingJobs.map((name) => `- \`${name}\``).join('\n')}`,
-      );
-      writeOutputs({
-        cancelled: 'true',
-        stuck_jobs: stuck,
-        age_minutes: decision.ageMinutes.toFixed(0),
-        summary,
-      });
-      return;
-    }
-
-    await sleep(pollSeconds * 1000);
+  if (decision?.action !== ACTION_CANCEL) {
+    writeOutputs({ cancelled: 'false' });
+    return;
   }
+
+  const stuck = decision.stuckJobs.join(', ');
+  const summary =
+    `Deploy run cancelled by the watchdog: ${stuck} waited ` +
+    `${decision.ageMinutes.toFixed(0)} min for a runner that never came (LS-10328). ` +
+    'Nothing was in progress when it was cancelled. ' +
+    'The pending Deploy for the newest main HEAD will start now.';
+  console.log(`::error::${summary}`);
+  writeStepSummary(
+    `## 🐕 Deploy Watchdog — run cancelled\n\n${summary}\n\n` +
+      `Waiting jobs:\n${decision.waitingJobs.map((name) => `- \`${name}\``).join('\n')}`,
+  );
+  writeOutputs({
+    cancelled: 'true',
+    stuck_jobs: stuck,
+    age_minutes: decision.ageMinutes.toFixed(0),
+    summary,
+  });
 }
 
 module.exports = {
   decideWatchdogAction,
+  trackWaitingSince,
+  watchRun,
   ACTION_DONE,
   ACTION_WAIT,
   ACTION_CANCEL,

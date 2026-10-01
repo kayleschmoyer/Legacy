@@ -75,10 +75,18 @@ name: Deploy
 # capacity — the same reasoning as ci-orchestrator.yml's report-runner-shutdown
 # job, LS-9710), starts with the run, needs nothing, and polls this run's jobs
 # via .github/scripts/deploy-watchdog.js. It cancels the run ONLY when all of:
-#   - the run is older than WATCHDOG_DEADLINE_MINUTES (30 — the ~30 min AC), and
-#   - at least one child is still waiting for a runner (queued/waiting/pending), and
+#   - at least one child has been waiting for a runner (queued/waiting/pending)
+#     for WATCHDOG_DEADLINE_MINUTES (30 — the ~30 min AC), and
 #   - NO job is in progress. A running job has a runner and its own
 #     `timeout-minutes`; a running terraform apply is never interrupted.
+# The wait is timed from when the watchdog itself first sees the job waiting,
+# NOT from the run's `run_started_at`/`created_at` (LS-10365): GitHub stamps
+# those when the run is created, so a run that sat pending behind `deploy-main`
+# arrives with hours already on that clock and was cancelled on the first poll
+# (run 36817980251, "waiting 676.8 min" after being runnable for seconds).
+# After the cancel, a follow-up step force-cancels if the run still cannot
+# finish — Rollup Status is `if: always()` on the self-hosted pool, so a plain
+# cancel leaves the run (and `deploy-main`) held until that pool has a runner.
 # Cancelling frees the `deploy-main` slot so the pending Deploy for the newest
 # main HEAD starts within the poll interval, and its freshly-queued jobs fire
 # new scale-up webhooks for the stuck pool. Discord is notified BEFORE the
@@ -207,6 +215,41 @@ jobs:
         run: |
           echo "Cancelling run ${GITHUB_RUN_ID}: ${{ steps.watch.outputs.stuck_jobs }} never got a runner after ${{ steps.watch.outputs.age_minutes }} min."
           gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/cancel"
+
+      # LS-10365: a plain cancel does not finish the run on its own. Rollup
+      # Status is `if: always()`, so it is still dispatched after the cancel and
+      # the run stays non-terminal — holding `deploy-main` — until a self-hosted
+      # runner picks it up (run 36817980251: 3.5 min). If that pool is the one
+      # that is wedged, it never does, and the cancel has freed nothing. So give
+      # the cancel 3 min to land, then force-cancel — but only while nothing is
+      # in progress: a job that has a runner finishes under its own timeout.
+      # `always()` keeps this step alive through the cancellation of this job;
+      # 3 min stays inside the 5 min GitHub allows a cancelled job to wind down.
+      - name: Force-cancel if the run cannot reach a terminal state
+        id: force-cancel
+        if: always() && steps.watch.outputs.cancelled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELF_JOB_NAME: Deploy Watchdog
+        run: |
+          count_jobs() {
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs?filter=latest&per_page=100" \
+              --jq "[.jobs[] | select(.name != env.SELF_JOB_NAME and .status $1)] | length" || echo unknown
+          }
+          for _ in $(seq 1 12); do
+            sleep 15
+            if [ "$(count_jobs '!= "completed"')" = "0" ]; then
+              echo "Every other job has completed — the cancel landed."
+              exit 0
+            fi
+          done
+          running="$(count_jobs '== "in_progress"')"
+          if [ "$running" != "0" ]; then
+            echo "Not force-cancelling: in-progress job count is ${running}; a running job ends under its own timeout."
+            exit 0
+          fi
+          echo "::warning::Run ${GITHUB_RUN_ID} still has jobs waiting for a runner 3 min after the cancel — force-cancelling so deploy-main is released."
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/force-cancel"
 
   # ---------------------------------------------------------------------------
   # Detect which deploy targets are affected by this push.

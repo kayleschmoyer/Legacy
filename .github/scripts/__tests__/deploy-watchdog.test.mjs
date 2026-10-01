@@ -30,6 +30,9 @@ const fs = require('node:fs');
 
 const {
   decideWatchdogAction,
+  trackWaitingSince,
+  watchRun,
+  MAX_CONSECUTIVE_API_FAILURES,
   ACTION_DONE,
   ACTION_WAIT,
   ACTION_CANCEL,
@@ -60,13 +63,34 @@ const SELF = job(DEFAULT_JOB_NAME, 'in_progress');
 const ANDROID = 'Build Android App / Build Android APK';
 const APPLY = 'Apply Lambda Infrastructure / Apply Lambda Infrastructure';
 
+// Every waiting job in `jobs` was first seen waiting at T0 and has now waited
+// `ageMinutes`.
 function decide(jobs, ageMinutes, overrides = {}) {
+  const all = [SELF, ...jobs];
   return decideWatchdogAction({
-    jobs: [SELF, ...jobs],
-    runStartedMs: T0,
+    jobs: all,
+    waitingSinceMs: trackWaitingSince({}, all, T0),
     nowMs: T0 + ageMinutes * MIN,
     ...overrides,
   });
+}
+
+// Drives watchRun against a fake clock: `sleep` advances it, and `snapshot`
+// maps minutes-since-arm to the job list GitHub would return at that moment.
+async function watch(snapshot, overrides = {}) {
+  let nowMs = T0;
+  const logs = [];
+  const decision = await watchRun({
+    listJobs: async () => [SELF, ...snapshot((nowMs - T0) / MIN)],
+    now: () => nowMs,
+    sleep: async (ms) => {
+      nowMs += ms;
+    },
+    log: (line) => logs.push(line),
+    warn: (line) => logs.push(line),
+    ...overrides,
+  });
+  return { decision, logs, elapsedMinutes: (nowMs - T0) / MIN };
 }
 
 describe('decideWatchdogAction — the LS-10328 incident shape', () => {
@@ -169,7 +193,7 @@ describe('decideWatchdogAction — completion and dispatch gaps', () => {
   it('honours a custom deadline and job names', () => {
     const decision = decideWatchdogAction({
       jobs: [job('Guard', 'in_progress'), job(ANDROID, 'queued')],
-      runStartedMs: T0,
+      waitingSinceMs: { [ANDROID]: T0 },
       nowMs: T0 + 11 * MIN,
       deadlineMinutes: 10,
       selfJobName: 'Guard',
@@ -179,10 +203,124 @@ describe('decideWatchdogAction — completion and dispatch gaps', () => {
     assert.ok(decision.ageMinutes >= 11);
   });
 
-  it('clamps a clock skew that puts "now" before the run start to age 0', () => {
+  it('clamps a clock skew that puts "now" before the first sighting to age 0', () => {
     const decision = decide([job(ANDROID, 'queued')], -5);
     assert.equal(decision.ageMinutes, 0);
     assert.equal(decision.action, ACTION_WAIT);
+  });
+});
+
+// LS-10365. Run 36817980251 was created 05:03Z, sat pending behind the
+// `deploy-main` group until 16:20Z, and was cancelled on the watchdog's first
+// poll for "waiting 676.8 min": the baseline was the run's `run_started_at`,
+// which GitHub stamps at run creation, not at release from the group.
+describe('watchRun — the wait is timed from what the watchdog itself observes (LS-10365)', () => {
+  const DETECT = 'Detect Deploy Targets';
+  const ELEVEN_HOURS_AGO = new Date(T0 - 11 * 60 * MIN).toISOString();
+  // What the API reports for a job of a run that was created 11 h ago and
+  // released from the concurrency group a minute before the watchdog armed.
+  const staleQueued = (name) => ({
+    ...job(name, 'queued'),
+    created_at: ELEVEN_HOURS_AGO,
+    started_at: ELEVEN_HOURS_AGO,
+  });
+
+  it('does not cancel a run created 11 h ago whose jobs only just became runnable', async () => {
+    const { decision, logs } = await watch((minute) => {
+      if (minute < 1) return [staleQueued(DETECT)];
+      if (minute < 3) return [job(DETECT, 'in_progress')];
+      return [
+        job(DETECT, 'completed', 'success'),
+        job(DEFAULT_TERMINAL_JOB_NAME, 'completed', 'success'),
+      ];
+    });
+    assert.equal(decision.action, ACTION_DONE);
+    assert.ok(
+      !logs.some((line) => line.includes(`${ACTION_CANCEL}:`)),
+      `no poll may decide cancel:\n${logs.join('\n')}`,
+    );
+    assert.match(logs[0], /^\[0\.0 min\] wait: .*for 0\.0 min/);
+  });
+
+  it('cancels once a job has been queued for 31 min since the watchdog armed with nothing in progress', async () => {
+    const decision = decide([staleQueued(DETECT)], 31);
+    assert.equal(decision.action, ACTION_CANCEL);
+    assert.deepEqual(decision.stuckJobs, [DETECT]);
+    assert.equal(decision.ageMinutes, 31);
+  });
+
+  it('cancels at the default 30 min deadline, not before', async () => {
+    const { decision, elapsedMinutes } = await watch(() => [
+      job(ANDROID, 'queued'),
+    ]);
+    assert.equal(decision.action, ACTION_CANCEL);
+    assert.equal(elapsedMinutes, DEFAULT_DEADLINE_MINUTES);
+  });
+
+  it('gives a job dispatched late in a long deploy its own deadline instead of the age of the run', async () => {
+    // Web deploys for 40 min, then Rollup Status is dispatched and queues.
+    // Under a run-age baseline that first queued poll would cancel.
+    const { decision, elapsedMinutes } = await watch((minute) =>
+      minute < 40
+        ? [job('Deploy Web / Build and Deploy', 'in_progress')]
+        : [
+            job('Deploy Web / Build and Deploy', 'completed', 'success'),
+            job(DEFAULT_TERMINAL_JOB_NAME, 'queued'),
+          ],
+    );
+    assert.equal(decision.action, ACTION_CANCEL);
+    assert.deepEqual(decision.stuckJobs, [DEFAULT_TERMINAL_JOB_NAME]);
+    assert.equal(elapsedMinutes, 40 + DEFAULT_DEADLINE_MINUTES);
+  });
+
+  it('still cancels the LS-10328 shape: a child queued from the start while siblings run and finish', async () => {
+    const { decision, elapsedMinutes } = await watch((minute) => [
+      job(ANDROID, 'queued'),
+      minute < 12
+        ? job('Deploy Web / Build and Deploy', 'in_progress')
+        : job('Deploy Web / Build and Deploy', 'completed', 'success'),
+    ]);
+    assert.equal(decision.action, ACTION_CANCEL);
+    assert.deepEqual(decision.stuckJobs, [ANDROID]);
+    assert.equal(elapsedMinutes, DEFAULT_DEADLINE_MINUTES);
+  });
+
+  it('fails open (null, no cancel) when the jobs API keeps failing', async () => {
+    let calls = 0;
+    const { decision } = await watch(() => [], {
+      listJobs: async () => {
+        calls += 1;
+        throw new Error('HTTP 503');
+      },
+    });
+    assert.equal(decision, null);
+    assert.equal(calls, MAX_CONSECUTIVE_API_FAILURES);
+  });
+});
+
+describe('trackWaitingSince', () => {
+  it('keeps the first sighting across polls and ignores API timestamps and the watchdog itself', () => {
+    const jobs = [
+      SELF,
+      { ...job(ANDROID, 'queued'), created_at: '2020-01-01T00:00:00Z' },
+    ];
+    const first = trackWaitingSince({}, jobs, T0);
+    assert.deepEqual(first, { [ANDROID]: T0 });
+    assert.deepEqual(trackWaitingSince(first, jobs, T0 + 5 * MIN), first);
+  });
+
+  it('restarts the clock for a job that got a runner and later waits again', () => {
+    const first = trackWaitingSince({}, [job(ANDROID, 'queued')], T0);
+    const running = trackWaitingSince(
+      first,
+      [job(ANDROID, 'in_progress')],
+      T0 + MIN,
+    );
+    assert.deepEqual(running, {});
+    assert.deepEqual(
+      trackWaitingSince(running, [job(ANDROID, 'queued')], T0 + 2 * MIN),
+      { [ANDROID]: T0 + 2 * MIN },
+    );
   });
 });
 
@@ -261,6 +399,31 @@ describe('deploy.yml — Deploy Watchdog job shape (LS-10328)', () => {
       steps[cancelIdx].run,
       /actions\/runs\/\$\{?GITHUB_RUN_ID\}?\/cancel/,
       "the cancel step must POST to this run's /cancel endpoint",
+    );
+  });
+
+  it('force-cancels after the cancel if the run cannot finish, surviving its own cancellation, and never while a job is in progress (LS-10365)', () => {
+    // A plain cancel still dispatches `if: always()` Rollup Status onto the
+    // self-hosted pool; if that pool is the wedged one the run never reaches
+    // a terminal state and `deploy-main` stays held.
+    const steps = watchdog.steps;
+    const cancelIdx = steps.findIndex((s) => s.id === 'cancel');
+    const forceIdx = steps.findIndex((s) => s.id === 'force-cancel');
+    assert.ok(forceIdx > cancelIdx, 'force-cancel must follow the cancel');
+    const force = steps[forceIdx];
+    assert.match(String(force.if), /always\(\)/);
+    assert.match(
+      String(force.if),
+      /steps\.watch\.outputs\.cancelled == 'true'/,
+    );
+    assert.equal(force.env.SELF_JOB_NAME, DEFAULT_JOB_NAME);
+    assert.match(
+      force.run,
+      /actions\/runs\/\$\{?GITHUB_RUN_ID\}?\/force-cancel/,
+    );
+    assert.ok(
+      force.run.indexOf('in_progress') < force.run.indexOf('/force-cancel'),
+      'the in-progress guard must come before the force-cancel call',
     );
   });
 
