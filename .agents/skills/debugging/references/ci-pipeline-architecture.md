@@ -73,7 +73,7 @@ Common issues: missing `VITE_*` secrets, Rollbar sourcemap upload failure, Pages
 
 ### Lambda deployment (`upload-lambdas.yml` → `lambda-terraform-apply.yml`)
 
-The consolidated upload workflow builds affected lambdas via matrix, packages and uploads to S3. Then `lambda-terraform-apply.yml` runs Terraform to update the Lambda function code.
+The consolidated upload workflow builds every affected lambda in a single job (one checkout + install, `nx run-many` 3-wide — LS-10335 collapsed the former one-job-per-lambda matrix), packages and uploads each to S3, and reports per-lambda status via its `results` output. Then `lambda-terraform-apply.yml` runs Terraform to update the Lambda function code.
 
 **MCP (preferred):**
 

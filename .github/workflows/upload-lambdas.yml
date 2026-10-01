@@ -1,8 +1,10 @@
 name: Upload Lambdas
 
 # Consolidated Lambda upload workflow — replaces 8 individual upload-*.yml files.
-# Uses nx affected to only build lambdas that actually changed, then uploads each
-# to S3 in parallel via matrix strategy. The central Terraform workflow applies
+# Uses nx affected to only build lambdas that actually changed, then builds and
+# uploads all of them to S3 from ONE job (single checkout + install; LS-10335
+# collapsed the former one-job-per-lambda matrix — see the `upload` job for
+# the per-lambda status contract). The central Terraform workflow applies
 # infrastructure changes after this completes.
 #
 # Triggering:
@@ -28,6 +30,16 @@ on:
         required: false
         default: false
         type: boolean
+    outputs:
+      results:
+        description: "Per-lambda upload status as a JSON map { project: success | build-failed | upload-failed | built | not-run } (LS-10335)"
+        value: ${{ jobs.upload.outputs.results }}
+      uploaded:
+        description: "Comma-separated nx project names whose upload succeeded"
+        value: ${{ jobs.upload.outputs.uploaded }}
+      failed:
+        description: "Comma-separated nx project names that did not reach a successful upload"
+        value: ${{ jobs.upload.outputs.failed }}
   workflow_dispatch:
     inputs:
       lambda:
@@ -425,10 +437,31 @@ jobs:
           echo "📋 Lambdas to build: $(echo "$MATRIX" | jq -r '[ .[].project ] | join(", ")')"
 
   # ---------------------------------------------------------------------------
-  # Job 2 — Build, package, and upload each affected lambda
+  # Job 2 — Build, package, and upload every affected lambda in ONE job
   # ---------------------------------------------------------------------------
+  # LS-10335: this was a per-lambda matrix — one self-hosted job per affected
+  # lambda (~15–18 on a lambda-touching merge), each paying its own checkout +
+  # pnpm install (~3 min) for a ~30 s build + upload. A lambda-touching Deploy
+  # cost 60–75 runner-minutes (Sept 9: ~10 such deploys = 773 min). Now one
+  # checkout + one install serves every lambda: all affected projects build
+  # via a single `nx run-many` (3-wide, nx-cached), then package/upload runs
+  # per lambda in a loop.
+  #
+  # Per-lambda status is preserved, surfaced differently:
+  #   - each lambda's build and upload outcome is recorded independently, so a
+  #     failed lambda never blocks the others (the old `fail-fast: false`)
+  #   - the `results` output is a JSON map { project: status } with status one
+  #     of success | build-failed | upload-failed | built | not-run, plus
+  #     `uploaded` / `failed` comma-separated project lists — exposed as
+  #     workflow_call outputs and rendered per lambda by deploy.yml's Rollup
+  #     Status
+  #   - one ::notice:: / ::error:: annotation per lambda and a per-lambda table
+  #     in the step summary
+  #   - the job fails iff at least one lambda failed, so deploy.yml's
+  #     `needs.upload-lambdas.result` gates (Apply Lambda Infrastructure,
+  #     Deploy Web, Build Android, Rollup Status) are unchanged.
   upload:
-    name: ${{ matrix.lambda.badgeName }}
+    name: Upload Lambdas
     needs: detect
     # always() is required to break the skip-chain poison: when verify-ci is
     # skipped (skip-ci-check=true), GitHub Actions auto-skips all transitive
@@ -436,10 +469,12 @@ jobs:
     # only run when detect actually succeeded.
     if: always() && needs.detect.result == 'success' && needs.detect.outputs.has-lambdas == 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    strategy:
-      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
-      fail-fast: false
+    # Was 15 min per lambda job; one job now covers up to all 18 (force-all).
+    timeout-minutes: 40
+    outputs:
+      results: ${{ steps.report.outputs.results }}
+      uploaded: ${{ steps.report.outputs.uploaded }}
+      failed: ${{ steps.report.outputs.failed }}
 
     steps:
       - name: Check out code
@@ -459,93 +494,193 @@ jobs:
           role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build Lambda
+      - name: Build affected lambdas
         env:
           NODE_ENV: production
-          ROLLBAR_ACCESS_TOKEN: ${{ matrix.lambda.rollbar && secrets.ROLLBAR_ACCESS_TOKEN || '' }}
+          LAMBDAS_MATRIX: ${{ needs.detect.outputs.matrix }}
+          # Deliberately NOT exported as ROLLBAR_ACCESS_TOKEN: the matrix job
+          # only exposed the token to lambdas flagged `rollbar: true` in the
+          # registry, so the two build groups below set it per invocation.
+          ROLLBAR_TOKEN_SECRET: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
         run: |
           set -o pipefail
-          echo "🔨 Building ${{ matrix.lambda.badgeName }}..."
 
-          if pnpm exec nx run ${{ matrix.lambda.project }}:build 2>&1 | tee build.log; then
-            echo "✅ Build successful"
-          else
-            echo "❌ Build failed"
-            echo "## Build Errors" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -20 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+          # Working files shared by the build / upload / report steps.
+          echo "$LAMBDAS_MATRIX" | jq -c '.lambda' > lambdas.json
+          echo '{}' > lambda-results.json
+          record() { # record <project> <status>
+            jq -c --arg p "$1" --arg s "$2" '.[$p] = $s' lambda-results.json > lambda-results.tmp \
+              && mv lambda-results.tmp lambda-results.json
+          }
+          for PROJECT in $(jq -r '.[].project' lambdas.json); do
+            record "$PROJECT" "not-run"
+          done
+          echo "📋 Lambdas to build: $(jq -r '[ .[].project ] | join(", ")' lambdas.json)"
+
+          # One nx invocation per token group. nx runs every task even after
+          # one fails (no --nx-bail), so a single red project doesn't stop the
+          # others from building.
+          build_group() { # build_group <label> <comma-separated projects>
+            local LABEL="$1" PROJECTS="$2"
+            [ -z "$PROJECTS" ] && return 0
+            echo "🔨 Building ($LABEL): $PROJECTS"
+            pnpm exec nx run-many -t build --projects="$PROJECTS" --parallel=3 --output-style=stream 2>&1 \
+              | tee -a "build-${LABEL}.log"
+          }
+
+          ROLLBAR_PROJECTS=$(jq -r '[ .[] | select(.rollbar) | .project ] | join(",")' lambdas.json)
+          PLAIN_PROJECTS=$(jq -r '[ .[] | select(.rollbar | not) | .project ] | join(",")' lambdas.json)
+
+          ROLLBAR_GROUP_OK=true
+          PLAIN_GROUP_OK=true
+          ROLLBAR_ACCESS_TOKEN="$ROLLBAR_TOKEN_SECRET" build_group rollbar "$ROLLBAR_PROJECTS" || ROLLBAR_GROUP_OK=false
+          ROLLBAR_ACCESS_TOKEN="" build_group plain "$PLAIN_PROJECTS" || PLAIN_GROUP_OK=false
+
+          # Attribute results per lambda. When a group went green every member
+          # built; when it went red, re-run each member on its own — the ones
+          # that succeeded are instant nx cache hits, and only the real
+          # failure(s) re-execute, so we can name them precisely.
+          for PROJECT in $(jq -r '.[].project' lambdas.json); do
+            ROLLBAR=$(jq -r --arg p "$PROJECT" '.[] | select(.project == $p) | .rollbar' lambdas.json)
+            BADGE=$(jq -r --arg p "$PROJECT" '.[] | select(.project == $p) | .badgeName' lambdas.json)
+            if [ "$ROLLBAR" = "true" ]; then
+              GROUP_OK=$ROLLBAR_GROUP_OK; TOKEN="$ROLLBAR_TOKEN_SECRET"
+            else
+              GROUP_OK=$PLAIN_GROUP_OK; TOKEN=""
+            fi
+
+            if [ "$GROUP_OK" = "true" ]; then
+              echo "✅ $BADGE: build successful"
+              record "$PROJECT" "built"
+              continue
+            fi
+
+            if ROLLBAR_ACCESS_TOKEN="$TOKEN" pnpm exec nx run "${PROJECT}:build" 2>&1 | tee "build-${PROJECT}.log"; then
+              echo "✅ $BADGE: build successful"
+              record "$PROJECT" "built"
+            else
+              echo "::error::$BADGE: build failed"
+              record "$PROJECT" "build-failed"
+              {
+                echo "## ❌ Build Errors — $BADGE"
+                echo '```'
+                tail -20 "build-${PROJECT}.log"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
 
       - name: Package and Upload to S3
         run: |
-          echo "📦 Creating Lambda deployment package..."
-
-          # Create version string
+          # Create version string (shared across this run's lambdas — same
+          # timestamp+sha scheme the per-lambda jobs used)
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           COMMIT_SHA=$(echo "$GITHUB_SHA" | cut -c1-8)
           VERSION="${TIMESTAMP}-${COMMIT_SHA}"
           echo "Version: $VERSION"
 
-          DIST_PATH="${{ matrix.lambda.distPath }}"
-          S3_PREFIX="${{ matrix.lambda.s3Prefix }}"
-          ZIP_NAME="${S3_PREFIX}-${VERSION}.zip"
-
-          # Create deployment package from built artifacts
-          (cd "$DIST_PATH" && zip -r "${GITHUB_WORKSPACE}/${ZIP_NAME}" .)
-
-          # Get S3 bucket name from SSM parameter store
+          # Get S3 bucket name from SSM parameter store (once)
           echo "🔍 Getting S3 bucket name from SSM..."
           if S3_BUCKET=$(aws ssm get-parameter \
             --name "/legacy-sports/${AWS_STAGE}/s3/lambda-deployments-bucket" \
             --query "Parameter.Value" \
             --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null); then
+            --region "${AWS_REGION}" 2>/dev/null); then
             echo "✅ Found S3 bucket: $S3_BUCKET"
           else
             echo "⚠️ SSM parameter not found, using default bucket name"
             S3_BUCKET="legacy-sports-dev-lambdas-cca20ad9"
           fi
 
-          # Upload to S3
-          echo "⬆️  Uploading to S3..."
-          aws s3 cp "${ZIP_NAME}" \
-            "s3://${S3_BUCKET}/${S3_PREFIX}/${ZIP_NAME}" \
-            --region ${{ env.AWS_REGION }}
+          record() { # record <project> <status>
+            jq -c --arg p "$1" --arg s "$2" '.[$p] = $s' lambda-results.json > lambda-results.tmp \
+              && mv lambda-results.tmp lambda-results.json
+          }
 
-          echo "✅ Upload complete: s3://${S3_BUCKET}/${S3_PREFIX}/${ZIP_NAME}"
+          # upload_one <project> — zip the dist, push to S3, bump the SSM
+          # version pointer. Returns non-zero on any failure; the caller
+          # records it and moves on to the next lambda.
+          upload_one() {
+            local PROJECT="$1"
+            local ENTRY DIST_PATH S3_PREFIX SSM_NAME BADGE ZIP_NAME
+            ENTRY=$(jq -c --arg p "$PROJECT" '.[] | select(.project == $p)' lambdas.json)
+            DIST_PATH=$(echo "$ENTRY" | jq -r '.distPath')
+            S3_PREFIX=$(echo "$ENTRY" | jq -r '.s3Prefix')
+            SSM_NAME=$(echo "$ENTRY" | jq -r '.ssmName')
+            BADGE=$(echo "$ENTRY" | jq -r '.badgeName')
+            ZIP_NAME="${S3_PREFIX}-${VERSION}.zip"
 
-          # Save for next step
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "S3_BUCKET=${S3_BUCKET}" >> "$GITHUB_ENV"
-          echo "S3_KEY=${S3_PREFIX}/${ZIP_NAME}" >> "$GITHUB_ENV"
+            echo "📦 $BADGE: creating deployment package from $DIST_PATH..."
+            (cd "$DIST_PATH" && zip -qr "${GITHUB_WORKSPACE}/${ZIP_NAME}" .) || return 1
 
-      - name: Update SSM Parameter
-        env:
-          VERSION: ${{ env.VERSION }}
-          S3_KEY: ${{ env.S3_KEY }}
-        run: |
-          echo "📝 Updating SSM parameter with new version..."
+            echo "⬆️  $BADGE: uploading to s3://${S3_BUCKET}/${S3_PREFIX}/${ZIP_NAME}..."
+            aws s3 cp "${ZIP_NAME}" \
+              "s3://${S3_BUCKET}/${S3_PREFIX}/${ZIP_NAME}" \
+              --region "${AWS_REGION}" || return 1
 
-          aws ssm put-parameter \
-            --name "/legacy-sports/${AWS_STAGE}/lambda/${{ matrix.lambda.ssmName }}/version" \
-            --value "${VERSION}" \
-            --overwrite \
-            --region ${{ env.AWS_REGION }}
+            echo "📝 $BADGE: updating SSM version parameter..."
+            aws ssm put-parameter \
+              --name "/legacy-sports/${AWS_STAGE}/lambda/${SSM_NAME}/version" \
+              --value "${VERSION}" \
+              --overwrite \
+              --region "${AWS_REGION}" || return 1
 
-          echo "✅ SSM parameter updated"
+            {
+              echo "## 📦 Lambda Upload Complete — $BADGE"
+              echo "- **Lambda**: ${SSM_NAME}"
+              echo "- **Version**: \`${VERSION}\`"
+              echo "- **S3 Location**: \`${S3_PREFIX}/${ZIP_NAME}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::✅ $BADGE uploaded successfully (version ${VERSION})"
+          }
 
-          echo "## 📦 Lambda Upload Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Lambda**: ${{ matrix.lambda.ssmName }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Location**: \`${S3_KEY}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Next Step**: Central Terraform workflow will apply infrastructure changes" >> $GITHUB_STEP_SUMMARY
+          for PROJECT in $(jq -r 'to_entries[] | select(.value == "built") | .key' lambda-results.json); do
+            if upload_one "$PROJECT"; then
+              record "$PROJECT" "success"
+            else
+              echo "::error::$(jq -r --arg p "$PROJECT" '.[] | select(.project == $p) | .badgeName' lambdas.json): upload failed"
+              record "$PROJECT" "upload-failed"
+            fi
+          done
 
-      - name: Summary
-        env:
-          VERSION: ${{ env.VERSION }}
-        run: |
-          echo "::notice::✅ ${{ matrix.lambda.badgeName }} uploaded successfully"
-          echo "::notice::Version: ${VERSION}"
           echo "::notice::Waiting for Terraform workflow to apply infrastructure..."
+
+      - name: Report per-lambda results
+        id: report
+        # Runs even when a previous step died unexpectedly, so a lambda that
+        # never reached "success" is reported (as not-run / built) and fails
+        # the job rather than vanishing silently.
+        if: always()
+        run: |
+          if [ ! -f lambda-results.json ]; then
+            echo "::error::lambda-results.json missing — the build step never started"
+            echo "results={}" >> "$GITHUB_OUTPUT"
+            echo "uploaded=" >> "$GITHUB_OUTPUT"
+            echo "failed=" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          RESULTS=$(jq -c '.' lambda-results.json)
+          UPLOADED=$(jq -r '[ to_entries[] | select(.value == "success") | .key ] | join(",")' lambda-results.json)
+          FAILED=$(jq -r '[ to_entries[] | select(.value != "success") | .key ] | join(",")' lambda-results.json)
+          echo "results=$RESULTS" >> "$GITHUB_OUTPUT"
+          echo "uploaded=$UPLOADED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## 📊 Lambda Upload Results"
+            echo ""
+            echo "| Lambda | Status |"
+            echo "| --- | --- |"
+            jq -r '
+              to_entries[] |
+              (if .value == "success" then "✅" else "❌" end) as $emoji |
+              "| \(.key) | \($emoji) \(.value) |"
+            ' lambda-results.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::Lambda upload failed for: $FAILED"
+            exit 1
+          fi
+          echo "✅ All lambdas uploaded: $UPLOADED"

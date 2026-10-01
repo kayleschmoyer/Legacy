@@ -519,6 +519,11 @@ jobs:
           ANDROID_TARGETED: ${{ needs.detect-changes.outputs.android }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
           LAMBDAS_UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
+          # Per-lambda JSON map { project: status } from the consolidated
+          # single-job upload (LS-10335) — rendered as its own table below so
+          # the per-lambda visibility the old one-job-per-lambda matrix gave
+          # for free survives the collapse. Empty when the upload was skipped.
+          LAMBDAS_UPLOAD_RESULTS: ${{ needs.upload-lambdas.outputs.results }}
           LAMBDAS_APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
           WEB_RESULT: ${{ needs.deploy-web.result }}
           ANDROID_RESULT: ${{ needs.build-android.result }}
@@ -671,6 +676,18 @@ jobs:
             echo ""
             echo "**Overall:** $OVERALL"
             echo ""
+            if [ -n "$LAMBDAS_UPLOAD_RESULTS" ] && [ "$LAMBDAS_UPLOAD_RESULTS" != "{}" ]; then
+              echo "### Lambdas uploaded"
+              echo ""
+              echo "| Lambda | Upload |"
+              echo "| --- | --- |"
+              echo "$LAMBDAS_UPLOAD_RESULTS" | jq -r '
+                to_entries[] |
+                (if .value == "success" then "✅" else "❌" end) as $emoji |
+                "| \(.key) | \($emoji) \(.value) |"
+              '
+              echo ""
+            fi
             if [ "$LAMBDAS_STATE" = "success" ]; then
               echo "> ℹ️ Terraform apply already ran synchronously as part of this Deploy run"
               echo "> (**Apply Lambda Infrastructure** job, before Deploy Web started)."
