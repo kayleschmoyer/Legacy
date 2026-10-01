@@ -2248,3 +2248,184 @@ describe('ci-gate — jobNameMatchesGateKey (LS-10140)', () => {
     }
   });
 });
+
+// ── LS-10311: a runner death that concluded `failure` ───────────────────────
+
+describe('ci-gate — a spot-killed job that concluded failure posts PENDING, not red (LS-10311)', () => {
+  const SHUTDOWN_LOG =
+    '##[error]The runner has received a shutdown signal. This can happen when ' +
+    'the runner service is stopped, or a manually started runner is canceled.\n' +
+    '##[error]The operation was canceled.';
+
+  it('failure with no failed step + shutdown-first log → pending no-verdict', async () => {
+    // The Sep 22-29 2026 shape: GitHub concluded the killed `test` job
+    // `failure` even though no step failed.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 1101,
+            name: '🚀 CI Pipeline / test',
+            conclusion: 'failure',
+            steps: [
+              { name: 'Set up job', conclusion: 'success' },
+              { name: 'Run Tests', conclusion: null },
+            ],
+          },
+        ],
+      },
+      jobLogsById: { 1101: SHUTDOWN_LOG },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(res.cancelClassifications.test, 'runner-shutdown');
+    assert.match(calls.statuses[0].description, /test: runner-shutdown/);
+  });
+
+  it('NEGATIVE CONTROL: failure with a failed step stays red, and skips the log read', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 1102,
+            name: '🚀 CI Pipeline / test',
+            conclusion: 'failure',
+            steps: [
+              { name: 'Set up job', conclusion: 'success' },
+              { name: 'Run Tests', conclusion: 'failure' },
+            ],
+          },
+        ],
+      },
+      jobLogsById: { 1102: SHUTDOWN_LOG },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+    assert.ok(res.failing.some((f) => f.startsWith('test')));
+    assert.strictEqual(calls.jobLogs.length, 0);
+  });
+
+  it('NEGATIVE CONTROL: a plain failure with no shutdown notice stays red', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 1103,
+            name: '🚀 CI Pipeline / lint & format',
+            conclusion: 'failure',
+            steps: [],
+          },
+        ],
+      },
+      jobLogsById: { 1103: '##[error]Process completed with exit code 1.' },
+    });
+
+    await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), lint: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
+  it('NEGATIVE CONTROL: mixed matrix — one shard really failed, another lost its runner — stays red', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 1104,
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/3)',
+            conclusion: 'failure',
+            steps: [{ name: 'Run E2E', conclusion: null }],
+          },
+          {
+            id: 1105,
+            name: '🚀 CI Pipeline / E2E Tests (Shard 2/3)',
+            conclusion: 'failure',
+            steps: [{ name: 'Run E2E', conclusion: 'failure' }],
+          },
+        ],
+      },
+      jobLogsById: { 1104: SHUTDOWN_LOG, 1105: SHUTDOWN_LOG },
+    });
+
+    await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
+  it('a failed jobs lookup keeps the failure red — unproven is not a runner death', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsError: 'API rate limit exceeded',
+    });
+
+    await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+  });
+
+  it('a runner-death failure alongside a real failure in another input stays red', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            id: 1106,
+            name: '🚀 CI Pipeline / test',
+            conclusion: 'failure',
+            steps: [],
+          },
+          {
+            id: 1107,
+            name: '🚀 CI Pipeline / build',
+            conclusion: 'failure',
+            steps: [{ name: 'Build', conclusion: 'failure' }],
+          },
+        ],
+      },
+      jobLogsById: { 1106: SHUTDOWN_LOG },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'failure', build: 'failure' },
+    });
+
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+    assert.deepStrictEqual(res.failing, ['build (failure)']);
+  });
+});

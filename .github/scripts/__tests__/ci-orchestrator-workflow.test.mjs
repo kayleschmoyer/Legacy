@@ -237,16 +237,25 @@ describe('rerun-cancelled-ci.yml — re-run guards (LS-10091)', () => {
     assert.deepEqual(on.workflow_run.types, ['completed']);
   });
 
-  it('acts only on a cancelled conclusion, never on a real failure verdict', () => {
+  it('acts on a cancelled conclusion, and on failure only for the orchestrator (LS-10311)', () => {
     const { parsed } = loadRerun();
     const condition = parsed.jobs.rerun.if;
     assert.match(condition, /conclusion == 'cancelled'/);
-    assert.doesNotMatch(
+    // A spot-killed job often concludes `failure`, so the orchestrator's
+    // failed runs must be candidates too. They are gated to the orchestrator
+    // by name, and the script re-runs one only when CI Gate is pending (no
+    // genuine failure), so a real verdict is never retried.
+    assert.match(
       condition,
-      /conclusion == 'failure'/,
-      'a `failure` conclusion is a genuine verdict — re-running it would ' +
-        'silently retry a SHA that has already been ruled on.',
+      /conclusion == 'failure' &&\s*github\.event\.workflow_run\.name == 'Legacy Sports CI Orchestrator'/,
     );
+  });
+
+  it('passes the run conclusion and CI Gate state to the re-run decision (LS-10311)', () => {
+    const { raw } = loadRerun();
+    assert.match(raw, /runConclusion: run\.conclusion/);
+    assert.match(raw, /gateState,/);
+    assert.match(raw, /context === 'CI Gate'/);
   });
 
   it('requests actions:write only for itself, not for ci-orchestrator', () => {

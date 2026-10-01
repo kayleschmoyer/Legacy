@@ -106,11 +106,25 @@ const MAX_RERUN_ATTEMPTS = 3;
  * direction — the cost of not re-running is a human clicking "Re-run", while
  * the cost of re-running wrongly is burning the runner pool on a dead SHA.
  *
+ * A run that concluded `failure` is re-run too, but only under two extra
+ * conditions (LS-10311). A spot-reclaimed runner often leaves its job
+ * concluded `failure` with no failed step, and that alone turns the whole run
+ * `failure` — so a cancelled-only rule never re-runs the most common runner
+ * death. The extra conditions keep a genuine verdict from being retried:
+ *   - the run must show a runner shutdown (`classification`), and
+ *   - the SHA's `CI Gate` must be `pending`. The gate classifies every gate
+ *     input before it posts (ci-gate.js), so it posts red for any genuine
+ *     failure and pending only when the sole problems were cancellations or
+ *     runner deaths. A red gate, or an unknown one, means no re-run.
+ *
  * @param {object} opts
  * @param {number} opts.runAttempt        `run_attempt` of the completed run.
  * @param {string} opts.runHeadSha        Head SHA the cancelled run tested.
  * @param {string} opts.prHeadSha         PR's head SHA right now.
  * @param {string} [opts.classification]  Result of classifyJobLog across the run.
+ * @param {string} [opts.runConclusion]   The run's conclusion (default `cancelled`).
+ * @param {string} [opts.gateState]       Current `CI Gate` state for the SHA;
+ *   consulted only for a `failure` run.
  * @param {number} [opts.maxAttempts]     Override for MAX_RERUN_ATTEMPTS.
  * @returns {{ rerun: boolean, reason: string }}
  */
@@ -119,8 +133,17 @@ function shouldRerunCancelledRun({
   runHeadSha,
   prHeadSha,
   classification,
+  runConclusion = 'cancelled',
+  gateState,
   maxAttempts = MAX_RERUN_ATTEMPTS,
 }) {
+  if (runConclusion !== 'cancelled' && runConclusion !== 'failure') {
+    return {
+      rerun: false,
+      reason: `run concluded '${runConclusion}' — only cancelled or runner-killed runs are re-run`,
+    };
+  }
+
   if (!Number.isInteger(runAttempt) || runAttempt < 1) {
     return { rerun: false, reason: 'run attempt is unknown — failing closed' };
   }
@@ -149,6 +172,25 @@ function shouldRerunCancelledRun({
     };
   }
 
+  if (runConclusion === 'failure') {
+    if (classification !== RUNNER_SHUTDOWN) {
+      return {
+        rerun: false,
+        reason:
+          'run failed with no runner shutdown in any job — a genuine verdict',
+      };
+    }
+    if (gateState !== 'pending') {
+      // A red gate means some gate input really failed. Another state, or an
+      // unknown one, means the gate has not confirmed "no real failure". Fail
+      // closed in both cases.
+      return {
+        rerun: false,
+        reason: `CI Gate is '${gateState || 'unknown'}', not pending — a runner died but the SHA may still have a real failure`,
+      };
+    }
+  }
+
   if (runAttempt >= maxAttempts) {
     return {
       rerun: false,
@@ -158,7 +200,10 @@ function shouldRerunCancelledRun({
 
   return {
     rerun: true,
-    reason: `attempt ${runAttempt} of ${maxAttempts} cancelled on the current head SHA — re-running failed jobs`,
+    reason:
+      runConclusion === 'failure'
+        ? `attempt ${runAttempt} of ${maxAttempts} lost a runner on the current head SHA and CI Gate found no real failure — re-running failed jobs`
+        : `attempt ${runAttempt} of ${maxAttempts} cancelled on the current head SHA — re-running failed jobs`,
   };
 }
 
@@ -241,6 +286,38 @@ function classifyCancelledJob({ steps, logText, logAvailable = true } = {}) {
 }
 
 /**
+ * Classify ONE job that concluded `failure` (LS-10311).
+ *
+ * When EC2 reclaims a spot runner mid-job, GitHub often concludes the job
+ * `failure` instead of `cancelled`, even though no step failed. Between Sep 22
+ * and Sep 29 2026, 59 of 153 spot-killed jobs ended this way. Each one posted a
+ * red CI Gate for code that never failed.
+ *
+ * A `failure` job counts as runner death only when BOTH hold:
+ *   - no step concluded `failure`. A failed step is a real verdict, and it
+ *     wins even when the runner also died afterwards (same precedence as
+ *     `classifyCancelledJob`), and
+ *   - the log shows the shutdown notice before any cancel line
+ *     (`classifyJobLog`).
+ * Missing or unreadable evidence falls back to `real-failure`. The job already
+ * reported `failure`, so staying red is the conservative direction.
+ *
+ * @param {object} params
+ * @param {Array<{conclusion?: string|null}>} [params.steps] The job's steps.
+ * @param {string} [params.logText] Tail of the job's log.
+ * @returns {'runner-shutdown'|'real-failure'}
+ */
+function classifyFailedJob({ steps, logText } = {}) {
+  const stepList = Array.isArray(steps) ? steps : [];
+  if (stepList.some((step) => step && step.conclusion === 'failure')) {
+    return REAL_FAILURE;
+  }
+  return classifyJobLog(logText) === RUNNER_SHUTDOWN
+    ? RUNNER_SHUTDOWN
+    : REAL_FAILURE;
+}
+
+/**
  * What a cancelled job's classification means to the CI Gate aggregate status
  * (LS-10140).
  *
@@ -287,6 +364,7 @@ module.exports = {
   NEVER_RAN,
   classifyJobLog,
   classifyCancelledJob,
+  classifyFailedJob,
   gateEffectOfCancellation,
   isRunnerAttributable,
   shouldRerunCancelledRun,

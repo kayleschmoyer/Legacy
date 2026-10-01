@@ -84,6 +84,29 @@ after a test has already failed must not launder that failure into
 infrastructure. This generalises LS-9467 (PR #6909) from the two E2E matrix
 jobs to every gate input.
 
+#### A runner death that concluded `failure` (LS-10311)
+
+When EC2 reclaims a spot runner mid-job, GitHub often concludes the job
+**`failure`**, not `cancelled`, even though no step failed. In the week of
+Sep 22–29 2026 this happened to 59 of the 153 jobs killed by spot reclamation.
+
+So every `failure` gate input is checked too (`classifyFailedJob`). If **every**
+failed instance of that input has no failed step **and** logged the shutdown
+notice first, the input is folded as a cancelled `runner-shutdown` and the gate
+posts `pending`.
+
+Everything else stays `failure`:
+
+- any step concluded `failure`
+- a matrix input where one shard really failed
+- a plain error log
+- missing evidence (the jobs lookup failed or the log could not be read)
+
+The orchestrator run still concludes `failure`. `rerun-cancelled-ci.yml`
+therefore also accepts failed orchestrator runs. It re-runs one only when a job
+logged a runner shutdown **and** the SHA's `CI Gate` is `pending`, so a red
+gate is never retried.
+
 Two guards keep the pending state from causing the very problem LS-8219 fixed:
 
 - A cancelled run carries **no evidence**, so it must never overwrite a verdict

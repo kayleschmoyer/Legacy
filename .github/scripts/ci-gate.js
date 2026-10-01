@@ -26,6 +26,7 @@
 
 const {
   classifyCancelledJob,
+  classifyFailedJob,
   gateEffectOfCancellation,
   REAL_FAILURE,
   NEVER_RAN,
@@ -592,6 +593,64 @@ async function classifyCancelledGateJob({
   return (
     CLASSIFICATION_PRECEDENCE.find((c) => verdicts.includes(c)) || NO_SIGNAL
   );
+}
+
+/**
+ * Decide whether the GATE_INPUT_JOBS entry `jobKey`, which reported `failure`,
+ * failed only because its runner died (LS-10311).
+ *
+ * A spot-reclaimed runner often leaves its job concluded `failure` with no
+ * failed step. Without this check that job posts a red gate for code that
+ * never failed, and the orchestrator run's `failure` conclusion keeps
+ * rerun-cancelled-ci.yml from ever re-running it.
+ *
+ * Returns true only when at least one instance concluded `failure` and EVERY
+ * such instance classifies as runner-shutdown (`classifyFailedJob`). A matrix
+ * key where one shard really failed and another shard lost its runner stays
+ * red. A jobs lookup that failed (`jobs === null`) or found no matching
+ * instance also stays red. The job already said `failure`, so red is the
+ * conservative direction.
+ *
+ * @param {Array<object>|null} jobs All jobs in the run (from `listRunJobs`).
+ * @returns {Promise<boolean>}
+ */
+async function failedGateJobWasRunnerDeath({
+  github,
+  core,
+  owner,
+  repo,
+  jobs,
+  jobKey,
+}) {
+  const instances = (jobs || []).filter(
+    (job) =>
+      job &&
+      job.conclusion === 'failure' &&
+      jobNameMatchesGateKey(job.name, jobKey),
+  );
+  if (instances.length === 0) return false;
+
+  for (const job of instances) {
+    // A failed step settles the verdict — skip the (possibly multi-MB) log.
+    if (
+      (job.steps || []).some((step) => step && step.conclusion === 'failure')
+    ) {
+      return false;
+    }
+    const log = await fetchJobLogTail({
+      github,
+      core,
+      owner,
+      repo,
+      jobId: job.id,
+    });
+    const verdict = classifyFailedJob({ steps: job.steps, logText: log.text });
+    core.info(
+      `CI Gate: failed job "${job.name}" (${jobKey}) classified as ${verdict}.`,
+    );
+    if (verdict !== RUNNER_SHUTDOWN) return false;
+  }
+  return true;
 }
 
 /**
@@ -1195,10 +1254,16 @@ async function postCiGate({
   const cancelledKeys = GATE_INPUT_JOBS.filter(
     (jobKey) => results && results[jobKey] === 'cancelled',
   );
+  const failedKeys = GATE_INPUT_JOBS.filter(
+    (jobKey) => results && results[jobKey] === 'failure',
+  );
 
-  if (cancelledKeys.length > 0 && Number.isSafeInteger(selfRunIdForJobCheck)) {
+  if (
+    (cancelledKeys.length > 0 || failedKeys.length > 0) &&
+    Number.isSafeInteger(selfRunIdForJobCheck)
+  ) {
     // One paginated Jobs lookup for the whole run, shared across every
-    // cancelled key — this path only runs when something was cancelled.
+    // cancelled or failed key — this path only runs when something went wrong.
     const jobs = await listRunJobs({
       github,
       core,
@@ -1206,6 +1271,28 @@ async function postCiGate({
       repo,
       runId: selfRunIdForJobCheck,
     });
+    // LS-10311: a `failure` that is really a dead runner becomes a cancelled
+    // runner-shutdown, so it folds as no-verdict (pending) instead of red.
+    for (const jobKey of failedKeys) {
+      const runnerDeath = await failedGateJobWasRunnerDeath({
+        github,
+        core,
+        owner,
+        repo,
+        jobs,
+        jobKey,
+      });
+      if (runnerDeath) {
+        if (effectiveResults === results) effectiveResults = { ...results };
+        effectiveResults[jobKey] = 'cancelled';
+        cancelClassifications[jobKey] = RUNNER_SHUTDOWN;
+        core.warning(
+          `CI Gate: "${jobKey}" reported 'failure' but its runner was shut ` +
+            'down under it with no failed step — treating it as a runner ' +
+            'shutdown, not a code failure (LS-10311).',
+        );
+      }
+    }
     for (const jobKey of cancelledKeys) {
       const classification = await classifyCancelledGateJob({
         github,

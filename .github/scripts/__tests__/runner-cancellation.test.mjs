@@ -11,6 +11,8 @@
  *    this "not a flake", which is why the ordering rule exists.
  *  - shouldRerunCancelledRun: fails closed on unknown/superseded SHAs, refuses
  *    to fight a deliberate cancel, and caps repeated attempts.
+ *  - classifyFailedJob + shouldRerunCancelledRun for `failure` runs (LS-10311):
+ *    a spot-killed job that concluded `failure` with no failed step.
  *  - classifyCancelledJob (LS-10140): the job-level classification the CI Gate
  *    consults before it posts a verdict — real failure, never ran, runner
  *    shutdown, deliberate cancel — and the two mappings built on it
@@ -27,6 +29,7 @@ const require = createRequire(import.meta.url);
 const {
   classifyJobLog,
   classifyCancelledJob,
+  classifyFailedJob,
   gateEffectOfCancellation,
   isRunnerAttributable,
   shouldRerunCancelledRun,
@@ -296,6 +299,140 @@ describe('classifyCancelledJob — job-level classification (LS-10140)', () => {
       runHeadSha: 'a30b3ec',
       prHeadSha: 'a30b3ec',
       classification: NEVER_RAN,
+    });
+    assert.equal(rerun, true);
+  });
+});
+
+/**
+ * LS-10311 — a spot-reclaimed runner often leaves its job concluded `failure`
+ * (not `cancelled`) with NO failed step. Observed 59 times Sep 22-29 2026, e.g.
+ * "🚀 CI Pipeline / test" on runner i-0428d3fd5fdab239f: conclusion `failure`,
+ * zero failed steps, log ending in the shutdown notice then "The operation was
+ * canceled.".
+ */
+describe('classifyFailedJob — runner death that concluded failure (LS-10311)', () => {
+  /** Tail of that job's log (Sep 22 2026, matched to a BidEvictedEvent). */
+  const SPOT_KILL_LOG =
+    '2026-09-22T17:38:19.7737542Z ##[error]The runner has received a shutdown signal. ' +
+    'This can happen when the runner service is stopped, or a manually started runner is canceled.\n' +
+    '2026-09-22T17:38:32.3170458Z ##[error]The operation was canceled.\n';
+
+  it('no failed step + shutdown-first log → runner-shutdown', () => {
+    const verdict = classifyFailedJob({
+      steps: [
+        { name: 'Set up job', conclusion: 'success' },
+        { name: 'Run Tests', conclusion: null },
+      ],
+      logText: SPOT_KILL_LOG,
+    });
+    assert.equal(verdict, RUNNER_SHUTDOWN);
+  });
+
+  it('NEGATIVE CONTROL: a failed step stays a real failure even with a shutdown log', () => {
+    const verdict = classifyFailedJob({
+      steps: [
+        { name: 'Set up job', conclusion: 'success' },
+        { name: 'Run Tests', conclusion: 'failure' },
+      ],
+      logText: SPOT_KILL_LOG,
+    });
+    assert.equal(verdict, REAL_FAILURE);
+  });
+
+  it('a plain failure log with no shutdown notice is a real failure', () => {
+    assert.equal(
+      classifyFailedJob({
+        steps: [],
+        logText: '##[error]Process completed with exit code 1.',
+      }),
+      REAL_FAILURE,
+    );
+  });
+
+  it('a cancel-then-shutdown log (deliberate stop) is a real failure, not churn', () => {
+    assert.equal(
+      classifyFailedJob({
+        steps: [],
+        logText:
+          '##[error]The operation was canceled.\n' +
+          '##[error]The runner has received a shutdown signal.',
+      }),
+      REAL_FAILURE,
+    );
+  });
+
+  it('missing evidence stays a real failure — the job already said failure', () => {
+    assert.equal(classifyFailedJob({}), REAL_FAILURE);
+    assert.equal(classifyFailedJob({ steps: [], logText: '' }), REAL_FAILURE);
+  });
+});
+
+describe('shouldRerunCancelledRun — failed runs (LS-10311)', () => {
+  const base = {
+    runAttempt: 1,
+    runHeadSha: 'e9997bf',
+    prHeadSha: 'e9997bf',
+    classification: RUNNER_SHUTDOWN,
+    runConclusion: 'failure',
+    gateState: 'pending',
+  };
+
+  it('re-runs a failed run whose runner died and whose CI Gate found no real failure', () => {
+    const { rerun, reason } = shouldRerunCancelledRun(base);
+    assert.equal(rerun, true);
+    assert.match(reason, /lost a runner/);
+  });
+
+  it('NEGATIVE CONTROL: mixed run — a runner died but CI Gate is red — is never re-run', () => {
+    // A real failure in one gate input plus a runner death in another: the
+    // gate posts red for the real failure, and that verdict must stand.
+    const { rerun, reason } = shouldRerunCancelledRun({
+      ...base,
+      gateState: 'failure',
+    });
+    assert.equal(rerun, false);
+    assert.match(reason, /not pending/);
+  });
+
+  it('NEGATIVE CONTROL: a genuine failure with no runner shutdown is never re-run', () => {
+    for (const classification of [null, NO_SIGNAL, DELIBERATE_CANCEL]) {
+      const { rerun } = shouldRerunCancelledRun({ ...base, classification });
+      assert.equal(rerun, false, `classification ${classification}`);
+    }
+  });
+
+  it('fails closed when the CI Gate state is unknown or already green', () => {
+    for (const gateState of [undefined, 'success', 'error']) {
+      const { rerun } = shouldRerunCancelledRun({ ...base, gateState });
+      assert.equal(rerun, false, `gateState ${gateState}`);
+    }
+  });
+
+  it('keeps the superseded-SHA and attempt-cap guards', () => {
+    assert.equal(
+      shouldRerunCancelledRun({ ...base, prHeadSha: 'newer' }).rerun,
+      false,
+    );
+    assert.equal(
+      shouldRerunCancelledRun({ ...base, runAttempt: MAX_RERUN_ATTEMPTS })
+        .rerun,
+      false,
+    );
+  });
+
+  it('never re-runs a successful or skipped run', () => {
+    for (const runConclusion of ['success', 'skipped', 'timed_out']) {
+      const { rerun } = shouldRerunCancelledRun({ ...base, runConclusion });
+      assert.equal(rerun, false, `runConclusion ${runConclusion}`);
+    }
+  });
+
+  it('a cancelled run ignores the gate state, as before (LS-10091 unchanged)', () => {
+    const { rerun } = shouldRerunCancelledRun({
+      ...base,
+      runConclusion: 'cancelled',
+      gateState: undefined,
     });
     assert.equal(rerun, true);
   });

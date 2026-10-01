@@ -19,6 +19,11 @@
 # in progress, and any job that could call it is by definition still in
 # progress. `workflow_run: [completed]` is the earliest point the API accepts.
 #
+# LS-10311 widened this to orchestrator runs that end `failure` because a spot
+# runner was reclaimed. GitHub often concludes the killed job `failure` rather
+# than `cancelled`, which alone turns the whole run `failure`. Such a run is
+# re-run only when its CI Gate is pending, i.e. the gate found no real failure.
+#
 # Guards live in .github/scripts/runner-cancellation.js (unit-tested) and fail
 # CLOSED — superseded SHA, deliberate cancellation, or attempt cap reached all
 # mean "leave it for a human".
@@ -48,9 +53,15 @@ concurrency:
 jobs:
   rerun:
     name: "🔁 Re-run Cancelled Pipeline"
-    # Only cancelled runs are candidates. A `failure` conclusion is a real
-    # verdict — the SHA has been ruled on and must not be silently retried.
-    if: github.event.workflow_run.conclusion == 'cancelled'
+    # Cancelled runs are candidates. A `failure` run is a candidate only for
+    # the orchestrator, because a spot-killed job often concludes `failure`
+    # with no failed step (LS-10311). The script re-runs it only when a runner
+    # died AND the SHA's CI Gate is pending. The gate posts red for any
+    # genuine failure, so a real verdict is never retried.
+    if: >-
+      github.event.workflow_run.conclusion == 'cancelled' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.name == 'Legacy Sports CI Orchestrator')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -137,11 +148,33 @@ jobs:
               }
             }
 
+            // LS-10311: for a failed run, the CI Gate decides whether any gate
+            // input really failed. It posts red for a real failure and pending
+            // when the only problems were runner deaths. If the gate can't be
+            // read, the run is not re-run.
+            let gateState;
+            if (run.conclusion === 'failure') {
+              try {
+                const { data: combined } =
+                  await github.rest.repos.getCombinedStatusForRef({
+                    owner, repo, ref: runHeadSha, per_page: 100,
+                  });
+                gateState = combined.statuses.find(
+                  (s) => s.context === 'CI Gate',
+                )?.state;
+              } catch (e) {
+                core.warning(`Could not read CI Gate for ${runHeadSha}: ${e.message}`);
+              }
+              core.info(`CI Gate for ${runHeadSha}: ${gateState || 'unknown'}`);
+            }
+
             const { rerun, reason } = shouldRerunCancelledRun({
               runAttempt: run.run_attempt,
               runHeadSha,
               prHeadSha: pr.head.sha,
               classification,
+              runConclusion: run.conclusion,
+              gateState,
             });
 
             if (!rerun) {
