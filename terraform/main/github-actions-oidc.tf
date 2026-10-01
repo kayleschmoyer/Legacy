@@ -1154,6 +1154,44 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
             "iam:AWSServiceName" = "events.amazonaws.com"
           }
         }
+      },
+      # LS-10334: aws_flow_log.nat_instance (nat-flow-logs.tf) is a diagnostic
+      # toggle on the NAT instance ENI. CreateFlowLogs authorises against both
+      # the new vpc-flow-log resource and the target ENI, so the resource
+      # pattern mirrors the inline policy's EC2 write statement. DescribeFlowLogs
+      # is already covered by the inline ec2:Describe* grant.
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateFlowLogs",
+          "ec2:DeleteFlowLogs"
+        ]
+        Resource = [
+          "arn:aws:ec2:${local.region}:${local.account_id}:*"
+        ]
+      },
+      # LS-10334: the flow log's CloudWatch destination lives under
+      # /aws/vpc/<prefix>-* — a namespace none of the inline policy's log-group
+      # ARNs cover. Same read + lifecycle action set the inline policy grants
+      # for /aws/lambda and /aws/apigateway groups.
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogStreams",
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/vpc/${local.name_prefix}-*"
+        ]
       }
     ]
   })
@@ -1474,7 +1512,8 @@ resource "aws_iam_role_policy" "github_actions_plan_policy" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/cloudtrail/${local.name_prefix}*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/vpc/${local.name_prefix}-*"
         ]
       },
       # EC2 read

@@ -21,6 +21,15 @@ enable_rds_proxy = true
 # as of LS-2425 — see terraform/runners/README.md for the runner architecture.
 enable_ci_runner_db_access = true
 
+# ── NAT instance egress flow logs (LS-10334) ─────────────────────────────────
+# Diagnostic toggle. When true, terraform/main/nat-flow-logs.tf creates an
+# ACCEPT-only VPC flow log on the NAT instance ENI (CloudWatch Logs, 3-day
+# retention) so the ~3 TB/month DataTransfer-Out can be attributed to
+# destinations. Intended lifecycle: flip to true → merge → wait one busy CI
+# day → run scripts/nat-egress-top-destinations.sh → flip back to false → merge.
+# Leave false in steady state; the flow log itself is the only cost.
+enable_nat_flow_logs = false
+
 # ── MLB Data Provider ─────────────────────────────────────────────────────────
 # The free MLB Stats API (mlb-statsapi) is NOT licensed for commercial use.
 # All non-dev environments must use a licensed provider.

@@ -104,6 +104,12 @@ variable "use_nat_instance" {
   default     = true
 }
 
+variable "enable_nat_flow_logs" {
+  description = "Diagnostic toggle (LS-10334): capture ACCEPT-only VPC flow logs on the NAT instance ENI into CloudWatch Logs (3-day retention) so EC2 egress bytes can be attributed to destinations. Off by default — flip on for one busy CI day, run scripts/nat-egress-top-destinations.sh, then flip back off. Has no effect unless use_nat_instance is also true."
+  type        = bool
+  default     = false
+}
+
 variable "alert_email" {
   description = "E-mail address to receive CloudWatch ops-alert notifications (leave empty to disable e-mail subscription)"
   type        = string
