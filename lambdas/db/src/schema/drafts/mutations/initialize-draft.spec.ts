@@ -9,12 +9,14 @@
  */
 
 const mockLoggerError = jest.fn();
+const mockLoggerWarn = jest.fn();
+const mockDraftSqsService = jest.fn();
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
     debug: jest.fn(),
-    warn: jest.fn(),
+    warn: mockLoggerWarn,
     error: mockLoggerError,
   },
 }));
@@ -24,6 +26,7 @@ type Resolver = (...args: unknown[]) => Promise<unknown>;
 function captureInitializeDraftResolver(): Resolver {
   jest.resetModules();
   mockLoggerError.mockReset();
+  mockLoggerWarn.mockReset();
   let captured: Resolver | undefined;
 
   jest.doMock('../../builder', () => ({
@@ -63,7 +66,7 @@ function captureInitializeDraftResolver(): Resolver {
   }));
 
   jest.doMock('@legacy-sports/aws-utils', () => ({
-    DraftSqsService: jest.fn(),
+    DraftSqsService: mockDraftSqsService,
   }));
 
   jest.doMock('@legacy-sports/utils', () => ({
@@ -218,6 +221,100 @@ describe('initializeDraft resolver', () => {
     });
     expect(forLockedLeague).toHaveBeenCalledWith('update');
     expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
+  describe("automated draft: post-SQS 'queued' write failure (LS-10315)", () => {
+    const originalQueueUrl = process.env.SQS_AUTOMATIC_DRAFTS_URL;
+
+    beforeEach(() => {
+      process.env.SQS_AUTOMATIC_DRAFTS_URL =
+        'https://sqs.test/automatic-drafts';
+    });
+
+    afterEach(() => {
+      process.env.SQS_AUTOMATIC_DRAFTS_URL = originalQueueUrl;
+    });
+
+    /**
+     * Drive the resolver to the automated branch: the main transaction is
+     * stubbed to return its result directly, SQS send succeeds, and the
+     * second transaction (the 'queued' CAS write) rejects with `queuedError`.
+     */
+    function setup(queuedError: unknown) {
+      const initializeDraft = captureInitializeDraftResolver();
+      const sendStartDraftMessage = jest.fn().mockResolvedValue(undefined);
+      mockDraftSqsService.mockImplementation(() => ({
+        sendStartDraftMessage,
+      }));
+
+      const draft = { id: 7, leagueId: 1 };
+      const limit = jest
+        .fn()
+        .mockResolvedValueOnce([]) // saved draft settings lookup
+        .mockResolvedValueOnce([
+          { id: 1, draftStatus: 'not-started', rosterContinuity: 'redraft' },
+        ]) // league lookup
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]) // membership
+        .mockResolvedValueOnce([{ id: 7 }]); // existingDraft lookup
+      const db: Record<string, jest.Mock> = {
+        select: jest.fn(() => db),
+        from: jest.fn(() => db),
+        where: jest.fn(() => db),
+        limit,
+        orderBy: jest.fn(),
+        transaction: jest
+          .fn()
+          .mockResolvedValueOnce({ draft, mode: 'automated' })
+          .mockRejectedValueOnce(queuedError),
+      };
+      // orderBy calls 1 and 3 continue the chain into .limit(1); call 2 is
+      // the teams query, awaited directly.
+      db.orderBy
+        .mockReturnValueOnce(db)
+        .mockResolvedValueOnce([{ id: 10 }, { id: 11 }])
+        .mockReturnValueOnce(db);
+
+      const ctx = { user: { id: 99 }, db };
+      const run = () =>
+        initializeDraft(
+          {},
+          { leagueId: 1, draftMode: 'automated', selectionMethod: 'random' },
+          ctx,
+          undefined,
+        );
+      return { run, draft, sendStartDraftMessage };
+    }
+
+    it('returns the draft and only warns when the write deadlocks (40P01)', async () => {
+      const deadlock = Object.assign(
+        new Error('Failed query: update leagues'),
+        {
+          cause: Object.assign(new Error('deadlock detected'), {
+            code: '40P01',
+          }),
+        },
+      );
+      const { run, draft, sendStartDraftMessage } = setup(deadlock);
+
+      await expect(run()).resolves.toBe(draft);
+      expect(sendStartDraftMessage).toHaveBeenCalledTimes(1);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining("'queued' status write failed transiently"),
+        expect.objectContaining({ leagueId: 1, draftId: 7, pgCode: '40P01' }),
+      );
+      expect(mockLoggerError).not.toHaveBeenCalled();
+    });
+
+    it('still returns the draft but logs at error level for a non-transient failure', async () => {
+      const { run, draft } = setup(new Error('connection terminated'));
+
+      await expect(run()).resolves.toBe(draft);
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        "Automated draft queued but 'queued' status write failed",
+        expect.any(Error),
+        expect.objectContaining({ leagueId: 1, draftId: 7 }),
+      );
+    });
   });
 
   it('still logs an unexpected error at error level', async () => {

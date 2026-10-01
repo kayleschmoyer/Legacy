@@ -20,6 +20,11 @@ import { setLeagueDraftStatus } from '../draft-status';
 import { reseatLeagueDraft } from '../participants';
 import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
 import { applyKeeperDesignationsForDraft } from '../keeper-application';
+import {
+  describeDbError,
+  formatDbError,
+  isRetryablePgError,
+} from '../../leagues/delete-resilience';
 import { builder } from '../../builder';
 import {
   AuthenticationError,
@@ -429,14 +434,44 @@ builder.mutationField('initializeDraft', (t) =>
           // Conditional on draftStatus='not-started' so we don't clobber an
           // 'in-progress'/'completed' state if the draft-processor has
           // already started consuming the message we just sent.
-          await context.db.transaction(async (tx) => {
-            await setLeagueDraftStatus(tx, {
-              draftId: draft.id,
-              leagueId,
-              status: 'queued',
-              expectedLeagueStatus: 'not-started',
+          //
+          // The SQS message is already sent, so the draft-processor will run
+          // this draft whether or not this write lands — throwing here would
+          // show the commissioner an error for a draft that then completes
+          // (LS-10315). Log and return the draft instead. A transient error
+          // (e.g. a deadlock against the processor's own 'in-progress' write)
+          // is expected and only warns; anything else still reaches Rollbar.
+          try {
+            await context.db.transaction(async (tx) => {
+              await setLeagueDraftStatus(tx, {
+                draftId: draft.id,
+                leagueId,
+                status: 'queued',
+                expectedLeagueStatus: 'not-started',
+              });
             });
-          });
+          } catch (queuedError) {
+            const detail = describeDbError(queuedError);
+            const logContext = {
+              leagueId,
+              draftId: draft.id,
+              pgCode: detail.code,
+            };
+            if (isRetryablePgError(queuedError)) {
+              LOGGER.warn(
+                `Automated draft queued but 'queued' status write failed transiently; draft-processor will advance the league: ${formatDbError(detail)}`,
+                logContext,
+              );
+            } else {
+              LOGGER.error(
+                "Automated draft queued but 'queued' status write failed",
+                queuedError instanceof Error
+                  ? queuedError
+                  : new Error(String(queuedError)),
+                logContext,
+              );
+            }
+          }
 
           LOGGER.info('Automated draft queued', {
             leagueId,

@@ -429,6 +429,48 @@ describe('draft-processor handler', () => {
       );
     });
 
+    it('retries a transient 40P01 on the in-progress write and completes without a batch-item failure (LS-10315)', async () => {
+      mockRunWithPublicClient.mockResolvedValue(undefined);
+      // Drizzle wraps the driver error; the SQLSTATE lives on `cause`.
+      const deadlock = Object.assign(new Error('Failed query: update ...'), {
+        cause: Object.assign(new Error('deadlock detected'), {
+          code: '40P01',
+        }),
+      });
+      mockUpdateLeagueDraftStatus
+        .mockRejectedValueOnce(deadlock)
+        .mockResolvedValue(undefined);
+
+      const msg = makeValidStartDraftMessage();
+      const result = await handler(makeSqsEvent([makeSqsRecord(msg)]));
+
+      expect(result.batchItemFailures).toHaveLength(0);
+      const statuses = mockUpdateLeagueDraftStatus.mock.calls.map(
+        (call: unknown[]) => call[1],
+      );
+      expect(statuses.slice(0, 2)).toEqual(['in-progress', 'in-progress']);
+      expect(statuses).not.toContain('not-started');
+      expect(mockNotifyDraftCompleted).toHaveBeenCalled();
+    });
+
+    it('does not retry a non-transient error on the in-progress write (LS-10315)', async () => {
+      const fkViolation = Object.assign(new Error('Failed query'), {
+        cause: Object.assign(new Error('fk violation'), { code: '23503' }),
+      });
+      mockUpdateLeagueDraftStatus
+        .mockRejectedValueOnce(fkViolation)
+        .mockResolvedValue(undefined);
+
+      const msg = makeValidStartDraftMessage();
+      const result = await handler(makeSqsEvent([makeSqsRecord(msg)]));
+
+      expect(result.batchItemFailures).toHaveLength(1);
+      const statuses = mockUpdateLeagueDraftStatus.mock.calls.map(
+        (call: unknown[]) => call[1],
+      );
+      expect(statuses).toEqual(['in-progress', 'not-started']);
+    });
+
     it('handles status reset failure gracefully', async () => {
       mockRunWithPublicClient.mockRejectedValue(new Error('processing failed'));
       // First call (in-progress) succeeds; recovery call (not-started) fails

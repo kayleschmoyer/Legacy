@@ -171,7 +171,7 @@ test.describe
     commissionerPage: page,
     apiCommissioner,
   }) => {
-    // 600 s ≥ AUTOMATED_DRAFT_TEST_TIMEOUT_MS (420 s draft budget + setup headroom)
+    // 600 s ≥ AUTOMATED_DRAFT_TEST_TIMEOUT_MS (480 s draft budget + 120 s setup headroom)
     test.setTimeout(600_000);
 
     await test.step('Navigate to commissioner panel', async () => {

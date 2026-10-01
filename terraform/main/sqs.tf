@@ -321,7 +321,15 @@ resource "aws_sqs_queue" "automatic_drafts" {
   content_based_deduplication = true
 
   # Message settings
-  visibility_timeout_seconds = 300    # 5 minutes (longer than lambda timeout)
+  # Visibility timeout must exceed the draft-processor lambda timeout (300 s,
+  # lambda-draft-processor.tf) or a slow-but-successful invocation can be
+  # redelivered and run concurrently. Lambda + 60 s margin rather than AWS's
+  # 6x rule of thumb: the event source mapping uses batch_size = 1 with no
+  # batching window, and a batch-item failure is only redelivered after this
+  # timeout expires, so every extra second here delays draft recovery.
+  # Transient DB errors are retried in-process instead (LS-10315).
+  # web-e2e's AUTOMATED_DRAFT_COMPLETION_BUDGET_MS is derived from this value.
+  visibility_timeout_seconds = 360    # 6 minutes (lambda timeout + 60 s)
   message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
   receive_wait_time_seconds  = 10     # Long polling
 

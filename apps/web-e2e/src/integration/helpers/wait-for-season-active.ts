@@ -36,6 +36,8 @@ import { graphqlOk } from './graphql';
  *   - LS-10179: one justified budget for every automated-draft spec (see
  *              AUTOMATED_DRAFT_COMPLETION_BUDGET_MS) plus a draftStatus
  *              timeline in the failure message.
+ *   - LS-10315: budget follows the automatic-drafts visibility timeout
+ *              (300 → 360 s): 420 → 480 s.
  */
 
 /**
@@ -49,8 +51,11 @@ import { graphqlOk } from './graphql';
  * seconds). But when the processor hits a transient error it resets the
  * league to 'not-started' and reports a batch-item failure; the only retry is
  * SQS redelivery, which waits out the queue's visibility timeout —
- * `visibility_timeout_seconds = 300` on the automatic-drafts queue
- * (terraform/main/sqs.tf). No other job completes a stalled automated draft.
+ * `visibility_timeout_seconds = 360` on the automatic-drafts queue
+ * (terraform/main/sqs.tf; raised from 300 by LS-10315 so it exceeds the
+ * 300 s lambda timeout). No other job completes a stalled automated draft.
+ * Since LS-10315 the processor retries transient DB errors (deadlock /
+ * serialization) in-process first, so redelivery is now the rarer path.
  *
  * That is not hypothetical. matchup-roster-editor-ui (league 13360, 180 s
  * budget) and matchup-detail-ui (league 13724, 2026-09-26 nightly
@@ -60,13 +65,13 @@ import { graphqlOk } from './graphql';
  * 263/264, 270; lock order fixed by LS-10176). Every per-spec budget in use
  * then (180–360 s) was shorter than, or within seconds of, one redelivery.
  *
- * So: 300 s for one redelivery + 120 s for queue lag, lambda cold start and
+ * So: 360 s for one redelivery + 120 s for queue lag, lambda cold start and
  * the draft itself under a loaded integration shard. Tolerating one retry is
  * the server's designed recovery path, not masking it — a second failure goes
  * to the DLQ and still fails here. Budget as of LS-10179; if sqs.tf's
  * visibility timeout changes, change this with it.
  */
-export const AUTOMATED_DRAFT_COMPLETION_BUDGET_MS = 420_000;
+export const AUTOMATED_DRAFT_COMPLETION_BUDGET_MS = 480_000;
 
 /**
  * Minimum `test.setTimeout` for a test that starts an automated draft through

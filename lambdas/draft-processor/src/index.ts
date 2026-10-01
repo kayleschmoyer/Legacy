@@ -51,6 +51,7 @@ import {
   sum,
 } from 'drizzle-orm';
 import { z } from 'zod';
+import { getPgErrorCode, withTransientDbRetry } from './transient-db-retry';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -1446,11 +1447,24 @@ async function updateDraftStatus(
       operation: 'updateDraftStatus',
     });
 
-    // Use shared utility for consistent status updates
-    await updateLeagueDraftStatus(
-      leagueId,
-      status,
-      `${context} (draft-processor)`,
+    // Retry transient DB errors (deadlock / serialization) in-process: the
+    // fallback — reset + batch-item failure — waits a full SQS visibility
+    // timeout before redelivery (LS-10315).
+    await withTransientDbRetry(
+      () =>
+        updateLeagueDraftStatus(
+          leagueId,
+          status,
+          `${context} (draft-processor)`,
+        ),
+      {
+        onRetry: (attempt, error) => {
+          LOGGER.warn(
+            `Transient DB error updating draft status to '${status}' for league ${leagueId}; retrying (attempt ${attempt + 1})`,
+            { leagueId, status, context, pgCode: getPgErrorCode(error) },
+          );
+        },
+      },
     );
   } catch (error) {
     LOGGER.error(
