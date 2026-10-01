@@ -181,6 +181,8 @@ The `CI_RUNNER_LABEL` repo variable controls which runner label most workflows u
 
 If the Terraform apply job is stuck in `queued`, check that `runs-on` in `.github/workflows/runner-terraform-apply.yml` is set to `ubuntu-latest` and not `${{ vars.CI_RUNNER_LABEL }}`.
 
+The same rule covers the short bookkeeping jobs whose loss strands a verdict or the queue, because the self-hosted pool is spot capacity: `ci-pipeline.yml` `summarize` (posts CI Gate), `merge-queue.yml` `process-merge-queue`, and both `⚡ Report Runner Shutdown` jobs (`ci-orchestrator.yml`, `lambda-terraform-apply.yml`) are pinned to `ubuntu-latest` (LS-9710, LS-10312). `.github/scripts/__tests__/bookkeeping-runner-placement.test.mjs` guards the pins.
+
 ---
 
 ## Verifying Runner Health End-to-End

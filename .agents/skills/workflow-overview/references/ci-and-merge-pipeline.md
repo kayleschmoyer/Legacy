@@ -73,6 +73,8 @@ When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job,
 - `custom-checks` — agent-skill lint, migration immutability, workflow validation (schema + working-directory + yamllint; the job installs a pinned yamllint via uv, and a missing yamllint fails the check under `CI` rather than silently skipping — LS-10104), touch-map freshness (advisory), repo-script unit suites (`scripts/` and `.github/scripts/`)
 - `lockfile-check` — `pnpm-lock.yaml` drift
 
+**Runner placement (LS-10312):** the Stage 2/3 jobs use the self-hosted-when-available fallback (`inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest'`), but `summarize` is pinned to `ubuntu-latest`. That pool is EC2 spot capacity, and a reclaimed `summarize` never posts the verdict, leaving `CI Gate` at the seeded pending status forever. It also held the orchestrator's `report-runner-shutdown` (which `needs` this workflow) queued behind the dying pool (LS-10306). Guarded by `.github/scripts/__tests__/bookkeeping-runner-placement.test.mjs`.
+
 Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci` label — a footgun once `CI Gate` is required; see [the skip-ci footgun](../../pr-lifecycle/references/ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected).
 
 **Stage 3 -- E2E Tests:** Playwright, sharded matrix from detect-changes. `e2e` and `e2e-mobile` both run with `strategy.fail-fast: true` (LS-1119): a shard that genuinely fails cancels its siblings instead of letting them run to their full 45-minute timeout. This is safe with the gate's cancellation classification — GitHub's matrix rollup gives the failing shard's `failure` precedence over a cancelled sibling, and `runner-cancellation.js`/`ci-gate.js` already promote a shard with a real failing step to `failure` even if its own job conclusion rolls up to `cancelled` (LS-9467). A fail-fast-cancelled sibling classifies as `deliberate-cancel` (pending, not failure) same as any other cancellation.
@@ -233,6 +235,7 @@ Epics with the Jira label `pinned-status` are excluded from automatic transition
 ### Concurrency
 
 - Group: `merge-queue` with `cancel-in-progress: false` (serialized processing).
+- Runner: `process-merge-queue` is pinned to `ubuntu-latest`, not the spot self-hosted pool. It was reclaimed 19 times Sep 22–29 2026 (LS-10312).
 - 30-second debounce on `workflow_run` and `pull_request_review` triggers to let concurrent triggers settle.
 
 ### 6 Validation Checks

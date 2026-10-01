@@ -75,9 +75,13 @@ jobs:
     concurrency:
       group: merge-queue
       cancel-in-progress: false
-    # Prefer self-hosted runner when available to avoid consuming GitHub Actions
-    # budget. This job only makes API calls — no builds or node_modules needed.
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-10312: pinned to ubuntu-latest, NOT the self-hosted CI_RUNNER_LABEL
+    # pool. That pool is spot capacity, and this job was reclaimed mid-run 19
+    # times Sep 22-29 2026 (BidEvictedEvent), stalling the queue. It only makes
+    # API calls — no builds, node_modules, AWS role, or pnpm cache — so the
+    # GitHub-hosted minutes it costs are small.
+    # Guarded by .github/scripts/__tests__/bookkeeping-runner-placement.test.mjs.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write

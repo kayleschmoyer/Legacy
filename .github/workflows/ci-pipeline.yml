@@ -1365,7 +1365,17 @@ jobs:
     name: "Summarize & Report"
     needs: [detect-changes, e2e, e2e-mobile, lint, test, build, custom-checks, lockfile-check]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-10312: deliberately pinned to ubuntu-latest, NOT the self-hosted
+    # `inputs.runner-label || vars.CI_RUNNER_LABEL` fallback the build jobs use.
+    # This job posts the CI Gate verdict; when the spot pool reclaims it (153
+    # BidEvictedEvent kills Sep 22-29 2026, 138 on Sep 29 alone) CI Gate stays
+    # at the seeded "Waiting for CI Pipeline to report results" forever, and
+    # ci-orchestrator's report-runner-shutdown (which `needs` this workflow)
+    # queues behind the same dying pool (LS-10306). It only runs node-based
+    # composite actions + github-script (install-dependencies: false) and
+    # uses no AWS role or pnpm cache, so GitHub-hosted capacity is sufficient.
+    # Guarded by .github/scripts/__tests__/bookkeeping-runner-placement.test.mjs.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       overall-status: ${{ steps.collect-results.outputs.overall-status }}

@@ -1009,7 +1009,10 @@ jobs:
       always() &&
       (needs.apply-infrastructure.result == 'failure' ||
       needs.apply-infrastructure.result == 'cancelled')
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-10312: pinned to ubuntu-latest for the same reason as
+    # ci-orchestrator.yml's report-runner-shutdown (LS-9710) — this job reports
+    # that the self-hosted pool died, so it must not queue on that pool.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
