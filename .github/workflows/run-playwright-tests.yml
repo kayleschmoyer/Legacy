@@ -1183,6 +1183,19 @@ jobs:
           retention-days: 3
           if-no-files-found: error
 
+      # Hand the merged per-test ledger to the notify-nightly-finish job
+      # (LS-10331): it diffs the failing-test set against the previous
+      # automated run to decide whether the Discord post is worth sending.
+      # Automated runs only — manual dispatches always post.
+      - name: "Upload Nightly Ledger Artifact"
+        if: ${{ github.event_name == 'workflow_run' && steps.merge.outputs.has-report == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-e2e-ledger
+          path: e2e-ledger.json
+          retention-days: 3
+          if-no-files-found: warn
+
   # ===========================================================================
   # Nightly flaky-pass → Jira filing (LS-9659)
   # ===========================================================================
@@ -1620,6 +1633,16 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Discord notification — fires after tests finish (automated + manual runs)
+  #
+  # Automated runs are change-detected (LS-10331): the previous run's result
+  # (overall status + failing-test set + red-streak length) is persisted at
+  # s3://legacy-sports-dev-ci-artifacts/ci-artifacts/nightly-state/last.json
+  # and the post only goes out when the status flips, the failing-test set
+  # changes, or every 7th consecutive identical red (digest). The decision
+  # itself lives in .github/scripts/nightly-notify-decision.mjs (unit-tested
+  # by pc-workflows). Every step in the chain is fail-open — an S3 or
+  # artifact hiccup degrades to "post as before", never to silence. Manual
+  # dispatches skip the whole chain and always post.
   # ---------------------------------------------------------------------------
   notify-nightly-finish:
     name: "Nightly Results"
@@ -1628,10 +1651,73 @@ jobs:
     # (run-tests is skipped by design when the gate says no).
     if: always() && needs.gate.outputs.should-run == 'true' && (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Setup Node.js"
+        if: github.event_name == 'workflow_run'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      # The ledger artifact only exists when deploy-report merged a report;
+      # a red run with no blob reports (infra failure) has no failing-test
+      # detail and is compared on status alone.
+      - name: "Download Nightly Ledger Artifact"
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: nightly-e2e-ledger
+          path: nightly-ledger
+
+      - name: "Configure AWS Credentials (nightly state)"
+        id: aws
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
+          aws-region: us-east-1
+
+      - name: "Read Previous Nightly State"
+        if: ${{ github.event_name == 'workflow_run' && steps.aws.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          STATE_URI: s3://legacy-sports-dev-ci-artifacts/ci-artifacts/nightly-state/last.json
+        run: |
+          mkdir -p nightly-state
+          if aws s3 cp "$STATE_URI" nightly-state/last.json --quiet; then
+            echo "Previous nightly state loaded"
+          else
+            echo "::notice::No previous nightly state at $STATE_URI — treating this as the first tracked run"
+          fi
+
+      - name: "Decide Whether To Post"
+        id: decide
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        env:
+          TESTS_RESULT: ${{ needs.run-tests.result }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          node .github/scripts/nightly-notify-decision.mjs \
+            --status "$TESTS_RESULT" \
+            --run-id "$RUN_ID" \
+            --previous-file nightly-state/last.json \
+            --ledger-file nightly-ledger/e2e-ledger.json \
+            --next-state-file nightly-state/next.json
+
+      - name: "Persist Nightly State"
+        if: ${{ github.event_name == 'workflow_run' && steps.aws.outcome == 'success' && steps.decide.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          STATE_URI: s3://legacy-sports-dev-ci-artifacts/ci-artifacts/nightly-state/last.json
+        run: |
+          aws s3 cp nightly-state/next.json "$STATE_URI" --quiet \
+            || echo "::warning::Nightly state S3 write failed — next run re-baselines (fail-open)"
 
       - name: "Resolve Status"
         id: status
@@ -1639,6 +1725,7 @@ jobs:
         env:
           # Script-injection hardening (LS-8503): see prepare/set step above.
           TEST_FILE_INPUT: ${{ inputs['test-file'] }}
+          CHANGE_SUMMARY: ${{ steps.decide.outputs.summary }}
         run: |
           TESTS_RESULT="${{ needs.run-tests.result }}"
 
@@ -1691,6 +1778,10 @@ jobs:
               echo "$SUMMARY_LINE1"
               echo "$SUMMARY_LINE2"
               echo "$SUMMARY_LINE3"
+              if [ -n "$CHANGE_SUMMARY" ]; then
+                echo ""
+                echo "$CHANGE_SUMMARY"
+              fi
               if [ "$STATUS" != "success" ]; then
                 echo ""
                 echo "**Debug:** \`/read-playwright-report ${DEST}\` in Claude Code"
@@ -1705,11 +1796,19 @@ jobs:
               echo "$SUMMARY_LINE1"
               echo "$SUMMARY_LINE2"
               echo "$SUMMARY_LINE3"
+              if [ -n "$CHANGE_SUMMARY" ]; then
+                echo ""
+                echo "$CHANGE_SUMMARY"
+              fi
               echo 'EOF_PLAYWRIGHT_NOTIFY'
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # Post unless the decision step positively said "unchanged". A skipped
+      # decision (manual dispatch) or a failed one (fail-open) leaves `post`
+      # empty, which is != 'false' → post as before LS-10331.
       - name: "Discord Playwright Results"
+        if: steps.decide.outputs.post != 'false'
         uses: ./.github/actions/discord-notify
         with:
           webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
