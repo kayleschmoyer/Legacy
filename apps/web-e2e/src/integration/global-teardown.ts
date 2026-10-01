@@ -6,8 +6,9 @@ import path from 'path';
 import {
   clearActiveRunLock,
   isTestLeague,
-  isYoungerThanCleanupThreshold,
+  resolveRunTag,
   resolveShardIdentity,
+  selectCleanupTargets,
 } from './test-league-cleanup';
 import { COLLECT_COVERAGE, mergeShardFragments } from '../fixtures/coverage';
 import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
@@ -158,8 +159,7 @@ export default async function globalTeardown(
     return;
   }
 
-  const matched = leagues.filter((l) => isTestLeague(l.name));
-  if (matched.length === 0) {
+  if (!leagues.some((l) => isTestLeague(l.name))) {
     LOGGER.info(
       `[integration teardown] ${leagues.length} league(s) found but none matched test patterns — skipping.`,
     );
@@ -167,15 +167,16 @@ export default async function globalTeardown(
     return;
   }
 
-  // Protect leagues created within the last few hours: they may be owned by a
-  // concurrent integration run on another branch (the commissioner test user
-  // is shared). See MIN_LEAGUE_AGE_FOR_CLEANUP_MS for the rationale (LS-4442).
-  const inFlight = matched.filter((l) => isYoungerThanCleanupThreshold(l.name));
-  const targets = matched.filter((l) => !isYoungerThanCleanupThreshold(l.name));
+  // Run-scoped selection (LS-10330): everything this run created is reclaimed
+  // immediately (the run is over), while another run's young leagues are left
+  // alone — the commissioner test user is shared, so they are that run's live
+  // fixtures. See MIN_LEAGUE_AGE_FOR_CLEANUP_MS for the age guard (LS-4442).
+  const runTag = resolveRunTag();
+  const { targets, inFlight } = selectCleanupTargets(leagues, { runTag });
 
   if (inFlight.length > 0) {
     LOGGER.info(
-      `[integration teardown] Skipping ${inFlight.length} young league(s) likely in active use by concurrent run(s): ${inFlight
+      `[integration teardown] Skipping ${inFlight.length} young league(s) owned by other run(s) likely still in flight: ${inFlight
         .map((l) => l.name)
         .join(', ')}`,
     );
@@ -183,14 +184,19 @@ export default async function globalTeardown(
 
   if (targets.length === 0) {
     LOGGER.info(
-      `[integration teardown] No stale test leagues to delete — done.`,
+      `[integration teardown] No test leagues to delete (run ${runTag}) — done.`,
     );
     clearActiveRunLock();
     return;
   }
 
+  // Delete newest-first: `deleteLeague` does not cascade the `previousLeagueId`
+  // lineage FK, so a renewed season-2 league (higher id) must be removed before
+  // its frozen season-1 parent or the parent delete fails (LS-7704).
+  targets.sort((a, b) => b.id - a.id);
+
   LOGGER.info(
-    `[integration teardown] Deleting ${targets.length} test league(s)...`,
+    `[integration teardown] Deleting ${targets.length} test league(s) (run ${runTag})...`,
   );
 
   let deleted = 0;

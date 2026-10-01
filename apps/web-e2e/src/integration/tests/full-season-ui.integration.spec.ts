@@ -35,6 +35,7 @@ import {
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { test } from '../fixtures/ui';
 
+import { testLeagueName } from '../league-run-scope';
 /**
  * Season-length config.
  *
@@ -99,7 +100,7 @@ test.describe
     commissionerPage: page,
     commissionerJwt,
   }) => {
-    state.leagueName = `UI E2E Season ${Date.now()}`;
+    state.leagueName = testLeagueName('UI Season');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

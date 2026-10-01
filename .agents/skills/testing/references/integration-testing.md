@@ -436,10 +436,12 @@ try {
 
 ### Don't share mutable state between parallel tests
 
-Integration tests run `workers: 1` and `fullyParallel: false` by default. If you need to create test data, use unique identifiers:
+Integration tests run `workers: 1` and `fullyParallel: false` by default. League names must come from `testLeagueName(label)` (`apps/web-e2e/src/integration/league-run-scope.ts`): it appends the `E2E` sweep marker, this run's tag (`INTEGRATION_RUN_ID` in CI), and a timestamp, so the pre-run/teardown sweeps can reclaim this run's leagues without touching a concurrent run's (LS-10330). Keep labels short — the server caps names at 50 characters and the helper throws when a label would overflow.
 
 ```typescript
-const uniqueName = `test-league-${Date.now()}`;
+import { testLeagueName } from '../league-run-scope';
+
+const leagueName = testLeagueName('Waiver Queue'); // "Waiver Queue E2E r36685892280 1727683200000"
 ```
 
 ## Distributed Flow Reference

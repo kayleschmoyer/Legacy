@@ -19,6 +19,7 @@ import {
   queryDepthLimitRule,
 } from './graphql-validation-rules';
 import { CLIENT_FACING_CODES } from './graphql-error-codes';
+import { describeErrorCause } from './describe-error-cause';
 import { createLoaders } from '../schema/dataloaders';
 import { schema } from '../schema';
 
@@ -88,7 +89,13 @@ export const server = new ApolloServer({
         'originalError' in error && error.originalError instanceof Error
           ? error.originalError
           : error;
-      LOGGER.error('GraphQL internal error', originalError, errorContext);
+      // Drizzle's "Failed query: …" wrapper hides the pg error (SQLSTATE code,
+      // detail, constraint) on `.cause`; lift it into the log line so a DB
+      // failure is diagnosable from CloudWatch/Rollbar alone (LS-10330).
+      LOGGER.error('GraphQL internal error', originalError, {
+        ...errorContext,
+        cause: describeErrorCause(originalError),
+      });
     } else {
       LOGGER.error('GraphQL internal error', errorContext);
     }

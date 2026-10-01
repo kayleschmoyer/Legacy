@@ -41,6 +41,7 @@ import {
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
 // ---------------------------------------------------------------------------
@@ -110,7 +111,7 @@ test.describe
     // age-guarded global sweep; clearing slots against a shared premium identity
     // would be unsafe (it has no age guard and would delete concurrent shards'
     // in-flight leagues).
-    state.leagueName = `Season Renewal E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('Season Renewal');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

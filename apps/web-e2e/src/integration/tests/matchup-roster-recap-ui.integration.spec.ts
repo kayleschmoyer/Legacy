@@ -46,6 +46,7 @@ import { provisionCompletedMatchup } from '../helpers/provision-completed-matchu
 import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
 // ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ test.describe
     const provisioned = await provisionCompletedMatchup({
       commissionerJwt,
       managerJwt: managerJwt1,
-      leagueName: `Roster Recap E2E ${Date.now()}`,
+      leagueName: testLeagueName('Roster Recap'),
     });
 
     state.leagueId = provisioned.leagueId;

@@ -36,6 +36,7 @@ import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
 // ---------------------------------------------------------------------------
@@ -110,7 +111,7 @@ test.describe
   test('Phase 1: Commissioner creates a league', async ({
     commissionerPage: page,
   }) => {
-    state.leagueName = `Activity Feed E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('Activity Feed');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

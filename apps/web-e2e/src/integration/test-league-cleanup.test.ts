@@ -11,6 +11,7 @@ import {
   isTestLeague,
   isYoungerThanCleanupThreshold,
   MIN_LEAGUE_AGE_FOR_CLEANUP_MS,
+  selectCleanupTargets,
   writeActiveRunLock,
 } from './test-league-cleanup';
 
@@ -182,4 +183,82 @@ void test('clearActiveRunLock is idempotent — no-op when file already gone', (
   // Should not throw even though the file does not exist.
   clearActiveRunLock(tmp);
   clearActiveRunLock(tmp);
+});
+
+// ---------------------------------------------------------------------------
+// Run-scoped selection (LS-10330)
+// ---------------------------------------------------------------------------
+
+const RUN_A = 'r36685892280';
+const RUN_B = 'r36685999999';
+const YOUNG_TS = FIXED_NOW - 30 * 60 * 1000; // 30 min old
+const OLD_TS = FIXED_NOW - 5 * HOUR_MS; // 5h old
+
+void test('selectCleanupTargets always reclaims leagues tagged with the current run', () => {
+  const leagues = [
+    { id: 1, name: `Settings E2E ${RUN_A} ${YOUNG_TS}` },
+    { id: 2, name: `Live Draft E2E ${RUN_A} ${FIXED_NOW}` },
+  ];
+  const { targets, inFlight } = selectCleanupTargets(leagues, {
+    runTag: RUN_A,
+    now: FIXED_NOW,
+  });
+  assert.deepEqual(
+    targets.map((l) => l.id),
+    [1, 2],
+  );
+  assert.deepEqual(inFlight, []);
+});
+
+void test("selectCleanupTargets protects another run's young leagues and reclaims its stale ones", () => {
+  const leagues = [
+    { id: 10, name: `Settings E2E ${RUN_B} ${YOUNG_TS}` },
+    { id: 11, name: `Waiver E2E ${RUN_B} ${OLD_TS}` },
+  ];
+  const { targets, inFlight } = selectCleanupTargets(leagues, {
+    runTag: RUN_A,
+    now: FIXED_NOW,
+  });
+  assert.deepEqual(
+    targets.map((l) => l.id),
+    [11],
+  );
+  assert.deepEqual(
+    inFlight.map((l) => l.id),
+    [10],
+  );
+});
+
+void test('selectCleanupTargets keeps the legacy timestamp heuristic for untagged names', () => {
+  const leagues = [
+    { id: 20, name: `Trade Flow E2E ${YOUNG_TS}` }, // pre-LS-10330 naming, young
+    { id: 21, name: `Trade Flow E2E ${OLD_TS}` }, // pre-LS-10330 naming, stale
+    { id: 22, name: 'Mock Draft Practice' }, // server-named, no timestamp
+    { id: 23, name: 'Integration Season Test League' }, // legacy hardcoded
+  ];
+  const { targets, inFlight } = selectCleanupTargets(leagues, {
+    runTag: RUN_A,
+    now: FIXED_NOW,
+  });
+  assert.deepEqual(
+    targets.map((l) => l.id),
+    [21, 22, 23],
+  );
+  assert.deepEqual(
+    inFlight.map((l) => l.id),
+    [20],
+  );
+});
+
+void test('selectCleanupTargets ignores leagues that match no test pattern', () => {
+  const leagues = [
+    { id: 30, name: `My Real League ${RUN_A} ${OLD_TS}` },
+    { id: 31, name: 'Dynasty Keepers' },
+  ];
+  const { targets, inFlight } = selectCleanupTargets(leagues, {
+    runTag: RUN_A,
+    now: FIXED_NOW,
+  });
+  assert.deepEqual(targets, []);
+  assert.deepEqual(inFlight, []);
 });

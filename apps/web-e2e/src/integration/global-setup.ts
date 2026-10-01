@@ -11,9 +11,10 @@ import {
   ACTIVE_RUN_LOCK_STALE_MS,
   isActiveRunLockFresh,
   isTestLeague,
-  isYoungerThanCleanupThreshold,
   listIntegrationSpecSlugs,
+  resolveRunTag,
   resolveShardIdentity,
+  selectCleanupTargets,
   writeActiveRunLock,
 } from './test-league-cleanup';
 import {
@@ -337,18 +338,19 @@ async function sweepStaleTestLeaguesForJwt(
   const leagues = data?.userLeagues;
   if (!leagues?.length) return 0;
 
-  const matched = leagues.filter((l) => isTestLeague(l.name));
-  if (matched.length === 0) return 0;
+  if (!leagues.some((l) => isTestLeague(l.name))) return 0;
 
-  // Protect leagues created within the last few hours: they may be owned by a
-  // concurrent integration run on another branch (test users are shared across
-  // runs). See MIN_LEAGUE_AGE_FOR_CLEANUP_MS for the rationale (LS-4442).
-  const inFlight = matched.filter((l) => isYoungerThanCleanupThreshold(l.name));
-  const targets = matched.filter((l) => !isYoungerThanCleanupThreshold(l.name));
+  // Run-scoped selection (LS-10330): this run's own leagues (a re-attempt of
+  // the same run id) are always reclaimed; another run's leagues are protected
+  // until they age past MIN_LEAGUE_AGE_FOR_CLEANUP_MS (LS-4442), since test
+  // users are shared across runs and a young league is that run's live fixture.
+  const { targets, inFlight } = selectCleanupTargets(leagues, {
+    runTag: resolveRunTag(),
+  });
 
   if (inFlight.length > 0) {
     LOGGER.info(
-      `[integration setup] ${label}: skipping ${inFlight.length} young league(s) likely in active use.`,
+      `[integration setup] ${label}: skipping ${inFlight.length} young league(s) owned by other run(s) likely still in flight.`,
     );
   }
   if (targets.length === 0) return 0;
@@ -637,6 +639,13 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // (LS-4318) which already skips teardown entirely when sharding is active.
   // Shard identity comes from INTEGRATION_SHARD_CURRENT/TOTAL under the
   // weighted-balance partition (LS-7845), falling back to config.shard.
+  // Pin this run's league namespace before anything else so every worker
+  // process forked after globalSetup inherits the same INTEGRATION_RUN_ID and
+  // stamps it into its league names (LS-10330). In CI the workflow already
+  // sets it to github.run_id; locally this mints a per-process tag.
+  const runTag = resolveRunTag();
+  LOGGER.info(`[integration setup] League namespace for this run: ${runTag}`);
+
   const shard = resolveShardIdentity(config);
   if (shard && shard.current !== 1) {
     LOGGER.info(

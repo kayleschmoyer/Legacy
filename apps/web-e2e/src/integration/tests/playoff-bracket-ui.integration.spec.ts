@@ -34,6 +34,7 @@ import {
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ test.describe
   }) => {
     test.setTimeout(60_000);
 
-    state.leagueName = `Playoff Bracket E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('Playoff Bracket');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

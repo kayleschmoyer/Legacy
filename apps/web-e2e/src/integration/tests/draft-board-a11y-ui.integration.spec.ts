@@ -39,6 +39,7 @@ import { pauseDraft, resumeDraft } from '../helpers/pause-draft';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 
+import { testLeagueName } from '../league-run-scope';
 interface A11yState {
   leagueId: number;
   inviteCode: string;
@@ -102,7 +103,7 @@ test.describe
   test('Phase 1: Create league via the UI', async ({
     commissionerPage: page,
   }) => {
-    state.leagueName = `A11y E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('A11y');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

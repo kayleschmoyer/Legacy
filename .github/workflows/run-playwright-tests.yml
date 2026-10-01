@@ -129,14 +129,24 @@ permissions:
   id-token: write # required for OIDC auth to AWS (S3 CI artifacts)
   actions: read # gate job inspects prior runs of this workflow for debouncing
 
-# Serialize automated (workflow_run-triggered) full-suite runs: the integration
-# suite hits the SHARED live backend, and two overlapping automated runs would
-# double the concurrency the LS-7867 shard ceiling was validated against.
+# Serialize EVERY run that touches the SHARED live backend (LS-10330). The
+# integration and shared-live suites all run against INTEGRATION_BASE_URL as
+# the same pool of test users, so two overlapping runs contend for the LS-7867
+# shard ceiling and can sweep each other's leagues. The former group only
+# covered workflow_run; a manual dispatch overlapped the automated run on
+# 2026-09-30 (07:45–07:58Z vs 07:52–08:19Z) and both went red with timeouts,
+# "Player has already been drafted", and a mutation against a league the other
+# run had just deleted.
+#
+# `live-backend-e2e` is shared BY NAME with run-integration-tests.yml (the PR
+# `run:integration` path) — GitHub concurrency groups are repo-wide across
+# workflows, so one group name is one queue. Only the hermetic `e2e` dispatch
+# (no live backend) keeps a unique per-run group.
 # cancel-in-progress:false keeps one active + at most one pending run (GitHub
-# replaces older pending entries), and the pending run's gate then debounces
-# it. Manual dispatches keep their own unique group (unchanged behavior).
+# replaces older pending entries), and a pending automated run's gate then
+# debounces it.
 concurrency:
-  group: playwright-suite-${{ github.event_name == 'workflow_run' && 'post-deploy' || github.run_id }}
+  group: ${{ (github.event_name == 'workflow_run' || inputs.test-suite != 'e2e') && 'live-backend-e2e' || format('playwright-suite-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
@@ -688,6 +698,12 @@ jobs:
           # test runner env. Integration tests use real OAuth login via
           # getTestUserJwt, so they don't need a signing key either.
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
+          # Per-run league namespace (LS-10330): every integration shard and the
+          # shared-live job of ONE workflow run stamp github.run_id into their
+          # league names, so the pre-run/teardown sweeps can tell this run's
+          # leagues from a concurrent run's instead of guessing from age alone.
+          # See apps/web-e2e/src/integration/league-run-scope.ts.
+          INTEGRATION_RUN_ID: ${{ github.run_id }}
           # E2E_* credentials are only needed by the integration suite (real
           # OAuth login). Hermetic e2e tests mock the network and don't need
           # them.

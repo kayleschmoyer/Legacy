@@ -63,6 +63,7 @@ import {
   WEB_BASE,
 } from '../integration/fixtures/ui';
 import { loginAs } from '../utils/test-user-auth';
+import { testLeagueName } from '../integration/league-run-scope';
 
 /**
  * TestData — the backend-agnostic data-precondition seam (ADR-0016).
@@ -1358,7 +1359,7 @@ export class LiveTestData implements TestData {
   }
 
   async leagueInvite(): Promise<SeededLeagueInvite> {
-    const leagueName = `Dual QR Invite ${Date.now()}`;
+    const leagueName = testLeagueName('Dual QR Invite');
     const { leagueId, inviteCode } = await this.#createLiveLeague(leagueName);
     return {
       leagueId,
@@ -1395,7 +1396,7 @@ export class LiveTestData implements TestData {
   }
 
   async scoringProfile(): Promise<SeededScoringProfile> {
-    const leagueName = `Dual Scoring Editor ${Date.now()}`;
+    const leagueName = testLeagueName('Dual Scoring');
     const { jwt, leagueId } = await this.#createLiveLeague(leagueName);
     const statDisplayName = 'Home Runs';
 
@@ -1441,7 +1442,7 @@ export class LiveTestData implements TestData {
     if (!this.#page) {
       throw new Error(LEAGUE_LIVE_REQUIRES_PAGE_REASON);
     }
-    const leagueName = `E2E Dual League ${Date.now()}`;
+    const leagueName = testLeagueName('Dual League');
     const { leagueId, inviteCode } = await createLeagueViaUI(this.#page, {
       leagueName,
     });
@@ -1499,7 +1500,7 @@ export class LiveTestData implements TestData {
       const league = await provisionDraftedLeague({
         commissionerJwt,
         memberJwt,
-        leagueName: `E2E Waiver Queue ${Date.now()}`,
+        leagueName: testLeagueName('Waiver Queue'),
       });
       const { freeAgents } = await gqlFetch<{
         freeAgents: Array<{
@@ -1597,7 +1598,7 @@ export class LiveTestData implements TestData {
       const provisioned = await provisionActiveMatchup({
         commissionerJwt,
         memberJwt,
-        leagueName: `E2E Season Active Matchup ${Date.now()}`,
+        leagueName: testLeagueName('Active Matchup'),
       });
       this.#liveState.seasonActiveMatchup = provisioned;
       return {

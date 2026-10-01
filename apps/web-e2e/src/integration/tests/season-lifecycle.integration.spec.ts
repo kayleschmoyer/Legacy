@@ -31,6 +31,7 @@ import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 import { waitForAllMatchupsStatsLoaded } from '../helpers/wait-for-stats-loaded';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -112,7 +113,7 @@ test.describe
            }`,
         {
           input: {
-            leagueName: `Season Lifecycle Integration Test ${Date.now()}`,
+            leagueName: testLeagueName('Season Lifecycle'),
             numberOfTeams: 3,
             numberOfDivisions: 1,
             maxRosterSize: MAX_ROSTER_SIZE,

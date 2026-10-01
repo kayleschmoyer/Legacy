@@ -9,6 +9,7 @@ import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
 import { CLIENT_FACING_CODES } from './server/graphql-error-codes';
+import { describeErrorCause } from './server/describe-error-cause';
 
 interface JWTPayload {
   id: number;
@@ -91,7 +92,11 @@ async function startServer() {
             'originalError' in error && error.originalError instanceof Error
               ? error.originalError
               : error;
-          LOGGER.error('GraphQL internal error', originalError, errorContext);
+          // Mirror apollo.ts: lift the pg error off Drizzle's `.cause` (LS-10330).
+          LOGGER.error('GraphQL internal error', originalError, {
+            ...errorContext,
+            cause: describeErrorCause(originalError),
+          });
         } else {
           LOGGER.error('GraphQL internal error', errorContext);
         }

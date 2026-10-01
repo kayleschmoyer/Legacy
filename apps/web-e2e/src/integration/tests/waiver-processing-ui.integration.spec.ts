@@ -54,6 +54,7 @@ import {
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases
 // ---------------------------------------------------------------------------
@@ -243,7 +244,7 @@ test.describe
   test('Phase 1: Create league via the UI', async ({
     commissionerPage: page,
   }) => {
-    state.leagueName = `Waiver E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('Waiver');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

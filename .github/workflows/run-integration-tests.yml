@@ -145,6 +145,15 @@ jobs:
     if: needs.resolve.outputs.has-touched-specs == 'true'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
+    # Job-level queue shared BY NAME with run-playwright-tests.yml (LS-10330):
+    # this job hits the same live backend as the automated full suite and any
+    # manual integration/shared-live dispatch, so it waits its turn behind them
+    # (and they behind it). Job-level rather than workflow-level so the per-PR
+    # `cancel-in-progress: true` group above still lets a new push cancel a
+    # stale run of THIS PR without ever cancelling another workflow's live run.
+    concurrency:
+      group: live-backend-e2e
+      cancel-in-progress: false
     env:
       PR_NUMBER: ${{ needs.resolve.outputs.pr-number }}
       PR_HEAD_SHA: ${{ needs.resolve.outputs.pr-head-sha }}
@@ -179,6 +188,9 @@ jobs:
         env:
           CI: "true"
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
+          # Per-run league namespace (LS-10330) — see the same var in
+          # run-playwright-tests.yml and apps/web-e2e/src/integration/league-run-scope.ts.
+          INTEGRATION_RUN_ID: ${{ github.run_id }}
           E2E_COMMISSIONER_EMAIL: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
           E2E_COMMISSIONER_PASSWORD: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
           E2E_MANAGER_1_EMAIL: ${{ secrets.E2E_MANAGER_1_EMAIL }}

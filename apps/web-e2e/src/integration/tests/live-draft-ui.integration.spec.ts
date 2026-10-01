@@ -24,6 +24,7 @@ import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { test } from '../fixtures/ui';
 import { gqlFetch, gqlFetchEnvelope } from '../helpers/gql-fetch';
 
+import { testLeagueName } from '../league-run-scope';
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
 // ---------------------------------------------------------------------------
@@ -73,7 +74,7 @@ test.describe
   test('Phase 1: Create league via the UI', async ({
     commissionerPage: page,
   }) => {
-    state.leagueName = `Live Draft E2E ${Date.now()}`;
+    state.leagueName = testLeagueName('Live Draft');
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,
     });

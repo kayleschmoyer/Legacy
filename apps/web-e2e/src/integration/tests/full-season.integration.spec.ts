@@ -6,6 +6,7 @@ import { cleanupLeague } from '../helpers/cleanup-league';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 
+import { testLeagueName } from '../league-run-scope';
 /**
  * Full-season integration test: exercises every team-manager action from
  * league creation through season-end renewal. Uses `test.describe.serial()`
@@ -215,7 +216,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
          }`,
         {
           input: {
-            leagueName: `Integration Season Test League ${Date.now()}`,
+            leagueName: testLeagueName('Season API'),
             numberOfTeams: 3,
             numberOfDivisions: 1,
             maxRosterSize: MAX_ROSTER_SIZE,
