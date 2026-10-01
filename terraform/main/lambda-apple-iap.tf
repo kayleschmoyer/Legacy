@@ -211,7 +211,7 @@ resource "aws_lambda_function" "apple_iap" {
   function_name = "${local.name_prefix}-apple-iap"
   role          = aws_iam_role.apple_iap_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   memory_size   = 256
 

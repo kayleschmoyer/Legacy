@@ -96,7 +96,7 @@ resource "aws_lambda_function" "jira_proxy" {
   function_name = "${local.name_prefix}-jira-proxy"
   role          = aws_iam_role.jira_proxy_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   memory_size   = 256
 

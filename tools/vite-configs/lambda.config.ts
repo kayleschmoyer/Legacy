@@ -64,7 +64,7 @@ export function createLambdaConfig(projectName: string, entryFile?: string) {
 
     // Performance optimizations
     esbuild: {
-      target: 'node20',
+      target: 'node22',
       platform: 'node',
     },
   });

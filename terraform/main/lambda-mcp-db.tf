@@ -158,7 +158,7 @@ resource "aws_lambda_function" "mcp_db" {
   function_name = "${local.name_prefix}-mcp-db"
   role          = aws_iam_role.mcp_db_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   # Dedicated ~15-min timeout for the async db_migrate worker branch (LS-8563).
   # The HTTP path is unaffected: API Gateway cuts sync callers at ~29s.
   timeout     = var.lambda_mcp_db_timeout

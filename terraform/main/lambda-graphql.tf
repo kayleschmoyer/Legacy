@@ -252,7 +252,7 @@ resource "aws_lambda_function" "graphql" {
   function_name = "${local.name_prefix}-graphql"
   role          = aws_iam_role.graphql_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 30
   memory_size   = var.environment == "dev" ? 512 : 1024
 

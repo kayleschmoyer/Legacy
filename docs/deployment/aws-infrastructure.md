@@ -158,10 +158,10 @@ Purpose: Controls access to VPC endpoints
 ┌─────────────────────┬─────────────────┬─────────────────┬─────────────────┐
 │ Function            │ Location        │ Runtime         │ Purpose         │
 ├─────────────────────┼─────────────────┼─────────────────┼─────────────────┤
-│ GraphQL             │ VPC Private     │ Node.js 20      │ API Gateway     │
-│ OAuth Proxy         │ VPC Private     │ Node.js 20      │ Authentication  │
-│ Stats               │ External        │ Node.js 20      │ Data Scraping   │
-│ Game Selection      │ External        │ Node.js 20      │ Game Logic      │
+│ GraphQL             │ VPC Private     │ Node.js 22      │ API Gateway     │
+│ OAuth Proxy         │ VPC Private     │ Node.js 22      │ Authentication  │
+│ Stats               │ External        │ Node.js 22      │ Data Scraping   │
+│ Game Selection      │ External        │ Node.js 22      │ Game Logic      │
 └─────────────────────┴─────────────────┴─────────────────┴─────────────────┘
 ```
 
@@ -169,7 +169,7 @@ Purpose: Controls access to VPC endpoints
 
 ```
 Configuration:
-├── Runtime: Node.js 20
+├── Runtime: Node.js 22
 ├── Memory: 512 MB (dev: 256 MB)
 ├── Timeout: 30 seconds
 ├── Location: VPC Private Subnets
@@ -190,7 +190,7 @@ Configuration:
 
 ```
 Configuration:
-├── Runtime: Node.js 20
+├── Runtime: Node.js 22
 ├── Memory: 512 MB (dev: 256 MB)
 ├── Timeout: 30 seconds
 ├── Location: VPC Private Subnets
@@ -213,7 +213,7 @@ Configuration:
 
 ```
 Configuration:
-├── Runtime: Node.js 20
+├── Runtime: Node.js 22
 ├── Memory: 256 MB (dev optimized)
 ├── Timeout: 180 seconds (dev) / 300 seconds (prod)
 ├── Location: EXTERNAL (outside VPC for performance)
@@ -235,7 +235,7 @@ Configuration:
 
 ```
 Configuration:
-├── Runtime: Node.js 20
+├── Runtime: Node.js 22
 ├── Memory: 256 MB
 ├── Timeout: 30 seconds
 ├── Location: EXTERNAL (outside VPC for performance)

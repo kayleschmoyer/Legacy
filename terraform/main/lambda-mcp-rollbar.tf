@@ -97,7 +97,7 @@ resource "aws_lambda_function" "mcp_rollbar" {
   function_name = "${local.name_prefix}-mcp-rollbar"
   role          = aws_iam_role.mcp_rollbar_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   memory_size   = 256
 

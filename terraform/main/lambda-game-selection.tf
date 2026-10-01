@@ -191,7 +191,7 @@ resource "aws_lambda_function" "game_selection" {
   function_name = "${local.name_prefix}-game-selection"
   role          = aws_iam_role.game_selection_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 30
   memory_size   = 256
 

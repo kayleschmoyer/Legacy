@@ -25,7 +25,7 @@
 //   the call.
 //
 // Packaging: zero runtime dependencies. `@aws-sdk/client-ec2` ships with the
-// nodejs20.x Lambda runtime, so this file is zipped as-is via data.archive_file
+// nodejs22.x Lambda runtime, so this file is zipped as-is via data.archive_file
 // (terraform/runners/packer-orphan-sweeper.tf) — no bundling step. (Plain
 // `console` logging is used deliberately: importing @legacy-sports/logging would
 // drag the monorepo dependency graph into what must stay a single-file zip.)

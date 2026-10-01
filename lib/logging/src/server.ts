@@ -1,4 +1,5 @@
 import { createServerLogger } from './lib/factories.server';
+import { routeProcessWarnings } from './lib/process-warnings';
 
 // Export the server logger (console + file) for server environments
 export const LOGGER = createServerLogger();
@@ -10,6 +11,7 @@ export { createServerLogger } from './lib/factories.server';
 export { ConsoleOutputDestination } from './lib/destinations';
 export { FileOutputDestination } from './lib/destinations/server';
 export { emitMetric } from './lib/metrics';
+export { routeProcessWarnings } from './lib/process-warnings';
 export type {
   ILogger,
   LoggerConfig,
@@ -52,4 +54,9 @@ if (isNode && typeof process !== 'undefined') {
 
     LOGGER.error('Promise rejected', error);
   });
+
+  // Node prints process warnings (e.g. the AWS SDK NodeVersionSupportWarning)
+  // to stderr, which Lambda's JSON log format records at ERROR. Route them
+  // through LOGGER at WARN instead (LS-10338).
+  routeProcessWarnings(LOGGER);
 }

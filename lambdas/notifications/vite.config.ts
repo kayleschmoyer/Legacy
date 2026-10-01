@@ -60,7 +60,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       ssr: true,
-      target: 'node20',
+      target: 'node22',
     },
     ssr: {
       noExternal: true,

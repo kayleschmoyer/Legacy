@@ -41,6 +41,6 @@ export default defineConfig({
         '@aws-sdk/client-lambda',
       ],
     },
-    target: 'node20',
+    target: 'node22',
   },
 });

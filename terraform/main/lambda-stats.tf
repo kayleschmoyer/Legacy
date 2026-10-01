@@ -214,7 +214,7 @@ resource "aws_lambda_function" "stats" {
   function_name = "${local.name_prefix}-stats"
   role          = aws_iam_role.stats_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.environment == "dev" ? 600 : var.lambda_stats_timeout
   memory_size   = var.environment == "dev" ? 256 : 512 # Lower memory for dev
 

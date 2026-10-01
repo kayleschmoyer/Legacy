@@ -41,6 +41,6 @@ export default defineConfig({
         '@aws-sdk/client-secrets-manager',
       ],
     },
-    target: 'node20',
+    target: 'node22',
   },
 });

@@ -160,7 +160,7 @@ resource "aws_lambda_function" "github_webhook" {
   function_name = "${local.name_prefix}-github-webhook"
   role          = aws_iam_role.github_webhook_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 30
   memory_size   = 128
 

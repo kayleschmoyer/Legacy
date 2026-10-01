@@ -31,7 +31,7 @@ locals {
 
 # -----------------------------------------------------------------------------
 # Lambda deployment package — single dependency-free index.mjs (the AWS SDK v3
-# ships with the nodejs20.x runtime), zipped in place. No build/bundle step.
+# ships with the nodejs22.x runtime), zipped in place. No build/bundle step.
 # -----------------------------------------------------------------------------
 data "archive_file" "packer_orphan_sweeper" {
   type        = "zip"
@@ -151,7 +151,7 @@ resource "aws_lambda_function" "packer_orphan_sweeper" {
   description   = "Terminates orphaned Packer AMI-builder EC2 instances (LS-7875)."
   role          = aws_iam_role.packer_orphan_sweeper.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 120
   memory_size   = 256
 

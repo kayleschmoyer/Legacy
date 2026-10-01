@@ -256,7 +256,7 @@ resource "aws_lambda_function" "notifications" {
   description = data.aws_ssm_parameter.notifications_lambda_version.value
 
   handler     = "index.handler"
-  runtime     = "nodejs20.x"
+  runtime     = "nodejs22.x"
   timeout     = 60
   memory_size = var.environment == "dev" ? 256 : 512
 

@@ -323,7 +323,7 @@ resource "aws_lambda_function" "oauth_proxy" {
   function_name = "${local.name_prefix}-oauth-proxy"
   role          = aws_iam_role.oauth_proxy_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   # Lambda CPU scales with memory, and this function's cost is dominated by
   # CPU-bound work (JSON marshalling, drizzle query building, JWT signing)

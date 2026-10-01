@@ -148,5 +148,5 @@ returns any `RETURNING` rows plus the affected `rowCount`.
 
 ## Build
 
-`vite build` bundles `src/lambda.ts` → `dist/index.js` (CJS, node20), with
+`vite build` bundles `src/lambda.ts` → `dist/index.js` (CJS, node22), with
 `@aws-sdk/client-secrets-manager` left external (provided by the Lambda runtime).

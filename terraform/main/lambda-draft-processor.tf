@@ -296,7 +296,7 @@ resource "aws_lambda_function" "draft_processor" {
   description = data.aws_ssm_parameter.draft_processor_lambda_version.value
 
   handler     = "index.handler"
-  runtime     = "nodejs20.x"
+  runtime     = "nodejs22.x"
   timeout     = 300
   memory_size = var.environment == "dev" ? 512 : 1024
 

@@ -96,7 +96,7 @@ resource "aws_lambda_function" "rollbar_discord" {
   function_name = "${local.name_prefix}-rollbar-discord"
   role          = aws_iam_role.rollbar_discord_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   memory_size   = 128
 

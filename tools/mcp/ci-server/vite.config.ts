@@ -77,6 +77,6 @@ export default defineConfig({
         '@aws-sdk/s3-request-presigner',
       ],
     },
-    target: 'node20',
+    target: 'node22',
   },
 });

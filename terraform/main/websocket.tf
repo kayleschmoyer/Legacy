@@ -299,7 +299,7 @@ resource "aws_lambda_function" "websocket" {
   description = data.aws_ssm_parameter.websocket_lambda_version.value
 
   handler     = "index.handler"
-  runtime     = "nodejs20.x"
+  runtime     = "nodejs22.x"
   timeout     = 30
   memory_size = 256
 

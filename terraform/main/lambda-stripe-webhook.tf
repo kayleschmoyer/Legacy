@@ -240,7 +240,7 @@ resource "aws_lambda_function" "stripe_webhook" {
   function_name = "${local.name_prefix}-stripe-webhook"
   role          = aws_iam_role.stripe_webhook_lambda.arn
   handler       = "index.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = var.lambda_timeout
   memory_size   = 256
 

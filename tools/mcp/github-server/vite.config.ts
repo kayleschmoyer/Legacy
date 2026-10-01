@@ -76,6 +76,6 @@ export default defineConfig({
         'libsodium-wrappers',
       ],
     },
-    target: 'node20',
+    target: 'node22',
   },
 });
