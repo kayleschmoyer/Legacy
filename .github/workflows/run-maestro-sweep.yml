@@ -80,6 +80,12 @@ jobs:
   # check therefore inspects the "Prepare Sweep" job of prior automated runs
   # (non-skipped = real attempt) rather than run-level conclusions, which would
   # re-arm the debounce forever on a busy repo.
+  #
+  # The decision lives in .github/scripts/full-suite-gate.mjs (LS-10336,
+  # shared with the other three gates, unit-tested): any `gh api` error on
+  # the run list or a per-run jobs probe resolves to "inconclusive → skip"
+  # rather than failing the job or failing open, and the decision is echoed
+  # to the job log (step summaries are not API-readable).
   # ---------------------------------------------------------------------------
   gate:
     name: "Maestro Sweep Gate"
@@ -88,40 +94,22 @@ jobs:
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
     steps:
+      - name: "Checkout (gate script only)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/full-suite-gate.mjs
+          sparse-checkout-cone-mode: false
       - name: "Decide whether to run"
         id: decide
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MIN_INTERVAL_HOURS: ${{ vars.MAESTRO_SWEEP_MIN_INTERVAL_HOURS || '156' }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "workflow_run" ]; then
-            echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-          # All automated runs of this workflow created since the cutoff,
-          # excluding this run itself.
-          RUN_IDS=$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/run-maestro-sweep.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
-            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
-
-          for id in $RUN_IDS; do
-            # Non-skipped, completed "Prepare Sweep" = a real sweep attempt.
-            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-              --jq '[.jobs[] | select(.name == "Prepare Sweep" and .conclusion != null and .conclusion != "skipped")] | length')
-            if [ "$PREPARED" -gt 0 ]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "Debounced — automated Maestro sweep (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-          done
-
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "No automated Maestro sweep in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+          GATE_TITLE: "Maestro Sweep Gate"
+          GATE_WORKFLOW_FILE: run-maestro-sweep.yml
+          GATE_SENTINEL_JOB: "Prepare Sweep"
+        run: node .github/scripts/full-suite-gate.mjs
 
   # ---------------------------------------------------------------------------
   # Marker + matrix computation. Runs only on a real (non-debounced) attempt, so

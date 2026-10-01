@@ -97,12 +97,28 @@ jobs:
       should-run: ${{ steps.decide.outputs.should-run }}
       skip-reason: ${{ steps.decide.outputs.skip-reason }}
     steps:
+      - name: "Checkout (gate script only)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/full-suite-gate.mjs
+          sparse-checkout-cone-mode: false
       - name: "Decide whether to run"
         id: decide
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MIN_INTERVAL_HOURS: ${{ vars.ANDROID_E2E_MIN_INTERVAL_HOURS || '156' }}
+          GATE_TITLE: "Native Android E2E"
+          GATE_WORKFLOW_FILE: e2e-native-android.yml
+          GATE_SENTINEL_JOB: "Build Bypass APK"
+          # A debounced run is gate-only and finishes in well under a minute; a
+          # real attempt builds an APK and boots an emulator (30+ min). The
+          # script pre-filters on wall time so job introspection stays at a
+          # handful of API calls rather than one per run in the window
+          # (LS-9652); introspection remains the authoritative check.
+          GATE_MIN_REAL_ATTEMPT_SECONDS: "300"
+          GATE_NOTE: "**No emulator test ran in this run.**"
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" != "workflow_run" ]; then
@@ -154,78 +170,14 @@ jobs:
             exit 0
           fi
 
-          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-
-          # Walk automated runs of this workflow (newest first) across EVERY page
-          # of the created>CUTOFF window.
-          #
-          # LS-9652: this used to read a single per_page=30 page. On a busy main —
-          # where "Build Android App" completes every 10-20 minutes and creates a
-          # debounced run each time — the last real attempt scrolled off page 1
-          # within ~7 hours, the loop found nothing, and the debounce re-armed. The
-          # effective interval was "the most recent 30 runs", not
-          # MIN_INTERVAL_HOURS, which is what the comment above claims.
-          #
-          # A debounced run is gate-only and finishes in well under a minute; a real
-          # attempt builds an APK and boots an emulator (30+ min). Pre-filtering on
-          # elapsed wall time keeps job introspection to a handful of API calls
-          # rather than one per run in the window. Job introspection remains the
-          # authoritative check. An attempt that died before
-          # MIN_REAL_ATTEMPT_SECONDS is not counted as one, which fails OPEN: the
-          # lane retries sooner rather than debouncing against a run that never got
-          # off the ground.
-          MIN_REAL_ATTEMPT_SECONDS=300
-          PAGE=1
-          MAX_PAGES=10
-
-          while [ "$PAGE" -le "$MAX_PAGES" ]; do
-            RESP=$(gh api \
-              "repos/${{ github.repository }}/actions/workflows/e2e-native-android.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=100&page=${PAGE}")
-            COUNT=$(printf '%s' "$RESP" | jq '.workflow_runs | length')
-            if [ "$COUNT" -eq 0 ]; then
-              break
-            fi
-
-            CANDIDATES=$(printf '%s' "$RESP" | jq -r \
-              --argjson self "${{ github.run_id }}" \
-              --argjson min "$MIN_REAL_ATTEMPT_SECONDS" '
-                [ .workflow_runs[]
-                  | select(.id != $self)
-                  | select(.run_started_at != null and .updated_at != null)
-                  | select(((.updated_at | fromdateiso8601)
-                            - (.run_started_at | fromdateiso8601)) >= $min)
-                ] | .[].id')
-
-            for id in $CANDIDATES; do
-              # Non-skipped, completed "Build Bypass APK" = a real attempt.
-              PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-                --jq '[.jobs[] | select(.name == "Build Bypass APK" and .conclusion != null and .conclusion != "skipped")] | length')
-              if [ "$PREPARED" -gt 0 ]; then
-                echo "should-run=false" >> "$GITHUB_OUTPUT"
-                echo "skip-reason=Debounced — run ${id} already made a real attempt within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_OUTPUT"
-                {
-                  echo "## Native Android E2E — SKIPPED (debounced)"
-                  echo
-                  echo "**No emulator test ran in this run.**"
-                  echo
-                  echo "Run [\`${id}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${id}) already made a real attempt within the last ${MIN_INTERVAL_HOURS}h."
-                } >> "$GITHUB_STEP_SUMMARY"
-                exit 0
-              fi
-            done
-
-            if [ "$COUNT" -lt 100 ]; then
-              break
-            fi
-            PAGE=$((PAGE + 1))
-          done
-
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          {
-            echo "## Native Android E2E — RUNNING"
-            echo
-            echo "No automated run made a real attempt in the last ${MIN_INTERVAL_HOURS}h."
-          } >> "$GITHUB_STEP_SUMMARY"
+          # Debounce walk (every page of the created>CUTOFF window — LS-9652 —
+          # with the wall-time pre-filter above) lives in the shared, unit-
+          # tested gate script (LS-10336). Any `gh api` error on the run list
+          # or a per-run jobs probe resolves to "inconclusive → skip" (with
+          # should-run=false and skip-reason set) rather than failing open or
+          # hard-failing the job, and the decision is echoed to the job log
+          # because step summaries are not API-readable.
+          node .github/scripts/full-suite-gate.mjs
 
   # ---------------------------------------------------------------------------
   # AC1 (LS-9652): a debounced run used to be indistinguishable from a passing

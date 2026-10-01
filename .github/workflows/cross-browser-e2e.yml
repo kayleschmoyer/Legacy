@@ -73,6 +73,12 @@ jobs:
   # "Prepare Matrix" job of prior automated runs (non-skipped = real attempt)
   # rather than run-level conclusions, which would re-arm the debounce forever
   # on a busy repo.
+  #
+  # The decision lives in .github/scripts/full-suite-gate.mjs (LS-10336,
+  # shared with the other three gates, unit-tested): any `gh api` error on
+  # the run list or a per-run jobs probe resolves to "inconclusive → skip"
+  # rather than failing the job or failing open, and the decision is echoed
+  # to the job log (step summaries are not API-readable).
   # ---------------------------------------------------------------------------
   gate:
     name: "Cross-Browser Gate"
@@ -81,42 +87,22 @@ jobs:
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
     steps:
+      - name: "Checkout (gate script only)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/full-suite-gate.mjs
+          sparse-checkout-cone-mode: false
       - name: "Decide whether to run"
         id: decide
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MIN_INTERVAL_HOURS: ${{ vars.CROSS_BROWSER_MIN_INTERVAL_HOURS || '168' }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "workflow_run" ]; then
-            echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-          # All automated runs of this workflow created since the cutoff,
-          # excluding this run itself.
-          RUN_IDS=$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/cross-browser-e2e.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
-            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
-
-          for id in $RUN_IDS; do
-            # Non-skipped, completed "Prepare Matrix" = a real cross-browser
-            # attempt (in-flight attempts are excluded here but already
-            # serialized by the concurrency group above).
-            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-              --jq '[.jobs[] | select(.name == "Prepare Matrix" and .conclusion != null and .conclusion != "skipped")] | length')
-            if [ "$PREPARED" -gt 0 ]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "Debounced — cross-browser attempt (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-          done
-
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "No cross-browser attempt in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+          GATE_TITLE: "Cross-Browser Gate"
+          GATE_WORKFLOW_FILE: cross-browser-e2e.yml
+          GATE_SENTINEL_JOB: "Prepare Matrix"
+        run: node .github/scripts/full-suite-gate.mjs
 
   # ---------------------------------------------------------------------------
   # Compute the engine matrix.
