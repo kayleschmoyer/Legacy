@@ -26,6 +26,10 @@ import { useThemeContext } from '../../context/ThemeContext';
 interface OnboardingTutorialProps {
   /** Called when the user completes or explicitly skips the tutorial */
   onClose: () => void;
+  /** Step index to open on (e.g. restored after a reload). Clamped to range. */
+  initialStep?: number;
+  /** Called with the new step index whenever the user navigates */
+  onStepChange?: (step: number) => void;
 }
 
 /* ─── Step definitions ──────────────────────────────────── */
@@ -636,8 +640,18 @@ function useModalDialogFocus(
  * A multi-step onboarding tutorial that explains the historical-stats
  * game mechanic to new users.  Displayed as a dismissible modal overlay.
  */
-export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
-  const [currentStep, setCurrentStep] = React.useState(0);
+export function OnboardingTutorial({
+  onClose,
+  initialStep = 0,
+  onStepChange,
+}: OnboardingTutorialProps) {
+  const [currentStep, setCurrentStepState] = React.useState(() =>
+    Math.min(Math.max(0, initialStep), STEPS.length - 1),
+  );
+  const setCurrentStep = (next: number) => {
+    setCurrentStepState(next);
+    onStepChange?.(next);
+  };
   const backdropRef = React.useRef<HTMLDivElement>(null);
   useModalDialogFocus(backdropRef, onClose);
   const { resolvedTheme } = useThemeContext();
@@ -652,12 +666,12 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
     if (isLast) {
       onClose();
     } else {
-      setCurrentStep((s) => s + 1);
+      setCurrentStep(currentStep + 1);
     }
   };
 
   const handleBack = () => {
-    setCurrentStep((s) => Math.max(0, s - 1));
+    setCurrentStep(Math.max(0, currentStep - 1));
   };
 
   return (

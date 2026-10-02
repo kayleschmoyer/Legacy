@@ -20,7 +20,11 @@ import {
   type UserLeagueSummaryFragment,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
-import { migrateLegacyOnboardingFlag } from './onboardingStorage';
+import {
+  getOnboardingStepKey,
+  migrateLegacyOnboardingFlag,
+  readOnboardingStep,
+} from './onboardingStorage';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
@@ -100,6 +104,7 @@ export function HomePage(): React.JSX.Element {
   const auth = useAuth();
   const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialInitialStep, setTutorialInitialStep] = useState(0);
   const [showArchived, setShowArchived] = useState(false);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
@@ -200,7 +205,15 @@ export function HomePage(): React.JSX.Element {
         const stored = window.localStorage.getItem(key);
         const completed =
           stored !== null ? (JSON.parse(stored) as boolean) : false;
-        if (!completed) setTutorialOpen(true);
+        if (!completed) {
+          setTutorialInitialStep(
+            readOnboardingStep(
+              window.localStorage,
+              getOnboardingStepKey(userId),
+            ),
+          );
+          setTutorialOpen(true);
+        }
       } catch (caught) {
         LOGGER.error(
           'HomePage: onboarding localStorage access failed',
@@ -219,12 +232,25 @@ export function HomePage(): React.JSX.Element {
           getOnboardingKey(userId),
           JSON.stringify(true),
         );
+        window.localStorage.removeItem(getOnboardingStepKey(userId));
       } catch (caught) {
         LOGGER.error(
           'HomePage: failed to persist onboarding completion',
           caught instanceof Error ? caught : new Error(String(caught)),
         );
       }
+    }
+  };
+
+  const handleTutorialStepChange = (step: number) => {
+    if (!userId) return;
+    try {
+      window.localStorage.setItem(getOnboardingStepKey(userId), String(step));
+    } catch (caught) {
+      LOGGER.error(
+        'HomePage: failed to persist onboarding step',
+        caught instanceof Error ? caught : new Error(String(caught)),
+      );
     }
   };
 
@@ -263,7 +289,13 @@ export function HomePage(): React.JSX.Element {
         title="Dashboard"
         description="Your personalized fantasy sports dashboard."
       />
-      {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
+      {tutorialOpen && (
+        <OnboardingTutorial
+          onClose={handleTutorialClose}
+          initialStep={tutorialInitialStep}
+          onStepChange={handleTutorialStepChange}
+        />
+      )}
       <div style={pageBackgroundStyle}>
         <HomeScreen
           userName={userName}

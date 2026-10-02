@@ -1,6 +1,8 @@
 import {
+  getOnboardingStepKey,
   LEGACY_ONBOARDING_KEY,
   migrateLegacyOnboardingFlag,
+  readOnboardingStep,
 } from './onboardingStorage';
 
 const USER_KEY = 'ls_onboarding_complete_501';
@@ -42,4 +44,31 @@ describe('migrateLegacyOnboardingFlag', () => {
     expect(storage.data.get(LEGACY_ONBOARDING_KEY)).toBe('false');
     expect(storage.data.has(USER_KEY)).toBe(false);
   });
+});
+
+describe('readOnboardingStep (LS-6900)', () => {
+  const STEP_KEY = getOnboardingStepKey(501);
+
+  it('uses a per-user key', () => {
+    expect(STEP_KEY).toBe('ls_onboarding_step_501');
+  });
+
+  it('returns 0 when nothing is stored', () => {
+    expect(readOnboardingStep(makeStorage(), STEP_KEY)).toBe(0);
+  });
+
+  it('returns the stored step index', () => {
+    expect(readOnboardingStep(makeStorage({ [STEP_KEY]: '4' }), STEP_KEY)).toBe(
+      4,
+    );
+  });
+
+  it.each(['-1', '1.5', 'abc', ''])(
+    'falls back to 0 for the invalid value %j',
+    (value) => {
+      expect(
+        readOnboardingStep(makeStorage({ [STEP_KEY]: value }), STEP_KEY),
+      ).toBe(0);
+    },
+  );
 });

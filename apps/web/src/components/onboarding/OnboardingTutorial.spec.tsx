@@ -164,3 +164,48 @@ describe('OnboardingTutorial — modal focus management (LS-6902)', () => {
     expect(document.activeElement).toBe(launch);
   });
 });
+
+describe('OnboardingTutorial — step resume (LS-6900)', () => {
+  it('opens on step 1 by default', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+
+    expect(screen.getByText(/Step\s*1\s*of/)).toBeInTheDocument();
+  });
+
+  it('opens on the provided initialStep', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={3} />);
+
+    expect(screen.getByText(/Step\s*4\s*of/)).toBeInTheDocument();
+  });
+
+  it('clamps an out-of-range initialStep to a valid step', () => {
+    const { unmount } = render(
+      <OnboardingTutorial onClose={jest.fn()} initialStep={999} />,
+    );
+    expect(screen.getByText(/Step\s*6\s*of\s*6/)).toBeInTheDocument();
+    unmount();
+
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={-2} />);
+    expect(screen.getByText(/Step\s*1\s*of/)).toBeInTheDocument();
+  });
+
+  it('reports each navigation through onStepChange', () => {
+    const onStepChange = jest.fn();
+    render(
+      <OnboardingTutorial
+        onClose={jest.fn()}
+        initialStep={1}
+        onStepChange={onStepChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Next →'));
+    expect(onStepChange).toHaveBeenLastCalledWith(2);
+
+    fireEvent.click(screen.getByText('← Back'));
+    expect(onStepChange).toHaveBeenLastCalledWith(1);
+
+    fireEvent.click(screen.getByTestId('onboarding-dot-1'));
+    expect(onStepChange).toHaveBeenLastCalledWith(0);
+  });
+});
