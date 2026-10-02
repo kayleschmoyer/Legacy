@@ -63,6 +63,24 @@ LOCAL_SUBS = {
     "${var.environment}": "dev",
 }
 
+# Stand-in for a bare Terraform reference used as a policy value, e.g.
+# `Resource = [aws_vpc.main.arn]` (LS-10408). The real value is only known at
+# apply time; a typical resource ARN is ~60-80 bytes, so this is sized to match
+# one rather than to under-count. References that name a LOCAL_SUBS key
+# (`local.region`) use that key's value instead.
+REFERENCE_PLACEHOLDER = (
+    "arn:aws:service:us-east-1:176661590736:resource/legacy-sports-dev-example"
+)
+
+# A double-quoted HCL string, or a bare dotted reference such as
+# `aws_vpc.main.arn`, `local.z`, `var.w`, `data.x.y.z`, `aws_subnet.a[0].arn`.
+# Matching strings in the same alternation keeps dotted text *inside* a string
+# (`"ec2:Vpc"`, `"s3.amazonaws.com"`) from being mistaken for a reference.
+_STRING_OR_REFERENCE = re.compile(
+    r'"(?:[^"\\]|\\.)*"'
+    r"|(?<![\w.\"-])(?P<ref>[A-Za-z_][\w-]*(?:\.(?:[A-Za-z_][\w-]*|\*)|\[\d+\])+)"
+)
+
 
 class ParseError(Exception):
     """Raised when the Terraform file isn't shaped the way this script expects."""
@@ -98,16 +116,25 @@ def find_policy_block(content: str, label: str) -> str:
     raise ParseError(f"Unbalanced parens in: {label}")
 
 
+def _reference_to_string(match: re.Match[str]) -> str:
+    ref = match.group("ref")
+    if ref is None:
+        return match.group(0)
+    return json.dumps(LOCAL_SUBS.get("${" + ref + "}", REFERENCE_PLACEHOLDER))
+
+
 def hcl_body_to_json(hcl_body: str) -> str:
     """Convert an HCL object body to compact JSON, returning the JSON string.
 
     The bodies we deal with here are restricted: pure data (strings, lists,
     objects), bare or quoted-string identifier keys, `=` between key and
-    value, no commas, and `${local.x}` interpolations. We:
+    value, no commas, `${local.x}` interpolations, and bare references
+    (`aws_vpc.main.arn`) as values. We:
 
     1. Substitute HCL interpolations with realistic values (so the size we
        report matches what jsonencode emits at apply time).
-    2. Strip line comments.
+    2. Strip line comments, then replace bare references with placeholder
+       strings of representative length.
     3. Quote bare identifier keys: `Effect = ` -> `"Effect": `.
     4. Convert already-quoted keys' `=` to `:` — Terraform condition blocks
        key on the literal AWS condition-key name, which contains a `:` and
@@ -130,12 +157,17 @@ def hcl_body_to_json(hcl_body: str) -> str:
     # inside any string in these policies, so this is safe.
     s = re.sub(r"(?m)\s+#[^\n]*$", "", s)
 
+    # Replace bare references with placeholder strings, leaving quoted strings
+    # untouched (see REFERENCE_PLACEHOLDER).
+    s = _STRING_OR_REFERENCE.sub(_reference_to_string, s)
+
     # Quote bare identifier keys preceding `=`.
     s = re.sub(r"(?m)([A-Za-z_]\w*)(\s*)=", r'"\1"\2:', s)
 
-    # Convert an already-quoted key's `=` to `:` (a quoted key is always the
-    # first non-whitespace token on its line in these policy bodies).
-    s = re.sub(r'(?m)^(\s*"[^"]*")(\s*)=', r"\1\2:", s)
+    # Convert an already-quoted key's `=` to `:`. A quoted key is the first
+    # token on its line, or follows the `{` / `,` of a single-line map such as
+    # `StringEquals = { "ec2:Vpc" = aws_vpc.main.arn }`.
+    s = re.sub(r'(?m)((?:^|[{,])\s*"[^"]*")(\s*)=', r"\1\2:", s)
 
     # Insert commas:
     #   - between `}` and `{` (adjacent objects in a list)
