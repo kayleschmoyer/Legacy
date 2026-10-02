@@ -47,6 +47,11 @@ import {
 } from './closeGameThreshold';
 import { CollapsibleBody } from './CollapsibleBody';
 import { getDefaultEnableAnimations } from './defaultEnableAnimations';
+import {
+  SavedBannerProvider,
+  useSavedBanner,
+  useTriggerSave,
+} from './SavedBannerContext';
 import { useCoalescedSave } from './useCoalescedSave';
 import { useRetryingSave } from './useRetryingSave';
 import { PageMeta } from '../../components/PageMeta';
@@ -893,14 +898,13 @@ function NotificationPreferencesSection({
   isDark,
   isCollapsed,
   onToggleCollapse,
-  onSaved,
 }: {
   cardStyle: React.CSSProperties;
   isDark: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  onSaved: () => void;
 }) {
+  const triggerSave = useTriggerSave();
   const { data, loading, error, refetch, networkStatus, updateQuery } =
     useGetUserNotificationPreferencesQuery({
       notifyOnNetworkStatusChange: true,
@@ -949,7 +953,7 @@ function NotificationPreferencesSection({
   } = useRetryingSave<NotificationPatch>(send, {
     maxAutoRetries: NOTIFICATION_SAVE_MAX_AUTO_RETRIES,
     baseDelayMs: NOTIFICATION_SAVE_RETRY_BASE_MS,
-    onSaved,
+    onSaved: triggerSave,
   });
   const coalesced = useCoalescedSave<NotificationPatch>(
     save,
@@ -1355,8 +1359,7 @@ const PreferencesPage: React.FC = () => {
     ...loadPrefs(),
     theme: themePreference,
   }));
-  const [saved, setSaved] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const { saved, saveFailed, triggerSave } = useSavedBanner();
   const isInitialRender = useRef(true);
 
   // Stats-format preference is persisted server-side so it syncs across devices
@@ -1430,7 +1433,6 @@ const PreferencesPage: React.FC = () => {
         });
       }
       setPrefs((prev) => ({ ...prev, [key]: value }));
-      setSaved(false);
     },
     [setThemePreference, isAuthenticated, updateUserPreferences],
   );
@@ -1441,19 +1443,10 @@ const PreferencesPage: React.FC = () => {
       isInitialRender.current = false;
       return;
     }
-    setSaveFailed(!savePrefs(prefs));
-    setSaved(true);
-    const timer = setTimeout(() => setSaved(false), 2000);
-    return () => clearTimeout(timer);
-  }, [prefs]);
+    triggerSave(savePrefs(prefs));
+  }, [prefs, triggerSave]);
 
   const SaveBannerIcon = saveFailed ? X : Check;
-
-  const flashSaved = useCallback(() => {
-    setSaveFailed(false);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2000);
-  }, []);
 
   return (
     <PageContainer style={pageBackgroundStyle}>
@@ -1654,13 +1647,14 @@ const PreferencesPage: React.FC = () => {
 
           {/* ── Notifications ── */}
           {isAuthenticated ? (
-            <NotificationPreferencesSection
-              cardStyle={cardStyle}
-              isDark={isDark}
-              isCollapsed={collapsedSections.notifications}
-              onToggleCollapse={() => toggleSection('notifications')}
-              onSaved={flashSaved}
-            />
+            <SavedBannerProvider triggerSave={triggerSave}>
+              <NotificationPreferencesSection
+                cardStyle={cardStyle}
+                isDark={isDark}
+                isCollapsed={collapsedSections.notifications}
+                onToggleCollapse={() => toggleSection('notifications')}
+              />
+            </SavedBannerProvider>
           ) : (
             <NotificationsSignInCard cardStyle={cardStyle} />
           )}
