@@ -6,13 +6,15 @@
  * - Default state: annual toggle active, premium price shown
  * - Billing toggle: switching monthly / annual updates price display
  * - Free plan card: $0; "Get Started Free" for signed-out visitors only (LS-7184)
- * - Premium plan card: "Upgrade to Premium" button, "Most Popular" badge
+ * - Premium plan card: "Upgrade to Premium" for free users, "Manage
+ *   subscription" for Premium subscribers (LS-7193), "Most Popular" badge
  * - Feature comparison table: "Compare plans" heading, key rows present
  * - FAQ section: heading visible
  * - No GraphQL calls needed (pricing page is fully static)
  */
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { useTier } from '../fixtures/shared-mocks';
 
 test.describe('Pricing page – page load @regression', () => {
   test('renders page heading and billing toggle', async ({ page }) => {
@@ -46,11 +48,30 @@ test.describe('Pricing page – page load @regression', () => {
       page.getByRole('button', { name: /get started free/i }),
     ).toHaveCount(0);
 
-    // Premium plan
+    // Premium plan — the default hermetic user is a Premium subscriber, who
+    // must see "Manage subscription" rather than a second checkout (LS-7193).
     await expect(page.getByText('PREMIUM').first()).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /upgrade to premium/i }).first(),
+      page.getByRole('button', { name: /manage subscription/i }).first(),
     ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /upgrade to premium/i }),
+    ).toHaveCount(0);
+  });
+
+  test('shows "Upgrade to Premium" on the Premium card for free users', async ({
+    page,
+  }) => {
+    await useTier(page, 'free');
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('button', { name: /upgrade to premium/i }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByRole('button', { name: /manage subscription/i }),
+    ).toHaveCount(0);
   });
 
   test('shows "Most Popular" badge on premium plan', async ({ page }) => {

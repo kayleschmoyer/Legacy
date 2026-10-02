@@ -479,6 +479,77 @@ describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)'
   });
 });
 
+// LS-7193: a Premium subscriber must not be offered a second checkout.
+describe('PricingPage — Premium card CTA by viewer state (LS-7193)', () => {
+  beforeEach(() => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  it('shows "Upgrade to Premium" (card and bottom CTA) to unauthenticated visitors', () => {
+    render(<PricingPage />);
+
+    expect(
+      screen.getAllByRole('button', { name: 'Upgrade to Premium' }),
+    ).toHaveLength(2);
+    expect(screen.queryByText('Manage subscription')).not.toBeInTheDocument();
+  });
+
+  it('shows "Upgrade to Premium" to authenticated free users', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    expect(
+      screen.getAllByRole('button', { name: 'Upgrade to Premium' }),
+    ).toHaveLength(2);
+    expect(screen.queryByText('Manage subscription')).not.toBeInTheDocument();
+  });
+
+  it('replaces "Upgrade to Premium" with "Manage subscription" for premium users', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    const premiumCard = screen.getByTestId('plan-card-premium');
+    expect(
+      within(premiumCard).getByRole('button', { name: 'Manage subscription' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Manage subscription')).toHaveLength(2);
+    expect(
+      screen.queryByRole('button', { name: /upgrade to premium/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows neither CTA while an authenticated user's tier is still loading", () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: true,
+    });
+
+    render(<PricingPage />);
+
+    expect(
+      screen.queryByRole('button', { name: /upgrade to premium/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Manage subscription')).not.toBeInTheDocument();
+  });
+});
+
 // LS-7168: "Save 30%" alone gives screen reader users no idea what it is
 // relative to, so the Annual option's accessible name carries the context.
 describe('PricingPage — annual option accessible name (LS-7168)', () => {

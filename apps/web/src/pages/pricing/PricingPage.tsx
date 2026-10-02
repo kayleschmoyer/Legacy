@@ -526,6 +526,13 @@ export default function PricingPage() {
   const showFreeCta = !isAuthenticated;
   const showCurrentPlan = isAuthenticated && !premiumLoading && !isPremium;
 
+  // LS-7193: an existing Premium subscriber must never be offered a second
+  // checkout, so they get "Manage subscription" instead of "Upgrade to
+  // Premium". While an authenticated user's tier is still loading we render
+  // neither CTA rather than flash an upgrade prompt at a subscriber.
+  const showUpgradeCta = !isAuthenticated || (!premiumLoading && !isPremium);
+  const showManageCta = isAuthenticated && !premiumLoading && isPremium;
+
   const prices = useStripePrices();
   const monthlyPrice = prices.monthlyPrice;
   const annualTotal = prices.annualTotal.toFixed(2);
@@ -813,9 +820,19 @@ export default function PricingPage() {
                 )}
               </PlanHeader>
 
-              <ActionButton onPress={() => navigate('/profile/subscription')}>
-                Upgrade to Premium
-              </ActionButton>
+              {showUpgradeCta && (
+                <ActionButton onPress={() => navigate('/profile/subscription')}>
+                  Upgrade to Premium
+                </ActionButton>
+              )}
+              {showManageCta && (
+                <OutlineButton
+                  data-testid="premium-plan-manage"
+                  onPress={() => navigate('/profile/subscription')}
+                >
+                  Manage subscription
+                </OutlineButton>
+              )}
 
               <Separator />
 
@@ -1108,12 +1125,23 @@ export default function PricingPage() {
               fantasy baseball experience.
             </Paragraph>
             <XStack gap="$4" flexWrap="wrap" justifyContent="center">
-              <ActionButton
-                onPress={() => navigate('/profile/subscription')}
-                minWidth={200}
-              >
-                Upgrade to Premium
-              </ActionButton>
+              {showUpgradeCta && (
+                <ActionButton
+                  onPress={() => navigate('/profile/subscription')}
+                  minWidth={200}
+                >
+                  Upgrade to Premium
+                </ActionButton>
+              )}
+              {showManageCta && (
+                <OutlineButton
+                  data-testid="premium-bottom-manage"
+                  onPress={() => navigate('/profile/subscription')}
+                  width={200}
+                >
+                  Manage subscription
+                </OutlineButton>
+              )}
               {showFreeCta && (
                 <OutlineButton onPress={navigateToHome} width={180}>
                   Get Started Free
