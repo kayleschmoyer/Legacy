@@ -49,6 +49,19 @@ function shQuote(value) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// LS-10350: msys/Git-for-Windows `xargs` aborts at startup (exit 134,
+// `assertion "bc_ctl.arg_max >= LINE_MAX" failed`) when the inherited
+// environment is large enough to eat its ARG_MAX headroom — which it is inside
+// the full `test:github-scripts` run. The pipeline needs nothing from the
+// environment beyond locating bash/xargs and a temp dir, so run it with only
+// those variables instead of inheriting the caller's.
+const PIPELINE_ENV = Object.fromEntries(
+  ['PATH', 'TMP', 'TEMP', 'SYSTEMROOT']
+    .filter((name) => process.env[name] !== undefined)
+    .map((name) => [name, process.env[name]]),
+);
+const XARGS_ARG_MAX_ABORT = /bc_ctl\.arg_max >= LINE_MAX/;
+
 function runPipeline({ filter, downstream }) {
   const dir = mkdtempSync(join(tmpdir(), 'ls8207-'));
   try {
@@ -59,7 +72,18 @@ function runPipeline({ filter, downstream }) {
         | ${filter} \\
         | xargs -0 -r ${downstream}
     `;
-    return spawnSync('bash', ['-c', script], { encoding: 'utf8' });
+    const result = spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      env: PIPELINE_ENV,
+    });
+    // An xargs startup abort says nothing about the filter under test. Fail
+    // loudly rather than let it satisfy the `notEqual(status, 0)` assertions.
+    assert.doesNotMatch(
+      result.stderr ?? '',
+      XARGS_ARG_MAX_ABORT,
+      'xargs aborted on the msys ARG_MAX assertion — the pipeline never ran (LS-10350)',
+    );
+    return result;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
