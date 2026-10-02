@@ -37,14 +37,48 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
   const Passthrough = ({ children }: ChildrenProps) => <div>{children}</div>;
   return {
     AvatarPicker: () => null,
-    Dialog: () => null,
+    Dialog: ({
+      open,
+      title,
+      confirmLabel,
+      cancelLabel,
+      onConfirm,
+      onCancel,
+    }: {
+      open?: boolean;
+      title: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      onConfirm?: () => void;
+      onCancel?: () => void;
+    }) =>
+      open ? (
+        <div role="dialog" aria-label={title}>
+          <button onClick={onCancel}>{cancelLabel}</button>
+          <button onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      ) : null,
     H1: Passthrough,
     Paragraph: Passthrough,
     Separator: () => <hr />,
     XStack: Passthrough,
-    YStack: Passthrough,
+    YStack: ({
+      children,
+      onPress,
+    }: ChildrenProps & { onPress?: () => void }) => (
+      <div onClick={onPress}>{children}</div>
+    ),
   };
 });
+
+const mockSignOut = jest.fn();
+jest.mock('./signOut', () => ({
+  signOut: (...args: unknown[]): unknown => mockSignOut(...args),
+}));
+
+jest.mock('../../utils/analytics', () => ({
+  trackSignOut: jest.fn(),
+}));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   AuthService: jest.fn(),
@@ -163,5 +197,40 @@ describe('ProfileSettingsPage username save in flight (LS-7237)', () => {
     rerender(<ProfileSettingsPage />);
 
     expect(fireBeforeUnload().defaultPrevented).toBe(false);
+  });
+});
+
+describe('ProfileSettingsPage sign-out confirmation (LS-7221)', () => {
+  beforeEach(() => {
+    mockSignOut.mockReset();
+  });
+
+  it('asks for confirmation instead of signing out immediately', () => {
+    renderPage(null);
+
+    fireEvent.click(screen.getByText('Sign Out'));
+
+    expect(screen.getByRole('dialog', { name: 'Sign out?' })).toBeVisible();
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('signs out once the user confirms', () => {
+    renderPage(null);
+
+    fireEvent.click(screen.getByText('Sign Out'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('stays signed in when the user cancels', () => {
+    renderPage(null);
+
+    fireEvent.click(screen.getByText('Sign Out'));
+    fireEvent.click(screen.getByRole('button', { name: 'Stay signed in' }));
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

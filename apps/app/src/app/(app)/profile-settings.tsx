@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import {
   AvatarImage,
   AvatarPicker,
+  Dialog,
   formatDisplayName,
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -55,6 +56,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   const subscriptionWarning = getSubscriptionWarning(subscription, isPremium);
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
   // Fetch full user data (including avatarUrl)
   const userId = currentUser?.id;
@@ -82,6 +84,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   useSystemBackAction(loggingOut, () => undefined);
 
   const handleLogout = async () => {
+    setConfirmingSignOut(false);
     setLoggingOut(true);
     trackSignOut('profile_settings');
     try {
@@ -599,12 +602,24 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 <Button
                   backgroundColor={brand.seamRed}
                   color="white"
-                  onPress={handleLogout}
+                  onPress={() => setConfirmingSignOut(true)}
                   disabled={loggingOut}
                   paddingHorizontal="$5"
                 >
                   {loggingOut ? 'Signing out...' : 'Sign Out'}
                 </Button>
+                <Dialog
+                  open={confirmingSignOut}
+                  onOpenChange={setConfirmingSignOut}
+                  eyebrow="Account"
+                  title="Sign out?"
+                  description="You will be signed out of this device and redirected to the login page."
+                  confirmLabel="Sign out"
+                  cancelLabel="Stay signed in"
+                  destructive
+                  onCancel={() => setConfirmingSignOut(false)}
+                  onConfirm={() => void handleLogout()}
+                />
               </XStack>
             </YStack>
           </YStack>

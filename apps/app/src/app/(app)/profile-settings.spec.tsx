@@ -53,12 +53,44 @@ jest.mock('expo-router', () => {
 });
 
 jest.mock('@legacy-sports/shared-components', () => {
-  const { View } =
+  const { View, Text } =
     jest.requireActual<typeof import('react-native')>('react-native');
   const React = jest.requireActual<typeof import('react')>('react');
   return {
     AvatarImage: () => React.createElement(View, { testID: 'avatar-image' }),
     AvatarPicker: () => React.createElement(View, { testID: 'avatar-picker' }),
+    Dialog: ({
+      open,
+      title,
+      confirmLabel,
+      cancelLabel,
+      onConfirm,
+      onCancel,
+    }: {
+      open?: boolean;
+      title: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      onConfirm?: () => void;
+      onCancel?: () => void;
+    }) =>
+      open
+        ? React.createElement(
+            View,
+            { testID: 'confirm-dialog' },
+            React.createElement(Text, null, title),
+            React.createElement(
+              Text,
+              { testID: 'confirm-dialog-cancel', onPress: onCancel },
+              cancelLabel,
+            ),
+            React.createElement(
+              Text,
+              { testID: 'confirm-dialog-confirm', onPress: onConfirm },
+              confirmLabel,
+            ),
+          )
+        : null,
     formatDisplayName: (username: string): string =>
       /^[^@]+@[^@]+\.[^@]+$/.test(username) ? username.split('@')[0] : username,
   };
@@ -384,9 +416,25 @@ describe('ProfileSettingsScreen', () => {
   });
 
   describe('sign out', () => {
-    it('calls logout when the Sign Out button is pressed', async () => {
+    it('asks for confirmation instead of logging out immediately (LS-7221)', () => {
       render(<ProfileSettingsScreen />);
       fireEvent.press(screen.getByText('Sign Out'));
+      expect(screen.getByTestId('confirm-dialog')).toBeTruthy();
+      expect(mockLogout).not.toHaveBeenCalled();
+    });
+
+    it('does not log out when the confirmation is cancelled (LS-7221)', () => {
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Sign Out'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-cancel'));
+      expect(screen.queryByTestId('confirm-dialog')).toBeNull();
+      expect(mockLogout).not.toHaveBeenCalled();
+    });
+
+    it('calls logout once the sign-out is confirmed', async () => {
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Sign Out'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-confirm'));
       await waitFor(() => {
         expect(mockLogout).toHaveBeenCalled();
       });
@@ -430,6 +478,7 @@ describe('ProfileSettingsScreen', () => {
         );
         render(<ProfileSettingsScreen />);
         fireEvent.press(screen.getByText('Sign Out'));
+        fireEvent.press(screen.getByTestId('confirm-dialog-confirm'));
 
         await waitFor(() => {
           expect(screen.getByText('Signing out...')).toBeTruthy();

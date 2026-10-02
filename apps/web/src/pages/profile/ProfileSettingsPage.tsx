@@ -232,7 +232,9 @@ function getAccessBadgeColor(level: string): string {
 const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const handleSignOut = () => {
+    setConfirmingSignOut(false);
     trackSignOut('profile_settings');
     signOut(auth);
   };
@@ -1088,7 +1090,7 @@ const ProfileSettingsPage: React.FC = () => {
                 <SignOutButton
                   role="button"
                   tabIndex={0}
-                  onPress={handleSignOut}
+                  onPress={() => setConfirmingSignOut(true)}
                   onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
                     if (e.repeat) {
                       return;
@@ -1097,7 +1099,7 @@ const ProfileSettingsPage: React.FC = () => {
                       if (e.key === ' ') {
                         e.preventDefault();
                       }
-                      handleSignOut();
+                      setConfirmingSignOut(true);
                     }
                   }}
                 >
@@ -1109,6 +1111,18 @@ const ProfileSettingsPage: React.FC = () => {
                     Sign Out
                   </Paragraph>
                 </SignOutButton>
+                <Dialog
+                  open={confirmingSignOut}
+                  onOpenChange={setConfirmingSignOut}
+                  eyebrow="Account"
+                  title="Sign out?"
+                  description="You will be signed out of this device and redirected to the login page."
+                  confirmLabel="Sign out"
+                  cancelLabel="Stay signed in"
+                  destructive
+                  onCancel={() => setConfirmingSignOut(false)}
+                  onConfirm={handleSignOut}
+                />
               </XStack>
             </SectionBody>
           </SectionCard>
