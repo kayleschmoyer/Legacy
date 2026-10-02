@@ -478,3 +478,43 @@ describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)'
     ).not.toBeInTheDocument();
   });
 });
+
+// LS-7168: "Save 30%" alone gives screen reader users no idea what it is
+// relative to, so the Annual option's accessible name carries the context.
+describe('PricingPage — annual option accessible name (LS-7168)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('names the savings relative to monthly billing', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 9.99,
+      annualTotal: 99.99,
+      annualSavingsPct: '17%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+    render(<PricingPage />);
+
+    expect(
+      screen.getByRole('radio', {
+        name: 'Annual billing, save 17% compared with monthly',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the percentage from the name while prices are loading', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 9.99,
+      annualTotal: 99.99,
+      annualSavingsPct: '17%',
+      trialPeriodDays: 0,
+      loading: true,
+    });
+    render(<PricingPage />);
+
+    expect(
+      screen.getByRole('radio', { name: 'Annual billing' }),
+    ).toBeInTheDocument();
+  });
+});

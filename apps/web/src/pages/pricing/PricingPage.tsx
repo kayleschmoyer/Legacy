@@ -630,6 +630,11 @@ export default function PricingPage() {
                 onPress={() => setIsAnnual(true)}
                 role="radio"
                 aria-checked={isAnnual}
+                aria-label={
+                  pricesLoading
+                    ? 'Annual billing'
+                    : `Annual billing, save ${ANNUAL_SAVINGS_PCT} compared with monthly`
+                }
                 tabIndex={isAnnual ? 0 : -1}
                 onKeyDown={onSelectKey(() => setIsAnnual(true))}
               >
