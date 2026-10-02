@@ -53,9 +53,24 @@ function isOriginAllowed(origin: string, allowed: Set<string>): boolean {
 }
 
 /**
+ * True if `origin` is this API's own origin (derived from the request's Host
+ * header, so there is no static list to go stale). A same-origin request needs
+ * no CORS headers, so it is neither reflected nor worth a Rollbar warning —
+ * Rollbar #215 (LS-9160, LS-10065, LS-10373) was `https://api.legacy-fantasy.com`
+ * hitting `https://api.legacy-fantasy.com`, e.g. a page or scanner that sends
+ * Origin equal to Host.
+ */
+function isSameOrigin(event: APIGatewayProxyEvent, origin: string): boolean {
+  const host = event.headers?.Host ?? event.headers?.host;
+  return !!host && origin.toLowerCase() === `https://${host.toLowerCase()}`;
+}
+
+/**
  * Build CORS + security headers for a request, reflecting the validated origin.
  * If the request origin is not in the allowlist, Access-Control-Allow-Origin is
- * omitted so the browser rejects the cross-origin response.
+ * omitted so the browser rejects the cross-origin response. A same-origin
+ * request is also left without Access-Control-Allow-Origin (the browser does
+ * not need it) but is not reported as a rejection.
  */
 export function getCorsHeaders(
   event: APIGatewayProxyEvent,
@@ -78,7 +93,7 @@ export function getCorsHeaders(
   if (origin && isOriginAllowed(origin, allowed)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Vary'] = 'Origin';
-  } else if (origin) {
+  } else if (origin && !isSameOrigin(event, origin)) {
     LOGGER.warn(
       'CORS: rejected unrecognized origin — check CORS_ALLOWED_ORIGINS env var',
       { origin },

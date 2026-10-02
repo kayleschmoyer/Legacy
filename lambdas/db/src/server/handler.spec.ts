@@ -14,10 +14,13 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
+// Stable across jest.resetModules() so tests can assert on it.
+const mockCaptureWarning = jest.fn();
+
 jest.mock('@legacy-sports/rollbar', () => ({
   addBreadcrumb: jest.fn(),
   captureError: jest.fn(),
-  captureWarning: jest.fn(),
+  captureWarning: mockCaptureWarning,
 }));
 
 function eventWithOrigin(origin: string | undefined): APIGatewayProxyEvent {
@@ -87,6 +90,36 @@ describe('getCorsHeaders', () => {
       eventWithOrigin('https://api.legacy-fantasy.com'),
     );
     expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+  });
+
+  // LS-10373 — Rollbar #215 recurred with Origin https://api.legacy-fantasy.com
+  // (the API's own host). Same-origin needs no CORS headers and is not a
+  // rejection worth a warning; a genuinely foreign origin still is.
+  it('does not report a same-origin request (Origin equals Host) as a rejection', () => {
+    process.env.CORS_ALLOWED_ORIGINS = 'https://legacy-fantasy.com';
+    mockCaptureWarning.mockClear();
+    const { getCorsHeaders } = require('./handler');
+    const headers = getCorsHeaders({
+      headers: {
+        Origin: 'https://api.legacy-fantasy.com',
+        Host: 'api.legacy-fantasy.com',
+      },
+    });
+    expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+  });
+
+  it('still reports a foreign origin when the Host differs', () => {
+    process.env.CORS_ALLOWED_ORIGINS = 'https://legacy-fantasy.com';
+    mockCaptureWarning.mockClear();
+    const { getCorsHeaders } = require('./handler');
+    getCorsHeaders({
+      headers: {
+        Origin: 'https://evil.example',
+        Host: 'api.legacy-fantasy.com',
+      },
+    });
+    expect(mockCaptureWarning).toHaveBeenCalledTimes(1);
   });
 
   it('omits Access-Control-Allow-Origin when no Origin header is present', () => {
