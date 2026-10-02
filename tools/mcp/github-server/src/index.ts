@@ -490,23 +490,25 @@ export function createServer(): McpServer {
   // --- github_get_repo_info ---
   server.tool(
     'github_get_repo_info',
-    'Get repo info: owner, name, default branch, URL. Optional "include": "rulesets" and/or "actions_permissions", for workflow-403 triage without a raw `gh api` call.',
+    'Get repo owner, name, default branch, URL. "include" adds rulesets, workflow permissions, or Actions cache usage vs 10 GB with entries by key prefix.',
     {
       include: z
-        .array(z.enum(['rulesets', 'actions_permissions']))
-        .optional()
-        .describe('Extra data to include beyond the default repo card.'),
+        .array(z.enum(['rulesets', 'actions_permissions', 'actions_cache']))
+        .optional(),
       includesParents: z
         .boolean()
         .optional()
-        .describe(
-          'Rulesets "includes_parents" query param. Only used with include: ["rulesets"].',
-        ),
+        .describe('Rulesets "includes_parents" param.'),
+      cacheLimit: z
+        .number()
+        .optional()
+        .describe('Max actions_cache rows (default 30).'),
     },
     async (params) =>
       getRepoInfo({
         include: params.include,
         includesParents: params.includesParents,
+        cacheLimit: params.cacheLimit,
       }),
   );
 

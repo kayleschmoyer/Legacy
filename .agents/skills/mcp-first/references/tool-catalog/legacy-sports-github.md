@@ -187,12 +187,13 @@ Read the contents of a file at a specific git ref (branch, tag, or commit SHA) w
 
 ### `github_get_repo_info`
 
-Get repo info: owner, name, default branch, URL. Optional "include": "rulesets" and/or "actions_permissions", for workflow-403 triage without a raw `gh api` call.
+Get repo owner, name, default branch, URL. "include" adds rulesets, workflow permissions, or Actions cache usage vs 10 GB with entries by key prefix.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `include` | enum[] |  | — | Extra data to include beyond the default repo card. |
-| `includesParents` | boolean |  | — | Rulesets "includes_parents" query param. Only used with include: ["rulesets"]. |
+| `include` | enum[] |  | — | — |
+| `includesParents` | boolean |  | — | Rulesets "includes_parents" param. |
+| `cacheLimit` | number |  | — | Max actions_cache rows (default 30). |
 
 ### `github_get_review_threads`
 

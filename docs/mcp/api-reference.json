@@ -5054,7 +5054,7 @@
         },
         {
           "name": "github_get_repo_info",
-          "description": "Get repo info: owner, name, default branch, URL. Optional \"include\": \"rulesets\" and/or \"actions_permissions\", for workflow-403 triage without a raw `gh api` call.",
+          "description": "Get repo owner, name, default branch, URL. \"include\" adds rulesets, workflow permissions, or Actions cache usage vs 10 GB with entries by key prefix.",
           "inputs": {
             "include": {
               "type": "array",
@@ -5064,15 +5064,20 @@
                 "optional": false,
                 "enum": [
                   "rulesets",
-                  "actions_permissions"
+                  "actions_permissions",
+                  "actions_cache"
                 ]
-              },
-              "description": "Extra data to include beyond the default repo card."
+              }
             },
             "includesParents": {
               "type": "boolean",
               "optional": true,
-              "description": "Rulesets \"includes_parents\" query param. Only used with include: [\"rulesets\"]."
+              "description": "Rulesets \"includes_parents\" param."
+            },
+            "cacheLimit": {
+              "type": "number",
+              "optional": true,
+              "description": "Max actions_cache rows (default 30)."
             }
           },
           "transports": [
