@@ -16,11 +16,13 @@ set -uo pipefail
 #  - Emits ONLY actionable transitions, never raw status dumps (the harness
 #    auto-stops monitors that emit too much; a killed watch = silent stall).
 #  - Polls `gh pr view --json ... statusCheckRollup`, which carries BOTH check
-#    runs AND commit statuses. Half the merge gate (bot-review, CI Gate — see
-#    .github/ruleset.json) is commit statuses that go ABSENT when the pipeline
-#    never fires, not red — hence the explicit stall emission below.
+#    runs AND commit statuses. The merge gate (bot-review, CI Gate, No Merge
+#    Conflicts, Verify All Migrations Applied — see .github/ruleset.json) is all
+#    commit statuses that go ABSENT when the pipeline never fires, not red —
+#    hence the explicit stall emission below.
 #  - Conflict detection is corroborated: mergeable==CONFLICTING or the
-#    newest "No Merge Conflicts" run red, held for 2 consecutive polls. The
+#    "No Merge Conflicts" commit status red (FAILURE/ERROR), held for 2
+#    consecutive polls; the once-key re-arms while clear. The
 #    "CI: Conflicts" label alone is never a trigger — it is a multi-writer flag
 #    that flaps (see check-conflicts-sweep.yml header, LS-8229).
 #  - Every way the watch can end produces a line (loud death): terminal PR
@@ -268,13 +270,20 @@ def _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs):
         elif t == "StatusContext":
             statuses[node.get("context", "")] = node.get("state", "")
 
+    RED_STATUS = ("FAILURE", "ERROR")
+
     labels = {l.get("name", "") for l in (cur.get("labels") or [])}
     prev_labels = set(prev.get("labels", []))
 
     # --- Conflict (corroborated + debounced; label is never the trigger) ---
-    nmc = checks.get("No Merge Conflicts")
-    nmc_red = bool(nmc and nmc.get("conclusion") == "FAILURE")
+    # "No Merge Conflicts" is a COMMIT STATUS (StatusContext), not a check run
+    # (LS-9604; .github/ruleset.json) — read it from `statuses` (LS-10374).
+    nmc_red = statuses.get("No Merge Conflicts") in RED_STATUS
     conflicting = cur.get("mergeable") == "CONFLICTING" or nmc_red
+    if not conflicting:
+        # Re-arm: a conflict that clears and returns on the same head SHA must be
+        # announced again, so drop the persisted once-key while it is clear.
+        emitted.discard(f"conflict:{sha}")
     emit_debounced(
         f"conflict:{sha}",
         f"conflict: PR #{pr} has merge conflicts with main on {sha} "
@@ -286,11 +295,8 @@ def _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs):
     # --- Red required contexts + early-signal CI Pipeline checks (debounced) ---
     RED_CHECK = {"FAILURE", "TIMED_OUT"}
     for name, node in checks.items():
-        if name == "No Merge Conflicts":
-            continue  # handled above
-        required = name == "Verify All Migrations Applied"
         early = name.startswith("\U0001F680 CI Pipeline /")
-        if (required or early) and node.get("conclusion") in RED_CHECK:
+        if early and node.get("conclusion") in RED_CHECK:
             emit_debounced(
                 f"red:{name}:{sha}",
                 f"check red: '{name}' = {node.get('conclusion')} on {sha} — triage per ci-event-response.md (ci_list_runs → ci_get_logs).",
@@ -298,14 +304,16 @@ def _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs):
             )
         else:
             pending.pop(f"red:{name}:{sha}", None)
-    for ctx in ("bot-review", "CI Gate"):
+    # "No Merge Conflicts" is excluded: red is the conflict signal handled above.
+    # "Verify All Migrations Applied" is a commit status too (LS-9776).
+    for ctx in ("bot-review", "CI Gate", "Verify All Migrations Applied"):
         st = statuses.get(ctx)
         emit_debounced(
             f"red-status:{ctx}:{sha}",
             f"status red: '{ctx}' = {st} on {sha} — "
             + ("fetch review threads and respond per Author Agent Contract." if ctx == "bot-review"
                else "the CI pipeline failed; triage per ci-event-response.md."),
-            st in ("FAILURE", "ERROR"),
+            st in RED_STATUS,
         )
 
     # --- Label transitions (post-baseline only; adds of escalation/CI labels) ---
@@ -346,20 +354,14 @@ def _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs):
                           f"review: {r.get('author', {}).get('login', '?')} submitted {r.get('state', '?')} on PR #{pr} — respond per Author Agent Contract (FIX:/JUSTIFY:), then re-apply bot:ready-for-review.")
 
     # --- All-required-terminal summary (once per head SHA) ---
-    REQUIRED_STATUSES = ("bot-review", "CI Gate")
-    REQUIRED_CHECKS = ("No Merge Conflicts", "Verify All Migrations Applied")
+    # All four merge-gate contexts are commit statuses (.github/ruleset.json).
+    REQUIRED_STATUSES = ("bot-review", "CI Gate", "No Merge Conflicts", "Verify All Migrations Applied")
     gate = {}
     all_terminal = True
     for ctx in REQUIRED_STATUSES:
-        st = statuses.get(ctx, "ABSENT")
+        st = statuses.get(ctx) or "ABSENT"
         gate[ctx] = st
         if st in ("ABSENT", "PENDING", "EXPECTED"):
-            all_terminal = False
-    for name in REQUIRED_CHECKS:
-        node = checks.get(name)
-        concl = (node or {}).get("conclusion") or "ABSENT"
-        gate[name] = concl
-        if concl in ("ABSENT", "") or (node or {}).get("status") not in ("COMPLETED", None):
             all_terminal = False
     if all_terminal and not cur.get("isDraft"):
         summary = ", ".join(f"{k}={v}" for k, v in gate.items())
