@@ -374,6 +374,43 @@ describe('ProfileSettingsScreen', () => {
       });
     });
 
+    // Boundary parity with web (LS-7671): both platforms share validateUsername.
+    it.each([
+      ['51 characters', 'a'.repeat(51)],
+      ['emoji', 'user😀name'],
+      ['interior whitespace', 'user name'],
+    ])(
+      'rejects a username with %s without calling the mutation',
+      async (_label, value) => {
+        mockUpdateUsername.mockClear();
+        render(<ProfileSettingsScreen />);
+        fireEvent.press(screen.getByText('Edit'));
+        fireEvent.changeText(screen.getByDisplayValue('testuser'), value);
+        fireEvent.press(screen.getByText('Save'));
+        await waitFor(() => {
+          expect(screen.getByText(/Username must be/)).toBeTruthy();
+        });
+        expect(mockUpdateUsername).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['3 characters', 'abc'],
+      ['50 characters', 'a'.repeat(50)],
+      ['a leading dot', '.hidden'],
+    ])('accepts a username with %s', async (_label, value) => {
+      mockUpdateUsername.mockClear();
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Edit'));
+      fireEvent.changeText(screen.getByDisplayValue('testuser'), value);
+      fireEvent.press(screen.getByText('Save'));
+      await waitFor(() => {
+        expect(mockUpdateUsername).toHaveBeenCalledWith({
+          variables: { username: value },
+        });
+      });
+    });
+
     it('calls the updateUsername mutation with the trimmed new username', async () => {
       render(<ProfileSettingsScreen />);
       fireEvent.press(screen.getByText('Edit'));

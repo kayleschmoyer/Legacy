@@ -368,6 +368,21 @@ class ProfileSurface {
     await this.#driver.byRole('button', { name: 'Set as primary' }).tap();
   }
 
+  /** Enter username edit mode and replace the input value with `value`. */
+  async editUsername(value: string): Promise<void> {
+    await this.#driver.byText('Edit', { exact: true }).first().tap();
+    await this.#driver.byLabel('Username', { exact: true }).fill(value);
+  }
+
+  /** Click the username editor's "Save" button. */
+  async saveUsername(): Promise<void> {
+    // The username editor precedes the other "Save" button on the page.
+    await this.#driver
+      .byRole('button', { name: 'Save', exact: true })
+      .first()
+      .tap();
+  }
+
   /** Click "Enable 2FA" (waits for it to be actionable first). */
   async clickEnable2fa(timeout = 10_000): Promise<void> {
     await this.#enable2fa.expectVisible({ timeout });
@@ -422,6 +437,11 @@ class ProfileSurface {
   /** Assert the Username field label is visible. */
   async expectUsernameField(): Promise<void> {
     await this.#driver.byText('Username', { exact: true }).expectVisible();
+  }
+
+  /** Assert a username validation error (exact copy or pattern) is shown. */
+  async expectUsernameError(message: string | RegExp): Promise<void> {
+    await this.#driver.byText(message).expectVisible();
   }
 
   /** Assert the Email field label is visible. */

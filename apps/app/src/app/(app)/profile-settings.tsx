@@ -25,6 +25,7 @@ import {
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
+import { validateUsername } from '@legacy-sports/utils';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
@@ -35,8 +36,6 @@ import {
 } from '../../features/subscription';
 import { trackSignOut } from '../../utils/analytics';
 import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
-
-const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
 
 function getAccessLevelLabel(level: string): string {
   switch (level) {
@@ -101,15 +100,15 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   }, [user?.username, currentUser?.username]);
 
   const handleSaveUsername = useCallback(async () => {
-    const trimmed = usernameInput.trim();
-    if (!USERNAME_REGEX.test(trimmed)) {
+    const validation = validateUsername(usernameInput);
+    if (!validation.valid) {
       setUsernameError(
         'Username must be 3-50 characters: letters, numbers, _, -, or .',
       );
       return;
     }
     try {
-      await updateUsername({ variables: { username: trimmed } });
+      await updateUsername({ variables: { username: validation.username } });
       await refetchUser();
       setEditingUsername(false);
       setUsernameError(null);

@@ -111,6 +111,68 @@ test.describe('Profile Settings Page @smoke', () => {
     await settingsPage.profile.expectUsernameField();
   });
 
+  // Username boundary rule (LS-7671): shared with native via validateUsername.
+  // The input has maxLength=50, so the 51-char boundary is covered by the
+  // validator unit spec; here we cover the too-short and bad-character paths.
+  test('should reject a 2-character username without calling the API', async ({
+    page,
+    settingsPage,
+  }) => {
+    await setupProfileGraphQL(page);
+    // Registered after the shared mock: Playwright runs the most recently
+    // registered matching route first, so this spy sees UpdateUsername and
+    // falls back to the shared mock for everything else.
+    let updateUsernameCalls = 0;
+    await page.route(
+      (url) => isGraphQLEndpoint(url),
+      async (route, request) => {
+        const body = request.postDataJSON() as { operationName?: string };
+        if (body.operationName === 'UpdateUsername') {
+          updateUsernameCalls += 1;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                updateUsername: {
+                  __typename: 'User',
+                  id: 1,
+                  username: 'ab',
+                },
+              },
+            }),
+          });
+          return;
+        }
+        await route.fallback();
+      },
+    );
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.editUsername('ab');
+    await settingsPage.profile.saveUsername();
+
+    await settingsPage.profile.expectUsernameError(
+      'Username must be between 3 and 50 characters',
+    );
+    expect(updateUsernameCalls).toBe(0);
+  });
+
+  test('should reject a username with emoji and show the character-set error', async ({
+    page,
+    settingsPage,
+  }) => {
+    await setupProfileGraphQL(page);
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.editUsername('user😀name');
+    await settingsPage.profile.saveUsername();
+
+    await settingsPage.profile.expectUsernameError(
+      'Only letters, numbers, underscores, hyphens, and periods allowed',
+    );
+  });
+
   test('should display email field', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
     await settingsPage.profile.goto();

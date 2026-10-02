@@ -23,6 +23,7 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
+import { validateUsername } from '@legacy-sports/utils';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
@@ -344,17 +345,16 @@ const ProfileSettingsPage: React.FC = () => {
   }, [dbUsername]);
 
   const handleUsernameSave = useCallback(() => {
-    const trimmed = editedUsername.trim();
-    if (trimmed.length < 3 || trimmed.length > 50) {
-      setUsernameError('Username must be between 3 and 50 characters');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_.-]+$/.test(trimmed)) {
+    const validation = validateUsername(editedUsername);
+    if (!validation.valid) {
       setUsernameError(
-        'Only letters, numbers, underscores, hyphens, and periods allowed',
+        validation.reason === 'length'
+          ? 'Username must be between 3 and 50 characters'
+          : 'Only letters, numbers, underscores, hyphens, and periods allowed',
       );
       return;
     }
+    const trimmed = validation.username;
     if (trimmed === dbUsername) {
       setEditedUsername(dbUsername);
       setUsernameError(null);

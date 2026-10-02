@@ -27,6 +27,9 @@ export * from './lib/percentage';
 // silently `undefined` on device rather than throwing at import — same
 // barrel-drift root cause as formatDraftDate above.
 export * from './lib/sport-defaults';
+// Shared username rule consumed by the native profile-settings editor (LS-7671);
+// missing here it is `undefined` on device.
+export * from './lib/username-validation';
 // Pure, Hermes-safe string helpers consumed by shared-components (OnThisDayFeed).
 // These must be re-exported here — Metro resolves '@legacy-sports/utils' to this
 // file via the package "react-native" field, so anything missing here is
