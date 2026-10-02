@@ -38,10 +38,33 @@ export const SYNC_BUDGET_MS = 45_000;
 /** Process-level timeout backstop for the plan+show job — terraform/main plans commonly take 2-6 minutes. */
 const DEFAULT_PLAN_TIMEOUT_MS = 900_000; // 15 minutes
 
+/** Cap on the serialized size of all `changes` entries in one `detail: true` result. */
+export const MAX_DETAIL_CHARS = 20_000;
+
+/** Cap on a single before/after value in a `detail: true` result. */
+export const MAX_DETAIL_VALUE_CHARS = 200;
+
+export const SENSITIVE_PLACEHOLDER = '(sensitive)';
+export const UNKNOWN_PLACEHOLDER = '(known after apply)';
+
+export const RUNNER_LAMBDAS_REMEDY =
+  'Runner Lambda zips are missing under terraform/runners/lambdas. Run `make runner-lambdas-sync` ' +
+  '(make_run({ target: "runner-lambdas-sync" })), then re-run terraform_plan.';
+
+export interface AttributeChange {
+  attr: string;
+  before?: unknown;
+  after?: unknown;
+}
+
 export interface PlannedResource {
   address: string;
   action: 'create' | 'update' | 'delete' | 'replace';
   forcesReplacementOn?: string[];
+  /** Only with `detail: true` — changed attributes, sensitive values redacted. */
+  changes?: AttributeChange[];
+  /** Only with `detail: true` — set when MAX_DETAIL_CHARS cut this resource's `changes` short. */
+  changesTruncated?: true;
 }
 
 export interface PlanSummary {
@@ -56,19 +79,151 @@ interface TerraformShowJson {
     change: {
       actions: string[];
       replace_paths?: unknown[];
+      before?: unknown;
+      after?: unknown;
+      after_unknown?: unknown;
+      before_sensitive?: unknown;
+      after_sensitive?: unknown;
     };
   }>;
+}
+
+type Container = Record<string, unknown> | unknown[];
+
+function isContainer(value: unknown): value is Container {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Child of a before/after/sensitivity-mask node; masks are `true`/`false` at or above the leaves they describe. */
+function childOf(node: unknown, key: string): unknown {
+  if (!isContainer(node)) return undefined;
+  return (node as Record<string, unknown>)[key];
+}
+
+function capValue(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  const isString = typeof value === 'string';
+  if (!isString && !isContainer(value)) return value;
+  const text = isString ? value : JSON.stringify(value);
+  if (text.length <= MAX_DETAIL_VALUE_CHARS) return isString ? value : text;
+  return `${text.slice(0, MAX_DETAIL_VALUE_CHARS)}…(+${text.length - MAX_DETAIL_VALUE_CHARS} chars)`;
+}
+
+interface ChangeNode {
+  before: unknown;
+  after: unknown;
+  unknown: unknown;
+  beforeSensitive: unknown;
+  afterSensitive: unknown;
+}
+
+/**
+ * Walk a resource_changes[].change before/after pair and collect the leaf
+ * attributes that differ. `terraform show -json` carries sensitive values in
+ * plaintext alongside before_sensitive/after_sensitive masks, so anything a
+ * mask marks is replaced with a placeholder before it can reach the result.
+ */
+function collectChanges(
+  node: ChangeNode,
+  path: string,
+  out: AttributeChange[],
+): void {
+  const { before, after, unknown, beforeSensitive, afterSensitive } = node;
+  const attr = path || '(root)';
+
+  if (beforeSensitive === true || afterSensitive === true) {
+    if (
+      unknown === true ||
+      JSON.stringify(before ?? null) !== JSON.stringify(after ?? null)
+    ) {
+      out.push({
+        attr,
+        before: SENSITIVE_PLACEHOLDER,
+        after: SENSITIVE_PLACEHOLDER,
+      });
+    }
+    return;
+  }
+
+  if (unknown === true) {
+    // The mask can be `true` above a subtree whose sensitive leaves are only
+    // marked deeper down, so `before` is not safe to print unless no part of
+    // its sensitivity mask is set.
+    const beforeHasSensitive = JSON.stringify(
+      beforeSensitive ?? false,
+    ).includes('true');
+    out.push({
+      attr,
+      before: beforeHasSensitive ? SENSITIVE_PLACEHOLDER : capValue(before),
+      after: UNKNOWN_PLACEHOLDER,
+    });
+    return;
+  }
+
+  const beforeIsContainer = isContainer(before);
+  const afterIsContainer = isContainer(after);
+  const sameShape =
+    (beforeIsContainer || before === null || before === undefined) &&
+    (afterIsContainer || after === null || after === undefined) &&
+    (!beforeIsContainer ||
+      !afterIsContainer ||
+      Array.isArray(before) === Array.isArray(after));
+
+  if (
+    (beforeIsContainer || afterIsContainer || isContainer(unknown)) &&
+    sameShape
+  ) {
+    const keys = new Set<string>();
+    for (const source of [before, after, unknown]) {
+      if (isContainer(source)) Object.keys(source).forEach((k) => keys.add(k));
+    }
+    for (const key of keys) {
+      collectChanges(
+        {
+          before: childOf(before, key),
+          after: childOf(after, key),
+          unknown: childOf(unknown, key),
+          beforeSensitive: childOf(beforeSensitive, key),
+          afterSensitive: childOf(afterSensitive, key),
+        },
+        path ? `${path}.${key}` : key,
+        out,
+      );
+    }
+    return;
+  }
+
+  if (JSON.stringify(before ?? null) === JSON.stringify(after ?? null)) return;
+
+  // A scalar-vs-container mismatch lands here un-recursed, so a nested mask
+  // may still mark part of the value — redact the whole thing in that case.
+  const hasNestedSensitive =
+    JSON.stringify(beforeSensitive ?? false).includes('true') ||
+    JSON.stringify(afterSensitive ?? false).includes('true');
+  out.push(
+    hasNestedSensitive
+      ? { attr, before: SENSITIVE_PLACEHOLDER, after: SENSITIVE_PLACEHOLDER }
+      : { attr, before: capValue(before), after: capValue(after) },
+  );
 }
 
 /**
  * Parse the JSON produced by `terraform show -json <planfile>` into the
  * structured shape terraform_plan/terraform_apply_status return, instead of
  * making callers grep raw `terraform plan` text for resource replacements.
+ * With `detail`, each resource also carries its changed attributes
+ * (before/after), redacted and capped at MAX_DETAIL_CHARS overall.
  */
-export function parseTerraformPlanJson(json: string): {
+export function parseTerraformPlanJson(
+  json: string,
+  options: { detail?: boolean } = {},
+): {
   summary: PlanSummary;
   resources: PlannedResource[];
+  detailTruncated?: true;
 } {
+  let detailBudget = MAX_DETAIL_CHARS;
+  let detailTruncated = false;
   const parsed = JSON.parse(json) as TerraformShowJson;
   const resourceChanges = parsed.resource_changes ?? [];
 
@@ -111,10 +266,59 @@ export function parseTerraformPlanJson(json: string): {
         Array.isArray(p) ? p.join('.') : String(p),
       );
     }
+    if (options.detail) {
+      const all: AttributeChange[] = [];
+      collectChanges(
+        {
+          before: rc.change.before,
+          after: rc.change.after,
+          unknown: rc.change.after_unknown,
+          beforeSensitive: rc.change.before_sensitive,
+          afterSensitive: rc.change.after_sensitive,
+        },
+        '',
+        all,
+      );
+      const kept: AttributeChange[] = [];
+      for (const change of all) {
+        const size = JSON.stringify(change).length;
+        if (size > detailBudget) break;
+        detailBudget -= size;
+        kept.push(change);
+      }
+      resource.changes = kept;
+      if (kept.length < all.length) {
+        resource.changesTruncated = true;
+        detailTruncated = true;
+        detailBudget = 0;
+      }
+    }
     resources.push(resource);
   }
 
-  return { summary, resources };
+  return detailTruncated
+    ? { summary, resources, detailTruncated: true }
+    : { summary, resources };
+}
+
+/** True when a failed plan's log says the working directory was never `terraform init`ed. */
+export function needsBackendInit(log: string): boolean {
+  return /Backend initialization required/i.test(log);
+}
+
+/**
+ * terraform/runners reads its Lambda zips with filebase64sha256(); when they
+ * have not been synced every Lambda resource fails with its own copy of the
+ * same error. Returns the one-line remedy for that case, otherwise undefined.
+ */
+export function runnerLambdaZipRemedy(
+  log: string,
+  dir: string,
+): string | undefined {
+  if (!/terraform[\\/]+runners/.test(dir)) return undefined;
+  if (!/filebase64sha256/.test(log)) return undefined;
+  if (!/lambdas[\\/]+[\w.-]+\.zip/.test(log)) return undefined;
+  return RUNNER_LAMBDAS_REMEDY;
 }
 
 /** Single-quote a value for safe embedding in the plan+show `sh -c` script. */
@@ -128,6 +332,9 @@ interface TerraformPlanJobMeta {
   planJsonPath: string;
   lock: boolean;
   targets?: string[];
+  detail?: boolean;
+  /** Set on the retry job after an automatic `terraform init`. */
+  autoInit?: boolean;
 }
 
 function metaOf(snapshot: JobSnapshot): TerraformPlanJobMeta {
@@ -138,6 +345,8 @@ function metaOf(snapshot: JobSnapshot): TerraformPlanJobMeta {
       typeof meta.planJsonPath === 'string' ? meta.planJsonPath : '',
     lock: meta.lock === true,
     targets: meta.targets,
+    detail: meta.detail === true,
+    autoInit: meta.autoInit === true,
   };
 }
 
@@ -184,6 +393,26 @@ function buildPlanResult(snapshot: JobSnapshot): ToolResult {
 
   const failed = snapshot.status === 'failed';
   if (failed) {
+    const remedy = runnerLambdaZipRemedy(snapshot.log ?? '', meta.dir);
+    if (remedy) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: minifiedJson({
+              status: 'failed',
+              success: false,
+              jobId: snapshot.jobId,
+              dir: meta.dir,
+              elapsedSec: snapshot.elapsedSec,
+              error: snapshot.error,
+              remedy,
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
     return {
       content: [
         {
@@ -206,7 +435,10 @@ function buildPlanResult(snapshot: JobSnapshot): ToolResult {
   // done
   try {
     const planJson = readFileSync(meta.planJsonPath, 'utf-8');
-    const { summary, resources } = parseTerraformPlanJson(planJson);
+    const { summary, resources, detailTruncated } = parseTerraformPlanJson(
+      planJson,
+      { detail: meta.detail },
+    );
     return {
       content: [
         {
@@ -217,8 +449,15 @@ function buildPlanResult(snapshot: JobSnapshot): ToolResult {
             jobId: snapshot.jobId,
             dir: meta.dir,
             elapsedSec: snapshot.elapsedSec,
+            ...(meta.autoInit ? { autoInit: true } : {}),
             summary,
             resources,
+            ...(detailTruncated
+              ? {
+                  detailTruncated: true,
+                  hint: 'Attribute detail was capped; pass `targets` to narrow the plan.',
+                }
+              : {}),
           }),
         },
       ],
@@ -251,6 +490,7 @@ export interface TerraformPlanParams {
   targets?: string[];
   worktreePath?: string;
   timeoutMs?: number;
+  detail?: boolean;
 }
 
 /**
@@ -260,10 +500,14 @@ export interface TerraformPlanParams {
  * text an agent would otherwise grep. Plans that don't finish inside the sync
  * budget (terraform/main commonly takes 2-6 minutes) return a pollable jobId
  * — poll with terraform_apply_status.
+ *
+ * A plan that fails because the directory was never initialized (every fresh
+ * worktree) is retried once behind `terraform init -input=false`.
  */
 export async function terraformPlan(
   params: TerraformPlanParams,
   repoRoot: string,
+  runJob: typeof runner.runJobWithBudget = runner.runJobWithBudget,
 ): Promise<ToolResult> {
   let resolvedDir: string;
   try {
@@ -346,7 +590,14 @@ export async function terraformPlan(
   // completion, and a caller may poll a "done" job more than once — deleting
   // it on first read would break a second, legitimate poll. It's small
   // (structured JSON, not the full plan) and OS tmpdir cleanup reclaims it.
-  const script =
+  const initArgs = [
+    'terraform',
+    '-chdir=' + resolvedDir,
+    'init',
+    '-input=false',
+    '-no-color',
+  ];
+  const planScript =
     '{ ' +
     planArgs.map(shQuote).join(' ') +
     ' && ' +
@@ -364,12 +615,13 @@ export async function terraformPlan(
     planJsonPath,
     lock,
     targets: params.targets,
+    detail: params.detail === true,
   };
 
-  const snapshot = await runner.runJobWithBudget(
+  const snapshot = await runJob(
     {
       command: resolveBashExecutable(),
-      args: ['-c', script],
+      args: ['-c', planScript],
       cwd: resolvedDir,
       label: `terraform plan ${params.dir}`,
       timeoutMs,
@@ -378,7 +630,25 @@ export async function terraformPlan(
     SYNC_BUDGET_MS,
   );
 
-  return buildPlanResult(snapshot);
+  if (snapshot.status !== 'failed' || !needsBackendInit(snapshot.log ?? '')) {
+    return buildPlanResult(snapshot);
+  }
+
+  // Retried at most once: the retry's own result is returned as-is, so an
+  // init that does not clear the error surfaces instead of looping.
+  const retry = await runJob(
+    {
+      command: resolveBashExecutable(),
+      args: ['-c', initArgs.map(shQuote).join(' ') + ' && ' + planScript],
+      cwd: resolvedDir,
+      label: `terraform init + plan ${params.dir}`,
+      timeoutMs,
+      meta: { ...meta, autoInit: true },
+    },
+    SYNC_BUDGET_MS,
+  );
+
+  return buildPlanResult(retry);
 }
 
 export interface TerraformApplyStatusParams {

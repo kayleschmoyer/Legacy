@@ -124,13 +124,14 @@ Generate terraform/secrets.auto.tfvars from environment variables. Reads GOOGLE_
 
 ### `terraform_plan`
 
-Prefer this over raw `terraform plan` via Bash. Runs `terraform plan` (via `terraform show -json` under the hood) and returns structured output — { summary: { add, change, destroy }, resources: [{ address, action, forcesReplacementOn? }] } — instead of raw text an agent would otherwise grep for resource replacements. Defaults to `lock: false` (passes `-lock=false`) so a routine plan never contends for the shared state lock that the Lock Watchdog polices; pass `lock: true` only when you specifically need the real locking behavior. Plans against `terraform/main` commonly take 2-6 minutes — a plan still running after ~45s returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.
+Prefer this over raw `terraform plan` via Bash. Returns { summary: { add, change, destroy }, resources: [{ address, action, forcesReplacementOn? }] } parsed from `terraform show -json`. Runs `terraform init` itself, once, when the backend is uninitialized (fresh worktrees). Plans against `terraform/main` commonly take 2-6 minutes — a plan still running after ~45s returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `dir` | string | **required** | — | Terraform working directory, e.g. "terraform/main" or "terraform/runners". Relative to repo root, or absolute. |
-| `lock` | boolean |  | — | Whether to take the real Terraform state lock. Default false (passes -lock=false) — a plan is read-only and should not contend for the shared lock by accident. Set true only when you specifically need locking. |
-| `targets` | string[] |  | — | Optional resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags. |
+| `lock` | boolean |  | — | Take the real Terraform state lock. Default false (passes -lock=false) so a read-only plan never contends for the shared lock the Lock Watchdog polices. |
+| `targets` | string[] |  | — | Resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags. |
+| `detail` | boolean |  | — | Add `changes: [{ attr, before, after }]` per resource for changed attributes. Sensitive values are redacted; output is size-capped. |
 | `worktreePath` | string |  | — | Repo or worktree root (default: repo root). Used to resolve relative `dir` values. |
 | `timeoutMs` | number |  | integer, > 0 | Process-level timeout backstop in ms (default: 900000 / 15 minutes). Independent of the MCP transport timeout. |
 

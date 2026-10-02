@@ -586,12 +586,10 @@ server.tool(
 // --- terraform_plan ---
 server.tool(
   'terraform_plan',
-  'Prefer this over raw `terraform plan` via Bash. Runs `terraform plan` (via `terraform show -json` under the hood) and ' +
-    'returns structured output — { summary: { add, change, destroy }, resources: [{ address, action, forcesReplacementOn? }] } ' +
-    '— instead of raw text an agent would otherwise grep for resource replacements. Defaults to `lock: false` (passes ' +
-    '`-lock=false`) so a routine plan never contends for the shared state lock that the Lock Watchdog polices; pass `lock: true` ' +
-    'only when you specifically need the real locking behavior. Plans against `terraform/main` commonly take 2-6 minutes — a plan ' +
-    'still running after ~45s returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.',
+  'Prefer this over raw `terraform plan` via Bash. Returns { summary: { add, change, destroy }, resources: [{ address, action, ' +
+    'forcesReplacementOn? }] } parsed from `terraform show -json`. Runs `terraform init` itself, once, when the backend is ' +
+    'uninitialized (fresh worktrees). Plans against `terraform/main` commonly take 2-6 minutes — a plan still running after ~45s ' +
+    'returns { status: "running", jobId }; poll with terraform_apply_status({ jobId }) and do NOT re-run it.',
   {
     dir: z
       .string()
@@ -603,14 +601,20 @@ server.tool(
       .boolean()
       .default(false)
       .describe(
-        'Whether to take the real Terraform state lock. Default false (passes -lock=false) — a plan is read-only and ' +
-          'should not contend for the shared lock by accident. Set true only when you specifically need locking.',
+        'Take the real Terraform state lock. Default false (passes -lock=false) so a read-only plan never contends ' +
+          'for the shared lock the Lock Watchdog polices.',
       ),
     targets: z
       .array(z.string())
       .optional()
       .describe(
-        'Optional resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags.',
+        'Resource addresses to scope the plan to, e.g. ["aws_lambda_function.graphql"] — passed as repeated -target flags.',
+      ),
+    detail: z
+      .boolean()
+      .optional()
+      .describe(
+        'Add `changes: [{ attr, before, after }]` per resource for changed attributes. Sensitive values are redacted; output is size-capped.',
       ),
     worktreePath: z
       .string()
