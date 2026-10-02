@@ -41,6 +41,12 @@ jest.mock('@legacy-sports/db-client', () => ({
       matchupPlayerId: 'matchupPlayerGames.matchupPlayerId',
       gameNum: 'matchupPlayerGames.gameNum',
     },
+    leagueWeekPlayerSeasons: {
+      leagueId: 'leagueWeekPlayerSeasons.leagueId',
+      weekNumber: 'leagueWeekPlayerSeasons.weekNumber',
+      playerId: 'leagueWeekPlayerSeasons.playerId',
+      season: 'leagueWeekPlayerSeasons.season',
+    },
   },
   // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
   // up to 2x on the pool's connection-timeout message), so the LS-10043
@@ -68,6 +74,7 @@ jest.mock('@legacy-sports/db-client', () => ({
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import {
   createFootballScoringSettingsLoader,
+  createLeagueWeekPlayerSeasonsLoader,
   createLockedTeamMembersLoader,
   createMatchupPlayerGamesLoader,
   createSelectedGamesCountLoader,
@@ -376,5 +383,42 @@ describe('createSelectedGamesCountLoader (LS-10043)', () => {
     await expect(loader.load(1)).rejects.toThrow(
       'syntax error at or near "SELECT"',
     );
+  });
+});
+
+// LS-10258 (Rollbar #289): the batched league_week_player_seasons query was not
+// wrapped in withPoolTimeoutRetry, so a pool connection timeout propagated
+// straight to the resolver.
+describe('createLeagueWeekPlayerSeasonsLoader (LS-10258)', () => {
+  const makeDb = (where: jest.Mock) =>
+    ({
+      select: () => ({ from: () => ({ where }) }),
+    }) as unknown as Parameters<typeof createLeagueWeekPlayerSeasonsLoader>[0];
+
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    const where = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('timeout exceeded when trying to connect'),
+      )
+      .mockResolvedValueOnce([
+        { leagueId: 1, weekNumber: 9, playerId: 7, season: 2026 },
+      ]);
+
+    const loader = createLeagueWeekPlayerSeasonsLoader(makeDb(where));
+
+    await expect(loader.load('1-9-7')).resolves.toBe(2026);
+    expect(where).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry and rejects on a non-pool-timeout error', async () => {
+    const where = jest
+      .fn()
+      .mockRejectedValue(new Error('syntax error at or near "SELECT"'));
+
+    const loader = createLeagueWeekPlayerSeasonsLoader(makeDb(where));
+
+    await expect(loader.load('1-9-7')).rejects.toThrow('syntax error');
+    expect(where).toHaveBeenCalledTimes(1);
   });
 });

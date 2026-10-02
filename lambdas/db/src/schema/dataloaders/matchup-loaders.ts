@@ -305,28 +305,33 @@ export const createLeagueWeekPlayerSeasonsLoader = (
         ]),
       ).values(),
     ];
+    // Wrapped in withPoolTimeoutRetry (LS-10258): one batched query, but it
+    // fires alongside every other per-request loader against the small Lambda
+    // pool, so a burst can outwait connectionTimeoutMillis (Rollbar #289).
     const allRows = pairs.length
-      ? await db
-          .select({
-            leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
-            weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-            playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
-            season: PublicSchema.leagueWeekPlayerSeasons.season,
-          })
-          .from(PublicSchema.leagueWeekPlayerSeasons)
-          .where(
-            or(
-              ...pairs.map(({ leagueId, weekNumber }) =>
-                and(
-                  eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
-                  eq(
-                    PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-                    weekNumber,
+      ? await withPoolTimeoutRetry(() =>
+          db
+            .select({
+              leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
+              weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+              season: PublicSchema.leagueWeekPlayerSeasons.season,
+            })
+            .from(PublicSchema.leagueWeekPlayerSeasons)
+            .where(
+              or(
+                ...pairs.map(({ leagueId, weekNumber }) =>
+                  and(
+                    eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+                    eq(
+                      PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                      weekNumber,
+                    ),
                   ),
                 ),
               ),
             ),
-          )
+        )
       : [];
 
     const seasonMap = new Map<string, number>();
@@ -508,9 +513,10 @@ export const createLatestScoringChangeAtLoader = (
 ) =>
   new DataLoader<number, Date | null>(async (keys) => {
     const leagueIds = [...new Set(keys)] as number[];
-    const changeAtByLeague = await getLatestScoringChangeAtByLeague(
-      db,
-      leagueIds,
+    // Wrapped in withPoolTimeoutRetry (LS-10258): same Matchup fan-out as the
+    // other loaders, and the one query here was the Rollbar #274 failure site.
+    const changeAtByLeague = await withPoolTimeoutRetry(() =>
+      getLatestScoringChangeAtByLeague(db, leagueIds),
     );
     return keys.map((key) => changeAtByLeague.get(key) ?? null);
   });
@@ -532,6 +538,9 @@ export const createScoringChangeLogLoader = (
 ) =>
   new DataLoader<number, ScoringChangeLogEntry[]>(async (keys) => {
     const leagueIds = [...new Set(keys)] as number[];
-    const changeLogByLeague = await getScoringChangeLogByLeague(db, leagueIds);
+    // LS-10258: sibling of createLatestScoringChangeAtLoader on the same path.
+    const changeLogByLeague = await withPoolTimeoutRetry(() =>
+      getScoringChangeLogByLeague(db, leagueIds),
+    );
     return keys.map((key) => changeLogByLeague.get(key) ?? []);
   });

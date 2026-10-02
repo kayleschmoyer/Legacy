@@ -16,6 +16,24 @@ const getLatestScoringChangeAtByLeague: jest.Mock<
 jest.mock('@legacy-sports/db-client', () => ({
   PublicSchema: {},
   getLatestScoringChangeAtByLeague,
+  // Minimal stand-in for Helpers.ts's `withPoolTimeoutRetry` (retry up to 2x on
+  // the pool's connection-timeout message) — see the LS-10258 test below.
+  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      try {
+        return await queryFn();
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message === 'timeout exceeded when trying to connect' &&
+          attempt < 2
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+  },
 }));
 
 import { createLatestScoringChangeAtLoader } from './matchup-loaders';
@@ -63,6 +81,34 @@ describe('createLatestScoringChangeAtLoader', () => {
     expect(getLatestScoringChangeAtByLeague).toHaveBeenCalledTimes(1);
     const [, leagueIds] = getLatestScoringChangeAtByLeague.mock.calls[0];
     expect([...leagueIds].sort((a, b) => a - b)).toEqual([4, 9]);
+  });
+
+  // LS-10258 (Rollbar #274): the lookup was not wrapped in withPoolTimeoutRetry,
+  // so a pool connection timeout under a concurrent Matchup fan-out reached the
+  // resolver as a hard failure.
+  it('retries after a pool connection-timeout error (LS-10258)', async () => {
+    const changedAt = new Date('2026-08-02T00:00:00.000Z');
+    getLatestScoringChangeAtByLeague
+      .mockRejectedValueOnce(
+        new Error('timeout exceeded when trying to connect'),
+      )
+      .mockResolvedValueOnce(new Map([[1, changedAt]]));
+
+    const loader = createLatestScoringChangeAtLoader(db);
+
+    await expect(loader.load(1)).resolves.toEqual(changedAt);
+    expect(getLatestScoringChangeAtByLeague).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a non-pool-timeout error (LS-10258)', async () => {
+    getLatestScoringChangeAtByLeague.mockRejectedValue(
+      new Error('syntax error at or near "SELECT"'),
+    );
+
+    const loader = createLatestScoringChangeAtLoader(db);
+
+    await expect(loader.load(1)).rejects.toThrow('syntax error');
+    expect(getLatestScoringChangeAtByLeague).toHaveBeenCalledTimes(1);
   });
 
   it('returns null for a league the lookup did not report on', async () => {
