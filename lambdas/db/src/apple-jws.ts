@@ -11,7 +11,12 @@
  *
  * Revocation (OCSP/CRL) is not checked; residual risk accepted per LS-2617.
  */
-import { decodeProtectedHeader, importX509, jwtVerify } from 'jose';
+import {
+  decodeProtectedHeader,
+  importX509,
+  type JWTPayload,
+  jwtVerify,
+} from 'jose';
 import { z } from 'zod';
 import * as crypto from 'crypto';
 
@@ -149,16 +154,12 @@ export interface VerifiedAppleTransactionPayload {
 }
 
 /**
- * Decode and cryptographically verify a StoreKit 2 JWS transaction token.
- *
- * Validates the x5c certificate chain against Apple Root CA G3 and verifies
- * the ES256 signature before returning the payload. Throws if the JWS is
- * malformed, the certificate chain is untrusted, or the signature is invalid.
+ * Verify the x5c chain and ES256 signature of an Apple-signed JWS and return
+ * its raw (unvalidated-shape) payload. Shared by every Apple JWS consumer;
+ * callers are responsible for validating the payload fields they need.
  */
-export async function decodeAndVerifyJwsTransaction(
-  jwsTransaction: string,
-): Promise<VerifiedAppleTransactionPayload> {
-  const header = decodeProtectedHeader(jwsTransaction);
+export async function verifyAppleJwsPayload(jws: string): Promise<JWTPayload> {
+  const header = decodeProtectedHeader(jws);
   const x5c = header['x5c'];
 
   if (!x5c || x5c.length === 0) {
@@ -169,9 +170,23 @@ export async function decodeAndVerifyJwsTransaction(
   validateCertificateChain(certs);
 
   const publicKey = await importX509(certs[0], 'ES256');
-  const { payload } = await jwtVerify(jwsTransaction, publicKey, {
+  const { payload } = await jwtVerify(jws, publicKey, {
     algorithms: ['ES256'],
   });
+  return payload;
+}
+
+/**
+ * Decode and cryptographically verify a StoreKit 2 JWS transaction token.
+ *
+ * Validates the x5c certificate chain against Apple Root CA G3 and verifies
+ * the ES256 signature before returning the payload. Throws if the JWS is
+ * malformed, the certificate chain is untrusted, or the signature is invalid.
+ */
+export async function decodeAndVerifyJwsTransaction(
+  jwsTransaction: string,
+): Promise<VerifiedAppleTransactionPayload> {
+  const payload = await verifyAppleJwsPayload(jwsTransaction);
 
   const result = transactionPayloadSchema.safeParse(payload);
   if (!result.success) {
