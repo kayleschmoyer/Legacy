@@ -133,9 +133,14 @@ export async function ec2Instances(
 // ---------------------------------------------------------------------------
 
 export interface Ec2DescribeImageParams {
-  imageId: string;
+  imageId?: string;
+  /** AMI name pattern (wildcards allowed), searched among images owned by this account. */
+  nameFilter?: string;
   tag?: string;
 }
+
+/** Newest-first cap on `nameFilter` matches. */
+const MAX_IMAGE_MATCHES = 10;
 
 interface AwsImage {
   ImageId?: string;
@@ -155,14 +160,116 @@ interface DescribeImagesResponse {
 const IMAGE_ID_RE = /^ami-[0-9a-f]{8,17}$/;
 const SAFE_TAG_KEY_RE = /^[A-Za-z0-9._:/+=@\- ]+$/;
 
+function imageTags(image: AwsImage): Record<string, string> {
+  const tagsObject: Record<string, string> = {};
+  for (const t of image.Tags ?? []) {
+    if (t.Key !== undefined) tagsObject[t.Key] = t.Value ?? '';
+  }
+  return tagsObject;
+}
+
+/**
+ * `nameFilter` mode: find this account's AMIs by name pattern, newest first —
+ * the "which runner AMI is the latest?" lookup that previously needed
+ * `aws ec2 describe-images --owners self --filters Name=name,Values=...`.
+ */
+async function ec2FindImagesByName(
+  nameFilter: string,
+  tag: string | undefined,
+  cwd: string,
+): Promise<ToolResult> {
+  if (!SAFE_NAME_FILTER_RE.test(nameFilter)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error:
+              'Invalid nameFilter: only alphanumeric characters, dots, underscores, hyphens, and wildcards (*) are allowed.',
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  try {
+    const output = await runCommand(
+      'aws',
+      [
+        'ec2',
+        'describe-images',
+        '--owners',
+        'self',
+        '--filters',
+        `Name=name,Values=${nameFilter}`,
+        '--output',
+        'json',
+      ],
+      cwd,
+    );
+    const data = JSON.parse(output) as DescribeImagesResponse;
+    // CreationDate is ISO-8601, so a string compare orders chronologically.
+    const sorted = [...(data.Images ?? [])].sort((a, b) =>
+      (b.CreationDate ?? '').localeCompare(a.CreationDate ?? ''),
+    );
+    const images = sorted.slice(0, MAX_IMAGE_MATCHES).map((image) => {
+      const tags = imageTags(image);
+      return {
+        imageId: image.ImageId ?? '',
+        name: image.Name,
+        creationDate: image.CreationDate,
+        state: image.State,
+        ...(tag !== undefined ? { [tag]: tags[tag] ?? null } : { tags }),
+      };
+    });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            ok: true,
+            nameFilter,
+            count: images.length,
+            totalMatches: sorted.length,
+            images,
+          }),
+        },
+      ],
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResult(
+      `Failed to describe images matching ${nameFilter}`,
+      message,
+    );
+  }
+}
+
 export async function ec2DescribeImage(
   params: Ec2DescribeImageParams,
 ): Promise<ToolResult> {
   const repoRoot = getRepoRoot();
-  const { imageId } = params;
+  const { imageId, nameFilter } = params;
   let tag = params.tag;
 
-  if (!IMAGE_ID_RE.test(imageId)) {
+  if (!imageId && !nameFilter) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: 'Either imageId or nameFilter must be provided.',
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (imageId && !IMAGE_ID_RE.test(imageId)) {
     return {
       content: [
         {
@@ -209,6 +316,11 @@ export async function ec2DescribeImage(
     };
   }
 
+  if (!imageId) {
+    // Guarded above: with no imageId, nameFilter is set.
+    return ec2FindImagesByName(nameFilter ?? '', tag, repoRoot);
+  }
+
   const args = [
     'ec2',
     'describe-images',
@@ -239,10 +351,7 @@ export async function ec2DescribeImage(
       };
     }
 
-    const tagsObject: Record<string, string> = {};
-    for (const t of image.Tags ?? []) {
-      if (t.Key !== undefined) tagsObject[t.Key] = t.Value ?? '';
-    }
+    const tagsObject = imageTags(image);
 
     if (tag !== undefined) {
       const value = tagsObject[tag];
@@ -795,6 +904,31 @@ function mapInternetGateway(igw: AwsInternetGateway): Record<string, unknown> {
   };
 }
 
+interface AwsFlowLog {
+  FlowLogId?: string;
+  ResourceId?: string;
+  TrafficType?: string;
+  FlowLogStatus?: string;
+  LogDestinationType?: string;
+  LogDestination?: string;
+  LogGroupName?: string;
+}
+
+interface DescribeFlowLogsResponse {
+  FlowLogs?: AwsFlowLog[];
+}
+
+function mapFlowLog(flowLog: AwsFlowLog): Record<string, unknown> {
+  return {
+    id: flowLog.FlowLogId ?? null,
+    resourceId: flowLog.ResourceId ?? null,
+    trafficType: flowLog.TrafficType ?? null,
+    status: flowLog.FlowLogStatus ?? null,
+    destinationType: flowLog.LogDestinationType ?? null,
+    destination: flowLog.LogDestination ?? flowLog.LogGroupName ?? null,
+  };
+}
+
 interface VpcAttributeResponse {
   EnableDnsSupport?: { Value?: boolean };
   EnableDnsHostnames?: { Value?: boolean };
@@ -1006,99 +1140,132 @@ export async function ec2NetworkInspect(
   // subnet data by this point.
   const vpcId = vpc.VpcId;
 
-  const [routeTablesResult, naclsResult, gatewaysResult, dnsResult] =
-    await Promise.all([
-      includeRouteTables
-        ? (async () => {
-            try {
-              const output = await runCommand(
-                'aws',
-                [
-                  'ec2',
-                  'describe-route-tables',
-                  '--output',
-                  'json',
-                  '--filters',
-                  `Name=vpc-id,Values=${vpcId}`,
-                ],
-                repoRoot,
-              );
-              const data = JSON.parse(output) as DescribeRouteTablesResponse;
-              const { items, truncated } = capEntries(data.RouteTables ?? []);
-              return { items: items.map(mapRouteTable), truncated };
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err);
-              return { error: message };
-            }
-          })()
-        : undefined,
-      includeNacls
-        ? (async () => {
-            try {
-              const output = await runCommand(
-                'aws',
-                [
-                  'ec2',
-                  'describe-network-acls',
-                  '--output',
-                  'json',
-                  '--filters',
-                  `Name=vpc-id,Values=${vpcId}`,
-                ],
-                repoRoot,
-              );
-              const data = JSON.parse(output) as DescribeNetworkAclsResponse;
-              const { items, truncated } = capEntries(data.NetworkAcls ?? []);
-              return { items: items.map(mapNacl), truncated };
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err);
-              return { error: message };
-            }
-          })()
-        : undefined,
-      includeGateways
-        ? (async () => {
-            try {
-              const output = await runCommand(
-                'aws',
-                [
-                  'ec2',
-                  'describe-internet-gateways',
-                  '--output',
-                  'json',
-                  '--filters',
-                  `Name=attachment.vpc-id,Values=${vpcId}`,
-                ],
-                repoRoot,
-              );
-              const data = JSON.parse(
-                output,
-              ) as DescribeInternetGatewaysResponse;
-              const { items, truncated } = capEntries(
-                data.InternetGateways ?? [],
-              );
-              return { items: items.map(mapInternetGateway), truncated };
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err);
-              return { error: message };
-            }
-          })()
-        : undefined,
-      includeDnsAttributes && vpcId
-        ? (async () => {
-            try {
-              const [enableDnsSupport, enableDnsHostnames] = await Promise.all([
-                describeVpcAttribute(vpcId, 'enableDnsSupport', repoRoot),
-                describeVpcAttribute(vpcId, 'enableDnsHostnames', repoRoot),
-              ]);
-              return { enableDnsSupport, enableDnsHostnames };
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err);
-              return { error: message };
-            }
-          })()
-        : undefined,
-    ]);
+  // Flow logs are always reported (no flag): an empty `items` is itself the
+  // answer to "is traffic on this VPC being captured?". They can be attached
+  // to the VPC or to individual subnets, so filter on both.
+  const flowLogResourceIds = [
+    vpcId,
+    ...subnets.map((s) => s.SubnetId).filter((id): id is string => Boolean(id)),
+  ];
+
+  const [
+    routeTablesResult,
+    naclsResult,
+    gatewaysResult,
+    dnsResult,
+    flowLogsResult,
+  ] = await Promise.all([
+    includeRouteTables
+      ? (async () => {
+          try {
+            const output = await runCommand(
+              'aws',
+              [
+                'ec2',
+                'describe-route-tables',
+                '--output',
+                'json',
+                '--filters',
+                `Name=vpc-id,Values=${vpcId}`,
+              ],
+              repoRoot,
+            );
+            const data = JSON.parse(output) as DescribeRouteTablesResponse;
+            const { items, truncated } = capEntries(data.RouteTables ?? []);
+            return { items: items.map(mapRouteTable), truncated };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { error: message };
+          }
+        })()
+      : undefined,
+    includeNacls
+      ? (async () => {
+          try {
+            const output = await runCommand(
+              'aws',
+              [
+                'ec2',
+                'describe-network-acls',
+                '--output',
+                'json',
+                '--filters',
+                `Name=vpc-id,Values=${vpcId}`,
+              ],
+              repoRoot,
+            );
+            const data = JSON.parse(output) as DescribeNetworkAclsResponse;
+            const { items, truncated } = capEntries(data.NetworkAcls ?? []);
+            return { items: items.map(mapNacl), truncated };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { error: message };
+          }
+        })()
+      : undefined,
+    includeGateways
+      ? (async () => {
+          try {
+            const output = await runCommand(
+              'aws',
+              [
+                'ec2',
+                'describe-internet-gateways',
+                '--output',
+                'json',
+                '--filters',
+                `Name=attachment.vpc-id,Values=${vpcId}`,
+              ],
+              repoRoot,
+            );
+            const data = JSON.parse(output) as DescribeInternetGatewaysResponse;
+            const { items, truncated } = capEntries(
+              data.InternetGateways ?? [],
+            );
+            return { items: items.map(mapInternetGateway), truncated };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { error: message };
+          }
+        })()
+      : undefined,
+    includeDnsAttributes && vpcId
+      ? (async () => {
+          try {
+            const [enableDnsSupport, enableDnsHostnames] = await Promise.all([
+              describeVpcAttribute(vpcId, 'enableDnsSupport', repoRoot),
+              describeVpcAttribute(vpcId, 'enableDnsHostnames', repoRoot),
+            ]);
+            return { enableDnsSupport, enableDnsHostnames };
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { error: message };
+          }
+        })()
+      : undefined,
+    (async () => {
+      try {
+        const output = await runCommand(
+          'aws',
+          [
+            'ec2',
+            'describe-flow-logs',
+            '--output',
+            'json',
+            '--filter',
+            `Name=resource-id,Values=${flowLogResourceIds.join(',')}`,
+          ],
+          repoRoot,
+        );
+        const data = JSON.parse(output) as DescribeFlowLogsResponse;
+        const { items, truncated } = capEntries(data.FlowLogs ?? []);
+        return { items: items.map(mapFlowLog), truncated };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    })(),
+  ]);
 
   return {
     content: [
@@ -1123,6 +1290,7 @@ export async function ec2NetworkInspect(
           ...(naclsResult ? { networkAcls: naclsResult } : {}),
           ...(gatewaysResult ? { internetGateways: gatewaysResult } : {}),
           ...(dnsResult ? { dnsAttributes: dnsResult } : {}),
+          flowLogs: flowLogsResult,
         }),
       },
     ],

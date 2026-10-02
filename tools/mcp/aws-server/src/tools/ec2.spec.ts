@@ -107,6 +107,105 @@ describe('ec2DescribeImage', () => {
     expect(parsed.imageId).toBe('ami-0123456789abcdef0');
     expect(parsed.tags).toEqual({ PlaywrightVersion: '1.50.0' });
   });
+
+  describe('nameFilter', () => {
+    const image = (id: string, creationDate: string) => ({
+      ImageId: id,
+      Name: `legacy-sports-runner-android-${creationDate}`,
+      CreationDate: creationDate,
+      State: 'available',
+      Tags: [{ Key: 'PlaywrightVersion', Value: '1.50.0' }],
+    });
+
+    it('searches self-owned images by name and returns newest first', async () => {
+      mockedRun.mockResolvedValue(
+        JSON.stringify({
+          Images: [
+            image('ami-0000000000000000a', '2026-08-01T00:00:00.000Z'),
+            image('ami-0000000000000000c', '2026-09-30T00:00:00.000Z'),
+            image('ami-0000000000000000b', '2026-09-01T00:00:00.000Z'),
+          ],
+        }),
+      );
+      const out = text(
+        await ec2DescribeImage({
+          nameFilter: 'legacy-sports-runner-android-*',
+        }),
+      );
+      const args = mockedRun.mock.calls[0][1];
+      expect(args[args.indexOf('--owners') + 1]).toBe('self');
+      expect(args[args.indexOf('--filters') + 1]).toBe(
+        'Name=name,Values=legacy-sports-runner-android-*',
+      );
+      expect(args).not.toContain('--image-ids');
+
+      const parsed = JSON.parse(out) as {
+        ok: boolean;
+        count: number;
+        images: Array<{ imageId: string; tags: object }>;
+      };
+      expect(parsed.ok).toBe(true);
+      expect(parsed.images.map((i) => i.imageId)).toEqual([
+        'ami-0000000000000000c',
+        'ami-0000000000000000b',
+        'ami-0000000000000000a',
+      ]);
+      expect(parsed.images[0].tags).toEqual({ PlaywrightVersion: '1.50.0' });
+    });
+
+    it('caps the result at the 10 newest matches and reports the total', async () => {
+      mockedRun.mockResolvedValue(
+        JSON.stringify({
+          Images: Array.from({ length: 12 }, (_, i) =>
+            image(
+              `ami-00000000000000${String(i).padStart(2, '0')}a`,
+              `2026-09-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+            ),
+          ),
+        }),
+      );
+      const parsed = JSON.parse(
+        text(await ec2DescribeImage({ nameFilter: 'legacy-*' })),
+      ) as {
+        count: number;
+        totalMatches: number;
+        images: Array<{ creationDate: string }>;
+      };
+      expect(parsed.count).toBe(10);
+      expect(parsed.totalMatches).toBe(12);
+      expect(parsed.images[0].creationDate).toBe('2026-09-12T00:00:00.000Z');
+    });
+
+    it('returns only the requested tag per image when tag is set', async () => {
+      mockedRun.mockResolvedValue(
+        JSON.stringify({
+          Images: [image('ami-0000000000000000a', '2026-08-01T00:00:00.000Z')],
+        }),
+      );
+      const parsed = JSON.parse(
+        text(
+          await ec2DescribeImage({
+            nameFilter: 'legacy-*',
+            tag: 'PlaywrightVersion',
+          }),
+        ),
+      ) as { images: Array<Record<string, unknown>> };
+      expect(parsed.images[0].PlaywrightVersion).toBe('1.50.0');
+      expect(parsed.images[0].tags).toBeUndefined();
+    });
+
+    it('rejects an unsafe nameFilter without calling AWS', async () => {
+      const result = await ec2DescribeImage({ nameFilter: 'a,Name=x' });
+      expect(result.isError).toBe(true);
+      expect(mockedRun).not.toHaveBeenCalled();
+    });
+
+    it('rejects a call with neither imageId nor nameFilter', async () => {
+      const result = await ec2DescribeImage({});
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('Either imageId or nameFilter');
+    });
+  });
 });
 
 describe('ec2ConsoleOutput', () => {
@@ -229,6 +328,9 @@ describe('ec2NetworkInspect', () => {
       for (const [key, handler] of Object.entries(handlers)) {
         if (a.includes(key)) return Promise.resolve(handler());
       }
+      // Flow logs are always queried; default to none unless a test overrides.
+      if (a.includes('describe-flow-logs'))
+        return Promise.resolve(JSON.stringify({ FlowLogs: [] }));
       throw new Error('unexpected runCommand call: ' + a.join(' '));
     });
   }
@@ -249,6 +351,67 @@ describe('ec2NetworkInspect', () => {
     expect(parsed.networkAcls).toBeUndefined();
     expect(parsed.internetGateways).toBeUndefined();
     expect(parsed.dnsAttributes).toBeUndefined();
+  });
+
+  it('always reports flow logs, empty when none are configured', async () => {
+    mockRunFor({});
+    const parsed = await body({ environment: 'dev' });
+    expect(parsed.flowLogs).toEqual({ items: [], truncated: false });
+  });
+
+  it('reports flow logs attached to the VPC or its subnets', async () => {
+    mockedRun.mockImplementation((_cmd, args) => {
+      if (args.includes('describe-vpcs')) return Promise.resolve(vpcResponse);
+      if (args.includes('describe-subnets'))
+        return Promise.resolve(
+          JSON.stringify({ Subnets: [{ SubnetId: 'subnet-1' }] }),
+        );
+      if (args.includes('describe-flow-logs'))
+        return Promise.resolve(
+          JSON.stringify({
+            FlowLogs: [
+              {
+                FlowLogId: 'fl-1',
+                ResourceId: 'vpc-0abc123',
+                TrafficType: 'REJECT',
+                FlowLogStatus: 'ACTIVE',
+                LogDestinationType: 'cloud-watch-logs',
+                LogGroupName: '/vpc/flow-logs',
+              },
+            ],
+          }),
+        );
+      throw new Error('unexpected runCommand call: ' + args.join(' '));
+    });
+    const parsed = await body({ environment: 'dev' });
+    expect(parsed.flowLogs).toEqual({
+      items: [
+        {
+          id: 'fl-1',
+          resourceId: 'vpc-0abc123',
+          trafficType: 'REJECT',
+          status: 'ACTIVE',
+          destinationType: 'cloud-watch-logs',
+          destination: '/vpc/flow-logs',
+        },
+      ],
+      truncated: false,
+    });
+    const flowArgs = mockedRun.mock.calls
+      .map((c) => c[1])
+      .find((a) => a.includes('describe-flow-logs'));
+    expect(flowArgs).toContain('Name=resource-id,Values=vpc-0abc123,subnet-1');
+  });
+
+  it('reports a flow-log lookup failure without failing the call', async () => {
+    mockRunFor({
+      'describe-flow-logs': () => {
+        throw new Error('UnauthorizedOperation');
+      },
+    });
+    const parsed = await body({ environment: 'dev' });
+    expect(parsed.ok).toBe(true);
+    expect(parsed.flowLogs).toEqual({ error: 'UnauthorizedOperation' });
   });
 
   it('includeRouteTables returns routes with destination + target', async () => {

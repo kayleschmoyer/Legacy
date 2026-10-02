@@ -16,7 +16,10 @@ const defaultRunner: CommandRunner = (cmd, args, cwd) =>
   runCommand(cmd, args, cwd);
 
 export interface LogsFilterParams {
-  logGroup: string;
+  logGroup?: string;
+  /** Log-group name prefix: list matching groups instead of searching events. */
+  listGroups?: string;
+  logStreamNames?: string[];
   filterPattern?: string;
   startTime?: number;
   endTime?: number;
@@ -104,6 +107,102 @@ interface AwsFilterResponse {
   events?: AwsLogEvent[];
 }
 
+interface AwsLogGroup {
+  logGroupName?: string;
+  retentionInDays?: number;
+  storedBytes?: number;
+}
+
+interface AwsDescribeLogGroupsResponse {
+  logGroups?: AwsLogGroup[];
+  nextToken?: string;
+}
+
+function failureResult(
+  logGroup: string,
+  err: unknown,
+  format: LogsFilterFormat,
+): ToolResult {
+  const message = err instanceof Error ? err.message : String(err);
+  const isSsoError =
+    /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i.test(
+      message,
+    );
+  const failure: LogsFilterFailure = {
+    ok: false,
+    logGroup,
+    error: message,
+    remedy: isSsoError
+      ? 'Run `aws sso login` to re-authenticate, then retry.'
+      : null,
+    hint: null,
+  };
+  const text =
+    format === 'markdown' ? renderAsMarkdown(failure) : JSON.stringify(failure);
+  return { content: [{ type: 'text', text }], isError: true };
+}
+
+/**
+ * `listGroups` mode: enumerate log groups by name prefix, so a caller that
+ * guessed a group name wrong (ResourceNotFoundException) can discover the real
+ * one without shelling out to `aws logs describe-log-groups`.
+ */
+async function listLogGroups(
+  prefix: string,
+  format: LogsFilterFormat,
+  runner: CommandRunner,
+): Promise<ToolResult> {
+  try {
+    const output = await runner(
+      'aws',
+      [
+        'logs',
+        'describe-log-groups',
+        '--log-group-name-prefix',
+        prefix,
+        '--limit',
+        String(MAX_EVENTS),
+        '--output',
+        'json',
+        '--no-cli-pager',
+      ],
+      getRepoRoot(),
+    );
+    const parsed: AwsDescribeLogGroupsResponse = output
+      ? (JSON.parse(output) as AwsDescribeLogGroupsResponse)
+      : {};
+    const logGroups = (parsed.logGroups ?? []).map((g) => ({
+      name: g.logGroupName ?? '',
+      retentionInDays: g.retentionInDays ?? null,
+      storedBytes: g.storedBytes ?? null,
+    }));
+    const truncated = Boolean(parsed.nextToken);
+
+    const text =
+      format === 'markdown'
+        ? [
+            `**prefix**: ${prefix}`,
+            `**logGroups**: ${logGroups.length}${truncated ? ` shown (truncated at ${MAX_EVENTS}; narrow the prefix)` : ''}`,
+            '',
+            ...(logGroups.length === 0
+              ? ['(no log groups found)']
+              : logGroups.map(
+                  (g) =>
+                    `- ${g.name} (retentionInDays: ${g.retentionInDays ?? 'never expires'}, storedBytes: ${g.storedBytes ?? 'unknown'})`,
+                )),
+          ].join('\n')
+        : JSON.stringify({
+            prefix,
+            logGroups,
+            count: logGroups.length,
+            truncated,
+          });
+    return { content: [{ type: 'text', text }] };
+  } catch (err) {
+    return failureResult(prefix, err, format);
+  }
+}
+
 export async function logsFilter(
   params: LogsFilterParams,
   runner: CommandRunner = defaultRunner,
@@ -112,11 +211,24 @@ export async function logsFilter(
   const format: LogsFilterFormat = params.format ?? 'markdown';
   const limit = Math.min(params.limit ?? 100, MAX_EVENTS);
 
+  if (params.listGroups) {
+    return listLogGroups(params.listGroups, format, runner);
+  }
+
+  const logGroup = params.logGroup;
+  if (!logGroup) {
+    return failureResult(
+      '(none)',
+      'Either `logGroup` or `listGroups` must be provided.',
+      format,
+    );
+  }
+
   const args = [
     'logs',
     'filter-log-events',
     '--log-group-name',
-    params.logGroup,
+    logGroup,
     '--limit',
     String(limit),
     '--output',
@@ -124,6 +236,9 @@ export async function logsFilter(
     '--no-cli-pager',
   ];
 
+  if (params.logStreamNames && params.logStreamNames.length > 0) {
+    args.push('--log-stream-names', ...params.logStreamNames);
+  }
   if (params.filterPattern) {
     args.push('--filter-pattern', params.filterPattern);
   }
@@ -164,7 +279,7 @@ export async function logsFilter(
     }
 
     result = {
-      logGroup: params.logGroup,
+      logGroup,
       filterPattern: params.filterPattern ?? null,
       startTime: params.startTime ?? null,
       endTime: params.endTime ?? null,
@@ -173,31 +288,10 @@ export async function logsFilter(
       truncated,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const isSsoError =
-      /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i.test(
-        message,
-      );
-    result = {
-      ok: false,
-      logGroup: params.logGroup,
-      error: message,
-      remedy: isSsoError
-        ? 'Run `aws sso login` to re-authenticate, then retry.'
-        : null,
-      hint: null,
-    };
+    return failureResult(logGroup, err, format);
   }
 
-  if (format === 'markdown') {
-    const text = renderAsMarkdown(result);
-    return isFailure(result)
-      ? { content: [{ type: 'text', text }], isError: true }
-      : { content: [{ type: 'text', text }] };
-  }
-
-  const text = JSON.stringify(result);
-  return isFailure(result)
-    ? { content: [{ type: 'text', text }], isError: true }
-    : { content: [{ type: 'text', text }] };
+  const text =
+    format === 'markdown' ? renderAsMarkdown(result) : JSON.stringify(result);
+  return { content: [{ type: 'text', text }] };
 }

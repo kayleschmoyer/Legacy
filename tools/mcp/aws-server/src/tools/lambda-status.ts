@@ -23,7 +23,12 @@ interface LambdaStatusCommonParams {
 export interface LambdaStatusParams extends LambdaStatusCommonParams {
   function?: string;
   functions?: string[];
+  /** Discovery mode: list deployed functions whose full name contains this. */
+  nameContains?: string;
 }
+
+/** Maximum number of functions returned by a `nameContains` lookup. */
+export const MAX_NAME_MATCHES = 50;
 
 /** Placeholder substituted for the value of any secret-named variable. */
 export const REDACTED = '[REDACTED]';
@@ -244,10 +249,89 @@ function toolError(message: string): ToolResult {
   };
 }
 
+/**
+ * `nameContains` mode: list every deployed function whose full name contains
+ * the substring (case-insensitive). Reaches functions `function` cannot name
+ * because they do not follow legacy-sports-{env}-{short} or are simply
+ * unknown to the caller (e.g. the runner scale-up/scale-down Lambdas).
+ */
+async function listByName(
+  nameContains: string,
+  runner: CommandRunner,
+): Promise<ToolResult> {
+  try {
+    // `--query` drops each function's Environment block from the CLI output,
+    // keeping the account-wide listing well under runCommand's output buffer.
+    const output = await runner(
+      'aws',
+      [
+        'lambda',
+        'list-functions',
+        '--query',
+        'Functions[].{FunctionName:FunctionName,Runtime:Runtime,LastModified:LastModified,MemorySize:MemorySize,Timeout:Timeout}',
+        '--output',
+        'json',
+      ],
+      getRepoRoot(),
+    );
+    const all = (output ? JSON.parse(output) : []) as LambdaConfig[] | null;
+    const needle = nameContains.toLowerCase();
+    const matches = (all ?? [])
+      .filter((f) => (f.FunctionName ?? '').toLowerCase().includes(needle))
+      .sort((a, b) =>
+        (a.FunctionName ?? '').localeCompare(b.FunctionName ?? ''),
+      );
+    const functions = matches.slice(0, MAX_NAME_MATCHES).map((f) => ({
+      functionName: f.FunctionName,
+      runtime: f.Runtime,
+      lastModified: f.LastModified,
+      memorySize: f.MemorySize,
+      timeout: f.Timeout,
+    }));
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            nameContains,
+            count: functions.length,
+            truncated: matches.length > MAX_NAME_MATCHES,
+            functions,
+          }),
+        },
+      ],
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: message,
+            remedy: classifyRemedy(message),
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
 export async function lambdaStatus(
   params: LambdaStatusParams,
   runner: CommandRunner = defaultRunner,
 ): Promise<ToolResult> {
+  if (params.nameContains) {
+    if (params.function || (params.functions && params.functions.length > 0)) {
+      return toolError(
+        'Provide `nameContains` on its own, not with `function` or `functions`.',
+      );
+    }
+    return listByName(params.nameContains, runner);
+  }
+
   const fns = params.functions;
   // `includeEnvValues` is the explicit values opt-in; asking for values without
   // also asking for the block would otherwise silently return nothing.
@@ -299,7 +383,9 @@ export async function lambdaStatus(
   }
 
   if (!params.function) {
-    return toolError('Either `function` or `functions` must be provided.');
+    return toolError(
+      'One of `function`, `functions`, or `nameContains` must be provided.',
+    );
   }
 
   const result = await fetchOne(

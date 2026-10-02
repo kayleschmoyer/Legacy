@@ -41,10 +41,11 @@ Look up CloudTrail events to diagnose EC2 instance lifecycle transitions: spot e
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `instanceId` | string |  | — | EC2 instance ID (e.g. "i-0abc1234def56789a"). Required for mode="death-verdict". |
-| `eventName` | string |  | — | CloudTrail event name (e.g. "BidEvictedEvent", "TerminateInstances"). Alphanumeric only. With instanceId in events mode, the query is by eventName, filtered client-side by instanceId. |
+| `eventName` | string |  | — | CloudTrail event name (e.g. "BidEvictedEvent", "TerminateInstances"). Alphanumeric only. |
+| `username` | string |  | — | Events mode: look up by Username (e.g. "legacy-sports-dev-runner-android-scale-up"); eventName/instanceId then filter client-side. |
 | `startTime` | string |  | — | Window start, ISO 8601 (e.g. "2024-01-15T12:00:00Z"). CloudTrail retains 90 days. |
 | `endTime` | string |  | — | Window end, ISO 8601. |
-| `mode` | enum |  | — | "events" (default): compact events { eventTime, eventName, username, instanceIds[], terminationReason }. "death-verdict": returns { verdict, events[] } where verdict is "spot" \| "scale-down" \| "manual" \| "unknown". |
+| `mode` | enum |  | — | "events" (default): compact events. "death-verdict": { verdict, signals[], events[] }, verdict "spot" \| "scale-down" \| "manual" \| "unknown"; also checks the runner syslog for a spot interruption notice. |
 
 ### `aws_cost_explorer`
 
@@ -74,12 +75,13 @@ Retrieve the system console output for an EC2 instance. Useful for diagnosing bo
 
 ### `aws_ec2_describe_image`
 
-Look up AMI metadata (name, creation date, state, tags) by image ID. Pass `tag` to return only the value of a single tag (e.g. PlaywrightVersion). Used to answer "what is baked into this AMI?" without falling back to raw `aws ec2 describe-images`.
+Look up AMI metadata (name, creation date, state, tags) by image ID, or find self-owned AMIs by name, newest first. Use instead of `aws ec2 describe-images`.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `imageId` | string | **required** | — | The AMI ID (e.g. "ami-03f0d40f5298d8217"). |
-| `tag` | string |  | — | If provided, return only the value of this specific tag (e.g. "PlaywrightVersion", "PnpmVersion"). Otherwise return the full image metadata with all tags. |
+| `imageId` | string |  | — | AMI ID (e.g. "ami-03f0d40f5298d8217"). Required unless nameFilter is set. |
+| `nameFilter` | string |  | — | Name pattern among self-owned AMIs (e.g. "legacy-sports-runner-android-*"); returns the 10 newest. |
+| `tag` | string |  | — | Return only this tag's value (e.g. "PlaywrightVersion"). |
 
 ### `aws_ec2_describe_security_groups`
 
@@ -113,7 +115,7 @@ Inspect EC2 launch templates filtered by Environment tag (and optional name subs
 
 ### `aws_ec2_network_inspect`
 
-Discover the project VPC + subnets in one call. Optional flags add route tables, NACLs, internet gateways, and VPC DNS attributes for reachability debugging.
+Discover the project VPC, subnets, and flow logs in one call. Flags add route tables, NACLs, internet gateways, and VPC DNS attributes.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -143,28 +145,31 @@ List the managed IAM policies attached to a role. Returns each attached policy's
 
 ### `aws_lambda_status`
 
-Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` (1-25) is batch mode; one failing function does not fail the others. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Both env flags apply per function in batch mode.
+Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` is batch mode; `nameContains` discovers functions by name. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `function` | string |  | — | Lambda short name (e.g. "graphql", "rollbar-discord"). Expanded to legacy-sports-{env}-{name}. Provide this OR `functions`, not both. |
-| `functions` | string[] |  | min 1, max 25 | Batch mode: 1-25 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. |
+| `function` | string |  | — | Lambda short name (e.g. "graphql"), expanded to legacy-sports-{env}-{name}. This OR `functions`. |
+| `functions` | string[] |  | min 1, max 25 | Batch mode: 1-25 short names. Returns `{ statuses, missing }`. |
+| `nameContains` | string |  | — | List deployed functions whose full name contains this (e.g. "runner"). Use alone. |
 | `environment` | enum |  | — | AWS environment (default: dev) |
-| `includeEnv` | boolean |  | — | Also return `environment: { variableNames }` — the names of the environment variables set on the deployed function (default: false). Names only; use `includeEnvValues` for values. |
-| `includeEnvValues` | boolean |  | — | Opt in to environment variable VALUES as well as names (default: false; implies `includeEnv`). Variables whose names match the secret heuristics (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back as "[REDACTED]" and are listed in `environment.redactedNames`; the rest are returned verbatim. Use for config verification, never to read credential material. |
+| `includeEnv` | boolean |  | — | Also return `environment.variableNames` (names only). |
+| `includeEnvValues` | boolean |  | — | Also return environment variable values (implies `includeEnv`). Secret-named variables (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back "[REDACTED]". For config verification, never credential material. |
 
 ### `aws_logs_filter`
 
-Search CloudWatch log events in any log group, with an optional filter pattern. Returns { timestamp, message } events, hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer this over shell aws logs filter-log-events, which mangles leading-slash group names on Windows.
+Search CloudWatch log events in a log group (optional filter pattern), or list log groups by name prefix. Returns { timestamp, message } events, capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer over shell aws logs, which mangles leading-slash group names on Windows.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
-| `logGroup` | string | **required** | — | Log group name, with the leading slash for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql). |
-| `filterPattern` | string |  | — | CloudWatch filter pattern (e.g. "ERROR", "{ $.statusCode = 500 }", "deleteAllLeagues"). Omit to return all events. |
-| `startTime` | number |  | integer | Start of the time range as epoch milliseconds (inclusive). |
-| `endTime` | number |  | integer | End of the time range as epoch milliseconds (exclusive). |
-| `limit` | number |  | coerced, integer, > 0, max MAX_EVENTS | Maximum number of events to return (default: ${MAX_EVENTS}, hard cap: ${MAX_EVENTS}). Output is also capped at ${MAX_CHARS} chars. |
-| `format` | enum |  | — | `markdown` (default): header plus a timestamped code block, cheaper to read. `json`: the full structured payload. |
+| `logGroup` | string |  | — | Log group name, e.g. /aws/lambda/legacy-sports-dev-graphql. Required unless listGroups is set. |
+| `listGroups` | string |  | — | List log groups with this name prefix (e.g. "/github-runners/") instead. |
+| `logStreamNames` | string[] |  | — | Only these streams (e.g. a runner instance ID). |
+| `filterPattern` | string |  | — | CloudWatch filter pattern (e.g. "ERROR", "{ $.statusCode = 500 }"). Omit for all events. |
+| `startTime` | number |  | integer | Range start, epoch ms (inclusive). |
+| `endTime` | number |  | integer | Range end, epoch ms (exclusive). |
+| `limit` | number |  | coerced, integer, > 0, max MAX_EVENTS | Maximum events (default and cap: ${MAX_EVENTS}). |
+| `format` | enum |  | — | Output shape (default: markdown). |
 
 ### `aws_logs_tail`
 

@@ -9,6 +9,7 @@ import {
   isSecretName,
   lambdaStatus,
   MAX_BATCH_FUNCTIONS,
+  MAX_NAME_MATCHES,
   REDACTED,
 } from './lambda-status.js';
 
@@ -420,5 +421,98 @@ describe('lambdaStatus environment reporting', () => {
       );
       expect(statuses[fn].environment.variables).toBeUndefined();
     }
+  });
+});
+
+describe('lambdaStatus (nameContains)', () => {
+  const listJson = (names: string[]) =>
+    JSON.stringify(
+      names.map((FunctionName) => ({
+        FunctionName,
+        Runtime: 'nodejs20.x',
+        LastModified: '2026-01-01T00:00:00.000+0000',
+        MemorySize: 512,
+        Timeout: 30,
+      })),
+    );
+
+  it('lists functions whose full name contains the substring, case-insensitively', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockResolvedValue(
+        listJson([
+          'legacy-sports-dev-runner-android-scale-up',
+          'legacy-sports-dev-graphql',
+          'legacy-sports-dev-Runner-scale-down',
+        ]),
+      );
+    const { body, isError } = unwrap(
+      await lambdaStatus({ ...baseParams, nameContains: 'runner' }, runner),
+    );
+    expect(isError).toBe(false);
+    expect(body.count).toBe(2);
+    expect(body.truncated).toBe(false);
+    const functions = body.functions as Array<{ functionName: string }>;
+    expect(functions.map((f) => f.functionName)).toEqual([
+      'legacy-sports-dev-runner-android-scale-up',
+      'legacy-sports-dev-Runner-scale-down',
+    ]);
+
+    expect(runner).toHaveBeenCalledTimes(1);
+    const args = jest.mocked(runner).mock.calls[0][1];
+    expect(args).toContain('list-functions');
+    expect(args).not.toContain('get-function-configuration');
+  });
+
+  it('returns an empty list when nothing matches', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockResolvedValue(listJson(['legacy-sports-dev-graphql']));
+    const { body } = unwrap(
+      await lambdaStatus({ ...baseParams, nameContains: 'runner' }, runner),
+    );
+    expect(body.count).toBe(0);
+    expect(body.functions).toEqual([]);
+  });
+
+  it(`caps matches at ${MAX_NAME_MATCHES} and reports truncated`, async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockResolvedValue(
+        listJson(
+          Array.from(
+            { length: MAX_NAME_MATCHES + 3 },
+            (_, i) => `legacy-sports-dev-fn-${String(i).padStart(3, '0')}`,
+          ),
+        ),
+      );
+    const { body } = unwrap(
+      await lambdaStatus({ ...baseParams, nameContains: 'fn-' }, runner),
+    );
+    expect(body.count).toBe(MAX_NAME_MATCHES);
+    expect(body.truncated).toBe(true);
+  });
+
+  it('rejects nameContains combined with function', async () => {
+    const runner: CommandRunner = jest.fn();
+    const { isError } = unwrap(
+      await lambdaStatus(
+        { ...baseParams, nameContains: 'runner', function: 'graphql' },
+        runner,
+      ),
+    );
+    expect(isError).toBe(true);
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it('returns isError with a remedy on SSO expiry', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockRejectedValue(new Error('sso session has expired'));
+    const { body, isError } = unwrap(
+      await lambdaStatus({ ...baseParams, nameContains: 'runner' }, runner),
+    );
+    expect(isError).toBe(true);
+    expect(body.remedy).toMatch(/aws sso login/);
   });
 });

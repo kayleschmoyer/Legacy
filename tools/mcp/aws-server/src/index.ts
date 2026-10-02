@@ -182,44 +182,51 @@ server.tool(
 // --- aws_logs_filter ---
 server.tool(
   'aws_logs_filter',
-  `Search CloudWatch log events in any log group, with an optional filter pattern. Returns { timestamp, message } events, hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer this over shell aws logs filter-log-events, which mangles leading-slash group names on Windows.`,
+  `Search CloudWatch log events in a log group (optional filter pattern), or list log groups by name prefix. Returns { timestamp, message } events, capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer over shell aws logs, which mangles leading-slash group names on Windows.`,
   {
     logGroup: z
       .string()
+      .optional()
       .describe(
-        'Log group name, with the leading slash for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql).',
+        'Log group name, e.g. /aws/lambda/legacy-sports-dev-graphql. Required unless listGroups is set.',
       ),
+    listGroups: z
+      .string()
+      .optional()
+      .describe(
+        'List log groups with this name prefix (e.g. "/github-runners/") instead.',
+      ),
+    logStreamNames: z
+      .array(z.string())
+      .optional()
+      .describe('Only these streams (e.g. a runner instance ID).'),
     filterPattern: z
       .string()
       .optional()
       .describe(
-        'CloudWatch filter pattern (e.g. "ERROR", "{ $.statusCode = 500 }", "deleteAllLeagues"). Omit to return all events.',
+        'CloudWatch filter pattern (e.g. "ERROR", "{ $.statusCode = 500 }"). Omit for all events.',
       ),
     startTime: z
       .number()
       .int()
       .optional()
-      .describe('Start of the time range as epoch milliseconds (inclusive).'),
+      .describe('Range start, epoch ms (inclusive).'),
     endTime: z
       .number()
       .int()
       .optional()
-      .describe('End of the time range as epoch milliseconds (exclusive).'),
+      .describe('Range end, epoch ms (exclusive).'),
     limit: z.coerce
       .number()
       .int()
       .positive()
       .max(MAX_EVENTS)
       .default(MAX_EVENTS)
-      .describe(
-        `Maximum number of events to return (default: ${MAX_EVENTS}, hard cap: ${MAX_EVENTS}). Output is also capped at ${MAX_CHARS} chars.`,
-      ),
+      .describe(`Maximum events (default and cap: ${MAX_EVENTS}).`),
     format: z
       .enum(['markdown', 'json'])
       .default('markdown')
-      .describe(
-        '`markdown` (default): header plus a timestamped code block, cheaper to read. `json`: the full structured payload.',
-      ),
+      .describe('Output shape (default: markdown).'),
   },
   async (params) => logsFilter(params),
 );
@@ -227,13 +234,13 @@ server.tool(
 // --- aws_lambda_status ---
 server.tool(
   'aws_lambda_status',
-  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` (1-25) is batch mode; one failing function does not fail the others. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Both env flags apply per function in batch mode.',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` is batch mode; `nameContains` discovers functions by name. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply.',
   {
     function: z
       .string()
       .optional()
       .describe(
-        'Lambda short name (e.g. "graphql", "rollbar-discord"). Expanded to legacy-sports-{env}-{name}. Provide this OR `functions`, not both.',
+        'Lambda short name (e.g. "graphql"), expanded to legacy-sports-{env}-{name}. This OR `functions`.',
       ),
     functions: z
       .array(z.string())
@@ -241,7 +248,13 @@ server.tool(
       .max(25)
       .optional()
       .describe(
-        'Batch mode: 1-25 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`.',
+        'Batch mode: 1-25 short names. Returns `{ statuses, missing }`.',
+      ),
+    nameContains: z
+      .string()
+      .optional()
+      .describe(
+        'List deployed functions whose full name contains this (e.g. "runner"). Use alone.',
       ),
     environment: z
       .enum(['dev', 'prod'])
@@ -250,14 +263,12 @@ server.tool(
     includeEnv: z
       .boolean()
       .default(false)
-      .describe(
-        'Also return `environment: { variableNames }` — the names of the environment variables set on the deployed function (default: false). Names only; use `includeEnvValues` for values.',
-      ),
+      .describe('Also return `environment.variableNames` (names only).'),
     includeEnvValues: z
       .boolean()
       .default(false)
       .describe(
-        'Opt in to environment variable VALUES as well as names (default: false; implies `includeEnv`). Variables whose names match the secret heuristics (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back as "[REDACTED]" and are listed in `environment.redactedNames`; the rest are returned verbatim. Use for config verification, never to read credential material.',
+        'Also return environment variable values (implies `includeEnv`). Secret-named variables (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back "[REDACTED]". For config verification, never credential material.',
       ),
   },
   async (params) => lambdaStatus(params),
@@ -559,7 +570,13 @@ server.tool(
       .string()
       .optional()
       .describe(
-        'CloudTrail event name (e.g. "BidEvictedEvent", "TerminateInstances"). Alphanumeric only. With instanceId in events mode, the query is by eventName, filtered client-side by instanceId.',
+        'CloudTrail event name (e.g. "BidEvictedEvent", "TerminateInstances"). Alphanumeric only.',
+      ),
+    username: z
+      .string()
+      .optional()
+      .describe(
+        'Events mode: look up by Username (e.g. "legacy-sports-dev-runner-android-scale-up"); eventName/instanceId then filter client-side.',
       ),
     startTime: z
       .string()
@@ -572,7 +589,7 @@ server.tool(
       .enum(['events', 'death-verdict'])
       .default('events')
       .describe(
-        '"events" (default): compact events { eventTime, eventName, username, instanceIds[], terminationReason }. "death-verdict": returns { verdict, events[] } where verdict is "spot" | "scale-down" | "manual" | "unknown".',
+        '"events" (default): compact events. "death-verdict": { verdict, signals[], events[] }, verdict "spot" | "scale-down" | "manual" | "unknown"; also checks the runner syslog for a spot interruption notice.',
       ),
   },
   async (params) => cloudTrailLookup(params),
@@ -736,7 +753,7 @@ server.tool(
 // --- aws_ec2_network_inspect ---
 server.tool(
   'aws_ec2_network_inspect',
-  'Discover the project VPC + subnets in one call. Optional flags add route tables, NACLs, internet gateways, and VPC DNS attributes for reachability debugging.',
+  'Discover the project VPC, subnets, and flow logs in one call. Flags add route tables, NACLs, internet gateways, and VPC DNS attributes.',
   {
     environment: z
       .enum(['dev', 'prod'])
@@ -760,15 +777,24 @@ server.tool(
 // --- aws_ec2_describe_image ---
 server.tool(
   'aws_ec2_describe_image',
-  'Look up AMI metadata (name, creation date, state, tags) by image ID. Pass `tag` to return only the value of a single tag (e.g. PlaywrightVersion). Used to answer "what is baked into this AMI?" without falling back to raw `aws ec2 describe-images`.',
+  'Look up AMI metadata (name, creation date, state, tags) by image ID, or find self-owned AMIs by name, newest first. Use instead of `aws ec2 describe-images`.',
   {
-    imageId: z.string().describe('The AMI ID (e.g. "ami-03f0d40f5298d8217").'),
-    tag: z
+    imageId: z
       .string()
       .optional()
       .describe(
-        'If provided, return only the value of this specific tag (e.g. "PlaywrightVersion", "PnpmVersion"). Otherwise return the full image metadata with all tags.',
+        'AMI ID (e.g. "ami-03f0d40f5298d8217"). Required unless nameFilter is set.',
       ),
+    nameFilter: z
+      .string()
+      .optional()
+      .describe(
+        'Name pattern among self-owned AMIs (e.g. "legacy-sports-runner-android-*"); returns the 10 newest.',
+      ),
+    tag: z
+      .string()
+      .optional()
+      .describe('Return only this tag\'s value (e.g. "PlaywrightVersion").'),
   },
   async (params) => ec2DescribeImage(params),
 );

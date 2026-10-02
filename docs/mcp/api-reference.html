@@ -658,7 +658,7 @@ td.param-desc {
         </div>
         <div class="stat">
           <dt>Parameters</dt>
-          <dd>948</dd>
+          <dd>953</dd>
         </div>
         <div class="stat">
           <dt>Run locally</dt>
@@ -8587,7 +8587,12 @@ td.param-desc {
             "eventName": {
               "type": "string",
               "optional": true,
-              "description": "CloudTrail event name (e.g. \"BidEvictedEvent\", \"TerminateInstances\"). Alphanumeric only. With instanceId in events mode, the query is by eventName, filtered client-side by instanceId."
+              "description": "CloudTrail event name (e.g. \"BidEvictedEvent\", \"TerminateInstances\"). Alphanumeric only."
+            },
+            "username": {
+              "type": "string",
+              "optional": true,
+              "description": "Events mode: look up by Username (e.g. \"legacy-sports-dev-runner-android-scale-up\"); eventName/instanceId then filter client-side."
             },
             "startTime": {
               "type": "string",
@@ -8607,7 +8612,7 @@ td.param-desc {
                 "death-verdict"
               ],
               "default": "events",
-              "description": "\"events\" (default): compact events { eventTime, eventName, username, instanceIds[], terminationReason }. \"death-verdict\": returns { verdict, events[] } where verdict is \"spot\" | \"scale-down\" | \"manual\" | \"unknown\"."
+              "description": "\"events\" (default): compact events. \"death-verdict\": { verdict, signals[], events[] }, verdict \"spot\" | \"scale-down\" | \"manual\" | \"unknown\"; also checks the runner syslog for a spot interruption notice."
             }
           },
           "transports": [
@@ -8725,17 +8730,22 @@ td.param-desc {
         },
         {
           "name": "aws_ec2_describe_image",
-          "description": "Look up AMI metadata (name, creation date, state, tags) by image ID. Pass `tag` to return only the value of a single tag (e.g. PlaywrightVersion). Used to answer \"what is baked into this AMI?\" without falling back to raw `aws ec2 describe-images`.",
+          "description": "Look up AMI metadata (name, creation date, state, tags) by image ID, or find self-owned AMIs by name, newest first. Use instead of `aws ec2 describe-images`.",
           "inputs": {
             "imageId": {
               "type": "string",
-              "optional": false,
-              "description": "The AMI ID (e.g. \"ami-03f0d40f5298d8217\")."
+              "optional": true,
+              "description": "AMI ID (e.g. \"ami-03f0d40f5298d8217\"). Required unless nameFilter is set."
+            },
+            "nameFilter": {
+              "type": "string",
+              "optional": true,
+              "description": "Name pattern among self-owned AMIs (e.g. \"legacy-sports-runner-android-*\"); returns the 10 newest."
             },
             "tag": {
               "type": "string",
               "optional": true,
-              "description": "If provided, return only the value of this specific tag (e.g. \"PlaywrightVersion\", \"PnpmVersion\"). Otherwise return the full image metadata with all tags."
+              "description": "Return only this tag's value (e.g. \"PlaywrightVersion\")."
             }
           },
           "transports": [
@@ -8853,7 +8863,7 @@ td.param-desc {
         },
         {
           "name": "aws_ec2_network_inspect",
-          "description": "Discover the project VPC + subnets in one call. Optional flags add route tables, NACLs, internet gateways, and VPC DNS attributes for reachability debugging.",
+          "description": "Discover the project VPC, subnets, and flow logs in one call. Flags add route tables, NACLs, internet gateways, and VPC DNS attributes.",
           "inputs": {
             "environment": {
               "type": "enum",
@@ -8941,12 +8951,12 @@ td.param-desc {
         },
         {
           "name": "aws_lambda_status",
-          "description": "Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` (1-25) is batch mode; one failing function does not fail the others. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Both env flags apply per function in batch mode.",
+          "description": "Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` is batch mode; `nameContains` discovers functions by name. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply.",
           "inputs": {
             "function": {
               "type": "string",
               "optional": true,
-              "description": "Lambda short name (e.g. \"graphql\", \"rollbar-discord\"). Expanded to legacy-sports-{env}-{name}. Provide this OR `functions`, not both."
+              "description": "Lambda short name (e.g. \"graphql\"), expanded to legacy-sports-{env}-{name}. This OR `functions`."
             },
             "functions": {
               "type": "array",
@@ -8959,7 +8969,12 @@ td.param-desc {
                 "type": "string",
                 "optional": false
               },
-              "description": "Batch mode: 1-25 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: \u003centry\u003e }, missing: [{ function, error }] }`."
+              "description": "Batch mode: 1-25 short names. Returns `{ statuses, missing }`."
+            },
+            "nameContains": {
+              "type": "string",
+              "optional": true,
+              "description": "List deployed functions whose full name contains this (e.g. \"runner\"). Use alone."
             },
             "environment": {
               "type": "enum",
@@ -8975,13 +8990,13 @@ td.param-desc {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Also return `environment: { variableNames }` — the names of the environment variables set on the deployed function (default: false). Names only; use `includeEnvValues` for values."
+              "description": "Also return `environment.variableNames` (names only)."
             },
             "includeEnvValues": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Opt in to environment variable VALUES as well as names (default: false; implies `includeEnv`). Variables whose names match the secret heuristics (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back as \"[REDACTED]\" and are listed in `environment.redactedNames`; the rest are returned verbatim. Use for config verification, never to read credential material."
+              "description": "Also return environment variable values (implies `includeEnv`). Secret-named variables (*_SECRET*, *_TOKEN*, *PASSWORD*, *_KEY*) come back \"[REDACTED]\". For config verification, never credential material."
             }
           },
           "transports": [
@@ -8990,17 +9005,31 @@ td.param-desc {
         },
         {
           "name": "aws_logs_filter",
-          "description": "Search CloudWatch log events in any log group, with an optional filter pattern. Returns { timestamp, message } events, hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer this over shell aws logs filter-log-events, which mangles leading-slash group names on Windows.",
+          "description": "Search CloudWatch log events in a log group (optional filter pattern), or list log groups by name prefix. Returns { timestamp, message } events, capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer over shell aws logs, which mangles leading-slash group names on Windows.",
           "inputs": {
             "logGroup": {
               "type": "string",
-              "optional": false,
-              "description": "Log group name, with the leading slash for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql)."
+              "optional": true,
+              "description": "Log group name, e.g. /aws/lambda/legacy-sports-dev-graphql. Required unless listGroups is set."
+            },
+            "listGroups": {
+              "type": "string",
+              "optional": true,
+              "description": "List log groups with this name prefix (e.g. \"/github-runners/\") instead."
+            },
+            "logStreamNames": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "Only these streams (e.g. a runner instance ID)."
             },
             "filterPattern": {
               "type": "string",
               "optional": true,
-              "description": "CloudWatch filter pattern (e.g. \"ERROR\", \"{ $.statusCode = 500 }\", \"deleteAllLeagues\"). Omit to return all events."
+              "description": "CloudWatch filter pattern (e.g. \"ERROR\", \"{ $.statusCode = 500 }\"). Omit for all events."
             },
             "startTime": {
               "type": "number",
@@ -9008,7 +9037,7 @@ td.param-desc {
               "constraints": [
                 "integer"
               ],
-              "description": "Start of the time range as epoch milliseconds (inclusive)."
+              "description": "Range start, epoch ms (inclusive)."
             },
             "endTime": {
               "type": "number",
@@ -9016,7 +9045,7 @@ td.param-desc {
               "constraints": [
                 "integer"
               ],
-              "description": "End of the time range as epoch milliseconds (exclusive)."
+              "description": "Range end, epoch ms (exclusive)."
             },
             "limit": {
               "type": "number",
@@ -9028,7 +9057,7 @@ td.param-desc {
                 "max MAX_EVENTS"
               ],
               "default": "MAX_EVENTS",
-              "description": "Maximum number of events to return (default: ${MAX_EVENTS}, hard cap: ${MAX_EVENTS}). Output is also capped at ${MAX_CHARS} chars."
+              "description": "Maximum events (default and cap: ${MAX_EVENTS})."
             },
             "format": {
               "type": "enum",
@@ -9038,7 +9067,7 @@ td.param-desc {
                 "json"
               ],
               "default": "markdown",
-              "description": "`markdown` (default): header plus a timestamped code block, cheaper to read. `json`: the full structured payload."
+              "description": "Output shape (default: markdown)."
             }
           },
           "transports": [

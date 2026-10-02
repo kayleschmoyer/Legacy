@@ -139,6 +139,49 @@ describe('cloudTrailLookup — events mode', () => {
     expect(data.count).toBe(1);
   });
 
+  it('queries by Username when username is provided', async () => {
+    mockedRun.mockResolvedValue(JSON.stringify({ Events: [TERMINATE_EVENT] }));
+    const result = await cloudTrailLookup({
+      username: 'legacy-sports-dev-runner-scale-down',
+    });
+    expect(parsed(result).count).toBe(1);
+    expect(mockedRun).toHaveBeenCalledTimes(1);
+    expect(mockedRun.mock.calls[0][1]).toContain(
+      'AttributeKey=Username,AttributeValue=legacy-sports-dev-runner-scale-down',
+    );
+  });
+
+  it('filters a Username lookup client-side by eventName and instanceId', async () => {
+    mockedRun.mockResolvedValue(
+      JSON.stringify({
+        Events: [
+          TERMINATE_EVENT,
+          { ...TERMINATE_EVENT, EventName: 'DescribeInstances' },
+          {
+            ...TERMINATE_EVENT,
+            Resources: [{ ResourceName: 'i-0other000000000a' }],
+          },
+        ],
+      }),
+    );
+    const result = await cloudTrailLookup({
+      username: 'legacy-sports-dev-runner-scale-down',
+      eventName: 'TerminateInstances',
+      instanceId: 'i-0abc1234def56789a',
+    });
+    expect(parsed(result).count).toBe(1);
+    expect(mockedRun.mock.calls[0][1].join(' ')).toContain(
+      'AttributeKey=Username',
+    );
+  });
+
+  it('rejects a username that would break the lookup-attributes shorthand', async () => {
+    const result = await cloudTrailLookup({ username: 'a,AttributeKey=x' });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('Invalid username');
+    expect(mockedRun).not.toHaveBeenCalled();
+  });
+
   it('returns terminationReason=spot-eviction for BidEvictedEvent', async () => {
     mockedRun.mockResolvedValue(
       JSON.stringify({ Events: [BID_EVICTED_EVENT] }),
@@ -246,7 +289,7 @@ describe('cloudTrailLookup — death-verdict mode', () => {
     expect(parsed(result).verdict).toBe('spot');
   });
 
-  it('runs exactly two parallel lookups (ResourceName + BidEvictedEvent)', async () => {
+  it('runs the two CloudTrail lookups plus one syslog check per runner group', async () => {
     mockedRun
       .mockResolvedValueOnce(JSON.stringify({ Events: [] }))
       .mockResolvedValueOnce(JSON.stringify({ Events: [] }));
@@ -255,10 +298,150 @@ describe('cloudTrailLookup — death-verdict mode', () => {
       instanceId: 'i-0abc1234def56789a',
       mode: 'death-verdict',
     });
-    expect(mockedRun).toHaveBeenCalledTimes(2);
+    expect(mockedRun).toHaveBeenCalledTimes(4);
     const lookupArgs = mockedRun.mock.calls.map((c) => c[1].join(' '));
     expect(lookupArgs.some((a) => a.includes('ResourceName'))).toBe(true);
     expect(lookupArgs.some((a) => a.includes('BidEvictedEvent'))).toBe(true);
+    expect(
+      lookupArgs.filter((a) => a.includes('filter-log-events')),
+    ).toHaveLength(2);
+  });
+
+  describe('spot interruption notice (LS-10346)', () => {
+    const SPOT_NOTICE_LOG = JSON.stringify({
+      events: [
+        {
+          timestamp: Date.parse('2024-01-15T11:58:54Z'),
+          message:
+            'Jan 15 11:58:54 ip-10-0-1-27 user-data: [spot-handler] Spot interruption notice received — sending SIGTERM to runner\n',
+        },
+      ],
+    });
+
+    /** Route by command so the mock does not depend on Promise.all ordering. */
+    function mockLookups(opts: {
+      byResource?: object[];
+      bidEvicted?: object[];
+      syslog?: (group: string) => string | Error;
+    }): void {
+      mockedRun.mockImplementation((_cmd, args) => {
+        if (args.includes('filter-log-events')) {
+          const group = args[args.indexOf('--log-group-name') + 1];
+          const out = opts.syslog?.(group) ?? JSON.stringify({ events: [] });
+          return out instanceof Error
+            ? Promise.reject(out)
+            : Promise.resolve(out);
+        }
+        const isBidEvicted = args.some((a) => a.includes('BidEvictedEvent'));
+        return Promise.resolve(
+          JSON.stringify({
+            Events: isBidEvicted
+              ? (opts.bidEvicted ?? [])
+              : (opts.byResource ?? []),
+          }),
+        );
+      });
+    }
+
+    it('returns verdict=spot with both signals when scale-down terminated an instance that already had its notice', async () => {
+      mockLookups({
+        byResource: [TERMINATE_EVENT],
+        syslog: (group) =>
+          group.endsWith('-runner/syslog')
+            ? SPOT_NOTICE_LOG
+            : JSON.stringify({ events: [] }),
+      });
+
+      const data = parsed(
+        await cloudTrailLookup({
+          instanceId: 'i-0abc1234def56789a',
+          mode: 'death-verdict',
+        }),
+      );
+      expect(data.verdict).toBe('spot');
+      expect(data.signals).toEqual([
+        'spot-interruption-notice',
+        'scale-down-terminate',
+      ]);
+      const spotNotice = data.spotNotice as { time: string; message: string };
+      expect(spotNotice.time).toBe('2024-01-15T11:58:54.000Z');
+      expect(spotNotice.message).toContain('Spot interruption notice received');
+      // The TerminateInstances event is still reported alongside the notice.
+      expect(data.events).toHaveLength(1);
+    });
+
+    it('still returns verdict=scale-down when the syslog has no notice', async () => {
+      mockLookups({ byResource: [TERMINATE_EVENT] });
+
+      const data = parsed(
+        await cloudTrailLookup({
+          instanceId: 'i-0abc1234def56789a',
+          mode: 'death-verdict',
+        }),
+      );
+      expect(data.verdict).toBe('scale-down');
+      expect(data.signals).toEqual(['scale-down-terminate']);
+      expect(data.spotNotice).toBeUndefined();
+      expect(data.spotNoticeCheckError).toBeUndefined();
+    });
+
+    it('scopes the syslog search to the instance stream and a leading-slash group', async () => {
+      mockLookups({});
+
+      await cloudTrailLookup({
+        instanceId: 'i-0abc1234def56789a',
+        mode: 'death-verdict',
+        startTime: '2024-01-15T11:00:00Z',
+      });
+      const logCalls = mockedRun.mock.calls
+        .map((c) => c[1])
+        .filter((a) => a.includes('filter-log-events'));
+      for (const args of logCalls) {
+        expect(args[args.indexOf('--log-group-name') + 1]).toMatch(
+          /^\/github-runners\/legacy-sports-dev-runner(-android)?\/syslog$/,
+        );
+        expect(args[args.indexOf('--log-stream-names') + 1]).toBe(
+          'i-0abc1234def56789a',
+        );
+        expect(args[args.indexOf('--start-time') + 1]).toBe(
+          String(Date.parse('2024-01-15T11:00:00Z')),
+        );
+      }
+    });
+
+    it('flags an unverified verdict when no syslog group could be read', async () => {
+      mockLookups({
+        byResource: [TERMINATE_EVENT],
+        syslog: () => new Error('AccessDeniedException'),
+      });
+
+      const data = parsed(
+        await cloudTrailLookup({
+          instanceId: 'i-0abc1234def56789a',
+          mode: 'death-verdict',
+        }),
+      );
+      expect(data.verdict).toBe('scale-down');
+      expect(data.spotNoticeCheckError).toContain('AccessDeniedException');
+    });
+
+    it('does not flag an error when only one syslog group is unreadable', async () => {
+      mockLookups({
+        byResource: [TERMINATE_EVENT],
+        syslog: (group) =>
+          group.includes('android')
+            ? new Error('ResourceNotFoundException')
+            : JSON.stringify({ events: [] }),
+      });
+
+      const data = parsed(
+        await cloudTrailLookup({
+          instanceId: 'i-0abc1234def56789a',
+          mode: 'death-verdict',
+        }),
+      );
+      expect(data.spotNoticeCheckError).toBeUndefined();
+    });
   });
 
   it('does not include BidEvictedEvents for a different instance in verdict', async () => {

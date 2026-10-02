@@ -183,7 +183,129 @@ describe('logsFilter', () => {
     });
   });
 
+  describe('logStreamNames', () => {
+    it('passes each stream name as its own argv entry', async () => {
+      const runner: CommandRunner = jest
+        .fn()
+        .mockResolvedValue(makeAwsOutput([]));
+      await logsFilter(
+        {
+          logGroup: '/github-runners/legacy-sports-dev-runner/syslog',
+          logStreamNames: ['i-0f4049f842a966c2d', 'i-0abc1234def56789a'],
+          format: 'json',
+        },
+        runner,
+      );
+      const args = jest.mocked(runner).mock.calls[0][1];
+      const idx = args.indexOf('--log-stream-names');
+      expect(args.slice(idx + 1, idx + 3)).toEqual([
+        'i-0f4049f842a966c2d',
+        'i-0abc1234def56789a',
+      ]);
+      // Leading-slash group name reaches the CLI byte-for-byte.
+      expect(args[args.indexOf('--log-group-name') + 1]).toBe(
+        '/github-runners/legacy-sports-dev-runner/syslog',
+      );
+    });
+
+    it('omits --log-stream-names when not provided', async () => {
+      const runner: CommandRunner = jest
+        .fn()
+        .mockResolvedValue(makeAwsOutput([]));
+      await logsFilter({ logGroup: LOG_GROUP, format: 'json' }, runner);
+      expect(jest.mocked(runner).mock.calls[0][1]).not.toContain(
+        '--log-stream-names',
+      );
+    });
+  });
+
+  describe('listGroups', () => {
+    const groupsOutput = JSON.stringify({
+      logGroups: [
+        {
+          logGroupName: '/github-runners/legacy-sports-dev-runner/syslog',
+          retentionInDays: 7,
+          storedBytes: 1234,
+        },
+        { logGroupName: '/github-runners/legacy-sports-dev-runner/cloud-init' },
+      ],
+    });
+
+    it('lists log groups by prefix instead of searching events', async () => {
+      const runner: CommandRunner = jest.fn().mockResolvedValue(groupsOutput);
+      const result = await logsFilter(
+        { listGroups: '/github-runners/', format: 'json' },
+        runner,
+      );
+      expect(result.isError).toBeFalsy();
+      const args = jest.mocked(runner).mock.calls[0][1];
+      expect(args).toContain('describe-log-groups');
+      expect(args).not.toContain('filter-log-events');
+      expect(args[args.indexOf('--log-group-name-prefix') + 1]).toBe(
+        '/github-runners/',
+      );
+      const body = parseJson(result) as {
+        logGroups: { name: string; retentionInDays: number | null }[];
+        count: number;
+        truncated: boolean;
+      };
+      expect(body.count).toBe(2);
+      expect(body.truncated).toBe(false);
+      expect(body.logGroups[0]).toEqual({
+        name: '/github-runners/legacy-sports-dev-runner/syslog',
+        retentionInDays: 7,
+        storedBytes: 1234,
+      });
+      expect(body.logGroups[1].retentionInDays).toBeNull();
+    });
+
+    it('reports truncated:true when AWS returns a nextToken', async () => {
+      const runner: CommandRunner = jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ logGroups: [], nextToken: 't' }));
+      const result = await logsFilter(
+        { listGroups: '/aws/', format: 'json' },
+        runner,
+      );
+      expect((parseJson(result) as { truncated: boolean }).truncated).toBe(
+        true,
+      );
+    });
+
+    it('renders group names in markdown', async () => {
+      const runner: CommandRunner = jest.fn().mockResolvedValue(groupsOutput);
+      const text = rawText(
+        await logsFilter({ listGroups: '/github-runners/' }, runner),
+      );
+      expect(text).toContain('**prefix**: /github-runners/');
+      expect(text).toContain(
+        '- /github-runners/legacy-sports-dev-runner/syslog',
+      );
+    });
+
+    it('returns isError:true when describe-log-groups fails', async () => {
+      const runner: CommandRunner = jest
+        .fn()
+        .mockRejectedValue(new Error('AccessDeniedException'));
+      const result = await logsFilter(
+        { listGroups: '/github-runners/', format: 'json' },
+        runner,
+      );
+      expect(result.isError).toBe(true);
+    });
+  });
+
   describe('errors', () => {
+    it('rejects a call with neither logGroup nor listGroups', async () => {
+      const runner: CommandRunner = jest.fn();
+      const result = await logsFilter({ format: 'json' }, runner);
+      expect(result.isError).toBe(true);
+      expect(runner).not.toHaveBeenCalled();
+      expect((parseJson(result) as { error: string }).error).toMatch(
+        /logGroup.*listGroups/,
+      );
+    });
+
     it('returns isError:true and remedy for SSO expiry', async () => {
       const runner: CommandRunner = jest
         .fn()
