@@ -603,7 +603,7 @@ function CancelConfirmDialog({
               Cancel Subscription?
             </Paragraph>
             <Paragraph size="$2" color="$colorPress">
-              Your access will end at the current billing period
+              Finish cancelling in our billing portal
             </Paragraph>
           </YStack>
         </SectionHeader>
@@ -627,6 +627,11 @@ function CancelConfirmDialog({
             <Paragraph size="$3" color="$colorPress">
               You can resubscribe at any time to restore access.
             </Paragraph>
+            <Paragraph size="$3" color="$colorPress">
+              Your subscription isn&apos;t cancelled yet. Continue to the
+              billing portal and confirm the cancellation there — your access
+              will then end at the current billing period.
+            </Paragraph>
           </YStack>
 
           <Separator />
@@ -648,7 +653,7 @@ function CancelConfirmDialog({
               disabled={loading}
               style={{ color: RED } as React.CSSProperties}
             >
-              {loading ? 'Processing...' : 'Confirm Cancel'}
+              {loading ? 'Processing...' : 'Continue to billing portal'}
             </CtaButton>
           </XStack>
         </SectionBody>
@@ -902,7 +907,8 @@ const SubscriptionPage: React.FC = () => {
   };
 
   const handleCancelConfirm = () => {
-    // Opens billing portal to complete cancellation on Stripe side
+    // Opens billing portal to complete cancellation on Stripe side — the
+    // dialog copy says so; nothing is cancelled until the user confirms there.
     setShowCancelDialog(false);
     requireStepUp(() => void handleManageSubscriptionAction());
   };

@@ -69,7 +69,7 @@ Key features compared: Leagues, Stats access, Waiver system, and more.
 ## Cancel Subscription Dialog
 
 - "Keep Premium" button
-- "Yes, Cancel" (confirm cancel) button
+- "Continue to billing portal" button (opens the Stripe billing portal, where the cancellation is actually confirmed)
 
 ---
 

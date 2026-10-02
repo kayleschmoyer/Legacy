@@ -707,6 +707,30 @@ describe('SubscriptionPage — league-cap comparison row (LS-7394)', () => {
     expect(screen.getByText('Unlimited active leagues')).toBeInTheDocument();
     expect(screen.getByText('Salary cap leagues')).toBeInTheDocument();
   });
+
+  // LS-7402: confirming only opens the Stripe billing portal (cancellation is
+  // completed there), so the dialog must not claim the cancel is confirmed.
+  it('labels the cancel dialog action as a billing-portal handoff, not a confirmed cancel (LS-7402)', () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'active',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+
+    renderPage();
+    fireEvent.click(screen.getByText('Cancel Subscription'));
+
+    expect(screen.getByText('Continue to billing portal')).toBeInTheDocument();
+    expect(screen.queryByText('Confirm Cancel')).not.toBeInTheDocument();
+    expect(screen.getByText(/isn.t cancelled yet/)).toBeInTheDocument();
+  });
 });
 
 // LS-7424: checkoutJustCompleted was a one-shot flag — once true it never reset,
