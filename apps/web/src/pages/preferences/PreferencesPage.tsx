@@ -55,6 +55,7 @@ import {
 import { useCoalescedSave } from './useCoalescedSave';
 import { useRetryingSave } from './useRetryingSave';
 import { PageMeta } from '../../components/PageMeta';
+import { useBrowserNotificationPermission } from '../../hooks/useBrowserNotificationPermission';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -979,11 +980,27 @@ function NotificationPreferencesSection({
     [updateQuery, coalesced],
   );
 
+  const { permission: browserPermission, request: requestBrowserPermission } =
+    useBrowserNotificationPermission();
+
   const handleToggle = useCallback(
     (field: NotificationToggleField, value: boolean) => {
-      queueChange({ [field]: value });
+      if (field !== 'pushEnabled' || !value) {
+        queueChange({ [field]: value });
+        return;
+      }
+      // LS-7089: only turn push ON when the browser can actually deliver it.
+      // 'unsupported' cannot be verified, so it keeps the previous behaviour.
+      void (async () => {
+        const permission =
+          browserPermission === 'default'
+            ? await requestBrowserPermission()
+            : browserPermission;
+        if (permission === 'denied' || permission === 'default') return;
+        queueChange({ pushEnabled: true });
+      })();
     },
-    [queueChange],
+    [queueChange, browserPermission, requestBrowserPermission],
   );
 
   const handleThresholdChange = useCallback(
@@ -1169,6 +1186,17 @@ function NotificationPreferencesSection({
             label="Push notifications"
             description="On this device. Game alerts in your hand."
           />
+          {browserPermission === 'denied' && (
+            <Paragraph
+              size="$3"
+              color="$red10"
+              role="status"
+              data-testid="prefs-push-blocked-hint"
+            >
+              Notifications are blocked for this site. Enable notifications in
+              your browser settings to receive push alerts.
+            </Paragraph>
+          )}
 
           <Separator />
 

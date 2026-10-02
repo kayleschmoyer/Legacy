@@ -163,6 +163,143 @@ describe('PreferencesPage notification save failure (LS-7082)', () => {
   });
 });
 
+describe('PreferencesPage push toggle OS permission (LS-7089)', () => {
+  const original = Object.getOwnPropertyDescriptor(window, 'Notification');
+  let updatePrefs: jest.Mock;
+
+  function setPermission(
+    permission: NotificationPermission,
+    requestPermission: jest.Mock = jest.fn(),
+  ): void {
+    Object.defineProperty(window, 'Notification', {
+      value: { permission, requestPermission },
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockUseQuery.mockReturnValue({
+      data: {
+        getUserNotificationPreferences: {
+          __typename: 'NotificationPreferences',
+          pushEnabled: false,
+        },
+      },
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+      updateQuery: jest.fn(),
+    });
+    updatePrefs = jest.fn().mockResolvedValue({ data: undefined });
+    (useUpdateNotificationPreferencesMutation as jest.Mock).mockReturnValue([
+      updatePrefs,
+    ]);
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    if (original) Object.defineProperty(window, 'Notification', original);
+    else delete (window as { Notification?: unknown }).Notification;
+  });
+
+  async function clickPush(): Promise<void> {
+    fireEvent.click(screen.getByRole('switch', { name: 'Push notifications' }));
+    await act(() => jest.advanceTimersByTimeAsync(300));
+  }
+
+  it('does not enable push and shows the blocked hint when permission is denied', async () => {
+    setPermission('denied');
+    render(<PreferencesPage />);
+    expect(
+      screen.getByText(/notifications are blocked for this site/i),
+    ).toBeTruthy();
+
+    await clickPush();
+
+    expect(updatePrefs).not.toHaveBeenCalled();
+  });
+
+  it('prompts when permission is undecided and enables push once granted', async () => {
+    const requestPermission = jest.fn().mockImplementation(() => {
+      setPermission('granted', requestPermission);
+      return Promise.resolve('granted');
+    });
+    setPermission('default', requestPermission);
+    render(<PreferencesPage />);
+
+    await clickPush();
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(updatePrefs).toHaveBeenCalledTimes(1);
+    expect(updatePrefs.mock.calls[0][0].variables.input).toEqual({
+      pushEnabled: true,
+    });
+    expect(
+      screen.queryByText(/notifications are blocked for this site/i),
+    ).toBeNull();
+  });
+
+  it('does not enable push when the prompt is dismissed', async () => {
+    const requestPermission = jest.fn().mockResolvedValue('default');
+    setPermission('default', requestPermission);
+    render(<PreferencesPage />);
+
+    await clickPush();
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(updatePrefs).not.toHaveBeenCalled();
+  });
+
+  it('enables push without prompting when permission is already granted', async () => {
+    const requestPermission = jest.fn();
+    setPermission('granted', requestPermission);
+    render(<PreferencesPage />);
+
+    await clickPush();
+
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(updatePrefs).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the previous behaviour where the Notification API is unavailable', async () => {
+    delete (window as { Notification?: unknown }).Notification;
+    render(<PreferencesPage />);
+
+    await clickPush();
+
+    expect(updatePrefs).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByText(/notifications are blocked for this site/i),
+    ).toBeNull();
+  });
+
+  it('still lets the user turn push OFF while permission is denied', async () => {
+    setPermission('denied');
+    mockUseQuery.mockReturnValue({
+      data: {
+        getUserNotificationPreferences: {
+          __typename: 'NotificationPreferences',
+          pushEnabled: true,
+        },
+      },
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+      updateQuery: jest.fn(),
+    });
+    render(<PreferencesPage />);
+
+    await clickPush();
+
+    expect(updatePrefs.mock.calls[0][0].variables.input).toEqual({
+      pushEnabled: false,
+    });
+  });
+});
+
 describe('PreferencesPage notifications Retry (LS-7095)', () => {
   it('requests network-status updates so refetch state is observable', () => {
     mockQueryState(NetworkStatus.error, jest.fn());
