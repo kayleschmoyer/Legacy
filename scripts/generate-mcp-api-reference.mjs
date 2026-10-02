@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import {
   budgetFromMeasurement,
   checkBudget,
+  describeSingleServerUpdate,
   measureDefinitionTokens,
   updateSingleServerBudget,
 } from './mcp-api-reference/budget.mjs';
@@ -165,11 +166,11 @@ function main() {
     const body = `${JSON.stringify(updated, null, 2)}\n`;
     mkdirSync(OUT_DIR, { recursive: true });
     writeFileSync(BUDGET_PATH, body);
-    const actual = measured.servers[updateBudgetServer];
     console.log(
-      `Raised ${updateBudgetServer}'s ceiling to ${actual.tools} tools / ${actual.tokens} definition tokens\n` +
-        `and recomputed total to ${updated.total.tools} tools / ${updated.total.tokens} tokens.\n` +
-        'Every other server ceiling is untouched. Review the diff and justify the raise in the PR description.',
+      describeSingleServerUpdate(
+        updateBudgetServer,
+        measured.servers[updateBudgetServer],
+      ),
     );
     return;
   }

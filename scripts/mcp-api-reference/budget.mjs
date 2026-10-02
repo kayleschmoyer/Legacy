@@ -212,6 +212,14 @@ export function updateSingleServerBudget(measured, budget, serverId) {
   };
 }
 
+/** Confirmation printed after a single-server ceiling raise. */
+export function describeSingleServerUpdate(serverId, actual) {
+  return (
+    `Raised ${serverId}'s ceiling to ${actual.tools} tools / ${actual.tokens} definition tokens.\n` +
+    'Every other server ceiling is untouched. Review the diff and justify the raise in the PR description.'
+  );
+}
+
 /** Build a budget file body from the current measurement (for seeding/updating). */
 export function budgetFromMeasurement(measured) {
   const servers = {};

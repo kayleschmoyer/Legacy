@@ -15,6 +15,7 @@ import { strict as assert } from 'node:assert';
 import {
   budgetFromMeasurement,
   checkBudget,
+  describeSingleServerUpdate,
   measureDefinitionTokens,
   tokenTolerance,
   updateSingleServerBudget,
@@ -183,6 +184,26 @@ test('updateSingleServerBudget raises only the named server', () => {
 
   const { violations } = checkBudget(measured, updated);
   assert.deepEqual(violations, []);
+});
+
+test('single-server update returns a total-free budget and a confirmation that renders from it (LS-10371)', () => {
+  const measured = measureDefinitionTokens(SAMPLE);
+  const budget = budgetFromMeasurement(measured);
+
+  const updated = updateSingleServerBudget(measured, budget, 'srv-a');
+  const message = describeSingleServerUpdate(
+    'srv-a',
+    measured.servers['srv-a'],
+  );
+
+  assert.equal(updated.total, undefined);
+  assert.match(
+    message,
+    new RegExp(
+      `Raised srv-a's ceiling to ${measured.servers['srv-a'].tools} tools / ${measured.servers['srv-a'].tokens} definition tokens\\.`,
+    ),
+  );
+  assert.doesNotMatch(message, /total/);
 });
 
 test('updateSingleServerBudget throws for a server absent from the measurement', () => {
