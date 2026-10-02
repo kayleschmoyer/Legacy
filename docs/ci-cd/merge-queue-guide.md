@@ -47,7 +47,7 @@ Draft PRs are never merged. Mark the PR as "Ready for review" first.
 
 ### 2. No merge conflicts
 
-The PR must be mergeable (`mergeable: true`). If GitHub hasn't computed the mergeable state yet, the queue polls for up to 60 seconds before giving up (it retries on the next cycle).
+The PR must be mergeable (`mergeable: true`). Note this is the **only** freshness-related gate: the ruleset sets `strict_required_status_checks_policy: false` (LS-4183), so the merge queue **never enforces that a PR is up to date with `main`** — a PR that is merely _behind_ merges as-is as long as it has no textual conflict. Semantic conflicts between textually-disjoint PRs are caught by post-merge CI on `main`, not blocked pre-merge. Don't rebase or `update-branch` a PR just to be current. If GitHub hasn't computed the mergeable state yet, the queue polls for up to 60 seconds before giving up (it retries on the next cycle).
 
 ### 3. Code Reviewer Bot passed (`bot-review` status check)
 
@@ -169,7 +169,7 @@ Options:
 
 ### "PR has merge conflicts"
 
-Rebase or merge main into your branch:
+Rebase onto `main` (the default; merge `main` only in the cases listed in the [rebase-vs-merge rule](../../.agents/skills/worktree-workflow/references/rebase.md#rebase-vs-merge-main-one-rule-ls-10377)):
 
 ```bash
 git fetch origin main

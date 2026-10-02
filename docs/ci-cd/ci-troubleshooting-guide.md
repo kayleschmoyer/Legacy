@@ -350,8 +350,8 @@ The detector **distinguishes** a true stall (all 7 green + `bot-review` success 
 
 1. **Immediate — bump the SHA on each stalled PR.** This forces GitHub to recompute the merge verdict against the now-clean ruleset. Any of:
    - push an empty commit: `git commit --allow-empty -m "chore: bump SHA to recompute merge verdict (LS-7759)"` then push;
-   - `PUT /repos/{repo}/pulls/{n}/update-branch` (what `detect-stalled-prs.mjs --fix` does, and `pulls.updateBranch()` in Octokit);
-   - rebase the branch.
+   - `PUT /repos/{repo}/pulls/{n}/update-branch` (what `detect-stalled-prs.mjs --fix` does, and `pulls.updateBranch()` in Octokit) — a script/maintainer tool; an agent on its own branch prefers the empty commit above;
+   - rebase the branch — only if it is also behind/conflicting, per the [rebase-vs-merge rule](../../.agents/skills/worktree-workflow/references/rebase.md#rebase-vs-merge-main-one-rule-ls-10377).
 
    **Cost:** `dismiss_stale_reviews_on_push` dismisses the bot approval and CI re-runs on the new SHA — **both recover automatically** (the reviewer re-approves a clean diff, CI re-passes). No manual re-approval needed.
 

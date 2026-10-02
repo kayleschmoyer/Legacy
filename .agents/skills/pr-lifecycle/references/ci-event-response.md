@@ -58,7 +58,11 @@ Find the event type in the left column, read across for the first action. Detail
 1. Load and run the [`/rebase` skill](../../worktree-workflow/references/rebase.md).
 2. Resolve any conflicts that arise during rebase.
 3. Push the rebased branch.
-4. Apply `bot:ready-for-review` if CI was previously passing and the PR was already in review.
+4. Do **not** re-apply `bot:ready-for-review` — see [When to re-apply `bot:ready-for-review`](#when-to-re-apply-botready-for-review).
+
+### When to re-apply `bot:ready-for-review`
+
+One rule for this file, [fix.md](fix.md) and [waiting-and-wakeups](../../mcp-first/references/waiting-and-wakeups.md#conflicted-and-behind-ls-10377): the label is a trigger that is **already on** a PR in review, and a push (`synchronize`) re-fires CI and the Reviewer by itself. After a conflict rebase or any fix push, check it is present and add it **only if it is missing** (stripped, or the PR was never marked ready). Re-apply deliberately — remove and re-add, as the **last** label op — only in the [stall playbook](#pipeline-skipped--never-ran) or for `review-bot-degraded`. Never as the response to a conflict. This is consistent with [Critical Rule 14](critical-rules.md#critical-rules) ("apply after every fix-push") and the PR template: `review.yml` fires on `synchronize` only when the label is already present, and applying an already-present label starts nothing — so "apply" means "make sure it is on", which a presence check satisfies without a redundant label op.
 
 ---
 

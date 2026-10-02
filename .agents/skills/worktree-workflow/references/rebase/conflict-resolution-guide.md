@@ -10,9 +10,13 @@ This reference covers the complete conflict resolution process: the step-by-step
 
 ```bash
 git status
-# If dirty:
-git stash --include-untracked
+# If dirty: commit a WIP checkpoint instead of stashing — the stash stack is
+# shared by every worktree of this repo, so a bare `git stash` / `git stash pop`
+# can restore another ticket's work into this tree.
+worktree_commit({ message: "wip(LS-####): pre-rebase checkpoint" })
 ```
+
+> If you truly must stash, name it and pop that exact entry: `git stash push --include-untracked -m "LS-####-pre-rebase"`, later `git stash list` → `git stash pop stash@{n}`. Never a bare `git stash` / `git stash pop`.
 
 ### Step 2: Fetch Latest and Start Rebase
 
@@ -73,11 +77,14 @@ GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
 
 If more commits have conflicts, Git will pause again. Repeat Steps 3-5 for each commit.
 
-### Step 6: Unstash (if you stashed in Step 1)
+### Step 6: Unstash (only if you used a _named_ stash in Step 1)
 
 ```bash
-git stash pop
+git stash list                 # find your LS-####-pre-rebase entry
+git stash pop stash@{n}        # that exact entry — never a bare `git stash pop`
 ```
+
+(If you committed a WIP checkpoint instead, nothing to do here; squash or amend it before pushing if you don't want the WIP commit in history.)
 
 ### Step 7: Post-Rebase Stabilization (BEFORE push)
 
@@ -92,14 +99,13 @@ make install
 # Regenerate schema + codegen (may have changed on main)
 pnpm exec nx run db:print-schema
 pnpm exec nx affected -t codegen --base=origin/main
-
-# Run full pre-commit validation
-make pc
 ```
 
-If `make pc` fails:
+Then validate with the seven `pc-*` chunks **in order**, one at a time — `pc-db-prep` → `pc-typecheck` → `pc-lint` → `pc-format` → `pc-workflows` → `pc-test` → `pc-build` (`nx_run_pc_chunk` per chunk; degraded sessions: background `make pc-<chunk>` one at a time). Never monolithic `make pc` — see [rebase.md § Post-Rebase Stabilization](../rebase.md#post-rebase-stabilization-critical).
 
-- **Formatting**: `nx format:write` rewrote files -- commit them and re-run `make pc`
+If a chunk fails:
+
+- **Formatting**: `nx format:write` rewrote files -- commit them and re-run from `pc-format`
 - **Type errors**: the rebase resolution missed a rename or signature change -- fix, commit, re-run
 - **Lint errors**: new rules on main or unresolved conflicts -- fix, commit, re-run
 - **Test failures**: merged code broke a test -- fix, commit, re-run
@@ -107,12 +113,12 @@ If `make pc` fails:
 ```bash
 git add -A
 git commit -m "fix: post-rebase stabilization"
-make pc   # re-run until clean
+# re-run the failed pc-* chunk (and those after it) until clean
 ```
 
 ### Step 8: Force-Push the Validated Branch
 
-Only push **after `make pc` passes**:
+Only push **after the `pc-*` chunks pass**:
 
 ```bash
 git push --force-with-lease origin HEAD
@@ -120,7 +126,7 @@ git push --force-with-lease origin HEAD
 
 > **Always use `--force-with-lease`** instead of `--force`. It prevents overwriting someone else's commits if they pushed to the same branch.
 
-If `make pc` fails with a formatting error:
+If `pc-format` fails with a formatting error:
 
 ```bash
 pnpm exec nx format:write
@@ -175,7 +181,7 @@ pnpm --prefix $wt exec nx run db:print-schema
 pnpm --prefix $wt exec nx affected -t codegen --base=origin/main
 make -C $wt pc
 
-# Only push AFTER make pc passes
+# Only push AFTER the pc-* chunks pass
 git -C $wt push --force-with-lease origin HEAD
 ```
 
@@ -237,10 +243,9 @@ git push --force-with-lease origin HEAD
 ### "Cannot rebase: You have unstaged changes"
 
 ```bash
-git stash --include-untracked
+# commit a WIP checkpoint rather than a bare `git stash` (the stash stack is shared across worktrees)
+git add -A && git commit -m "wip(LS-####): pre-rebase checkpoint"
 GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
-# after rebase:
-git stash pop
 ```
 
 ### "CONFLICT (modify/delete)" -- file deleted on one side

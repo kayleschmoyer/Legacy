@@ -20,11 +20,13 @@ github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true, format: "jso
 
 Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`), and a top-level `draftsExcluded` count (omitted when 0) — log it in the report. Post-filter out PRs labeled `agent-in-progress` or `sweep-claimed` (owned by other agents; the dashboard does not filter these server-side). For job-level detail on specific PRs use `github_pr_batch_status(prs: [...])` (≤50 numbers per call) — dashboard `ciStatus` can be stale on old SHAs.
 
+**`mergeable` alone is not a conflict test.** It reads `UNKNOWN` every time `main` advances and can sit stale-`MERGEABLE` for minutes. Classify a PR as **conflicted** if **any** of three signals fires: `mergeable: CONFLICTING`, the `CI: Conflicts` label (in `labels[]`), or a failing **No Merge Conflicts** check — the union `github_pr_scan` (`conflicting` bucket), `github_pr_why_blocked`, and `github_pr_diagnose` already apply. A conflicted PR goes to "needs local agent" (rebase) and is never "clean", whatever `mergeable` says.
+
 > For a **scan-only** request, stop here and report.
 
 ## Step 2: Verify Reviewer Bot labeling on clean PRs
 
-`merge-when-ready` is applied by the Reviewer Bot only — on all PRs, including Dependabot's. See the [Label Ownership table and boxed Dependabot ruling](label-ownership.md#label-ownership); never apply it manually. For a clean PR (MERGEABLE, CI green, 0 threads) missing the label, fix the upstream cause:
+`merge-when-ready` is applied by the Reviewer Bot only — on all PRs, including Dependabot's. See the [Label Ownership table and boxed Dependabot ruling](label-ownership.md#label-ownership); never apply it manually. For a clean PR (no conflict signal per the three-signal union above — not merely `mergeable: MERGEABLE` — CI green, 0 threads) missing the label, fix the upstream cause:
 
 - `bot:ready-for-review` missing on current HEAD → `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`
 - `review-bot-degraded` present (rate-limited cycle) → remove then re-add `bot:ready-for-review`

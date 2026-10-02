@@ -11,8 +11,8 @@ Triage stuck PRs in one pass and dispatch the minimal correct action per PR. The
 
 Before taking any action:
 
-1. Run `github_pr_scan(compact: true, excludeDrafts: false)` to get the full picture — buckets include `ciFailing`, `reviews`, `conflicts`, and `ready`. If the response includes a `nextPageToken`, call again with `pageToken: <token>` and merge results before proceeding.
-2. For every PR in `ciFailing`, call `github_pr_why_blocked` in parallel to separate false positives (READY) from real blocks before dispatching anything.
+1. Run `github_pr_scan(compact: true, excludeDrafts: false)` to get the full picture — buckets are `conflicting`, `reviews`, `ciFailing`, `ciPending`, and `clean` (the tool's own names; `conflicting` already unions `mergeable: CONFLICTING`, the `CI: Conflicts` label, and a failing **No Merge Conflicts** check). If the response includes a `nextPageToken`, call again with `pageToken: <token>` and merge results before proceeding.
+2. For every PR in `ciFailing`, call `github_pr_why_blocked` in parallel to separate false positives (READY) from real blocks before dispatching anything. Every PR in `conflicting` is dispatched a rebase chip directly (Step 2b) — it needs no `why_blocked` call, and a conflicting PR with **green CI** appears only in this bucket, so skipping it leaves it stranded.
 3. For every PR that `why_blocked` returns READY (false positive), call `github_get_check_runs(prNumber, checkName: "🚀 CI Pipeline / build")` to detect Expected CI state (no check runs on the current HEAD SHA).
 4. If any tool call fails (network error, auth error, unexpected response), proceed with partial information — record the failure in the summary table under "Action Taken" as `tool-error: <tool-name>` and continue processing the remaining PRs. Do not abort the full triage pass on a single tool failure.
 
@@ -24,7 +24,7 @@ Before taking any action:
 github_pr_scan(compact: true, excludeDrafts: false)
 ```
 
-Note the PRs in each bucket (`ciFailing`, `conflicts`, `reviews`, `ready`). A PR can appear in multiple buckets if it has overlapping issues. If the response includes a `nextPageToken`, call again with `pageToken: <token>` and merge the bucket lists before proceeding to Step 2.
+Note the PRs in each bucket (`conflicting`, `ciFailing`, `reviews`, `ciPending`, `clean`). A PR can appear in multiple buckets if it has overlapping issues. If the response includes a `nextPageToken`, call again with `pageToken: <token>` and merge the bucket lists before proceeding to Step 2.
 
 ### Step 2 — Parallel `why_blocked` on all `ciFailing` PRs
 
@@ -39,6 +39,10 @@ Run all calls in parallel. Each result is one of:
 - `READY` — merge queue will handle it; check for Expected CI before skipping
 - `MERGE_CONFLICT` — needs rebase
 - `CI_FAILING` — inspect `failingChecks` to distinguish bot-review-only from real CI failures
+
+### Step 2b — Rebase every `conflicting` PR
+
+For each PR in `conflicting` (whether or not it is also in `ciFailing`), dispatch one rebase chip — see the [Pattern Table](#pattern-table). Do this **before** treating its CI failures as real: a conflict masks or causes red checks, and a rebase push re-runs CI, so fix-pr work on a conflicted PR is wasted until it lands. A PR in both `conflicting` and `ciFailing` gets the rebase chip only; the next pass picks up whatever is still red.
 
 ### Step 3 — Detect Expected CI state on READY PRs
 
@@ -58,13 +62,13 @@ Apply the pattern table below. Run label additions and `spawn_task` calls in par
 
 ## Pattern Table
 
-| Pattern                                     | Detection                                                                              | Action                                                                                                                                                 |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| False positive — `process-merge-queue` only | `why_blocked` returns READY, `github_get_check_runs` finds runs on HEAD                | None — `merge-when-ready` will handle it                                                                                                               |
-| Expected CI — no check runs on HEAD SHA     | `why_blocked` returns READY, `github_get_check_runs` returns empty / no runs on HEAD   | `github_manage_labels(prs: [<N>], add: ["ci:run"])` — but see Step 3: a missing **commit status** (`CI Gate`) needs a new `pull_request` event instead |
-| Merge conflict                              | `why_blocked` returns MERGE_CONFLICT                                                   | Spawn rebase chip via `mcp__ccd_session__spawn_task`                                                                                                   |
-| bot-review threads only                     | `why_blocked` returns CI_FAILING with `bot-review` the only entry in `failingChecks`   | Spawn `fix-pr` chip                                                                                                                                    |
-| Real CI failures                            | `why_blocked` returns CI_FAILING with lint/format/test/build checks in `failingChecks` | Spawn `fix-pr` chip                                                                                                                                    |
+| Pattern                                     | Detection                                                                                                        | Action                                                                                                                                                 |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| False positive — `process-merge-queue` only | `why_blocked` returns READY, `github_get_check_runs` finds runs on HEAD                                          | None — `merge-when-ready` will handle it                                                                                                               |
+| Expected CI — no check runs on HEAD SHA     | `why_blocked` returns READY, `github_get_check_runs` returns empty / no runs on HEAD                             | `github_manage_labels(prs: [<N>], add: ["ci:run"])` — but see Step 3: a missing **commit status** (`CI Gate`) needs a new `pull_request` event instead |
+| Merge conflict                              | PR is in the scan's `conflicting` bucket (any of the three signals), **or** `why_blocked` returns MERGE_CONFLICT | Spawn rebase chip via `mcp__ccd_session__spawn_task` — even when CI is green                                                                           |
+| bot-review threads only                     | `why_blocked` returns CI_FAILING with `bot-review` the only entry in `failingChecks`                             | Spawn `fix-pr` chip                                                                                                                                    |
+| Real CI failures                            | `why_blocked` returns CI_FAILING with lint/format/test/build checks in `failingChecks`                           | Spawn `fix-pr` chip                                                                                                                                    |
 
 ### Input validation (apply before substituting into any chip prompt)
 
@@ -84,7 +88,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Rebase PR #<N> onto main and resolve any conflicts.",
   prompt: `PR #<N> on branch <branch> has a merge conflict with main. Rebase it and push.
 
-Load Skill(skill: "rebase") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts per the rebase reference's conflict decision tree, make pc, push.
+Load Skill(skill: "rebase") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts per the rebase reference's conflict decision tree, validate with the seven pc-* chunks in order (never monolithic make pc), push. Confirm no Reviewer (W1) run is in flight before the force-push. Do not re-apply bot:ready-for-review — the push re-fires review.
 
 Stop after a clean push — the next sweep will handle any remaining problems.`
 })

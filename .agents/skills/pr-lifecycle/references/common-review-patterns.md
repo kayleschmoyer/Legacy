@@ -97,6 +97,7 @@ These are not review findings — they are CI check failures from the reviewer i
 - **Root cause**: a force-push (typically a rebase) landed while a `Reviewer (W1)` run was already in flight. The reviewer's recorded base SHA no longer matches HEAD, so the SHA Sanity Check fails and the review run aborts.
 - **Recovery**: push a fresh commit (or a rebase that lands a new HEAD SHA) **after** the cancelled run finishes. The next `synchronize` event with `bot:ready-for-review` present fires a clean cycle. Do **not** just re-toggle the label without a new SHA — Reviewer (W1) will fail SHA Sanity again on the same HEAD.
 - **Reference PRs**: #4324, #4349, #4359 (2026-05-26 sweep).
+- **Prevention (LS-10377)**: before any force-push (rebase) to a PR that is already `bot:ready-for-review`, check that no `Reviewer (W1)` run is in flight (`ci_list_runs({ branch, limit: 5 })`; wait for it to finish or be cancelled) — a force-push mid-review aborts it and costs a full extra cycle. Don't combine a rebase with a label re-apply to "kick" review: the push already re-fires it.
 
 ### "Verify All Migrations Applied" check failed
 

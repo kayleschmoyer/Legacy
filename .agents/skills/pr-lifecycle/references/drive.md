@@ -172,8 +172,8 @@ If ANY conflict signal fires — `mergeable: "CONFLICTING"`, the `CI: Conflicts`
 2. Rebase onto the base branch (usually `origin/main`)
 3. Resolve conflicts
 4. Run post-rebase stabilization: `worktree_stabilize()`
-5. Validate the worktree: `make_run(target: "pc")`
-6. Force-push: `worktree_push()`
+5. Validate the worktree: the seven `pc-*` chunks in order via `nx_run_pc_chunk` (never monolithic `make pc` — see [rebase.md § Post-Rebase Stabilization](../../worktree-workflow/references/rebase.md#post-rebase-stabilization-critical))
+6. Force-push: `worktree_push()` — first confirm no Reviewer (W1) run is in flight ([why](common-review-patterns.md#ci--reviewer-infrastructure-recovery-recipes))
 
 #### Priority 2: CI failures
 
@@ -207,7 +207,7 @@ If the branch is behind `main` but not conflicting, rebase to pick up the latest
 ```
 worktree_rebase()
 worktree_stabilize()
-make_run(target: "pc")
+# validate: the seven pc-* chunks in order (nx_run_pc_chunk), not monolithic make pc
 worktree_push()
 ```
 
@@ -352,7 +352,7 @@ Summarize:
 - **`worktree_set` is required for native CI event routing** — Claude Code Desktop routes CI/PR push notifications to the session whose active worktree matches the branch. Without calling `worktree_set` after any checkout or attach, the session enters the Step 6 event loop but never receives events and spins indefinitely. Note: `worktree_set` requires a local worktree entry to exist; for sessions that cannot create a local checkout, native events are unavailable — `worktree_watch_pr` (LS-7904) will close this gap when shipped.
 - **`worktree_set` does NOT link the session to the PR in the desktop UI** — the session's branch association is snapshotted at creation, and MCP calls are invisible to the desktop's PR detection, so a pickup session's PR status bar usually stays empty. Stamp the PR with `bash scripts/link-pr-session.sh <PR#>` (Step 4) for provenance and the best available shot at linkage — but note the tested caveat in [create-pr.md § Agent-Session Marker](create-pr.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570): a body edit alone has not been observed to trigger desktop linkage; an empty status bar after stamping is an upstream desktop limitation, not a workflow bug (LS-8570).
 - **Don't stop after the first fix** — the event loop is the core of this skill. A PR often needs multiple rounds (fix CI → new review → fix review → CI again → merge). Replying to a review or pushing a fix is a mid-loop event, never a stopping point — see [Terminal states](#terminal-states-the-only-places-this-loop-may-stop). The most common abandonment is exiting on an open `JUSTIFY:` or a `SKIPPED`/red CI pipeline.
-- **`mergeable: UNKNOWN` is not a blocker** — GitHub may still be computing. Wait for the next event rather than treating it as an error.
+- **`mergeable: UNKNOWN` is "unclassified", not "wait for an event"** — GitHub recomputes lazily and flips to `UNKNOWN` every time `main` advances, and **no event is delivered when `main` advancing causes a conflict** (see Step 6). Check next: the `CI: Conflicts` label and the failing **No Merge Conflicts** check — either one means conflicted, so go to Priority 1 (rebase). With neither, treat it as pending and re-check on the next wake; if it is still `UNKNOWN` after two wakes, run `github_pr_why_blocked` once for the unioned verdict. Full rule: [waiting-and-wakeups § Conflicted and behind](../../mcp-first/references/waiting-and-wakeups.md#conflicted-and-behind-ls-10377).
 - **Check Runs vs. Commit Statuses** — `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API. If "check not found", use `github_list_commit_statuses({ prNumber: <PR#> })` instead. See pr-lifecycle SKILL.md Critical Rule 8.
 - **Cap review fix rounds at 2** — after 2 rounds, resolve remaining threads and proceed. Infinite review loops are a common agent failure mode.
 - **Always validate before pushing** — `make pc` locally; in cloud/timeout-prone sessions the seven `pc-*` chunks per [cloud-agent-mode](../../cloud-agent-mode/SKILL.md) (never monolithic `make pc`). Every push without validation risks a 40-60 min CI failure cycle.

@@ -67,7 +67,7 @@ If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number:
 2. `worktree_rebase()` — fetches origin and rebases onto parent
 3. If conflicts: use the rebase skill's decision framework (auto-generated files -> theirs; manual code -> evaluate)
 4. `worktree_rebase_continue()` after resolving each conflict set
-5. Post-rebase stabilization: `make install` ; codegen if needed ; `make pc`
+5. Post-rebase stabilization: `make install` ; codegen if needed ; validate with the seven `pc-*` chunks in order (`nx_run_pc_chunk`) — never monolithic `make pc`
 6. If Step 2 and/or Step 3 still need changes, **do NOT push yet** — batch everything into the later single push.
 7. If the PR only needed the rebase, force-push the rebased branch now so GitHub can recompute mergeability before Step 4 verification.
 
@@ -108,7 +108,7 @@ After all fixes are applied and pushed:
 1. Re-check PR status: `github_pr_batch_status({ prs: [<PR#>] })`
 2. Confirm: `mergeable != CONFLICTING`, `CI: Conflicts` label gone (it clears automatically once the re-run check passes — never remove it yourself), no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
-4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](label-ownership.md#label-ownership)).
+4. Confirm `bot:ready-for-review` is on the PR (`github_view_pr`) and add it **only if missing** (`github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`) — the push itself fires a fresh Reviewer cycle on the new HEAD, and a rebase-only fix for a conflict never needs the label re-applied ([ruling](ci-event-response.md#when-to-re-apply-botready-for-review)). The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](label-ownership.md#label-ownership)).
 
 ## Iteration Cap
 

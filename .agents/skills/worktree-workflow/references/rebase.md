@@ -27,7 +27,8 @@ GIT_EDITOR='node -e "process.exit(0)"' git rebase origin/main
 make install
 pnpm exec nx run db:print-schema
 pnpm exec nx affected -t codegen --base=origin/main
-make pc                          # MUST pass before pushing
+# MUST pass before pushing: the seven pc-* chunks, in order, one at a time
+for c in db-prep typecheck lint format workflows test build; do make "pc-$c" || break; done
 git push --force-with-lease origin HEAD
 ```
 
@@ -46,6 +47,24 @@ git push --force-with-lease origin HEAD
 | Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                |
 | Base PR (stacked-on branch) squash-merged   | See [Squash-merged stacked base](#squash-merged-stacked-base-ls-8779) below — do NOT plain-rebase/merge      |
 | Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](rebase/rebase-interactive-and-recovery.md)                          |
+
+## Rebase vs Merge-main: one rule (LS-10377)
+
+This repo had four answers to "my branch is behind or conflicting with `main`" (rebase only; `update-branch`; `git merge main`; `worktree_merge_main`). This section is the single ruling — other docs link here rather than restating it.
+
+**Default: rebase** (`worktree_rebase_onto_main` / `worktree_rebase`, then `worktree_stabilize`, validate, `worktree_push` — `--force-with-lease`). Agent-owned PR branches are single-author and squash-merged, so linear history costs nothing and a rebase leaves no `Merge branch 'main'` commits.
+
+**Merge `main` instead** (`worktree_merge_main`, or the `update-branch` API) only when rewriting history is wrong:
+
+| Situation                                                                                                             | Why not rebase                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| The branch is **not yours / shared** (another agent or person has it checked out or pushed to it)                     | A force-push would erase their commits; never rewrite history on someone else's branch                                                  |
+| The **remote head has already advanced** past local — e.g. the `e2e-hold-resume` backstop already ran `update-branch` | A local rebase + `--force-with-lease` fails or erases the revalidation in flight; `git fetch`, reset to `origin/<branch>`, and continue |
+| You were explicitly told to merge, or the repo's contributing rule for that branch says so                            | Explicit instruction wins                                                                                                               |
+
+**Never** hand-run `git merge main` / `git checkout main && git merge main` as a workaround — use `worktree_merge_main` so conflicts come back as structured info. **Never** use `update-branch` as a routine freshness step: `strict_required_status_checks_policy` is `false`, so the merge queue never requires a PR to be up to date with `main` — _behind_ alone does not block merge, and a SHA bump dismisses the bot approval and re-runs CI for nothing ([ruleset note](../../../../.github/ruleset.json), LS-4183). Rebase when there is a **conflict**, when `main` changed code your diff depends on, or when a failing check needs the fix that landed on `main` — not just to be current. The cost of that choice, accepted by design: a semantic conflict between textually-disjoint PRs is caught by post-merge CI on `main`, not blocked pre-merge.
+
+**Before any force-push to a PR already in review**, confirm no Reviewer (W1) run is in flight — a force-push mid-run aborts it and fails SHA Sanity Check ([recovery](../../pr-lifecycle/references/common-review-patterns.md#ci--reviewer-infrastructure-recovery-recipes)).
 
 ## Squash-Merged Stacked Base (LS-8779)
 
@@ -90,7 +109,7 @@ If `worktree_conflict_info` returns no conflicts, all merge conflicts are resolv
 
 ## Post-Rebase Stabilization (CRITICAL)
 
-> Do NOT push until `make pc` passes. This is the #1 cause of post-rebase CI failures.
+> Do NOT push until the `pc-*` chunks pass. This is the #1 cause of post-rebase CI failures.
 >
 > **Why**: rebasing can silently break type compatibility, schema alignment, and lock file integrity even when no conflicts are reported. The stabilization step catches these invisible breakages before they become CI failures that cost 40-60 minutes each.
 
@@ -108,10 +127,11 @@ make_run({ target: "stabilize-after-rebase" })
 make install
 pnpm exec nx run db:print-schema
 pnpm exec nx affected -t codegen --base=origin/main
-make pc
 ```
 
-If `make pc` fails: fix issues, commit (`fix: post-rebase stabilization`), re-run until clean.
+Then validate with the seven `pc-*` chunks **in order**, one at a time — `pc-db-prep` → `pc-typecheck` → `pc-lint` → `pc-format` → `pc-workflows` → `pc-test` → `pc-build` (`nx_run_pc_chunk` per chunk; degraded sessions: background `make pc-<chunk>` one at a time). **Never monolithic `make pc`**, on any platform ([AGENTS.md](../../../../AGENTS.md) Workflow Discipline; a backgrounded monolithic run has silently deadlocked, LS-8797).
+
+If a chunk fails: fix issues, commit (`fix: post-rebase stabilization`), re-run from that chunk until clean.
 
 **Self-review after conflict resolution**: if the rebase required manual conflict resolution, re-read every file you resolved in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. Conflict resolution code is new code that Copilot will review — catching issues here prevents a review round-trip.
 
@@ -151,7 +171,7 @@ $conflicting | Select-Object number, headRefName
 
 | Problem                            | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| "Cannot rebase: unstaged changes"  | `git stash --include-untracked`, rebase, then pop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| "Cannot rebase: unstaged changes"  | Commit a WIP checkpoint (`worktree_commit`) and rebase — avoid bare `git stash` (the stash stack is shared by every worktree of the repo, so a bare `git stash pop` can restore another ticket's stash); if you must, name it: `git stash push --include-untracked -m "LS-####-pre-rebase"` and pop that exact `stash@{n}` found via `git stash list`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | "CONFLICT (modify/delete)"         | `git rm <file>` if delete correct, else `git checkout --ours <file>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Empty commits                      | `git rebase --skip`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Stale rebase-merge directory       | `git rebase --abort`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
