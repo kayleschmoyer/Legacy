@@ -42,6 +42,11 @@ const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 const GOOGLE_PLAY_SUBSCRIPTIONS_URL =
   'https://play.google.com/store/account/subscriptions';
 
+// Store purchase-history (receipt) pages for the free-tier Past Purchases card.
+const APPLE_RECEIPTS_URL = 'https://apps.apple.com/account/billing';
+const GOOGLE_PLAY_RECEIPTS_URL =
+  'https://play.google.com/store/account/orderhistory';
+
 function tierLabel(tier: string | null): string {
   switch (tier) {
     case 'premium':
@@ -439,6 +444,19 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     clearRestoreError();
     restoreInitiated.current = true;
     await restorePurchases();
+  };
+
+  const handleViewReceipts = async () => {
+    try {
+      await Linking.openURL(
+        isAndroid ? GOOGLE_PLAY_RECEIPTS_URL : APPLE_RECEIPTS_URL,
+      );
+    } catch {
+      Alert.alert(
+        'Unable to Open',
+        `Could not open ${isAndroid ? 'Google Play' : 'the App Store'} purchase history.`,
+      );
+    }
   };
 
   return (
@@ -885,6 +903,56 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   before the end of the billing period. Manage in your{' '}
                   {isAndroid ? 'Google Play' : 'Apple ID'} settings.
                 </Text>
+              </YStack>
+            </YStack>
+          ) : null}
+
+          {/* Past Purchases (free tier, mobile): receipts live in store history */}
+          {!isPremium && restoreSupported ? (
+            <YStack
+              borderRadius="$6"
+              borderWidth={1}
+              borderColor="$borderColor"
+              overflow="hidden"
+            >
+              <XStack
+                paddingHorizontal="$5"
+                paddingVertical="$4"
+                alignItems="center"
+                gap="$3"
+                borderBottomWidth={1}
+                borderBottomColor="$borderColor"
+              >
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius="$4"
+                  alignItems="center"
+                  justifyContent="center"
+                  backgroundColor="$color2"
+                >
+                  <Text fontSize={16}>🧾</Text>
+                </YStack>
+                <YStack flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="600">
+                    Past Purchases
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Receipts for in-app purchases are in your store history
+                  </Paragraph>
+                </YStack>
+              </XStack>
+
+              <YStack padding="$5">
+                <Button
+                  theme="alt1"
+                  onPress={() => void handleViewReceipts()}
+                  borderRadius="$4"
+                >
+                  {isAndroid
+                    ? 'View Play Store Receipts'
+                    : 'View Apple Receipts'}
+                </Button>
               </YStack>
             </YStack>
           ) : null}

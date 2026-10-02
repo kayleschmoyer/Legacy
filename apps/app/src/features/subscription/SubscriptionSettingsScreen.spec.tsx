@@ -942,3 +942,82 @@ describe('SubscriptionSettingsScreen — trial end date (LS-7392)', () => {
     expect(screen.getByText('Renews on')).toBeTruthy();
   });
 });
+
+describe('SubscriptionSettingsScreen — Past Purchases receipts (LS-10399)', () => {
+  const originalOS = Platform.OS;
+
+  const mockTier = (isPremium: boolean) => {
+    mockUseSubscription.mockReturnValue({
+      subscription: null,
+      isPremium,
+      tier: isPremium ? 'premium' : 'free',
+      loading: false,
+      refetch: mockRefetch,
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOS });
+    jest.restoreAllMocks();
+  });
+
+  it('opens Apple receipts for free-tier iOS users', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    mockTier(false);
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Past Purchases')).toBeTruthy();
+    expect(screen.queryByText('View Play Store Receipts')).toBeNull();
+    fireEvent.press(screen.getByText('View Apple Receipts'));
+
+    expect(openURLSpy).toHaveBeenCalledWith(
+      'https://apps.apple.com/account/billing',
+    );
+  });
+
+  it('opens Play Store receipts for free-tier Android users', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    mockTier(false);
+    const openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.getByText('Past Purchases')).toBeTruthy();
+    expect(screen.queryByText('View Apple Receipts')).toBeNull();
+    fireEvent.press(screen.getByText('View Play Store Receipts'));
+
+    expect(openURLSpy).toHaveBeenCalledWith(
+      'https://play.google.com/store/account/orderhistory',
+    );
+  });
+
+  it.each(['ios', 'android'])(
+    'does not show Past Purchases to premium users on %s',
+    (os) => {
+      Object.defineProperty(Platform, 'OS', { value: os });
+      mockTier(true);
+
+      render(<SubscriptionSettingsScreen />);
+
+      expect(screen.queryByText('Past Purchases')).toBeNull();
+      expect(screen.queryByText('View Apple Receipts')).toBeNull();
+      expect(screen.queryByText('View Play Store Receipts')).toBeNull();
+    },
+  );
+
+  it('does not show Past Purchases on unsupported platforms', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'web' });
+    mockTier(false);
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText('Past Purchases')).toBeNull();
+  });
+});
