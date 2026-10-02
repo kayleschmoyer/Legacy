@@ -12,6 +12,7 @@ import { resolveOrCreateUser } from './resolveOrCreateUser';
 import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
 import { verifyOauthState } from '../util/oauth-state';
 import {
+  getAuthenticatedUser,
   getAuthenticatedUserId,
   requireCsrf,
 } from '../util/authenticated-request';
@@ -65,6 +66,7 @@ jest.mock('../util/jwt-cookie', () => ({
 }));
 
 jest.mock('../util/authenticated-request', () => ({
+  getAuthenticatedUser: jest.fn(),
   getAuthenticatedUserId: jest.fn().mockResolvedValue(42),
   requireCsrf: jest.fn().mockReturnValue(null),
 }));
@@ -120,6 +122,9 @@ const mockSetInitialAvatarUrl = setInitialAvatarUrl as jest.MockedFunction<
 >;
 const mockNotifyNewUserSignup = notifyNewUserSignup as jest.MockedFunction<
   typeof notifyNewUserSignup
+>;
+const mockGetAuthenticatedUser = getAuthenticatedUser as jest.MockedFunction<
+  typeof getAuthenticatedUser
 >;
 const mockGetAuthenticatedUserId =
   getAuthenticatedUserId as jest.MockedFunction<typeof getAuthenticatedUserId>;
@@ -651,10 +656,95 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
 });
 
 describe('handleDiscordUnlink', () => {
+  const withHeaders = (headers: Record<string, string>): APIGatewayEvent => ({
+    ...makeEvent({}),
+    headers,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetAuthenticatedUserId.mockResolvedValue(42);
-    mockRequireCsrf.mockReturnValue(null);
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: true,
+      user: { id: 42, email: 'user@example.com' },
+    });
+  });
+
+  it('authenticates a Bearer token without cookie or CSRF header', async () => {
+    mockUnlinkProviderIdentity.mockResolvedValue({ ok: true });
+    const event = withHeaders({ Authorization: 'Bearer valid-jwt' });
+
+    const result = await handleDiscordUnlink(event);
+
+    expect(result.statusCode).toBe(200);
+    expect(mockGetAuthenticatedUser).toHaveBeenCalledWith(event);
+    expect(mockRequireCsrf).not.toHaveBeenCalled();
+    expect(mockUnlinkProviderIdentity).toHaveBeenCalledWith(
+      expect.anything(),
+      42,
+      'discord',
+    );
+  });
+
+  it('returns 401 for a missing, invalid or expired token', async () => {
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: false,
+      response: {
+        statusCode: 401,
+        body: JSON.stringify({ error: 'Invalid token' }),
+      },
+    });
+
+    const result = await handleDiscordUnlink(
+      withHeaders({ Authorization: 'Bearer bad-jwt' }),
+    );
+
+    expect(result.statusCode).toBe(401);
+    expect(mockUnlinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for a token with an invalid payload', async () => {
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: false,
+      response: {
+        statusCode: 401,
+        body: JSON.stringify({ error: 'Invalid token payload' }),
+      },
+    });
+
+    const result = await handleDiscordUnlink(makeEvent({}));
+
+    expect(result.statusCode).toBe(401);
+    expect(mockUnlinkProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it('succeeds for a cookie caller presenting a valid CSRF token', async () => {
+    mockUnlinkProviderIdentity.mockResolvedValue({ ok: true });
+
+    const result = await handleDiscordUnlink(
+      withHeaders({
+        Cookie: 'legacy-sports-internal-jwt=jwt',
+        'x-csrf-token': 't',
+      }),
+    );
+
+    expect(result.statusCode).toBe(200);
+  });
+
+  it('returns 403 for a cookie caller without a CSRF token', async () => {
+    mockGetAuthenticatedUser.mockResolvedValue({
+      ok: false,
+      response: {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'CSRF validation failed' }),
+      },
+    });
+
+    const result = await handleDiscordUnlink(
+      withHeaders({ Cookie: 'legacy-sports-internal-jwt=jwt' }),
+    );
+
+    expect(result.statusCode).toBe(403);
+    expect(mockUnlinkProviderIdentity).not.toHaveBeenCalled();
   });
 
   it('unlinks via the provider-agnostic core and returns success', async () => {

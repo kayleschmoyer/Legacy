@@ -8,6 +8,7 @@ import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
 import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import {
+  getAuthenticatedUser,
   getAuthenticatedUserId,
   requireCsrf,
 } from '../util/authenticated-request';
@@ -650,21 +651,18 @@ export const handleDiscordLink = async (
 
 /**
  * POST /oauth/discord/unlink
- * Removes the Discord account link from the authenticated user.
+ * Removes the Discord account link from the authenticated user. Authenticates
+ * via Bearer token (native) or cookie + CSRF (web).
  */
 export const handleDiscordUnlink = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const csrfError = requireCsrf(event);
-  if (csrfError) return csrfError;
-
-  const userId = await getAuthenticatedUserId(event);
-  if (!userId) {
-    return errorResponse(401, 'Authentication required');
-  }
+  // Accepts a mobile Bearer JWT, or the web cookie JWT + CSRF double-submit.
+  const auth = await getAuthenticatedUser(event);
+  if (!auth.ok) return auth.response;
 
   return await withDbClient(async (db) => {
-    const unlinked = await unlinkProviderIdentity(db, userId, 'discord');
+    const unlinked = await unlinkProviderIdentity(db, auth.user.id, 'discord');
     if (!unlinked.ok) {
       return errorResponse(unlinked.statusCode, unlinked.message);
     }
