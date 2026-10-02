@@ -3,6 +3,8 @@ name: Label Pager (W4)
 # Event-driven escalation paging: fires immediately when an escalation label
 # is applied to a PR. Routes via ESCALATION_WEBHOOK_URL (Discord webhook —
 # payload uses the 'content' field); channel routing is configured at the webhook side.
+# The target (#reviews) is a forum channel: each PR gets one thread, shared with
+# the merge-queue CODEOWNER ping via a hidden DISCORD-REVIEWS-THREAD PR comment.
 # bot:ready-for-review is intentionally excluded — it is NOT an escalation.
 #
 # Merged PRs still page (LS-9969). Some escalations are post-merge by nature —
@@ -30,7 +32,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write # persists the Discord thread id as a hidden PR comment
 
 jobs:
   page:
@@ -47,15 +49,16 @@ jobs:
           LABEL: ${{ github.event_name == 'workflow_dispatch' && inputs.label_name || github.event.label.name }}
           REPO: ${{ github.repository }}
           PR_NUMBER_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          # Event-sourced values go through env, never inline in the script: the PR title is attacker-controlled.
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            PR_URL="https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }}"
-            PR_TITLE=$(gh pr view "${{ inputs.pr_number }}" --json title --jq '.title')
-            PR_MERGED=$(gh pr view "${{ inputs.pr_number }}" --json merged --jq '.merged')
-          else
-            PR_URL="${{ github.event.pull_request.html_url }}"
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_MERGED="${{ github.event.pull_request.merged }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR_URL="https://github.com/${REPO}/pull/${PR_NUMBER_INPUT}"
+            PR_TITLE=$(gh pr view "$PR_NUMBER_INPUT" --json title --jq '.title')
+            PR_MERGED=$(gh pr view "$PR_NUMBER_INPUT" --json merged --jq '.merged')
           fi
 
           # LS-9969: a page for an already-merged PR is not a review request —
@@ -89,14 +92,51 @@ jobs:
           # jq var is "lbl", not "label": `label` is a reserved word in the
           # runner's jq 1.6 and fails to compile (LS-8307); jq 1.7 accepts it,
           # so local testing won't catch a rename back.
-          if [ -n "$DETAILS" ]; then
-            curl -fsS -X POST "$WEBHOOK" \
-              -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" --arg prefix "$PREFIX" \
-                    '{ content: ("\($prefix): \($lbl) on \($pr_url) — \($title)\n\n\($details)") }')"
-          else
-            curl -fsS -X POST "$WEBHOOK" \
-              -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg prefix "$PREFIX" \
-                    '{ content: ("\($prefix): \($lbl) on \($pr_url) — \($title)") }')"
+          PAYLOAD=$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" --arg prefix "$PREFIX" \
+            '{ content: ("\($prefix): \($lbl) on \($pr_url) — \($title)" + (if $details == "" then "" else "\n\n\($details)" end)) }')
+
+          # #reviews is a forum channel: one thread per PR. The first page for a
+          # PR creates the thread (`thread_name`); the thread id is persisted in
+          # a hidden PR comment so later pages — and the merge-queue CODEOWNER
+          # ping in .github/scripts/merge-queue-processor.js, which shares the
+          # marker — land in the same thread.
+          THREAD_NAME=$(jq -nr --arg n "$PR_NUMBER_INPUT" --arg t "$PR_TITLE" '"PR #\($n): \($t)" | .[0:100]')
+          THREAD_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER_INPUT}/comments" --paginate \
+            | jq -rs '(add // []) | map((.body // "") | capture("<!-- DISCORD-REVIEWS-THREAD:(?<id>[0-9]+) -->")?) | (last.id // "")' \
+            || true)
+
+          RESP=$(mktemp)
+          send() { # $1 = query string (incl. leading ?), $2 = JSON payload; echoes HTTP status
+            curl -sS -o "$RESP" -w '%{http_code}' -X POST "${WEBHOOK}$1" \
+              -H 'Content-Type: application/json' -d "$2" || echo 000
+          }
+
+          CODE=000
+          if [ -n "$THREAD_ID" ]; then
+            CODE=$(send "?wait=true&thread_id=${THREAD_ID}" "$PAYLOAD")
+          fi
+          # Create a thread when none exists yet, or when the stored one was
+          # deleted (404). Any other failure on an existing thread (e.g. 429)
+          # must not spawn a duplicate thread.
+          if [ -z "$THREAD_ID" ] || [ "$CODE" = "404" ]; then
+            CODE=$(send "?wait=true" "$(echo "$PAYLOAD" | jq -c --arg tn "$THREAD_NAME" '. + {thread_name: $tn}')")
+            if [ "$CODE" -ge 200 ] && [ "$CODE" -lt 300 ]; then
+              NEW_ID=$(jq -r '.channel_id // empty' "$RESP")
+              if [ -n "$NEW_ID" ]; then
+                gh api -X POST "repos/${REPO}/issues/${PR_NUMBER_INPUT}/comments" \
+                  -f body="<!-- DISCORD-REVIEWS-THREAD:${NEW_ID} -->
+          🧵 Review escalations for this PR are tracked in a Discord #reviews thread." >/dev/null \
+                  || echo "::warning::could not persist Discord thread id for PR #${PR_NUMBER_INPUT}"
+              fi
+            elif [ "$CODE" = "400" ]; then
+              # Webhook targets a non-forum channel (thread_name rejected): still
+              # deliver the page rather than dropping it.
+              echo "::warning::thread_name rejected (http=400) — is ESCALATION_WEBHOOK_URL a forum channel? Posting without a thread."
+              CODE=$(send "?wait=true" "$PAYLOAD")
+            fi
+          fi
+
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "::error::Discord escalation page failed (http=$CODE): $(cat "$RESP")"
+            exit 1
           fi

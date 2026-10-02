@@ -397,15 +397,18 @@ gh run list --workflow lambda-terraform-apply.yml --limit 5
 
 CI workflows post to Discord via channel-specific webhooks:
 
-| Secret                        | Used by                                  |
-| ----------------------------- | ---------------------------------------- |
-| `DISCORD_CI_WEBHOOK_URL`      | Playwright tests, CI pipeline            |
-| `DISCORD_DEPLOY_WEBHOOK_URL`  | Web deploys, Lambda Terraform, rollbacks |
-| `DISCORD_RELEASE_WEBHOOK_URL` | iOS/Android builds, web release summary  |
+| Secret                        | Used by                                      |
+| ----------------------------- | -------------------------------------------- |
+| `DISCORD_CI_WEBHOOK_URL`      | Playwright tests, CI pipeline                |
+| `DISCORD_DEPLOY_WEBHOOK_URL`  | Web deploys, Lambda Terraform, rollbacks     |
+| `DISCORD_RELEASE_WEBHOOK_URL` | iOS/Android builds, web release summary      |
+| `ESCALATION_WEBHOOK_URL`      | #reviews: escalation labels, CODEOWNER pings |
 
 Update webhooks in GitHub **Settings → Secrets and variables → Actions**.
 
 > **Forum channel required for Playwright thread grouping.** The `thread_name` webhook parameter is a Discord API forum-channel-only feature. A regular text channel will cause the finish notification to fail with `code 10003`.
+
+> **#reviews is a forum channel with one thread per PR.** `ESCALATION_WEBHOOK_URL` must target a forum channel. The first page for a PR (`label-pager.yml` or the merge-queue CODEOWNER ping) creates the thread and stores its id in a hidden `<!-- DISCORD-REVIEWS-THREAD:id -->` PR comment; later pages reuse it. If the webhook points at a regular text channel, pages still post (without threads) and a warning is logged.
 
 ## Nx Cache
 

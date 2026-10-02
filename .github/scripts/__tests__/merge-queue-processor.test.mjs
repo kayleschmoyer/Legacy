@@ -4135,3 +4135,141 @@ describe('merge-queue-processor - post-merge content verification (LS-9404)', ()
     );
   });
 });
+
+// ── #reviews forum threads ───────────────────────────────────────────────────
+
+describe('merge-queue-processor — Discord #reviews per-PR threads', () => {
+  const THREAD_MARKER = (id) => `<!-- DISCORD-REVIEWS-THREAD:${id} -->`;
+
+  // Replies with the given status codes in order; 200s carry a channel_id body.
+  function mockDiscordThreads(statuses, channelId = '9001') {
+    const https = require('https');
+    const requests = [];
+    const original = https.request;
+    https.request = (opts, cb) => {
+      const statusCode = statuses[requests.length] ?? 200;
+      requests.push({ opts, body: '' });
+      const entry = requests[requests.length - 1];
+      return {
+        on: () => undefined,
+        write: (b) => (entry.body += b),
+        end: () => {
+          const handlers = {};
+          const res = {
+            statusCode,
+            resume: () => {},
+            on: (ev, fn) => ((handlers[ev] = fn), res),
+          };
+          cb(res);
+          handlers.data?.(JSON.stringify({ id: '1', channel_id: channelId }));
+          handlers.end?.();
+        },
+      };
+    };
+    return { requests, restore: () => (https.request = original) };
+  }
+
+  async function run(github) {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+  }
+
+  it('opens a thread named after the PR and persists its id in a PR comment', async () => {
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    const discord = mockDiscordThreads([200]);
+    try {
+      await run(github);
+    } finally {
+      discord.restore();
+    }
+
+    assert.strictEqual(discord.requests.length, 1);
+    assert.match(discord.requests[0].body, /"thread_name":"PR #\d+: /);
+    assert.ok(!discord.requests[0].opts.path.includes('thread_id'));
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes(THREAD_MARKER('9001'))),
+      'thread id should be persisted as a hidden PR comment',
+    );
+  });
+
+  it('posts into the stored thread instead of opening a new one', async () => {
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    github.rest.issues.listComments = async () => ({
+      data: [{ id: 7, body: `${THREAD_MARKER('4242')}\nthread` }],
+    });
+    const discord = mockDiscordThreads([200]);
+    try {
+      await run(github);
+    } finally {
+      discord.restore();
+    }
+
+    assert.strictEqual(discord.requests.length, 1);
+    assert.ok(discord.requests[0].opts.path.includes('thread_id=4242'));
+    assert.ok(!discord.requests[0].body.includes('thread_name'));
+    assert.ok(
+      !calls.comments.some((c) => c.body?.includes('DISCORD-REVIEWS-THREAD')),
+      'no new marker when the stored thread is reused',
+    );
+  });
+
+  it('opens a fresh thread when the stored one was deleted (404)', async () => {
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    github.rest.issues.listComments = async () => ({
+      data: [{ id: 7, body: THREAD_MARKER('4242') }],
+    });
+    const discord = mockDiscordThreads([404, 200], '5555');
+    try {
+      await run(github);
+    } finally {
+      discord.restore();
+    }
+
+    assert.strictEqual(discord.requests.length, 2);
+    assert.ok(discord.requests[0].opts.path.includes('thread_id=4242'));
+    assert.match(discord.requests[1].body, /thread_name/);
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes(THREAD_MARKER('5555'))),
+    );
+  });
+
+  it('does not open a duplicate thread on a non-404 failure of the stored thread', async () => {
+    const { github } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    github.rest.issues.listComments = async () => ({
+      data: [{ id: 7, body: THREAD_MARKER('4242') }],
+    });
+    const discord = mockDiscordThreads([429]);
+    try {
+      await run(github);
+    } finally {
+      discord.restore();
+    }
+
+    assert.strictEqual(discord.requests.length, 1);
+  });
+
+  it('falls back to a plain post when the webhook is not a forum channel (400)', async () => {
+    const { github } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    const discord = mockDiscordThreads([400, 200]);
+    try {
+      await run(github);
+    } finally {
+      discord.restore();
+    }
+
+    assert.strictEqual(discord.requests.length, 2);
+    assert.match(discord.requests[0].body, /thread_name/);
+    assert.ok(!discord.requests[1].body.includes('thread_name'));
+  });
+});

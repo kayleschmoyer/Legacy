@@ -2445,12 +2445,125 @@ module.exports = async ({
     }
   }
 
+  // POST JSON to the Discord webhook; resolves { statusCode, body } and never
+  // rejects (a notification failure must not fail the queue run). Discord
+  // answers 204 with no body unless ?wait=true, so only 200s are read.
+  function postDiscordJson(webhookUrl, params, payload) {
+    const url = new URL(webhookUrl);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const data = JSON.stringify(payload);
+    return new Promise((resolve) => {
+      const req = require('https').request(
+        {
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data),
+          },
+        },
+        (res) => {
+          if (res.statusCode !== 200) {
+            res.resume();
+            resolve({ statusCode: res.statusCode, body: '' });
+            return;
+          }
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => resolve({ statusCode: res.statusCode, body }));
+        },
+      );
+      req.on('error', (err) => {
+        console.warn(`⚠️ Discord webhook error: ${err.message}`);
+        resolve({ statusCode: 0, body: '' });
+      });
+      req.write(data);
+      req.end();
+    });
+  }
+
+  // #reviews is a forum channel: one thread per PR. The thread id lives in a
+  // hidden PR comment shared with .github/workflows/label-pager.yml (keep the
+  // DISCORD-REVIEWS-THREAD marker in sync) so every page for a PR lands in the
+  // same thread regardless of which workflow sent it.
+  async function postToReviewsThread(pr, webhookUrl, message) {
+    const markerRe = /<!-- DISCORD-REVIEWS-THREAD:(\d+) -->/;
+    let threadId = '';
+    try {
+      const comments = await github.paginate(github.rest.issues.listComments, {
+        owner,
+        repo,
+        issue_number: pr.number,
+        per_page: 100,
+      });
+      for (const c of comments) {
+        const m = (c.body || '').match(markerRe);
+        if (m) threadId = m[1];
+      }
+    } catch (e) {
+      console.log(
+        `ℹ️ PR #${pr.number}: could not read Discord thread marker (${e.message}) — opening a new thread`,
+      );
+    }
+
+    let res = { statusCode: 0, body: '' };
+    if (threadId) {
+      res = await postDiscordJson(
+        webhookUrl,
+        { wait: 'true', thread_id: threadId },
+        message,
+      );
+    }
+    // New thread when none exists or the stored one was deleted (404); other
+    // failures on an existing thread must not spawn a duplicate.
+    if (!threadId || res.statusCode === 404) {
+      const threadName = `PR #${pr.number}: ${pr.title}`.slice(0, 100);
+      res = await postDiscordJson(
+        webhookUrl,
+        { wait: 'true' },
+        { ...message, thread_name: threadName },
+      );
+      if (res.statusCode === 400) {
+        // Non-forum webhook rejects thread_name: still deliver the page.
+        console.warn(
+          `⚠️ Discord rejected thread_name for PR #${pr.number} — is ESCALATION_WEBHOOK_URL a forum channel? Posting without a thread`,
+        );
+        res = await postDiscordJson(webhookUrl, { wait: 'true' }, message);
+      } else if (res.statusCode >= 200 && res.statusCode < 300) {
+        let newId = '';
+        try {
+          newId = JSON.parse(res.body).channel_id || '';
+        } catch {
+          // 204/empty body: no thread id to persist
+        }
+        if (newId) {
+          try {
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr.number,
+              body:
+                `<!-- DISCORD-REVIEWS-THREAD:${newId} -->\n` +
+                '🧵 Review escalations for this PR are tracked in a Discord #reviews thread.',
+            });
+          } catch (e) {
+            console.warn(
+              `⚠️ Could not persist Discord thread id for PR #${pr.number}: ${e.message}`,
+            );
+          }
+        }
+      }
+    }
+    return res;
+  }
+
   async function notifyDiscordCodeownerRequired(pr) {
     const webhookUrl = process.env.ESCALATION_WEBHOOK_URL;
     if (!webhookUrl) return;
 
     const prUrl = `https://github.com/${owner}/${repo}/pull/${pr.number}`;
-    const payload = JSON.stringify({
+    const res = await postToReviewsThread(pr, webhookUrl, {
       embeds: [
         {
           title: '🔐 Code Owner Review Required',
@@ -2468,42 +2581,15 @@ module.exports = async ({
         },
       ],
     });
-
-    const url = new URL(webhookUrl);
-    await new Promise((resolve) => {
-      const req = require('https').request(
-        {
-          hostname: url.hostname,
-          path: url.pathname + url.search,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload),
-          },
-        },
-        (res) => {
-          res.resume();
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            console.log(
-              `📣 Discord CODEOWNER notification sent for PR #${pr.number}`,
-            );
-          } else {
-            console.warn(
-              `⚠️ Discord webhook returned ${res.statusCode} for PR #${pr.number}`,
-            );
-          }
-          resolve();
-        },
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      console.log(
+        `📣 Discord CODEOWNER notification sent for PR #${pr.number}`,
       );
-      req.on('error', (err) => {
-        console.warn(
-          `⚠️ Discord webhook error for PR #${pr.number}: ${err.message}`,
-        );
-        resolve();
-      });
-      req.write(payload);
-      req.end();
-    });
+    } else {
+      console.warn(
+        `⚠️ Discord webhook returned ${res.statusCode} for PR #${pr.number}`,
+      );
+    }
   }
 
   async function reportProcessingError(pr, error) {
