@@ -316,6 +316,54 @@ export const subscriptions = appInternal.table(
   },
 );
 
+export const subscriptionTransactionProviderEnum = appInternal.enum(
+  'subscription_transaction_provider',
+  ['stripe', 'apple', 'google'],
+);
+
+export const subscriptionTransactionEventTypeEnum = appInternal.enum(
+  'subscription_transaction_event_type',
+  ['payment_succeeded', 'payment_failed', 'refund', 'dispute_created'],
+);
+
+/**
+ * Append-only ledger of billing events (LS-10396). The subscriptions row holds
+ * only the latest mutable state; this table keeps one row per provider event
+ * so amount/currency and refund/dispute history survive later overwrites.
+ * `provider_event_id` is unique so webhook re-deliveries cannot double-insert.
+ */
+export const subscriptionTransactions = appInternal.table(
+  'subscription_transactions',
+  {
+    id: serial('id').primaryKey().notNull(),
+    subscriptionId: integer('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
+    provider: subscriptionTransactionProviderEnum('provider').notNull(),
+    eventType: subscriptionTransactionEventTypeEnum('event_type').notNull(),
+    amountCents: integer('amount_cents'),
+    currency: text('currency'),
+    providerEventId: text('provider_event_id').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      subscriptionIdIdx: index(
+        'subscription_transactions_subscription_id_idx',
+      ).on(table.subscriptionId),
+      providerEventIdUk: unique(
+        'subscription_transactions_provider_event_id_uk',
+      ).on(table.providerEventId),
+    };
+  },
+);
+
 export const stripeEvents = appInternal.table('stripe_events', {
   eventId: text('event_id').primaryKey().notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true })

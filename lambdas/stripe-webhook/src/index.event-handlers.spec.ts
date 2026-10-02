@@ -131,6 +131,42 @@ function makeClaimEventDb(claimed: boolean) {
 
 const mockPushPublish = jest.fn().mockResolvedValue(undefined);
 
+// Ledger (LS-10396): rows the handlers insert into subscription_transactions,
+// plus the onConflictDoNothing args, captured by the db wrapper below.
+const LEDGER_TABLE = { providerEventId: 'providerEventId' };
+let ledgerRows: Record<string, unknown>[] = [];
+let ledgerConflictArgs: unknown[] = [];
+
+/**
+ * Give a per-test mock DB the `transaction` method the handlers now call, and
+ * route inserts into the ledger table to the capture arrays. Inserts into any
+ * other table fall through to the test's own mock (when it defines one).
+ */
+function withLedgerAndTransaction(db: unknown): unknown {
+  const base = db as Record<string, unknown>;
+  const wrapped: Record<string, unknown> = {
+    ...base,
+    insert: (table: unknown) => {
+      if (table === LEDGER_TABLE) {
+        return {
+          values: (row: Record<string, unknown>) => {
+            ledgerRows.push(row);
+            return {
+              onConflictDoNothing: (args: unknown) => {
+                ledgerConflictArgs.push(args);
+                return Promise.resolve();
+              },
+            };
+          },
+        };
+      }
+      return (base['insert'] as (t: unknown) => unknown)(table);
+    },
+  };
+  wrapped['transaction'] = (cb: (tx: unknown) => unknown) => cb(wrapped);
+  return wrapped;
+}
+
 describe('stripe-webhook event handlers', () => {
   let handler: HandlerModule['handler'];
   let mockConstructEvent: jest.Mock;
@@ -149,6 +185,8 @@ describe('stripe-webhook event handlers', () => {
     mockClearLeagueTierFreezes = jest.fn().mockResolvedValue(undefined);
     mockSendGa4ServerEvent = jest.fn().mockResolvedValue(undefined);
     mockPushPublish.mockClear();
+    ledgerRows = [];
+    ledgerConflictArgs = [];
 
     jest.doMock('@legacy-sports/rollbar', () => ({
       getRollbarConfigFromEnv: jest.fn(() => null),
@@ -175,12 +213,20 @@ describe('stripe-webhook event handlers', () => {
     }));
 
     jest.doMock('@legacy-sports/db-client', () => ({
-      runWithInternalClient: mockRunWithInternalClient,
+      runWithInternalClient: (
+        opts: unknown,
+        cb: (db: unknown) => unknown,
+      ): unknown =>
+        mockRunWithInternalClient(opts, (db: unknown) =>
+          cb(withLedgerAndTransaction(db)),
+        ),
       clearLeagueTierFreezes: mockClearLeagueTierFreezes,
       handleSubscriptionDowngrade: mockHandleSubscriptionDowngrade,
       InternalSchema: {
         stripeEvents: { eventId: 'eventId' },
+        subscriptionTransactions: LEDGER_TABLE,
         subscriptions: {
+          id: 'id',
           stripeSubscriptionId: 'stripeSubscriptionId',
           stripeCustomerId: 'stripeCustomerId',
           tier: 'tier',
@@ -1588,6 +1634,248 @@ describe('stripe-webhook event handlers', () => {
   });
 
   // ── Out-of-order event guard (LS-2613) ────────────────────────────────────
+
+  // ── subscription_transactions ledger (LS-10396) ───────────────────────────
+
+  describe('subscription_transactions ledger', () => {
+    const CREATED = 1_700_000_000;
+    const OCCURRED_AT = new Date(CREATED * 1000);
+
+    function invoiceEvent(
+      type: 'invoice.payment_succeeded' | 'invoice.payment_failed',
+      invoice: Record<string, unknown>,
+    ) {
+      return fakeStripeEvent({
+        id: 'evt_ledger_1',
+        type,
+        created: CREATED,
+        data: {
+          object: {
+            customer: 'cus_123',
+            currency: 'eur',
+            parent: { subscription_details: { subscription: 'sub_123' } },
+            ...invoice,
+          },
+        },
+      });
+    }
+
+    /** Runs the customer-lookup + tier-update callbacks for refund/dispute. */
+    function setupRefundOrDisputeDb() {
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(
+            makeSelectDb([
+              { id: 7, userId: 42, stripeSubscriptionId: 'sub_123' },
+            ]),
+          ),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectThenUpdateDb([{ tier: 'premium' }])),
+      );
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'refunded' }])),
+      );
+    }
+
+    it('invoice.payment_succeeded inserts a payment_succeeded row with amount_paid/currency', async () => {
+      mockConstructEvent.mockReturnValue(
+        invoiceEvent('invoice.payment_succeeded', { amount_paid: 999 }),
+      );
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectThenUpdateDb([{ id: 7, userId: 42 }])),
+      );
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(ledgerRows).toEqual([
+        {
+          subscriptionId: 7,
+          userId: 42,
+          provider: 'stripe',
+          eventType: 'payment_succeeded',
+          amountCents: 999,
+          currency: 'eur',
+          providerEventId: 'evt_ledger_1',
+          occurredAt: OCCURRED_AT,
+        },
+      ]);
+      expect(ledgerConflictArgs).toEqual([
+        { target: LEDGER_TABLE.providerEventId },
+      ]);
+    });
+
+    it('invoice.payment_failed inserts a payment_failed row with amount_due/currency', async () => {
+      mockConstructEvent.mockReturnValue(
+        invoiceEvent('invoice.payment_failed', { amount_due: 1500 }),
+      );
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(
+            makeSelectThenUpdateDb([
+              { id: 7, userId: 42, gracePeriodEndsAt: null },
+            ]),
+          ),
+      );
+      // within grace period → no downgrade side-effects
+      setupRecordEvent();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'past_due' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(ledgerRows).toEqual([
+        expect.objectContaining({
+          subscriptionId: 7,
+          userId: 42,
+          eventType: 'payment_failed',
+          amountCents: 1500,
+          currency: 'eur',
+          providerEventId: 'evt_ledger_1',
+          occurredAt: OCCURRED_AT,
+        }),
+      ]);
+    });
+
+    it('charge.refunded inserts a refund row keyed by charge.id and still updates the subscription', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.refunded',
+          created: CREATED,
+          data: {
+            object: {
+              id: 'ch_ledger',
+              customer: 'cus_123',
+              payment_intent: 'pi_123',
+              amount: 1999,
+              amount_refunded: 500,
+              currency: 'usd',
+            },
+          },
+        }),
+      );
+      setupRefundOrDisputeDb();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(ledgerRows).toEqual([
+        {
+          subscriptionId: 7,
+          userId: 42,
+          provider: 'stripe',
+          eventType: 'refund',
+          amountCents: 500,
+          currency: 'usd',
+          providerEventId: 'ch_ledger',
+          occurredAt: OCCURRED_AT,
+        },
+      ]);
+      // Partial refund: no tier change side effects (no regression).
+      expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
+    });
+
+    it('charge.dispute.created inserts a dispute_created row keyed by dispute.id and still downgrades', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.dispute.created',
+          created: CREATED,
+          data: {
+            object: {
+              id: 'dp_ledger',
+              charge: 'ch_disputed',
+              amount: 1999,
+              currency: 'usd',
+              status: 'needs_response',
+            },
+          },
+        }),
+      );
+      setupRefundOrDisputeDb();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(ledgerRows).toEqual([
+        {
+          subscriptionId: 7,
+          userId: 42,
+          provider: 'stripe',
+          eventType: 'dispute_created',
+          amountCents: 1999,
+          currency: 'usd',
+          providerEventId: 'dp_ledger',
+          occurredAt: OCCURRED_AT,
+        },
+      ]);
+      expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(
+        42,
+        expect.any(Object),
+      );
+    });
+
+    it('re-delivery relies on onConflictDoNothing(providerEventId) so no duplicate row is created', async () => {
+      // Each delivery inserts with ON CONFLICT DO NOTHING on provider_event_id;
+      // the unique constraint (covered by the .db.spec) makes the second a no-op.
+      for (let i = 0; i < 2; i++) {
+        mockConstructEvent.mockReturnValue(
+          invoiceEvent('invoice.payment_succeeded', { amount_paid: 999 }),
+        );
+        setupNotProcessed();
+        mockRunWithInternalClient.mockImplementationOnce(
+          (_opts: unknown, cb: (db: unknown) => unknown) =>
+            cb(makeSelectThenUpdateDb([{ id: 7, userId: 42 }])),
+        );
+        setupRecordEvent();
+        mockRunWithInternalClient.mockImplementationOnce(
+          (_opts: unknown, cb: (db: unknown) => unknown) =>
+            cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+        );
+        const result = await handler(makeEvent());
+        expect(result.statusCode).toBe(200);
+      }
+
+      expect(ledgerRows).toHaveLength(2);
+      expect(ledgerRows[0]?.['providerEventId']).toBe(
+        ledgerRows[1]?.['providerEventId'],
+      );
+      expect(ledgerConflictArgs).toEqual([
+        { target: LEDGER_TABLE.providerEventId },
+        { target: LEDGER_TABLE.providerEventId },
+      ]);
+    });
+
+    it('a Stripe event already claimed by another invocation writes no ledger row', async () => {
+      mockConstructEvent.mockReturnValue(
+        invoiceEvent('invoice.payment_succeeded', { amount_paid: 999 }),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeClaimEventDb(false)),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(ledgerRows).toEqual([]);
+    });
+  });
 
   describe('out-of-order event guard', () => {
     it('ignores a stale subscription.updated arriving after a newer event', async () => {

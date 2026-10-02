@@ -665,6 +665,52 @@ async function handleSubscriptionEvent(
   return userId;
 }
 
+// ── Transaction ledger (LS-10396) ────────────────────────────────────────────
+
+type LedgerEntry = {
+  eventType:
+    | 'payment_succeeded'
+    | 'payment_failed'
+    | 'refund'
+    | 'dispute_created';
+  amountCents: number | null;
+  currency: string | null;
+  providerEventId: string;
+  occurredAt: Date;
+};
+
+/**
+ * Append one row to app_internal.subscription_transactions. Callers pass the
+ * transaction handle so the insert commits atomically with the subscriptions
+ * update. onConflictDoNothing on provider_event_id keeps webhook re-deliveries
+ * from creating duplicate rows.
+ */
+async function insertLedgerEntry(
+  tx: Pick<
+    Parameters<Parameters<typeof runWithInternalClient>[1]>[0],
+    'insert'
+  >,
+  subscriptionId: number,
+  userId: number,
+  entry: LedgerEntry,
+): Promise<void> {
+  await tx
+    .insert(InternalSchema.subscriptionTransactions)
+    .values({
+      subscriptionId,
+      userId,
+      provider: 'stripe',
+      eventType: entry.eventType,
+      amountCents: entry.amountCents,
+      currency: entry.currency,
+      providerEventId: entry.providerEventId,
+      occurredAt: entry.occurredAt,
+    })
+    .onConflictDoNothing({
+      target: InternalSchema.subscriptionTransactions.providerEventId,
+    });
+}
+
 // ── Payment failure / success (grace period) ─────────────────────────────────
 
 /**
@@ -675,72 +721,83 @@ async function handleSubscriptionEvent(
  */
 async function handlePaymentFailed(
   stripeSubscriptionId: string,
+  ledger: Omit<LedgerEntry, 'eventType'>,
 ): Promise<number | null> {
-  const result = await runWithInternalClient(getDbOptions(), async (db) => {
-    const existing = await db
-      .select()
-      .from(InternalSchema.subscriptions)
-      .where(
-        eq(
-          InternalSchema.subscriptions.stripeSubscriptionId,
+  const result = await runWithInternalClient(getDbOptions(), (client) =>
+    client.transaction(async (db) => {
+      const existing = await db
+        .select()
+        .from(InternalSchema.subscriptions)
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        LOGGER.warn('No subscription record found for invoice.payment_failed', {
           stripeSubscriptionId,
-        ),
-      )
-      .limit(1);
+        });
+        return null;
+      }
 
-    if (existing.length === 0) {
-      LOGGER.warn('No subscription record found for invoice.payment_failed', {
-        stripeSubscriptionId,
+      const record = existing[0];
+      const now = new Date();
+      // Set grace period on the first failure only (don't reset on retries).
+      const gracePeriodEndsAt =
+        record.gracePeriodEndsAt ??
+        new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+      const withinGracePeriod = gracePeriodEndsAt > now;
+      const tier: 'free' | 'premium' = withinGracePeriod ? 'premium' : 'free';
+
+      await db
+        .update(InternalSchema.subscriptions)
+        .set({ status: 'past_due', tier, gracePeriodEndsAt, updatedAt: now })
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        );
+
+      // Bump the entitlements invalidation marker on payment failure too, so the
+      // client re-mints against Stripe's current state (epic Resolved Decisions
+      // #3 — grace defers to Stripe as-is). Rides the tier-denorm write (LS-8642).
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({
+          subscriptionTier: tier,
+          entitlementsUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(InternalSchema.usersInAppInternal.id, record.userId));
+
+      await insertLedgerEntry(db, record.id, record.userId, {
+        ...ledger,
+        eventType: 'payment_failed',
       });
-      return null;
-    }
 
-    const record = existing[0];
-    const now = new Date();
-    // Set grace period on the first failure only (don't reset on retries).
-    const gracePeriodEndsAt =
-      record.gracePeriodEndsAt ??
-      new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+      if (withinGracePeriod) {
+        LOGGER.info(
+          'Payment failed — user retains premium during grace period',
+          {
+            userId: record.userId,
+            gracePeriodEndsAt,
+          },
+        );
+      } else {
+        LOGGER.info('Grace period expired — user downgraded to free tier', {
+          userId: record.userId,
+          gracePeriodEndsAt,
+        });
+      }
 
-    const withinGracePeriod = gracePeriodEndsAt > now;
-    const tier: 'free' | 'premium' = withinGracePeriod ? 'premium' : 'free';
-
-    await db
-      .update(InternalSchema.subscriptions)
-      .set({ status: 'past_due', tier, gracePeriodEndsAt, updatedAt: now })
-      .where(
-        eq(
-          InternalSchema.subscriptions.stripeSubscriptionId,
-          stripeSubscriptionId,
-        ),
-      );
-
-    // Bump the entitlements invalidation marker on payment failure too, so the
-    // client re-mints against Stripe's current state (epic Resolved Decisions
-    // #3 — grace defers to Stripe as-is). Rides the tier-denorm write (LS-8642).
-    await db
-      .update(InternalSchema.usersInAppInternal)
-      .set({
-        subscriptionTier: tier,
-        entitlementsUpdatedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(InternalSchema.usersInAppInternal.id, record.userId));
-
-    if (withinGracePeriod) {
-      LOGGER.info('Payment failed — user retains premium during grace period', {
-        userId: record.userId,
-        gracePeriodEndsAt,
-      });
-    } else {
-      LOGGER.info('Grace period expired — user downgraded to free tier', {
-        userId: record.userId,
-        gracePeriodEndsAt,
-      });
-    }
-
-    return { userId: record.userId, withinGracePeriod };
-  });
+      return { userId: record.userId, withinGracePeriod };
+    }),
+  );
 
   if (result === null) return null;
 
@@ -758,65 +815,76 @@ async function handlePaymentFailed(
  */
 async function handlePaymentSucceeded(
   stripeSubscriptionId: string,
+  ledger: Omit<LedgerEntry, 'eventType'>,
 ): Promise<number | null> {
-  return runWithInternalClient(getDbOptions(), async (db) => {
-    const existing = await db
-      .select({ userId: InternalSchema.subscriptions.userId })
-      .from(InternalSchema.subscriptions)
-      .where(
-        eq(
-          InternalSchema.subscriptions.stripeSubscriptionId,
-          stripeSubscriptionId,
-        ),
-      )
-      .limit(1);
+  return runWithInternalClient(getDbOptions(), (client) =>
+    client.transaction(async (db) => {
+      const existing = await db
+        .select({
+          id: InternalSchema.subscriptions.id,
+          userId: InternalSchema.subscriptions.userId,
+        })
+        .from(InternalSchema.subscriptions)
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        )
+        .limit(1);
 
-    if (existing.length === 0) {
-      LOGGER.warn(
-        'No subscription record found for invoice.payment_succeeded',
-        {
-          stripeSubscriptionId,
-        },
-      );
-      return null;
-    }
+      if (existing.length === 0) {
+        LOGGER.warn(
+          'No subscription record found for invoice.payment_succeeded',
+          {
+            stripeSubscriptionId,
+          },
+        );
+        return null;
+      }
 
-    const { userId } = existing[0];
-    const now = new Date();
+      const { id: subscriptionRowId, userId } = existing[0];
+      const now = new Date();
 
-    await db
-      .update(InternalSchema.subscriptions)
-      .set({
-        status: 'active',
-        tier: 'premium',
-        gracePeriodEndsAt: null,
-        updatedAt: now,
-      })
-      .where(
-        eq(
-          InternalSchema.subscriptions.stripeSubscriptionId,
-          stripeSubscriptionId,
-        ),
-      );
+      await db
+        .update(InternalSchema.subscriptions)
+        .set({
+          status: 'active',
+          tier: 'premium',
+          gracePeriodEndsAt: null,
+          updatedAt: now,
+        })
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        );
 
-    // Bump the entitlements invalidation marker alongside the tier restore so
-    // stale JWTs are force-expired on their next request (LS-8642).
-    await db
-      .update(InternalSchema.usersInAppInternal)
-      .set({
-        subscriptionTier: 'premium',
-        entitlementsUpdatedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      // Bump the entitlements invalidation marker alongside the tier restore so
+      // stale JWTs are force-expired on their next request (LS-8642).
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({
+          subscriptionTier: 'premium',
+          entitlementsUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
-    LOGGER.info('Payment succeeded — subscription restored to active', {
-      userId,
-      stripeSubscriptionId,
-    });
+      await insertLedgerEntry(db, subscriptionRowId, userId, {
+        ...ledger,
+        eventType: 'payment_succeeded',
+      });
 
-    return userId;
-  });
+      LOGGER.info('Payment succeeded — subscription restored to active', {
+        userId,
+        stripeSubscriptionId,
+      });
+
+      return userId;
+    }),
+  );
 }
 
 /**
@@ -912,12 +980,14 @@ type RefundOutcome = {
  * Returns the userId, subscription row id + stripeSubscriptionId, or null.
  */
 async function findSubscriptionByCustomer(stripeCustomerId: string): Promise<{
+  id: number;
   userId: number;
   stripeSubscriptionId: string | null;
 } | null> {
   return runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
       .select({
+        id: InternalSchema.subscriptions.id,
         userId: InternalSchema.subscriptions.userId,
         stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
       })
@@ -965,6 +1035,7 @@ async function cancelStripeSubscriptionSafely(
  */
 async function handleChargeRefunded(
   charge: Stripe.Charge,
+  occurredAt: Date,
 ): Promise<RefundOutcome | null> {
   const stripeCustomerId =
     typeof charge.customer === 'string' ? charge.customer : null;
@@ -985,15 +1056,15 @@ async function handleChargeRefunded(
   }
 
   const userId = existing.userId;
+  const subscriptionRowId = existing.id;
   const stripeSubscriptionId = existing.stripeSubscriptionId;
   const amountRefunded = charge.amount_refunded ?? 0;
   const amount = charge.amount ?? 0;
   const isFullRefund = amount > 0 && amountRefunded >= amount;
   const now = new Date();
 
-  const previousTier = await runWithInternalClient(
-    getDbOptions(),
-    async (db) => {
+  const previousTier = await runWithInternalClient(getDbOptions(), (client) =>
+    client.transaction(async (db) => {
       const rows = await db
         .select({ tier: InternalSchema.subscriptions.tier })
         .from(InternalSchema.subscriptions)
@@ -1030,8 +1101,16 @@ async function handleChargeRefunded(
           .where(eq(InternalSchema.usersInAppInternal.id, userId));
       }
 
+      await insertLedgerEntry(db, subscriptionRowId, userId, {
+        eventType: 'refund',
+        amountCents: amountRefunded,
+        currency: charge.currency ?? null,
+        providerEventId: charge.id,
+        occurredAt,
+      });
+
       return prior;
-    },
+    }),
   );
 
   if (isFullRefund) {
@@ -1064,6 +1143,7 @@ async function handleChargeRefunded(
  */
 async function handleChargeDisputeCreated(
   dispute: Stripe.Dispute,
+  occurredAt: Date,
 ): Promise<RefundOutcome | null> {
   // dispute.charge may be a string id or expanded Charge object.
   const chargeId =
@@ -1102,12 +1182,12 @@ async function handleChargeDisputeCreated(
   }
 
   const userId = existing.userId;
+  const subscriptionRowId = existing.id;
   const stripeSubscriptionId = existing.stripeSubscriptionId;
   const now = new Date();
 
-  const previousTier = await runWithInternalClient(
-    getDbOptions(),
-    async (db) => {
+  const previousTier = await runWithInternalClient(getDbOptions(), (client) =>
+    client.transaction(async (db) => {
       const rows = await db
         .select({ tier: InternalSchema.subscriptions.tier })
         .from(InternalSchema.subscriptions)
@@ -1140,8 +1220,16 @@ async function handleChargeDisputeCreated(
         })
         .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
+      await insertLedgerEntry(db, subscriptionRowId, userId, {
+        eventType: 'dispute_created',
+        amountCents: dispute.amount ?? null,
+        currency: dispute.currency ?? null,
+        providerEventId: dispute.id,
+        occurredAt,
+      });
+
       return prior;
-    },
+    }),
   );
 
   LOGGER.info('Dispute created — revoking premium access immediately', {
@@ -1353,7 +1441,12 @@ const baseStripeWebhookHandler = async (
         const invoiceSubId =
           typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
         if (invoiceSubId) {
-          userId = await handlePaymentSucceeded(invoiceSubId);
+          userId = await handlePaymentSucceeded(invoiceSubId, {
+            amountCents: invoice.amount_paid ?? null,
+            currency: invoice.currency ?? null,
+            providerEventId: stripeEvent.id,
+            occurredAt: new Date(stripeEvent.created * 1000),
+          });
           subscriptionId = invoiceSubId;
         }
         customerId =
@@ -1381,7 +1474,12 @@ const baseStripeWebhookHandler = async (
         const invoiceSubId =
           typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
         if (invoiceSubId) {
-          userId = await handlePaymentFailed(invoiceSubId);
+          userId = await handlePaymentFailed(invoiceSubId, {
+            amountCents: invoice.amount_due ?? null,
+            currency: invoice.currency ?? null,
+            providerEventId: stripeEvent.id,
+            occurredAt: new Date(stripeEvent.created * 1000),
+          });
           subscriptionId = invoiceSubId;
         }
         customerId =
@@ -1393,7 +1491,10 @@ const baseStripeWebhookHandler = async (
 
       case 'charge.refunded': {
         const charge = stripeEvent.data.object;
-        const refundResult = await handleChargeRefunded(charge);
+        const refundResult = await handleChargeRefunded(
+          charge,
+          new Date(stripeEvent.created * 1000),
+        );
         userId = refundResult?.userId ?? null;
         subscriptionId = refundResult?.subscriptionId ?? null;
         customerId =
@@ -1424,7 +1525,10 @@ const baseStripeWebhookHandler = async (
 
       case 'charge.dispute.created': {
         const dispute = stripeEvent.data.object;
-        const disputeResult = await handleChargeDisputeCreated(dispute);
+        const disputeResult = await handleChargeDisputeCreated(
+          dispute,
+          new Date(stripeEvent.created * 1000),
+        );
         userId = disputeResult?.userId ?? null;
         subscriptionId = disputeResult?.subscriptionId ?? null;
         break;
