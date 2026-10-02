@@ -37,6 +37,7 @@
  *     [--timestamp <iso>]           # default: now
  *     [--run-all]                   # e2e-select's run-all=true (full suite)
  *     [--affected-specs-file <path>] # newline-delimited e2e-select specs output
+ *     [--manifest <path>]           # e2e-surface-map.json, to canonicalize spec paths
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -139,6 +140,56 @@ export function parseAffectedSpecs(text) {
   );
 }
 
+/**
+ * Canonicalize a reporter spec path to the repo-relative form e2e-select and
+ * the surface-map manifest use (`apps/web-e2e/src/tests/<name>.spec.ts`).
+ *
+ * The reporter emits spec paths relative to Playwright's `config.rootDir`,
+ * and in the CI merge-reports pass that is the merge config's
+ * `testDir: "apps/web-e2e/src"` — the common parent of the e2e and
+ * integration test dirs, needed so mixed-testDir blobs merge at all. Each
+ * shard's blob only stores locations relative to its own rootDir (the
+ * shard's testDir), so after re-rooting the `tests/` / `integration/tests/`
+ * segment is gone and the reporter can only see a bare `<name>.spec.ts`
+ * (LS-10337). Without canonicalization the S3 key would be
+ * `spec/<name>.spec.ts/...`, `query-e2e-ledger.mjs --spec <manifest path>`
+ * would never find it, and `relatedToDiff` (an exact-path set lookup) would
+ * never be true.
+ *
+ * Resolution: an exact match in `knownSpecs` wins; otherwise the unique
+ * known spec ending in `/<spec>` wins; anything else (no match, or an
+ * ambiguous basename) is returned unchanged so the record is still written
+ * under a stable, if less useful, key.
+ */
+export function canonicalizeSpec(spec, knownSpecs) {
+  if (!knownSpecs || knownSpecs.size === 0 || knownSpecs.has(spec)) return spec;
+  const suffix = `/${spec}`;
+  let match = null;
+  for (const known of knownSpecs) {
+    if (!known.endsWith(suffix)) continue;
+    if (match !== null) return spec; // ambiguous
+    match = known;
+  }
+  return match ?? spec;
+}
+
+/** Spec paths from e2e-select's manifest (`apps/web-e2e/src/e2e-surface-map.json`
+ * — `specs` is keyed by repo-relative spec path). Fail-open: anything that
+ * isn't a manifest with a `specs` object yields an empty set. */
+export function parseManifestSpecs(text) {
+  try {
+    const parsed = JSON.parse(text ?? '');
+    const specs = parsed?.specs;
+    return new Set(
+      specs && typeof specs === 'object' && !Array.isArray(specs)
+        ? Object.keys(specs)
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -153,6 +204,7 @@ function parseArgs(argv) {
     timestamp: new Date().toISOString(),
     runAll: false,
     affectedSpecsFile: null,
+    manifest: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -164,6 +216,7 @@ function parseArgs(argv) {
     else if (a === '--timestamp') args.timestamp = argv[++i];
     else if (a === '--run-all') args.runAll = true;
     else if (a === '--affected-specs-file') args.affectedSpecsFile = argv[++i];
+    else if (a === '--manifest') args.manifest = argv[++i];
   }
   return args;
 }
@@ -208,9 +261,18 @@ async function main() {
       args.affectedSpecsFile && existsSync(args.affectedSpecsFile)
         ? parseAffectedSpecs(readFileSync(args.affectedSpecsFile, 'utf8'))
         : new Set();
+    const manifestSpecs =
+      args.manifest && existsSync(args.manifest)
+        ? parseManifestSpecs(readFileSync(args.manifest, 'utf8'))
+        : new Set();
+    const knownSpecs = new Set([...manifestSpecs, ...affectedSpecs]);
+    const canonicalEntries = entries.map((entry) => ({
+      ...entry,
+      spec: canonicalizeSpec(entry.spec, knownSpecs),
+    }));
 
     const records = buildLedgerRecords({
-      entries,
+      entries: canonicalEntries,
       sha: args.sha,
       prNumber,
       timestamp: args.timestamp,

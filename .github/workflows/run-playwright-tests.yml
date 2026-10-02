@@ -1023,6 +1023,7 @@ jobs:
             .github/scripts/e2e-ledger
             scripts/rewrite-pw-attachment-paths.py
             apps/web-e2e/src/reporters/agent-md-reporter.ts
+            apps/web-e2e/src/e2e-surface-map.json
           sparse-checkout-cone-mode: false
           fetch-depth: 1
 
@@ -1090,8 +1091,13 @@ jobs:
       # as the PR-CI write in ci-pipeline.yml's "Deploy Playwright Report"
       # job. No PR/diff context exists on a nightly/full-suite run, so
       # prNumber and relatedToDiff are always null here — see
-      # build-ledger-records.mjs. Fail-open: an S3 write error must never
-      # fail this (already informational) job.
+      # build-ledger-records.mjs. The reporter writes e2e-ledger.json next to
+      # playwright.merge.config.js (workspace root): it resolves against the
+      # Playwright-injected configDir, not rootDir/testDir (LS-10337). The
+      # surface-map manifest (in the sparse checkout above) canonicalizes the
+      # merge pass's bare `<name>.spec.ts` spec paths back to the repo-relative
+      # form the query tool and e2e-select use. Fail-open: an S3 write error
+      # must never fail this (already informational) job.
       - name: "Build E2E Ledger Records"
         id: build-ledger
         if: ${{ !cancelled() && steps.merge.outputs.has-report == 'true' }}
@@ -1102,6 +1108,7 @@ jobs:
             --sha "${{ github.sha }}" \
             --run-id "${{ github.run_id }}" \
             --out-dir /tmp/e2e-ledger-staging \
+            --manifest apps/web-e2e/src/e2e-surface-map.json \
             || echo "::warning::E2E ledger record build failed — no ledger data this run (fail-open)"
 
       # Deliberately not the `s3-artifact` composite action: see the matching

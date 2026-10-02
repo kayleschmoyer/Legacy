@@ -23,6 +23,20 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
  */
 
 interface Options {
+  /**
+   * Directory of the Playwright config file. Playwright injects this into
+   * every reporter's options (`reporterOptions()` in
+   * playwright/lib/runner/reporters.js) for both `test` and `merge-reports`
+   * runs; it is not meant to be set by hand. All relative output paths below
+   * resolve against it — the same base the built-in `json`/`html` reporters
+   * use — NOT against `config.rootDir`, which Playwright sets to the resolved
+   * `testDir` (`rootDir: pathResolve(configDir, userConfig.testDir) ||
+   * configDir`). Resolving against rootDir is why the CI merge pass — whose
+   * merge config sets `testDir: "apps/web-e2e/src"` — silently wrote
+   * summary.md / flaky-tests.json / e2e-ledger.json under `apps/web-e2e/src/`
+   * while the workflow looked for them at the workspace root (LS-10337).
+   */
+  configDir?: string;
   /** Destination path, relative to the Playwright config dir. */
   outputFile?: string;
   /**
@@ -112,6 +126,7 @@ export default class AgentMarkdownReporter implements Reporter {
   private readonly outputFile: string;
   private readonly flakyJsonFile?: string;
   private readonly ledgerJsonFile?: string;
+  private readonly configDir?: string;
   private rootDir = process.cwd();
   private suiteRoot?: Suite;
 
@@ -119,6 +134,16 @@ export default class AgentMarkdownReporter implements Reporter {
     this.outputFile = options.outputFile ?? 'test-results/summary.md';
     this.flakyJsonFile = options.flakyJsonFile;
     this.ledgerJsonFile = options.ledgerJsonFile;
+    this.configDir = options.configDir;
+  }
+
+  /** Resolve a reporter output path the way Playwright's built-in reporters
+   * do: absolute paths as-is, relative paths against the config dir. Falls
+   * back to `config.rootDir` only when Playwright didn't inject `configDir`
+   * (direct instantiation in unit tests). See `Options.configDir`. */
+  private resolveOutput(file: string): string {
+    if (isAbsolute(file)) return file;
+    return resolve(this.configDir ?? this.rootDir, file);
   }
 
   onBegin(config: FullConfig, suite: Suite): void {
@@ -256,18 +281,14 @@ export default class AgentMarkdownReporter implements Reporter {
     lines.push(`## ✅ Passed: ${passed}`);
     lines.push('');
 
-    const dest = isAbsolute(this.outputFile)
-      ? this.outputFile
-      : resolve(this.rootDir, this.outputFile);
+    const dest = this.resolveOutput(this.outputFile);
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, lines.join('\n'), 'utf-8');
 
     if (this.flakyJsonFile) {
       // Raw (unescaped) file/title values: this output is machine-read by the
       // nightly flaky-ticket step, not rendered as Markdown.
-      const flakyDest = isAbsolute(this.flakyJsonFile)
-        ? this.flakyJsonFile
-        : resolve(this.rootDir, this.flakyJsonFile);
+      const flakyDest = this.resolveOutput(this.flakyJsonFile);
       mkdirSync(dirname(flakyDest), { recursive: true });
       writeFileSync(
         flakyDest,
@@ -279,9 +300,7 @@ export default class AgentMarkdownReporter implements Reporter {
     if (this.ledgerJsonFile) {
       // Raw per-test records for the E2E ledger (LS-9757): machine-read by
       // the workflow-level enrichment step, not rendered as Markdown.
-      const ledgerDest = isAbsolute(this.ledgerJsonFile)
-        ? this.ledgerJsonFile
-        : resolve(this.rootDir, this.ledgerJsonFile);
+      const ledgerDest = this.resolveOutput(this.ledgerJsonFile);
       mkdirSync(dirname(ledgerDest), { recursive: true });
       writeFileSync(
         ledgerDest,

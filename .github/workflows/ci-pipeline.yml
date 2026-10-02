@@ -1230,9 +1230,14 @@ jobs:
       # flaky-tickets filing on the nightly side) and enriches them with this
       # PR's sha/PR-number/relatedToDiff. relatedToDiff comes from the SAME
       # e2e-select output (detect-changes job) that decided which specs to
-      # run for this PR. Deliberately fail-open (same posture as e2e-select
-      # itself) — a ledger-write error must never fail the required e2e-
-      # affected check.
+      # run for this PR. The reporter writes e2e-ledger.json next to
+      # playwright.merge.config.js (workspace root): it resolves against the
+      # Playwright-injected configDir, not rootDir/testDir (LS-10337); the
+      # surface-map manifest canonicalizes the merge pass's bare
+      # `<name>.spec.ts` spec paths back to the repo-relative form e2e-select
+      # emits, so relatedToDiff can actually match. Deliberately fail-open
+      # (same posture as e2e-select itself) — a ledger-write error must never
+      # fail the required e2e-affected check.
       - name: "Build E2E Ledger Records"
         id: build-ledger
         if: ${{ !cancelled() && steps.check-reports.outputs.has-reports == 'true' }}
@@ -1252,6 +1257,7 @@ jobs:
             --out-dir /tmp/e2e-ledger-staging \
             --pr-number "${{ github.event.pull_request.number }}" \
             --affected-specs-file /tmp/e2e-affected-specs.txt \
+            --manifest apps/web-e2e/src/e2e-surface-map.json \
             $RUN_ALL_FLAG \
             || echo "::warning::E2E ledger record build failed — no ledger data this run (fail-open, does not block the PR)"
 

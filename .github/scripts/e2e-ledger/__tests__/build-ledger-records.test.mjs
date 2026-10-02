@@ -9,10 +9,12 @@ import { test } from 'node:test';
 
 import {
   buildLedgerRecords,
+  canonicalizeSpec,
   computeRelatedToDiff,
   groupRecordsBySpec,
   isSafeSpecPath,
   parseAffectedSpecs,
+  parseManifestSpecs,
   toNdjson,
 } from '../build-ledger-records.mjs';
 
@@ -254,4 +256,50 @@ test('parseAffectedSpecs splits newline-delimited specs and drops blank lines', 
 test('parseAffectedSpecs is defensive against undefined/empty input', () => {
   assert.deepEqual(parseAffectedSpecs(undefined), new Set());
   assert.deepEqual(parseAffectedSpecs(''), new Set());
+});
+
+// ---------------------------------------------------------------------------
+// canonicalizeSpec / parseManifestSpecs (LS-10337)
+// ---------------------------------------------------------------------------
+
+test('canonicalizeSpec maps a bare merge-pass basename to the unique manifest path', () => {
+  const known = new Set([SPEC_A, SPEC_B]);
+  assert.equal(canonicalizeSpec('a.spec.ts', known), SPEC_A);
+  assert.equal(canonicalizeSpec('tests/b.spec.ts', known), SPEC_B);
+});
+
+test('canonicalizeSpec keeps an exact known path unchanged', () => {
+  assert.equal(canonicalizeSpec(SPEC_A, new Set([SPEC_A, SPEC_B])), SPEC_A);
+});
+
+test('canonicalizeSpec leaves unknown and ambiguous specs unchanged', () => {
+  const known = new Set([
+    SPEC_A,
+    'apps/web-e2e/src/integration/tests/a.spec.ts',
+  ]);
+  assert.equal(canonicalizeSpec('a.spec.ts', known), 'a.spec.ts');
+  assert.equal(canonicalizeSpec('zzz.spec.ts', known), 'zzz.spec.ts');
+  assert.equal(canonicalizeSpec('a.spec.ts', new Set()), 'a.spec.ts');
+  assert.equal(canonicalizeSpec('a.spec.ts', undefined), 'a.spec.ts');
+});
+
+test('canonicalizeSpec only matches on a path-segment boundary', () => {
+  // "a.spec.ts" must not match ".../extra.spec.ts" via a bare endsWith.
+  const known = new Set(['apps/web-e2e/src/tests/extra.spec.ts']);
+  assert.equal(canonicalizeSpec('a.spec.ts', known), 'a.spec.ts');
+});
+
+test('parseManifestSpecs returns the manifest spec keys and fails open otherwise', () => {
+  assert.deepEqual(
+    parseManifestSpecs(
+      JSON.stringify({ specs: { [SPEC_A]: {}, [SPEC_B]: {} } }),
+    ),
+    new Set([SPEC_A, SPEC_B]),
+  );
+  assert.deepEqual(parseManifestSpecs('not json'), new Set());
+  assert.deepEqual(
+    parseManifestSpecs(JSON.stringify({ specs: [SPEC_A] })),
+    new Set(),
+  );
+  assert.deepEqual(parseManifestSpecs(undefined), new Set());
 });
