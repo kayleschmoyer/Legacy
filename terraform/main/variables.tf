@@ -32,6 +32,17 @@ variable "availability_zones" {
   default     = ["us-east-1a", "us-east-1b"] # Minimum 2 AZs required for RDS
 }
 
+# LS-10314: extra AZs for runner-only public subnets so the spot runner fleet
+# spans more independent spot pools. Kept separate from availability_zones,
+# which also drives the private lambda/database subnets and the RDS subnet
+# group. us-east-1e is excluded: none of the runner instance types are offered
+# there. Append only — each AZ's index fixes its subnet CIDR (10.0.30+idx).
+variable "runner_extra_availability_zones" {
+  description = "Additional AZs that get a runner-only public subnet (not used by Lambda/RDS)"
+  type        = list(string)
+  default     = ["us-east-1c", "us-east-1d", "us-east-1f"]
+}
+
 variable "database_name" {
   description = "Database name"
   type        = string

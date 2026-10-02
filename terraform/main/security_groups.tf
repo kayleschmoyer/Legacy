@@ -96,7 +96,7 @@ resource "aws_security_group_rule" "rds_from_ci_runners" {
   from_port         = 5432
   to_port           = 5432
   protocol          = "tcp"
-  cidr_blocks       = aws_subnet.public[*].cidr_block
+  cidr_blocks       = concat(aws_subnet.public[*].cidr_block, aws_subnet.runner_public[*].cidr_block)
   security_group_id = aws_security_group.rds.id
   description       = "PostgreSQL from self-hosted CI runners (public subnet traffic)"
 }

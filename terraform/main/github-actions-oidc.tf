@@ -1192,6 +1192,39 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/vpc/${local.name_prefix}-*"
         ]
+      },
+      # LS-10314: aws_subnet.runner_public + its route table associations
+      # (vpc.tf), scoped to the main VPC and the public route table. Subnet
+      # reads are covered by the inline ec2:Describe* grant. Split by resource
+      # type: CreateSubnet / AssociateRouteTable authorize against the subnet
+      # ARN *and* the VPC / route-table ARN, and only the subnet resource type
+      # carries the ec2:Vpc condition key (vpc uses ec2:VpcID), so the
+      # condition must live on a subnet-only statement.
+      {
+        Effect   = "Allow"
+        Action   = ["ec2:CreateSubnet"]
+        Resource = ["arn:aws:ec2:${local.region}:${local.account_id}:vpc/${aws_vpc.main.id}"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateSubnet",
+          "ec2:DeleteSubnet",
+          "ec2:ModifySubnetAttribute",
+          "ec2:AssociateRouteTable",
+          "ec2:DisassociateRouteTable"
+        ]
+        Resource = ["arn:aws:ec2:${local.region}:${local.account_id}:subnet/*"]
+        Condition = {
+          StringEquals = {
+            "ec2:Vpc" = "arn:aws:ec2:${local.region}:${local.account_id}:vpc/${aws_vpc.main.id}"
+          }
+        }
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ec2:AssociateRouteTable", "ec2:DisassociateRouteTable"]
+        Resource = ["arn:aws:ec2:${local.region}:${local.account_id}:route-table/${aws_route_table.public.id}"]
       }
     ]
   })

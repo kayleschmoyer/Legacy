@@ -33,6 +33,31 @@ resource "aws_subnet" "public" {
   })
 }
 
+# Runner-only Public Subnets (LS-10314)
+# Extra AZs for the self-hosted spot runner fleet. The Name tag matches the
+# ${name_prefix}-public-* filter terraform/runners uses to find runner subnets,
+# so the runner modules pick these up with no change there. Not part of the
+# RDS subnet group or NAT placement, which stay on aws_subnet.public.
+resource "aws_subnet" "runner_public" {
+  count = length(var.runner_extra_availability_zones)
+
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.${count.index + 30}.0/24"
+  availability_zone       = var.runner_extra_availability_zones[count.index]
+  map_public_ip_on_launch = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-public-runner-${count.index + 1}"
+    Type = "public"
+  })
+
+  # ec2:CreateSubnet / ModifySubnetAttribute are granted by
+  # github_actions_supplemental_2 in the same change; without this dependency
+  # Terraform creates the subnets in parallel with the policy update and races
+  # into AccessDenied on the first apply.
+  depends_on = [aws_iam_policy.github_actions_supplemental_2]
+}
+
 # Private Subnets for Lambda
 resource "aws_subnet" "private_lambda" {
   count = length(var.availability_zones)
@@ -132,6 +157,15 @@ resource "aws_route_table_association" "public" {
 
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "runner_public" {
+  count = length(aws_subnet.runner_public)
+
+  subnet_id      = aws_subnet.runner_public[count.index].id
+  route_table_id = aws_route_table.public.id
+
+  depends_on = [aws_iam_policy.github_actions_supplemental_2]
 }
 
 resource "aws_route_table_association" "private_lambda" {
