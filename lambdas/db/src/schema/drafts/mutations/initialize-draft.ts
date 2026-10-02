@@ -257,6 +257,10 @@ builder.mutationField('initializeDraft', (t) =>
               .insert(PublicSchema.drafts)
               .values({
                 leagueId,
+                // NOT NULL with no column default (LS-10073, LS-10318).
+                status: lockedLeague.draftStatus,
+                createdBy: league.owner,
+                sport: league.sport,
                 draftMode,
                 selectionMethod,
                 draftOrder,

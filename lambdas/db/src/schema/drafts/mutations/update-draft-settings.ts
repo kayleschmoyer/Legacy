@@ -305,6 +305,12 @@ builder.mutationField('updateDraftSettings', (t) =>
             .insert(PublicSchema.drafts)
             .values({
               leagueId,
+              // status/created_by/sport are NOT NULL with no column default
+              // (LS-10073); supply them from the league rather than relying
+              // on the drafts_fill_from_league trigger (LS-10318).
+              status: league.draftStatus,
+              createdBy: league.owner,
+              sport: league.sport,
               draftMode: (draftMode as 'live' | 'automated') || 'live',
               selectionMethod:
                 (selectionMethod as 'standard' | 'auction' | 'random') ||

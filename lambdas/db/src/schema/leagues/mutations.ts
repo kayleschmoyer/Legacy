@@ -3944,6 +3944,10 @@ builder.mutationField('renewLeague', (t) =>
         // 15. Create a draft record for the new league
         await tx.insert(PublicSchema.drafts).values({
           leagueId: newLeague.id,
+          // NOT NULL with no column default (LS-10073, LS-10318).
+          status: newLeague.draftStatus,
+          createdBy: newLeague.owner,
+          sport: newLeague.sport,
           draftMode: oldDraft?.draftMode ?? 'live',
           selectionMethod: oldDraft?.selectionMethod ?? 'standard',
           draftOrder: oldDraft?.draftOrder ?? 'snake',

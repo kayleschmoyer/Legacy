@@ -409,4 +409,27 @@ describe('updateDraftSettings — league chat system message (LS-9217, AC3)', ()
   });
 });
 
+describe('updateDraftSettings — drafts insert (LS-10318)', () => {
+  // drafts.status/created_by/sport are NOT NULL with no column default, so the
+  // insert path must supply them explicitly (Rollbar #288).
+  it('supplies status, createdBy and sport when it has to create the draft row', async () => {
+    const resolve = captureResolver();
+    const ctx = makeCtx({ tier: 'premium', userId: 7, leagueOwner: 7 });
+
+    await resolve(
+      null,
+      { input: { leagueId: 10, draftMode: 'automated' } },
+      ctx,
+    );
+
+    const valuesFn = ctx.db.insert.mock.results[0].value.values as jest.Mock;
+    expect(valuesFn.mock.calls[0][0]).toMatchObject({
+      leagueId: 10,
+      status: 'not-started',
+      createdBy: 7,
+      sport: 'baseball',
+    });
+  });
+});
+
 export {};
