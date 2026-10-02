@@ -24,6 +24,7 @@ import {
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
 import { validateUsername } from '@legacy-sports/utils';
+import { getSessionStatus } from './sessionStatus';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
@@ -252,6 +253,22 @@ const ProfileSettingsPage: React.FC = () => {
   const accessLevel = user?.accessLevel ?? 'none';
 
   const mfa = useMfa(authService);
+
+  // Session row: derived from the cached token expiry, re-evaluated every 30s
+  // (and whenever the auth context changes, e.g. a token refresh).
+  // Impersonation keeps its JWT in an HttpOnly cookie, so the cached expiry
+  // would be the admin's — treat as unknown there. A definitively
+  // revoked/expired session is handled by AuthProvider (auth:session-expired
+  // -> AUTH_LOGOUT), which routes to login.
+  const [sessionNowMs, setSessionNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setSessionNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const sessionStatus = getSessionStatus(
+    auth.isImpersonating ? null : authService.getStoredTokenExpiry(),
+    sessionNowMs,
+  );
 
   const { data: userData, refetch: refetchUser } = useGetUserByIdQuery({
     variables: { id: user?.id ?? 0 },
@@ -732,14 +749,23 @@ const ProfileSettingsPage: React.FC = () => {
                 </FieldRow>
                 <FieldRow>
                   <FieldLabel>Session</FieldLabel>
-                  <XStack alignItems="center" gap="$2">
+                  <XStack
+                    alignItems="center"
+                    gap="$2"
+                    data-testid="profile-session-status"
+                    title={sessionStatus.expiryHint ?? undefined}
+                  >
                     <YStack
                       width={8}
                       height={8}
                       borderRadius={4}
-                      backgroundColor="$statusSuccessFg"
+                      backgroundColor={
+                        sessionStatus.state === 'expired'
+                          ? '$statusDangerFg'
+                          : '$statusSuccessFg'
+                      }
                     />
-                    <FieldValue>Active</FieldValue>
+                    <FieldValue>{sessionStatus.label}</FieldValue>
                   </XStack>
                 </FieldRow>
               </YStack>

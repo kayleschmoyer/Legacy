@@ -81,7 +81,9 @@ jest.mock('../../utils/analytics', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
-  AuthService: jest.fn(),
+  AuthService: jest.fn().mockImplementation(() => ({
+    getStoredTokenExpiry: () => null,
+  })),
   useAuth: () => mockUseAuth(),
   useMfa: () => ({}),
 }));
