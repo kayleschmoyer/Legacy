@@ -5,6 +5,13 @@ import { apigatewayInspect } from './tools/apigateway-inspect.js';
 import { apigatewayV2Inspect } from './tools/apigatewayv2-inspect.js';
 import { cloudTrailLookup } from './tools/cloudtrail.js';
 import {
+  COST_GROUP_BY,
+  COST_METRICS,
+  costExplorer,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+} from './tools/cost-explorer.js';
+import {
   ec2ConsoleOutput,
   ec2DescribeImage,
   ec2Instances,
@@ -67,31 +74,31 @@ server.tool(
 // --- aws_apigatewayv2_inspect ---
 server.tool(
   'aws_apigatewayv2_inspect',
-  'Inspect API Gateway v2 (HTTP and WebSocket) APIs. Lists v2 APIs and optionally expands their routes, authorizers, and integrations. Read-only — mutating ops (update-route, delete-authorizer, etc.) go through terraform. Replaces shell fallback to `aws apigatewayv2 get-apis / get-routes / get-authorizers / get-integrations`.',
+  'Inspect API Gateway v2 (HTTP and WebSocket) APIs. Lists v2 APIs and optionally expands their routes, authorizers, and integrations. Read-only — mutations go through terraform. Use instead of `aws apigatewayv2 get-*`.',
   {
     apiNameFilter: z
       .string()
       .optional()
       .describe(
-        'Case-insensitive substring filter applied to API names (e.g. "mcp" matches the 3 MCP HTTP APIs). Omit to list all v2 APIs.',
+        'Case-insensitive substring filter on API names (e.g. "mcp"). Omit to list all v2 APIs.',
       ),
     includeRoutes: z
       .boolean()
       .default(true)
       .describe(
-        "Include each API's routes (RouteId, RouteKey, AuthorizationType, AuthorizerId, Target). Default: true.",
+        'Include routes (RouteKey, AuthorizationType, AuthorizerId, Target). Default: true.',
       ),
     includeAuthorizers: z
       .boolean()
       .default(true)
       .describe(
-        "Include each API's authorizers (AuthorizerType, JwtConfiguration, IdentitySource, AuthorizerUri). Default: true.",
+        'Include authorizers (type, JwtConfiguration, IdentitySource, AuthorizerUri). Default: true.',
       ),
     includeIntegrations: z
       .boolean()
       .default(true)
       .describe(
-        "Include each API's integrations (IntegrationType, IntegrationUri, IntegrationMethod, PayloadFormatVersion). Default: true.",
+        'Include integrations (type, URI, method, PayloadFormatVersion). Default: true.',
       ),
   },
   async (params) => apigatewayV2Inspect(params),
@@ -175,12 +182,12 @@ server.tool(
 // --- aws_logs_filter ---
 server.tool(
   'aws_logs_filter',
-  `Search CloudWatch log events by log group and optional filter pattern. Accepts any log group name (including leading-slash names like /aws/lambda/... and /aws/apigateway/...) and returns structured { timestamp, message } events. Hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (whichever is smaller); returns truncated: true when the cap is hit. Use startTime/endTime (epoch ms) to scope a specific window. Prefer this over shell aws logs filter-log-events to avoid Windows path mangling and encoding issues.`,
+  `Search CloudWatch log events in any log group, with an optional filter pattern. Returns { timestamp, message } events, hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (truncated: true when hit). Prefer this over shell aws logs filter-log-events, which mangles leading-slash group names on Windows.`,
   {
     logGroup: z
       .string()
       .describe(
-        'CloudWatch log group name. Leading slash required for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql, /aws/apigateway/legacy-sports-dev-api/access-logs).',
+        'Log group name, with the leading slash for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql).',
       ),
     filterPattern: z
       .string()
@@ -211,7 +218,7 @@ server.tool(
       .enum(['markdown', 'json'])
       .default('markdown')
       .describe(
-        'Output shape. `markdown` (default) renders a header block plus a timestamped code block — cheaper for the agent to read. `json` returns the full structured payload.',
+        '`markdown` (default): header plus a timestamped code block, cheaper to read. `json`: the full structured payload.',
       ),
   },
   async (params) => logsFilter(params),
@@ -220,7 +227,7 @@ server.tool(
 // --- aws_lambda_status ---
 server.tool(
   'aws_lambda_status',
-  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-25) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others. Pass `includeEnv` to also report the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Values stay hidden unless `includeEnvValues` is also set, and secret-named variables are redacted even then. Both flags apply per function in batch mode.',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. `functions` (1-25) is batch mode; one failing function does not fail the others. `includeEnv` reports the deployed environment variable names — the way to verify a Terraform-managed env var actually landed after an apply (terraform output reports intent, not what is deployed). Both env flags apply per function in batch mode.',
   {
     function: z
       .string()
@@ -259,7 +266,7 @@ server.tool(
 // --- aws_s3_inspect ---
 server.tool(
   'aws_s3_inspect',
-  'Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus, legacy-sports-dev-football-corpus). One tool, three actions: "list" pages keys with LastModified + size under a prefix (or, with summary:true, walks every page and returns only count / totalSize / min+max LastModified so a 100k-key prefix can be characterised without dumping keys); "head" returns one object\'s ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Uses only s3:ListBucket and s3:GetObject — never writes, copies, or deletes. Replaces shell fallback to `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.',
+  'Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus). "list" pages keys with LastModified + size under a prefix; "head" returns one object\'s ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Never writes, copies, or deletes. Use instead of `aws s3api list-objects-v2 / head-object` and `aws s3 cp ... - | gunzip`.',
   {
     action: z
       .enum(['list', 'head', 'get'])
@@ -450,7 +457,7 @@ server.tool(
 // --- secret_sync_to_github ---
 server.tool(
   'secret_sync_to_github',
-  'Atomically propagate a value from AWS Secrets Manager to a GitHub secret without the value ever crossing the agent transcript. Fetches the AWS secret server-side, pipes it via stdin to `gh secret set` (which handles libsodium encryption), and returns only metadata. Supports repo (default), environment (--env), and dependabot scopes. The canonical "never embed secrets in tool calls" pattern — use this instead of pairing aws_secretsmanager_get_secret_value with github_secret_set.',
+  'Copy a value from AWS Secrets Manager to a GitHub secret without it ever crossing the agent transcript: fetched server-side, piped via stdin to `gh secret set`, only metadata returned. Use this instead of pairing aws_secretsmanager_get_secret_value with github_secret_set.',
   {
     secretId: z
       .string()
@@ -539,40 +546,82 @@ server.tool(
 // --- aws_cloudtrail_lookup ---
 server.tool(
   'aws_cloudtrail_lookup',
-  'Look up CloudTrail events to diagnose EC2 instance lifecycle transitions: spot eviction (BidEvictedEvent), scale-down termination, or manual terminate. Pass mode="death-verdict" with an instanceId to get a { verdict, events[] } summary (verdict: "spot" | "scale-down" | "manual" | "unknown"). Pass mode="events" (default) to get raw compact events. Capped at 50 events. Replaces shell fallback to `aws cloudtrail lookup-events`.',
+  'Look up CloudTrail events to diagnose EC2 instance lifecycle transitions: spot eviction (BidEvictedEvent), scale-down termination, or manual terminate. Capped at 50 events. Use instead of `aws cloudtrail lookup-events`.',
   {
     instanceId: z
       .string()
       .optional()
       .describe(
-        'EC2 instance ID (e.g. "i-0abc1234def56789a"). Required for mode="death-verdict". Used to filter events by ResourceName (TerminateInstances) and by CloudTrailEvent payload (BidEvictedEvent, which has an empty ResourceName).',
+        'EC2 instance ID (e.g. "i-0abc1234def56789a"). Required for mode="death-verdict".',
       ),
     eventName: z
       .string()
       .optional()
       .describe(
-        'CloudTrail event name to look up (e.g. "BidEvictedEvent", "TerminateInstances", "RunInstances"). Must be alphanumeric only. If both eventName and instanceId are provided in events mode, the query is by eventName and filtered client-side by instanceId.',
+        'CloudTrail event name (e.g. "BidEvictedEvent", "TerminateInstances"). Alphanumeric only. With instanceId in events mode, the query is by eventName, filtered client-side by instanceId.',
       ),
     startTime: z
       .string()
       .optional()
       .describe(
-        'Start of the lookup window as an ISO 8601 timestamp (e.g. "2024-01-15T12:00:00Z"). CloudTrail retains events for 90 days.',
+        'Window start, ISO 8601 (e.g. "2024-01-15T12:00:00Z"). CloudTrail retains 90 days.',
       ),
-    endTime: z
-      .string()
-      .optional()
-      .describe(
-        'End of the lookup window as an ISO 8601 timestamp (e.g. "2024-01-15T13:00:00Z").',
-      ),
+    endTime: z.string().optional().describe('Window end, ISO 8601.'),
     mode: z
       .enum(['events', 'death-verdict'])
       .default('events')
       .describe(
-        '"events" (default): returns compact events with { eventTime, eventName, username, instanceIds[], terminationReason }. "death-verdict": requires instanceId; runs two parallel lookups (ResourceName and BidEvictedEvent) and returns { verdict, events[] } where verdict is "spot" | "scale-down" | "manual" | "unknown".',
+        '"events" (default): compact events { eventTime, eventName, username, instanceIds[], terminationReason }. "death-verdict": returns { verdict, events[] } where verdict is "spot" | "scale-down" | "manual" | "unknown".',
       ),
   },
   async (params) => cloudTrailLookup(params),
+);
+
+// --- aws_cost_explorer ---
+server.tool(
+  'aws_cost_explorer',
+  'Cost Explorer spend for a date window: a table sorted by cost plus a per-period trend. Use instead of `aws ce get-cost-and-usage`. Excludes resources tagged CostReportExclude=true (the output says how).',
+  {
+    start: z.string().describe('Window start, YYYY-MM-DD (inclusive).'),
+    end: z.string().describe('Window end, YYYY-MM-DD (exclusive).'),
+    granularity: z
+      .enum(['daily', 'monthly'])
+      .default('monthly')
+      .describe('Trend bucket size.'),
+    groupBy: z
+      .enum(COST_GROUP_BY)
+      .default('service')
+      .describe(
+        '`usage_type` also buckets EC2 into spot / on-demand / egress / EBS / snapshot / NAT. `tag` needs tagKey.',
+      ),
+    tagKey: z.string().optional().describe('Tag key for groupBy "tag".'),
+    service: z
+      .string()
+      .optional()
+      .describe(
+        'Cost Explorer service name to filter to; "ec2" = EC2 compute + "EC2 - Other".',
+      ),
+    metrics: z
+      .array(z.enum(COST_METRICS))
+      .default(['UnblendedCost'])
+      .describe('Add UsageQuantity for a usage column.'),
+    compareWith: z
+      .enum(['previousPeriod'])
+      .optional()
+      .describe('Add prev + delta columns against the preceding window.'),
+    includeExcluded: z
+      .boolean()
+      .default(false)
+      .describe('Keep CostReportExclude resources.'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(MAX_LIMIT)
+      .default(DEFAULT_LIMIT)
+      .describe('Max rows.'),
+  },
+  async (params) => costExplorer(params),
 );
 
 // --- aws_ec2_instances ---
@@ -667,7 +716,7 @@ server.tool(
 // --- aws_ec2_launch_template_inspect ---
 server.tool(
   'aws_ec2_launch_template_inspect',
-  'Inspect EC2 launch templates filtered by Environment tag (and optional name substring). Returns the latest version data: AMI (resolved through any `resolve:ssm:` indirection by calling SSM), instance type, key name, IAM instance profile, and tags. Used for "what is this fleet currently configured to launch?" debugging without chaining describe-launch-templates + describe-launch-template-versions + ssm get-parameter via Bash.',
+  'Inspect EC2 launch templates filtered by Environment tag (and optional name substring). Returns the latest version data: AMI (resolved through any `resolve:ssm:` indirection), instance type, key name, IAM instance profile, and tags — "what is this fleet currently configured to launch?" in one call.',
   {
     environment: z
       .enum(['dev', 'prod'])
