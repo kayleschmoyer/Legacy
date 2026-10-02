@@ -28,6 +28,8 @@ function makePR(overrides: Record<string, unknown> = {}) {
     url: 'https://github.com/o/r/pull/42',
     labels: { nodes: [{ name: 'bug' }] },
     isDraft: false,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
     reviewDecision: 'REVIEW_REQUIRED',
     additions: 100,
     deletions: 20,
@@ -183,6 +185,29 @@ describe('viewPR — compact default', () => {
     const result = await viewPR({ number: 42 });
     const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.mergedBy).toEqual({ login: 'merge-queue[bot]', isBot: true });
+  });
+});
+
+describe('viewPR — mergeability (LS-10375)', () => {
+  const view = async (overrides: Record<string, unknown>) => {
+    mockedGraphQL.mockResolvedValue(gqlResponse(makePR(overrides)));
+    const result = await viewPR({ number: 42 });
+    return JSON.parse(result.content[0].text) as Record<string, unknown>;
+  };
+
+  it('exposes mergeable and mergeStateStatus on the compact card', async () => {
+    const parsed = await view({
+      mergeable: 'UNKNOWN',
+      mergeStateStatus: 'DIRTY',
+    });
+    expect(parsed['mergeable']).toBe('UNKNOWN');
+    expect(parsed['mergeStateStatus']).toBe('DIRTY');
+  });
+
+  it('negative control: reports the settled values verbatim, not a hardcoded conflict', async () => {
+    const parsed = await view({});
+    expect(parsed['mergeable']).toBe('MERGEABLE');
+    expect(parsed['mergeStateStatus']).toBe('CLEAN');
   });
 });
 

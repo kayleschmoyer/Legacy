@@ -33,6 +33,7 @@ function row(overrides: Partial<DashboardRow>): DashboardRow {
     author: 'user',
     isDraft: false,
     mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
     hasConflictSignal: false,
     ciStatus: 'pass',
     ciFailingCount: 0,
@@ -308,6 +309,7 @@ function prNode(overrides: Record<string, unknown> = {}) {
     labels: { nodes: [] },
     isDraft: false,
     mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
     reviewDecision: 'APPROVED',
     commits: { nodes: [{ commit: { oid: 'sha' } }] },
     ...overrides,
@@ -512,5 +514,51 @@ describe('prDashboard fetch pagination', () => {
     expect(text).not.toBe(
       "Failed to build PR dashboard: GitHub GraphQL failed (504): We couldn't respond to your request in time.",
     );
+  });
+});
+
+describe('prDashboard conflict signals (LS-10375)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedRepo.mockResolvedValue({ owner: 'o', name: 'r' });
+  });
+
+  const rowFor = async (overrides: Record<string, unknown>) => {
+    mockedGraphQL.mockResolvedValueOnce(
+      repoPage([prNode({ number: 9, ...overrides })], false),
+    );
+    return jsonPayload(await prDashboard({ format: 'json' })).prs[0];
+  };
+
+  it('drops a stale CI: Conflicts label once mergeable=MERGEABLE and mergeStateStatus=CLEAN (LS-9945)', async () => {
+    const r = await rowFor({ labels: { nodes: [{ name: 'CI: Conflicts' }] } });
+    expect(r.hasConflictSignal).toBe(false);
+  });
+
+  it('negative control: keeps the label signal while live fields are still UNKNOWN', async () => {
+    const r = await rowFor({
+      mergeable: 'UNKNOWN',
+      mergeStateStatus: 'UNKNOWN',
+      labels: { nodes: [{ name: 'CI: Conflicts' }] },
+    });
+    expect(r.hasConflictSignal).toBe(true);
+  });
+
+  it('treats mergeStateStatus DIRTY as a conflict even when mergeable is UNKNOWN', async () => {
+    const r = await rowFor({ mergeable: 'UNKNOWN', mergeStateStatus: 'DIRTY' });
+    expect(r.hasConflictSignal).toBe(true);
+  });
+
+  it('lists an UNKNOWN PR in Blocked with a reason instead of dropping it', () => {
+    const md = renderDashboardMarkdown(
+      payload([row({ number: 31, mergeable: 'UNKNOWN' })]),
+    );
+    expect(md).toContain('### Blocked PRs');
+    expect(md).toContain('- #31 — mergeability still computing (UNKNOWN)');
+  });
+
+  it('negative control: a settled MERGEABLE PR is not listed as blocked', () => {
+    const md = renderDashboardMarkdown(payload([row({ number: 32 })]));
+    expect(md).not.toContain('### Blocked PRs');
   });
 });

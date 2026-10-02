@@ -1191,7 +1191,7 @@ export function createServer(): McpServer {
   // --- github_pr_batch_status ---
   server.tool(
     'github_pr_batch_status',
-    'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
+    'Detailed status for specific PRs: mergeable/conflicting, CI jobs, reviews, unresolved threads. Batched GraphQL.',
     {
       prs: z
         .preprocess(
@@ -1208,7 +1208,7 @@ export function createServer(): McpServer {
       compact: coercedBoolean
         .default(false)
         .describe(
-          'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads)',
+          'Essential fields only (number, branch, mergeable, mergeStateStatus, conflicting, ciSummary, failedJobs, cancelledJobs, unresolvedThreads)',
         ),
     },
     async (params) => {
@@ -1706,7 +1706,7 @@ export function createServer(): McpServer {
   // --- github_view_pr ---
   server.tool(
     'github_view_pr',
-    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. By default returns a compact card: number, title, state, isDraft, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, checksSummary, mergedAt, mergeCommit, mergedBy (null unless merged). Pass optional "fields" array to opt-in to heavy fields: "body", "files", "reviews", "assignees", "milestone". Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'Prefer this over `gh pr view`/`gh pr diff --name-only`. Compact card: number, title, state, isDraft, mergeable, mergeStateStatus, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, checksSummary, mergedAt, mergeCommit, mergedBy. Optional "fields": "body", "files", "reviews", "assignees", "milestone". PR number as "number" or alias "prNumber".',
     {
       number: z.coerce
         .number()

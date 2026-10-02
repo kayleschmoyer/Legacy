@@ -1,6 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
-import { detectConflictSignals } from '../conflict-signals.js';
+import {
+  detectConflictSignals,
+  isStaleConflictSignalOnly,
+} from '../conflict-signals.js';
 import { githubGraphQL } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
@@ -28,6 +31,7 @@ interface PRNode {
   labels: { nodes: Array<{ name: string }> };
   isDraft: boolean;
   mergeable: string;
+  mergeStateStatus: string;
   reviewDecision: string | null;
   // Head commit SHA — required checks are evaluated against it via REST
   // (the merge-queue-aligned path), not GraphQL statusCheckRollup.
@@ -79,6 +83,7 @@ export interface DashboardRow {
   author: string;
   isDraft: boolean;
   mergeable: string;
+  mergeStateStatus: string;
   /**
    * Union of the three conflict signals: mergeable CONFLICTING, the
    * `CI: Conflicts` label, or a failing required "No Merge Conflicts" check.
@@ -356,6 +361,9 @@ interface BlockedReason {
 function blockedReasons(row: DashboardRow): string[] {
   const reasons: string[] = [];
   if (row.hasConflictSignal) reasons.push('merge conflict');
+  else if (row.mergeable === 'UNKNOWN') {
+    reasons.push('mergeability still computing (UNKNOWN)');
+  }
   if (row.ciStatus === 'fail') {
     reasons.push(
       row.ciFailingCount > 0
@@ -520,6 +528,7 @@ query($query: String!, $first: Int!, $after: String) {
         labels(first: 20) { nodes { name } }
         isDraft
         mergeable
+        mergeStateStatus
         reviewDecision
         commits(last: 1) {
           nodes {
@@ -563,6 +572,7 @@ query($owner: String!, $repo: String!, $first: Int!, $after: String) {
         labels(first: 20) { nodes { name } }
         isDraft
         mergeable
+        mergeStateStatus
         reviewDecision
         commits(last: 1) {
           nodes {
@@ -678,9 +688,15 @@ query($owner: String!, $repo: String!, $first: Int!, $after: String) {
       const labelNames = pr.labels.nodes.map((l) => l.name);
       const conflictSignals = detectConflictSignals({
         mergeable: pr.mergeable,
+        mergeStateStatus: pr.mergeStateStatus,
         labels: labelNames,
         failingChecks: ci?.failing,
       });
+      // LS-9945: a label/check-only verdict is lag once GitHub's live fields
+      // say the branch is clean — same override as why_blocked/diagnose.
+      const hasConflictSignal =
+        conflictSignals.conflicting &&
+        !isStaleConflictSignalOnly(conflictSignals, pr);
 
       return {
         number: pr.number,
@@ -690,7 +706,8 @@ query($owner: String!, $repo: String!, $first: Int!, $after: String) {
         author: pr.author?.login ?? 'unknown',
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
-        hasConflictSignal: conflictSignals.conflicting,
+        mergeStateStatus: pr.mergeStateStatus,
+        hasConflictSignal,
         ciStatus,
         ciFailingCount,
         hadStaleChecks,

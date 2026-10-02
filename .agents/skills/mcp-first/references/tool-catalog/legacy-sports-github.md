@@ -360,13 +360,13 @@ Semantic one-shot for the Ship step: push branch → create PR as draft → mark
 
 ### `github_pr_batch_status`
 
-Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.
+Detailed status for specific PRs: mergeable/conflicting, CI jobs, reviews, unresolved threads. Batched GraphQL.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `prs` | number[] |  | min 1, max 50, coerced | PR numbers. Alias: "numbers". |
 | `numbers` | number[] |  | min 1, max 50, coerced | Alias for "prs". |
-| `compact` | boolean |  | — | Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, cancelledJobs, unresolvedThreads) |
+| `compact` | boolean |  | — | Essential fields only (number, branch, mergeable, mergeStateStatus, conflicting, ciSummary, failedJobs, cancelledJobs, unresolvedThreads) |
 
 ### `github_pr_commits`
 
@@ -600,7 +600,7 @@ List all repo Actions variable names or check specific variables (Settings > Sec
 
 ### `github_view_pr`
 
-Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. By default returns a compact card: number, title, state, isDraft, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, checksSummary, mergedAt, mergeCommit, mergedBy (null unless merged). Pass optional "fields" array to opt-in to heavy fields: "body", "files", "reviews", "assignees", "milestone". Pass the PR number as "number" (preferred) or "prNumber" (alias).
+Prefer this over `gh pr view`/`gh pr diff --name-only`. Compact card: number, title, state, isDraft, mergeable, mergeStateStatus, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, checksSummary, mergedAt, mergeCommit, mergedBy. Optional "fields": "body", "files", "reviews", "assignees", "milestone". PR number as "number" or alias "prNumber".
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

@@ -1,5 +1,10 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
+import {
+  CONFLICT_CHECK_NAME,
+  detectConflictSignals,
+  isStaleConflictSignalOnly,
+} from '../conflict-signals.js';
 import { githubGraphQL } from '../github-api.js';
 import {
   CI_FAILURE_CONCLUSIONS,
@@ -27,6 +32,7 @@ interface PRBatchNode {
   author: { login: string } | null;
   isDraft: boolean;
   mergeable: string;
+  mergeStateStatus: string;
   reviewDecision: string | null;
   updatedAt: string;
   url: string;
@@ -70,6 +76,7 @@ function buildBatchPRQuery(numbers: number[]): string {
       author { login }
       isDraft
       mergeable
+      mergeStateStatus
       reviewDecision
       updatedAt
       url
@@ -229,6 +236,28 @@ export async function prBatchStatus(
         );
         const ciSummary = summarizeCIStatus(ciJobs);
 
+        // Combined conflict verdict (mergeable + mergeStateStatus + label +
+        // required check) so a conflicting PR never looks clean while
+        // `mergeable` is UNKNOWN after a base push (LS-10375).
+        const rawSignals = detectConflictSignals({
+          mergeable: pr.mergeable,
+          mergeStateStatus: pr.mergeStateStatus,
+          labels: pr.labels.nodes.map((l) => l.name),
+          failingChecks: ciJobs
+            .filter(
+              (j) =>
+                j.name === CONFLICT_CHECK_NAME && j.conclusion === 'FAILURE',
+            )
+            .map((j) => j.name),
+        });
+        const conflicting =
+          rawSignals.conflicting && !isStaleConflictSignalOnly(rawSignals, pr);
+        const conflictFields = {
+          mergeStateStatus: pr.mergeStateStatus,
+          conflicting,
+          ...(conflicting ? { conflictSignals: rawSignals.sources } : {}),
+        };
+
         const totalThreads = pr.reviewThreads.totalCount;
         const unresolvedThreadNodes = pr.reviewThreads.nodes.filter(
           (t) => !t.isResolved && !t.isOutdated,
@@ -260,6 +289,7 @@ export async function prBatchStatus(
             number: pr.number,
             branch: pr.headRefName,
             mergeable: pr.mergeable,
+            ...conflictFields,
             ciSummary,
             ...(failedJobs.length > 0 ? { failedJobs } : {}),
             ...(cancelledJobs.length > 0 ? { cancelledJobs } : {}),
@@ -283,6 +313,7 @@ export async function prBatchStatus(
           author: pr.author?.login ?? 'unknown',
           isDraft: pr.isDraft,
           mergeable: pr.mergeable,
+          ...conflictFields,
           ciSummary,
           ciJobs,
           reviewDecision: pr.reviewDecision,

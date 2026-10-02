@@ -1,6 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
-import { detectConflictSignals } from '../conflict-signals.js';
+import {
+  detectConflictSignals,
+  isStaleConflictSignalOnly,
+} from '../conflict-signals.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
@@ -126,6 +129,7 @@ type BlockReason =
   | 'UNRESOLVED_THREADS'
   | 'AWAITING_REVIEW'
   | 'CI_PENDING'
+  | 'MERGEABLE_UNKNOWN'
   | 'IN_MERGE_QUEUE'
   | 'READY'
   | 'MERGED'
@@ -161,27 +165,16 @@ function deriveReason(
   // UNKNOWN/stale on every base push (see conflict-signals.ts).
   const conflictSignals = detectConflictSignals({
     mergeable: pr.mergeable,
+    mergeStateStatus: pr.mergeStateStatus,
     labels: pr.labels.nodes.map((l) => l.name),
     failingChecks: ci.failingNames,
   });
 
-  // The CI: Conflicts label (and its paired "No Merge Conflicts" check) are
-  // written by a separate, independently-scheduled workflow and can lag real
-  // git state by 5-15+ minutes after a conflict is actually resolved and
-  // pushed (LS-9945). GitHub's own `mergeable`/`mergeStateStatus` fields are
-  // recomputed live on every push and only ever settle to MERGEABLE/CLEAN
-  // (or UNSTABLE, which still means no conflict) once GitHub has finished
-  // computing — they never falsely report "clean" while still stale, unlike
-  // the label. When those two live fields already agree the branch is clean,
-  // a conflict verdict resting solely on the (unioned) label/check signal is
-  // that lag, not a real conflict — trust the live fields over it.
-  const liveMergeStateConfirmsClear =
-    pr.mergeable === 'MERGEABLE' &&
-    (pr.mergeStateStatus === 'CLEAN' || pr.mergeStateStatus === 'UNSTABLE');
-  const conflictIsStaleAsyncSignalOnly =
-    conflictSignals.conflicting &&
-    !conflictSignals.sources.includes('mergeable:CONFLICTING') &&
-    liveMergeStateConfirmsClear;
+  // LS-9945: a label/check-only verdict is lag once the live fields say clear.
+  const conflictIsStaleAsyncSignalOnly = isStaleConflictSignalOnly(
+    conflictSignals,
+    pr,
+  );
 
   if (conflictSignals.conflicting && !conflictIsStaleAsyncSignalOnly) {
     return {
@@ -245,6 +238,15 @@ function deriveReason(
       summary: 'Awaiting reviewer approval.',
       nextAction:
         'Request review via github_request_review or wait for bot review.',
+    };
+  }
+  // Same verdict as github_pr_why_blocked: UNKNOWN is not READY (LS-10375).
+  if (pr.mergeable === 'UNKNOWN') {
+    return {
+      reason: 'MERGEABLE_UNKNOWN',
+      summary:
+        'GitHub is still computing mergeability (UNKNOWN); conflicts cannot be ruled out yet.',
+      nextAction: 'Retry in a few seconds; GitHub recomputes asynchronously.',
     };
   }
   return {
@@ -342,7 +344,7 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
       `## PR #${pr.number}: ${pr.title}`,
       `**URL:** ${pr.url}`,
       `**State:** ${pr.state}${pr.isDraft ? ' (draft)' : ''}`,
-      `**Mergeable:** ${pr.mergeable}`,
+      `**Mergeable:** ${pr.mergeable} (${pr.mergeStateStatus})`,
       `**Labels:** ${labels.length > 0 ? labels.join(', ') : 'none'}`,
       `**Unresolved threads:** ${unresolvedThreads} / ${pr.reviewThreads.totalCount}`,
       '',

@@ -26,6 +26,7 @@ function makePR(
     author: { login: 'alice' },
     isDraft: false,
     mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
     reviewDecision: 'REVIEW_REQUIRED',
     updatedAt: '2026-01-02T00:00:00Z',
     url: `https://github.com/o/r/pull/${number}`,
@@ -426,5 +427,66 @@ describe('prBatchStatus — CANCELLED/SKIPPED are not failures (LS-10116)', () =
       },
       { name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ]);
+  });
+});
+
+// LS-10375: the Periodic Wake Protocol reads compact batch status, so a
+// conflicting PR must not look clean while `mergeable` is UNKNOWN.
+describe('prBatchStatus — combined conflict signal (LS-10375)', () => {
+  interface ConflictRow {
+    mergeable: string;
+    mergeStateStatus: string;
+    conflicting: boolean;
+    conflictSignals?: string[];
+  }
+  const run = async (overrides: Record<string, unknown>, compact: boolean) => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse({ pr_7: makePR(7, [], overrides) }),
+    );
+    const result = await prBatchStatus({ numbers: [7], compact });
+    return (JSON.parse(result.content[0].text) as { prs: ConflictRow[] })
+      .prs[0];
+  };
+
+  it.each([true, false])(
+    'flags DIRTY as conflicting while mergeable is UNKNOWN (compact=%s)',
+    async (compact) => {
+      const row = await run(
+        { mergeable: 'UNKNOWN', mergeStateStatus: 'DIRTY' },
+        compact,
+      );
+      expect(row.mergeable).toBe('UNKNOWN');
+      expect(row.mergeStateStatus).toBe('DIRTY');
+      expect(row.conflicting).toBe(true);
+      expect(row.conflictSignals).toEqual(['mergeState:DIRTY']);
+    },
+  );
+
+  it('flags the CI: Conflicts label as conflicting in compact mode', async () => {
+    const row = await run(
+      {
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'UNKNOWN',
+        labels: { nodes: [{ name: 'CI: Conflicts' }] },
+      },
+      true,
+    );
+    expect(row.conflicting).toBe(true);
+    expect(row.conflictSignals).toEqual(['label:CI: Conflicts']);
+  });
+
+  it('negative control: a clean PR reports conflicting=false and no conflictSignals', async () => {
+    const row = await run({}, true);
+    expect(row.mergeStateStatus).toBe('CLEAN');
+    expect(row.conflicting).toBe(false);
+    expect(row).not.toHaveProperty('conflictSignals');
+  });
+
+  it('negative control: a stale label is overridden once live fields confirm clear (LS-9945)', async () => {
+    const row = await run(
+      { labels: { nodes: [{ name: 'CI: Conflicts' }] } },
+      true,
+    );
+    expect(row.conflicting).toBe(false);
   });
 });

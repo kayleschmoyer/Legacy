@@ -3,7 +3,7 @@
  * (`github_pr_why_blocked`, `github_pr_diagnose`, `github_pr_dashboard`,
  * `github_pr_scan`).
  *
- * The repo has THREE conflict signals, and they can disagree:
+ * The repo has FOUR conflict signals, and they can disagree:
  *   1. GraphQL `mergeable` — GitHub's lazily-computed field. It flips to
  *      UNKNOWN every time the base branch advances and can stay stale for
  *      minutes (the flakiness that motivated check-conflicts.yml, LS-4479).
@@ -11,6 +11,8 @@
  *      base-push sweep from a deterministic local `git merge` test.
  *   3. The required "No Merge Conflicts" check run — same deterministic test,
  *      surfaced as the merge-gate check.
+ *   4. GraphQL `mergeStateStatus` — DIRTY means a merge conflict. It can read
+ *      DIRTY while `mergeable` is still UNKNOWN (LS-10375).
  *
  * Historically the triage tools read ONLY signal 1, so during an UNKNOWN (or
  * stale-MERGEABLE) window a conflicting PR was misdiagnosed as CI_FAILING with
@@ -30,6 +32,8 @@ export const CONFLICT_CHECK_NAME = 'No Merge Conflicts';
 export interface ConflictSignalInputs {
   /** GraphQL mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN' (or null). */
   mergeable?: string | null;
+  /** GraphQL mergeStateStatus: 'DIRTY' means conflicts (LS-10375). */
+  mergeStateStatus?: string | null;
   /** PR label names. */
   labels?: Iterable<string>;
   /**
@@ -68,6 +72,9 @@ export function detectConflictSignals(
   if (inputs.mergeable === 'CONFLICTING') {
     sources.push('mergeable:CONFLICTING');
   }
+  if (inputs.mergeStateStatus === 'DIRTY') {
+    sources.push('mergeState:DIRTY');
+  }
   for (const label of inputs.labels ?? []) {
     if (label === CONFLICT_LABEL) {
       sources.push(`label:${CONFLICT_LABEL}`);
@@ -82,4 +89,25 @@ export function detectConflictSignals(
   }
 
   return { conflicting: sources.length > 0, sources };
+}
+
+/**
+ * LS-9945: the label/check signals are written by an async workflow and lag
+ * real git state after a conflict is resolved, while GitHub's live
+ * `mergeable`/`mergeStateStatus` settle to MERGEABLE + CLEAN/UNSTABLE. When the
+ * live fields confirm clear, a verdict resting solely on label/check is that
+ * lag — trust the live fields. Shared by every triage tool (LS-10375).
+ */
+export function isStaleConflictSignalOnly(
+  signals: ConflictSignals,
+  inputs: Pick<ConflictSignalInputs, 'mergeable' | 'mergeStateStatus'>,
+): boolean {
+  return (
+    signals.conflicting &&
+    !signals.sources.includes('mergeable:CONFLICTING') &&
+    !signals.sources.includes('mergeState:DIRTY') &&
+    inputs.mergeable === 'MERGEABLE' &&
+    (inputs.mergeStateStatus === 'CLEAN' ||
+      inputs.mergeStateStatus === 'UNSTABLE')
+  );
 }

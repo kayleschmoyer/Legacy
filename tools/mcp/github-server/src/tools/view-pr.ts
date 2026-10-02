@@ -18,7 +18,7 @@ type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
 interface ViewPRParams {
   number: number;
   /** Opt-in fields to include beyond the compact default. Compact default: number, title, state,
-   *  isDraft, headRefName, baseRefName, url, labels, mergedAt, mergeCommit, mergedBy, additions,
+   *  isDraft, mergeable, mergeStateStatus, headRefName, baseRefName, url, labels, mergedAt, mergeCommit, mergedBy, additions,
    *  deletions, changedFiles, commits.totalCount, checksSummary. Pass e.g. ["body","files"] for
    *  richer output. */
   fields?: ViewPRField[];
@@ -50,6 +50,8 @@ interface PRGraphQLResponse {
       url: string;
       labels: { nodes: Array<{ name: string }> };
       isDraft: boolean;
+      mergeable: string;
+      mergeStateStatus: string;
       reviewDecision: string | null;
       additions: number;
       deletions: number;
@@ -108,6 +110,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
       url
       labels(first: 20) { nodes { name } }
       isDraft
+      mergeable
+      mergeStateStatus
       reviewDecision
       additions
       deletions
@@ -402,6 +406,8 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       title: pr.title,
       state: pr.state,
       isDraft: pr.isDraft,
+      mergeable: pr.mergeable,
+      mergeStateStatus: pr.mergeStateStatus,
       headRefName: pr.headRefName,
       baseRefName: pr.baseRefName,
       url: pr.url,

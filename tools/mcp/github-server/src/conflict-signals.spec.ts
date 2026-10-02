@@ -3,6 +3,7 @@ import {
   CONFLICT_LABEL,
   detectConflictSignals,
   isConflictCheckFailure,
+  isStaleConflictSignalOnly,
 } from './conflict-signals';
 
 describe('isConflictCheckFailure', () => {
@@ -76,5 +77,67 @@ describe('detectConflictSignals', () => {
 
   it('handles absent inputs', () => {
     expect(detectConflictSignals({}).conflicting).toBe(false);
+  });
+
+  it('fires on mergeStateStatus DIRTY even while mergeable is UNKNOWN (LS-10375)', () => {
+    const result = detectConflictSignals({
+      mergeable: 'UNKNOWN',
+      mergeStateStatus: 'DIRTY',
+    });
+    expect(result.conflicting).toBe(true);
+    expect(result.sources).toEqual(['mergeState:DIRTY']);
+  });
+
+  it('negative control: non-DIRTY mergeStateStatus values do not fire', () => {
+    for (const status of [
+      'CLEAN',
+      'BEHIND',
+      'BLOCKED',
+      'UNSTABLE',
+      'UNKNOWN',
+    ]) {
+      expect(
+        detectConflictSignals({
+          mergeable: 'UNKNOWN',
+          mergeStateStatus: status,
+        }).conflicting,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('isStaleConflictSignalOnly (LS-9945)', () => {
+  const labelOnly = detectConflictSignals({ labels: [CONFLICT_LABEL] });
+
+  it('is true for a label-only verdict when live fields confirm clear', () => {
+    expect(
+      isStaleConflictSignalOnly(labelOnly, {
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+      }),
+    ).toBe(true);
+  });
+
+  it('negative control: false while mergeable is UNKNOWN (not yet confirmed clear)', () => {
+    expect(
+      isStaleConflictSignalOnly(labelOnly, {
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'UNKNOWN',
+      }),
+    ).toBe(false);
+  });
+
+  it('negative control: false when GitHub itself reports CONFLICTING or DIRTY', () => {
+    const live = detectConflictSignals({
+      mergeable: 'CONFLICTING',
+      mergeStateStatus: 'DIRTY',
+      labels: [CONFLICT_LABEL],
+    });
+    expect(
+      isStaleConflictSignalOnly(live, {
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+      }),
+    ).toBe(false);
   });
 });

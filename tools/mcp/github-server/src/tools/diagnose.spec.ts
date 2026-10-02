@@ -368,4 +368,35 @@ describe('diagnose', () => {
     const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBeDefined();
   });
+
+  describe('mergeable UNKNOWN (LS-10375)', () => {
+    const approved = { ...BASE_PR, reviewDecision: 'APPROVED' };
+    const run = async (pr: Record<string, unknown>) => {
+      mockGithubGraphQL.mockResolvedValue({
+        data: { repository: { pullRequest: pr } },
+      });
+      const result = await diagnose({ prNumber: 100 });
+      return JSON.parse(result.content[0].text) as DiagnosePayload;
+    };
+
+    it('returns MERGEABLE_UNKNOWN, not READY, when nothing else is wrong', async () => {
+      const payload = await run({ ...approved, mergeable: 'UNKNOWN' });
+      expect(payload.reason).toBe('MERGEABLE_UNKNOWN');
+      expect(payload.summary).not.toMatch(/ready to merge/);
+    });
+
+    it('negative control: settled MERGEABLE + approved is still READY', async () => {
+      const payload = await run(approved);
+      expect(payload.reason).toBe('READY');
+    });
+
+    it('returns MERGE_CONFLICT when mergeStateStatus is DIRTY during the UNKNOWN window', async () => {
+      const payload = await run({
+        ...approved,
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'DIRTY',
+      });
+      expect(payload.reason).toBe('MERGE_CONFLICT');
+    });
+  });
 });
