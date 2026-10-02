@@ -6,6 +6,7 @@ jest.mock('../run-command.js', () => ({
 import { gzipSync } from 'node:zlib';
 import {
   type CommandRunner,
+  DEFAULT_BUCKET,
   DEFAULT_GET_MAX_BYTES,
   GET_SIZE_CAP_BYTES,
   MAX_GET_MAX_BYTES,
@@ -109,6 +110,38 @@ describe('s3Inspect', () => {
       expect(valueOf(args, '--bucket')).toBe(BUCKET);
       expect(valueOf(args, '--prefix')).toBe('retrosheet/v1/');
       expect(args).toContain('--no-paginate');
+    });
+
+    it('defaults to the CI artifacts bucket when none is given (LS-10344)', async () => {
+      const runner: CommandRunner = jest.fn().mockResolvedValue(listPage([]));
+      const body = parseJson(
+        await s3Inspect(
+          { action: 'list', prefix: 'e2e-ledger/' },
+          makeDeps(runner),
+        ),
+      );
+
+      expect(DEFAULT_BUCKET).toBe('legacy-sports-dev-ci-artifacts');
+      expect(valueOf(argsOf(runner), '--bucket')).toBe(DEFAULT_BUCKET);
+      expect(body.bucket).toBe(DEFAULT_BUCKET);
+    });
+
+    it('reports the page totalSize alongside the key listing (LS-10344)', async () => {
+      const runner: CommandRunner = jest
+        .fn()
+        .mockResolvedValue(
+          listPage([
+            { Key: 'a', Size: 10 },
+            { Key: 'b', Size: 5 },
+            { Key: 'c' },
+          ]),
+        );
+      const body = parseJson(
+        await s3Inspect({ action: 'list', bucket: BUCKET }, makeDeps(runner)),
+      );
+
+      expect(body.count).toBe(3);
+      expect(body.totalSize).toBe(15);
     });
 
     it('surfaces nextContinuationToken so a listing can be resumed', async () => {
@@ -285,6 +318,16 @@ describe('s3Inspect', () => {
       );
 
       expect(result.isError).toBe(true);
+    });
+
+    it('defaults to the CI artifacts bucket when none is given (LS-10344)', async () => {
+      const runner: CommandRunner = jest.fn().mockResolvedValue('{}');
+      await s3Inspect(
+        { action: 'head', key: 'ci-artifacts/abc/web.tgz' },
+        makeDeps(runner),
+      );
+
+      expect(valueOf(argsOf(runner), '--bucket')).toBe(DEFAULT_BUCKET);
     });
 
     it('requires a key', async () => {

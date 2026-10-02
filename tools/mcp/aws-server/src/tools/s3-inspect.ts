@@ -10,6 +10,11 @@ import { errorResult } from '../aws-error.js';
 // Limits
 // ---------------------------------------------------------------------------
 
+/**
+ * Bucket used when the caller omits one: the CI artifacts bucket, the most
+ * common target of ad-hoc `aws s3 ls` checks (LS-10344).
+ */
+export const DEFAULT_BUCKET = 'legacy-sports-dev-ci-artifacts';
 /** S3's own per-request ceiling for list-objects-v2. */
 export const MAX_KEYS = 1000;
 /** Default page size for a non-summary list. */
@@ -136,7 +141,8 @@ export type S3InspectAction = 'list' | 'head' | 'get';
 
 export interface S3InspectParams {
   action: S3InspectAction;
-  bucket: string;
+  /** Defaults to DEFAULT_BUCKET. */
+  bucket?: string;
   prefix?: string;
   key?: string;
   maxKeys?: number;
@@ -234,17 +240,18 @@ function listArgs(
 
 async function listObjects(
   params: S3InspectParams,
+  bucket: string,
   deps: S3InspectDeps,
   repoRoot: string,
 ): Promise<ToolResult> {
-  const { bucket, prefix, continuationToken } = params;
+  const { prefix, continuationToken } = params;
   const maxKeys = Math.min(
     Math.max(params.maxKeys ?? DEFAULT_MAX_KEYS, 1),
     MAX_KEYS,
   );
 
   if (params.summary) {
-    return summarizeObjects(params, deps, repoRoot, maxKeys);
+    return summarizeObjects(params, bucket, deps, repoRoot, maxKeys);
   }
 
   try {
@@ -266,6 +273,8 @@ async function listObjects(
       bucket,
       prefix: prefix ?? null,
       count: objects.length,
+      // Bytes in this page only — use summary mode for a whole-prefix total.
+      totalSize: objects.reduce((sum, o) => sum + (o.size ?? 0), 0),
       truncated: data.IsTruncated === true,
       nextContinuationToken: data.NextContinuationToken ?? null,
       objects,
@@ -283,11 +292,12 @@ async function listObjects(
  */
 async function summarizeObjects(
   params: S3InspectParams,
+  bucket: string,
   deps: S3InspectDeps,
   repoRoot: string,
   maxKeys: number,
 ): Promise<ToolResult> {
-  const { bucket, prefix } = params;
+  const { prefix } = params;
   let token = params.continuationToken;
   let count = 0;
   let totalSize = 0;
@@ -534,7 +544,8 @@ export async function s3Inspect(
 ): Promise<ToolResult> {
   const resolved: S3InspectDeps = { ...defaultDeps, ...deps };
   const repoRoot = getRepoRoot();
-  const { action, bucket, prefix, key, continuationToken } = params;
+  const { action, prefix, key, continuationToken } = params;
+  const bucket = params.bucket ?? DEFAULT_BUCKET;
 
   const bucketError = validateBucket(bucket);
   if (bucketError) return errorResult('s3 inspect', bucketError);
@@ -554,7 +565,7 @@ export async function s3Inspect(
   }
 
   if (action === 'list') {
-    return listObjects(params, resolved, repoRoot);
+    return listObjects(params, bucket, resolved, repoRoot);
   }
 
   if (key === undefined || key === '') {

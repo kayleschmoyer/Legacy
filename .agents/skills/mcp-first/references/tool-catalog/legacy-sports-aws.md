@@ -185,12 +185,12 @@ Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a L
 
 ### `aws_s3_inspect`
 
-Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus). "list" pages keys with LastModified + size under a prefix; "head" returns one object's ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Never writes, copies, or deletes. Use instead of `aws s3api list-objects-v2 / head-object` and `aws s3 cp ... - | gunzip`.
+Read-only S3 inspection of any bucket (CI artifacts by default; also corpus buckets). "list" pages keys with LastModified + size under a prefix (summary:true walks every page and returns only count / totalSize / min+max LastModified); "head" returns one object's ContentLength, LastModified and ContentType, or exists:false on a 404; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Never writes, copies, or deletes. Replaces shell `aws s3 ls`, `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `action` | enum | **required** | — | list = page keys under a prefix; head = one object's metadata (exists:false on 404); get = peek at a small object's contents. |
-| `bucket` | string | **required** | — | Bucket name without the s3:// scheme (e.g. "legacy-sports-dev-retrosheet-corpus"). |
+| `bucket` | string |  | — | Bucket name without the s3:// scheme (default: legacy-sports-dev-ci-artifacts). |
 | `prefix` | string |  | — | Key prefix to scope a "list" (e.g. "retrosheet/v1/"). Ignored by head/get. |
 | `key` | string |  | — | Full object key. Required for "head" and "get"; ignored by "list". Keys starting with "-" are not supported. |
 | `maxKeys` | number |  | coerced, integer, min 1, max MAX_KEYS | Keys per "list" page (default and max: ${MAX_KEYS}). In summary mode this is the internal page size, not a result cap. |

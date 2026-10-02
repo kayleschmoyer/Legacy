@@ -266,7 +266,7 @@ server.tool(
 // --- aws_s3_inspect ---
 server.tool(
   'aws_s3_inspect',
-  'Read-only S3 inspection for corpus buckets (e.g. legacy-sports-dev-retrosheet-corpus). "list" pages keys with LastModified + size under a prefix; "head" returns one object\'s ContentLength, LastModified and ContentType, or exists:false on a 404 rather than an error; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Never writes, copies, or deletes. Use instead of `aws s3api list-objects-v2 / head-object` and `aws s3 cp ... - | gunzip`.',
+  'Read-only S3 inspection of any bucket (CI artifacts by default; also corpus buckets). "list" pages keys with LastModified + size under a prefix (summary:true walks every page and returns only count / totalSize / min+max LastModified); "head" returns one object\'s ContentLength, LastModified and ContentType, or exists:false on a 404; "get" peeks at a small object, auto-gunzipping .gz and refusing anything above the size cap. Never writes, copies, or deletes. Replaces shell `aws s3 ls`, `aws s3api list-objects-v2 / head-object` and `aws s3 cp s3://... - | gunzip`.',
   {
     action: z
       .enum(['list', 'head', 'get'])
@@ -275,8 +275,9 @@ server.tool(
       ),
     bucket: z
       .string()
+      .optional()
       .describe(
-        'Bucket name without the s3:// scheme (e.g. "legacy-sports-dev-retrosheet-corpus").',
+        'Bucket name without the s3:// scheme (default: legacy-sports-dev-ci-artifacts).',
       ),
     prefix: z
       .string()
