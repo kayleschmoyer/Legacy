@@ -79,8 +79,9 @@ type ThemePreference = 'system' | 'light' | 'dark';
 type DefaultSportView = 'baseball' | 'football';
 type StatsFormat = 'standard' | 'expanded';
 
+// `theme` is deliberately absent: ThemeContext is its sole owner (LS-7078),
+// so it is never persisted in this blob.
 interface UserPreferences {
-  theme: ThemePreference;
   defaultSport: DefaultSportView;
   statsFormat: StatsFormat;
   showSeasonTotals: boolean;
@@ -92,7 +93,6 @@ interface UserPreferences {
 // setting at load time (LS-7072) instead of being frozen at module import.
 export function getDefaultPrefs(): UserPreferences {
   return {
-    theme: 'system',
     defaultSport: 'baseball',
     statsFormat: 'standard',
     showSeasonTotals: true,
@@ -124,10 +124,11 @@ function loadPrefs(): UserPreferences {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
     if (!raw) return getDefaultPrefs();
-    return {
-      ...getDefaultPrefs(),
-      ...(JSON.parse(raw) as Partial<UserPreferences>),
-    };
+    // Drop a legacy `theme` so a stale value is never written back (LS-7078).
+    const stored = JSON.parse(raw) as Partial<UserPreferences> &
+      Record<string, unknown>;
+    delete stored.theme;
+    return { ...getDefaultPrefs(), ...stored };
   } catch {
     return getDefaultPrefs();
   }
@@ -1383,10 +1384,7 @@ const PreferencesPage: React.FC = () => {
   );
   const cardStyle = useMemo(() => getCardStyle(isDark), [isDark]);
   const cardStyleAlt = useMemo(() => getCardStyle(isDark, 80), [isDark]);
-  const [prefs, setPrefs] = useState<UserPreferences>(() => ({
-    ...loadPrefs(),
-    theme: themePreference,
-  }));
+  const [prefs, setPrefs] = useState<UserPreferences>(loadPrefs);
   const { saved, saveFailed, triggerSave } = useSavedBanner();
   const isInitialRender = useRef(true);
 
@@ -1409,13 +1407,6 @@ const PreferencesPage: React.FC = () => {
       return next;
     });
   }, []);
-
-  useEffect(() => {
-    setPrefs((prev) => {
-      if (prev.theme === themePreference) return prev;
-      return { ...prev, theme: themePreference };
-    });
-  }, [themePreference]);
 
   // Reflect the server-side stats-format preference once it loads (LS-7138), so
   // a value set on another device is shown here instead of stale localStorage.
@@ -1443,9 +1434,6 @@ const PreferencesPage: React.FC = () => {
 
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
-      if (key === 'theme') {
-        setThemePreference(value as ThemePreference);
-      }
       // Stats format is persisted server-side so it syncs across devices
       // (LS-7138); other prefs remain device-local for now.
       if (key === 'statsFormat' && isAuthenticated) {
@@ -1462,7 +1450,7 @@ const PreferencesPage: React.FC = () => {
       }
       setPrefs((prev) => ({ ...prev, [key]: value }));
     },
-    [setThemePreference, isAuthenticated, updateUserPreferences],
+    [isAuthenticated, updateUserPreferences],
   );
 
   // Auto-save on changes (skip the initial render).
@@ -1475,6 +1463,16 @@ const PreferencesPage: React.FC = () => {
   }, [prefs, triggerSave]);
 
   const SaveBannerIcon = saveFailed ? X : Check;
+
+  // Theme goes straight to ThemeContext, which owns its persistence (LS-7078);
+  // it never passes through `prefs`, so confirm the save here.
+  const onThemeChange = useCallback(
+    (value: ThemePreference) => {
+      setThemePreference(value);
+      triggerSave();
+    },
+    [setThemePreference, triggerSave],
+  );
 
   return (
     <PageContainer style={pageBackgroundStyle}>
@@ -1572,10 +1570,7 @@ const PreferencesPage: React.FC = () => {
                     </Paragraph>
                   </PrefLabel>
                 </PrefRow>
-                <ThemePicker
-                  value={prefs.theme}
-                  onChange={(v) => update('theme', v)}
-                />
+                <ThemePicker value={themePreference} onChange={onThemeChange} />
 
                 <Separator />
 

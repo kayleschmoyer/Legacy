@@ -1,8 +1,9 @@
 /**
  * ThemeContext — manages dark/light/system theme preference for the web app.
  *
- * - Persists the preference inside the existing `ls_user_preferences` blob
- *   in localStorage so PreferencesPage and ThemeContext share one source.
+ * - Sole owner of the theme preference: persisted under its own
+ *   `ls_theme_preference` localStorage key (LS-7078). The `ls_user_preferences`
+ *   blob no longer carries `theme`; PreferencesPage reads it from this context.
  * - Listens to OS `prefers-color-scheme` changes for "system" mode.
  * - Exposes `resolvedTheme` ('light' | 'dark') consumed by main.tsx to drive
  *   TamaguiProvider's active theme.
@@ -40,7 +41,13 @@ function isThemePreference(value: unknown): value is ThemePreference {
 }
 export type ResolvedTheme = 'light' | 'dark';
 
-const PREFS_KEY = 'ls_user_preferences';
+/** ThemeContext is the sole owner of this key (LS-7078). */
+const THEME_KEY = 'ls_theme_preference';
+/**
+ * Legacy home of `theme` — the shared preferences blob. Only read (once, to
+ * migrate existing users) and scrubbed; never written with a theme again.
+ */
+const LEGACY_PREFS_KEY = 'ls_user_preferences';
 
 /* ── Helpers ──────────────────────────────────────────── */
 
@@ -54,12 +61,34 @@ function getSystemTheme(): ResolvedTheme {
   return 'light';
 }
 
+/** Remove `theme` from the legacy blob so it can never go stale there. */
+function scrubLegacyTheme(): void {
+  try {
+    const raw = localStorage.getItem(LEGACY_PREFS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!('theme' in parsed)) return;
+    delete parsed.theme;
+    localStorage.setItem(LEGACY_PREFS_KEY, JSON.stringify(parsed));
+  } catch {
+    // Corrupt/unavailable storage: nothing to scrub
+  }
+}
+
 function readStoredPreference(): ThemePreference {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return 'system';
-    const parsed = JSON.parse(raw) as { theme?: ThemePreference };
-    return parsed.theme ?? 'system';
+    const stored = localStorage.getItem(THEME_KEY);
+    if (isThemePreference(stored)) return stored;
+
+    // One-time migration: adopt the theme previously kept in the shared blob.
+    const raw = localStorage.getItem(LEGACY_PREFS_KEY);
+    const legacy = raw ? (JSON.parse(raw) as { theme?: unknown }).theme : null;
+    if (isThemePreference(legacy)) {
+      localStorage.setItem(THEME_KEY, legacy);
+      scrubLegacyTheme();
+      return legacy;
+    }
+    return 'system';
   } catch {
     return 'system';
   }
@@ -67,12 +96,8 @@ function readStoredPreference(): ThemePreference {
 
 function persistPreference(pref: ThemePreference): void {
   try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    localStorage.setItem(
-      PREFS_KEY,
-      JSON.stringify({ ...existing, theme: pref }),
-    );
+    localStorage.setItem(THEME_KEY, pref);
+    scrubLegacyTheme();
   } catch {
     // Storage may be unavailable; silently skip
   }

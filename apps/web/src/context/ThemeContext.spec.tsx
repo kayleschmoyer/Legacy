@@ -83,15 +83,70 @@ describe('ThemeProvider system theme (LS-7076)', () => {
   });
 
   it('ignores OS changes when the user has pinned a theme', () => {
-    localStorage.setItem(
-      'ls_user_preferences',
-      JSON.stringify({ theme: 'light' }),
-    );
+    localStorage.setItem('ls_theme_preference', 'light');
     const mq = installMatchMedia(false);
     const { getByTestId } = renderProvider();
 
     mq.emit(true);
     expect(getByTestId('resolved').textContent).toBe('light');
+  });
+
+  describe('single source of truth (LS-7078)', () => {
+    function ThemeSetter() {
+      const { themePreference, setThemePreference } = useThemeContext();
+      return (
+        <button onClick={() => setThemePreference('dark')}>
+          {themePreference}
+        </button>
+      );
+    }
+
+    it('persists to its own key and never writes theme into the prefs blob', () => {
+      installMatchMedia(false);
+      localStorage.setItem(
+        'ls_user_preferences',
+        JSON.stringify({ statsFormat: 'expanded' }),
+      );
+      const { getByRole } = render(
+        <ThemeProvider>
+          <ThemeSetter />
+        </ThemeProvider>,
+      );
+
+      act(() => getByRole('button').click());
+
+      expect(localStorage.getItem('ls_theme_preference')).toBe('dark');
+      expect(
+        JSON.parse(localStorage.getItem('ls_user_preferences') ?? '{}'),
+      ).toEqual({ statsFormat: 'expanded' });
+    });
+
+    it('migrates a legacy blob theme to its own key and scrubs the blob', () => {
+      installMatchMedia(false);
+      localStorage.setItem(
+        'ls_user_preferences',
+        JSON.stringify({ theme: 'dark', statsFormat: 'expanded' }),
+      );
+      const { getByTestId } = renderProvider();
+
+      expect(getByTestId('resolved').textContent).toBe('dark');
+      expect(localStorage.getItem('ls_theme_preference')).toBe('dark');
+      expect(
+        JSON.parse(localStorage.getItem('ls_user_preferences') ?? '{}'),
+      ).toEqual({ statsFormat: 'expanded' });
+    });
+
+    it('prefers its own key over a stale legacy blob theme', () => {
+      installMatchMedia(false);
+      localStorage.setItem('ls_theme_preference', 'light');
+      localStorage.setItem(
+        'ls_user_preferences',
+        JSON.stringify({ theme: 'dark' }),
+      );
+      const { getByTestId } = renderProvider();
+
+      expect(getByTestId('resolved').textContent).toBe('light');
+    });
   });
 
   it('removes the matchMedia listener on unmount', () => {

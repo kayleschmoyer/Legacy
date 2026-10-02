@@ -87,11 +87,12 @@ jest.mock('@tamagui/lucide-icons/icons/Bell', () => {
   };
 });
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
+const mockSetThemePreference = jest.fn();
 jest.mock('../../context/ThemeContext', () => ({
   useThemeContext: () => ({
     themePreference: 'system',
     resolvedTheme: 'light',
-    setThemePreference: jest.fn(),
+    setThemePreference: mockSetThemePreference,
   }),
 }));
 jest.mock('@legacy-sports/graphql', () => ({
@@ -329,5 +330,42 @@ describe('PreferencesPage notifications Retry (LS-7095)', () => {
     fireEvent.click(retry);
     fireEvent.click(retry);
     expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('PreferencesPage theme ownership (LS-7078)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockSetThemePreference.mockClear();
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('hands theme changes to ThemeContext instead of the prefs blob', () => {
+    render(<PreferencesPage />);
+    fireEvent.click(screen.getByLabelText('Dark theme'));
+
+    expect(mockSetThemePreference).toHaveBeenCalledWith('dark');
+    expect(localStorage.getItem('ls_user_preferences')).toBeNull();
+  });
+
+  it('never writes a stale legacy theme back when another pref auto-saves', () => {
+    localStorage.setItem(
+      'ls_user_preferences',
+      JSON.stringify({ theme: 'dark', statsFormat: 'expanded' }),
+    );
+    render(<PreferencesPage />);
+    fireEvent.click(screen.getByRole('switch', { name: 'Animations' }));
+
+    const saved = JSON.parse(
+      localStorage.getItem('ls_user_preferences') ?? '{}',
+    ) as Record<string, unknown>;
+    expect(saved).not.toHaveProperty('theme');
+    expect(saved.statsFormat).toBe('expanded');
   });
 });

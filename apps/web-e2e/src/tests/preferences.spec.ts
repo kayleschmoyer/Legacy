@@ -21,6 +21,7 @@
 import { expect, test, unauthTest } from '../fixtures/pages';
 
 const PREFS_KEY = 'ls_user_preferences';
+const THEME_KEY = 'ls_theme_preference';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -105,14 +106,19 @@ test.describe('Preferences Page @smoke', () => {
     // Verify saved banner appears
     await settingsPage.preferences.expectSaveBanner();
 
-    // Verify preference was saved to localStorage
-    const saved = await page.evaluate(
+    // Theme is owned by ThemeContext under its own key (LS-7078)
+    const savedTheme = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      THEME_KEY,
+    );
+    expect(savedTheme).toBe('dark');
+    // ...and must not be mirrored into the shared preferences blob.
+    const blob = await page.evaluate(
       (key) => localStorage.getItem(key),
       PREFS_KEY,
     );
-    expect(saved).not.toBeNull();
-    const prefs = JSON.parse(saved ?? '{}') as Record<string, unknown>;
-    expect(prefs.theme).toBe('dark');
+    const prefs = JSON.parse(blob ?? '{}') as Record<string, unknown>;
+    expect(prefs).not.toHaveProperty('theme');
   });
 
   test('should persist preferences across page reload', async ({
@@ -148,7 +154,10 @@ test.describe('Preferences Page @smoke', () => {
     await settingsPage.preferences.expectSaveBanner();
 
     // Clear localStorage and reload
-    await page.evaluate((key) => localStorage.removeItem(key), PREFS_KEY);
+    await page.evaluate(
+      (keys) => keys.forEach((key) => localStorage.removeItem(key)),
+      [PREFS_KEY, THEME_KEY],
+    );
     await page.reload();
 
     // Default theme should be "System"

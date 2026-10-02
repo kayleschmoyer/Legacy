@@ -19,8 +19,8 @@ import { expect, test } from '../fixtures/auth-enhanced';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
-/** localStorage key shared by ThemeContext and PreferencesPage */
-const LS_PREFS_KEY = 'ls_user_preferences';
+/** localStorage key owned solely by ThemeContext (LS-7078) */
+const LS_THEME_KEY = 'ls_theme_preference';
 
 /** Expected computed background-color strings for each theme (from tamagui-config themes) */
 const DARK_BG_CSS = 'rgb(10, 15, 26)'; // #0A0F1A
@@ -29,16 +29,10 @@ const LIGHT_BG_CSS = 'rgb(255, 255, 255)'; // #FFFFFF
 /* ── Helper: read theme from localStorage ───────────────────────────────── */
 
 async function readThemePref(page: Page): Promise<string | null> {
-  return page.evaluate((key: string) => {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw) as { theme?: string };
-      return parsed.theme ?? null;
-    } catch {
-      return null;
-    }
-  }, LS_PREFS_KEY);
+  return page.evaluate(
+    (key: string) => localStorage.getItem(key),
+    LS_THEME_KEY,
+  );
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -183,15 +177,9 @@ test.describe('Dark mode – component rendering @regression', () => {
     // Inject dark theme into localStorage before any page scripts run
     await page.addInitScript(
       ({ key }: { key: string }) => {
-        const existing = JSON.parse(
-          localStorage.getItem(key) ?? '{}',
-        ) as Record<string, unknown>;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...existing, theme: 'dark' }),
-        );
+        localStorage.setItem(key, 'dark');
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
   });
 
@@ -236,15 +224,9 @@ test.describe('Light mode – component rendering @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(
       ({ key }: { key: string }) => {
-        const existing = JSON.parse(
-          localStorage.getItem(key) ?? '{}',
-        ) as Record<string, unknown>;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...existing, theme: 'light' }),
-        );
+        localStorage.setItem(key, 'light');
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
   });
 
@@ -289,15 +271,9 @@ test.describe('Contrast check – dark mode @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(
       ({ key }: { key: string }) => {
-        const existing = JSON.parse(
-          localStorage.getItem(key) ?? '{}',
-        ) as Record<string, unknown>;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...existing, theme: 'dark' }),
-        );
+        localStorage.setItem(key, 'dark');
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
   });
 
@@ -351,15 +327,9 @@ test.describe('Contrast check – light mode @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(
       ({ key }: { key: string }) => {
-        const existing = JSON.parse(
-          localStorage.getItem(key) ?? '{}',
-        ) as Record<string, unknown>;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...existing, theme: 'light' }),
-        );
+        localStorage.setItem(key, 'light');
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
   });
 
@@ -445,15 +415,9 @@ test.describe('Theme change takes effect immediately without reload @regression'
     // Seed dark so we can verify a real switch to light
     await page.evaluate(
       ({ key }: { key: string }) => {
-        const existing = JSON.parse(
-          localStorage.getItem(key) ?? '{}',
-        ) as Record<string, unknown>;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...existing, theme: 'dark' }),
-        );
+        localStorage.setItem(key, 'dark');
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
     // Reload so ThemeContext picks up the dark preference
     await page.reload();
@@ -486,7 +450,7 @@ test.describe('System theme default @regression', () => {
       ({ key }: { key: string }) => {
         localStorage.removeItem(key);
       },
-      { key: LS_PREFS_KEY },
+      { key: LS_THEME_KEY },
     );
 
     await page.goto('/preferences');

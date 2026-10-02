@@ -78,15 +78,9 @@ test.describe('User Preferences – Appearance section @regression', () => {
     await settingsPage.preferences.expectSaveBanner(5000);
 
     // Verify preference was actually persisted to localStorage
-    const savedTheme = await page.evaluate(() => {
-      const raw = localStorage.getItem('ls_user_preferences');
-      if (!raw) return null;
-      try {
-        return (JSON.parse(raw) as { theme?: string }).theme ?? null;
-      } catch {
-        return null;
-      }
-    });
+    const savedTheme = await page.evaluate(() =>
+      localStorage.getItem('ls_theme_preference'),
+    );
     expect(savedTheme).toBe('dark');
   });
 });
