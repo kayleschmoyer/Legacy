@@ -86,6 +86,51 @@ describe('useStripePrices', () => {
     expect(result.current.pricesFailed).toBe(false);
   });
 
+  // LS-7194: `cache-and-network` reports loading=true while revalidating even
+  // when cached live data is present. The hook must keep serving the live
+  // prices with loading=false so callers show them immediately (SWR) rather
+  // than flashing a skeleton or the hardcoded fallback.
+  it('serves cached live prices with loading=false while revalidating in the background', () => {
+    useGetStripePricesQuery.mockReturnValue({
+      data: {
+        stripePrices: {
+          monthlyPriceCents: 999,
+          annualTotalCents: 9999,
+          monthlyPriceId: 'price_monthly_live',
+          annualPriceId: 'price_annual_live',
+          trialPeriodDays: 7,
+        },
+      },
+      loading: true,
+      error: undefined,
+    });
+
+    const { result } = renderHook(() => useStripePrices());
+
+    expect(result.current.monthlyPrice).toBe(9.99);
+    expect(result.current.annualTotal).toBe(99.99);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.pricesFailed).toBe(false);
+    expect(result.current.monthlyPriceId).toBe('price_monthly_live');
+    expect(result.current.trialPeriodDays).toBe(7);
+  });
+
+  it('reports loading=true (not pricesFailed) on a cold first load so callers can show a skeleton', () => {
+    useGetStripePricesQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    });
+
+    const { result } = renderHook(() => useStripePrices());
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.pricesFailed).toBe(false);
+    expect(result.current.monthlyPriceId).toBeNull();
+    expect(result.current.annualPriceId).toBeNull();
+    expect(captureWarning).not.toHaveBeenCalled();
+  });
+
   it('returns fallbacks and warns on error', () => {
     const gqlError = { message: 'Network error' };
     useGetStripePricesQuery.mockReturnValue({

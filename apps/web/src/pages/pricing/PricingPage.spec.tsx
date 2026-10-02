@@ -172,6 +172,38 @@ describe('PricingPage — Premium plan price loading state (LS-8813)', () => {
     expect(screen.getAllByTestId('price-skeleton').length).toBeGreaterThan(0);
   });
 
+  // LS-7194: no price-affecting copy (savings %, billed-amount lines) may show
+  // fallback-derived numbers while live prices are still loading, on either
+  // billing cycle.
+  it('hides savings and billed-amount copy while loading, on both billing cycles', async () => {
+    const user = userEvent.setup();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: true,
+    });
+
+    render(<PricingPage />);
+
+    const assertNoPriceCopy = () => {
+      expect(screen.queryByText(/33%/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Billed (annually|monthly)/),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/\/mo/)).not.toBeInTheDocument();
+    };
+
+    assertNoPriceCopy();
+
+    await user.click(screen.getByText('Monthly'));
+    assertNoPriceCopy();
+
+    await user.click(screen.getByText('Annual'));
+    assertNoPriceCopy();
+  });
+
   it('still renders the fallback price when the prices query genuinely fails (not loading)', () => {
     mockUseStripePrices.mockReturnValue({
       monthlyPrice: 4.99,
