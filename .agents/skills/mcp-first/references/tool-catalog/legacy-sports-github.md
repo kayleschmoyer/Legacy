@@ -394,7 +394,7 @@ Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, 
 
 ### `github_pr_diagnose`
 
-Semantic one-shot for CI failure investigation: returns a compact markdown report with PR state, CI summary, failing job list with extracted error context, and a recommended next action. Replaces the 4-5 call chain: github_view_pr → github_get_check_runs → github_pr_why_blocked → ci_find_session → ci_get_logs. For full CI log lines, fetch logs separately via ci_get_logs after using this tool to identify which jobs are failing. Pass the PR number as "number" (preferred) or "prNumber" (alias).
+One-shot CI failure triage: compact markdown report with PR state, behindBy, STALE_BASE hint, failing jobs with error context, and next action. Replaces the 4-5 call chain: github_view_pr → github_get_check_runs → github_pr_why_blocked → ci_find_session → ci_get_logs. For full CI log lines, fetch logs separately via ci_get_logs after using this tool to identify which jobs are failing. Pass the PR number as "number" (preferred) or "prNumber" (alias).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -456,7 +456,7 @@ List issue/PR timeline events (thin wrapper over GET /repos/{owner}/{repo}/issue
 
 ### `github_pr_why_blocked`
 
-Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, AWAITING_CODE_OWNER_REVIEW, NO_REVIEWER_ASSIGNED, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state. Pass the PR number as "number" (preferred) or "prNumber" (alias).
+Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, AWAITING_CODE_OWNER_REVIEW, NO_REVIEWER_ASSIGNED, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Reports behindBy and, on CI_FAILING, hint STALE_BASE (rebase; no rerun or code-fix). Pass the PR number as "number" (preferred) or "prNumber" (alias).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

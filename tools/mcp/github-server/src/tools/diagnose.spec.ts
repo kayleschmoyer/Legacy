@@ -369,6 +369,49 @@ describe('diagnose', () => {
     expect(payload.reason).toBeDefined();
   });
 
+  it('reports behindBy and the STALE_BASE hint for a failing check that is green on base (LS-10376)', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: { repository: { pullRequest: BASE_PR } },
+    });
+    mockEvaluatePRChecks.mockResolvedValue({
+      failing: ['test (failure)'],
+      pending: [],
+      passing: 4,
+      hadDuplicateRuns: false,
+    });
+    mockGithubRest.mockImplementation(({ path }: { path: string }) => {
+      if (path.includes('/compare/')) {
+        return Promise.resolve({
+          behind_by: 3,
+          ahead_by: 1,
+          merge_base_commit: { sha: 'aaaaaaaaaaaaaaaa' },
+          base_commit: { sha: 'bbbbbbbbbbbbbbbb' },
+        });
+      }
+      const sha = path.split('/commits/')[1].split('/')[0];
+      return Promise.resolve({
+        check_runs: [
+          {
+            id: sha === 'bbbbbbbbbbbbbbbb' ? 1 : 2,
+            name: 'test',
+            status: 'completed',
+            conclusion: sha === 'bbbbbbbbbbbbbbbb' ? 'success' : 'failure',
+            html_url: 'u',
+            output: { title: null, summary: null },
+          },
+        ],
+      });
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload & {
+      behindBy: number;
+      hint: string;
+    };
+    expect(payload.reason).toBe('CI_FAILING');
+    expect(payload.behindBy).toBe(3);
+    expect(payload.hint).toBe('STALE_BASE');
+  });
+
   describe('mergeable UNKNOWN (LS-10375)', () => {
     const approved = { ...BASE_PR, reviewDecision: 'APPROVED' };
     const run = async (pr: Record<string, unknown>) => {

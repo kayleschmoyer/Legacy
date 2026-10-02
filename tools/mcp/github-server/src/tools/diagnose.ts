@@ -8,6 +8,12 @@ import { githubGraphQL, githubRest } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
 import {
+  detectStaleBase,
+  fetchBaseDivergence,
+  staleBaseNextAction,
+} from '../utils/stale-base.js';
+import type { StaleBaseHint } from '../utils/stale-base.js';
+import {
   fetchAllReviews,
   latestReviewsByAuthor,
 } from '../utils/github-reviews.js';
@@ -139,6 +145,7 @@ function deriveReason(
   pr: NonNullable<PRStateResponse['repository']['pullRequest']>,
   ci: { hasFailures: boolean; isPending: boolean; failingNames: string[] },
   failing: CheckRun[],
+  staleBase: StaleBaseHint | null = null,
 ): { reason: BlockReason; summary: string; nextAction: string } {
   if (pr.state === 'MERGED') {
     return {
@@ -193,7 +200,9 @@ function deriveReason(
     return {
       reason: 'CI_FAILING',
       summary: `CI failing: ${names || 'unknown jobs'}${unknownNote}`,
-      nextAction: 'Fix the failing tests/checks, then push.',
+      nextAction: staleBase
+        ? staleBaseNextAction(pr.baseRefName, staleBase)
+        : 'Fix the failing tests/checks, then push.',
     };
   }
   const changesRequested = latestReviewsByAuthor(pr.reviews.nodes).some(
@@ -318,6 +327,27 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
       ciEvalWarning = ciErr instanceof Error ? ciErr.message : String(ciErr);
     }
 
+    // Stale-base check (LS-10376): how far behind base is the head, and is a
+    // failing check already green on the newer base tip? Fail-open.
+    const divergence =
+      pr.state === 'OPEN'
+        ? await fetchBaseDivergence(
+            repo.owner,
+            repo.name,
+            pr.baseRefName,
+            pr.headRefOid,
+          )
+        : null;
+    const staleBase =
+      divergence && ci.hasFailures
+        ? await detectStaleBase(
+            repo.owner,
+            repo.name,
+            divergence,
+            ci.failingNames,
+          )
+        : null;
+
     // A `reviews(first: 20)` first page only covers the earliest reviews —
     // fetch the rest so a reviewer's true latest state (which may be beyond
     // page 1 on a heavily-reviewed PR) is never missed by the dedup below.
@@ -334,7 +364,7 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
       reason,
       summary: blockSummary,
       nextAction,
-    } = deriveReason(pr, ci, failingRuns);
+    } = deriveReason(pr, ci, failingRuns, staleBase);
     const labels = pr.labels.nodes.map((l) => l.name);
     const unresolvedThreads = pr.reviewThreads.nodes.filter(
       (t) => !t.isResolved,
@@ -345,6 +375,9 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
       `**URL:** ${pr.url}`,
       `**State:** ${pr.state}${pr.isDraft ? ' (draft)' : ''}`,
       `**Mergeable:** ${pr.mergeable} (${pr.mergeStateStatus})`,
+      ...(divergence
+        ? [`**Behind ${pr.baseRefName} by:** ${divergence.behindBy} commit(s)`]
+        : []),
       `**Labels:** ${labels.length > 0 ? labels.join(', ') : 'none'}`,
       `**Unresolved threads:** ${unresolvedThreads} / ${pr.reviewThreads.totalCount}`,
       '',
@@ -380,6 +413,8 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
             reason,
             summary: blockSummary,
             nextAction,
+            ...(divergence ? { behindBy: divergence.behindBy } : {}),
+            ...(staleBase ? { hint: staleBase.hint } : {}),
             labels,
             unresolvedThreads,
             failingJobs: failingRuns.map((r) => ({

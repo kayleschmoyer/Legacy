@@ -72,6 +72,12 @@ One rule for this file, [fix.md](fix.md) and [waiting-and-wakeups](../../mcp-fir
 
 **Response**:
 
+0. **Step 0: stale-base check (MANDATORY — before reading logs, rerunning, or editing code).** CI runs on `refs/pull/N/merge`, so a branch that fell behind `main` can fail on something `main` already fixed (the most common false CI failure: LS-9529, 9541/9545/9550, 9800, 9300, 10207). Answer these in order — one `github_pr_why_blocked({ number: <PR#> })` call covers 1–2:
+   1. **How far behind?** Read `behindBy` (commits on the base ref the PR head lacks). Shell fallback: `git fetch origin && git rev-list --count HEAD..origin/main`.
+   2. **Does the check fail on `main` too / was it fixed after my merge base?** `hint: "STALE_BASE"` (present on `CI_FAILING` when `behindBy >= 1` and a failing check is green on the base tip) means yes — `details.staleBase` names `greenOnBase` / `failingOnBase`. No hint but `behindBy >= 1`: check `ci_list_runs({ branch: "main", limit: 1 })`; red on `main` too → not this PR's failure (see [e2e-hold.md](e2e-hold.md) / file a blocker), do not code-fix it here.
+   3. **Is a known fix in my history?** Red checks in files outside the diff → `git merge-base --is-ancestor <fix-sha> HEAD`: exit `0` = fix already included (failure is real), exit `1` = fix is on `main` but not in this branch → rebase.
+   4. **Rerun vs rebase rule.** `behindBy >= 1` with `STALE_BASE` (or a non-flake failure class — typecheck/test/build/"No files matching" — with `behindBy >= 1`) → **rebase onto `main` and push a real commit** (default per the [rebase-vs-merge rule](../../worktree-workflow/references/rebase.md#rebase-vs-merge-main-one-rule-ls-10377)); never `ci_rerun` — a rerun replays the old `refs/pull/N/merge` snapshot and reproduces the stale failure (LS-9638). `ci_rerun` is only for `behindBy == 0` infra/flake failures (timeout, network, OOM). `behindBy == 0`, no hint → continue to step 1 below.
+   5. **Test-count-mismatch tell.** If local `make test` passes but CI fails, or the test counts differ between local and CI, you are behind `main` (CI tested the merge ref, which contains tests/code your branch lacks) — apply 1–4 before debugging.
 1. Get the run ID:
    ```
    ci_list_runs(prNumber: <PR#>)

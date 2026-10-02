@@ -10,7 +10,7 @@ jest.mock('../required-checks', () => ({
 
 import { diagnose, prWhyBlocked } from './pr-why-blocked';
 import type { Diagnosis } from './pr-why-blocked';
-import { githubGraphQL } from '../github-api';
+import { githubGraphQL, githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
 import { evaluatePRChecks, requiresCodeOwnerReview } from '../required-checks';
 import type { CIPartition } from '../required-checks';
@@ -18,6 +18,7 @@ import type { CIPartition } from '../required-checks';
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
 >;
+const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
   typeof getRepoOwnerName
 >;
@@ -259,6 +260,30 @@ describe('diagnose', () => {
         ci({ failing: ['lint (failure)'], pending: ['build (in_progress)'] }),
       );
       expect(result.reason).toBe('CI_FAILING');
+    });
+
+    it('adds the STALE_BASE hint and rebase nextAction when a failing check is green on base (LS-10376)', () => {
+      const result = diagnose(
+        makePR(),
+        ci({ failing: ['test (failure)'] }),
+        false,
+        {
+          hint: 'STALE_BASE',
+          behindBy: 4,
+          mergeBaseSha: 'aaaaaaaaaaaaaaaa',
+          baseTipSha: 'bbbbbbbbbbbbbbbb',
+          greenOnBase: ['test'],
+          failingOnBase: [],
+        },
+      );
+      expect(result.reason).toBe('CI_FAILING');
+      expect(result.hint).toBe('STALE_BASE');
+      expect(result.nextAction).toContain('Rebase onto main');
+    });
+
+    it('omits the hint when no stale-base evidence is passed', () => {
+      const result = diagnose(makePR(), ci({ failing: ['test (failure)'] }));
+      expect(result.hint).toBeUndefined();
     });
 
     it('flags un-ruled-out conflicts on CI_FAILING while mergeable is UNKNOWN', () => {
@@ -702,5 +727,33 @@ describe('prWhyBlocked', () => {
     const payload = JSON.parse(result.content[0].text) as Diagnosis;
     expect(payload.reason).not.toBe('CHANGES_REQUESTED');
     expect(payload.status).toBe('READY');
+  });
+  it('reports behindBy and the STALE_BASE hint when CI fails on a stale base (LS-10376)', async () => {
+    mockedGraphQL.mockResolvedValueOnce({
+      data: { repository: { pullRequest: makePR() } },
+    });
+    mockedEvaluatePRChecks.mockResolvedValue(
+      ci({ failing: ['test (failure)'] }),
+    );
+    mockedRest
+      .mockResolvedValueOnce({
+        behind_by: 2,
+        ahead_by: 1,
+        merge_base_commit: { sha: 'aaaaaaaaaaaaaaaa' },
+        base_commit: { sha: 'bbbbbbbbbbbbbbbb' },
+      })
+      .mockResolvedValueOnce({
+        check_runs: [
+          { id: 1, name: 'test', status: 'completed', conclusion: 'success' },
+        ],
+      });
+
+    const result = await prWhyBlocked({ number: 42 });
+    const payload = JSON.parse(result.content[0].text) as Diagnosis & {
+      behindBy: number;
+    };
+    expect(payload.reason).toBe('CI_FAILING');
+    expect(payload.behindBy).toBe(2);
+    expect(payload.hint).toBe('STALE_BASE');
   });
 });

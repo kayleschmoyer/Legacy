@@ -13,6 +13,12 @@ import {
 import type { CIPartition } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
 import {
+  detectStaleBase,
+  fetchBaseDivergence,
+  staleBaseNextAction,
+} from '../utils/stale-base.js';
+import type { StaleBaseHint } from '../utils/stale-base.js';
+import {
   deriveReviewDecision,
   fetchAllReviews,
   latestReviewsByAuthor,
@@ -151,6 +157,8 @@ export interface Diagnosis {
   summary: string;
   details: Record<string, unknown>;
   nextAction: string;
+  /** Set on CI_FAILING when a failing check is green on a newer base tip (LS-10376). */
+  hint?: 'STALE_BASE';
 }
 
 function reviewerName(
@@ -172,6 +180,7 @@ export function diagnose(
   pr: NonNullable<PRWhyBlockedGraphQLResponse['repository']['pullRequest']>,
   ci: CIPartition,
   requireCodeOwnerReview = false,
+  staleBase: StaleBaseHint | null = null,
 ): Diagnosis {
   const labels = new Set(pr.labels.nodes.map((l) => l.name));
   const hasReadyLabel = labels.has('bot:ready-for-review');
@@ -278,15 +287,27 @@ export function diagnose(
     return {
       status: 'BLOCKED',
       reason: 'CI_FAILING',
+      ...(staleBase ? { hint: staleBase.hint } : {}),
       summary: `${ci.failing.length} required CI check${ci.failing.length === 1 ? '' : 's'} ${ci.failing.length === 1 ? 'is' : 'are'} failing.${pr.mergeable === 'UNKNOWN' ? ' (Mergeability is still being computed — conflicts cannot be ruled out yet.)' : ''}`,
       details: {
         failingChecks: ci.failing,
         pendingChecks: ci.pending,
         passingChecks: ci.passing,
         ...(pr.mergeable === 'UNKNOWN' ? { mergeable: 'UNKNOWN' } : {}),
+        ...(staleBase
+          ? {
+              staleBase: {
+                mergeBase: staleBase.mergeBaseSha,
+                baseTip: staleBase.baseTipSha,
+                greenOnBase: staleBase.greenOnBase,
+                failingOnBase: staleBase.failingOnBase,
+              },
+            }
+          : {}),
       },
-      nextAction:
-        'Fix the root cause of the failing checks and push a new commit.',
+      nextAction: staleBase
+        ? staleBaseNextAction(pr.baseRefName, staleBase)
+        : 'Fix the root cause of the failing checks and push a new commit.',
     };
   }
 
@@ -551,10 +572,22 @@ export async function prWhyBlocked(
     // false CI_FAILING verdict (LS-7993). Fetched alongside the code-owner-review
     // branch-protection flag so a green PR blocked only on CODEOWNERS reports
     // AWAITING_CODE_OWNER_REVIEW instead of a generic review-required reason.
-    const [ci, requireCodeOwnerReview] = await Promise.all([
+    const [ci, requireCodeOwnerReview, divergence] = await Promise.all([
       evaluatePRChecks(repo.owner, repo.name, pr.headRefOid, pr.baseRefName),
       requiresCodeOwnerReview(repo.owner, repo.name, pr.baseRefName),
+      pr.state === 'OPEN'
+        ? fetchBaseDivergence(
+            repo.owner,
+            repo.name,
+            pr.baseRefName,
+            pr.headRefOid,
+          )
+        : Promise.resolve(null),
     ]);
+    const staleBase =
+      divergence && ci.failing.length > 0
+        ? await detectStaleBase(repo.owner, repo.name, divergence, ci.failing)
+        : null;
 
     // A `reviews(first: 100)` first page can still truncate on a
     // heavily-reviewed PR — fetch the rest so a reviewer's true latest state
@@ -569,7 +602,7 @@ export async function prWhyBlocked(
       pr.reviews.pageInfo.hasNextPage = false;
     }
 
-    const diagnosis = diagnose(pr, ci, requireCodeOwnerReview);
+    const diagnosis = diagnose(pr, ci, requireCodeOwnerReview, staleBase);
 
     return {
       content: [
@@ -577,6 +610,7 @@ export async function prWhyBlocked(
           type: 'text',
           text: minifiedJson({
             pr: { number: pr.number, title: pr.title, url: pr.url },
+            ...(divergence ? { behindBy: divergence.behindBy } : {}),
             ...diagnosis,
           }),
         },

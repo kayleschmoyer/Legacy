@@ -14,6 +14,20 @@
 
 Rebasing is inherently a **Medium-risk** operation — it modifies git history and can introduce conflicts in areas you didn't originally change. For branches with High-risk changes (auth, payments, infrastructure), take extra care during conflict resolution. If the rebase introduces conflicts in unfamiliar code areas, re-run the [planning reference](../../plan-ticket/references/planning.md) on the conflicting files before resolving.
 
+## Before You Rebase: Inherited Worktree Check
+
+A session that inherits a worktree or branch (cloud-session checkout, `/fix-pr` on an existing PR, a recovered branch) may not match what is on the remote. Before rebasing, compare local HEAD with `origin/<branch>`:
+
+```bash
+git fetch origin <branch>
+git rev-list --left-right --count HEAD...origin/<branch>   # "<local-only> <remote-only>"
+git diff --stat HEAD origin/<branch>
+```
+
+- `0 0` → in sync, rebase normally.
+- remote-only commits (second number > 0) → someone pushed since your checkout; fast-forward/merge them first (`git merge --ff-only origin/<branch>`), or you will force-push over their work.
+- local-only commits you did not write → inspect with `git log origin/<branch>..HEAD` before pushing; they are inherited state, not necessarily yours to publish.
+
 ## Quick Start: Simple Rebase
 
 **Preferred (MCP):** `worktree_rebase` -- fetches, rebases, and injects a cross-platform no-op Git editor automatically.
@@ -36,17 +50,34 @@ git push --force-with-lease origin HEAD
 
 ## Decision Tree
 
-| Situation                                   | Action                                                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| No conflicts after rebase                   | Go straight to post-rebase stabilization                                                                     |
-| Generated files (`*.generated.ts`) conflict | Regenerate -- never manually merge. `.\scripts\resolve-generated-conflicts.ps1`                              |
-| Lock file (`pnpm-lock.yaml`) conflicts      | Now handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs, regenerates via `make install`)  |
-| Migration files conflict (duplicate)        | Handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs; skip dupes with `git rebase --skip`) |
-| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](rebase/conflict-resolution-guide.md)         |
-| Many files conflict across many commits     | See [rebase-conflict-strategies.md](rebase/rebase-conflict-strategies.md)                                    |
-| Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                |
-| Base PR (stacked-on branch) squash-merged   | See [Squash-merged stacked base](#squash-merged-stacked-base-ls-8779) below — do NOT plain-rebase/merge      |
-| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](rebase/rebase-interactive-and-recovery.md)                          |
+| Situation                                   | Action                                                                                                                                                                                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No conflicts after rebase                   | Go straight to post-rebase stabilization                                                                                                                                                                                                                  |
+| Generated files (`*.generated.ts`) conflict | Regenerate -- never manually merge. `.\scripts\resolve-generated-conflicts.ps1`                                                                                                                                                                           |
+| Lock file (`pnpm-lock.yaml`) conflicts      | Now handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs, regenerates via `make install`)                                                                                                                                               |
+| Migration files conflict (duplicate)        | Handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs; skip dupes with `git rebase --skip`)                                                                                                                                              |
+| Conflict in a file this PR's fix touches    | **Check for a competing fix first**: `git log origin/main -- <file>` (and `git log -S'<symbol>' origin/main`) — `main` may already contain the fix, making your change redundant; see [Conflict May Mean Already Fixed](#conflict-may-mean-already-fixed) |
+| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](rebase/conflict-resolution-guide.md)                                                                                                                                                      |
+| Many files conflict across many commits     | See [rebase-conflict-strategies.md](rebase/rebase-conflict-strategies.md)                                                                                                                                                                                 |
+| Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                                                                                                                                                             |
+| Base PR (stacked-on branch) squash-merged   | See [Squash-merged stacked base](#squash-merged-stacked-base-ls-8779) below — do NOT plain-rebase/merge                                                                                                                                                   |
+| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](rebase/rebase-interactive-and-recovery.md)                                                                                                                                                                       |
+
+## Conflict May Mean Already Fixed
+
+A rebase conflict in the file your fix edits is often because another PR already landed the same (or a competing) fix on `main` — resolving it blindly produces a duplicate or contradictory change. **Before resolving**, with `origin/main` fetched:
+
+```bash
+git log origin/main --oneline -10 -- <conflicted-file>   # recent main commits touching it
+git log origin/main -S'<symbol-or-string-you-fixed>' --oneline
+git diff HEAD...origin/main -- <conflicted-file>          # what main changed vs the merge base
+```
+
+- `main` already fixes it → take `main`'s version (`git checkout --ours` during a rebase = the upstream side), drop your now-redundant hunk or the whole commit (`git rebase --skip` if it becomes empty), and say so in the PR.
+- `main` fixes it differently → reconcile onto `main`'s approach, keep only what is still missing.
+- No competing change → resolve normally per the decision tree.
+
+Also: `git merge-base --is-ancestor <fix-sha> HEAD` tells you whether a fix you are looking for is already in your branch (exit `0`) or only on `main` (exit `1`).
 
 ## Rebase vs Merge-main: one rule (LS-10377)
 

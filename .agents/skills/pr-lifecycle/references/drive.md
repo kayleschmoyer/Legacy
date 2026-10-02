@@ -179,8 +179,9 @@ If ANY conflict signal fires — `mergeable: "CONFLICTING"`, the `CI: Conflicts`
 
 If CI is failing:
 
+0. **Step 0: stale-base check (mandatory, before any rerun or code fix)** — `github_pr_why_blocked({ number: <PR#> })`: if `hint: "STALE_BASE"` or `behindBy >= 1` on a non-flake failure, go to Priority 4 (rebase) instead of continuing; never `ci_rerun` on a stale base (it replays the old merge ref). Full checklist (behind-by, red-on-main, `git merge-base --is-ancestor`, rerun-vs-rebase rule, test-count-mismatch tell): [ci-event-response.md § Failing CI Checks](ci-event-response.md#failing-ci-checks).
 1. Get the run ID: `ci_list_runs(branch: "<headRefName>", limit: 1)`
-2. Check if it's a flaky test — `ci_rerun(runId: <id>, failedOnly: true)` if it looks transient
+2. Check if it's a flaky test (only when `behindBy == 0`) — `ci_rerun(runId: <id>, failedOnly: true)` if it looks transient
 3. If persistent, get logs: `ci_get_logs(runId: <id>, errorSummary: true)`
 4. Load debugging skill if code changes are needed: read `../../debugging/SKILL.md`
 5. Fix, validate with `make pc`, self-review fix code against `./common-review-patterns.md`, then commit and push
@@ -202,7 +203,7 @@ Cap at **2 fix-review rounds**. After round 2, resolve remaining threads as "ack
 
 #### Priority 4: Stale branch
 
-If the branch is behind `main` but not conflicting, rebase to pick up the latest:
+If the branch is behind `main` but not conflicting — concretely, `behindBy >= 1` from `github_pr_why_blocked` / `github_pr_diagnose` (or `mergeStateStatus: BEHIND`), or any `STALE_BASE` hint from Priority 2 — rebase to pick up the latest (no minimum distance: one commit is enough when a failing check is green on `main`; with no failing check, rebase only when `behindBy >= 1` and you are about to push anyway):
 
 ```
 worktree_rebase()
