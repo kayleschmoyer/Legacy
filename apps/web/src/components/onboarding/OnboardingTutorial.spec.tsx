@@ -11,6 +11,14 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { OnboardingTutorial } from './OnboardingTutorial';
+import * as analytics from '../../utils/analytics';
+
+jest.mock('../../utils/analytics', () => ({
+  trackOnboardingStarted: jest.fn(),
+  trackOnboardingStepViewed: jest.fn(),
+  trackOnboardingSkipped: jest.fn(),
+  trackOnboardingCompleted: jest.fn(),
+}));
 
 type MockProps = {
   children?: React.ReactNode;
@@ -162,6 +170,95 @@ describe('OnboardingTutorial — modal focus management (LS-6902)', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.activeElement).toBe(launch);
+  });
+});
+
+describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('emits started and the first step view on mount', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+
+    expect(analytics.trackOnboardingStarted).toHaveBeenCalledTimes(1);
+    expect(analytics.trackOnboardingStepViewed).toHaveBeenCalledTimes(1);
+    expect(analytics.trackOnboardingStepViewed).toHaveBeenLastCalledWith(
+      expect.any(String),
+      0,
+    );
+  });
+
+  it('emits a step view for each step advanced to, without re-emitting started', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByText('Next →'));
+
+    expect(analytics.trackOnboardingStepViewed).toHaveBeenCalledTimes(2);
+    expect(analytics.trackOnboardingStepViewed).toHaveBeenLastCalledWith(
+      expect.any(String),
+      1,
+    );
+    expect(analytics.trackOnboardingStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'close_button',
+      () => fireEvent.click(screen.getByLabelText('Skip tutorial')),
+    ],
+    ['skip_button', () => fireEvent.click(screen.getByText('Skip'))],
+    ['escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
+    [
+      'backdrop',
+      () =>
+        fireEvent.click(screen.getByRole('dialog').parentElement as Element),
+    ],
+  ])('emits skipped with from_step and method=%s', (method, act) => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+    const firstStep = (analytics.trackOnboardingStepViewed as jest.Mock).mock
+      .calls[0][0];
+
+    act();
+
+    expect(analytics.trackOnboardingSkipped).toHaveBeenCalledWith(
+      firstStep,
+      method,
+    );
+    expect(analytics.trackOnboardingCompleted).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits completed (not skipped) when finishing from the last step', () => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+    while (screen.queryByText('Next →')) {
+      fireEvent.click(screen.getByText('Next →'));
+    }
+
+    fireEvent.click(screen.getByText('🚀 Get Started'));
+
+    expect(analytics.trackOnboardingCompleted).toHaveBeenCalledTimes(1);
+    expect(analytics.trackOnboardingSkipped).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits only one terminal event if close fires twice', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByText('Skip'));
+
+    expect(analytics.trackOnboardingSkipped).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-emit started when resuming past the first step', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={2} />);
+
+    expect(analytics.trackOnboardingStarted).not.toHaveBeenCalled();
+    expect(analytics.trackOnboardingStepViewed).toHaveBeenCalledWith(
+      expect.any(String),
+      2,
+    );
   });
 });
 

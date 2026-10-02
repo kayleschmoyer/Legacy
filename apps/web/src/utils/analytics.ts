@@ -138,6 +138,55 @@ export function trackSignOut(source: string): void {
   trackEvent('sign_out', { source, category: 'auth' });
 }
 
+/** How the user left the onboarding tutorial without finishing it. */
+export type OnboardingSkipMethod =
+  | 'close_button'
+  | 'skip_button'
+  | 'backdrop'
+  | 'escape';
+
+/**
+ * Onboarding tutorial funnel (LS-6903). Event names are GA4-safe
+ * (letters, digits, underscores) and carry no PII.
+ */
+export function trackOnboardingStarted(): void {
+  trackEvent('onboarding_started', { category: 'onboarding' });
+}
+
+/**
+ * @param stepId - Stable id of the step shown (e.g., 'get-started')
+ * @param stepIndex - Zero-based position of the step
+ */
+export function trackOnboardingStepViewed(
+  stepId: string,
+  stepIndex: number,
+): void {
+  trackEvent('onboarding_step_viewed', {
+    category: 'onboarding',
+    step_id: stepId,
+    step_index: stepIndex,
+  });
+}
+
+/**
+ * @param fromStep - Id of the step the user was on when they left
+ * @param method - What they used to leave
+ */
+export function trackOnboardingSkipped(
+  fromStep: string,
+  method: OnboardingSkipMethod,
+): void {
+  trackEvent('onboarding_skipped', {
+    category: 'onboarding',
+    from_step: fromStep,
+    method,
+  });
+}
+
+export function trackOnboardingCompleted(): void {
+  trackEvent('onboarding_completed', { category: 'onboarding' });
+}
+
 /**
  * Track player selection
  * @param playerId - The selected player ID

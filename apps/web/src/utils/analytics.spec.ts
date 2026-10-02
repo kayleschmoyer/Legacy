@@ -11,6 +11,10 @@
 import {
   trackEvent,
   trackMatchupViewed,
+  trackOnboardingCompleted,
+  trackOnboardingSkipped,
+  trackOnboardingStarted,
+  trackOnboardingStepViewed,
   trackSignOut,
   trackTeamViewed,
 } from './analytics';
@@ -166,5 +170,37 @@ describe('trackSignOut (LS-7224)', () => {
       'sign_out',
       expect.objectContaining({ source: 'profile_settings', category: 'auth' }),
     );
+  });
+});
+
+describe('onboarding funnel events (LS-6903)', () => {
+  afterEach(() => {
+    delete (window as { gtag?: unknown }).gtag;
+  });
+
+  it('emits the four funnel events with their params', () => {
+    mockGetEnvironmentConfig.mockReturnValue({
+      googleAnalyticsMeasurementId: 'G-TEST123',
+    } as ReturnType<typeof getEnvironmentConfig>);
+    const gtag = jest.fn();
+    window.gtag = gtag;
+
+    trackOnboardingStarted();
+    trackOnboardingStepViewed('get-started', 4);
+    trackOnboardingSkipped('welcome', 'backdrop');
+    trackOnboardingCompleted();
+
+    const calls = gtag.mock.calls as [string, string, unknown][];
+    const events = calls.map(([, name, params]) => [name, params]);
+    expect(events[0][0]).toBe('onboarding_started');
+    expect(events[1]).toEqual([
+      'onboarding_step_viewed',
+      expect.objectContaining({ step_id: 'get-started', step_index: 4 }),
+    ]);
+    expect(events[2]).toEqual([
+      'onboarding_skipped',
+      expect.objectContaining({ from_step: 'welcome', method: 'backdrop' }),
+    ]);
+    expect(events[3][0]).toBe('onboarding_completed');
   });
 });

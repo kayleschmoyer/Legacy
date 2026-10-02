@@ -22,6 +22,13 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
+import {
+  type OnboardingSkipMethod,
+  trackOnboardingCompleted,
+  trackOnboardingSkipped,
+  trackOnboardingStarted,
+  trackOnboardingStepViewed,
+} from '../../utils/analytics';
 
 interface OnboardingTutorialProps {
   /** Called when the user completes or explicitly skips the tutorial */
@@ -653,18 +660,50 @@ export function OnboardingTutorial({
     onStepChange?.(next);
   };
   const backdropRef = React.useRef<HTMLDivElement>(null);
-  useModalDialogFocus(backdropRef, onClose);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
   const step = STEPS[currentStep];
   const isFirst = currentStep === 0;
   const isLast = currentStep === STEPS.length - 1;
+
+  // LS-6903: funnel analytics. `stepRef` lets the stable close handlers
+  // report the step the user was on; `closedRef` guarantees exactly one
+  // terminal event (completed / skipped) per tutorial run.
+  const stepRef = React.useRef(step.id);
+  stepRef.current = step.id;
+  const closedRef = React.useRef(false);
+  const startedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    // A tutorial resumed mid-way (initialStep > 0) is not a new start.
+    if (currentStep === 0) trackOnboardingStarted();
+  }, [currentStep]);
+
+  React.useEffect(() => {
+    trackOnboardingStepViewed(step.id, currentStep);
+  }, [step.id, currentStep]);
+
+  const finish = (method: OnboardingSkipMethod | 'completed') => {
+    if (!closedRef.current) {
+      closedRef.current = true;
+      if (method === 'completed') trackOnboardingCompleted();
+      else trackOnboardingSkipped(stepRef.current, method);
+    }
+    onClose();
+  };
+  const complete = () => finish('completed');
+
+  useModalDialogFocus(backdropRef, () => finish('escape'));
   const bodyContent =
-    typeof step.body === 'function' ? step.body({ onClose }) : step.body;
+    typeof step.body === 'function'
+      ? step.body({ onClose: complete })
+      : step.body;
 
   const handleNext = () => {
     if (isLast) {
-      onClose();
+      complete();
     } else {
       setCurrentStep(currentStep + 1);
     }
@@ -693,7 +732,7 @@ export function OnboardingTutorial({
       }}
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) finish('backdrop');
       }}
     >
       {/* ── Modal card ── */}
@@ -778,7 +817,7 @@ export function OnboardingTutorial({
             size="$2"
             backgroundColor="transparent"
             borderWidth={0}
-            onPress={onClose}
+            onPress={() => finish('close_button')}
             aria-label="Skip tutorial"
             color="$colorPress"
             hoverStyle={{ color: BRAND_GOLD_LIGHT }}
@@ -873,7 +912,7 @@ export function OnboardingTutorial({
                 backgroundColor="transparent"
                 borderWidth={0}
                 color="$colorPress"
-                onPress={onClose}
+                onPress={() => finish('skip_button')}
                 hoverStyle={{ color: BRAND_GOLD_LIGHT }}
               >
                 Skip
