@@ -28,6 +28,7 @@ import { Minus } from '@tamagui/lucide-icons/icons/Minus';
 import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import { SunMoon } from '@tamagui/lucide-icons/icons/SunMoon';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { ScrollView, Spinner, styled } from 'tamagui';
 import {
   GetUserNotificationPreferences,
@@ -83,7 +84,7 @@ interface UserPreferences {
 
 // Evaluated per call so the animations default tracks the OS reduced-motion
 // setting at load time (LS-7072) instead of being frozen at module import.
-function getDefaultPrefs(): UserPreferences {
+export function getDefaultPrefs(): UserPreferences {
   return {
     theme: 'system',
     defaultSport: 'baseball',
@@ -126,13 +127,15 @@ function loadPrefs(): UserPreferences {
   }
 }
 
-function savePrefs(prefs: UserPreferences): void {
+/** Persists prefs locally; returns false when storage rejects the write (private mode, quota). */
+export function savePrefs(prefs: UserPreferences): boolean {
   try {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
     // Same-tab consumers (useReducedMotion, LS-7073) don't get a `storage` event.
     window.dispatchEvent(new Event(USER_PREFERENCES_CHANGED_EVENT));
+    return true;
   } catch {
-    // Best-effort persistence; ignore storage errors (private mode, quota).
+    return false;
   }
 }
 
@@ -1353,6 +1356,7 @@ const PreferencesPage: React.FC = () => {
     theme: themePreference,
   }));
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const isInitialRender = useRef(true);
 
   // Stats-format preference is persisted server-side so it syncs across devices
@@ -1437,13 +1441,16 @@ const PreferencesPage: React.FC = () => {
       isInitialRender.current = false;
       return;
     }
-    savePrefs(prefs);
+    setSaveFailed(!savePrefs(prefs));
     setSaved(true);
     const timer = setTimeout(() => setSaved(false), 2000);
     return () => clearTimeout(timer);
   }, [prefs]);
 
+  const SaveBannerIcon = saveFailed ? X : Check;
+
   const flashSaved = useCallback(() => {
+    setSaveFailed(false);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   }, []);
@@ -1491,7 +1498,7 @@ const PreferencesPage: React.FC = () => {
             <SaveBannerWrap aria-live="polite">
               <SaveBanner data-testid="prefs-save-banner">
                 <SaveBannerTick>
-                  <Check size={14} color="#1A1408" strokeWidth={3} />
+                  <SaveBannerIcon size={14} color="#1A1408" strokeWidth={3} />
                 </SaveBannerTick>
                 <Paragraph
                   fontFamily={FONT_DISPLAY}
@@ -1501,11 +1508,13 @@ const PreferencesPage: React.FC = () => {
                   textTransform="uppercase"
                   color="$color"
                 >
-                  Saved
+                  {saveFailed ? 'Failed to save' : 'Saved'}
                 </Paragraph>
-                <Paragraph size="$2" color="$colorPress">
-                  just now
-                </Paragraph>
+                {!saveFailed && (
+                  <Paragraph size="$2" color="$colorPress">
+                    just now
+                  </Paragraph>
+                )}
               </SaveBanner>
             </SaveBannerWrap>
           )}
