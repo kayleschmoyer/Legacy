@@ -29,6 +29,7 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 ## Infrastructure & Tooling
 
+- **[runner-spot-capacity.md](runner-spot-capacity.md)** — LS-10313: self-hosted runner spot diversification (instance types, allocation strategy, on-demand failover), the AZ-spread follow-up, and the documented-but-not-enabled on-demand pool option with cost estimate
 - **[nx-remote-caching-implementation.md](nx-remote-caching-implementation.md)** — GitHub Actions-based Nx caching (still relevant)
 - **[CI_BADGES_SETUP.md](CI_BADGES_SETUP.md)** — Status badge configuration
 

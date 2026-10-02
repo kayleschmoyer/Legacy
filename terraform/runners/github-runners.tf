@@ -71,12 +71,27 @@ module "github_runners" {
   enable_job_queued_check = true
 
   # Spot instances with fleet diversification across types and AZs.
-  # capacity-optimized-prioritized picks from the pools with the most
-  # available capacity (fewest reclamations) while respecting the type
-  # priority order in var.github_runners_instance_types.
+  # LS-10313: price-capacity-optimized (AWS's recommended spot strategy)
+  # replaces capacity-optimized-prioritized. It first narrows to the pools
+  # with the deepest spare capacity (lowest interruption likelihood), then
+  # picks the cheapest of those — so adding the pricier 32 GB r-family types
+  # to var.github_runners_instance_types widens the set of pools the fleet
+  # can land in during a reclamation storm without shifting steady-state
+  # spend onto them. The old strategy's type priority order would have
+  # pinned launches to the m-family pools that the 2026-09-22/29 storms
+  # emptied.
   instance_target_capacity_type = "spot"
-  instance_allocation_strategy  = "capacity-optimized-prioritized"
+  instance_allocation_strategy  = "price-capacity-optimized"
   instance_types                = var.github_runners_instance_types
+
+  # LS-10313: on a launch-time spot capacity error, fall back to on-demand
+  # for that launch instead of leaving the job queued until the next scale-up
+  # retry. See var.github_runners_on_demand_failover_errors for scope/cost.
+  # Side effect (intended by the module, modules/runners/main.tf): with
+  # failover set, the launch template stops tagging spot-instances-request
+  # resources (an on-demand fallback creates no spot request). Instance,
+  # volume and network-interface tags — incl. ghr:* — are unchanged.
+  enable_runner_on_demand_failover_for_errors = var.github_runners_on_demand_failover_errors
 
   # Check every minute for idle runners. Non-ephemeral runners stay alive between
   # jobs so we need frequent polling to reclaim instances quickly once they go idle.
@@ -559,7 +574,7 @@ module "github_runners" {
 # Everything else mirrors the default pool above: same instance type list
 # (var.github_runners_instance_types — LS-8693's ≥16 GB RAM / 4 vCPU floor
 # applies here too, this pool is NOT a place to reintroduce smaller types),
-# same spot/capacity-optimized-prioritized config, same non-ephemeral +
+# same spot/price-capacity-optimized + on-demand-failover config (LS-10313), same non-ephemeral +
 # job-heartbeat + inter-job-cleanup hooks, same egress rules, same shared IAM
 # policies (runner_cache, runner_self_tag, runner_permissions_boundary — all
 # three were widened in this same PR to cover both pools' ghr:environment tag
@@ -598,8 +613,10 @@ module "github_runners_android" {
   enable_job_queued_check = true
 
   instance_target_capacity_type = "spot"
-  instance_allocation_strategy  = "capacity-optimized-prioritized"
+  instance_allocation_strategy  = "price-capacity-optimized"
   instance_types                = var.github_runners_instance_types
+
+  enable_runner_on_demand_failover_for_errors = var.github_runners_on_demand_failover_errors
 
   scale_down_schedule_expression = "cron(* * * * ? *)"
   runners_maximum_count          = var.github_runners_android_max_count

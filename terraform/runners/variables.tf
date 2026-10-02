@@ -88,9 +88,42 @@ variable "github_runners_instance_types" {
   # android-build OOM in build-android-app.yml and the LS-8550 e2e shard-2
   # flake hypothesis). Types stay at 4 vCPU so jest/nx don't spawn more
   # workers — same worker count, double the headroom.
-  description = "EC2 instance types for runners, in priority order (spot fleet diversification). Keep every entry at ≥16 GB RAM / 4 vCPU (LS-8693: 8 GB types OOM-kill the test job)."
+  #
+  # LS-10313: widened from 4 m-family types to 8 (adds the 32 GB r-family at
+  # the same 4 vCPU). Spot reclamation arrived in storms (CloudTrail
+  # BidEvictedEvent: 86 on 2026-09-22, 195 on 2026-09-29) that emptied the
+  # 4-type x 2-AZ = 8 pools at once. Every type added is 6th/7th-gen x86_64
+  # Nitro (the Ubuntu AMI is x64-only, so no Graviton), offered in every
+  # usable us-east-1 AZ, and ≥16 GB / exactly 4 vCPU. Deliberately NOT added:
+  #   - c-family 2xlarge (8 vCPU / 16 GB): jest/nx size worker count from
+  #     vCPUs, so 8 vCPU doubles workers into the same 16 GB — the LS-8693
+  #     OOM regression again.
+  #   - m5/m5a/r5a: cheapest spot, so price-capacity-optimized would favour
+  #     them, but they are older generations (Skylake / EPYC Naples) and
+  #     slower per job than the 6th/7th-gen types.
+  #   - m7i-flex: burstable baseline, unsuitable for sustained CI load.
+  # With price-capacity-optimized (see github-runners.tf) list order is no
+  # longer a priority signal; it is kept m-first for readability only.
+  description = "EC2 instance types for runners (spot fleet diversification — more types = more independent spot pools). Keep every entry x86_64 at ≥16 GB RAM and exactly 4 vCPU (LS-8693: 8 GB types OOM-kill the test job; more vCPUs spawn more jest/nx workers into the same RAM)."
   type        = list(string)
-  default     = ["m7a.xlarge", "m6a.xlarge", "m7i.xlarge", "m6i.xlarge"]
+  default = [
+    "m7a.xlarge", "m6a.xlarge", "m7i.xlarge", "m6i.xlarge",
+    "r7a.xlarge", "r6a.xlarge", "r7i.xlarge", "r6i.xlarge",
+  ]
+}
+
+variable "github_runners_on_demand_failover_errors" {
+  # LS-10313: when CreateFleet returns one of these error codes for a spot
+  # launch, the scale-up Lambda immediately retries the same launch as
+  # on-demand instead of throwing ScaleError and waiting for the next retry
+  # (see the module's lambdas/functions/control-plane/src/aws/runners.ts
+  # processFleetResult). Launch-time only: it does NOT protect a job whose
+  # instance is reclaimed mid-run, and it never converts a running spot
+  # instance. Cost exposure is bounded to the minutes spot capacity is
+  # unavailable and by runners_maximum_count. Set to [] to disable.
+  description = "CreateFleet error codes that trigger an immediate on-demand fallback launch for spot runners (module input enable_runner_on_demand_failover_for_errors). Applies to both pools."
+  type        = list(string)
+  default     = ["InsufficientInstanceCapacity"]
 }
 
 variable "github_runners_max_count" {
