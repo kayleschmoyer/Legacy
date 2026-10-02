@@ -670,6 +670,7 @@ const SubscriptionPage: React.FC = () => {
   );
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [portalError, setPortalError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -889,17 +890,35 @@ const SubscriptionPage: React.FC = () => {
     requireStepUp(() => void handleUpgradeAction());
   };
 
+  // requireStepUp does not catch a rejected action (it only wraps it in
+  // Promise.resolve), so every failure must be handled here.
   const handleManageSubscriptionAction = async () => {
-    const result = await createBillingPortalSession({
-      variables: {
-        returnUrl: window.location.href,
-      },
-    });
+    setPortalError(null);
+    try {
+      const result = await createBillingPortalSession({
+        variables: {
+          returnUrl: window.location.href,
+        },
+      });
 
-    const url = result.data?.createBillingPortalSession?.url;
-    if (url) {
-      window.location.href = url;
+      const url = result.data?.createBillingPortalSession?.url;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      LOGGER.error(
+        'Billing portal session returned no url',
+        new Error('createBillingPortalSession returned no url'),
+      );
+    } catch (error) {
+      LOGGER.error(
+        'Failed to create billing portal session',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
+    setPortalError(
+      'Could not open the billing portal — please try again or contact support.',
+    );
   };
 
   const handleManageSubscription = () => {
@@ -1123,6 +1142,33 @@ const SubscriptionPage: React.FC = () => {
                   </YStack>
 
                   <Separator />
+
+                  {/* Billing portal error */}
+                  {portalError && (
+                    <XStack
+                      alignItems="flex-start"
+                      gap="$2"
+                      padding="$3"
+                      borderRadius="$4"
+                      style={
+                        {
+                          backgroundColor: withAlpha(RED, 0.08),
+                          borderWidth: 1,
+                          borderColor: withAlpha(RED, 0.3),
+                        } as React.CSSProperties
+                      }
+                    >
+                      <AlertTriangle
+                        size={16}
+                        color={RED}
+                        flexShrink={0}
+                        marginTop={2}
+                      />
+                      <Paragraph size="$3" style={{ color: RED }}>
+                        {portalError}
+                      </Paragraph>
+                    </XStack>
+                  )}
 
                   {/* Actions */}
                   <XStack

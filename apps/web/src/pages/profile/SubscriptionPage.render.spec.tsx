@@ -138,6 +138,7 @@ jest.mock('../../utils/analytics', () => ({
 }));
 
 const mockCreateCheckoutSession = jest.fn();
+const mockCreateBillingPortalSession = jest.fn();
 const mockUseGetMySubscriptionQuery = jest.fn<MySubscriptionQueryMock, []>();
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (): MySubscriptionQueryMock =>
@@ -146,7 +147,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockCreateCheckoutSession,
     { loading: false },
   ],
-  useCreateBillingPortalSessionMutation: () => [jest.fn(), { loading: false }],
+  useCreateBillingPortalSessionMutation: () => [
+    mockCreateBillingPortalSession,
+    { loading: false },
+  ],
 }));
 
 type UseLeagueWebSocketOptions = {
@@ -811,5 +815,81 @@ describe('SubscriptionPage — repeat checkout return in one session (LS-7424)',
     // ...and it polls again.
     advancePollTicks(1);
     expect(refetch).toHaveBeenCalledTimes(callsAfterFirstWindow + 2);
+  });
+});
+
+describe('SubscriptionPage — billing portal failure banner (LS-10398)', () => {
+  const PORTAL_ERROR =
+    'Could not open the billing portal — please try again or contact support.';
+
+  const flushPromises = () => act(() => Promise.resolve());
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateBillingPortalSession.mockReset();
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'active',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+  });
+
+  function clickManage() {
+    act(() => {
+      fireEvent.click(screen.getByText('Manage Subscription'));
+    });
+  }
+
+  it('shows the banner when the portal mutation rejects', async () => {
+    mockCreateBillingPortalSession.mockRejectedValueOnce(new Error('boom'));
+
+    renderPage();
+    clickManage();
+    await flushPromises();
+
+    expect(screen.getByText(PORTAL_ERROR)).toBeInTheDocument();
+  });
+
+  it('shows the banner when the portal mutation returns no url', async () => {
+    mockCreateBillingPortalSession.mockResolvedValueOnce({
+      data: { createBillingPortalSession: { url: null } },
+    });
+
+    renderPage();
+    clickManage();
+    await flushPromises();
+
+    expect(screen.getByText(PORTAL_ERROR)).toBeInTheDocument();
+  });
+
+  it('clears the banner when a retry starts', async () => {
+    mockCreateBillingPortalSession.mockRejectedValueOnce(new Error('boom'));
+    // Retry stays pending, so the cleared state is observable.
+    mockCreateBillingPortalSession.mockReturnValueOnce(
+      new Promise<never>(jest.fn()),
+    );
+
+    renderPage();
+    clickManage();
+    await flushPromises();
+    expect(screen.getByText(PORTAL_ERROR)).toBeInTheDocument();
+
+    clickManage();
+    await flushPromises();
+
+    expect(screen.queryByText(PORTAL_ERROR)).not.toBeInTheDocument();
   });
 });
