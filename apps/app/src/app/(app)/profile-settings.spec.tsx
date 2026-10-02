@@ -20,6 +20,7 @@ const mockRefetchUser = jest.fn();
 const mockNavigate = jest.fn();
 const mockUseCurrentUserInfo = jest.fn();
 const mockUseGetUserByIdQuery = jest.fn();
+const mockUseMyIdentitiesQuery = jest.fn();
 
 const mockUser = {
   id: 1,
@@ -59,6 +60,8 @@ jest.mock('@legacy-sports/shared-components', () => {
   return {
     AvatarImage: () => React.createElement(View, { testID: 'avatar-image' }),
     AvatarPicker: () => React.createElement(View, { testID: 'avatar-picker' }),
+    BrandIcon: ({ name }: { name: string }) =>
+      React.createElement(View, { testID: `brand-icon-${name}` }),
     Dialog: ({
       open,
       title,
@@ -120,6 +123,8 @@ jest.mock('../../features/subscription', () => ({
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: (...args: unknown[]): unknown =>
     mockUseGetUserByIdQuery(...args),
+  useMyIdentitiesQuery: (...args: unknown[]): unknown =>
+    mockUseMyIdentitiesQuery(...args),
   useUpdateUsernameMutation: () => [
     (...args: unknown[]): unknown => mockUpdateUsername(...args),
     { loading: false },
@@ -245,6 +250,26 @@ jest.mock('tamagui', () => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+const googleIdentity = {
+  id: 10,
+  provider: 'google',
+  providerEmail: 'test@example.com',
+  providerEmailVerified: true,
+  providerUsername: null,
+  providerAvatar: null,
+  linkedAt: '2026-01-01T00:00:00Z',
+};
+
+const discordIdentity = {
+  id: 11,
+  provider: 'discord',
+  providerEmail: 'disc@example.com',
+  providerEmailVerified: false,
+  providerUsername: 'discord_user',
+  providerAvatar: null,
+  linkedAt: '2026-01-02T00:00:00Z',
+};
+
 describe('ProfileSettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -268,6 +293,11 @@ describe('ProfileSettingsScreen', () => {
     mockUseGetUserByIdQuery.mockReturnValue({
       data: { user: mockUser },
       refetch: (...args: unknown[]): unknown => mockRefetchUser(...args),
+    });
+    mockUseMyIdentitiesQuery.mockReturnValue({
+      data: { myIdentities: [googleIdentity] },
+      loading: false,
+      error: undefined,
     });
   });
 
@@ -313,14 +343,84 @@ describe('ProfileSettingsScreen', () => {
       expect(screen.getByText('#1')).toBeTruthy();
     });
 
-    it('renders Google OAuth as the sign-in method', () => {
+    it('derives the sign-in method from linked identities', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: { myIdentities: [googleIdentity, discordIdentity] },
+        loading: false,
+      });
       render(<ProfileSettingsScreen />);
-      expect(screen.getByText('Google OAuth')).toBeTruthy();
+      expect(screen.getByText('Google, Discord')).toBeTruthy();
+      expect(screen.queryByText('Google OAuth')).toBeNull();
     });
 
     it('renders Active as the session status', () => {
       render(<ProfileSettingsScreen />);
       expect(screen.getByText('Active')).toBeTruthy();
+    });
+  });
+
+  describe('connected accounts (LS-10410)', () => {
+    it('shows a loading state while identities load', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: undefined,
+        loading: true,
+      });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('identities-loading')).toBeTruthy();
+    });
+
+    it('shows the empty state when there are no identities', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: { myIdentities: [] },
+        loading: false,
+      });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('No linked providers found.')).toBeTruthy();
+      expect(screen.getByText('Not connected')).toBeTruthy();
+    });
+
+    it('treats a partial response without myIdentities as empty', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({ data: {}, loading: false });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('No linked providers found.')).toBeTruthy();
+    });
+
+    it('shows the Discord username and unverified suffix for a linked Discord identity', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: { myIdentities: [discordIdentity] },
+        loading: false,
+      });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('discord_user (unverified)')).toBeTruthy();
+      expect(screen.queryByText('Not connected')).toBeNull();
+    });
+
+    it('shows the provider email for non-Discord identities and Not connected for Discord', () => {
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('identity-row-google')).toBeTruthy();
+      expect(
+        screen.getByTestId('identity-row-discord-not-connected'),
+      ).toBeTruthy();
+    });
+
+    it('shows an error state when the query fails', () => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+        error: new Error('boom'),
+      });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('identities-error')).toBeTruthy();
+    });
+
+    it('renders the same card for premium users', () => {
+      mockSubscriptionState = {
+        isPremium: true,
+        tier: 'annual',
+        subscription: null,
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('connected-accounts-card')).toBeTruthy();
     });
   });
 

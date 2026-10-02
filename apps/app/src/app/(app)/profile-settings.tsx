@@ -15,12 +15,14 @@ import { useRouter } from 'expo-router';
 import {
   AvatarImage,
   AvatarPicker,
+  BrandIcon,
   Dialog,
   formatDisplayName,
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetUserByIdQuery,
+  useMyIdentitiesQuery,
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
@@ -48,6 +50,22 @@ function getAccessLevelLabel(level: string): string {
   }
 }
 
+type LinkedProvider = 'discord' | 'google' | 'apple';
+
+const KNOWN_PROVIDERS: readonly LinkedProvider[] = [
+  'discord',
+  'google',
+  'apple',
+];
+
+function isKnownProvider(provider: string): provider is LinkedProvider {
+  return (KNOWN_PROVIDERS as readonly string[]).includes(provider);
+}
+
+function getProviderLabel(provider: string): string {
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
 export default function ProfileSettingsScreen(): React.JSX.Element {
   const { data: currentUser } = useCurrentUserInfo();
   const { logout } = useAuthHandlers();
@@ -64,6 +82,25 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
     skip: !userId,
   });
   const user = userData?.user;
+
+  // Linked identities (read-only). A partial/errored response yields data
+  // without the field, so guard with `?? []` instead of trusting the shape.
+  const {
+    data: identitiesData,
+    loading: identitiesLoading,
+    error: identitiesError,
+  } = useMyIdentitiesQuery({ skip: !userId });
+  const identities = identitiesData?.myIdentities ?? [];
+  const hasDiscordIdentity = identities.some(
+    (identity) => identity.provider === 'discord',
+  );
+  const signInMethodLabel = identitiesLoading
+    ? 'Loading\u2026'
+    : identities.length > 0
+      ? identities
+          .map((identity) => getProviderLabel(identity.provider))
+          .join(', ')
+      : 'Unknown';
 
   // Username editing state
   const [editingUsername, setEditingUsername] = useState(false);
@@ -450,9 +487,12 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   Sign-in Method
                 </Paragraph>
                 <XStack alignItems="center" gap="$2">
-                  <Text fontSize={16}>{'\u{1F310}'}</Text>
-                  <Paragraph size="$4" color="$color">
-                    Google OAuth
+                  <Paragraph
+                    size="$4"
+                    color="$color"
+                    testID="sign-in-method-value"
+                  >
+                    {signInMethodLabel}
                   </Paragraph>
                 </XStack>
               </XStack>
@@ -477,6 +517,120 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   </Paragraph>
                 </XStack>
               </XStack>
+            </YStack>
+          </YStack>
+
+          {/* Connected Accounts (read-only; Connect/Disconnect are separate tickets) */}
+          <YStack
+            borderRadius="$6"
+            borderWidth={1}
+            borderColor="$borderColor"
+            overflow="hidden"
+            testID="connected-accounts-card"
+          >
+            <XStack
+              paddingHorizontal="$5"
+              paddingVertical="$4"
+              alignItems="center"
+              gap="$3"
+              borderBottomWidth={1}
+              borderBottomColor="$borderColor"
+            >
+              <YStack
+                width={36}
+                height={36}
+                borderRadius="$4"
+                alignItems="center"
+                justifyContent="center"
+                backgroundColor="$color2"
+              >
+                <Text fontSize={16}>{'\u{1F517}'}</Text>
+              </YStack>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Connected Accounts
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Sign-in providers linked to your account
+                </Paragraph>
+              </YStack>
+            </XStack>
+
+            <YStack padding="$5" gap="$3">
+              {identitiesLoading ? (
+                <XStack
+                  alignItems="center"
+                  gap="$2"
+                  testID="identities-loading"
+                >
+                  <Spinner size="small" />
+                  <Paragraph size="$3" color="$colorPress">
+                    Loading{'\u2026'}
+                  </Paragraph>
+                </XStack>
+              ) : identitiesError && identities.length === 0 ? (
+                <Paragraph size="$3" color="$red10" testID="identities-error">
+                  Could not load linked accounts.
+                </Paragraph>
+              ) : (
+                <>
+                  {identities.length === 0 ? (
+                    <Paragraph size="$3" color="$colorPress">
+                      No linked providers found.
+                    </Paragraph>
+                  ) : null}
+                  {identities.map((identity) => {
+                    const detail =
+                      identity.provider === 'discord' &&
+                      identity.providerUsername
+                        ? identity.providerUsername
+                        : (identity.providerEmail ?? 'No email');
+                    const showUnverified =
+                      identity.providerEmail != null &&
+                      !identity.providerEmailVerified;
+                    return (
+                      <XStack
+                        key={identity.id}
+                        alignItems="center"
+                        gap="$3"
+                        testID={`identity-row-${identity.provider}`}
+                      >
+                        {isKnownProvider(identity.provider) ? (
+                          <BrandIcon name={identity.provider} size={24} />
+                        ) : (
+                          <Text fontSize={22}>{'\u{1F511}'}</Text>
+                        )}
+                        <YStack flex={1}>
+                          <Paragraph size="$4" color="$color" fontWeight="500">
+                            {getProviderLabel(identity.provider)}
+                          </Paragraph>
+                          <Paragraph size="$3" color="$colorPress">
+                            {detail}
+                            {showUnverified ? ' (unverified)' : ''}
+                          </Paragraph>
+                        </YStack>
+                      </XStack>
+                    );
+                  })}
+                  {!hasDiscordIdentity ? (
+                    <XStack
+                      alignItems="center"
+                      gap="$3"
+                      testID="identity-row-discord-not-connected"
+                    >
+                      <BrandIcon name="discord" size={24} />
+                      <YStack flex={1}>
+                        <Paragraph size="$4" color="$color" fontWeight="500">
+                          Discord
+                        </Paragraph>
+                        <Paragraph size="$3" color="$colorPress">
+                          Not connected
+                        </Paragraph>
+                      </YStack>
+                    </XStack>
+                  ) : null}
+                </>
+              )}
             </YStack>
           </YStack>
 
