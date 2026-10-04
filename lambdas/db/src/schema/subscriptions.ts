@@ -1255,8 +1255,13 @@ ExpireSubscriptionGracePeriodsResultRef.implement({
  * never paying.  This sweep closes that gap by processing expired grace
  * periods on a fixed schedule (hourly via EventBridge).
  *
- * Idempotent: rows are filtered on `tier = 'premium'`, so once a row is
- * downgraded it won't be re-processed.
+ * Safe under concurrent invocations (hourly schedule + manual admin trigger):
+ * the initial SELECT only enumerates candidates.  Each candidate is then
+ * claimed with a single conditional `UPDATE ... WHERE id = ? AND status =
+ * 'past_due' AND tier = 'premium' AND grace_period_ends_at < now RETURNING`.
+ * Postgres serializes concurrent updates of the same row, so exactly one run
+ * gets the row back; the loser sees an empty result and skips the row.  Side
+ * effects (downgrade, notification, `expired` count) run only for claimed rows.
  *
  * Exported (not just wired into the resolver) so it can be unit-tested
  * independently of the Pothos builder.
@@ -1295,21 +1300,54 @@ export async function expireSubscriptionGracePeriods(
     `[expireSubscriptionGracePeriods] Found ${rows.length} expired grace periods`,
   );
 
-  for (const row of rows) {
+  for (const candidate of rows) {
     try {
-      await runWithInternalClient(getDbOptions(), async (db) => {
-        // Scope the update to the specific row by primary key — a user may
-        // theoretically hold multiple platform rows (Stripe + Apple IAP), and
-        // the sweep must only touch the expired one.
-        await db
-          .update(InternalSchema.subscriptions)
-          .set({ tier: 'free', updatedAt: new Date() })
-          .where(eq(InternalSchema.subscriptions.id, row.id));
-        await db
-          .update(InternalSchema.usersInAppInternal)
-          .set({ subscriptionTier: 'free', updatedAt: new Date() })
-          .where(eq(InternalSchema.usersInAppInternal.id, row.userId));
-      });
+      const claimed = await runWithInternalClient(
+        getDbOptions(),
+        async (db) => {
+          // Atomic claim: a single conditional UPDATE ... RETURNING. Scoped to
+          // the specific row by primary key (a user may theoretically hold
+          // multiple platform rows — Stripe + Apple IAP) and re-checking the
+          // sweep predicate, so a row a concurrent run already flipped to
+          // 'free' matches nothing and returns no rows.
+          const claimedRows = await db
+            .update(InternalSchema.subscriptions)
+            .set({ tier: 'free', updatedAt: new Date() })
+            .where(
+              and(
+                eq(InternalSchema.subscriptions.id, candidate.id),
+                eq(InternalSchema.subscriptions.status, 'past_due'),
+                eq(InternalSchema.subscriptions.tier, 'premium'),
+                lt(InternalSchema.subscriptions.gracePeriodEndsAt, now),
+              ),
+            )
+            .returning({
+              id: InternalSchema.subscriptions.id,
+              userId: InternalSchema.subscriptions.userId,
+              stripeSubscriptionId:
+                InternalSchema.subscriptions.stripeSubscriptionId,
+              gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
+            });
+          const claimedRow = claimedRows[0];
+          if (!claimedRow) return null;
+
+          await db
+            .update(InternalSchema.usersInAppInternal)
+            .set({ subscriptionTier: 'free', updatedAt: new Date() })
+            .where(eq(InternalSchema.usersInAppInternal.id, claimedRow.userId));
+          return claimedRow;
+        },
+      );
+
+      // Another invocation already claimed this row — it owns the side effects.
+      if (!claimed) {
+        LOGGER.info(
+          '[expireSubscriptionGracePeriods] Row already claimed by a concurrent run, skipping',
+          { subscriptionId: candidate.id, userId: candidate.userId },
+        );
+        continue;
+      }
+      const row = claimed;
 
       await handleSubscriptionDowngrade(row.userId, getDbOptions());
 
@@ -1335,7 +1373,7 @@ export async function expireSubscriptionGracePeriods(
         gracePeriodEndsAt: row.gracePeriodEndsAt,
       });
     } catch (err) {
-      const errMsg = `User ${row.userId}: ${err instanceof Error ? err.message : String(err)}`;
+      const errMsg = `User ${candidate.userId}: ${err instanceof Error ? err.message : String(err)}`;
       LOGGER.error(
         `[expireSubscriptionGracePeriods] Error downgrading user: ${errMsg}`,
       );

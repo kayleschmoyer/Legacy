@@ -116,17 +116,35 @@ function makeNotificationService(notify: NotifyMock) {
 }
 
 /** Build a DB stub that returns `selectRows` for the initial SELECT, and
- *  resolves all chained update().set().where() calls. */
-function makeDb(selectRows: unknown[]) {
+ *  resolves all chained update().set().where() calls.
+ *
+ *  The atomic claim on the subscriptions table (`.where().returning()`) yields
+ *  the row unless `claim(row)` says a concurrent run already took it — by
+ *  default every candidate is claimed.  Claim attempts are matched to
+ *  candidates in order (one attempt per candidate, since the sweep iterates
+ *  `selectRows` sequentially). */
+function makeDb(
+  selectRows: Array<Record<string, unknown>>,
+  claim: (row: Record<string, unknown>) => boolean = () => true,
+) {
+  let claimAttempt = 0;
   return {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => Promise.resolve(selectRows)),
       })),
     })),
-    update: jest.fn(() => ({
+    update: jest.fn((table: { id: string }) => ({
       set: jest.fn(() => ({
-        where: jest.fn(() => Promise.resolve()),
+        where: jest.fn(() => {
+          if (table.id !== 'subscriptions.id') return Promise.resolve();
+          const row = selectRows[claimAttempt++];
+          return {
+            returning: jest.fn(() =>
+              Promise.resolve(row && claim(row) ? [row] : []),
+            ),
+          };
+        }),
       })),
     })),
   };
@@ -263,6 +281,89 @@ describe('expireSubscriptionGracePeriods', () => {
 
     expect(result).toEqual({ expired: 1, errors: [] });
     expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(401, {});
+  });
+
+  it('skips side effects for rows a concurrent run already claimed (LS-7399)', async () => {
+    const rows = [
+      {
+        id: 7,
+        userId: 501,
+        stripeSubscriptionId: 'sub_claimed',
+        gracePeriodEndsAt: new Date('2026-04-01T00:00:00Z'),
+      },
+      {
+        id: 8,
+        userId: 502,
+        stripeSubscriptionId: 'sub_free',
+        gracePeriodEndsAt: new Date('2026-04-02T00:00:00Z'),
+      },
+    ];
+    const db = makeDb(rows, (row) => row['id'] !== 7);
+    mockRunWithInternalClient.mockImplementation(
+      async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(db),
+    );
+    mockHandleSubscriptionDowngrade.mockResolvedValue(undefined);
+    const notify: NotifyMock = jest.fn().mockResolvedValue(undefined);
+
+    const result = await expireSubscriptionGracePeriods(
+      makeNotificationService(notify),
+    );
+
+    expect(result).toEqual({ expired: 1, errors: [] });
+    expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledTimes(1);
+    expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(502, {});
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith(502, 'free', 'past_due');
+    // Claim attempt for both rows, but the users-table update only for the
+    // claimed one: 2 subscription updates + 1 user update.
+    expect(db.update).toHaveBeenCalledTimes(3);
+  });
+
+  it('processes each row exactly once when two invocations see the same candidate (LS-7399)', async () => {
+    const candidate = {
+      id: 9,
+      userId: 601,
+      stripeSubscriptionId: 'sub_race',
+      gracePeriodEndsAt: new Date('2026-04-01T00:00:00Z'),
+    };
+    // Shared "database": the first UPDATE to reach the row wins; the row is no
+    // longer premium afterwards, so the second conditional UPDATE matches nothing.
+    const claimedIds = new Set<number>();
+    const claimOnce = (row: Record<string, unknown>) => {
+      const id = row['id'] as number;
+      if (claimedIds.has(id)) return false;
+      claimedIds.add(id);
+      return true;
+    };
+    // Both invocations SELECT before either UPDATE, so both "see" the row.
+    const dbA = makeDb([candidate], claimOnce);
+    const dbB = makeDb([candidate], claimOnce);
+    const dbs = [dbA, dbB];
+    let selectCalls = 0;
+    mockRunWithInternalClient.mockImplementation(
+      async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
+        // The first call of each invocation is the candidate SELECT; hand out
+        // dbA then dbB, then reuse each invocation's own db for its updates.
+        const db = dbs[selectCalls % 2];
+        selectCalls++;
+        return cb(db);
+      },
+    );
+    mockHandleSubscriptionDowngrade.mockResolvedValue(undefined);
+    const notify: NotifyMock = jest.fn().mockResolvedValue(undefined);
+    const service = makeNotificationService(notify);
+
+    const [resultA, resultB] = await Promise.all([
+      expireSubscriptionGracePeriods(service),
+      expireSubscriptionGracePeriods(service),
+    ]);
+
+    expect(resultA.expired + resultB.expired).toBe(1);
+    expect(resultA.errors).toEqual([]);
+    expect(resultB.errors).toEqual([]);
+    expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledTimes(1);
+    expect(mockHandleSubscriptionDowngrade).toHaveBeenCalledWith(601, {});
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });
 
