@@ -21,22 +21,6 @@ export const ACTIVATION_POLL_INTERVAL_MS = 2000;
 /** 8 polls × 2s = 16s, comfortably past the cold webhook delivery ceiling. */
 export const ACTIVATION_MAX_POLLS = 8;
 
-export interface PremiumFeature {
-  label: string;
-  free: boolean;
-  premium: boolean;
-}
-
-export const PREMIUM_FEATURES: PremiumFeature[] = [
-  { label: 'Join up to 3 leagues', free: true, premium: true },
-  { label: 'Unlimited active leagues', free: false, premium: true },
-  { label: 'Salary cap leagues', free: false, premium: true },
-  {
-    label: 'Advanced playoff formats (6-team, 8-team)',
-    free: false,
-    premium: true,
-  },
-  { label: 'Unlimited mock drafts', free: false, premium: true },
-  { label: 'FAAB waivers', free: false, premium: true },
-  { label: 'Historical era filters', free: false, premium: true },
-];
+// The canonical Free-vs-Premium feature list is shared with the web app (LS-7393).
+export { PREMIUM_FEATURES } from '@legacy-sports/shared-components/premium-features';
+export type { PremiumFeature } from '@legacy-sports/shared-components/premium-features';

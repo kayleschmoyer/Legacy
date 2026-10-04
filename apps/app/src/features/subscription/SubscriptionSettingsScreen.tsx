@@ -38,6 +38,25 @@ const BILLING_PORTAL_RETURN_URL = `${APP_SCHEME}://subscription/portal-return`;
 // Apple subscription management deep link.
 const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
+/** What a Free/Premium comparison cell shows: a limit string, a check or a dash. */
+function featureCellText(value: boolean | string): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  return value ? '✓' : '—';
+}
+
+function featureCellA11yLabel(
+  label: string,
+  value: boolean | string,
+  tier: 'Free' | 'Premium',
+): string {
+  if (typeof value === 'string') {
+    return `${label}: ${value} on ${tier}`;
+  }
+  return `${label}: ${value ? 'Included' : 'Not included'} on ${tier}`;
+}
+
 // Google Play subscription management page.
 const GOOGLE_PLAY_SUBSCRIPTIONS_URL =
   'https://play.google.com/store/account/subscriptions';
@@ -827,9 +846,13 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                         textAlign="center"
                         fontSize="$4"
                         accessibilityRole="text"
-                        accessibilityLabel={`${feature.label}: ${feature.free ? 'Included' : 'Not included'} on Free`}
+                        accessibilityLabel={featureCellA11yLabel(
+                          feature.label,
+                          feature.free,
+                          'Free',
+                        )}
                       >
-                        {feature.free ? '✓' : '—'}
+                        {featureCellText(feature.free)}
                       </Text>
                       <Text
                         width={80}
@@ -837,9 +860,13 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                         fontSize="$4"
                         color={brand.gold}
                         accessibilityRole="text"
-                        accessibilityLabel={`${feature.label}: ${feature.premium ? 'Included' : 'Not included'} on Premium`}
+                        accessibilityLabel={featureCellA11yLabel(
+                          feature.label,
+                          feature.premium,
+                          'Premium',
+                        )}
                       >
-                        {feature.premium ? '✓' : '—'}
+                        {featureCellText(feature.premium)}
                       </Text>
                     </XStack>
                   </React.Fragment>

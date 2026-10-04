@@ -10,6 +10,10 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  PREMIUM_FEATURES,
+  type PremiumFeatureValue,
+} from '@legacy-sports/shared-components/premium-features';
 import { type EntitlementKey, ENTITLEMENTS } from '@legacy-sports/utils';
 import { ScrollView, Separator, styled, Text } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
@@ -321,38 +325,22 @@ const DiscountBadge = styled(XStack, {
 
 /* ─── Data ─── */
 
-const FREE_FEATURES = [
-  { label: '3 leagues', included: true },
-  { label: 'Basic stats', included: true },
-  { label: 'Standard waivers', included: true },
-  { label: '4-team playoffs', included: true },
-  { label: 'Modern era only', included: true },
-  { label: '2 mock drafts/week', included: true },
-  { label: 'Unlimited leagues', included: false },
-  { label: 'Player comparison', included: false },
-  { label: 'Advanced projections', included: false },
-  { label: 'AI-powered recaps', included: false },
-  { label: 'Salary cap leagues', included: false },
-  { label: 'FAAB waivers', included: false },
-  { label: 'All playoff formats', included: false },
-  { label: 'All historical eras', included: false },
-  { label: 'Unlimited mock drafts', included: false },
-  { label: 'Draft recommendations', included: false },
-];
+// Derived from the canonical feature list so Pricing can't drift from the
+// Subscription page, mobile screen and Upgrade modal (LS-7393). String values
+// (e.g. a limit) are appended to the label: "Active leagues: Up to 3".
+function planFeatureLabel(label: string, value: PremiumFeatureValue): string {
+  return typeof value === 'string' ? `${label}: ${value}` : label;
+}
 
-const PREMIUM_FEATURES = [
-  { label: 'Unlimited leagues', included: true },
-  { label: 'Basic stats', included: true },
-  { label: 'FAAB & standard waivers', included: true },
-  { label: 'All playoff formats', included: true },
-  { label: 'All historical eras', included: true },
-  { label: 'Unlimited mock drafts', included: true },
-  { label: 'Player comparison', included: true },
-  { label: 'Advanced projections', included: true },
-  { label: 'AI-powered recaps', included: true },
-  { label: 'Salary cap leagues', included: true },
-  { label: 'Draft recommendations', included: true },
-];
+const FREE_FEATURES = PREMIUM_FEATURES.map(({ label, free }) => ({
+  label: planFeatureLabel(label, free),
+  included: free !== false,
+}));
+
+const PREMIUM_PLAN_FEATURES = PREMIUM_FEATURES.map(({ label, premium }) => ({
+  label: planFeatureLabel(label, premium),
+  included: premium !== false,
+}));
 
 // Each row is pinned to the catalog entitlement it advertises (LS-7182) so
 // PricingPage.spec.tsx can fail when pricing copy and the gating catalog drift.
@@ -882,7 +870,7 @@ export default function PricingPage() {
               <Separator />
 
               <YStack gap="$1">
-                {PREMIUM_FEATURES.map((f) => (
+                {PREMIUM_PLAN_FEATURES.map((f) => (
                   <FeatureRow key={f.label}>
                     <YStack
                       width={20}

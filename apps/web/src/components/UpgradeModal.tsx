@@ -3,6 +3,10 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
 import { Star } from '@tamagui/lucide-icons/icons/Star';
+import {
+  PREMIUM_FEATURES,
+  premiumFeatureBenefitLabel,
+} from '@legacy-sports/shared-components/premium-features';
 import { PriceSkeleton } from './PriceSkeleton';
 import { BaseModal } from './BaseModal';
 import {
@@ -21,18 +25,11 @@ import { useStripePrices } from '../hooks/useStripePrices';
 // Constants
 // ---------------------------------------------------------------------------
 
-const PREMIUM_FEATURES = [
-  'Player Comparison tool',
-  'Matchup Projections',
-  'AI Matchup Narratives & Recaps',
-  'Mock Draft simulator',
-  'Unlimited league creation',
-  'Salary cap league settings',
-  'FAAB waiver settings',
-  'Advanced playoff formats (6/8-team)',
-  'Historical era selection',
-  'Draft Recommendations panel',
-] as const;
+// Premium-only features from the canonical list (LS-7393); features the free
+// tier already has are not upsell material.
+const PREMIUM_FEATURE_LABELS = PREMIUM_FEATURES.filter(
+  (f) => f.free !== true,
+).map(premiumFeatureBenefitLabel);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -150,7 +147,7 @@ export function UpgradeModal({
             Everything included in Premium:
           </Text>
           <YStack gap="$2">
-            {PREMIUM_FEATURES.map((feature) => (
+            {PREMIUM_FEATURE_LABELS.map((feature) => (
               <XStack key={feature} alignItems="center" gap="$2">
                 <Check size={14} color={BRAND_GOLD_LIGHT} />
                 <Text color={TEXT_PRIMARY} fontSize="$3">

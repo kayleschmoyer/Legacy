@@ -18,6 +18,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
+  PREMIUM_FEATURES,
+  type PremiumFeatureValue,
+} from '@legacy-sports/shared-components/premium-features';
+import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
@@ -48,34 +52,6 @@ import {
   trackBeginCheckout,
   trackSubscriptionStarted,
 } from '../../utils/analytics';
-
-type FeatureValue = boolean | string;
-
-interface PremiumFeature {
-  label: string;
-  free: FeatureValue;
-  premium: FeatureValue;
-  /** Label for the cancel dialog's "you'll lose access to" list, when the comparison label doesn't read as a loss. */
-  lossLabel?: string;
-}
-
-const PREMIUM_FEATURES: PremiumFeature[] = [
-  {
-    label: 'Active leagues',
-    free: 'Up to 3',
-    premium: 'Unlimited',
-    lossLabel: 'Unlimited active leagues',
-  },
-  { label: 'Salary cap leagues', free: false, premium: true },
-  {
-    label: 'Advanced playoff formats (6-team, 8-team)',
-    free: false,
-    premium: true,
-  },
-  { label: 'Unlimited mock drafts', free: false, premium: true },
-  { label: 'FAAB waivers', free: false, premium: true },
-  { label: 'Historical era filters', free: false, premium: true },
-];
 
 /* ─── Styled Components ─── */
 
@@ -505,7 +481,7 @@ function FeatureValueCell({
   value,
   checkColor,
 }: {
-  value: FeatureValue;
+  value: PremiumFeatureValue;
   checkColor: string;
 }) {
   if (typeof value === 'string') {

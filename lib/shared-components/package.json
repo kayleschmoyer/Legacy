@@ -18,6 +18,7 @@
     "./matchup": "./src/entry/matchup.ts",
     "./notifications": "./src/entry/notifications.ts",
     "./players": "./src/entry/players.ts",
+    "./premium-features": "./src/entry/premium-features.ts",
     "./roster": "./src/entry/roster.ts",
     "./scoreboard": "./src/entry/scoreboard.ts",
     "./season-draft": "./src/entry/season-draft.ts",

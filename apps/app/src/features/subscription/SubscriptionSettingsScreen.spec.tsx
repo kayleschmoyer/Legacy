@@ -433,16 +433,35 @@ describe('SubscriptionSettingsScreen — comparison table a11y (LS-7395)', () =>
   it('gives every Free/Premium indicator cell a column- and state-aware label', () => {
     render(<SubscriptionSettingsScreen />);
 
+    const cell = (value: boolean | string) =>
+      typeof value === 'string'
+        ? { state: value, text: value }
+        : {
+            state: value ? 'Included' : 'Not included',
+            text: value ? '✓' : '—',
+          };
+
     for (const feature of PREMIUM_FEATURES) {
-      const free = `${feature.label}: ${feature.free ? 'Included' : 'Not included'} on Free`;
-      const premium = `${feature.label}: ${feature.premium ? 'Included' : 'Not included'} on Premium`;
-      expect(screen.getByLabelText(free)).toHaveTextContent(
-        feature.free ? '✓' : '—',
-      );
-      expect(screen.getByLabelText(premium)).toHaveTextContent(
-        feature.premium ? '✓' : '—',
-      );
+      const free = cell(feature.free);
+      const premium = cell(feature.premium);
+      expect(
+        screen.getByLabelText(`${feature.label}: ${free.state} on Free`),
+      ).toHaveTextContent(free.text);
+      expect(
+        screen.getByLabelText(`${feature.label}: ${premium.state} on Premium`),
+      ).toHaveTextContent(premium.text);
     }
+  });
+
+  it('shows the league cap as limits, not two check marks (LS-7394)', () => {
+    render(<SubscriptionSettingsScreen />);
+
+    expect(
+      screen.getByLabelText('Active leagues: Up to 3 on Free'),
+    ).toHaveTextContent('Up to 3');
+    expect(
+      screen.getByLabelText('Active leagues: Unlimited on Premium'),
+    ).toHaveTextContent('Unlimited');
   });
 
   it('distinguishes a Free-excluded, Premium-included feature', () => {

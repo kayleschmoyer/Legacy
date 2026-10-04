@@ -96,6 +96,9 @@
       "@legacy-sports/shared-components/players": [
         "lib/shared-components/src/entry/players.ts"
       ],
+      "@legacy-sports/shared-components/premium-features": [
+        "lib/shared-components/src/entry/premium-features.ts"
+      ],
       "@legacy-sports/shared-components/roster": [
         "lib/shared-components/src/entry/roster.ts"
       ],
