@@ -3355,6 +3355,17 @@ export type MyAwardVote = {
   playerLastName?: Maybe<Scalars['String']['output']>;
 };
 
+export type MyInvoice = {
+  __typename?: 'MyInvoice';
+  amountPaidCents: Scalars['Int']['output'];
+  created: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  hostedInvoiceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  invoicePdf?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+};
+
 /** Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044) */
 export type NflTeamSeasonMetadata = {
   __typename?: 'NflTeamSeasonMetadata';
@@ -3860,6 +3871,8 @@ export type Query = {
   myIdentities: Array<UserIdentity>;
   /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
   myInvites?: Maybe<InvitationConnection>;
+  /** List the authenticated user’s most recent Stripe invoices (billing history). */
+  myInvoices: Array<MyInvoice>;
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;

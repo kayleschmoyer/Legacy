@@ -3361,6 +3361,17 @@ export type MyAwardVote = {
   playerLastName?: Maybe<Scalars['String']['output']>;
 };
 
+export type MyInvoice = {
+  __typename?: 'MyInvoice';
+  amountPaidCents: Scalars['Int']['output'];
+  created: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  hostedInvoiceUrl?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  invoicePdf?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+};
+
 /** Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044) */
 export type NflTeamSeasonMetadata = {
   __typename?: 'NflTeamSeasonMetadata';
@@ -3866,6 +3877,8 @@ export type Query = {
   myIdentities: Array<UserIdentity>;
   /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
   myInvites?: Maybe<InvitationConnection>;
+  /** List the authenticated user’s most recent Stripe invoices (billing history). */
+  myInvoices: Array<MyInvoice>;
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
@@ -9552,6 +9565,22 @@ export type GetMySubscriptionQuery = {
     trialEndsAt?: string | null;
     managedBy?: string | null;
   } | null;
+};
+
+export type GetMyInvoicesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMyInvoicesQuery = {
+  __typename?: 'Query';
+  myInvoices: Array<{
+    __typename?: 'MyInvoice';
+    id: string;
+    amountPaidCents: number;
+    currency: string;
+    status?: string | null;
+    created: string;
+    hostedInvoiceUrl?: string | null;
+    invoicePdf?: string | null;
+  }>;
 };
 
 export type GetMyBillingIntervalQueryVariables = Exact<{
@@ -23833,6 +23862,97 @@ export type GetMySubscriptionSuspenseQueryHookResult = ReturnType<
 export type GetMySubscriptionQueryResult = Apollo.QueryResult<
   GetMySubscriptionQuery,
   GetMySubscriptionQueryVariables
+>;
+export const GetMyInvoices = gql`
+  query GetMyInvoices {
+    myInvoices {
+      id
+      amountPaidCents
+      currency
+      status
+      created
+      hostedInvoiceUrl
+      invoicePdf
+    }
+  }
+`;
+
+/**
+ * __useGetMyInvoicesQuery__
+ *
+ * To run a query within a React component, call `useGetMyInvoicesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyInvoicesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyInvoicesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyInvoicesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyInvoicesQuery,
+    GetMyInvoicesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetMyInvoicesQuery, GetMyInvoicesQueryVariables>(
+    GetMyInvoices,
+    options,
+  );
+}
+export function useGetMyInvoicesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyInvoicesQuery,
+    GetMyInvoicesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetMyInvoicesQuery, GetMyInvoicesQueryVariables>(
+    GetMyInvoices,
+    options,
+  );
+}
+export function useGetMyInvoicesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyInvoicesQuery,
+        GetMyInvoicesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyInvoicesQuery,
+    GetMyInvoicesQueryVariables
+  >(
+    GetMyInvoices,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyInvoicesQuery,
+          GetMyInvoicesQueryVariables
+        >,
+  );
+}
+export type GetMyInvoicesQueryHookResult = ReturnType<
+  typeof useGetMyInvoicesQuery
+>;
+export type GetMyInvoicesLazyQueryHookResult = ReturnType<
+  typeof useGetMyInvoicesLazyQuery
+>;
+export type GetMyInvoicesSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyInvoicesSuspenseQuery
+>;
+export type GetMyInvoicesQueryResult = Apollo.QueryResult<
+  GetMyInvoicesQuery,
+  GetMyInvoicesQueryVariables
 >;
 export const GetMyBillingInterval = gql`
   query GetMyBillingInterval {

@@ -3795,6 +3795,16 @@ type MyAwardVote {
   playerLastName: String
 }
 
+type MyInvoice {
+  amountPaidCents: Int!
+  created: String!
+  currency: String!
+  hostedInvoiceUrl: String
+  id: String!
+  invoicePdf: String
+  status: String
+}
+
 """
 Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044)
 """
@@ -4699,6 +4709,11 @@ type Query {
     """
     kind: String
   ): InvitationConnection
+
+  """
+  List the authenticated user’s most recent Stripe invoices (billing history).
+  """
+  myInvoices: [MyInvoice!]!
   myLeagues(sport: Sport): [League!]!
 
   """

@@ -333,6 +333,69 @@ SubscriptionInfoRef.implement({
   }),
 });
 
+// ─── Invoices (billing history) ─────────────────────────────────────────────
+
+interface MyInvoice {
+  id: string;
+  amountPaidCents: number;
+  currency: string;
+  status: string | null;
+  created: string;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
+const MyInvoiceRef = builder.objectRef<MyInvoice>('MyInvoice');
+
+MyInvoiceRef.implement({
+  fields: (t) => ({
+    id: t.exposeString('id', { nullable: false }),
+    amountPaidCents: t.exposeInt('amountPaidCents', { nullable: false }),
+    currency: t.exposeString('currency', { nullable: false }),
+    status: t.exposeString('status', { nullable: true }),
+    created: t.exposeString('created', { nullable: false }),
+    hostedInvoiceUrl: t.exposeString('hostedInvoiceUrl', { nullable: true }),
+    invoicePdf: t.exposeString('invoicePdf', { nullable: true }),
+  }),
+});
+
+const MY_INVOICES_LIMIT = 20;
+
+/**
+ * Lists the user's most recent Stripe invoices. Returns [] when the user has no
+ * Stripe customer, and on any Stripe error (billing history is non-critical, so
+ * the UI degrades to an empty list instead of failing the query).
+ */
+export async function listInvoicesForUser(
+  userId: number,
+): Promise<MyInvoice[]> {
+  const subscription = await getSubscriptionForUser(userId);
+  if (!subscription?.stripeCustomerId) return [];
+
+  try {
+    const stripe = await getStripeClient();
+    const invoices = await stripe.invoices.list({
+      customer: subscription.stripeCustomerId,
+      limit: MY_INVOICES_LIMIT,
+    });
+    return invoices.data.map((invoice) => ({
+      id: invoice.id ?? '',
+      amountPaidCents: invoice.amount_paid,
+      currency: invoice.currency,
+      status: invoice.status ?? null,
+      created: new Date(invoice.created * 1000).toISOString(),
+      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+      invoicePdf: invoice.invoice_pdf ?? null,
+    }));
+  } catch (error) {
+    LOGGER.warn('Failed to list Stripe invoices; returning empty list', {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+}
+
 // ─── Stripe Prices ──────────────────────────────────────────────────────────
 
 const StripePriceInfoRef = builder.objectRef<{
@@ -492,6 +555,19 @@ builder.queryField('stripePrices', (t) =>
 );
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
+
+builder.queryField('myInvoices', (t) =>
+  t.field({
+    type: [MyInvoiceRef],
+    nullable: false,
+    description:
+      'List the authenticated user’s most recent Stripe invoices (billing history).',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) throw AuthenticationError();
+      return listInvoicesForUser(context.user.id);
+    },
+  }),
+);
 
 builder.queryField('mySubscription', (t) =>
   t.field({
