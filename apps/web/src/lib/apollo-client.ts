@@ -245,6 +245,9 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
         'FORBIDDEN',
         'PREMIUM_REQUIRED',
         'GAME_UNAVAILABLE',
+        // Per-user rate limits (RateLimitedError) working as designed
+        // (LS-10468 / LS-10469).
+        'RATE_LIMITED',
       ]);
 
       const premiumError = error.errors.find(

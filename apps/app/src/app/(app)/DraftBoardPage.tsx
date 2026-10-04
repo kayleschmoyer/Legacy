@@ -49,7 +49,7 @@ function ChatTabConnector({
   // League drafts always carry a league id; the mock-draft room has its own
   // chat connector ((app)/mock-draft/[draftId].tsx) and never mounts this
   // one (LS-10076).
-  const { messages, loading, sending, sendMessage } = useLeagueChat(
+  const { messages, loading, sending, sendError, sendMessage } = useLeagueChat(
     leagueId ?? 0,
   );
   // null until the first sync so loading the existing message history never
@@ -79,6 +79,7 @@ function ChatTabConnector({
         pending: m.pending,
       }))}
       onSend={(text) => void sendMessage(text)}
+      sendError={sendError}
     />
   );
 }

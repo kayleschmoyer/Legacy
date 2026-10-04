@@ -26,6 +26,25 @@ function renderTab(
 }
 
 describe('DraftChatTab', () => {
+  it('shows the send error notice when one is set (LS-10468)', () => {
+    renderTab({
+      sendError:
+        "You're sending messages too fast — try again in a few seconds.",
+    });
+
+    expect(
+      screen.getByText(
+        "You're sending messages too fast — try again in a few seconds.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows no send error notice by default', () => {
+    renderTab();
+
+    expect(screen.queryByTestId('draft-chat-send-error')).toBeNull();
+  });
+
   it('renders a sender label above bubbles from other users, and not above mine', () => {
     renderTab();
 

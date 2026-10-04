@@ -21,6 +21,8 @@ export interface DraftChatTabProps {
   loading: boolean;
   sending: boolean;
   onSend: (text: string) => void;
+  /** Inline notice for a send the server rejected (e.g. rate-limited — LS-10468). */
+  sendError?: string | null;
 }
 
 /**
@@ -67,6 +69,7 @@ export function DraftChatTab({
   loading,
   sending,
   onSend,
+  sendError,
 }: DraftChatTabProps): React.JSX.Element {
   const palette = useDraftPalette();
   const [inputText, setInputText] = useState('');
@@ -154,6 +157,21 @@ export function DraftChatTab({
           )}
         </YStack>
       </ScrollView>
+
+      {sendError != null && (
+        <XStack
+          testID="draft-chat-send-error"
+          paddingHorizontal={12}
+          paddingVertical={6}
+          borderTopWidth={1}
+          borderTopColor="$red6"
+          backgroundColor="$red2"
+        >
+          <Text fontSize={12} color="$red10">
+            {sendError}
+          </Text>
+        </XStack>
+      )}
 
       <XStack
         padding={10}

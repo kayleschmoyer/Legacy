@@ -90,4 +90,11 @@ export const CLIENT_FACING_CODES = new Set([
   // and may only release players until it is back under (LS-10477). Expected
   // user-facing state, not a server defect.
   'ROSTER_OVER_LIMIT',
+  // A request rejected by a per-user rate limit (RateLimitedError — e.g. the
+  // 5-sends-per-10s league chat limit, invite-code joins). The limit working
+  // as designed is not a server defect, but this code was missing here, so
+  // formatError masked the message as "Internal server error" and reported
+  // every throttled send to Rollbar (LS-10468 / LS-10469, same pattern as
+  // LS-9879).
+  'RATE_LIMITED',
 ]);

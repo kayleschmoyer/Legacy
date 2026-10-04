@@ -65,6 +65,7 @@ export function LeagueChatTab({
     loading,
     sending,
     wsError,
+    sendError,
     sendMessage,
     mentionCandidates = [],
     hasMoreHistory,
@@ -427,6 +428,22 @@ export function LeagueChatTab({
               onPress={() => setAnnounceMode(false)}
             >
               Cancel
+            </Text>
+          </XStack>
+        )}
+
+        {/* Send error notice (e.g. rate-limited — LS-10468) */}
+        {sendError != null && (
+          <XStack
+            testID="chat-send-error"
+            backgroundColor="$red2"
+            paddingHorizontal="$3"
+            paddingVertical="$2"
+            borderTopWidth={1}
+            borderTopColor="$red6"
+          >
+            <Text color="$red10" fontSize="$3">
+              {sendError}
             </Text>
           </XStack>
         )}

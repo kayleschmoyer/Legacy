@@ -234,6 +234,7 @@ describe('NodeRollbarImplementation', () => {
       'GRAPHQL_VALIDATION_FAILED',
       'POSITION_INELIGIBLE',
       'ROSTER_OVER_LIMIT',
+      'RATE_LIMITED',
     ])('returns true for GraphQLError with %s code', (code) => {
       const err = Object.assign(new Error('client'), {
         name: 'GraphQLError',

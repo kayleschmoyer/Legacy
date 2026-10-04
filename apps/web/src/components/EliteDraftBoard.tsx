@@ -66,7 +66,7 @@ function ChatTabConnector({
 }: DraftChatTabRenderProps): React.JSX.Element {
   // League drafts always carry a league id; the mock-draft room has its own
   // chat connector (MockDraftBoard.tsx) and never mounts this one (LS-10076).
-  const { messages, loading, sending, sendMessage } = useLeagueChat(
+  const { messages, loading, sending, sendError, sendMessage } = useLeagueChat(
     leagueId ?? 0,
   );
   // null until the first sync so loading the existing message history never
@@ -95,6 +95,7 @@ function ChatTabConnector({
         messageText: m.messageText,
       }))}
       onSend={(text) => void sendMessage(text)}
+      sendError={sendError}
     />
   );
 }

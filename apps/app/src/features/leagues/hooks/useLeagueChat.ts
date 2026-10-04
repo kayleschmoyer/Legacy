@@ -4,6 +4,10 @@ import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import {
+  CHAT_RATE_LIMITED_MESSAGE,
+  isRateLimitedError,
+} from '@legacy-sports/shared-components/chat';
+import {
   GetLeagueAnnouncements,
   type GetLeagueAnnouncementsQuery,
   GetLeagueMessages,
@@ -114,6 +118,8 @@ export function useLeagueChat(leagueId: number): {
   loading: boolean;
   sending: boolean;
   wsError: Error | null;
+  /** Inline notice for a send the server rejected (e.g. rate-limited). */
+  sendError: string | null;
   sendMessage: (text: string, gifUrl?: string) => Promise<void>;
   mentionCandidates: MentionCandidate[];
   /** True while there is still older chat history to reverse-paginate. */
@@ -128,6 +134,7 @@ export function useLeagueChat(leagueId: number): {
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [wsError, setWsError] = useState<Error | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const apolloClient = useApolloClient();
@@ -251,6 +258,7 @@ export function useLeagueChat(leagueId: number): {
     setMessages([]);
     setHistorySynced(false);
     setWsError(null);
+    setSendError(null);
     setQueue([]);
     setHasMoreHistory(true);
     setLoadingOlder(false);
@@ -291,6 +299,7 @@ export function useLeagueChat(leagueId: number): {
     async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
       if (!trimmed && !gifUrl) return;
+      setSendError(null);
 
       if (!connected) {
         enqueue(trimmed, gifUrl);
@@ -312,7 +321,14 @@ export function useLeagueChat(leagueId: number): {
             });
           },
         });
-      } catch {
+      } catch (error) {
+        // The server's per-user chat rate limit (5 sends / 10s) rejected the
+        // send. Queueing it would only retry straight into the same limit,
+        // so show a short notice instead and let the user resend (LS-10468).
+        if (isRateLimitedError(error)) {
+          setSendError(CHAT_RATE_LIMITED_MESSAGE);
+          return;
+        }
         // The mutation failed (e.g. a network blip the WS `connected` flag
         // hasn't caught up to yet) — queue it rather than losing it; it
         // retries on the next reconnect.
@@ -360,8 +376,14 @@ export function useLeagueChat(leagueId: number): {
         });
       } catch (error) {
         // Stop; this item (and anything behind it) retries on the next
-        // reconnect rather than spinning on a persistent failure.
-        captureError(error instanceof Error ? error : new Error(String(error)));
+        // reconnect rather than spinning on a persistent failure. A
+        // rate-limited flush is the limit working as designed, not a bug,
+        // so it is not reported (LS-10468 / LS-10469).
+        if (!isRateLimitedError(error)) {
+          captureError(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        }
       } finally {
         flushingRef.current = false;
       }
@@ -436,6 +458,7 @@ export function useLeagueChat(leagueId: number): {
     loading,
     sending,
     wsError,
+    sendError,
     sendMessage,
     mentionCandidates,
     hasMoreHistory,

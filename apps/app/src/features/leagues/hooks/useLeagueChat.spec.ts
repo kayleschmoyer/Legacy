@@ -1,5 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CombinedGraphQLErrors } from '@apollo/client';
+import { captureError } from '@legacy-sports/rollbar/native';
+import { CHAT_RATE_LIMITED_MESSAGE } from '@legacy-sports/shared-components/chat';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { useLeagueChat } from './useLeagueChat';
 
@@ -379,6 +382,101 @@ describe('useLeagueChat — offline queueing (LS-9097)', () => {
     expect(result.current.messages.map((m) => m.messageText)).toContain(
       'queued while offline',
     );
+  });
+});
+
+const rateLimitedError = (): CombinedGraphQLErrors =>
+  new CombinedGraphQLErrors({
+    errors: [
+      {
+        message: 'Too many attempts. Please try again later.',
+        extensions: { code: 'RATE_LIMITED' },
+      },
+    ],
+  });
+
+describe('useLeagueChat — rate-limited sends (LS-10468)', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRegisteredHandlers.clear();
+    mockConnected = true;
+    mockUseQuery.mockReturnValue({ loading: false, data: undefined });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+    await AsyncStorage.clear();
+  });
+
+  it('shows the rate-limit notice instead of queueing a throttled send', async () => {
+    const sendMutation = jest.fn().mockRejectedValue(rateLimitedError());
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.sendMessage('too fast');
+    });
+
+    expect(result.current.sendError).toBe(CHAT_RATE_LIMITED_MESSAGE);
+    expect(result.current.messages.some((m) => m.pending)).toBe(false);
+    expect(sendMutation).toHaveBeenCalledTimes(1);
+    expect(captureError).not.toHaveBeenCalled();
+  });
+
+  it('clears the notice on the next send', async () => {
+    const sendMutation = jest
+      .fn()
+      .mockRejectedValueOnce(rateLimitedError())
+      .mockResolvedValueOnce({});
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.sendMessage('too fast');
+    });
+    expect(result.current.sendError).toBe(CHAT_RATE_LIMITED_MESSAGE);
+
+    await act(async () => {
+      await result.current.sendMessage('later');
+    });
+    expect(result.current.sendError).toBeNull();
+  });
+
+  it('does not report a rate-limited queue flush to Rollbar', async () => {
+    mockConnected = false;
+    const sendMutation = jest.fn().mockRejectedValue(rateLimitedError());
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+
+    const { result, rerender } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.sendMessage('queued while offline');
+    });
+
+    mockConnected = true;
+    await act(() => {
+      rerender(undefined);
+    });
+
+    await waitFor(() => {
+      expect(sendMutation).toHaveBeenCalledTimes(1);
+    });
+    expect(captureError).not.toHaveBeenCalled();
+    // The item stays queued for the next reconnect.
+    expect(result.current.messages.some((m) => m.pending)).toBe(true);
   });
 });
 

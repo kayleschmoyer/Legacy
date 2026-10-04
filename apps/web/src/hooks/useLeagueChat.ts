@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  CHAT_RATE_LIMITED_MESSAGE,
+  isRateLimitedError,
+} from '@legacy-sports/shared-components/chat';
+import {
   GetLeagueChatMessages,
   type GetLeagueChatMessagesQuery,
   useSendLeagueChatMessageMutation,
@@ -117,6 +121,11 @@ export function useLeagueChat(leagueId: number): {
             messageText: trimmed || ' ',
             gifUrl: gifUrl ?? null,
           },
+          // Send failures are surfaced inline via `sendError` below, so skip
+          // the global error toast — otherwise a throttled send also showed
+          // the server message as a second, blocking-looking toast
+          // (LS-10468).
+          context: { suppressGlobalError: true },
           awaitRefetchQueries: true,
           refetchQueries: [
             {
@@ -148,7 +157,16 @@ export function useLeagueChat(leagueId: number): {
           },
         });
       } catch (err) {
-        LOGGER.error('useLeagueChat: sendMessage failed', { err });
+        // The server's per-user chat rate limit working as designed is not
+        // an error — show a short notice and don't report it (LS-10468).
+        if (isRateLimitedError(err)) {
+          setSendError(CHAT_RATE_LIMITED_MESSAGE);
+          return;
+        }
+        LOGGER.error(
+          'useLeagueChat: sendMessage failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
         setSendError('Failed to send message. Please try again.');
       }
     },

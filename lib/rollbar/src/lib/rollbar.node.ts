@@ -48,6 +48,9 @@ const CLIENT_FACING_GRAPHQL_CODES: ReadonlySet<string> = new Set([
   // A roster move rejected because the team is over the league's roster limit
   // (LS-10477) — an expected user-facing state, not a server defect.
   'ROSTER_OVER_LIMIT',
+  // A request rejected by a per-user rate limit (RateLimitedError) — the
+  // limit working as designed, not a server defect (LS-10468 / LS-10469).
+  'RATE_LIMITED',
 ]);
 
 /**

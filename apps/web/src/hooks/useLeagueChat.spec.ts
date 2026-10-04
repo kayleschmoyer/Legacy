@@ -1,4 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client';
+import { LOGGER } from '@legacy-sports/logging';
+import { CHAT_RATE_LIMITED_MESSAGE } from '@legacy-sports/shared-components/chat';
 import { useLeagueChat } from './useLeagueChat';
 
 jest.mock('@apollo/client/react', () => ({
@@ -350,5 +353,78 @@ describe('useLeagueChat — WS notifications are scoped to the viewed league (LS
     expect(result.current.messages.map((m) => m.messageText)).toEqual([
       'message from this league',
     ]);
+  });
+});
+
+describe('useLeagueChat — send errors (LS-10468)', () => {
+  let sendMutation: jest.Mock;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    useLeagueWebSocket.mockReturnValue(undefined);
+    useQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: [] },
+      refetch: jest.fn(),
+    });
+    sendMutation = jest.fn();
+    useSendLeagueChatMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('shows the rate-limit notice without logging an error when the send is throttled', async () => {
+    const logError = jest.spyOn(LOGGER, 'error').mockReturnValue(undefined);
+    sendMutation.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Too many attempts. Please try again later.',
+            extensions: { code: 'RATE_LIMITED' },
+          },
+        ],
+      }),
+    );
+
+    const { result } = renderHook(() => useLeagueChat(1));
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+
+    expect(result.current.sendError).toBe(CHAT_RATE_LIMITED_MESSAGE);
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the global error toast for chat sends', async () => {
+    sendMutation.mockResolvedValue({});
+
+    const { result } = renderHook(() => useLeagueChat(1));
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+
+    expect(sendMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { suppressGlobalError: true } }),
+    );
+  });
+
+  it('keeps the generic failure message and logs any other send error', async () => {
+    const logError = jest.spyOn(LOGGER, 'error').mockReturnValue(undefined);
+    sendMutation.mockRejectedValue(new Error('Failed to fetch'));
+
+    const { result } = renderHook(() => useLeagueChat(1));
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+
+    expect(result.current.sendError).toBe(
+      'Failed to send message. Please try again.',
+    );
+    expect(logError).toHaveBeenCalled();
   });
 });
