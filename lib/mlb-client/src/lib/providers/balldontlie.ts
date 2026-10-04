@@ -109,6 +109,43 @@ const RETRY_BASE_DELAY_MS = 500;
 // short of a full retry cycle if it does time out.
 const REQUEST_TIMEOUT_MS = 15_000;
 
+// Total wall-clock budget for one fetchScoreboard() call, kept under the
+// GraphQL Lambda's 30s timeout. A retry is only scheduled when its delay plus
+// one more full request timeout still fits, so a 429 `Retry-After: 60` can
+// never park the invocation past the Lambda deadline (LS-10404).
+const RETRY_BUDGET_MS = 25_000;
+
+// Hard ceiling on any single retry wait, regardless of remaining budget.
+const MAX_RETRY_DELAY_MS = 5_000;
+
+/**
+ * Thrown (when no stale cache entry can be served) instead of waiting out a
+ * retry delay that would not fit the invocation's time budget. `cause` is the
+ * upstream error that triggered the retry.
+ */
+export class BallDontLieRetryBudgetError extends Error {
+  constructor(
+    readonly retryDelayMs: number,
+    readonly cause: unknown,
+  ) {
+    super(
+      `[balldontlie] retry delay of ${retryDelayMs}ms exceeds the request time budget; failing fast`,
+    );
+    this.name = 'BallDontLieRetryBudgetError';
+  }
+}
+
+/**
+ * Whether waiting `delayMs` and then making one more request still fits the
+ * budget, given `elapsedMs` already spent. Exported for unit testing.
+ */
+export function retryFitsBudget(delayMs: number, elapsedMs: number): boolean {
+  return (
+    delayMs <= MAX_RETRY_DELAY_MS &&
+    elapsedMs + delayMs + REQUEST_TIMEOUT_MS <= RETRY_BUDGET_MS
+  );
+}
+
 /**
  * Returns true for errors that are worth retrying: rate limits (429), server
  * errors (5xx), and transient network-level failures (ECONNRESET, etc.).
@@ -227,6 +264,7 @@ export class BallDontLieProvider implements MlbDataProvider {
     LOGGER.debug('[balldontlie] fetching scoreboard', { date });
 
     let lastErr: unknown;
+    const startedAt = Date.now();
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const response = await axios.get<BdlGamesResponse>(
@@ -253,6 +291,18 @@ export class BallDontLieProvider implements MlbDataProvider {
         lastErr = err;
         if (!isRetryableError(err) || attempt >= MAX_RETRIES) break;
         const delay = retryDelay(err, attempt);
+        if (!retryFitsBudget(delay, Date.now() - startedAt)) {
+          LOGGER.warn(
+            '[balldontlie] retry delay exceeds budget; failing fast',
+            {
+              attempt,
+              delayMs: delay,
+              date,
+            },
+          );
+          lastErr = new BallDontLieRetryBudgetError(delay, err);
+          break;
+        }
         LOGGER.warn('[balldontlie] transient error, retrying', {
           attempt,
           delayMs: delay,

@@ -7,8 +7,10 @@
 import axios, { AxiosError } from 'axios';
 import {
   BallDontLieProvider,
+  BallDontLieRetryBudgetError,
   isRetryableError,
   retryDelay,
+  retryFitsBudget,
 } from './balldontlie';
 
 // Spy on axios.get only — do NOT jest.mock('axios') as that auto-mocks
@@ -361,6 +363,83 @@ describe('BallDontLieProvider.getScoreboard', () => {
     expect(result.games).toHaveLength(1);
     // 1 initial populate + 1 timeout attempt (no retries)
     expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
+  });
+
+  describe('retry time budget (LS-10404)', () => {
+    const waits = (): number[] =>
+      jest
+        .mocked(setTimeout)
+        .mock.calls.map((call) => Number(call[1]))
+        .filter((ms) => ms >= 500);
+
+    beforeEach(() => jest.mocked(setTimeout).mockClear());
+
+    it('fails fast with a typed error on a 429 with a 60s Retry-After and never waits', async () => {
+      mockedAxiosGet.mockRejectedValue(makeAxiosError(429, '60'));
+
+      const failure = makeProvider().getScoreboard('2024-07-20');
+      await expect(failure).rejects.toBeInstanceOf(BallDontLieRetryBudgetError);
+      await expect(failure).rejects.toMatchObject({ retryDelayMs: 60_000 });
+      expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
+      expect(waits()).toEqual([]);
+    });
+
+    it('serves stale cache instead of waiting out a 60s Retry-After', async () => {
+      const provider = makeProvider();
+      mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
+      await provider.getScoreboard('2024-07-21');
+      const cacheMap = (
+        provider as unknown as {
+          cache: Map<string, { data: unknown; expiry: number }>;
+        }
+      ).cache;
+      const entry = cacheMap.get('scoreboard:2024-07-21');
+      if (entry) entry.expiry = Date.now() - 1;
+      jest.mocked(setTimeout).mockClear();
+
+      mockedAxiosGet.mockRejectedValue(makeAxiosError(429, '60'));
+      const result = await provider.getScoreboard('2024-07-21');
+
+      expect(result.games).toHaveLength(1);
+      expect(waits()).toEqual([]);
+    });
+
+    it('still honours a short Retry-After that fits the budget', async () => {
+      mockedAxiosGet
+        .mockRejectedValueOnce(makeAxiosError(429, '2'))
+        .mockResolvedValueOnce(BDL_RESPONSE);
+
+      await makeProvider().getScoreboard('2024-07-22');
+
+      expect(waits()).toEqual([2_000]);
+      expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips a retry whose delay would overrun the budget after a slow attempt', async () => {
+      const now = jest.spyOn(Date, 'now');
+      now.mockReturnValueOnce(0).mockReturnValue(10_000);
+      mockedAxiosGet.mockRejectedValue(makeAxiosError(503));
+
+      await expect(makeProvider().getScoreboard('2024-07-23')).rejects.toThrow(
+        BallDontLieRetryBudgetError,
+      );
+      now.mockRestore();
+      expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('retryFitsBudget', () => {
+    it('accepts a short delay early in the budget', () => {
+      expect(retryFitsBudget(1_000, 200)).toBe(true);
+    });
+
+    it('rejects a delay above the hard ceiling', () => {
+      expect(retryFitsBudget(60_000, 0)).toBe(false);
+    });
+
+    it('rejects when remaining budget cannot fit delay plus one more request', () => {
+      expect(retryFitsBudget(1_000, 9_500)).toBe(false);
+    });
   });
 
   it('throws on timeout when no stale cache is available', async () => {
