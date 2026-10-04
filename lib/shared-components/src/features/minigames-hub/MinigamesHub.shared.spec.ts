@@ -4,6 +4,7 @@ import {
   type MinigameId,
   STAT_PLACEHOLDER,
   statFor,
+  UNLIMITED_STAT,
 } from './MinigamesHub.shared';
 
 const NO_STATS = {
@@ -54,6 +55,17 @@ describe('statFor', () => {
       value: '1',
     });
   });
+
+  it('shows ∞ instead of a count for unlimited mock drafts (LS-10463)', () => {
+    expect(
+      statFor('mock-draft', {
+        activeGamesCount: null,
+        bestScore: null,
+        mockDraftsRemaining: null,
+        mockDraftsUnlimited: true,
+      }),
+    ).toEqual({ label: 'Drafts Left', value: UNLIMITED_STAT });
+  });
 });
 
 describe('compactStatFor', () => {
@@ -100,6 +112,15 @@ describe('compactStatFor', () => {
       compactStatFor('season-draft', { ...NO_STATS, activeGamesCount: 0 })
         .value,
     ).toBe('0');
+  });
+
+  it('shows ∞ instead of a count for unlimited mock drafts (LS-10463)', () => {
+    expect(
+      compactStatFor('mock-draft', {
+        ...NO_STATS,
+        mockDraftsUnlimited: true,
+      }),
+    ).toEqual({ label: 'Left', value: UNLIMITED_STAT, tone: 'neutral' });
   });
 
   it('covers every game in the catalog', () => {

@@ -5,7 +5,7 @@
  * weekly cap so the web UI can reflect the limit *before* submit. These tests
  * exercise the three branches that drive the UI:
  *   1. Unauthenticated → UNAUTHENTICATED.
- *   2. Unlimited entitlement → isUnlimited=true, remaining clamped to limit.
+ *   2. Unlimited entitlement → isUnlimited=true, remaining null (LS-10463).
  *   3. Free tier → remaining = max(0, limit - used).
  */
 
@@ -132,11 +132,12 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
     );
 
     // Even when the user has created more drafts than the free cap, an
-    // unlimited user is never gated: remaining is clamped to the limit.
+    // unlimited user is never gated: remaining is null so no client can
+    // render it as a cap (LS-10463).
     expect(result).toEqual({
       used: 5,
       limit: 2,
-      remaining: 2,
+      remaining: null,
       isUnlimited: true,
     });
   });

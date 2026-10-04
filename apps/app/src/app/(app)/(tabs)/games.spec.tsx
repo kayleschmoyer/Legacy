@@ -106,6 +106,7 @@ jest.mock('@legacy-sports/shared-components', () => {
       bestScore: number | null;
       tokens: number | null;
       mockDraftsRemaining: number | null;
+      mockDraftsUnlimited?: boolean;
       resumeGame: { gameId: number } | null;
       personalStats: Record<string, number | null>;
       onSelectGame: (id: string) => void;
@@ -199,11 +200,23 @@ function mockPersonalStats(
 
 function mockMockDraftUsage(
   remaining: number | null,
-  { loading = false, error = undefined as Error | undefined } = {},
+  {
+    loading = false,
+    error = undefined as Error | undefined,
+    isUnlimited = false,
+  } = {},
 ) {
   mockUseGetMyMockDraftUsageQuery.mockReturnValue({
-    data:
-      remaining === null
+    data: isUnlimited
+      ? {
+          getMyMockDraftUsage: {
+            used: 0,
+            limit: 2,
+            remaining: null,
+            isUnlimited: true,
+          },
+        }
+      : remaining === null
         ? undefined
         : {
             getMyMockDraftUsage: {
@@ -223,6 +236,7 @@ interface ReceivedProps {
   bestScore: number | null;
   tokens: number | null;
   mockDraftsRemaining: number | null;
+  mockDraftsUnlimited: boolean;
   resumeGame: Record<string, unknown> | null;
   personalStats: Record<string, number | null>;
 }
@@ -336,6 +350,15 @@ describe('GamesTab', () => {
       render(<GamesTab />);
 
       expect(receivedProps().mockDraftsRemaining).toBe(1);
+      expect(receivedProps().mockDraftsUnlimited).toBe(false);
+    });
+
+    it('flags unlimited mock drafts for premium users (LS-10463)', () => {
+      mockMockDraftUsage(null, { isUnlimited: true });
+      render(<GamesTab />);
+
+      expect(receivedProps().mockDraftsUnlimited).toBe(true);
+      expect(receivedProps().mockDraftsRemaining).toBeNull();
     });
 
     it('passes null for mock drafts remaining while loading or on error', () => {

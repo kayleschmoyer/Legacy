@@ -91,6 +91,27 @@ describe('MinigamesHub', () => {
     expect(getByText('1')).toBeTruthy();
   });
 
+  it('shows ∞ on the Mock Draft card for unlimited (premium) users (LS-10463)', () => {
+    jest.mocked(useGetMyMockDraftUsageQuery).mockReturnValue({
+      data: {
+        getMyMockDraftUsage: {
+          used: 0,
+          limit: 2,
+          remaining: null,
+          isUnlimited: true,
+        },
+      },
+      loading: false,
+      error: undefined,
+    } as unknown as ReturnType<typeof useGetMyMockDraftUsageQuery>);
+
+    const { getByText } = render(
+      <MinigamesHub onNavigate={jest.fn()} isNarrow={false} />,
+    );
+
+    expect(getByText('∞')).toBeTruthy();
+  });
+
   it('falls back to em-dash while stat queries are loading', () => {
     jest.mocked(useGetSeasonDraftGamesQuery).mockReturnValue({
       data: undefined,

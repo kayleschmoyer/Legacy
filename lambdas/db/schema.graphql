@@ -2837,7 +2837,7 @@ type MockDraftUsage {
   limit: Int
 
   """
-  Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users.
+  Mock drafts still allowed this window (max(0, limit - used)); null for unlimited users, who are not capped.
   """
   remaining: Int
 

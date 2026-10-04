@@ -346,6 +346,8 @@ export function MinigamesHub({
   const dbStats = minigamesStatsData?.minigamesStats;
   const mockDraftsRemaining =
     mockDraftUsageData?.getMyMockDraftUsage?.remaining ?? null;
+  const mockDraftsUnlimited =
+    mockDraftUsageData?.getMyMockDraftUsage?.isUnlimited === true;
 
   const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
     ...template,
@@ -353,6 +355,7 @@ export function MinigamesHub({
       activeGamesCount,
       bestScore,
       mockDraftsRemaining,
+      mockDraftsUnlimited,
     }),
   }));
 

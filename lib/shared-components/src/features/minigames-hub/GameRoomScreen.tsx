@@ -71,6 +71,8 @@ export interface GameRoomScreenProps {
   tokens: number | null;
   /** Mock Draft weekly drafts remaining. Null while loading or on error. */
   mockDraftsRemaining: number | null;
+  /** True for premium users (no weekly cap) — the chip shows ∞. */
+  mockDraftsUnlimited?: boolean;
   /** Hidden entirely when null — the layout flows up with no gap. */
   resumeGame: GameRoomResumeGame | null;
   personalStats: GameRoomPersonalStats;
@@ -411,6 +413,7 @@ export function GameRoomScreen({
   bestScore,
   tokens: tokenBalance,
   mockDraftsRemaining,
+  mockDraftsUnlimited,
   resumeGame,
   personalStats,
   onSelectGame,
@@ -454,6 +457,7 @@ export function GameRoomScreen({
                 bestScore,
                 tokens: tokenBalance,
                 mockDraftsRemaining,
+                mockDraftsUnlimited,
               })}
               onPress={() => onSelectGame(template.id)}
             />

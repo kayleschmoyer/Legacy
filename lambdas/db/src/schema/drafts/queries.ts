@@ -1818,8 +1818,9 @@ builder.queryField('getMyMockDraftUsage', (t) =>
       return {
         used,
         limit,
-        // Unlimited users are never capped, so surface full headroom.
-        remaining: isUnlimited ? limit : Math.max(0, limit - used),
+        // Unlimited users are never capped, so there is no meaningful count
+        // to surface — null keeps clients from rendering a phantom cap (LS-10463).
+        remaining: isUnlimited ? null : Math.max(0, limit - used),
         isUnlimited,
       };
     },

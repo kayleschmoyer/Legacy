@@ -2266,7 +2266,7 @@ export type MockDraftUsage = {
   isUnlimited?: Maybe<Scalars['Boolean']['output']>;
   /** Free-tier mock drafts allowed per 7-day window. */
   limit?: Maybe<Scalars['Int']['output']>;
-  /** Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users. */
+  /** Mock drafts still allowed this window (max(0, limit - used)); null for unlimited users, who are not capped. */
   remaining?: Maybe<Scalars['Int']['output']>;
   /** Mock drafts the user has created within the trailing 7-day window. */
   used?: Maybe<Scalars['Int']['output']>;

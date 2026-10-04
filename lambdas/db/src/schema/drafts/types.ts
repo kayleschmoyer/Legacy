@@ -632,7 +632,7 @@ DraftQueueEntry.implement({
 export const MockDraftUsage = builder.objectRef<{
   used: number;
   limit: number;
-  remaining: number;
+  remaining: number | null;
   isUnlimited: boolean;
 }>('MockDraftUsage');
 
@@ -648,8 +648,9 @@ MockDraftUsage.implement({
       description: 'Free-tier mock drafts allowed per 7-day window.',
     }),
     remaining: t.exposeInt('remaining', {
+      nullable: true,
       description:
-        'Mock drafts still allowed this window (max(0, limit - used)); always equals limit for unlimited users.',
+        'Mock drafts still allowed this window (max(0, limit - used)); null for unlimited users, who are not capped.',
     }),
     isUnlimited: t.exposeBoolean('isUnlimited', {
       description:

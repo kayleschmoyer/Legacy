@@ -119,6 +119,14 @@ function statValue(n: number | null): string {
   return n !== null ? String(n) : STAT_PLACEHOLDER;
 }
 
+/** Shown in place of a drafts-left count for users with the
+ *  unlimited_mock_drafts entitlement (LS-10463). */
+export const UNLIMITED_STAT = '∞';
+
+function mockDraftsValue(remaining: number | null, unlimited?: boolean) {
+  return unlimited === true ? UNLIMITED_STAT : statValue(remaining);
+}
+
 /** Shared stat-selection logic — identical business rules on both platforms. */
 export function statFor(
   id: MinigameId,
@@ -126,6 +134,8 @@ export function statFor(
     activeGamesCount: number | null;
     bestScore: number | null;
     mockDraftsRemaining: number | null;
+    /** True for premium users — the weekly cap does not apply. */
+    mockDraftsUnlimited?: boolean;
   },
 ): MinigameStat {
   switch (id) {
@@ -141,7 +151,10 @@ export function statFor(
     case 'mock-draft':
       return {
         label: 'Drafts Left',
-        value: statValue(args.mockDraftsRemaining),
+        value: mockDraftsValue(
+          args.mockDraftsRemaining,
+          args.mockDraftsUnlimited,
+        ),
       };
   }
 }
@@ -162,6 +175,8 @@ export function compactStatFor(
     bestScore: number | null;
     tokens: number | null;
     mockDraftsRemaining: number | null;
+    /** True for premium users — the weekly cap does not apply. */
+    mockDraftsUnlimited?: boolean;
   },
 ): MinigameCompactStat {
   switch (id) {
@@ -186,7 +201,10 @@ export function compactStatFor(
     case 'mock-draft':
       return {
         label: 'Left',
-        value: statValue(args.mockDraftsRemaining),
+        value: mockDraftsValue(
+          args.mockDraftsRemaining,
+          args.mockDraftsUnlimited,
+        ),
         tone: 'neutral',
       };
   }

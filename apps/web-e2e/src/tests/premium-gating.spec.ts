@@ -299,7 +299,8 @@ test.describe('Premium gating — Mock Draft Control All Teams (LS-9253) @critic
                 isUnlimited: true,
                 used: 0,
                 limit: 2,
-                remaining: 2,
+                // Unlimited users get remaining: null (LS-10463).
+                remaining: null,
               },
             },
           }),
