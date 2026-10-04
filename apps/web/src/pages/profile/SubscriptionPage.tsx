@@ -46,7 +46,6 @@ import {
 import { useStripePrices } from '../../hooks/useStripePrices';
 import {
   trackBeginCheckout,
-  trackPurchase,
   trackSubscriptionStarted,
 } from '../../utils/analytics';
 
@@ -795,20 +794,17 @@ const SubscriptionPage: React.FC = () => {
     const alreadyTracked =
       sessionStorage.getItem('tracked_purchase_session_id') === sessionId;
     if (!alreadyTracked) {
-      const storedCycle = (sessionStorage.getItem('upgrade_billing_cycle') ??
-        'monthly') as 'monthly' | 'annual';
-      const value = storedCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
-      trackPurchase(storedCycle, value, sessionId);
+      // LS-7407: `purchase` (value + transaction_id) is tracked server-side from
+      // the Stripe webhook; a client call here was replayable via the URL.
       trackSubscriptionStarted('premium');
       sessionStorage.setItem('tracked_purchase_session_id', sessionId);
-      sessionStorage.removeItem('upgrade_billing_cycle');
     }
     // Remove query params to prevent re-tracking on refresh/back/forward.
     // This changes searchParams, which would re-trigger this effect — but the
     // next run exits early because checkout !== 'success', so it's safe.
     navigate('/profile/subscription', { replace: true });
     setCheckoutJustCompleted(true);
-  }, [searchParams, navigate, ANNUAL_TOTAL, MONTHLY_PRICE]);
+  }, [searchParams, navigate]);
 
   // Separated from the searchParams effect so navigate() doesn't cancel the
   // delayed retries: when searchParams changes, only the effect above re-runs.
@@ -876,7 +872,6 @@ const SubscriptionPage: React.FC = () => {
 
     const value = billingCycle === 'annual' ? ANNUAL_TOTAL : MONTHLY_PRICE;
     trackBeginCheckout(billingCycle, value);
-    sessionStorage.setItem('upgrade_billing_cycle', billingCycle);
 
     const origin = window.location.origin;
     try {

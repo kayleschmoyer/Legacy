@@ -134,7 +134,6 @@ jest.mock('../../hooks/useStripePrices', () => ({
 
 jest.mock('../../utils/analytics', () => ({
   trackBeginCheckout: jest.fn(),
-  trackPurchase: jest.fn(),
   trackSubscriptionStarted: jest.fn(),
 }));
 

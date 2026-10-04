@@ -588,6 +588,29 @@ async function handleCheckoutSessionCompleted(
     status: subscription.status,
   });
 
+  // LS-7407: the GA4 `purchase` event is fired here, not from the browser.
+  // The success-URL tracker was replayable (the session_id in the query string
+  // can be reopened in any tab; the sessionStorage de-dup does not follow it).
+  // Reaching this point means the event id was claimed once and
+  // upsertSubscription applied the write, so a replay cannot re-fire it.
+  try {
+    await sendGa4ServerEvent(userId, 'purchase', {
+      transaction_id: session.id,
+      currency: (session.currency ?? 'usd').toUpperCase(),
+      value: (session.amount_total ?? 0) / 100,
+      billing_cycle:
+        subscription.items.data[0]?.price?.recurring?.interval === 'year'
+          ? 'annual'
+          : 'monthly',
+    });
+  } catch (err) {
+    LOGGER.warn('purchase GA4 event failed (non-fatal)', {
+      err,
+      userId,
+      sessionId: session.id,
+    });
+  }
+
   return userId;
 }
 

@@ -363,6 +363,87 @@ describe('stripe-webhook event handlers', () => {
       );
     });
 
+    /** Queue the DB calls for a checkout.session.completed that upserts. */
+    function setupAppliedCheckout() {
+      setupNotProcessed();
+      setupOwnershipDbCheck();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb([])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeInsertUpdateDb()),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+    }
+
+    const paidCheckoutEvent = (created: number) =>
+      fakeStripeEvent({
+        type: 'checkout.session.completed',
+        created,
+        data: {
+          object: {
+            id: 'cs_paid_1',
+            customer: 'cus_123',
+            subscription: 'sub_123',
+            amount_total: 999,
+            currency: 'usd',
+            metadata: { userId: '42' },
+          },
+        },
+      });
+
+    it('fires a server-side GA4 purchase event with transaction_id, value and currency on a fresh checkout (LS-7407)', async () => {
+      mockConstructEvent.mockReturnValue(paidCheckoutEvent(300));
+      setupAppliedCheckout();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(42, 'purchase', {
+        transaction_id: 'cs_paid_1',
+        currency: 'USD',
+        value: 9.99,
+        billing_cycle: 'monthly',
+      });
+    });
+
+    it('still returns 200 and keeps the subscription_started event when the GA4 purchase send throws (LS-7407)', async () => {
+      mockConstructEvent.mockReturnValue(paidCheckoutEvent(300));
+      setupAppliedCheckout();
+      mockSendGa4ServerEvent.mockRejectedValueOnce(new Error('ga4 down'));
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_started',
+        { tier: 'premium', source: 'stripe' },
+      );
+    });
+
+    it('does not fire a GA4 purchase event for a stale/replayed checkout event (LS-7407)', async () => {
+      mockConstructEvent.mockReturnValue(paidCheckoutEvent(100));
+
+      setupNotProcessed();
+      setupOwnershipDbCheck();
+      // upsertSubscription: existing row carries a newer lastEventTimestamp,
+      // so the write is rejected as stale and nothing downstream fires.
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', lastEventTimestamp: 200 }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(mockSendGa4ServerEvent).not.toHaveBeenCalled();
+    });
+
     it('writes the subscription row keyed on stripeSubscriptionId with userId from session metadata, so a replayed event upserts instead of duplicating (LS-7427)', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({

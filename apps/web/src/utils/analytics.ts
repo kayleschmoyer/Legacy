@@ -486,37 +486,3 @@ export function trackBeginCheckout(
   });
   LOGGER.info('[Analytics] begin_checkout tracked:', billingCycle);
 }
-
-/**
- * Track subscription purchase — GA4 standard e-commerce event.
- * Fire on the post-checkout success page.
- * @param billingCycle - 'monthly' | 'annual'
- * @param value - Purchase value in USD
- * @param transactionId - Stripe session ID or client-generated fallback
- */
-export function trackPurchase(
-  billingCycle: 'monthly' | 'annual',
-  value: number,
-  transactionId: string,
-): void {
-  const env = getEnvironmentConfig();
-  if (!window.gtag || !env.googleAnalyticsMeasurementId) return;
-  window.gtag('event', 'purchase', {
-    transaction_id: transactionId,
-    currency: 'USD',
-    value,
-    items: [
-      {
-        item_id: `premium_${billingCycle}`,
-        item_name: 'Premium Subscription',
-        price: value,
-        quantity: 1,
-      },
-    ],
-  });
-  LOGGER.info('[Analytics] purchase tracked:', {
-    billingCycle,
-    transactionId,
-    value,
-  });
-}
