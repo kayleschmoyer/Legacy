@@ -35,8 +35,9 @@ interface OnboardingTutorialProps {
   onClose: () => void;
   /**
    * Called instead of `onClose` when the user finishes the tutorial via the
-   * final "Get Started" button (LS-6908). Skip, Escape and backdrop dismissals
-   * still call `onClose`. Falls back to `onClose` when omitted.
+   * final "Get Started" button (LS-6908). Skip and Escape dismissals still call
+   * `onClose`; clicking the backdrop does nothing (LS-6901). Falls back to
+   * `onClose` when omitted.
    */
   onGetStarted?: () => void;
   /** Step index to open on (e.g. restored after a reload). Clamped to range. */
@@ -744,9 +745,6 @@ export function OnboardingTutorial({
         justifyContent: 'center',
       }}
       role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) finish('backdrop');
-      }}
     >
       {/* ── Modal card ── */}
       <YStack

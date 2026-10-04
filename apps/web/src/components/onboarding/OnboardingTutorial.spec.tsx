@@ -171,6 +171,28 @@ describe('OnboardingTutorial — modal focus management (LS-6902)', () => {
   });
 });
 
+describe('OnboardingTutorial — backdrop click (LS-6901)', () => {
+  it('does not dismiss the tutorial when the backdrop is clicked', () => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+    const backdrop = screen.getByRole('dialog').parentElement as HTMLElement;
+
+    fireEvent.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('still dismisses via the explicit Skip button', () => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+
+    fireEvent.click(screen.getByLabelText('Skip tutorial'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OnboardingTutorial — footer skip label (LS-6904)', () => {
   it('labels the footer skip button "Skip tutorial", not the bare word "Skip"', () => {
     const onClose = jest.fn();
@@ -275,11 +297,6 @@ describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
     ],
     ['skip_button', () => fireEvent.click(screen.getByText('Skip tutorial'))],
     ['escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
-    [
-      'backdrop',
-      () =>
-        fireEvent.click(screen.getByRole('dialog').parentElement as Element),
-    ],
   ])('emits skipped with from_step and method=%s', (method, act) => {
     const onClose = jest.fn();
     render(<OnboardingTutorial onClose={onClose} />);
