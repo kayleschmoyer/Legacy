@@ -15239,6 +15239,7 @@ export type UpdateLeagueScoringPositionBonusesMutation = {
 export type SearchPlayersForDisclosureQueryVariables = Exact<{
   searchTerm: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  sport?: InputMaybe<Sport>;
 }>;
 
 export type SearchPlayersForDisclosureQuery = {
@@ -37744,8 +37745,12 @@ export type UpdateLeagueScoringPositionBonusesMutationOptions =
     UpdateLeagueScoringPositionBonusesMutationVariables
   >;
 export const SearchPlayersForDisclosure = gql`
-  query SearchPlayersForDisclosure($searchTerm: String!, $limit: Int) {
-    searchPlayers(searchTerm: $searchTerm, limit: $limit) {
+  query SearchPlayersForDisclosure(
+    $searchTerm: String!
+    $limit: Int
+    $sport: Sport
+  ) {
+    searchPlayers(searchTerm: $searchTerm, limit: $limit, sport: $sport) {
       id
       firstName
       lastName
@@ -37767,6 +37772,7 @@ export const SearchPlayersForDisclosure = gql`
  *   variables: {
  *      searchTerm: // value for 'searchTerm'
  *      limit: // value for 'limit'
+ *      sport: // value for 'sport'
  *   },
  * });
  */

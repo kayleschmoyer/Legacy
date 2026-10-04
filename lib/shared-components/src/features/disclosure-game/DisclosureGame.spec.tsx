@@ -25,8 +25,14 @@ type Children = { children?: React.ReactNode };
 type BaseProps = Children & { testID?: string };
 
 jest.mock('tamagui', () => {
-  const View = ({ children, testID }: BaseProps) => (
-    <div data-testid={testID}>{children}</div>
+  const View = ({
+    children,
+    testID,
+    onPress,
+  }: BaseProps & { onPress?: () => void }) => (
+    <div data-testid={testID} onClick={onPress ? () => onPress() : undefined}>
+      {children}
+    </div>
   );
   const Text = ({ children, testID }: BaseProps) => (
     <span data-testid={testID}>{children}</span>
@@ -208,6 +214,53 @@ describe('DisclosureGame — player search', () => {
     expect(screen.queryByTestId('player-suggestions')).toBeNull();
   });
 
+  it('scopes the search to baseball and renders the returned suggestions (LS-10439)', async () => {
+    await startGameAndRevealClue();
+
+    mockSearchPlayers.mockResolvedValueOnce({
+      data: {
+        searchPlayers: [{ id: 28724, firstName: 'Babe', lastName: 'Ruth' }],
+      },
+    });
+
+    fireEvent.change(screen.getByTestId('guess-input'), {
+      target: { value: 'Ruth' },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('suggestion-28724')).toBeTruthy(),
+    );
+    expect(mockSearchPlayers).toHaveBeenCalledWith({
+      variables: { searchTerm: 'Ruth', limit: 8, sport: 'baseball' },
+    });
+    expect(screen.getByTestId('submit-guess-button')).toHaveProperty(
+      'disabled',
+      true,
+    );
+
+    fireEvent.click(screen.getByTestId('suggestion-28724'));
+
+    expect(screen.getByTestId('submit-guess-button')).toHaveProperty(
+      'disabled',
+      false,
+    );
+  });
+
+  it('shows an inline empty-state when the search matches no players', async () => {
+    await startGameAndRevealClue();
+
+    mockSearchPlayers.mockResolvedValueOnce({ data: { searchPlayers: [] } });
+
+    fireEvent.change(screen.getByTestId('guess-input'), {
+      target: { value: 'Zzzz' },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('player-search-empty')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('player-suggestions')).toBeNull();
+  });
+
   it('shows the error banner when searchPlayers rejects with a real failure', async () => {
     await startGameAndRevealClue();
 
@@ -224,5 +277,8 @@ describe('DisclosureGame — player search', () => {
         /Could not search players/i,
       );
     });
+    // Also surfaced inline next to the input — the top banner can be scrolled
+    // out of view on short viewports (LS-10439).
+    expect(screen.getByTestId('player-search-error')).toBeTruthy();
   });
 });

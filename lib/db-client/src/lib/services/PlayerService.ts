@@ -711,7 +711,15 @@ export class PlayerService {
   }
 
   /**
-   * Search players by name (searches first name, last name, and full name)
+   * Search players by name (searches first name, last name, and full name).
+   *
+   * Results are ranked by relevance so a small `limit` still surfaces the
+   * player the user is typing (LS-10439): exact full-name match first, then
+   * full-name / last-name / first-name prefix matches, then any substring
+   * match. Rows missing a first or last name (single-name historical records)
+   * sort after complete names so they can't crowd out real matches. Ties break
+   * alphabetically by last name, first name, then id so the order is
+   * deterministic.
    */
   async searchPlayers(
     searchTerm: string,
@@ -719,20 +727,43 @@ export class PlayerService {
     sport?: 'baseball' | 'football',
   ): Promise<Player[]> {
     return runWithPublicClient(this.options, async (db) => {
+      const { firstName, lastName } = PublicSchema.players;
+      const fullName = sql`(${firstName} || ' ' || ${lastName})`;
+
       const nameCondition = or(
-        ilike(PublicSchema.players.firstName, `%${searchTerm}%`),
-        ilike(PublicSchema.players.lastName, `%${searchTerm}%`),
-        sql`(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}) ILIKE ${'%' + searchTerm + '%'}`,
+        ilike(firstName, `%${searchTerm}%`),
+        ilike(lastName, `%${searchTerm}%`),
+        sql`${fullName} ILIKE ${'%' + searchTerm + '%'}`,
       );
 
       const whereCondition = sport
         ? and(nameCondition, eq(PublicSchema.players.sport, sport))
         : nameCondition;
 
+      const relevance = sql`CASE
+        WHEN ${fullName} ILIKE ${searchTerm} THEN 0
+        WHEN ${fullName} ILIKE ${searchTerm + '%'} THEN 1
+        WHEN ${lastName} ILIKE ${searchTerm + '%'} THEN 2
+        WHEN ${firstName} ILIKE ${searchTerm + '%'} THEN 3
+        ELSE 4
+      END`;
+
+      const incompleteName = sql`CASE
+        WHEN COALESCE(${firstName}, '') = '' OR COALESCE(${lastName}, '') = ''
+        THEN 1 ELSE 0
+      END`;
+
       return db
         .select()
         .from(PublicSchema.players)
         .where(whereCondition)
+        .orderBy(
+          incompleteName,
+          relevance,
+          sql`${lastName} ASC NULLS LAST`,
+          sql`${firstName} ASC NULLS LAST`,
+          PublicSchema.players.id,
+        )
         .limit(limit);
     });
   }

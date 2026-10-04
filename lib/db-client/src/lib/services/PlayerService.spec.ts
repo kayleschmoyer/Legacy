@@ -308,6 +308,7 @@ describe('PlayerService — searchPlayers', () => {
     select: jest.Mock;
     from: jest.Mock;
     where: jest.Mock;
+    orderBy: jest.Mock;
     limit: jest.Mock;
   };
 
@@ -337,12 +338,25 @@ describe('PlayerService — searchPlayers', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockResolvedValue([]),
     };
 
     mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
       handler(mockDb as never),
     );
+  });
+
+  it('orders results by name completeness, relevance, then name before limiting (LS-10439)', async () => {
+    await service.searchPlayers('Ruth', 8, 'baseball');
+
+    // incompleteName, relevance, lastName, firstName, id
+    expect(mockDb.orderBy).toHaveBeenCalledTimes(1);
+    expect(mockDb.orderBy.mock.calls[0]).toHaveLength(5);
+    expect(mockDb.orderBy.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDb.limit.mock.invocationCallOrder[0],
+    );
+    expect(mockDb.limit).toHaveBeenCalledWith(8);
   });
 
   it('returns players matching the search term', async () => {

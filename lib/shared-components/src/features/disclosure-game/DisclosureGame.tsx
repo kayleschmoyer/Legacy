@@ -10,6 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  Sport,
   useActiveDisclosureGameLazyQuery,
   useGiveUpDisclosureGameMutation,
   useNextClueMutation,
@@ -140,6 +141,12 @@ export const DisclosureGame: React.FC = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerSuggestion | null>(
     null,
   );
+  // Inline status for the most recent player search, rendered next to the
+  // guess input so it stays visible on short viewports where the top error
+  // banner has scrolled out of view (LS-10439).
+  const [searchStatus, setSearchStatus] = useState<
+    'idle' | 'no-results' | 'error'
+  >('idle');
 
   // ── Error state ────────────────────────────────────────────────────────
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -217,6 +224,7 @@ export const DisclosureGame: React.FC = () => {
       setIsLastClue(false);
       setGuessText('');
       setSuggestions([]);
+      setSearchStatus('idle');
       setSelectedPlayer(null);
       setResult(null);
       setPhase('playing');
@@ -234,6 +242,7 @@ export const DisclosureGame: React.FC = () => {
     setIsLastClue(resumable.isLastClue);
     setGuessText('');
     setSuggestions([]);
+    setSearchStatus('idle');
     setSelectedPlayer(null);
     setResult(null);
     setResumable(null);
@@ -265,18 +274,22 @@ export const DisclosureGame: React.FC = () => {
   const handleGuessInput = async (text: string) => {
     setGuessText(text);
     setSelectedPlayer(null);
+    setSearchStatus('idle');
     if (text.length < 2) {
       setSuggestions([]);
       return;
     }
     try {
+      // Who Am I answers are always MLB players — scope the search to baseball
+      // so football players with similar names can't crowd out the answer.
       const { data } = await searchPlayers({
-        variables: { searchTerm: text, limit: 8 },
+        variables: { searchTerm: text, limit: 8, sport: Sport.Baseball },
       });
       const players = (data?.searchPlayers ?? []).filter(
         (p): p is PlayerSuggestion => p.id != null,
       );
       setSuggestions(players);
+      setSearchStatus(players.length === 0 ? 'no-results' : 'idle');
     } catch (e) {
       // Apollo Client v4 rejects a lazy query's promise with an AbortError when
       // a newer keystroke triggers a fresh searchPlayers call before the prior
@@ -285,6 +298,7 @@ export const DisclosureGame: React.FC = () => {
       // rather than flashing "Could not search players" while the user is typing.
       if (e instanceof Error && e.name === 'AbortError') return;
       setSuggestions([]);
+      setSearchStatus('error');
       setErrorMsg('Could not search players. Please try again.');
     }
   };
@@ -293,6 +307,7 @@ export const DisclosureGame: React.FC = () => {
     setSelectedPlayer(player);
     setGuessText(`${player.firstName ?? ''} ${player.lastName ?? ''}`.trim());
     setSuggestions([]);
+    setSearchStatus('idle');
   };
 
   const handleSubmitGuess = async () => {
@@ -330,6 +345,7 @@ export const DisclosureGame: React.FC = () => {
         setGuessText('');
         setSelectedPlayer(null);
         setSuggestions([]);
+        setSearchStatus('idle');
       }
     } catch (_e) {
       setErrorMsg('Could not submit guess. Please try again.');
@@ -363,6 +379,7 @@ export const DisclosureGame: React.FC = () => {
     setResult(null);
     setGuessText('');
     setSuggestions([]);
+    setSearchStatus('idle');
     setSelectedPlayer(null);
     setIsLastClue(false);
     setErrorMsg(null);
@@ -931,6 +948,24 @@ export const DisclosureGame: React.FC = () => {
                 {searching && (
                   <Text color="$textMuted" fontSize={12}>
                     Searching…
+                  </Text>
+                )}
+                {!searching && searchStatus === 'no-results' && (
+                  <Text
+                    color="$textMuted"
+                    fontSize={12}
+                    testID="player-search-empty"
+                  >
+                    No matching players — try a different spelling.
+                  </Text>
+                )}
+                {!searching && searchStatus === 'error' && (
+                  <Text
+                    color={BRAND_SEAM_RED_LIGHT}
+                    fontSize={12}
+                    testID="player-search-error"
+                  >
+                    Could not search players. Keep typing to retry.
                   </Text>
                 )}
                 <Button
