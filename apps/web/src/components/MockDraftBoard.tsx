@@ -1,5 +1,6 @@
 /**
- * Mock draft room route component (LS-10076) — `/:sport/mock-draft/:draftId`.
+ * Mock draft room route component (LS-10076) — mounted at both
+ * `/baseball/mock-draft/:draftId` and `/football/mock-draft/:draftId`.
  *
  * The league draft route (`EliteDraftBoard.tsx`) resolves a league and lets
  * the board find its draft; a mock draft has no league, so this route carries
@@ -8,7 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useMatch, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import {
   GetDraftMessages as GET_DRAFT_MESSAGES,
@@ -84,10 +85,11 @@ function DraftChatConnector({
 }
 
 export function MockDraftBoardScreen(): React.JSX.Element {
-  const { draftId: draftIdParam, sport } = useParams<{
-    draftId: string;
-    sport?: string;
-  }>();
+  const { draftId: draftIdParam } = useParams<{ draftId: string }>();
+  // The routes are static per sport (no `:sport` param), so derive the sport
+  // from the matched path — an explicit `sport` overrides the draft's own, and
+  // this keeps the board correct before `draftRoom` loads (LS-10489).
+  const isFootball = useMatch('/football/mock-draft/:draftId') !== null;
   const navigate = useNavigate();
   const draftId = draftIdParam ? parseInt(draftIdParam, 10) : null;
   const [, setIsDraftActive] = useState(false);
@@ -104,7 +106,7 @@ export function MockDraftBoardScreen(): React.JSX.Element {
     <EliteDraftBoardScreen
       leagueId={null}
       draftId={Number.isFinite(draftId) ? draftId : null}
-      sport={sport === 'football' ? 'football' : 'baseball'}
+      sport={isFootball ? 'football' : 'baseball'}
       onNavigate={(path) => navigate(path)}
       websocketUrl={env.websocketUrl}
       renderChatTab={renderChatTab}
