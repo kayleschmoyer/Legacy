@@ -826,6 +826,21 @@ export default function PricingPage() {
                 </ActionButton>
               )}
               {showManageCta && (
+                // LS-7199: tell subscribers this card is their plan, not just
+                // swap the CTA (LS-7193) — the page otherwise gives no signal
+                // of which plan is current.
+                <Paragraph
+                  textAlign="center"
+                  size="$2"
+                  fontWeight="700"
+                  color={BRAND_GOLD_LIGHT}
+                  marginBottom={0}
+                  data-testid="premium-plan-current"
+                >
+                  Current plan
+                </Paragraph>
+              )}
+              {showManageCta && (
                 <OutlineButton
                   data-testid="premium-plan-manage"
                   onPress={() => navigate('/profile/subscription')}

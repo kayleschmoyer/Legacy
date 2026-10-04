@@ -7,7 +7,8 @@
  * - Billing toggle: switching monthly / annual updates price display
  * - Free plan card: $0; "Get Started Free" for signed-out visitors only (LS-7184)
  * - Premium plan card: "Upgrade to Premium" for free users, "Manage
- *   subscription" for Premium subscribers (LS-7193), "Most Popular" badge
+ *   subscription" plus a "Current plan" label for Premium subscribers
+ *   (LS-7193, LS-7199), "Most Popular" badge
  * - Feature comparison table: "Compare plans" heading, key rows present
  * - FAQ section: heading visible
  * - No GraphQL calls needed (pricing page is fully static)
@@ -32,6 +33,8 @@ test.describe('Pricing page – page load @regression', () => {
   });
 
   test('shows Free and Premium plan cards', async ({ page }) => {
+    // The default hermetic user is premium; the "Upgrade to Premium" CTA is
+    // only shown to non-premium viewers (LS-7199).
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 
@@ -71,6 +74,27 @@ test.describe('Pricing page – page load @regression', () => {
     ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.getByRole('button', { name: /manage subscription/i }),
+    ).toHaveCount(0);
+  });
+
+  test('marks the Premium card as the current plan for premium users (LS-7199)', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    // Premium users see exactly one "Current plan" label (on the Premium
+    // card — the Free card shows "Includes Free tier" instead), next to the
+    // "Manage subscription" CTA, and no Upgrade CTA anywhere on the page.
+    const currentPlan = page.getByText('Current plan', { exact: true });
+    await expect(currentPlan).toBeVisible({ timeout: 15_000 });
+    await expect(currentPlan).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: /manage subscription/i }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /upgrade to premium/i }),
     ).toHaveCount(0);
   });
 

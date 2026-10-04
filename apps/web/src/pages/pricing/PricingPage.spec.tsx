@@ -489,9 +489,39 @@ describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)'
     const badge = within(freeCard).getByTestId('free-plan-included-badge');
     expect(badge).toHaveTextContent('Includes Free tier');
     expect(badge).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.queryByText('Current plan')).not.toBeInTheDocument();
+    expect(
+      within(freeCard).queryByText('Current plan'),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /get started free/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('labels the Premium card as the current plan for premium users only (LS-7199)', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+
+    const { unmount } = render(<PricingPage />);
+
+    const premiumCard = screen.getByTestId('plan-card-premium');
+    expect(
+      within(premiumCard).getByTestId('premium-plan-current'),
+    ).toHaveTextContent('Current plan');
+    // The Free card shows "Includes Free tier", so the label appears once.
+    expect(screen.getAllByText('Current plan')).toHaveLength(1);
+    unmount();
+
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: false,
+    });
+    render(<PricingPage />);
+
+    expect(
+      screen.queryByTestId('premium-plan-current'),
     ).not.toBeInTheDocument();
   });
 
