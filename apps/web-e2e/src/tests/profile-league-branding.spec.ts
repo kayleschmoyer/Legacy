@@ -147,17 +147,17 @@ test.describe('Profile Settings — Avatar Picker @regression', () => {
     await expect(page.getByText('No image selected')).toBeVisible();
   });
 
-  test('should render the custom URL input with Apply button', async ({
+  // LS-10443: user avatars are presets-only — the server rejects any avatar
+  // host outside the legacy-fantasy.com allowlist.
+  test('should not render a custom URL input for user avatars', async ({
     page,
   }) => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    await expect(page.getByText('CUSTOM URL')).toBeVisible();
-    await expect(
-      page.getByPlaceholder('https://example.com/avatar.png'),
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Apply' })).toBeVisible();
+    await expect(page.getByText('PRESETS')).toBeVisible();
+    await expect(page.getByText('CUSTOM URL')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Apply' })).toHaveCount(0);
   });
 
   test('should render Save and Clear action buttons', async ({ page }) => {

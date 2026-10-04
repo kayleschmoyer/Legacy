@@ -12,6 +12,7 @@ export * from '../utils/scoreFormatting';
 export * from '../utils/lastVisitedLeague';
 export * from '../features/onboarding';
 export * from '../utils/playerFormatting';
+export * from '../utils/validateBrandingUrl';
 export * from '../utils/draftStatus';
 export * from '../utils/colors';
 export * from '../utils/typography';

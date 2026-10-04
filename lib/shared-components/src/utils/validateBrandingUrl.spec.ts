@@ -1,4 +1,4 @@
-import { validateBrandingUrl } from './validate-branding-url';
+import { validateBrandingUrl } from './validateBrandingUrl';
 
 describe('validateBrandingUrl', () => {
   it('returns null for a valid HTTPS URL', () => {

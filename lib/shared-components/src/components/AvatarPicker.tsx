@@ -7,6 +7,7 @@ import {
   type PresetImage,
 } from '../constants/presets';
 import { TYPE_BODY } from '../utils/typography';
+import { validateBrandingUrl } from '../utils/validateBrandingUrl';
 
 // -- Props ------------------------------------------------------------
 
@@ -38,7 +39,14 @@ const PREVIEW_SIZE = 64;
 const TILE_SIZE = 64;
 
 /**
- * AvatarPicker -- lets users pick from a curated preset list or enter any URL.
+ * AvatarPicker -- lets users pick from a curated preset list. The `team`
+ * variant also accepts a custom HTTPS logo URL, validated client-side with
+ * the same rule the server applies to team branding (`validateBrandingUrl`).
+ *
+ * The `user` variant has no custom URL input (LS-10443): the server only
+ * accepts avatar URLs on the legacy-fantasy.com allowlist
+ * (lambdas/db/src/schema/validate-avatar-url.ts), so an external URL could
+ * never be saved.
  *
  * Does NOT handle its own mutation; callers provide `onSelect` which should
  * call the Apollo mutation and handle loading/error state.
@@ -55,6 +63,7 @@ export function AvatarPicker({
     variant === 'user' ? PRESET_AVATARS : PRESET_TEAM_LOGOS;
 
   const [customUrl, setCustomUrl] = useState('');
+  const [customUrlError, setCustomUrlError] = useState<string | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(
     currentUrl ?? null,
   );
@@ -66,7 +75,15 @@ export function AvatarPicker({
   const handleCustomApply = () => {
     const trimmed = customUrl.trim();
     if (!trimmed) return;
+    const error = validateBrandingUrl(trimmed, 'Logo');
+    setCustomUrlError(error);
+    if (error) return;
     setPendingUrl(trimmed);
+  };
+
+  const handleCustomUrlChange = (text: string) => {
+    setCustomUrl(text);
+    if (customUrlError) setCustomUrlError(null);
   };
 
   const resolve = (url: string): string => {
@@ -99,7 +116,11 @@ export function AvatarPicker({
             {variant === 'user' ? 'Avatar Preview' : 'Logo Preview'}
           </Text>
           <Text {...TYPE_BODY.caption} color="$textMuted">
-            {pendingUrl ? 'Custom URL or preset selected' : 'No image selected'}
+            {pendingUrl
+              ? variant === 'team'
+                ? 'Custom URL or preset selected'
+                : 'Image selected'
+              : 'No image selected'}
           </Text>
         </YStack>
       </XStack>
@@ -168,26 +189,34 @@ export function AvatarPicker({
         </XStack>
       </YStack>
 
-      {/* Custom URL input */}
-      <YStack gap="$2">
-        <Text {...TYPE_BODY.eyebrow} color="$textMuted">
-          CUSTOM URL
-        </Text>
-        <XStack gap="$2">
-          <Input
-            flex={1}
-            aria-label="Custom avatar URL"
-            placeholder="https://example.com/avatar.png"
-            value={customUrl}
-            onChangeText={setCustomUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Button size="$3" onPress={handleCustomApply} variant="outlined">
-            Apply
-          </Button>
-        </XStack>
-      </YStack>
+      {/* Custom URL input -- team logos only (LS-10443) */}
+      {variant === 'team' ? (
+        <YStack gap="$2">
+          <Text {...TYPE_BODY.eyebrow} color="$textMuted">
+            CUSTOM URL
+          </Text>
+          <XStack gap="$2">
+            <Input
+              flex={1}
+              aria-label="Custom logo URL"
+              aria-invalid={customUrlError ? true : undefined}
+              placeholder="https://example.com/logo.png"
+              value={customUrl}
+              onChangeText={handleCustomUrlChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Button size="$3" onPress={handleCustomApply} variant="outlined">
+              Apply
+            </Button>
+          </XStack>
+          {customUrlError ? (
+            <Text {...TYPE_BODY.caption} color="$red10" role="alert">
+              {customUrlError}
+            </Text>
+          ) : null}
+        </YStack>
+      ) : null}
 
       {/* Actions */}
       <XStack gap="$3" justifyContent="flex-end">

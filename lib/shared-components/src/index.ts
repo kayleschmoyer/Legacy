@@ -293,6 +293,7 @@ export type {
 export * from './utils/scoreFormatting';
 export * from './utils/playerFormatting';
 export * from './utils/draftStatus';
+export * from './utils/validateBrandingUrl';
 
 // Color constants and utilities
 export * from './utils/colors';
