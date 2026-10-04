@@ -50,6 +50,8 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
         { type: 'button', onClick: onPress, 'aria-label': rest['aria-label'] },
         children,
       ),
+    ConceptTooltip: ({ term }: { term: string }) =>
+      ReactActual.createElement('span', null, term),
     H2: ({ children, id }: MockProps) =>
       ReactActual.createElement('h2', { id }, children),
     Paragraph: passThrough,
@@ -62,10 +64,6 @@ jest.mock('react-router-dom', () => ({
   Link: ({ children, to }: { children?: React.ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
-}));
-
-jest.mock('./ConceptTooltip', () => ({
-  ConceptTooltip: ({ term }: { term: string }) => <span>{term}</span>,
 }));
 
 jest.mock('../../context/ThemeContext', () => ({

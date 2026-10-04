@@ -2,12 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Button,
+  ConceptTooltip,
   H2,
   Paragraph,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { ConceptTooltip } from './ConceptTooltip';
 import {
   BG_DARK,
   BG_LIGHT,

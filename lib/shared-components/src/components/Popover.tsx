@@ -12,6 +12,8 @@ export interface PopoverProps extends Omit<
   children?: React.ReactNode;
   /** Show pointer arrow. Defaults to true. */
   arrow?: boolean;
+  /** Overrides for the card (e.g. `minWidth`, `padding`, hover handlers). */
+  contentProps?: Partial<GetProps<typeof TamaguiPopover.Content>>;
 }
 
 /**
@@ -22,6 +24,7 @@ export function Popover({
   trigger,
   children,
   arrow = true,
+  contentProps,
   ...props
 }: PopoverProps): React.JSX.Element {
   return (
@@ -41,6 +44,7 @@ export function Popover({
         shadowColor="rgba(8, 12, 20, 0.65)"
         shadowOffset={{ width: 0, height: 12 }}
         shadowRadius={32}
+        {...contentProps}
       >
         {arrow ? (
           <TamaguiPopover.Arrow borderWidth={1} borderColor="$outlineStrong" />
