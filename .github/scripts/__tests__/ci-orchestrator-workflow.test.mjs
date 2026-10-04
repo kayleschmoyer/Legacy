@@ -226,15 +226,38 @@ describe('rerun-cancelled-ci.yml — re-run guards (LS-10091)', () => {
     return { raw, parsed: yaml.load(raw) };
   }
 
-  it('triggers only on a completed CI Orchestrator run', () => {
+  it('triggers only on a completed run of the orchestrator or a required-status workflow', () => {
     const { parsed } = loadRerun();
     // `on` parses as boolean `true` in YAML 1.1 unless quoted; js-yaml gives us
     // the key either way, so look it up defensively.
     const on = parsed.on ?? parsed[true];
+    // LS-10297: the standalone required-status workflows are listed too — a
+    // spot-killed job in them never posts its status, and nothing else re-runs it.
     assert.deepEqual(on.workflow_run.workflows, [
       'Legacy Sports CI Orchestrator',
+      'Check Migrations Applied',
+      'Check Merge Conflicts',
     ]);
     assert.deepEqual(on.workflow_run.types, ['completed']);
+  });
+
+  it('every listed workflow name matches a real workflow file (a typo would silently never fire)', () => {
+    const { parsed } = loadRerun();
+    const on = parsed.on ?? parsed[true];
+    const workflowsDir = path.resolve(__dirname, '..', '..', 'workflows');
+    const names = fs
+      .readdirSync(workflowsDir)
+      .filter((f) => f.endsWith('.yml'))
+      .map(
+        (f) =>
+          yaml.load(fs.readFileSync(path.join(workflowsDir, f), 'utf8')).name,
+      );
+    for (const wanted of on.workflow_run.workflows) {
+      assert.ok(
+        names.includes(wanted),
+        `workflow_run.workflows lists "${wanted}" but no workflow has that name`,
+      );
+    }
   });
 
   it('acts on a cancelled conclusion, and on failure only for the orchestrator (LS-10311)', () => {
@@ -430,5 +453,96 @@ describe('ci-orchestrator.yml — seed-ci-gate sparse checkout covers ci-gate.js
           `Add ".github/scripts/${dep}" to the sparse-checkout list.`,
       );
     }
+  });
+});
+
+/**
+ * LS-10297 — the runner-shutdown classifier must not be able to fail the
+ * cleanup jobs that consume it.
+ *
+ * On PR #8181 the installation's API budget was exhausted; the composite
+ * action's first call (`listJobsForWorkflowRun`) threw a 403 and both "Report
+ * Runner Shutdown" and "Remove Merge Label on Failure" went red instead of
+ * running. Unproven must read as "not runner churn" (fail-safe), not as a crash.
+ */
+describe('detect-runner-shutdown action — API errors fail safe (LS-10297)', () => {
+  const ACTION_PATH = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    'actions',
+    'detect-runner-shutdown',
+    'action.yml',
+  );
+
+  function loadScript() {
+    const parsed = yaml.load(fs.readFileSync(ACTION_PATH, 'utf8'));
+    const step = parsed.runs.steps.find((s) => s.id === 'detect');
+    return step.with.script;
+  }
+
+  async function run(github) {
+    const outputs = {};
+    const warnings = [];
+    const core = {
+      info: () => undefined,
+      warning: (m) => warnings.push(m),
+      setOutput: (k, v) => {
+        outputs[k] = v;
+      },
+    };
+    const AsyncFunction = Object.getPrototypeOf(
+      async () => undefined,
+    ).constructor;
+    const fn = new AsyncFunction(
+      'github',
+      'context',
+      'core',
+      'require',
+      'process',
+      loadScript(),
+    );
+    await fn(
+      github,
+      { repo: { owner: 'o', repo: 'r' }, runId: 1 },
+      core,
+      () => require('../runner-cancellation.js'),
+      { env: { DETECT_TOKEN: 't', DETECT_RUN_ID: '' } },
+    );
+    return { outputs, warnings };
+  }
+
+  it('does not throw when listing jobs is rate-limited, and reports no shutdown', async () => {
+    const rateLimited = Object.assign(
+      new Error('API rate limit exceeded for installation'),
+      {
+        status: 403,
+      },
+    );
+    const { outputs, warnings } = await run({
+      rest: {
+        actions: {
+          listJobsForWorkflowRun: async () => {
+            throw rateLimited;
+          },
+        },
+      },
+    });
+    assert.equal(outputs['shutdown-detected'], 'false');
+    assert.equal(outputs['job-names'], '');
+    assert.match(warnings.join('\n'), /rate limit exceeded/);
+  });
+
+  it('NEGATIVE CONTROL: a run with no failed jobs still classifies normally (no shutdown)', async () => {
+    const { outputs } = await run({
+      rest: {
+        actions: {
+          listJobsForWorkflowRun: async () => ({
+            data: { jobs: [{ id: 1, name: 'ok', conclusion: 'success' }] },
+          }),
+        },
+      },
+    });
+    assert.equal(outputs['shutdown-detected'], 'false');
   });
 });

@@ -31,9 +31,19 @@
 
 name: "Re-run Cancelled CI"
 
+# LS-10297: the standalone required-status workflows are covered too. They run
+# on the same spot-backed self-hosted pool, and a job killed mid-run never
+# reaches its `Post ... required status` step — so `Verify All Migrations
+# Applied` / `No Merge Conflicts` stay "not yet registered" and the merge queue
+# waits forever (PR #8181: two spot evictions, 11:08:42Z and 12:14:38Z, each
+# 1-2s before the Migration Check job was cancelled). Nothing but a human
+# re-run ever regenerated those statuses.
 on:
   workflow_run:
-    workflows: ["Legacy Sports CI Orchestrator"]
+    workflows:
+      - "Legacy Sports CI Orchestrator"
+      - "Check Migrations Applied"
+      - "Check Merge Conflicts"
     types: [completed]
 
 # `actions: write` is scoped to this workflow alone — deliberately NOT added to
@@ -89,7 +99,7 @@ jobs:
             const runId = run.id;
             const runHeadSha = run.head_sha;
 
-            // A cancelled orchestrator run with no PR is a dispatch against a
+            // A cancelled run (any workflow listed in `on:` above) with no PR is a dispatch against a
             // branch — there is no merge label to restore, so nothing to do.
             //
             // `workflow_run.pull_requests` is unreliable: GitHub leaves it

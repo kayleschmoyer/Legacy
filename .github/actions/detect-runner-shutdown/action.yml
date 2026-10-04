@@ -66,13 +66,28 @@ runs:
 
           let allJobs = [];
           let page = 1;
-          while (true) {
-            const { data } = await github.rest.actions.listJobsForWorkflowRun({
-              owner, repo, run_id: runId, per_page: 100, page,
-            });
-            allJobs = allJobs.concat(data.jobs);
-            if (data.jobs.length < 100) break;
-            page += 1;
+          try {
+            while (true) {
+              const { data } = await github.rest.actions.listJobsForWorkflowRun({
+                owner, repo, run_id: runId, per_page: 100, page,
+              });
+              allJobs = allJobs.concat(data.jobs);
+              if (data.jobs.length < 100) break;
+              page += 1;
+            }
+          } catch (e) {
+            // LS-10297: this action is a classifier for cleanup jobs, and it
+            // must not be able to fail them. On PR #8181 the installation's
+            // 5000-req/hr budget was exhausted, `listJobsForWorkflowRun` 403'd,
+            // and both "Report Runner Shutdown" and "Remove Merge Label on
+            // Failure" went red instead of doing their one job. Unproven ==
+            // "not runner churn" — the same fail-safe direction as an absent
+            // marker below, so the label strip keeps its pre-LS-10140 behaviour
+            // and the reporter simply stays silent.
+            core.warning(`Could not list jobs for run ${runId}: ${e.message} — treating as not a runner shutdown.`);
+            core.setOutput('shutdown-detected', 'false');
+            core.setOutput('job-names', '');
+            return;
           }
 
           // A spot-killed job surfaces as `failure` on lambda-terraform-apply
