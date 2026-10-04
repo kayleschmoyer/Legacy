@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Anchor,
   Button,
   Card,
   Input,
@@ -80,6 +81,71 @@ const FULL_BLEED_EMAIL_PASSWORD_PALETTE: EmailPasswordPalette = {
   dividerLine: '$outlineSubtle',
   dividerText: '$fg4',
 };
+
+interface LegalTextProps {
+  termsUrl?: string;
+  privacyUrl?: string;
+  linkColor: string;
+}
+
+/**
+ * Inline "Terms of Service" / "Privacy Policy" label. Renders as a real link
+ * (`<a href>` on web, `Linking.openURL` on native via tamagui's Anchor) when
+ * its URL is provided, so the policies are reachable from the logged-out
+ * sign-in surface — the privacy policy is an app-store requirement (LS-10432).
+ * Falls back to plain text when no URL is wired.
+ */
+function LegalLink({
+  href,
+  label,
+  color,
+  testID,
+}: {
+  href?: string;
+  label: string;
+  color: string;
+  testID: string;
+}): React.ReactNode {
+  if (!href) return label;
+  return (
+    <Anchor
+      testID={testID}
+      href={href}
+      color={color}
+      fontSize={12}
+      lineHeight={18}
+      textDecorationLine="underline"
+    >
+      {label}
+    </Anchor>
+  );
+}
+
+function LegalText({
+  termsUrl,
+  privacyUrl,
+  linkColor,
+}: LegalTextProps): React.JSX.Element {
+  return (
+    <>
+      By continuing, you agree to our{' '}
+      <LegalLink
+        href={termsUrl}
+        label="Terms of Service"
+        color={linkColor}
+        testID="login-terms-link"
+      />{' '}
+      and{' '}
+      <LegalLink
+        href={privacyUrl}
+        label="Privacy Policy"
+        color={linkColor}
+        testID="login-privacy-link"
+      />
+      .
+    </>
+  );
+}
 
 interface EmailPasswordFormProps {
   palette: EmailPasswordPalette;
@@ -275,6 +341,18 @@ export interface LoginPageProps {
    * accounts are the only accounts that support password reset (LS-5521).
    */
   onForgotPassword?: () => void;
+  /**
+   * URL of the Terms of Service page. When provided, "Terms of Service" in the
+   * legal line renders as a link (LS-10432). Native consumers must pass an
+   * absolute URL.
+   */
+  termsUrl?: string;
+  /**
+   * URL of the Privacy Policy page. When provided, "Privacy Policy" in the
+   * legal line renders as a link — required for app-store compliance
+   * (LS-10432). Native consumers must pass an absolute URL.
+   */
+  privacyUrl?: string;
   /** Extra style forwarded to the root container */
   style?: React.CSSProperties | Record<string, unknown>;
   /**
@@ -308,6 +386,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   errorMessage,
   onDismissError,
   onForgotPassword,
+  termsUrl,
+  privacyUrl,
   style,
   variant = 'card',
   children,
@@ -555,7 +635,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             color="$fg4"
             textAlign="center"
           >
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+            <LegalText
+              termsUrl={termsUrl}
+              privacyUrl={privacyUrl}
+              linkColor="$fg3"
+            />
           </Text>
         </YStack>
       </Theme>
@@ -772,7 +856,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             textAlign="center"
             lineHeight={18}
           >
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+            <LegalText
+              termsUrl={termsUrl}
+              privacyUrl={privacyUrl}
+              linkColor={CARD_EMAIL_PASSWORD_PALETTE.label}
+            />
           </Text>
         </YStack>
       </Card>

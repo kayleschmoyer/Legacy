@@ -61,6 +61,8 @@ export const H6 = ({ children, ...props }) =>
   React.createElement('h6', props, children);
 export const Paragraph = ({ children, ...props }) =>
   React.createElement('p', props, children);
+export const Anchor = ({ children, ...props }) =>
+  React.createElement('a', props, children);
 export const Separator = ({ ...props }) => React.createElement('hr', props);
 export const Avatar = ({ children, ...props }) =>
   React.createElement('div', props, children);

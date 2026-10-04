@@ -715,6 +715,8 @@ export function LoginPage(): React.JSX.Element {
           {/* Right: Auth card */}
           <section className="ll-card-pane" id="ll-signup-card">
             <AuthCard
+              termsUrl="/terms"
+              privacyUrl="/privacy"
               onGoogleSignIn={() => {
                 void handleSignIn();
               }}

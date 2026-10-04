@@ -81,6 +81,11 @@ jest.mock('tamagui', () => {
     Text: ({ children, testID }: ViewProps) => (
       <span data-testid={testID}>{children}</span>
     ),
+    Anchor: ({ children, testID, href }: ViewProps & { href?: string }) => (
+      <a data-testid={testID} href={href}>
+        {children}
+      </a>
+    ),
     Spinner: () => <span>spinner</span>,
     Button,
     Input,
@@ -409,5 +414,37 @@ describe('LoginPage fullBleed variant (LS-9433 — mobile sign-in redesign)', ()
     expect(screen.getByTestId('login-title')).toHaveTextContent(
       'Step up to the plate',
     );
+  });
+});
+
+describe('LoginPage legal links (LS-10432)', () => {
+  it.each(['card', 'fullBleed'] as const)(
+    'renders Terms of Service and Privacy Policy as links in the %s variant',
+    (variant) => {
+      render(
+        <LoginPage
+          variant={variant}
+          onGoogleSignIn={jest.fn()}
+          termsUrl="/terms"
+          privacyUrl="/privacy"
+        />,
+      );
+
+      const terms = screen.getByRole('link', { name: 'Terms of Service' });
+      const privacy = screen.getByRole('link', { name: 'Privacy Policy' });
+      expect(terms.getAttribute('href')).toBe('/terms');
+      expect(privacy.getAttribute('href')).toBe('/privacy');
+    },
+  );
+
+  it('renders plain text (no links) when no URLs are provided', () => {
+    render(<LoginPage onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(
+      screen.getByText(
+        'By continuing, you agree to our Terms of Service and Privacy Policy.',
+      ),
+    ).toBeTruthy();
   });
 });

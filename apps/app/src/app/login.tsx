@@ -16,6 +16,11 @@ import {
   storeJwtForBiometric,
 } from '../common/auth/BiometricAuth';
 
+// Legal policies are served by the web app; native needs absolute URLs so
+// tamagui's Anchor can hand them to Linking.openURL (LS-10432).
+const TERMS_URL = 'https://legacy-fantasy.com/terms';
+const PRIVACY_URL = 'https://legacy-fantasy.com/privacy';
+
 const Login: React.FC = () => {
   const router = useRouter();
   // The guard renders this screen in place at the deep-linked route, so the
@@ -192,6 +197,8 @@ const Login: React.FC = () => {
     <YStack testID="login-screen" flex={1}>
       <LoginPage
         variant="fullBleed"
+        termsUrl={TERMS_URL}
+        privacyUrl={PRIVACY_URL}
         onGoogleSignIn={handleGoogleSignIn}
         onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
         isGoogleLoading={isGoogleLoading}
