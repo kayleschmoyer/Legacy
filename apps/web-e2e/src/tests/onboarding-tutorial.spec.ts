@@ -201,33 +201,36 @@ test.describe('Onboarding Tutorial — skip and close @regression', () => {
   test('"Skip tutorial" close button (✕) is visible', async ({ page }) => {
     await openTutorial(page);
 
-    await expect(
-      page.getByRole('button', { name: /skip tutorial/i }),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel('Skip tutorial')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('clicking the close button dismisses the tutorial', async ({ page }) => {
     await openTutorial(page);
 
-    await page.getByRole('button', { name: /skip tutorial/i }).click();
+    await page.getByLabel('Skip tutorial').click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
   });
 
-  test('"Skip" footer button is visible on steps other than the last', async ({
+  test('"Skip tutorial" footer button is visible on steps other than the last', async ({
     page,
   }) => {
     await openTutorial(page);
 
-    await expect(page.getByRole('button', { name: /^skip$/i })).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByTestId('onboarding-skip-footer')).toHaveText(
+      'Skip tutorial',
+      { timeout: 10000 },
+    );
   });
 
-  test('clicking footer "Skip" dismisses the tutorial', async ({ page }) => {
+  test('clicking footer "Skip tutorial" dismisses the tutorial', async ({
+    page,
+  }) => {
     await openTutorial(page);
 
-    await page.getByRole('button', { name: /^skip$/i }).click();
+    await page.getByTestId('onboarding-skip-footer').click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
   });

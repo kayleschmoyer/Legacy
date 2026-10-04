@@ -926,9 +926,10 @@ export function OnboardingTutorial({
                 borderWidth={0}
                 color="$colorPress"
                 onPress={() => finish('skip_button')}
+                data-testid="onboarding-skip-footer"
                 hoverStyle={{ color: BRAND_GOLD_LIGHT }}
               >
-                Skip
+                Skip tutorial
               </Button>
             )}
 

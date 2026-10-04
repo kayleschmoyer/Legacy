@@ -306,7 +306,7 @@ test.describe('On This Day Feed — Player Navigation @regression', () => {
     await page.waitForLoadState('load');
 
     // Dismiss the Welcome tutorial dialog if it appears
-    const skipBtn = page.getByRole('button', { name: /skip tutorial/i });
+    const skipBtn = page.getByLabel('Skip tutorial');
     try {
       await expect(skipBtn).toBeVisible({ timeout: 3000 });
       await skipBtn.click();

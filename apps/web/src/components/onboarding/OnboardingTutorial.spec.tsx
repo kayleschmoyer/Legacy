@@ -171,6 +171,19 @@ describe('OnboardingTutorial — modal focus management (LS-6902)', () => {
   });
 });
 
+describe('OnboardingTutorial — footer skip label (LS-6904)', () => {
+  it('labels the footer skip button "Skip tutorial", not the bare word "Skip"', () => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+
+    expect(screen.queryByText('Skip')).toBeNull();
+
+    fireEvent.click(screen.getByText('Skip tutorial'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('OnboardingTutorial — Get Started routing (LS-6908)', () => {
   function advanceToLastStep() {
     // The final step swaps "Next →" for "🚀 Get Started".
@@ -221,7 +234,7 @@ describe('OnboardingTutorial — Get Started routing (LS-6908)', () => {
       <OnboardingTutorial onClose={onClose} onGetStarted={onGetStarted} />,
     );
 
-    fireEvent.click(screen.getByText('Skip'));
+    fireEvent.click(screen.getByText('Skip tutorial'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onGetStarted).not.toHaveBeenCalled();
@@ -260,7 +273,7 @@ describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
       'close_button',
       () => fireEvent.click(screen.getByLabelText('Skip tutorial')),
     ],
-    ['skip_button', () => fireEvent.click(screen.getByText('Skip'))],
+    ['skip_button', () => fireEvent.click(screen.getByText('Skip tutorial'))],
     ['escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
     [
       'backdrop',
@@ -301,7 +314,7 @@ describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
     render(<OnboardingTutorial onClose={jest.fn()} />);
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    fireEvent.click(screen.getByText('Skip'));
+    fireEvent.click(screen.getByText('Skip tutorial'));
 
     expect(analytics.trackOnboardingSkipped).toHaveBeenCalledTimes(1);
   });

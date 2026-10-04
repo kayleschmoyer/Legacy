@@ -15,7 +15,7 @@ test.describe('Homepage @smoke', () => {
     // Onboarding tutorial auto-opens for users with no leagues; dismiss it so
     // it doesn't intercept pointer events on the page buttons (LS-3854).
     // Use waitFor (not isVisible) — isVisible({ timeout }) is a no-op in Playwright v1.40+.
-    const skipTutorial = page.getByRole('button', { name: /skip tutorial/i });
+    const skipTutorial = page.getByLabel('Skip tutorial');
     try {
       await skipTutorial.waitFor({ state: 'visible', timeout: 2000 });
       await skipTutorial.click();
