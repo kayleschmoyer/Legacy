@@ -527,8 +527,12 @@ function Header({
               textTransform="uppercase"
               color="$brandGoldLight"
               fontFamily={FONT_DISPLAY}
+              data-testid="scoreboard-eyebrow"
             >
-              {isToday ? 'Today · ' : ''}Major League Baseball
+              {isToday ? 'Today · ' : ''}
+              {sport === 'nfl'
+                ? 'National Football League'
+                : 'Major League Baseball'}
             </Text>
           </XStack>
           <H1

@@ -132,6 +132,26 @@ describe('ScoreboardContainer', () => {
     expect(queryByTestId('game-card-1001')).toBeNull();
   });
 
+  it('uses NFL section labels instead of MLB labels when NFL is selected', () => {
+    const { getByTestId } = renderContainer({ sport: 'nfl' });
+    const eyebrow = getByTestId('scoreboard-eyebrow').textContent;
+    expect(eyebrow).toContain('National Football League');
+    expect(eyebrow).not.toContain('Major League Baseball');
+    expect(getByTestId('scoreboard-heading').textContent).toBe(
+      'NFL Scoreboard',
+    );
+  });
+
+  it('keeps MLB section labels when MLB is selected', () => {
+    const { getByTestId } = renderContainer({ sport: 'mlb' });
+    const eyebrow = getByTestId('scoreboard-eyebrow').textContent;
+    expect(eyebrow).toContain('Major League Baseball');
+    expect(eyebrow).not.toContain('National Football League');
+    expect(getByTestId('scoreboard-heading').textContent).toBe(
+      'MLB Scoreboard',
+    );
+  });
+
   it('shows the error card when hasError is set', () => {
     const { getByTestId } = renderContainer({ hasError: true });
     expect(getByTestId('scoreboard-error')).toBeTruthy();
