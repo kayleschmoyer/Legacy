@@ -3,6 +3,7 @@ import type { HTMLElement } from 'node-html-parser';
 import {
   cellByHeader,
   findStatTable,
+  findTableByAnyHeaderCell,
   parseHtml,
   parseIntColumn,
   parseLongGain,
@@ -23,7 +24,10 @@ import type {
 } from './types';
 
 // /nflboxscores1/1960nfl001.html -> "1960nfl001" (game id) and 1960 (season).
-const BOX_SCORE_URL_REGEX = /\/nflboxscores1\/(\d{4})nfl\d+\.html$/;
+// The folder number varies by era (verified live: 1960 uses
+// "nflboxscores1", 1990/1998 use "nflboxscores2" — not a fixed decade
+// boundary, so the digit is matched generically rather than assumed).
+const BOX_SCORE_URL_REGEX = /\/nflboxscores\d+\/(\d{4})nfl\d+\.html$/;
 
 export function parseGameIdentifierFromUrl(
   url: string,
@@ -275,36 +279,101 @@ export function parseBoxScore(html: string, sourceUrl: string): PfaBoxScore {
   };
 }
 
+// Real PFA markup (verified against live HTML, 2026-09-17): the
+// scoring-plays table's header row is `Qtr|Team|Scoring Plays|<AWAY>|<HOME>`
+// — the label is embedded mid-row, not a leading caption, and there is no
+// separate caption row above it. The play-description column's index
+// varies by game (it's always 3rd, but derived from the header rather than
+// hardcoded in case a future page shape adds/removes a column).
 function parseScoringPlays(root: HTMLElement): PfaScoringPlay[] {
-  const table = findStatTable(root, 'SCORING PLAYS');
+  const table = findTableByAnyHeaderCell(root, 'Scoring Plays');
   if (!table) return [];
 
+  const rows = table.getElementsByTagName('tr');
+  const header = [
+    ...rows[0].getElementsByTagName('th'),
+    ...rows[0].getElementsByTagName('td'),
+  ].map((c) => c.text.trim().toUpperCase());
+  const playColIdx = header.indexOf('SCORING PLAYS');
+  if (playColIdx === -1) return [];
+
   const plays: PfaScoringPlay[] = [];
-  // Skip the caption row and the header row (e.g. "Play").
-  const rows = table.getElementsByTagName('tr').slice(2);
-  for (const row of rows) {
-    const text = row.text.trim();
-    if (text === '') continue;
-    const quarterMatch = text.match(/^Q(\d)/i);
+  for (const row of rows.slice(1)) {
+    const cells = [
+      ...row.getElementsByTagName('th'),
+      ...row.getElementsByTagName('td'),
+    ];
+    const text = cells[playColIdx]?.text.trim();
+    if (!text) continue;
+    const quarterText = cells[0]?.text.trim();
+    const quarter = quarterText ? parseInt(quarterText, 10) : NaN;
     plays.push({
-      quarter: quarterMatch ? parseInt(quarterMatch[1], 10) : null,
+      quarter: isNaN(quarter) ? null : quarter,
       text,
     });
   }
   return plays;
 }
 
+/**
+ * PFA player links embedded in a scoring-play's description cell, matched
+ * against the kicking verbs PFA uses in that text — `<a ...>Name</a> kick`
+ * for a made PAT (inside parens after the TD) and `<a ...>Name</a> NN FG`
+ * (an optional yardage number) for a field goal. Verified against real
+ * scoring-play HTML (LS-9995): e.g.
+ * `<a href="/players/v/vill00800.html">Danny Villanueva</a> kick)` and
+ * `<a href="/players/c/conr00200.html">Bobby Joe Conrad</a> 12 FG`.
+ *
+ * This is the ONLY route to identifying which players are kickers pre-1999
+ * — box scores never render a kicking stat table (LS-9948 comment 20612) —
+ * so this drives which players get the extra per-kicker game-log crawl
+ * (`KickerGameLogParser`).
+ */
+const KICKER_MENTION_REGEX =
+  /<a\s+href="\/players\/[a-z]\/([a-z0-9]+)\.html"[^>]*>[^<]*<\/a>(?:\s+\d+)?\s+(?:FG|kick)\b/gi;
+
+export function extractKickerCandidates(html: string): string[] {
+  const table = findTableByAnyHeaderCell(parseHtml(html), 'Scoring Plays');
+  if (!table) return [];
+
+  const rows = table.getElementsByTagName('tr');
+  const header = [
+    ...rows[0].getElementsByTagName('th'),
+    ...rows[0].getElementsByTagName('td'),
+  ].map((c) => c.text.trim().toUpperCase());
+  const playColIdx = header.indexOf('SCORING PLAYS');
+  if (playColIdx === -1) return [];
+
+  const seen = new Set<string>();
+  for (const row of rows.slice(1)) {
+    const cells = [
+      ...row.getElementsByTagName('th'),
+      ...row.getElementsByTagName('td'),
+    ];
+    const cell = cells[playColIdx];
+    if (!cell) continue;
+    for (const match of cell.innerHTML.matchAll(KICKER_MENTION_REGEX)) {
+      seen.add(match[1]);
+    }
+  }
+  return Array.from(seen);
+}
+
+// Real PFA markup: "Score By Quarters" (plural), header row combines the
+// label with the quarter columns (`Score By Quarters|1st|2nd|3rd|4th|Final`)
+// — same single-header-row shape as the main stat tables, no separate
+// caption row. Data rows are visitor (away) then home, matching the season
+// index's visitor-then-home column order.
 function parseQuarterScores(root: HTMLElement): PfaBoxScore['quarterScores'] {
-  const table = findStatTable(root, 'SCORE BY QUARTER');
+  const table = findStatTable(root, 'SCORE BY QUARTERS');
   if (!table) return null;
 
-  // Skip the caption row and the header row (quarter numbers 1-4).
-  const rows = table.getElementsByTagName('tr').slice(2);
+  const rows = table.getElementsByTagName('tr').slice(1);
   if (rows.length < 2) return null;
 
   const parseRow = (row: HTMLElement) =>
     [...row.getElementsByTagName('th'), ...row.getElementsByTagName('td')]
-      .slice(1)
+      .slice(1, -1) // drop the team-name cell and the trailing Final total
       .map((c) => parseInt(c.text.trim(), 10))
       .filter((n) => !isNaN(n));
 

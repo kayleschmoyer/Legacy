@@ -989,6 +989,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
+      '@legacy-sports/pfa-client':
+        specifier: workspace:*
+        version: link:../../lib/pfa-client
       '@legacy-sports/pfr-client':
         specifier: workspace:*
         version: link:../../lib/pfr-client
@@ -1880,6 +1883,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging
+      '@legacy-sports/pfr-client':
+        specifier: workspace:*
+        version: link:../pfr-client
       drizzle-orm:
         specifier: ^0.44.6
         version: 0.44.7(@electric-sql/pglite@0.5.8)(@types/better-sqlite3@7.6.13)(@types/pg@8.21.0)(better-sqlite3@12.8.0)(pg@8.20.0)(postgres@3.4.9)

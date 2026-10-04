@@ -8,6 +8,7 @@
   "dependencies": {
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/pfr-client": "workspace:*",
     "drizzle-orm": "^0.44.6",
     "tslib": "*"
   }

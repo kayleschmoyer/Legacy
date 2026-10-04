@@ -31,6 +31,7 @@ import { handleDecodeJwt } from './commands/decodeJwt';
 import { handleSetUserType } from './commands/setUserType';
 import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
 import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball';
+import { handleIngestPfaFootball } from './commands/ingestPfaFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
 import { handleListUsers } from './commands/listUsers';
 import { handleAddUser } from './commands/addUser';
@@ -252,6 +253,34 @@ export function buildProgram(): Command {
         force?: boolean;
         dryRun?: boolean;
       }) => handleIngestNflverseFootball(options),
+    );
+
+  program
+    .command('ingest-pfa-football')
+    .description(
+      'Stage the Pro Football Archives football corpus (1960-1998) in S3, one object per player-season (LS-9995)',
+    )
+    .option(
+      '-b, --bucket <name>',
+      'Target S3 bucket (default $FOOTBALL_CORPUS_S3_BUCKET)',
+    )
+    .option(
+      '--prefix <prefix>',
+      'Key prefix (default $FOOTBALL_CORPUS_S3_PREFIX)',
+    )
+    .option('--from <year>', 'First season (default 1960)', parseInt)
+    .option('--to <year>', 'Last season (default 1998)', parseInt)
+    .option('--force', 'Re-upload objects that already exist')
+    .option('--dry-run', 'Crawl and report without writing to S3')
+    .action(
+      (options: {
+        bucket?: string;
+        prefix?: string;
+        from?: number;
+        to?: number;
+        force?: boolean;
+        dryRun?: boolean;
+      }) => handleIngestPfaFootball(options),
     );
 
   program

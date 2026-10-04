@@ -11,6 +11,7 @@
     "@legacy-sports/football-game-stats-provider": "workspace:*",
     "@legacy-sports/game-stats-provider": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/pfa-client": "workspace:*",
     "@legacy-sports/pfr-client": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/scoring": "workspace:*",

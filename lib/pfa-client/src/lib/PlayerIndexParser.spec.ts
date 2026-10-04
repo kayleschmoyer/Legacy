@@ -37,26 +37,39 @@ describe('parseLeagueAndLetterFromUrl', () => {
   });
 });
 
+// Fixture is a real captured page (2026-09-17, live egress — see LS-9995),
+// not synthetic — replaces the earlier hand-built version this package
+// shipped with before egress was available (see the package README).
 describe('parsePlayerIndexPage', () => {
   const html = fixture('player-index-m.html');
   const url = 'https://www.profootballarchives.com/nflplayers-m.html';
+  const entries = parsePlayerIndexPage(html, url);
 
-  it('extracts (pfaId, name, college) for each entry', () => {
-    const entries = parsePlayerIndexPage(html, url);
-    expect(entries).toEqual([
-      {
-        pfaId: 'mont00800',
-        name: 'Joe Montana',
-        college: 'Notre Dame',
-        league: 'nfl',
-      },
-      {
-        pfaId: 'mars00900',
-        name: 'Jim Marshall',
-        college: 'Ohio State',
-        league: 'nfl',
-      },
-    ]);
+  it('parses a large number of real entries, none malformed', () => {
+    expect(entries.length).toBeGreaterThan(1000);
+    for (const entry of entries) {
+      expect(entry.pfaId).toMatch(/^[a-z0-9]+$/);
+      expect(entry.name.length).toBeGreaterThan(0);
+      expect(entry.league).toBe('nfl');
+    }
+  });
+
+  it('extracts (pfaId, name, college) for a known entry', () => {
+    expect(entries).toContainEqual({
+      pfaId: 'mont00800',
+      name: 'Joe Montana',
+      college: 'Notre Dame',
+      league: 'nfl',
+    });
+  });
+
+  it('keeps a multi-school college value intact rather than truncating at the first delimiter', () => {
+    expect(entries).toContainEqual({
+      pfaId: 'maar00200',
+      name: 'J.D. Maarleveld',
+      college: 'Notre Dame; Maryland',
+      league: 'nfl',
+    });
   });
 
   it('throws for a URL that is not a player-index page', () => {

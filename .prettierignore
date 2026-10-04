@@ -50,3 +50,10 @@ lib/mcp-docs/src/pages/
 # refreshed by scripts/update-workflow-schemas.js. Reformatting them would make
 # every future upstream diff unreadable and break the `--check` drift compare.
 scripts/schemas/*.json
+# Real captured Pro Football Archives HTML fixtures (LS-9995) — verbatim
+# byte-for-byte page captures used to validate the pfa-client parsers
+# against live markup, not source code. PFA's own HTML is not strictly
+# valid (e.g. unescaped "Texas A&M" in nflplayers-m.html) and Prettier's
+# HTML parser rejects it outright; reformatting would also defeat the
+# point of a verbatim capture.
+lib/pfa-client/src/lib/__fixtures__/*.html

@@ -4,12 +4,16 @@ import htmlParser, { HTMLElement } from 'node-html-parser';
  * PFA stat tables carry no stable id/data-stat attributes (unlike PFR) and
  * table position is NOT stable across eras (LS-9948: "Tables 6-12 are the
  * stat tables; indices are not stable, so select by the ALL-CAPS header
- * cell, not position"). Each stat table is preceded by a caption cell whose
- * trimmed, upper-cased text names the category (e.g. "RUSHING", "PASSING").
- * We accept either a <caption> element or a lone header cell spanning the
- * table's first row, since PFA's markup for this has not been validated
- * against live HTML in this environment (network egress to
- * profootballarchives.com is blocked here — see package README).
+ * cell, not position").
+ *
+ * Verified against live HTML (2026-09-17, real egress — see LS-9995): each
+ * stat table's first `<tr>` IS its header row, and the category label is
+ * simply that row's FIRST cell (e.g. `<tr><th>RUSHING</th><th>ATT</th>...`)
+ * — there is no separate caption row or `<caption>` element on the real
+ * site. The package's earlier "lone header cell spanning the first row"
+ * guess (written before egress was available) was wrong; this replaces it.
+ * A `<caption>` element is still accepted too, in case a differently
+ * rendered page uses one.
  */
 export function findStatTable(
   root: HTMLElement,
@@ -31,9 +35,36 @@ export function findStatTable(
       ...firstRow.getElementsByTagName('td'),
     ];
     if (
-      firstRowCells.length === 1 &&
+      firstRowCells.length > 0 &&
       firstRowCells[0].text.trim().toUpperCase() === wantLabel
     ) {
+      return table;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Finds a table whose header row (first `<tr>`) contains `label` in ANY
+ * cell, not just the first — for tables like PFA's scoring-plays table
+ * (`Qtr|Team|Scoring Plays|<AWAY>|<HOME>`), where the category name is
+ * embedded mid-row rather than leading it.
+ */
+export function findTableByAnyHeaderCell(
+  root: HTMLElement,
+  label: string,
+): HTMLElement | null {
+  const wantLabel = label.trim().toUpperCase();
+
+  for (const table of root.getElementsByTagName('table')) {
+    const firstRow = table.getElementsByTagName('tr')[0];
+    if (!firstRow) continue;
+    const cells = [
+      ...firstRow.getElementsByTagName('th'),
+      ...firstRow.getElementsByTagName('td'),
+    ];
+    if (cells.some((c) => c.text.trim().toUpperCase() === wantLabel)) {
       return table;
     }
   }
@@ -51,6 +82,15 @@ function getHeaderCells(table: HTMLElement, captionPresent: boolean): string[] {
   ].map((c) => c.text.trim().toUpperCase());
 }
 
+/**
+ * True only when the category label appears as its own standalone row (a
+ * `<caption>` element, or a lone single-cell `<tr>`) ABOVE the real header
+ * row. On the real site this is never true for the RUSHING/PASSING/etc.
+ * tables (the label is embedded in the header row itself — see
+ * {@link findStatTable}'s doc comment) but is kept for any page shape that
+ * does render a separate caption row, so `parseStatTable` doesn't
+ * mis-parse it as a data row.
+ */
 function tableHasCaptionRow(
   table: HTMLElement,
   categoryLabel: string,
@@ -58,15 +98,29 @@ function tableHasCaptionRow(
   const caption = table.getElementsByTagName('caption')[0];
   if (caption) return caption.text.trim().toUpperCase() === categoryLabel;
 
-  const firstRow = table.getElementsByTagName('tr')[0];
+  const rows = table.getElementsByTagName('tr');
+  const firstRow = rows[0];
   if (!firstRow) return false;
   const cells = [
     ...firstRow.getElementsByTagName('th'),
     ...firstRow.getElementsByTagName('td'),
   ];
-  return (
-    cells.length === 1 && cells[0].text.trim().toUpperCase() === categoryLabel
-  );
+  if (
+    cells.length !== 1 ||
+    cells[0].text.trim().toUpperCase() !== categoryLabel
+  ) {
+    return false;
+  }
+  // A lone single-cell row is only a real "caption row" if a distinct
+  // header row (more than one cell) follows it — otherwise it's just a
+  // one-column table and rows.slice(1) would be right, not rows.slice(2).
+  const nextRow = rows[1];
+  if (!nextRow) return false;
+  const nextCells = [
+    ...nextRow.getElementsByTagName('th'),
+    ...nextRow.getElementsByTagName('td'),
+  ];
+  return nextCells.length > 1;
 }
 
 export interface RowMismatch {

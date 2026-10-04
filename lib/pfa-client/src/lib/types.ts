@@ -195,6 +195,11 @@ export interface PfaCrosswalkRow {
 
 export interface PfaKickerGameLogRow {
   date: string;
+  // Read from the DATE cell's own link to the box score — a direct,
+  // unambiguous join key (matches PfaBoxScore.gameIdentifier), not derived
+  // from date+team matching.
+  gameIdentifier: string;
+  season: number;
   team: string;
   // "A" (away) / "H" (home) — PFA's AHN column. Neutral-site games may carry
   // a distinct marker; treated as null when not recognized.
