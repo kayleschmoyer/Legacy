@@ -26,9 +26,7 @@ import { clearFootballCorpusCache } from '@legacy-sports/football-game-stats-pro
 import { gzipSync } from 'node:zlib';
 import {
   FootballCorpusUnavailableError,
-  type FootballGameStatsSource,
   getFootballGameStatsSource,
-  setPfaGameStatsSource,
 } from './football-game-stats-source';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -74,7 +72,6 @@ describe('getFootballGameStatsSource', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearFootballCorpusCache();
-    setPfaGameStatsSource(null);
     process.env['FOOTBALL_CORPUS_S3_BUCKET'] = BUCKET;
   });
 
@@ -84,7 +81,6 @@ describe('getFootballGameStatsSource', () => {
     } else {
       process.env['FOOTBALL_CORPUS_S3_BUCKET'] = originalBucket;
     }
-    setPfaGameStatsSource(null);
   });
 
   describe('1999+ (nflverse)', () => {
@@ -169,36 +165,71 @@ describe('getFootballGameStatsSource', () => {
     });
   });
 
-  describe('1960-1998 (PFA seam)', () => {
-    it('routes pre-1999 seasons to the injected PFA source', async () => {
-      const pfaLog = {
-        passing: [{ ...passingRow, season: 1985 }],
+  describe('1960-1998 (PFA)', () => {
+    const pfaPassing = {
+      ...passingRow,
+      season: 1985,
+      gameIdentifier: '1985-09-08-MIA',
+    };
+
+    it('reads the player game log from pfa/v1/<pfrId>/<season>.json.gz', async () => {
+      mockSend.mockResolvedValueOnce(
+        s3Body({
+          v: 1,
+          pfrId: 'MariDa00',
+          pfaId: 'marino-dan',
+          season: 1985,
+          passing: [pfaPassing],
+          rushing: [],
+          receiving: [],
+          kicking: [],
+        }),
+      );
+
+      const source = getFootballGameStatsSource(1985);
+      const log = await source.getCareerGameLog('MariDa00', 1985);
+
+      expect(source.name).toBe('pfa');
+      expect(requestedKey()).toBe('pfa/v1/MariDa00/1985.json.gz');
+      expect(log).toEqual({
+        passing: [pfaPassing],
         rushing: [],
         receiving: [],
         kicking: [],
-      };
-      const getCareerGameLog = jest.fn().mockResolvedValue(pfaLog);
-      const pfa: FootballGameStatsSource = {
-        name: 'pfa',
-        getCareerGameLog,
-        getIdpGameLog: jest.fn(),
-        getTeamDefenseGameLog: jest.fn(),
-      };
-      setPfaGameStatsSource(pfa);
-
-      const source = getFootballGameStatsSource(1998);
-      const log = await source.getCareerGameLog('MariDa00', 1998);
-
-      expect(source).toBe(pfa);
-      expect(log).toBe(pfaLog);
-      expect(getCareerGameLog).toHaveBeenCalledWith('MariDa00', 1998);
-      expect(mockSend).not.toHaveBeenCalled();
+      });
     });
 
-    it('rejects with FootballCorpusUnavailableError until LS-9997 is wired in', async () => {
+    it('routes 1998 to PFA and 1999 to nflverse', () => {
+      expect(getFootballGameStatsSource(1998).name).toBe('pfa');
+      expect(getFootballGameStatsSource(1999).name).toBe('nflverse');
+    });
+
+    it('treats a PFA NoSuchKey as a miss (null)', async () => {
+      mockSend.mockRejectedValueOnce(s3Error('NoSuchKey', 404));
+
+      await expect(
+        getFootballGameStatsSource(1985).getCareerGameLog('NobodY00', 1985),
+      ).resolves.toBeNull();
+    });
+
+    it('throws on a corrupt PFA object instead of reporting a miss', async () => {
+      mockSend.mockResolvedValueOnce(
+        s3Body({ v: 1, pfrId: 'SomeoneElse00', season: 1985 }),
+      );
+
       await expect(
         getFootballGameStatsSource(1985).getCareerGameLog('MariDa00', 1985),
-      ).rejects.toBeInstanceOf(FootballCorpusUnavailableError);
+      ).rejects.toMatchObject({ name: 'PfaPayloadError' });
+    });
+
+    it('resolves pre-1999 IDP and team defense as a miss without touching S3', async () => {
+      const source = getFootballGameStatsSource(1985);
+
+      await expect(source.getIdpGameLog('TaylLa00', 1985)).resolves.toBeNull();
+      await expect(
+        source.getTeamDefenseGameLog('NYG', 1985),
+      ).resolves.toBeNull();
+      expect(mockSend).not.toHaveBeenCalled();
     });
   });
 });

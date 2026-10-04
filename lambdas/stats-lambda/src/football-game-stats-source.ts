@@ -1,4 +1,5 @@
 import {
+  getPfaPlayerSeasonPayload,
   getPlayerSeasonPayload,
   getTeamDefenseSeasonPayload,
   isFootballCorpusConfigured,
@@ -20,6 +21,7 @@ import {
  *              nflverse/v1/team-defense/<nflTeam>/<season>.json.gz for DST
  *              (`@legacy-sports/football-game-stats-provider`, LS-9989)
  *   1960-1998  pfa/v1/<pfrId>/<season>.json.gz (PFA provider, LS-9997)
+ *              — offense and kicking only; see `pfaSource`
  *
  * There is deliberately no Pro Football Reference fallback. PFR returns 403 to
  * every scripted request (LS-9908), so a scrape fallback could only ever fail.
@@ -60,10 +62,9 @@ export interface FootballGameStatsSource {
 }
 
 /**
- * The corpus cannot be read at all: the bucket env var is missing, or the
- * season's source is not wired in yet. This is not a miss, so it must not be
- * recorded as no_game_data_found — that would stamp a permanent zero on a
- * matchup whose data does exist.
+ * The corpus cannot be read at all because the bucket env var is missing.
+ * This is not a miss, so it must not be recorded as no_game_data_found — that
+ * would stamp a permanent zero on a matchup whose data does exist.
  */
 export class FootballCorpusUnavailableError extends Error {
   constructor(message: string) {
@@ -111,34 +112,37 @@ export const nflverseSource: FootballGameStatsSource = {
 };
 
 /**
- * Placeholder for the 1960-1998 route until the PFA provider (LS-9997) is
- * wired in. It throws instead of reporting a miss: pfa/v1 is populated, so
- * calling every pre-1999 player "no data" would be wrong and would not heal
- * once the real provider lands.
+ * PFA source for 1960-1998. The provider package validates each object and
+ * throws `PfaPayloadError` on a corrupt one, so corruption is never reported
+ * as a miss.
+ *
+ * PFA has no per-game IDP or team-defense data, and no other source does
+ * either for these seasons (ADR 0022, LS-9948). Those are permanent gaps, not
+ * outages, so they resolve as a miss and the player is recorded as
+ * no_game_data_found.
  */
-export const pfaSourcePendingLs9997: FootballGameStatsSource = {
+export const pfaSource: FootballGameStatsSource = {
   name: 'pfa',
-  getCareerGameLog: rejectPfaPending,
-  getIdpGameLog: rejectPfaPending,
-  getTeamDefenseGameLog: rejectPfaPending,
+  async getCareerGameLog(pfrId, season) {
+    assertCorpusConfigured();
+    const payload = await getPfaPlayerSeasonPayload(pfrId, season);
+    if (payload === null) return null;
+    return {
+      passing: payload.passing,
+      rushing: payload.rushing,
+      receiving: payload.receiving,
+      kicking: payload.kicking,
+    };
+  },
+  getIdpGameLog() {
+    assertCorpusConfigured();
+    return Promise.resolve(null);
+  },
+  getTeamDefenseGameLog() {
+    assertCorpusConfigured();
+    return Promise.resolve(null);
+  },
 };
-
-function rejectPfaPending(_key: string, season: number): Promise<never> {
-  return Promise.reject(
-    new FootballCorpusUnavailableError(
-      `Season ${season} needs the PFA provider (LS-9997), which is not wired into the stats Lambda yet`,
-    ),
-  );
-}
-
-let pfaSource: FootballGameStatsSource = pfaSourcePendingLs9997;
-
-/** Seam for the LS-9997 PFA provider, and for tests. */
-export function setPfaGameStatsSource(
-  source: FootballGameStatsSource | null,
-): void {
-  pfaSource = source ?? pfaSourcePendingLs9997;
-}
 
 /** Pick the corpus source that covers `season`. */
 export function getFootballGameStatsSource(
