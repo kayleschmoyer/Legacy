@@ -71,16 +71,16 @@ test.describe('Premium gating — free user @critical', () => {
     ).toBeVisible();
   });
 
-  test('Player Detail career stats are gated for free users', async ({
+  // LS-10546: player career stats are a Free decision — a free user gets the
+  // real detail modal on /players/:id, matching /football/players/:id.
+  test('Player Detail career stats are open to free users', async ({
     page,
   }) => {
     await useTier(page, 'free');
     await page.goto('/players/123');
 
-    await expect(page.getByTestId(GATE)).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: UPGRADE_CTA }).first(),
-    ).toBeVisible();
+    await expect(page.getByTestId('player-detail-modal')).toBeVisible();
+    await expect(page.getByTestId(GATE)).toHaveCount(0);
   });
 });
 

@@ -297,17 +297,16 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
   });
 });
 
-test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () => {
-  test('free-tier user cannot see the detail modal', async ({
+test.describe('Player Stats — Modal open to free users (LS-10546) @regression', () => {
+  test('free-tier user sees the detail modal from a ?playerId link', async ({
     page,
     playersPage,
   }) => {
     await createGraphQLRouter(page, {
       getuserbyid: (route) => fulfillJson(route, USER_BY_ID_FREE),
-      // LS-9068: without this, `MyEntitlements` (which the modal gate reads
-      // via `useHasEntitlement` since LS-8645) cascaded to the _apiIsolation
-      // baseline — which serves the PREMIUM catalog — so the "free" user was
-      // fully entitled and the modal mounted.
+      // LS-9068: without this, `MyEntitlements` cascades to the _apiIsolation
+      // baseline — which serves the PREMIUM catalog — so the "free" user would
+      // be fully entitled and the test would not exercise the free path.
       myentitlements: (route) =>
         fulfillJson(route, tierEntitlementsResponse('free')),
       getcareerbattingstats: (route) =>
@@ -322,18 +321,16 @@ test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () =>
       careerarcquery: (route) => fulfillJson(route, BONDS_CAREER_ARC),
     });
 
-    // Register BEFORE goto so the response can't be missed. The gate only
-    // reaches its settled state once `MyEntitlements` resolves — asserting
-    // before that would pass spuriously while the entitlement set is still
-    // loading (the modal only mounts after resolution), masking a gate
-    // bypass as a flake (LS-9068).
+    // Register BEFORE goto so the response can't be missed: the assertions
+    // below must read the settled free-tier state, not the window before the
+    // entitlement set resolves (LS-9068).
     const entitlementsResolved = page.waitForResponse(
       (resp) =>
         resp.url().includes('/graphql') &&
         (resp.request().postData() ?? '').includes('MyEntitlements'),
     );
 
-    // Navigate directly with ?playerId=101 — exercises the premium gate
+    // Navigate directly with ?playerId=101 — exercises a shared deep link
     // without relying on a row click to set the URL param.
     await page.goto('/players/stats?playerId=101');
     await page.waitForLoadState('load');
@@ -345,8 +342,8 @@ test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () =>
     await expect(page.getByTestId('premium-feature-gate')).toHaveCount(0);
     await playersPage.stats.expectLoaded();
 
-    // …but the modal must not mount even though the URL carries ?playerId,
-    // because the entitlement gate on the modal itself is false.
-    await playersPage.detail.expectClosed();
+    // …and the modal mounts for the free viewer too: it is no longer gated
+    // on the unrelated advanced_search_filters entitlement (LS-10546).
+    await playersPage.detail.expectOpen();
   });
 });

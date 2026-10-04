@@ -926,22 +926,22 @@ test.describe('Career Summary Cards — advanced batting entitlement @regression
     await useTier(page, 'free');
     await playersPage.gotoDetail(1);
 
-    // LS-9793: gate the absence assertions on a POSITIVE readiness signal.
-    // The free-tier PremiumGate panel becoming visible proves the route
-    // settled into its gated state, so the `not.toBeVisible()` checks below
-    // read the final DOM rather than a not-yet-rendered one. (This replaces
-    // a `waitUntil: 'networkidle'` pass-through, which never reliably
-    // settles under Apollo polling.)
-    await playersPage.premiumGate.expectVisible();
+    // LS-10546: career stats on /players/:id are free, so a free user gets the
+    // real PlayerDetailModal. LS-9793: gate the absence assertions on a
+    // POSITIVE readiness signal — the career batting card rendering proves
+    // the modal settled, so the checks below read the final DOM.
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.expectCareerBattingCard();
 
-    // PlayerDetailPage gates the entire PlayerDetailModal behind
-    // advanced_search_filters (premium). Free users see a PremiumGate
-    // upgrade CTA instead; the dialog — and therefore CareerArcChart with
-    // its SR-only <th>OPS</th> — is never mounted. not.toBeVisible() passes
-    // for absent elements, covering both the no-dialog case and any
-    // defense-in-depth gating within the modal itself.
-    await expect(page.getByText('OPS', { exact: true })).not.toBeVisible();
-    await expect(page.getByText('OPS+', { exact: true })).not.toBeVisible();
-    await expect(page.getByText('BABIP', { exact: true })).not.toBeVisible();
+    // The premium tiles stay gated inside the modal on advanced_batting_stats.
+    const battingCard = playersPage.detail.dialog.getByTestId(
+      'career-batting-card',
+    );
+    await expect(battingCard.getByText('OPS', { exact: true })).toHaveCount(0);
+    await expect(battingCard.getByText('OPS+', { exact: true })).toHaveCount(0);
+    await expect(battingCard.getByText('BABIP', { exact: true })).toHaveCount(
+      0,
+    );
   });
 });

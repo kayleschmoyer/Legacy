@@ -2,7 +2,7 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { hasEntitlement, requireEntitlement } from './authorization';
+import { hasEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
 
 /**
@@ -1477,8 +1477,10 @@ builder.queryField('playerSeasonBatting', (t) =>
       playerId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
+    // Open to every viewer, like playerSeasonFielding and the playerCareer*
+    // queries: it backs the /players player-detail modal, which is free
+    // (LS-10546). Premium columns are nulled per field below.
     resolve: async (parent, { playerId, season }, context) => {
-      await requireEntitlement(context, ENTITLEMENTS.player_comparison);
       LOGGER.debug(
         `[playerSeasonBatting] Query for playerId=${playerId}, season=${season}`,
       );
@@ -1510,8 +1512,9 @@ builder.queryField('playerSeasonPitching', (t) =>
       playerId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
-    resolve: async (parent, { playerId, season }, context) => {
-      await requireEntitlement(context, ENTITLEMENTS.player_comparison);
+    // Open to every viewer, like playerSeasonBatting (LS-10546). Advanced
+    // pitching analytics are UI-gated on advanced_pitching_stats.
+    resolve: async (parent, { playerId, season }) => {
       LOGGER.debug(
         `[playerSeasonPitching] Query for playerId=${playerId}, season=${season}`,
       );

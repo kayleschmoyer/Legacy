@@ -48,10 +48,10 @@ import {
   WebFootballCardFeed,
 } from './PlayerStatsCardFeed';
 import { PageMeta } from '../../components/PageMeta';
-import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
+import { storeCameFrom } from '../../lib/came-from';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -1400,11 +1400,13 @@ export function PlayerStatsRoute() {
       // brefId-style id (e.g. 'troutmi01') can't be represented as a numeric
       // `?playerId`, so fall back to the standalone `/players/:id` route with the
       // raw id — never coerced to NaN (PST-050 / LS-7123). Pushing history means
-      // Back closes the modal / returns to the list. Free viewers always go to
-      // the standalone page: the in-place modal is premium-only, so writing
-      // `?playerId` for them was a silent no-op (LS-10428).
+      // Back closes the modal / returns to the list. The modal is open to every
+      // signed-in viewer — premium content inside it carries its own per-tab
+      // entitlements (LS-10546). Signed-out visitors go to the standalone page:
+      // career stats are login-only on the server (LS-6248), so the in-place
+      // modal is not mounted for them.
       const rawId = String(player.id);
-      if (isPremium && /^\d+$/.test(rawId)) {
+      if (isAuthenticated && /^\d+$/.test(rawId)) {
         const params = new URLSearchParams(searchParams);
         params.set('playerId', rawId);
         setSearchParams(params);
@@ -1412,17 +1414,17 @@ export function PlayerStatsRoute() {
         navigate(`/players/${encodeURIComponent(rawId)}`);
       }
     },
-    [isPremium, searchParams, setSearchParams, navigate],
+    [isAuthenticated, searchParams, setSearchParams, navigate],
   );
 
   // Card-feed player press (LS-9075): PlayersCardFeed rows carry a bare
   // numeric id string (career-stats `playerId`), not a full PlayerWithStats —
   // mirrors handlePlayerDetails' numeric branch above so both presentations
   // open the identical in-place modal via the same `?playerId` URL contract
-  // (premium) or the standalone page (free, LS-10428).
+  // (signed-in) or the standalone page (signed-out).
   const handleCardPlayerPress = useCallback(
     (rawId: string) => {
-      if (isPremium && /^\d+$/.test(rawId)) {
+      if (isAuthenticated && /^\d+$/.test(rawId)) {
         const params = new URLSearchParams(searchParams);
         params.set('playerId', rawId);
         setSearchParams(params);
@@ -1430,7 +1432,7 @@ export function PlayerStatsRoute() {
         navigate(`/players/${encodeURIComponent(rawId)}`);
       }
     },
-    [isPremium, searchParams, setSearchParams, navigate],
+    [isAuthenticated, searchParams, setSearchParams, navigate],
   );
 
   // Close the in-place modal by stripping only the playerId param; filters are
@@ -1712,13 +1714,13 @@ export function PlayerStatsRoute() {
     [setSearchParams],
   );
 
-  // A premium row click writes ?playerId, opening the detail modal in place
-  // (pushes history so Back closes it), matching the MLB deep-link behaviour.
-  // Free viewers can't see the premium-only modal, so they go to the
-  // standalone /football/players/:id page instead (LS-10428).
+  // A row click writes ?playerId, opening the detail modal in place (pushes
+  // history so Back closes it), matching the MLB deep-link behaviour. Open to
+  // every signed-in viewer (LS-10546); signed-out visitors go to the
+  // standalone /football/players/:id page (football data is login-only).
   const handleNflPlayerDetails = useCallback(
     (playerId: number) => {
-      if (!isPremium) {
+      if (!isAuthenticated) {
         navigate(`/football/players/${playerId}`);
         return;
       }
@@ -1726,11 +1728,11 @@ export function PlayerStatsRoute() {
       params.set('playerId', String(playerId));
       setSearchParams(params);
     },
-    [isPremium, navigate, setSearchParams],
+    [isAuthenticated, navigate, setSearchParams],
   );
 
   // NFL card-feed press: rows carry a numeric id string. Routes through the
-  // NFL handler so free viewers land on the football page, not /players/:id.
+  // NFL handler so the press opens the football modal, not /players/:id.
   const handleNflCardPlayerPress = useCallback(
     (rawId: string) => {
       if (/^\d+$/.test(rawId)) handleNflPlayerDetails(Number(rawId));
@@ -1840,10 +1842,10 @@ export function PlayerStatsRoute() {
             onLeagueChange={setFootballLeagueId}
           />
         )}
-        {/* Premium-only in-place detail modal, matching the MLB branch's
-            PlayerDetailModal gating (LS-9346). Free viewers never write
-            ?playerId — their taps go to /football/players/:id (LS-10428). */}
-        {isPremium && selectedPlayerId !== null && (
+        {/* In-place detail modal, matching the MLB branch's PlayerDetailModal
+            (LS-9346). Open to every signed-in viewer — it was once gated on
+            the unrelated advanced_search_filters entitlement (LS-10546). */}
+        {isAuthenticated && selectedPlayerId !== null && (
           <FootballPlayerDetailModal
             open={true}
             onOpenChange={(open) => {
@@ -2064,13 +2066,13 @@ export function PlayerStatsRoute() {
           the filtered list when ?playerId=X is present — opened by a row click or
           restored on reload of a shared deep link — and offers an "open full
           page" affordance (onViewFullPage) to navigate externally to the
-          standalone /players/:id route (PST-050 reconciliation). Premium-only:
-          the modal surfaces premium career stats. The list itself is public
-          (LS-9347), so free viewers' taps navigate to /players/:id instead,
-          which renders its own gated free view (LS-10428). The modal resolves
+          standalone /players/:id route (PST-050 reconciliation). Open to every
+          signed-in viewer (career stats are login-only on the server, LS-6248);
+          premium content inside it is gated by its own per-tab entitlements
+          (LS-10546). The modal resolves
           the player's name from its own query, so the deep-link mount (no name
           in the URL) renders correctly with a fallback. */}
-      {isPremium && selectedPlayerId !== null && (
+      {isAuthenticated && selectedPlayerId !== null && (
         <PlayerDetailModal
           open={true}
           onOpenChange={(open) => {
@@ -2105,8 +2107,15 @@ export function PlayerDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: identifier } = useParams<{ id: string }>();
-  const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
-
+  // Career stats are login-only on the server (LS-6248), so a signed-out
+  // visitor is sent to sign in, matching /football/players/:id (LS-10546).
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      storeCameFrom();
+      navigate('/login', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
   const isNumeric = !!identifier && /^\d+$/.test(identifier);
   const parsedNumericId = isNumeric ? Number(identifier) : null;
   const isValidNumericId =
@@ -2262,59 +2271,20 @@ export function PlayerDetailPage() {
           </div>
         )}
 
-      {resolvedId !== null &&
-        !brefError &&
-        (isPremium ? (
-          <PlayerDetailModal
-            open={true}
-            onOpenChange={(open) => {
-              if (!open) handleBack();
-            }}
-            onBack={handleBack}
-            playerId={resolvedId}
-            playerName={resolvedName}
-          />
-        ) : (
-          // Free users: the detail modal renders its content in a Dialog portal
-          // (outside any wrapper), so gating the modal directly would leak the
-          // stats. Instead render an inline, non-portal panel behind PremiumGate
-          // so the blur + upgrade CTA actually cover the career-stats surface.
-          <PremiumGate
-            isPremium={false}
-            featureName="Player Career Stats"
-            featureDescription="Unlock full career statistics, season-by-season splits, and advanced metrics for every player."
-          >
-            <div
-              style={{
-                minHeight: 360,
-                borderRadius: '16px',
-                border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
-                backgroundColor: SURFACE_CARD,
-                padding: '2rem',
-              }}
-            >
-              <h1
-                style={{
-                  fontFamily: "'Big Shoulders Display', sans-serif",
-                  color: WHITE,
-                  margin: 0,
-                }}
-              >
-                {resolvedName}
-              </h1>
-              <p
-                style={{
-                  fontFamily: "'Literata', serif",
-                  color: TEXT_HIGH_CONTRAST,
-                  marginTop: '0.75rem',
-                }}
-              >
-                Career statistics — season-by-season batting, pitching, and
-                fielding splits — are a Premium feature.
-              </p>
-            </div>
-          </PremiumGate>
-        ))}
+      {isAuthenticated && resolvedId !== null && !brefError && (
+        // Career stats are open to every signed-in viewer, matching
+        // /football/players/:id (LS-10546). Premium columns inside the modal
+        // keep their own per-tab entitlements.
+        <PlayerDetailModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) handleBack();
+          }}
+          onBack={handleBack}
+          playerId={resolvedId}
+          playerName={resolvedName}
+        />
+      )}
     </div>
   );
 }

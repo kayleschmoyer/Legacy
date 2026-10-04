@@ -643,15 +643,25 @@ describe('Statistics Resolver', () => {
   // ── playerSeasonBatting ────────────────────────────────────────────────────
 
   describe('playerSeasonBatting query', () => {
-    it('throws PREMIUM_REQUIRED for free-tier users (LS-7028)', async () => {
+    // LS-10546: open to every signed-in viewer (it backs the free /players
+    // detail modal); only the premium OPS+ column is nulled.
+    it('returns season batting with OPS+ nulled for free-tier users (LS-10546)', async () => {
+      mockStatistics.getSeasonBattingStats.mockResolvedValueOnce([
+        { playerId: 1, season: 2022, onbasePlusSluggingPlus: 140 },
+      ]);
       const resolver = getQuery('playerSeasonBatting');
-      await expect(
-        resolver({}, { playerId: 1 }, makeFreeCtx(), undefined as never),
-      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
-      expect(mockStatistics.getSeasonBattingStats).not.toHaveBeenCalled();
+      const result = await resolver(
+        {},
+        { playerId: 1 },
+        makeFreeCtx(),
+        undefined as never,
+      );
+      expect(result).toEqual([
+        { playerId: 1, season: 2022, onbasePlusSluggingPlus: null },
+      ]);
     });
 
-    it('throws UNAUTHENTICATED for unauthenticated requests (LS-7028)', async () => {
+    it('throws UNAUTHENTICATED for unauthenticated requests (login-only, LS-6248)', async () => {
       const resolver = getQuery('playerSeasonBatting');
       await expect(
         resolver({}, { playerId: 1 }, emptyCtx, undefined as never),
@@ -697,24 +707,18 @@ describe('Statistics Resolver', () => {
   // ── playerSeasonPitching ───────────────────────────────────────────────────
 
   describe('playerSeasonPitching query', () => {
-    it('throws PREMIUM_REQUIRED for free-tier users (LS-7028)', async () => {
+    // LS-10546: open to every viewer (it backs the free /players detail modal).
+    it('returns season pitching for free-tier users (LS-10546)', async () => {
+      const seasons = [{ playerId: 2, season: 2022, wins: 15 }];
+      mockStatistics.getSeasonPitchingStats.mockResolvedValueOnce(seasons);
       const resolver = getQuery('playerSeasonPitching');
-      await expect(
-        resolver(
-          {},
-          { playerId: 2, season: 2022 },
-          makeFreeCtx(),
-          undefined as never,
-        ),
-      ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
-      expect(mockStatistics.getSeasonPitchingStats).not.toHaveBeenCalled();
-    });
-
-    it('throws UNAUTHENTICATED for unauthenticated requests (LS-7028)', async () => {
-      const resolver = getQuery('playerSeasonPitching');
-      await expect(
-        resolver({}, { playerId: 2 }, emptyCtx, undefined as never),
-      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+      const result = await resolver(
+        {},
+        { playerId: 2, season: 2022 },
+        makeFreeCtx(),
+        undefined as never,
+      );
+      expect(result).toEqual(seasons);
     });
 
     it('returns player season pitching history', async () => {

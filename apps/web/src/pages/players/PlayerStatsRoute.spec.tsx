@@ -244,7 +244,7 @@ jest.mock('../../components/FootballPlayerDetailModal', () => ({
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
 // Spyable so LS-9347 regression tests can assert the stats grid is never
-// wrapped in the page-wide gate (still used elsewhere, e.g. PlayerDetailPage).
+// wrapped in the page-wide gate.
 const mockPremiumGate = jest.fn(
   ({ children }: { featureName: string; children: React.ReactNode }) =>
     children,
@@ -376,19 +376,17 @@ describe('PlayerStatsRoute inline NFL view', () => {
 });
 
 // LS-9346: the NFL in-place detail modal had no entitlement guard at all,
-// while the MLB detail modal was already gated on `isPremium` — so a free
-// viewer could open the football player-detail modal but not the baseball
-// one. (The page-wide PremiumGate wrap this ticket originally investigated
-// was superseded by LS-9347, which removed page-wide gating from both
-// sports — see the "does not gate" tests below.) These tests pin the
-// remaining inconsistency fix: the NFL modal now matches the MLB modal's
-// entitlement gate.
-describe('PlayerStatsRoute detail-modal gate consistency (LS-9346)', () => {
+// while the MLB detail modal was gated on `isPremium`. LS-10546 resolved the
+// inconsistency the other way: neither modal is gated on the unrelated
+// `advanced_search_filters` entitlement any more — both open for every viewer,
+// and premium content inside them carries its own per-tab entitlements.
+describe('PlayerStatsRoute detail-modal gate consistency (LS-9346 / LS-10546)', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockSetSearchParams.mockClear();
     mockFootballEnabled = true;
     mockMediaSm = false;
+    mockIsAuthenticated = true;
   });
 
   it('does not gate the NFL stats surface behind PremiumGate either (parity with MLB, LS-9347)', async () => {
@@ -410,43 +408,132 @@ describe('PlayerStatsRoute detail-modal gate consistency (LS-9346)', () => {
     );
   });
 
-  it('does not render the football detail modal for a non-premium viewer, matching the MLB modal gate', async () => {
-    mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
-    mockHasEntitlement = false;
-    render(<PlayerStatsRoute />);
-    await screen.findByTestId('football-stats-page');
-    expect(
-      screen.queryByTestId('football-player-detail-modal'),
-    ).not.toBeInTheDocument();
-  });
+  it.each([
+    ['non-premium', false],
+    ['premium', true],
+  ])(
+    'renders the football detail modal from a shared ?playerId link for a %s viewer',
+    async (_label, premium) => {
+      mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
+      mockHasEntitlement = premium;
+      render(<PlayerStatsRoute />);
+      await screen.findByTestId('football-stats-page');
+      expect(
+        screen.getByTestId('football-player-detail-modal'),
+      ).toHaveAttribute('data-player-id', '42');
+    },
+  );
 
-  it('renders the football detail modal for a premium viewer', async () => {
-    mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
-    mockHasEntitlement = true;
-    render(<PlayerStatsRoute />);
-    await screen.findByTestId('football-stats-page');
-    expect(screen.getByTestId('football-player-detail-modal')).toHaveAttribute(
-      'data-player-id',
-      '42',
-    );
-  });
+  it.each([
+    ['non-premium', false],
+    ['premium', true],
+  ])(
+    'renders the baseball detail modal from a shared ?playerId link for a %s viewer',
+    (_label, premium) => {
+      mockSearchParams = new URLSearchParams('sport=mlb&playerId=7');
+      mockHasEntitlement = premium;
+      render(<PlayerStatsRoute />);
+      expect(screen.getByTestId('player-detail-modal')).toHaveAttribute(
+        'data-player-id',
+        '7',
+      );
+    },
+  );
 });
 
-// LS-10428: the in-place detail modal is premium-only, but the list is public
-// (LS-9347) — so a free viewer's tap used to write ?playerId and silently do
-// nothing. Free taps now navigate to the standalone player page for the sport;
-// premium taps keep the in-place modal.
-describe('PlayerStatsRoute free-viewer player tap (LS-10428)', () => {
+// LS-10546 reverts the LS-10428 workaround: the in-place modal is no longer
+// premium-only, so every viewer's numeric tap writes ?playerId and opens the
+// modal in place on both sports and both presentations. Non-numeric (brefId)
+// ids still fall back to the standalone page (covered by the PST-050 suite).
+describe('PlayerStatsRoute free-viewer player tap (LS-10546)', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockSetSearchParams.mockClear();
     mockFootballEnabled = true;
     mockOnPlayerDetailsRef.current = undefined;
+    mockHasEntitlement = false;
+    mockIsAuthenticated = true;
   });
 
-  it('navigates a free viewer to /players/:id from the MLB table', () => {
+  const writtenPlayerId = () =>
+    (mockSetSearchParams.mock.calls[0][0] as URLSearchParams).get('playerId');
+
+  it('writes ?playerId for a free viewer from the MLB table', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 2 });
+    });
+    expect(writtenPlayerId()).toBe('2');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('writes ?playerId for a free viewer from the MLB card feed', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockBaseballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('2'));
+    expect(writtenPlayerId()).toBe('2');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('writes ?playerId for a free viewer from the NFL table', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    const onPlayerDetails = mockFootballStatsPageProps.onPlayerDetails as (
+      id: number,
+    ) => void;
+    act(() => onPlayerDetails(42));
+    expect(writtenPlayerId()).toBe('42');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('writes ?playerId for a free viewer from the NFL card feed', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockFootballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('42'));
+    expect(writtenPlayerId()).toBe('42');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('still navigates a free viewer to /players/:id for a non-numeric (brefId) id', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 'troutmi01' });
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/players/troutmi01');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+});
+
+// Career stats are login-only on the server (LS-6248), so the in-place modal
+// is never mounted for signed-out visitors of the public list — their taps go
+// to the standalone page, which sends them to sign in (LS-10546).
+describe('PlayerStatsRoute signed-out player tap (LS-10546)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+    mockOnPlayerDetailsRef.current = undefined;
     mockHasEntitlement = false;
+    mockIsAuthenticated = false;
+  });
+
+  afterEach(() => {
+    mockIsAuthenticated = true;
+  });
+
+  it('navigates a signed-out visitor to /players/:id from the MLB table', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
     render(<PlayerStatsRoute />);
     act(() => {
       mockOnPlayerDetailsRef.current?.({ id: 2 });
@@ -455,36 +542,9 @@ describe('PlayerStatsRoute free-viewer player tap (LS-10428)', () => {
     expect(mockSetSearchParams).not.toHaveBeenCalled();
   });
 
-  it('navigates a free viewer to /players/:id from the MLB card feed', () => {
-    mockSearchParams = new URLSearchParams('sport=mlb');
-    mockMediaSm = true;
-    mockHasEntitlement = false;
-    render(<PlayerStatsRoute />);
-    const onPlayerPress = mockBaseballCardFeedProps.onPlayerPress as (
-      id: string,
-    ) => void;
-    act(() => onPlayerPress('2'));
-    expect(mockNavigate).toHaveBeenCalledWith('/players/2');
-    expect(mockSetSearchParams).not.toHaveBeenCalled();
-  });
-
-  it('navigates a free viewer to /football/players/:id from the NFL table', async () => {
-    mockSearchParams = new URLSearchParams('sport=nfl');
-    mockHasEntitlement = false;
-    render(<PlayerStatsRoute />);
-    await screen.findByTestId('football-stats-page');
-    const onPlayerDetails = mockFootballStatsPageProps.onPlayerDetails as (
-      id: number,
-    ) => void;
-    act(() => onPlayerDetails(42));
-    expect(mockNavigate).toHaveBeenCalledWith('/football/players/42');
-    expect(mockSetSearchParams).not.toHaveBeenCalled();
-  });
-
-  it('navigates a free viewer to /football/players/:id from the NFL card feed', () => {
+  it('navigates a signed-out visitor to /football/players/:id from the NFL card feed', () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
     mockMediaSm = true;
-    mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
     const onPlayerPress = mockFootballCardFeedProps.onPlayerPress as (
       id: string,
@@ -494,28 +554,18 @@ describe('PlayerStatsRoute free-viewer player tap (LS-10428)', () => {
     expect(mockSetSearchParams).not.toHaveBeenCalled();
   });
 
-  it('keeps the in-place modal (?playerId) for a premium viewer on both sports', async () => {
-    mockSearchParams = new URLSearchParams('sport=mlb');
+  it('does not mount either detail modal from a shared ?playerId link', async () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=7');
     const { unmount } = render(<PlayerStatsRoute />);
-    act(() => {
-      mockOnPlayerDetailsRef.current?.({ id: 2 });
-    });
-    expect(
-      (mockSetSearchParams.mock.calls[0][0] as URLSearchParams).get('playerId'),
-    ).toBe('2');
+    expect(screen.queryByTestId('player-detail-modal')).not.toBeInTheDocument();
     unmount();
 
-    mockSetSearchParams.mockClear();
-    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
     render(<PlayerStatsRoute />);
     await screen.findByTestId('football-stats-page');
-    act(() =>
-      (mockFootballStatsPageProps.onPlayerDetails as (id: number) => void)(42),
-    );
     expect(
-      (mockSetSearchParams.mock.calls[0][0] as URLSearchParams).get('playerId'),
-    ).toBe('42');
-    expect(mockNavigate).not.toHaveBeenCalled();
+      screen.queryByTestId('football-player-detail-modal'),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -738,20 +738,20 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     await useTier(page, 'free');
     await playersPage.gotoDetail(1);
 
-    // LS-9793: gate the absence assertions on a POSITIVE readiness signal.
-    // Waiting for the PremiumGate panel proves the route settled into its
-    // gated state, so `toHaveCount(0)` below reads the final DOM rather
-    // than a not-yet-rendered one. (This replaces a `waitUntil:
-    // 'networkidle'` pass-through, which never reliably settles under
-    // Apollo polling.)
-    await playersPage.premiumGate.expectVisible();
+    // LS-10546: career stats on /players/:id are free, so a free user gets the
+    // real PlayerDetailModal. LS-9793: gate the absence assertions on a
+    // POSITIVE readiness signal — the always-present OBP header proves the
+    // Batting table rendered, so `toHaveCount(0)` reads the final DOM.
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+    await playersPage.detail.expectText('OBP', { exact: true });
 
-    // Free users at /players/:id see a PremiumGate panel instead of the
-    // PlayerDetailModal dialog — the advanced columns live inside the modal,
-    // so they are never rendered for a free-tier visitor.
-    await expect(page.getByText('OPS', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('BABIP', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('OPS+', { exact: true })).toHaveCount(0);
+    // The advanced columns stay gated inside the modal on advanced_batting_stats.
+    const dialog = playersPage.detail.dialog;
+    await expect(dialog.getByText('OPS', { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText('BABIP', { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText('OPS+', { exact: true })).toHaveCount(0);
   });
 
   test('premium user sees server-provided OPS value', async ({
