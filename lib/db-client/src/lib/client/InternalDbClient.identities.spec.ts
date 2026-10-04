@@ -1,6 +1,11 @@
 /**
- * Unit tests for the user_identities unlink rules on the internal db client
- * (LS-7823, AC5):
+ * Unit tests for the user_identities link/unlink rules on the internal db
+ * client.
+ *
+ * linkIdentity (LS-7215): a link that loses a concurrent race at insert time
+ * maps the unique violation onto the same friendly outcome as the pre-checks.
+ *
+ * unlinkIdentity (LS-7823, AC5):
  *   - reachability guard: refuse to remove the last identity unless a local
  *     password remains;
  *   - canonical re-derivation: when the unlinked identity was the canonical
@@ -12,7 +17,11 @@
  * (thenable), deletes via delete().where().returning(), and the canonical
  * writes via update().set().where()[.returning()].
  */
-import { type InternalDb, unlinkIdentity } from './InternalDbClient';
+import {
+  type InternalDb,
+  linkIdentity,
+  unlinkIdentity,
+} from './InternalDbClient';
 
 interface Capture {
   updates: Record<string, unknown>[];
@@ -168,5 +177,90 @@ describe('unlinkIdentity', () => {
     // setCanonicalEmailSource clears the source without touching the canonicalEmail.
     const sourceUpdate = capture.updates.find((u) => !('canonicalEmail' in u));
     expect(sourceUpdate).toMatchObject({ canonicalEmailSource: null });
+  });
+});
+
+/** A fake db whose pre-check selects find nothing and whose insert fails with
+ * `insertError` (or succeeds with `inserted`). */
+function makeLinkDb(
+  insertError: Error | undefined,
+  inserted?: unknown,
+): InternalDb {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          then: (onFulfilled: (rows: unknown[]) => unknown) =>
+            Promise.resolve([]).then(onFulfilled),
+        }),
+      }),
+    }),
+    insert: () => ({
+      values: () => ({
+        returning: () =>
+          insertError
+            ? Promise.reject(insertError)
+            : Promise.resolve([inserted]),
+      }),
+    }),
+  } as unknown as InternalDb;
+}
+
+/** A Postgres unique violation, wrapped the way drizzle-orm surfaces it. */
+function uniqueViolation(constraint: string): Error {
+  const cause = Object.assign(new Error('duplicate key value'), {
+    code: '23505',
+    constraint,
+  });
+  return Object.assign(new Error('Failed query'), { cause });
+}
+
+describe('linkIdentity', () => {
+  const input = {
+    userId: 2,
+    provider: 'discord' as const,
+    providerAccountId: 'acct',
+  };
+
+  it('links when the pre-checks pass and the insert succeeds', async () => {
+    const row = identity({ id: 9, userId: 2 });
+    const result = await linkIdentity(makeLinkDb(undefined, row), input);
+
+    expect(result).toEqual({ ok: true, identity: row });
+  });
+
+  it('maps a racing provider-account unique violation to PROVIDER_ACCOUNT_TAKEN', async () => {
+    const db = makeLinkDb(
+      uniqueViolation('user_identities_provider_account_uk'),
+    );
+
+    const result = await linkIdentity(db, input);
+
+    expect(result).toEqual({ ok: false, reason: 'PROVIDER_ACCOUNT_TAKEN' });
+  });
+
+  it('maps a racing user-provider unique violation to ALREADY_LINKED', async () => {
+    const db = makeLinkDb(uniqueViolation('user_identities_user_provider_uk'));
+
+    const result = await linkIdentity(db, input);
+
+    expect(result).toEqual({ ok: false, reason: 'ALREADY_LINKED' });
+  });
+
+  it('maps an unwrapped driver unique violation too', async () => {
+    const bare = Object.assign(new Error('duplicate key value'), {
+      code: '23505',
+      constraint: 'user_identities_provider_account_uk',
+    });
+
+    const result = await linkIdentity(makeLinkDb(bare), input);
+
+    expect(result).toEqual({ ok: false, reason: 'PROVIDER_ACCOUNT_TAKEN' });
+  });
+
+  it('rethrows unrelated insert errors', async () => {
+    const other = uniqueViolation('some_other_uk');
+
+    await expect(linkIdentity(makeLinkDb(other), input)).rejects.toBe(other);
   });
 });

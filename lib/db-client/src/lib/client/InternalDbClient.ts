@@ -152,7 +152,7 @@ export async function getUserIdentities(
 }
 
 /** Insert a new `user_identities` row. Throws on unique-constraint violations
- * — callers that need friendly conflicts should pre-check via `linkIdentity`. */
+ * — callers that need friendly conflicts should go through `linkIdentity`. */
 export async function createIdentity(
   db: InternalDb,
   input: NewIdentityInput,
@@ -347,8 +347,36 @@ export async function linkIdentity(
     return { ok: false, reason: 'ALREADY_LINKED' };
   }
 
-  const identity = await createIdentity(db, input);
-  return { ok: true, identity };
+  // The pre-checks above are select-then-insert, so a concurrent link of the
+  // same provider account (or a second link for this user) can still lose the
+  // race at insert time. Map those unique violations onto the same friendly
+  // outcomes instead of letting a raw 23505 escape (LS-7215).
+  try {
+    const identity = await createIdentity(db, input);
+    return { ok: true, identity };
+  } catch (error) {
+    const constraint = uniqueViolationConstraint(error);
+    if (constraint === 'user_identities_provider_account_uk') {
+      return { ok: false, reason: 'PROVIDER_ACCOUNT_TAKEN' };
+    }
+    if (constraint === 'user_identities_user_provider_uk') {
+      return { ok: false, reason: 'ALREADY_LINKED' };
+    }
+    throw error;
+  }
+}
+
+/** The violated constraint name when `error` is a Postgres unique violation
+ * (23505). drizzle-orm wraps the driver error in a DrizzleQueryError with the
+ * original on `.cause`, so check both the error and its cause. */
+function uniqueViolationConstraint(error: unknown): string | undefined {
+  for (const candidate of [error, (error as { cause?: unknown })?.cause]) {
+    const pgError = candidate as { code?: unknown; constraint?: unknown };
+    if (pgError?.code === '23505' && typeof pgError.constraint === 'string') {
+      return pgError.constraint;
+    }
+  }
+  return undefined;
 }
 
 /** Outcome of {@link unlinkIdentity}. */
