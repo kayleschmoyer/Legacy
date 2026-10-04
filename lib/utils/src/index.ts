@@ -11,6 +11,7 @@ export {
   mapWithConcurrency,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
+export * from './lib/disclosure-scoring';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/league-utils';

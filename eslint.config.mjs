@@ -269,6 +269,10 @@ export default [
       // walker — never compiled or linted. The root `**/*.tsx` react rule
       // would otherwise hard-error here (no react plugin at root scope).
       '.github/scripts/e2e-graph/__tests__/fixtures/**',
+      // Claude Design prototype bundles (synced design references, never
+      // compiled or shipped). Same root-scope react-plugin hard error as the
+      // fixtures above when a PR edits a bundle's .jsx (LS-10434).
+      'docs/design/**',
     ],
   },
 ];

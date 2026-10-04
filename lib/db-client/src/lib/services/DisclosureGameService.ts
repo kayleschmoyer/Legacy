@@ -9,6 +9,10 @@ import {
   sql,
 } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  calculateDisclosureScore,
+  DISCLOSURE_MIN_CLUES,
+} from '@legacy-sports/utils';
 import { orderFactsByDifficulty } from './DifficultyOrdering';
 import type { DifficultyTier, FactCategory } from './DifficultyOrdering';
 import * as PublicSchema from '../../drizzle/public/schema';
@@ -27,8 +31,11 @@ import type { PublicDb } from '../client/PublicDbClient';
 // Constants
 // ──────────────────────────────────────────────────────────────
 
-/** Minimum number of distinct facts a player must have to be eligible for the game. */
-export const MIN_FACT_COUNT = 5;
+/**
+ * Minimum number of distinct facts a player must have to be eligible for the
+ * game. Shared with the client copy via `@legacy-sports/utils` (LS-10434).
+ */
+export const MIN_FACT_COUNT = DISCLOSURE_MIN_CLUES;
 
 /**
  * Difficulty tier ordering used to sort facts before a session.
@@ -689,16 +696,14 @@ export class DisclosureGameService {
    * Calculate score for a session based on how many clues were revealed.
    *
    * Scoring: 1000 points for the first clue, scaling linearly down to a
-   * minimum of 100 points on the last clue.
-   *
-   * score = max(100, round(1000 - (cluesRevealed - 1) * (900 / (totalClues - 1))))
+   * minimum of 100 points on the last clue. Delegates to the shared
+   * `calculateDisclosureScore` so the client's scoring table is generated
+   * from the same function (LS-10434).
    *
    * When totalClues <= 1, the full 1000 points is always awarded.
    */
   static calculateScore(cluesRevealed: number, totalClues: number): number {
-    if (totalClues <= 1 || cluesRevealed <= 1) return 1000;
-    const penalty = Math.round((900 * (cluesRevealed - 1)) / (totalClues - 1));
-    return Math.max(100, 1000 - penalty);
+    return calculateDisclosureScore(cluesRevealed, totalClues);
   }
 
   /**

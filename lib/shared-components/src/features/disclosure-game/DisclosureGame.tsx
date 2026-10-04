@@ -18,6 +18,10 @@ import {
   useStartDisclosureGameMutation,
   useSubmitGuessMutation,
 } from '@legacy-sports/graphql';
+import {
+  buildDisclosureScoringTable,
+  DISCLOSURE_MIN_CLUES,
+} from '@legacy-sports/utils';
 import { Circle, Stack } from '../season-draft/primitives';
 import {
   BRAND_GOLD,
@@ -435,8 +439,9 @@ export const DisclosureGame: React.FC = () => {
               maxWidth={420}
               fontSize={17}
             >
-              Five clues. One player from the record book. Guess early for a
-              bigger score — but guess wrong and you keep revealing.
+              {DISCLOSURE_MIN_CLUES}+ clues. One player from the record book.
+              Guess early for a bigger score — but guess wrong and you keep
+              revealing.
             </Paragraph>
             <XStack
               gap="$2"
@@ -1009,10 +1014,13 @@ export const DisclosureGame: React.FC = () => {
               borderRadius="$4"
             >
               <Eyebrow color="$brandGoldLight">Scoring</Eyebrow>
-              <ScoringRow label="1 clue" value="100 pts" />
-              <ScoringRow label="2–3 clues" value="70–85 pts" />
-              <ScoringRow label="4–5 clues" value="40–55 pts" />
-              <ScoringRow label="6–7 clues" value="15–25 pts" />
+              {buildDisclosureScoringTable(totalClues).map((row) => (
+                <ScoringRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                />
+              ))}
             </YStack>
           </YStack>
         </XStack>

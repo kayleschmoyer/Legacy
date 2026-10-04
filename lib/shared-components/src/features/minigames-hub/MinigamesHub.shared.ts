@@ -9,6 +9,8 @@
  * glyph name.
  */
 
+import { DISCLOSURE_MIN_CLUES } from '@legacy-sports/utils';
+
 export type MinigameId =
   | 'season-draft'
   | 'disclosure'
@@ -81,7 +83,10 @@ export const GAME_TEMPLATES: MinigameTemplate[] = [
     desc: 'Clues drop one at a time — birthplace, era, quirks, milestones. Name the player with the fewest clues revealed for a higher score.',
     accent: 'seam',
     iconKind: 'stats',
-    meta: ['7 clues per player', 'Hall of Famers to deep cuts'],
+    meta: [
+      `${DISCLOSURE_MIN_CLUES}+ clues per player`,
+      'Hall of Famers to deep cuts',
+    ],
     cta: 'Play Now',
   },
   {

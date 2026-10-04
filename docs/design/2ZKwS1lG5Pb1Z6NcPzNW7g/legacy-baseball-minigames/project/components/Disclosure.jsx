@@ -427,13 +427,13 @@ const Disclosure = ({ onBack }) => {
               <div className="eyebrow">Scoring</div>
               <div className="dz-side-tip-grid">
                 <span>1 clue</span>
-                <b>100 pts</b>
+                <b>1,000 pts</b>
                 <span>2–3 clues</span>
-                <b>70–85 pts</b>
+                <b>850–700 pts</b>
                 <span>4–5 clues</span>
-                <b>40–55 pts</b>
+                <b>550–400 pts</b>
                 <span>6–7 clues</span>
-                <b>15–25 pts</b>
+                <b>250–100 pts</b>
               </div>
             </div>
           </aside>
@@ -454,7 +454,7 @@ const DisclosureIdle = ({ onBack, onStart, switcher }) => (
       </div>
       <h1>Who Am I?</h1>
       <p className="dz-idle-lede">
-        Seven clues. One player from the record book. Guess early for a bigger
+        5+ clues. One player from the record book. Guess early for a bigger
         score — but guess wrong and you keep revealing.
       </p>
       <div className="dz-idle-rules">

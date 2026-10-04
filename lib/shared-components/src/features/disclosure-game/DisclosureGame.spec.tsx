@@ -16,6 +16,10 @@ import {
   useStartDisclosureGameMutation,
   useSubmitGuessMutation,
 } from '@legacy-sports/graphql';
+import {
+  buildDisclosureScoringTable,
+  DISCLOSURE_MIN_CLUES,
+} from '@legacy-sports/utils';
 import { DisclosureGame } from './DisclosureGame';
 import { act, fireEvent, render, screen, waitFor } from '../../test-utils';
 
@@ -173,18 +177,34 @@ describe('DisclosureGame — intro copy', () => {
     setupHooks();
   });
 
-  it('describes the actual 5-clue max instead of the stale "Seven clues" copy', async () => {
+  it('describes the variable clue count (5+) instead of a fixed count (LS-10434)', async () => {
     mockFetchActive.mockResolvedValue({ data: { activeDisclosureGame: null } });
 
     render(<DisclosureGame />);
     await waitFor(() => expect(mockFetchActive).toHaveBeenCalled());
 
-    expect(screen.getByTestId('disclosure-game-idle').textContent).toMatch(
-      /Five clues/,
-    );
-    expect(screen.getByTestId('disclosure-game-idle').textContent).not.toMatch(
-      /Seven clues/,
-    );
+    const idle = screen.getByTestId('disclosure-game-idle').textContent;
+    expect(idle).toMatch(new RegExp(`${DISCLOSURE_MIN_CLUES}\\+ clues`));
+    expect(idle).not.toMatch(/(Five|Seven) clues/);
+  });
+});
+
+describe('DisclosureGame — scoring table', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupHooks();
+  });
+
+  it("renders the server's scoring curve for the round's clue count (LS-10434)", async () => {
+    await startGameAndRevealClue();
+
+    const playing = screen.getByTestId('disclosure-game-playing').textContent;
+    for (const row of buildDisclosureScoringTable(5)) {
+      expect(playing).toContain(row.label);
+      expect(playing).toContain(row.value);
+    }
+    expect(playing).toContain('1,000 pts');
+    expect(playing).not.toContain('6–7 clues');
   });
 });
 

@@ -19,7 +19,7 @@ const GAMES_LIST = [
     accent: 'seam',
     icon: 'icons/stats.svg',
     stat: { label: 'Your Best', value: '84' },
-    meta: ['7 clues per player', 'Hall of Famers to deep cuts'],
+    meta: ['5+ clues per player', 'Hall of Famers to deep cuts'],
     cta: 'Play Now',
   },
 ];

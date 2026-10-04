@@ -10,6 +10,10 @@ export * from './lib/entitlements';
 export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
+// Who Am I? scoring constants + table builder rendered by shared-components'
+// DisclosureGame and the minigames hub; missing here they are `undefined` on
+// device (LS-10434).
+export * from './lib/disclosure-scoring';
 // formatDraftDate is called during render by LeagueListRow (shared-components
 // HomeScreen). It was defined only in `index.ts`, so on device it resolved to
 // `undefined` and the Home dashboard crashed to the error boundary with
