@@ -39,6 +39,9 @@ const {
   jobNameMatchesGateKey,
   runIdFromTargetUrl,
   isRetryableStatusError,
+  rateLimitResetWaitMs,
+  withStatusRetry,
+  RATE_LIMIT_MAX_WAIT_MS,
   cancelledJobHadRealFailure,
   postCiGate,
   seedPendingCiGate,
@@ -2026,6 +2029,194 @@ describe('ci-gate — postCiGate survives createCommitStatus rate-limit/5xx blip
     assert.strictEqual(res.posted, false);
     assert.strictEqual(res.reason, 'status-post-failed');
     assert.strictEqual(calls.statuses.length, 0);
+  });
+});
+
+// ── LS-10322: wait for the rate-limit reset; a lost verdict fails the job ─────
+
+function rateLimitError(headers) {
+  const err = statusError(403, 'API rate limit exceeded for installation');
+  err.response = { headers };
+  return err;
+}
+
+describe('ci-gate — rateLimitResetWaitMs reads the reset window (LS-10322)', () => {
+  const NOW = 1_000_000_000_000;
+
+  it('prefers retry-after (seconds) plus a 1 s buffer', () => {
+    assert.strictEqual(
+      rateLimitResetWaitMs(rateLimitError({ 'retry-after': '30' }), NOW),
+      31_000,
+    );
+  });
+
+  it('uses x-ratelimit-reset (epoch seconds) when the bucket is empty', () => {
+    const resetEpoch = NOW / 1000 + 120;
+    assert.strictEqual(
+      rateLimitResetWaitMs(
+        rateLimitError({
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(resetEpoch),
+        }),
+        NOW,
+      ),
+      121_000,
+    );
+  });
+
+  it('ignores x-ratelimit-reset when the bucket is not empty', () => {
+    assert.strictEqual(
+      rateLimitResetWaitMs(
+        rateLimitError({
+          'x-ratelimit-remaining': '42',
+          'x-ratelimit-reset': String(NOW / 1000 + 120),
+        }),
+        NOW,
+      ),
+      null,
+    );
+  });
+
+  it('returns null when the error carries no headers', () => {
+    assert.strictEqual(rateLimitResetWaitMs(new Error('boom'), NOW), null);
+  });
+});
+
+describe('ci-gate — withStatusRetry waits for the rate-limit reset (LS-10322)', () => {
+  it('sleeps until the reset, not the ~500 ms in-window delay', async () => {
+    const sleeps = [];
+    let calls = 0;
+    const result = await withStatusRetry(
+      async () => {
+        calls++;
+        if (calls === 1) throw rateLimitError({ 'retry-after': '90' });
+        return 'ok';
+      },
+      {
+        maxRateLimitWaitMs: RATE_LIMIT_MAX_WAIT_MS,
+        sleep: async (ms) => sleeps.push(ms),
+      },
+    );
+    assert.strictEqual(result, 'ok');
+    assert.deepStrictEqual(sleeps, [91_000]);
+  });
+
+  it('caps the wait at maxRateLimitWaitMs', async () => {
+    const sleeps = [];
+    let calls = 0;
+    await withStatusRetry(
+      async () => {
+        calls++;
+        if (calls === 1) throw rateLimitError({ 'retry-after': '3600' });
+        return 'ok';
+      },
+      {
+        maxRateLimitWaitMs: RATE_LIMIT_MAX_WAIT_MS,
+        sleep: async (ms) => sleeps.push(ms),
+      },
+    );
+    assert.deepStrictEqual(sleeps, [RATE_LIMIT_MAX_WAIT_MS]);
+  });
+
+  it('NEGATIVE CONTROL: without maxRateLimitWaitMs it keeps the short delay', async () => {
+    const sleeps = [];
+    let calls = 0;
+    await withStatusRetry(
+      async () => {
+        calls++;
+        if (calls === 1) throw rateLimitError({ 'retry-after': '90' });
+        return 'ok';
+      },
+      { sleep: async (ms) => sleeps.push(ms) },
+    );
+    assert.deepStrictEqual(sleeps, [500]);
+  });
+});
+
+describe('ci-gate — postCiGate rate-limited post path (LS-10322)', () => {
+  it('waits for the reset then lands the verdict that the in-window retries could not', async () => {
+    const sleeps = [];
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      createStatusErrors: [rateLimitError({ 'retry-after': '120' })],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+      sleep: async (ms) => sleeps.push(ms),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.deepStrictEqual(sleeps, [121_000]);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('flags verdictLost when the post is still rate-limited after every retry', async () => {
+    const sleeps = [];
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      createStatusErrors: [
+        rateLimitError({ 'retry-after': '10' }),
+        rateLimitError({ 'retry-after': '10' }),
+        rateLimitError({ 'retry-after': '10' }),
+      ],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+      sleep: async (ms) => sleeps.push(ms),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'status-post-failed');
+    assert.strictEqual(
+      res.verdictLost,
+      true,
+      'the workflow keys its failing step off verdictLost',
+    );
+    assert.strictEqual(
+      sleeps.length,
+      2,
+      'waits between each of the 3 attempts',
+    );
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('NEGATIVE CONTROL: a successful post does not flag verdictLost', async () => {
+    const { github } = makeGithub({ currentSha: HEAD_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+    assert.strictEqual(res.posted, true);
+    assert.notStrictEqual(res.verdictLost, true);
+  });
+});
+
+describe('ci-pipeline.yml — summarize fails when the CI Gate verdict is lost (LS-10322)', () => {
+  it('has a failing step gated on the post step verdict-lost output', async () => {
+    const workflow = await readFile(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../workflows/ci-pipeline.yml',
+      ),
+      'utf8',
+    );
+    assert.match(workflow, /id: post-ci-gate/);
+    assert.match(workflow, /core\.setOutput\('verdict-lost'/);
+    assert.match(
+      workflow,
+      /name: "Fail when CI Gate verdict was lost"\s+if: >-\s+always\(\) &&\s+\(steps\.post-ci-gate\.outputs\.verdict-lost == 'true'/,
+    );
   });
 });
 

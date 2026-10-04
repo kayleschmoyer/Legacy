@@ -1397,7 +1397,8 @@ jobs:
     # uses no AWS role or pnpm cache, so GitHub-hosted capacity is sufficient.
     # Guarded by .github/scripts/__tests__/bookkeeping-runner-placement.test.mjs.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # LS-10322: headroom for the post step's rate-limit-reset wait (5 min cap).
+    timeout-minutes: 15
     outputs:
       overall-status: ${{ steps.collect-results.outputs.overall-status }}
       workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
@@ -1511,6 +1512,7 @@ jobs:
       # Fall back to the orchestrator-resolved pr-number/head-sha inputs so a
       # PR-scoped dispatch still posts.
       - name: "Post CI Gate aggregate status"
+        id: post-ci-gate
         if: always() && (github.event.pull_request.number || inputs.pr-number)
         # Never let a transient status-post failure (or a fork PR's read-only
         # GITHUB_TOKEN) fail the summarize job — CI Gate is informational during
@@ -1550,7 +1552,7 @@ jobs:
             const results = JSON.parse(process.env.GATE_RESULTS);
             const dispatchPrNumber = process.env.DISPATCH_PR_NUMBER;
             const dispatchHeadSha = process.env.DISPATCH_HEAD_SHA;
-            await postCiGate({
+            const gate = await postCiGate({
               github,
               context,
               core,
@@ -1558,6 +1560,9 @@ jobs:
               prNumber: dispatchPrNumber ? Number(dispatchPrNumber) : undefined,
               headSha: dispatchHeadSha || undefined,
             });
+            // LS-10322: a verdict that exhausted its post retries must not
+            // read as a green job — see "Fail when CI Gate verdict was lost".
+            core.setOutput('verdict-lost', gate && gate.verdictLost ? 'true' : 'false');
 
       - name: "Deployment Gate"
         id: deployment-gate
@@ -1708,3 +1713,16 @@ jobs:
             echo "Duration: ${DURATION}s"
             exit 1
           fi
+
+      # LS-10322: the post step is continue-on-error, so when the CI Gate post
+      # exhausts its retries (installation rate limit) the job would otherwise
+      # conclude success while the SHA stays at the seeded `pending` and blocks
+      # the merge queue until a human notices. Fail loudly instead.
+      - name: "Fail when CI Gate verdict was lost"
+        if: >-
+          always() &&
+          (steps.post-ci-gate.outputs.verdict-lost == 'true' ||
+          steps.post-ci-gate.outcome == 'failure')
+        run: |
+          echo "::error::CI Gate verdict was not posted for this SHA (rate limit or post failure). Re-run this Summarize job once the installation rate limit resets; see ci_installation_rate_limit."
+          exit 1

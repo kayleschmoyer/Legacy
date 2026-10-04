@@ -1151,10 +1151,26 @@ function isRetryableStatusError(err) {
  *
  * @template T
  * @param {() => Promise<T>} fn
- * @param {{ retries?: number, delayMs?: number }} [opts]
+ * @param {object} [opts]
+ * @param {number} [opts.retries] retries after the first attempt (default 2).
+ * @param {number} [opts.delayMs] short backoff between attempts (default 500).
+ * @param {number} [opts.maxRateLimitWaitMs] when > 0, a rate-limited error
+ *   that carries a reset header sleeps until that reset instead of `delayMs`,
+ *   capped at this many ms (LS-10322). 0 (default) keeps the short backoff.
+ * @param {(ms: number) => Promise<void>} [opts.sleep] injectable sleep (tests).
+ * @param {() => number} [opts.now] injectable clock in epoch ms (tests).
  * @returns {Promise<T>}
  */
-async function withStatusRetry(fn, { retries = 2, delayMs = 500 } = {}) {
+async function withStatusRetry(
+  fn,
+  {
+    retries = 2,
+    delayMs = 500,
+    maxRateLimitWaitMs = 0,
+    sleep = defaultSleep,
+    now = Date.now,
+  } = {},
+) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -1162,11 +1178,58 @@ async function withStatusRetry(fn, { retries = 2, delayMs = 500 } = {}) {
     } catch (err) {
       lastErr = err;
       if (attempt === retries || !isRetryableStatusError(err)) throw err;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      let waitMs = delayMs;
+      if (maxRateLimitWaitMs > 0) {
+        const resetWaitMs = rateLimitResetWaitMs(err, now());
+        if (resetWaitMs !== null) {
+          waitMs = Math.min(Math.max(resetWaitMs, delayMs), maxRateLimitWaitMs);
+        }
+      }
+      await sleep(waitMs);
     }
   }
   throw lastErr;
 }
+
+function defaultSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * How long a rate-limited Octokit error says to wait, in ms, or null when it
+ * carries no usable header (LS-10322). `retry-after` (seconds) wins; otherwise
+ * `x-ratelimit-reset` (epoch seconds) is honoured only when the bucket is
+ * actually empty (`x-ratelimit-remaining: 0`) so an unrelated 5xx carrying
+ * stale headers never triggers a long sleep. A 1 s buffer absorbs clock skew.
+ *
+ * @param {object} err
+ * @param {number} nowMs
+ * @returns {number|null}
+ */
+function rateLimitResetWaitMs(err, nowMs) {
+  const headers = (err && err.response && err.response.headers) || {};
+  const retryAfter = Number(headers['retry-after']);
+  if (Number.isFinite(retryAfter) && retryAfter >= 0) {
+    return retryAfter * 1000 + 1000;
+  }
+  const reset = Number(headers['x-ratelimit-reset']);
+  if (
+    Number.isFinite(reset) &&
+    String(headers['x-ratelimit-remaining']) === '0'
+  ) {
+    return Math.max(0, reset * 1000 - nowMs) + 1000;
+  }
+  return null;
+}
+
+/**
+ * Longest the final verdict post will sleep waiting for the installation
+ * rate-limit window to reset (LS-10322). The in-window retries (~500 ms apart)
+ * cannot succeed while the bucket is empty; sleeping to the reset can. Kept
+ * under the summarize job's `timeout-minutes` (ci-pipeline.yml) with room for
+ * the guards that run before the post.
+ */
+const RATE_LIMIT_MAX_WAIT_MS = 5 * 60 * 1000;
 
 /**
  * Post the aggregate `CI Gate` commit status for the PR head SHA.
@@ -1185,7 +1248,11 @@ async function withStatusRetry(fn, { retries = 2, delayMs = 500 } = {}) {
  * @param {string} [params.headSha] Head SHA to target alongside `prNumber`.
  *   Required together with `prNumber` for the no-payload path; without it
  *   there is no SHA to post the status to.
- * @returns {Promise<{posted: boolean, reason?: string, state?: string, sha?: string, currentSha?: string, failing?: string[]}>}
+ * @param {(ms: number) => Promise<void>} [params.sleep] Injectable sleep for
+ *   the rate-limit wait before the final post retry (tests only).
+ * @returns {Promise<{posted: boolean, reason?: string, verdictLost?: boolean, state?: string, sha?: string, currentSha?: string, failing?: string[]}>}
+ *   `verdictLost: true` means the post exhausted its retries — the workflow
+ *   step must fail the job (LS-10322).
  */
 async function postCiGate({
   github,
@@ -1194,6 +1261,7 @@ async function postCiGate({
   results,
   prNumber,
   headSha,
+  sleep = defaultSleep,
 }) {
   const { owner, repo } = context.repo;
   const payloadPr = context.payload && context.payload.pull_request;
@@ -1492,26 +1560,30 @@ async function postCiGate({
   // Retry transient errors briefly; if they persist, degrade to a no-op post
   // (mirroring the pulls.get() fallback above) rather than crashing the job.
   try {
-    await withStatusRetry(() =>
-      github.rest.repos.createCommitStatus({
-        owner,
-        repo,
-        sha: targetSha,
-        state: effectiveState,
-        context: CI_GATE_CONTEXT,
-        description,
-        target_url,
-      }),
+    await withStatusRetry(
+      () =>
+        github.rest.repos.createCommitStatus({
+          owner,
+          repo,
+          sha: targetSha,
+          state: effectiveState,
+          context: CI_GATE_CONTEXT,
+          description,
+          target_url,
+        }),
+      { maxRateLimitWaitMs: RATE_LIMIT_MAX_WAIT_MS, sleep },
     );
   } catch (e) {
     core.warning(
       `CI Gate: failed to post '${effectiveState}' for ${targetSha} on PR ` +
         `#${pr.number} after retries (${e.message}) — the gate status was not ` +
-        'posted; a subsequent run or manual retrigger will post it.',
+        'posted; the caller must fail the job so the lost verdict is not ' +
+        'reported as green (LS-10322).',
     );
     return {
       posted: false,
       reason: 'status-post-failed',
+      verdictLost: true,
       sha: targetSha,
       failing,
       ignored,
@@ -1659,6 +1731,9 @@ module.exports = {
   assertSuccessIsCurrent,
   assertFailureIsCurrent,
   isRetryableStatusError,
+  rateLimitResetWaitMs,
+  withStatusRetry,
+  RATE_LIMIT_MAX_WAIT_MS,
   postCiGate,
   seedPendingCiGate,
 };

@@ -195,6 +195,8 @@ All three **look like a verdict was reached and something else went wrong** — 
 2. Wait until the returned `resetsAt`.
 3. Re-run only the reporting/summarize job that failed to post (`ci_rerun`/`github_retrigger_check` as appropriate) — do not push a new commit or otherwise widen the PR to "fix" it.
 
+Since LS-10322, `ci-gate.js` waits (up to 5 min) for the `retry-after`/`x-ratelimit-reset` window before its final status post, and if the `CI Gate` post still fails the Summarize job **fails** ("Fail when CI Gate verdict was lost") instead of reporting green — a red Summarize job with a seeded `pending` gate is this failure mode, not a code failure.
+
 ---
 
 ## Debug Mode
