@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type {
   AvailableDraftPlayer,
   DraftPickRecord,
@@ -84,8 +84,19 @@ export function usePlayerData({
   footballStatsMap = EMPTY_FOOTBALL_STATS_MAP,
 }: UsePlayerDataParams) {
   const isFootball = sport === 'football';
+  // Last-seen projectedMatchupPoints per player id (LS-10473). The server
+  // drops a player from availablePlayers the moment they are drafted, and
+  // availablePlayers is the only source of a projection — so without this,
+  // every drafted player's ppg went missing and the draft recap's PROJ PTS
+  // total read 0.0 once the draft completed. Only ever grows, and only when
+  // availablePlayers changes, which already recomputes statsLookup below.
+  const lastKnownPpgRef = useRef(new Map<number, number | null>());
   // Build a lookup map by player ID for displaying player names in history/board
   const statsLookup = useMemo(() => {
+    const lastKnownPpg = lastKnownPpgRef.current;
+    for (const ap of availablePlayers) {
+      lastKnownPpg.set(ap.id, ap.projectedMatchupPoints ?? null);
+    }
     const map = new Map<number, DraftPlayer>();
     // Seed from playerStatsMap
     for (const [pid, s] of playerStatsMap) {
@@ -216,6 +227,14 @@ export function usePlayerData({
             eligiblePositions: pick.player.eligiblePositions,
           });
         }
+      }
+    }
+    // Restore the projection for players no longer in availablePlayers
+    // (drafted) — the entries seeded above from playerStatsMap / pickHistory
+    // carry no ppg of their own.
+    for (const [pid, player] of map) {
+      if (player.ppg === undefined && lastKnownPpg.has(pid)) {
+        map.set(pid, { ...player, ppg: lastKnownPpg.get(pid) });
       }
     }
     return map;

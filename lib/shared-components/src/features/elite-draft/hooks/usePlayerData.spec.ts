@@ -108,6 +108,125 @@ describe('usePlayerData — ppg sourced from projectedMatchupPoints', () => {
 });
 
 /**
+ * usePlayerData — ppg survives a player being drafted (LS-10473)
+ *
+ * The server removes a player from availablePlayers as soon as they are
+ * drafted, and availablePlayers is the only source of projectedMatchupPoints.
+ * The draft recap's PROJ PTS card sums myTeam[].ppg, so if the projection is
+ * dropped along with the player, the total reads 0.0 once the draft is done.
+ */
+describe('usePlayerData — ppg retained for drafted players (LS-10473)', () => {
+  const MY_TEAM_ID = 7;
+
+  function makePick(
+    playerId: number,
+    overallPick: number,
+    teamId = MY_TEAM_ID,
+  ): DraftPickRecord {
+    return {
+      id: `pick-${overallPick}`,
+      draftId: 1,
+      round: 1,
+      pickNumber: overallPick,
+      overallPick,
+      pickedAt: '2026-10-03T20:00:00.000Z',
+      teamId,
+      playerId,
+      player: {
+        id: playerId,
+        firstName: 'Drafted',
+        lastName: `Player${playerId}`,
+        eligiblePositions: ['SS'],
+      },
+    };
+  }
+
+  function renderDraft(initial: {
+    availablePlayers: AvailableDraftPlayer[];
+    pickHistory: DraftPickRecord[];
+  }) {
+    return renderHook(
+      (props: {
+        availablePlayers: AvailableDraftPlayer[];
+        pickHistory: DraftPickRecord[];
+      }) =>
+        usePlayerData({
+          ...props,
+          playerStatsMap: emptyStatsMap,
+          pitchingStatsMap: emptyPitchingMap,
+          myTeamId: MY_TEAM_ID,
+        }),
+      { initialProps: initial },
+    );
+  }
+
+  it("keeps a drafted player's projection after they leave availablePlayers", () => {
+    const shortstop = makeAvailablePlayer({
+      id: 10,
+      eligiblePositions: ['SS'],
+      projectedMatchupPoints: 14.5,
+    });
+    const pitcher = makeAvailablePlayer({
+      id: 11,
+      eligiblePositions: ['SP'],
+      projectedMatchupPoints: 6.25,
+    });
+    const { result, rerender } = renderDraft({
+      availablePlayers: [shortstop, pitcher],
+      pickHistory: [],
+    });
+
+    // Both drafted: the server list no longer contains either of them.
+    rerender({
+      availablePlayers: [],
+      pickHistory: [makePick(10, 1), makePick(11, 2)],
+    });
+
+    expect(result.current.myTeam.map((p) => p.ppg)).toEqual([14.5, 6.25]);
+    expect(result.current.statsLookup.get(10)?.ppg).toBe(14.5);
+    // The recap's PROJ PTS total (DraftRoomRecap sums myTeam[].ppg).
+    const projPts = result.current.myTeam.reduce(
+      (sum, p) => sum + (p.ppg ?? 0),
+      0,
+    );
+    expect(projPts).toBeCloseTo(20.75);
+  });
+
+  it('retains the projection for players loaded on an earlier page or filter', () => {
+    const { result, rerender } = renderDraft({
+      availablePlayers: [
+        makeAvailablePlayer({ id: 20, projectedMatchupPoints: 9 }),
+      ],
+      pickHistory: [],
+    });
+    // A different page/filter replaces the list without player 20...
+    rerender({
+      availablePlayers: [
+        makeAvailablePlayer({ id: 21, projectedMatchupPoints: 3 }),
+      ],
+      pickHistory: [],
+    });
+    // ...and then player 20 is drafted.
+    rerender({
+      availablePlayers: [
+        makeAvailablePlayer({ id: 21, projectedMatchupPoints: 3 }),
+      ],
+      pickHistory: [makePick(20, 1)],
+    });
+    expect(result.current.myTeam[0].ppg).toBe(9);
+  });
+
+  it('leaves ppg undefined for a drafted player whose projection was never loaded', () => {
+    // No fabricated 0 — the player simply has no projection on file here.
+    const { result } = renderDraft({
+      availablePlayers: [],
+      pickHistory: [makePick(30, 1)],
+    });
+    expect(result.current.myTeam[0].ppg).toBeUndefined();
+  });
+});
+
+/**
  * usePlayerData — football stat fields (LS-9478)
  *
  * The bug this ticket exists to avoid repeating (LS-9473): `?? 0` on an
