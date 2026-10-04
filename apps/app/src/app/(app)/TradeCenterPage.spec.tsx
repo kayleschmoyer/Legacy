@@ -224,11 +224,11 @@ describe('TradeCenterPage', () => {
     expect(screen.getByText(/Browse Leagues/i)).toBeTruthy();
   });
 
-  it('navigates to league-discovery when Browse Leagues is pressed', () => {
+  it("navigates to the Join screen's Browse tab when Browse Leagues is pressed", () => {
     mockUserLeagues = { userLeagues: [] };
     render(<TradeCenterPage />);
     fireEvent.press(screen.getByText(/Browse Leagues/i));
-    expect(mockNavigate).toHaveBeenCalledWith('/league-discovery');
+    expect(mockNavigate).toHaveBeenCalledWith('/league/join?tab=browse');
   });
 
   it('renders league cards when leagues are returned', () => {

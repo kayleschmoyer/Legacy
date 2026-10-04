@@ -3700,15 +3700,25 @@ export type ProcessWaiverClaimsResult = {
 export type PublicLeagueInfo = {
   __typename?: 'PublicLeagueInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
+  /** Scheduled draft date as an ISO-8601 string, preferring the commissioner-set `scheduled_at` over the calendar `date`. Null when unscheduled (LS-8812). */
+  draftDate?: Maybe<Scalars['String']['output']>;
+  /** Draft order — "snake" | "linear". Null when the league has no draft row yet (LS-8812). */
+  draftOrder?: Maybe<Scalars['String']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  /** Era restriction on the player pool, e.g. "golden_age" (LS-8812). */
+  eraFilter?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
   isFull?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  /** Number of teams in the league (LS-8812). Same underlying team count as `totalSpots`, which names it from the spot-meter denominator perspective; this field is the league-settings reading used by the browse row meta line. */
+  numberOfTeams?: Maybe<Scalars['Int']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  /** Draft selection method — "standard" | "auction" | "random". Null when the league has no draft row yet (LS-8812). */
+  selectionMethod?: Maybe<Scalars['String']['output']>;
   /** Sport for this league (baseball or football). (LS-6290) */
   sport?: Maybe<Sport>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
@@ -3889,6 +3899,8 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
+  /** Total public leagues matching the given filters, ignoring pagination. */
+  publicLeaguesCount: Scalars['Int']['output'];
   /** Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data. */
   resolveInviteCode?: Maybe<InvitePreview>;
   /** Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev). */
@@ -4459,11 +4471,27 @@ export type QueryPreviewEligiblePlayerCountArgs = {
 
 export type QueryPublicLeaguesArgs = {
   draftStatus?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hasOpenSpots?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  minRosterSize?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryPublicLeaguesCountArgs = {
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hasOpenSpots?: InputMaybe<Scalars['Boolean']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  minRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryResolveInviteCodeArgs = {
@@ -7477,6 +7505,11 @@ export type GetPublicLeaguesQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   draftStatus?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hasOpenSpots?: InputMaybe<Scalars['Boolean']['input']>;
+  minRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  sortBy?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
@@ -7494,10 +7527,31 @@ export type GetPublicLeaguesQuery = {
     playerPool?: string | null;
     isPublic?: boolean | null;
     totalSpots?: number | null;
+    numberOfTeams?: number | null;
     availableSpots?: number | null;
     isFull?: boolean | null;
     isAlreadyMember?: boolean | null;
+    eraFilter?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    draftDate?: string | null;
   }>;
+};
+
+export type GetPublicLeaguesCountQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hasOpenSpots?: InputMaybe<Scalars['Boolean']['input']>;
+  minRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetPublicLeaguesCountQuery = {
+  __typename?: 'Query';
+  publicLeaguesCount: number;
 };
 
 export type JoinPublicLeagueMutationVariables = Exact<{
@@ -21469,6 +21523,11 @@ export const GetPublicLeagues = gql`
     $search: String
     $draftStatus: String
     $playerPool: String
+    $eraFilter: String
+    $hasOpenSpots: Boolean
+    $minRosterSize: Int
+    $maxRosterSize: Int
+    $sortBy: String
     $limit: Int
     $offset: Int
   ) {
@@ -21477,6 +21536,11 @@ export const GetPublicLeagues = gql`
       search: $search
       draftStatus: $draftStatus
       playerPool: $playerPool
+      eraFilter: $eraFilter
+      hasOpenSpots: $hasOpenSpots
+      minRosterSize: $minRosterSize
+      maxRosterSize: $maxRosterSize
+      sortBy: $sortBy
       limit: $limit
       offset: $offset
     ) {
@@ -21489,9 +21553,14 @@ export const GetPublicLeagues = gql`
       playerPool
       isPublic
       totalSpots
+      numberOfTeams
       availableSpots
       isFull
       isAlreadyMember
+      eraFilter
+      selectionMethod
+      draftOrder
+      draftDate
     }
   }
 `;
@@ -21512,6 +21581,11 @@ export const GetPublicLeagues = gql`
  *      search: // value for 'search'
  *      draftStatus: // value for 'draftStatus'
  *      playerPool: // value for 'playerPool'
+ *      eraFilter: // value for 'eraFilter'
+ *      hasOpenSpots: // value for 'hasOpenSpots'
+ *      minRosterSize: // value for 'minRosterSize'
+ *      maxRosterSize: // value for 'maxRosterSize'
+ *      sortBy: // value for 'sortBy'
  *      limit: // value for 'limit'
  *      offset: // value for 'offset'
  *   },
@@ -21578,6 +21652,115 @@ export type GetPublicLeaguesSuspenseQueryHookResult = ReturnType<
 export type GetPublicLeaguesQueryResult = Apollo.QueryResult<
   GetPublicLeaguesQuery,
   GetPublicLeaguesQueryVariables
+>;
+export const GetPublicLeaguesCount = gql`
+  query GetPublicLeaguesCount(
+    $search: String
+    $draftStatus: String
+    $playerPool: String
+    $sport: String
+    $eraFilter: String
+    $hasOpenSpots: Boolean
+    $minRosterSize: Int
+    $maxRosterSize: Int
+  ) {
+    publicLeaguesCount(
+      search: $search
+      draftStatus: $draftStatus
+      playerPool: $playerPool
+      sport: $sport
+      eraFilter: $eraFilter
+      hasOpenSpots: $hasOpenSpots
+      minRosterSize: $minRosterSize
+      maxRosterSize: $maxRosterSize
+    )
+  }
+`;
+
+/**
+ * __useGetPublicLeaguesCountQuery__
+ *
+ * To run a query within a React component, call `useGetPublicLeaguesCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPublicLeaguesCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPublicLeaguesCountQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      draftStatus: // value for 'draftStatus'
+ *      playerPool: // value for 'playerPool'
+ *      sport: // value for 'sport'
+ *      eraFilter: // value for 'eraFilter'
+ *      hasOpenSpots: // value for 'hasOpenSpots'
+ *      minRosterSize: // value for 'minRosterSize'
+ *      maxRosterSize: // value for 'maxRosterSize'
+ *   },
+ * });
+ */
+export function useGetPublicLeaguesCountQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetPublicLeaguesCountQuery,
+    GetPublicLeaguesCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPublicLeaguesCountQuery,
+    GetPublicLeaguesCountQueryVariables
+  >(GetPublicLeaguesCount, options);
+}
+export function useGetPublicLeaguesCountLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPublicLeaguesCountQuery,
+    GetPublicLeaguesCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPublicLeaguesCountQuery,
+    GetPublicLeaguesCountQueryVariables
+  >(GetPublicLeaguesCount, options);
+}
+export function useGetPublicLeaguesCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPublicLeaguesCountQuery,
+        GetPublicLeaguesCountQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPublicLeaguesCountQuery,
+    GetPublicLeaguesCountQueryVariables
+  >(
+    GetPublicLeaguesCount,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPublicLeaguesCountQuery,
+          GetPublicLeaguesCountQueryVariables
+        >,
+  );
+}
+export type GetPublicLeaguesCountQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesCountQuery
+>;
+export type GetPublicLeaguesCountLazyQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesCountLazyQuery
+>;
+export type GetPublicLeaguesCountSuspenseQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesCountSuspenseQuery
+>;
+export type GetPublicLeaguesCountQueryResult = Apollo.QueryResult<
+  GetPublicLeaguesCountQuery,
+  GetPublicLeaguesCountQueryVariables
 >;
 export const JoinPublicLeague = gql`
   mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {

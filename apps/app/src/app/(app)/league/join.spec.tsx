@@ -1,21 +1,21 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
-import { CombinedGraphQLErrors } from '@apollo/client';
+import { render, screen, waitFor } from '@testing-library/react-native';
 
-import JoinLeagueScreen from './join';
+import JoinLeagueRoute from './join';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
+let mockParams: Record<string, string> = {};
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, back: mockBack }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockParams,
+}));
+
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -27,431 +27,236 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('tamagui', () => {
-  const mocks = jest.requireActual<
-    typeof import('../../../__test-utils__/tamagui-mocks')
-  >('../../../__test-utils__/tamagui-mocks');
-  return mocks.tamaguiMocks;
-});
+interface BrowseQueryOptions {
+  variables?: Record<string, unknown>;
+  skip?: boolean;
+}
 
-const mockJoinLeague = jest.fn();
+const mockJoinByCode = jest.fn();
 const mockValidateCode = jest.fn();
-const mockJoinPublicLeague = jest.fn();
-let mockPublicLeaguesData: unknown[] = [];
+const mockJoinPublic = jest.fn();
+let mockPublicLeagues: unknown[] = [];
+let mockPublicLeaguesCount = 0;
+let browseQueryOptions: BrowseQueryOptions | null = null;
+
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
-  useJoinLeagueByCodeMutation: () => [mockJoinLeague, { loading: false }],
+  useJoinLeagueByCodeMutation: () => [mockJoinByCode, { loading: false }],
   useValidateInviteCodeLazyQuery: () => [mockValidateCode, { loading: false }],
-  useGetPublicLeaguesQuery: () => ({
-    data: { publicLeagues: mockPublicLeaguesData },
-    loading: false,
+  useJoinPublicLeagueMutation: () => [mockJoinPublic, { loading: false }],
+  useGetPublicLeaguesQuery: (options: BrowseQueryOptions) => {
+    browseQueryOptions = options;
+    return {
+      data: { publicLeagues: mockPublicLeagues },
+      loading: false,
+      refetch: jest.fn(),
+    };
+  },
+  useGetPublicLeaguesCountQuery: () => ({
+    data: { publicLeaguesCount: mockPublicLeaguesCount },
+    refetch: jest.fn(),
   }),
-  useJoinPublicLeagueMutation: () => [mockJoinPublicLeague, { loading: false }],
 }));
 
-let mockIsPremium = false;
-jest.mock('../../../features/subscription/useSubscription', () => ({
-  useSubscription: () => ({ isPremium: mockIsPremium }),
+// The shared screen is exercised directly by its own spec in
+// lib/shared-components; here we assert only the wrapper's contract with it —
+// which props the route derives from the URL and the navigation callbacks.
+type ScreenProps = Record<string, unknown>;
+
+let capturedProps: ScreenProps | null = null;
+
+jest.mock('@legacy-sports/shared-components/leagues', () => ({
+  JoinLeagueScreen: (props: ScreenProps) => {
+    capturedProps = props;
+    const { Text } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return <Text testID="join-screen">join-screen</Text>;
+  },
 }));
 
 jest.mock('../_screenErrorBoundary', () => ({ ScreenErrorBoundary: null }));
 
+function lastProps(): ScreenProps {
+  if (!capturedProps) throw new Error('JoinLeagueScreen was never rendered');
+  return capturedProps;
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('JoinLeagueScreen (unified)', () => {
+describe('JoinLeagueRoute (two-tab Invite or Browse — LS-8812)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockValidateCode.mockResolvedValue({ data: null });
-    mockIsPremium = false;
-    mockPublicLeaguesData = [];
+    mockParams = {};
+    mockPublicLeagues = [];
+    mockPublicLeaguesCount = 0;
+    capturedProps = null;
+    browseQueryOptions = null;
   });
 
-  describe('rendering', () => {
-    it('renders the join league header', () => {
-      render(<JoinLeagueScreen />);
-      expect(screen.getByText(/🎟️ Join League/)).toBeTruthy();
+  it('renders the shared Join screen', () => {
+    render(<JoinLeagueRoute />);
+    expect(screen.getByTestId('join-screen')).toBeTruthy();
+  });
+
+  describe('sport derived from the entry route (AC2)', () => {
+    it('defaults to baseball when no sport param is present', () => {
+      render(<JoinLeagueRoute />);
+      expect(lastProps().sport).toBe('baseball');
     });
 
-    it('renders sport selector buttons', () => {
-      render(<JoinLeagueScreen />);
-      expect(screen.getByTestId('sport-selector-baseball')).toBeTruthy();
-      expect(screen.getByTestId('sport-selector-football')).toBeTruthy();
+    it('uses football when the football wrapper passes it through', () => {
+      mockParams = { sport: 'football' };
+      render(<JoinLeagueRoute />);
+      expect(lastProps().sport).toBe('football');
     });
 
-    it('renders the invite code input', () => {
-      render(<JoinLeagueScreen />);
-      expect(
-        screen.getByPlaceholderText('Enter 8-character code'),
-      ).toBeTruthy();
-    });
-
-    it('renders the team name input', () => {
-      render(<JoinLeagueScreen />);
-      expect(screen.getByPlaceholderText('Enter your team name')).toBeTruthy();
-    });
-
-    it('renders the Cancel button', () => {
-      render(<JoinLeagueScreen />);
-      expect(screen.getByText('Cancel')).toBeTruthy();
-    });
-
-    it('renders the how it works section', () => {
-      render(<JoinLeagueScreen />);
-      expect(screen.getByText(/How It Works/)).toBeTruthy();
-      expect(
-        screen.getByText(/Get an invite code from your league/),
-      ).toBeTruthy();
+    it('falls back to baseball for an unrecognized sport', () => {
+      mockParams = { sport: 'cricket' };
+      render(<JoinLeagueRoute />);
+      expect(lastProps().sport).toBe('baseball');
     });
   });
 
-  describe('form interactions', () => {
-    it('uppercases invite code input', () => {
-      render(<JoinLeagueScreen />);
-      const input = screen.getByPlaceholderText('Enter 8-character code');
-      fireEvent.changeText(input, 'abc12xyz');
-      expect(input.props.value).toBe('ABC12XYZ');
+  describe('deep link (AC3)', () => {
+    it('forwards the invite code so the invite tab pre-fills it', () => {
+      mockParams = { sport: 'baseball', inviteCode: 'ABC12XYZ' };
+      render(<JoinLeagueRoute />);
+      expect(lastProps().initialInviteCode).toBe('ABC12XYZ');
+      expect(lastProps().initialTab).toBe('invite');
     });
 
-    it('updates team name input', () => {
-      render(<JoinLeagueScreen />);
-      const input = screen.getByPlaceholderText('Enter your team name');
-      fireEvent.changeText(input, 'My Awesome Team');
-      expect(input.props.value).toBe('My Awesome Team');
-    });
-
-    it('cancel button navigates back', () => {
-      render(<JoinLeagueScreen />);
-      fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
-      expect(mockBack).toHaveBeenCalled();
+    it('opens the browse tab when ?tab=browse is passed', () => {
+      mockParams = { tab: 'browse' };
+      render(<JoinLeagueRoute />);
+      expect(lastProps().initialTab).toBe('browse');
     });
   });
 
-  describe('sport-aware navigation', () => {
-    it('navigates to baseball league when baseball sport is selected (default)', async () => {
-      mockJoinLeague.mockResolvedValue({
-        data: { joinLeagueByCode: { leagueId: 99 } },
-      });
-
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Join League/ }));
-
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/99');
-      });
-    });
-
-    it('navigates to football league when football sport is selected', async () => {
-      mockJoinLeague.mockResolvedValue({
-        data: { joinLeagueByCode: { leagueId: 77 } },
-      });
-
-      render(<JoinLeagueScreen />);
-
-      fireEvent.press(screen.getByTestId('sport-selector-football'));
-
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Join League/ }));
-
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/football/league/77');
-      });
-    });
-  });
-
-  describe('form validation', () => {
-    it('disables submit when invite code is empty', () => {
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Join League/ }));
-      expect(mockJoinLeague).not.toHaveBeenCalled();
-    });
-
-    it('disables submit when team name is empty', () => {
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Join League/ }));
-      expect(mockJoinLeague).not.toHaveBeenCalled();
-    });
-
-    it('displays error message when join fails', async () => {
-      mockJoinLeague.mockRejectedValue(new Error('Already a member'));
-
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Join League/ }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Already a member/)).toBeTruthy();
-      });
-    });
-  });
-
-  describe('invite code validation', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
-
-    it('triggers code validation after debounce when 8 valid characters are entered', async () => {
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-
-      expect(mockValidateCode).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(400);
-
-      await waitFor(() => {
-        expect(mockValidateCode).toHaveBeenCalledWith({
-          variables: { code: 'ABC12XYZ' },
-        });
-      });
-    });
-
-    it('does not validate code shorter than 8 characters', () => {
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC1',
-      );
-
-      jest.advanceTimersByTime(400);
-
-      expect(mockValidateCode).not.toHaveBeenCalled();
-    });
-  });
-
-  // LS-8846: validateInviteCode throws UNAUTHENTICATED for anonymous callers
-  // (or a session that expired while this screen was open); the join screen
-  // must show a sign-in prompt instead of misreporting the code as invalid.
-  describe('anonymous invite-code validation (LS-8846)', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
-
-    function unauthenticatedError() {
-      return new CombinedGraphQLErrors({
-        errors: [
-          {
-            message: 'Not authenticated',
-            extensions: { code: 'UNAUTHENTICATED' },
-          },
-        ],
-      });
-    }
-
-    it('shows a sign-in prompt, not "Invalid invite code", for a valid code while logged out', async () => {
+  describe('invite code validation wiring (AC5)', () => {
+    it('resolves the league behind a code via useValidateInviteCodeLazyQuery', async () => {
       mockValidateCode.mockResolvedValue({
-        data: null,
-        error: unauthenticatedError(),
+        data: { validateInviteCode: { leagueId: 7, leagueName: 'Legacy' } },
       });
 
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      jest.advanceTimersByTime(400);
+      render(<JoinLeagueRoute />);
+      const validate = lastProps().validateInviteCode as (
+        code: string,
+      ) => Promise<unknown>;
 
-      await waitFor(() => {
-        expect(screen.getByText(/Sign in to check this invite/)).toBeTruthy();
+      await expect(validate('ABC12XYZ')).resolves.toEqual({
+        leagueId: 7,
+        leagueName: 'Legacy',
       });
-      expect(screen.queryByText(/❌ Invalid invite code/)).toBeNull();
+      expect(mockValidateCode).toHaveBeenCalledWith({
+        variables: { code: 'ABC12XYZ' },
+      });
     });
 
-    it('still reports a genuinely invalid code (no error) while logged out', async () => {
+    it('resolves null for an unknown code', async () => {
       mockValidateCode.mockResolvedValue({
         data: { validateInviteCode: null },
       });
 
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'BADCODE1',
-      );
-      jest.advanceTimersByTime(400);
+      render(<JoinLeagueRoute />);
+      const validate = lastProps().validateInviteCode as (
+        code: string,
+      ) => Promise<unknown>;
 
-      await waitFor(() => {
-        expect(screen.getByText(/❌ Invalid invite code/)).toBeTruthy();
-      });
-      expect(screen.queryByText(/Sign in to check this invite/)).toBeNull();
-    });
-
-    it('pressing Sign In navigates to the login screen', async () => {
-      mockValidateCode.mockResolvedValue({
-        data: null,
-        error: unauthenticatedError(),
-      });
-
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter 8-character code'),
-        'ABC12XYZ',
-      );
-      jest.advanceTimersByTime(400);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Sign In' })).toBeTruthy();
-      });
-      fireEvent.press(screen.getByRole('button', { name: 'Sign In' }));
-
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      await expect(validate('NOPENOPE')).resolves.toBeNull();
     });
   });
 
-  // LS-6290: premium users get a Quick Join shortcut to open public leagues;
-  // free users see the same invite-code-only experience as before.
-  describe('Quick Join (premium differentiation, LS-6290)', () => {
-    const quickJoinLeague = {
-      id: 42,
-      name: 'Sunday Ballers',
-      totalSpots: 10,
-      availableSpots: 3,
-      isFull: false,
-      isAlreadyMember: false,
-    };
+  describe('join by code (AC5)', () => {
+    it('navigates to the entry sport league on success', async () => {
+      mockParams = { sport: 'football' };
+      mockJoinByCode.mockResolvedValue({
+        data: { joinLeagueByCode: { leagueId: 77 } },
+      });
 
-    it('does not render Quick Join for free users', () => {
-      mockIsPremium = false;
-      mockPublicLeaguesData = [quickJoinLeague];
-      render(<JoinLeagueScreen />);
-      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+      render(<JoinLeagueRoute />);
+      const join = lastProps().onJoinByCode as (
+        code: string,
+        team: string,
+      ) => void;
+      join('ABC12XYZ', 'My Team');
+
+      expect(mockJoinByCode).toHaveBeenCalledWith({
+        variables: { inviteCode: 'ABC12XYZ', teamName: 'My Team' },
+      });
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith('/football/league/77'),
+      );
+    });
+  });
+
+  describe('browse tab (AC8)', () => {
+    it('skips the browse query until the tab is opened', () => {
+      render(<JoinLeagueRoute />);
+      expect(browseQueryOptions?.skip).toBe(true);
     });
 
-    it('renders Quick Join with open public leagues for premium users', () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [quickJoinLeague];
-      render(<JoinLeagueScreen />);
-      expect(screen.getByTestId('quick-join-panel')).toBeTruthy();
-      expect(screen.getByText('Sunday Ballers')).toBeTruthy();
+    it('runs the browse query immediately when entered on the browse tab', () => {
+      mockParams = { tab: 'browse' };
+      render(<JoinLeagueRoute />);
+      expect(browseQueryOptions?.skip).toBe(false);
     });
 
-    it('hides Quick Join for premium users when no open public leagues exist', () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [];
-      render(<JoinLeagueScreen />);
-      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+    it('scopes the browse query to the entry sport', () => {
+      mockParams = { sport: 'football', tab: 'browse' };
+      render(<JoinLeagueRoute />);
+      expect(browseQueryOptions?.variables?.sport).toBe('football');
     });
 
-    it('excludes full and already-joined leagues from Quick Join', () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [
-        { ...quickJoinLeague, id: 1, name: 'Full League', isFull: true },
-        {
-          ...quickJoinLeague,
-          id: 2,
-          name: 'Already Joined',
-          isAlreadyMember: true,
-        },
-      ];
-      render(<JoinLeagueScreen />);
-      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+    it('passes the server-side total count through for the results header', () => {
+      mockParams = { tab: 'browse' };
+      mockPublicLeaguesCount = 12;
+      render(<JoinLeagueRoute />);
+      expect(lastProps().browseTotalCount).toBe(12);
     });
 
-    it('prompts for a team name before quick-joining', () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [quickJoinLeague];
-      render(<JoinLeagueScreen />);
-      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
-      expect(mockJoinPublicLeague).not.toHaveBeenCalled();
-      expect(
-        screen.getByText(/Please enter a team name to Quick Join/),
-      ).toBeTruthy();
-    });
-
-    it('quick-joins the league and navigates on success', async () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [quickJoinLeague];
-      mockJoinPublicLeague.mockResolvedValue({
+    it('routes a public join by the joined league sport, not hard-coded baseball', async () => {
+      mockParams = { tab: 'browse' };
+      mockJoinPublic.mockResolvedValue({
         data: { joinPublicLeague: { success: true, leagueId: 42 } },
       });
 
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
+      render(<JoinLeagueRoute />);
+      const joinPublic = lastProps().onJoinPublic as (
+        league: Record<string, unknown>,
+        team: string,
+      ) => void;
+      joinPublic({ id: 42, sport: 'football' }, 'My Team');
 
-      await waitFor(() => {
-        expect(mockJoinPublicLeague).toHaveBeenCalledWith({
-          variables: { leagueId: 42, teamName: 'My Team' },
-        });
-      });
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42');
-      });
-    });
-
-    // Project rule: every mutation call site needs coverage for an
-    // UNAUTHENTICATED error — the UI must surface it gracefully, not crash
-    // or silently no-op.
-    it('surfaces an error without crashing when quick-join returns UNAUTHENTICATED', async () => {
-      mockIsPremium = true;
-      mockPublicLeaguesData = [quickJoinLeague];
-      mockJoinPublicLeague.mockRejectedValue(
-        new CombinedGraphQLErrors({
-          errors: [
-            {
-              message: 'Not authenticated',
-              extensions: { code: 'UNAUTHENTICATED' },
-            },
-          ],
-        }),
-      );
-
-      render(<JoinLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your team name'),
-        'My Team',
-      );
-      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Not authenticated/)).toBeTruthy();
-      });
-      expect(mockNavigate).not.toHaveBeenCalledWith(
-        expect.stringContaining('/league/'),
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith('/football/league/42'),
       );
     });
+
+    it('surfaces a failed public join inline rather than via an alert', async () => {
+      mockParams = { tab: 'browse' };
+      mockJoinPublic.mockResolvedValue({
+        data: {
+          joinPublicLeague: { success: false, message: 'League is full' },
+        },
+      });
+
+      render(<JoinLeagueRoute />);
+      const joinPublic = lastProps().onJoinPublic as (
+        league: Record<string, unknown>,
+        team: string,
+      ) => void;
+      joinPublic({ id: 42, sport: 'baseball' }, 'My Team');
+
+      await waitFor(() =>
+        expect(lastProps().browseJoinError).toBe('League is full'),
+      );
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  it('closes back to the previous screen', () => {
+    render(<JoinLeagueRoute />);
+    (lastProps().onClose as () => void)();
+    expect(mockBack).toHaveBeenCalled();
   });
 });

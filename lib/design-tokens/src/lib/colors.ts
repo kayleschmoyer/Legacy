@@ -85,6 +85,19 @@ export const semantic = {
   accentFg: '#D4BB78',
   accentSoft: 'rgba(197, 165, 90, 0.12)',
   accentBorder: 'rgba(197, 165, 90, 0.4)',
+  // "Field green" affirmative accent (LS-8812) — the ballpark-grass tone the
+  // mobile join/browse handoff uses for valid states and spot meters. Distinct
+  // from `success` above, which is the brighter UI-chrome green used by toasts
+  // and status badges; do not collapse the two.
+  fieldGreen: '#7BA05B',
+  fieldGreenFg: '#9DC183',
+  fieldGreenSoft: 'rgba(123, 160, 91, 0.12)',
+  fieldGreenBorder: 'rgba(123, 160, 91, 0.5)',
+  // Seam-red error pairing for dark strips (LS-8812). `seamErrorFg` is a
+  // softer read of `brand.seamRed` than `dangerFg`, tuned for the invite-code
+  // "INVALID CODE" strip.
+  seamErrorFg: '#E06A7C',
+  seamErrorSoft: 'rgba(196, 30, 58, 0.12)',
 } as const;
 
 // Accents introduced by the mobile design-handoff batch (LS-8794/8795/8800/

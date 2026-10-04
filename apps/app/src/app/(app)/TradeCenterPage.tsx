@@ -271,7 +271,7 @@ export default function TradeCenterPage() {
                 </Text>
                 <Button
                   size="$3"
-                  onPress={() => router.navigate('/league-discovery')}
+                  onPress={() => router.navigate('/league/join?tab=browse')}
                   accessibilityRole="button"
                 >
                   Browse Leagues

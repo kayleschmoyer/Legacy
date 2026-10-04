@@ -195,11 +195,11 @@ describe('LeaguesTab', () => {
       expect(screen.getByTestId('leagues-browse-cta')).toBeTruthy();
     });
 
-    it('navigates to league discovery from the browse CTA', () => {
+    it("navigates to the Join screen's Browse tab from the browse CTA", () => {
       mockSummaries([]);
       render(<LeaguesTab />);
       fireEvent(screen.getByTestId('leagues-browse-cta'), 'touchEnd');
-      expect(mockNavigate).toHaveBeenCalledWith('/league-discovery');
+      expect(mockNavigate).toHaveBeenCalledWith('/league/join?tab=browse');
     });
   });
 

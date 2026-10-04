@@ -70,6 +70,21 @@ export const BRAND_GOLD_PRESS = '#A8894A';
 export const BRAND_GOLD_LIGHT = brand.goldLight;
 export const BRAND_GOLD_DARK = brand.goldDark;
 
+// -- Field Green (affirmative accent) --------------------------------
+// LS-8812: the ballpark-grass affirmative tone from the mobile join/browse
+// handoff — valid invite-code states, spot meters, and OPEN badges. Distinct
+// from the brighter `GREEN`/`semantic.success` UI-chrome green.
+
+export const FIELD_GREEN = semantic.fieldGreen;
+/** Field green lightened for legibility on dark strips. */
+export const FIELD_GREEN_FG = semantic.fieldGreenFg;
+export const FIELD_GREEN_SOFT = semantic.fieldGreenSoft;
+export const FIELD_GREEN_BORDER = semantic.fieldGreenBorder;
+
+/** Softer seam-red foreground for dark error strips. */
+export const SEAM_ERROR_FG = semantic.seamErrorFg;
+export const SEAM_ERROR_SOFT = semantic.seamErrorSoft;
+
 // -- Position Colors -------------------------------------------------
 
 /** Sport scope for position color lookups. Mirrors the `sport_kind` enum

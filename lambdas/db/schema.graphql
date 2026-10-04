@@ -4256,15 +4256,40 @@ A public league available for discovery and joining
 """
 type PublicLeagueInfo {
   availableSpots: Int
+
+  """
+  Scheduled draft date as an ISO-8601 string, preferring the commissioner-set `scheduled_at` over the calendar `date`. Null when unscheduled (LS-8812).
+  """
+  draftDate: String
+
+  """
+  Draft order — "snake" | "linear". Null when the league has no draft row yet (LS-8812).
+  """
+  draftOrder: String
   draftStatus: String
+
+  """
+  Era restriction on the player pool, e.g. "golden_age" (LS-8812).
+  """
+  eraFilter: String
   id: Int
   isAlreadyMember: Boolean
   isFull: Boolean
   isPublic: Boolean
   maxRosterSize: Int
   name: String
+
+  """
+  Number of teams in the league (LS-8812). Same underlying team count as `totalSpots`, which names it from the spot-meter denominator perspective; this field is the league-settings reading used by the browse row meta line.
+  """
+  numberOfTeams: Int
   owner: Int
   playerPool: String
+
+  """
+  Draft selection method — "standard" | "auction" | "random". Null when the league has no draft row yet (LS-8812).
+  """
+  selectionMethod: String
 
   """
   Sport for this league (baseball or football). (LS-6290)
@@ -4803,12 +4828,35 @@ type Query {
   privacyPolicyStatus: PrivacyPolicyStatus
   publicLeagues(
     draftStatus: String
+    eraFilter: String
+    hasOpenSpots: Boolean
     limit: Int
+    maxRosterSize: Int
+    minRosterSize: Int
     offset: Int
     playerPool: String
     search: String
+
+    """
+    Sort order — one of spotsLeft | draftDate | createdAt. Defaults to spotsLeft.
+    """
+    sortBy: String
     sport: Sport
   ): [PublicLeagueInfo!]!
+
+  """
+  Total public leagues matching the given filters, ignoring pagination.
+  """
+  publicLeaguesCount(
+    draftStatus: String
+    eraFilter: String
+    hasOpenSpots: Boolean
+    maxRosterSize: Int
+    minRosterSize: Int
+    playerPool: String
+    search: String
+    sport: String
+  ): Int!
 
   """
   Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data.

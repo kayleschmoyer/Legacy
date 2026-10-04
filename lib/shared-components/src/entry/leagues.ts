@@ -15,6 +15,7 @@ export {
 export * from '../features/leagues/AwardVotingPanel';
 export * from '../features/leagues/create-wizard';
 export * from '../features/leagues/CreateLeagueModal';
+export * from '../features/leagues/join';
 export * from '../features/leagues/KeeperDesignationPanel';
 export * from '../features/leagues/LeagueActivityFeed';
 export * from '../features/leagues/LeagueDetailShell';

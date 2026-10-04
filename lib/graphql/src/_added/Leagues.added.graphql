@@ -71,6 +71,11 @@ query GetPublicLeagues(
   $search: String
   $draftStatus: String
   $playerPool: String
+  $eraFilter: String
+  $hasOpenSpots: Boolean
+  $minRosterSize: Int
+  $maxRosterSize: Int
+  $sortBy: String
   $limit: Int
   $offset: Int
 ) {
@@ -79,6 +84,11 @@ query GetPublicLeagues(
     search: $search
     draftStatus: $draftStatus
     playerPool: $playerPool
+    eraFilter: $eraFilter
+    hasOpenSpots: $hasOpenSpots
+    minRosterSize: $minRosterSize
+    maxRosterSize: $maxRosterSize
+    sortBy: $sortBy
     limit: $limit
     offset: $offset
   ) {
@@ -91,10 +101,37 @@ query GetPublicLeagues(
     playerPool
     isPublic
     totalSpots
+    numberOfTeams
     availableSpots
     isFull
     isAlreadyMember
+    eraFilter
+    selectionMethod
+    draftOrder
+    draftDate
   }
+}
+
+query GetPublicLeaguesCount(
+  $search: String
+  $draftStatus: String
+  $playerPool: String
+  $sport: String
+  $eraFilter: String
+  $hasOpenSpots: Boolean
+  $minRosterSize: Int
+  $maxRosterSize: Int
+) {
+  publicLeaguesCount(
+    search: $search
+    draftStatus: $draftStatus
+    playerPool: $playerPool
+    sport: $sport
+    eraFilter: $eraFilter
+    hasOpenSpots: $hasOpenSpots
+    minRosterSize: $minRosterSize
+    maxRosterSize: $maxRosterSize
+  )
 }
 
 mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {

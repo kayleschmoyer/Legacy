@@ -4,6 +4,7 @@ describe('publicLeagues query — sport scoping (LS-7634)', () => {
   let schema: GraphQLSchema;
   let mockDb: {
     select: jest.Mock;
+    selectDistinctOn: jest.Mock;
     from: jest.Mock;
     leftJoin: jest.Mock;
     where: jest.Mock;
@@ -25,6 +26,7 @@ describe('publicLeagues query — sport scoping (LS-7634)', () => {
 
     mockDb = {
       select: jest.fn().mockReturnThis(),
+      selectDistinctOn: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
@@ -65,6 +67,16 @@ describe('publicLeagues query — sport scoping (LS-7634)', () => {
           isPublic: 'isPublic',
           isMockDraft: 'isMockDraft',
           tierFrozenAt: 'tierFrozenAt',
+          baseballEraFilter: 'baseballEraFilter',
+          createdAt: 'createdAt',
+        },
+        drafts: {
+          leagueId: 'leagueId',
+          selectionMethod: 'selectionMethod',
+          draftOrder: 'draftOrder',
+          scheduledAt: 'scheduledAt',
+          date: 'date',
+          createdAt: 'createdAt',
         },
         leagueMembers: {
           leagueId: 'leagueId',

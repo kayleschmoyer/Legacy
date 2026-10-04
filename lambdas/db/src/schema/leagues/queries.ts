@@ -1259,9 +1259,14 @@ const PublicLeagueInfo = builder.objectRef<{
   playerPool: string;
   isPublic: boolean;
   totalSpots: number;
+  numberOfTeams: number;
   availableSpots: number;
   isFull: boolean;
   isAlreadyMember: boolean;
+  eraFilter: string;
+  selectionMethod: string | null;
+  draftOrder: string | null;
+  draftDate: string | null;
 }>('PublicLeagueInfo');
 
 PublicLeagueInfo.implement({
@@ -1280,17 +1285,171 @@ PublicLeagueInfo.implement({
     playerPool: t.exposeString('playerPool'),
     isPublic: t.exposeBoolean('isPublic'),
     totalSpots: t.exposeInt('totalSpots'),
+    numberOfTeams: t.exposeInt('numberOfTeams', {
+      description:
+        'Number of teams in the league (LS-8812). Same underlying team count as `totalSpots`, which names it from the spot-meter denominator perspective; this field is the league-settings reading used by the browse row meta line.',
+    }),
     availableSpots: t.exposeInt('availableSpots'),
     isFull: t.exposeBoolean('isFull'),
     isAlreadyMember: t.exposeBoolean('isAlreadyMember'),
+    eraFilter: t.exposeString('eraFilter', {
+      description:
+        'Era restriction on the player pool, e.g. "golden_age" (LS-8812).',
+    }),
+    selectionMethod: t.exposeString('selectionMethod', {
+      nullable: true,
+      description:
+        'Draft selection method — "standard" | "auction" | "random". Null when the league has no draft row yet (LS-8812).',
+    }),
+    draftOrder: t.exposeString('draftOrder', {
+      nullable: true,
+      description:
+        'Draft order — "snake" | "linear". Null when the league has no draft row yet (LS-8812).',
+    }),
+    draftDate: t.exposeString('draftDate', {
+      nullable: true,
+      description:
+        'Scheduled draft date as an ISO-8601 string, preferring the commissioner-set `scheduled_at` over the calendar `date`. Null when unscheduled (LS-8812).',
+    }),
   }),
 });
+
+/** Sort orders accepted by `publicLeagues` (LS-8812). */
+const PUBLIC_LEAGUE_SORTS = ['spotsLeft', 'draftDate', 'createdAt'] as const;
+type PublicLeagueSort = (typeof PUBLIC_LEAGUE_SORTS)[number];
+
+function isValidPublicLeagueSort(value: string): value is PublicLeagueSort {
+  return (PUBLIC_LEAGUE_SORTS as readonly string[]).includes(value);
+}
+
+/**
+ * Era-filter values accepted by `publicLeagues` (LS-8812). Mirrors the
+ * `era_filter` pg enum; validated rather than cast so an unknown value returns
+ * BAD_USER_INPUT instead of failing deep in the query builder.
+ */
+const VALID_ERA_FILTERS = [
+  // Baseball
+  'all',
+  'dead_ball',
+  'golden_age',
+  'expansion',
+  'free_agency',
+  'steroid_era',
+  'modern',
+  'custom',
+  // Football
+  'pioneer',
+  'single_platoon',
+  'super_bowl_era',
+  'west_coast',
+  'salary_cap_era',
+  'spread_offense',
+] as const;
+type ValidEraFilter = (typeof VALID_ERA_FILTERS)[number];
+
+function isValidEraFilter(value: string): value is ValidEraFilter {
+  return (VALID_ERA_FILTERS as readonly string[]).includes(value);
+}
+
+const VALID_DRAFT_STATUSES = [
+  'not-started',
+  'queued',
+  'in-progress',
+  'paused',
+  'completed',
+] as const;
+type ValidDraftStatus = (typeof VALID_DRAFT_STATUSES)[number];
+
+function isValidDraftStatus(value: string): value is ValidDraftStatus {
+  return (VALID_DRAFT_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * Filter arguments shared by `publicLeagues` and `publicLeaguesCount` so the
+ * list and its total can never disagree about what "matching" means (LS-8812).
+ */
+interface PublicLeagueFilterArgs {
+  search?: string | null;
+  draftStatus?: string | null;
+  playerPool?: string | null;
+  sport?: string | null;
+  eraFilter?: string | null;
+  minRosterSize?: number | null;
+  maxRosterSize?: number | null;
+}
+
+/**
+ * Build the column-level WHERE conditions for a public-league browse query.
+ *
+ * Spot-availability (`hasOpenSpots`) is deliberately NOT handled here — it is
+ * derived from the joined team/member count subqueries, so each caller appends
+ * it after building those aliases.
+ */
+function buildPublicLeagueConditions(args: PublicLeagueFilterArgs): SQL[] {
+  const conditions: SQL[] = [eq(PublicSchema.leagues.isPublic, true)];
+
+  if (args.draftStatus) {
+    if (!isValidDraftStatus(args.draftStatus)) {
+      throw UserInputError(
+        `Invalid draftStatus: "${args.draftStatus}". Allowed values: ${VALID_DRAFT_STATUSES.join(', ')}.`,
+      );
+    }
+    conditions.push(eq(PublicSchema.leagues.draftStatus, args.draftStatus));
+  }
+
+  if (args.playerPool) {
+    if (!isValidPlayerPool(args.playerPool)) {
+      throw UserInputError(
+        `Invalid playerPool: "${args.playerPool}". Allowed values: ${VALID_PLAYER_POOLS.join(', ')}.`,
+      );
+    }
+    conditions.push(eq(PublicSchema.leagues.playerPool, args.playerPool));
+  }
+
+  if (args.sport) {
+    if (args.sport !== 'baseball' && args.sport !== 'football') {
+      throw UserInputError(
+        `Invalid sport: "${args.sport}". Allowed values: baseball, football.`,
+      );
+    }
+    conditions.push(eq(PublicSchema.leagues.sport, args.sport));
+  }
+
+  if (args.eraFilter) {
+    if (!isValidEraFilter(args.eraFilter)) {
+      throw UserInputError(
+        `Invalid eraFilter: "${args.eraFilter}". Allowed values: ${VALID_ERA_FILTERS.join(', ')}.`,
+      );
+    }
+    conditions.push(eq(PublicSchema.leagues.baseballEraFilter, args.eraFilter));
+  }
+
+  if (args.minRosterSize != null) {
+    conditions.push(
+      sql`${PublicSchema.leagues.maxRosterSize} >= ${args.minRosterSize}`,
+    );
+  }
+
+  if (args.maxRosterSize != null) {
+    conditions.push(
+      sql`${PublicSchema.leagues.maxRosterSize} <= ${args.maxRosterSize}`,
+    );
+  }
+
+  if (args.search) {
+    conditions.push(ilike(PublicSchema.leagues.name, `%${args.search}%`));
+  }
+
+  return conditions;
+}
 
 /**
  * Query: publicLeagues
  *
  * Browse open leagues that are visible to all authenticated users.
- * Supports search by name, and filters by draftStatus and playerPool.
+ * Supports search by name, and filters by sport, draftStatus, playerPool,
+ * era, roster-size range and spot availability, ordered by `sortBy`
+ * (LS-8812 — previously hard-ordered by league id).
  */
 builder.queryField('publicLeagues', (t) =>
   t.field({
@@ -1301,6 +1460,14 @@ builder.queryField('publicLeagues', (t) =>
       search: t.arg.string({ required: false }),
       draftStatus: t.arg.string({ required: false }),
       playerPool: t.arg.string({ required: false }),
+      eraFilter: t.arg.string({ required: false }),
+      hasOpenSpots: t.arg.boolean({ required: false }),
+      minRosterSize: t.arg.int({ required: false }),
+      maxRosterSize: t.arg.int({ required: false }),
+      sortBy: t.arg.string({
+        required: false,
+        description: `Sort order — one of ${PUBLIC_LEAGUE_SORTS.join(' | ')}. Defaults to spotsLeft.`,
+      }),
       limit: t.arg.int({ required: false }),
       offset: t.arg.int({ required: false }),
     },
@@ -1314,41 +1481,15 @@ builder.queryField('publicLeagues', (t) =>
       const userId = context.user.id;
       const limitVal = args.limit ?? 20;
       const offsetVal = args.offset ?? 0;
+      const sortBy = args.sortBy ?? 'spotsLeft';
+      if (!isValidPublicLeagueSort(sortBy)) {
+        throw UserInputError(
+          `Invalid sortBy: "${sortBy}". Allowed values: ${PUBLIC_LEAGUE_SORTS.join(', ')}.`,
+        );
+      }
 
       try {
-        // Build WHERE conditions
-        const conditions: SQL[] = [eq(PublicSchema.leagues.isPublic, true)];
-
-        if (args.sport) {
-          conditions.push(eq(PublicSchema.leagues.sport, args.sport));
-        }
-
-        if (args.draftStatus) {
-          conditions.push(
-            eq(
-              PublicSchema.leagues.draftStatus,
-              args.draftStatus as
-                | 'not-started'
-                | 'queued'
-                | 'in-progress'
-                | 'paused'
-                | 'completed',
-            ),
-          );
-        }
-
-        if (args.playerPool) {
-          if (!isValidPlayerPool(args.playerPool)) {
-            throw UserInputError(
-              `Invalid playerPool: "${args.playerPool}". Allowed values: ${VALID_PLAYER_POOLS.join(', ')}.`,
-            );
-          }
-          conditions.push(eq(PublicSchema.leagues.playerPool, args.playerPool));
-        }
-
-        if (args.search) {
-          conditions.push(ilike(PublicSchema.leagues.name, `%${args.search}%`));
-        }
+        const conditions = buildPublicLeagueConditions(args);
 
         // Pre-aggregate counts to avoid correlated subqueries per league row
         const teamCounts = context.db
@@ -1377,6 +1518,45 @@ builder.queryField('publicLeagues', (t) =>
           .where(eq(PublicSchema.leagueMembers.userId, userId))
           .as('user_membership');
 
+        // One draft row per league — DISTINCT ON keeps the newest so a league
+        // that somehow carries more than one draft cannot fan the result out
+        // into duplicate browse rows.
+        const latestDrafts = context.db
+          .selectDistinctOn([PublicSchema.drafts.leagueId], {
+            leagueId: PublicSchema.drafts.leagueId,
+            selectionMethod: PublicSchema.drafts.selectionMethod,
+            draftOrder: PublicSchema.drafts.draftOrder,
+            scheduledAt: PublicSchema.drafts.scheduledAt,
+            date: PublicSchema.drafts.date,
+          })
+          .from(PublicSchema.drafts)
+          .orderBy(
+            PublicSchema.drafts.leagueId,
+            desc(PublicSchema.drafts.createdAt),
+          )
+          .as('latest_drafts');
+
+        const availableSpotsSql = sql<number>`GREATEST(COALESCE(${teamCounts.count}, 0) - COALESCE(${memberCounts.count}, 0), 0)`;
+        // `scheduled_at` is a timestamptz, which the pg driver hydrates into a
+        // Date; `date` comes back as a string. The GraphQL field is an ISO
+        // string, so the mapping below normalizes both.
+        const draftDateSql = sql<
+          Date | string | null
+        >`COALESCE(${latestDrafts.scheduledAt}, ${latestDrafts.date}::timestamptz)`;
+
+        if (args.hasOpenSpots) {
+          conditions.push(sql`${availableSpotsSql} > 0`);
+        }
+
+        const orderBy = {
+          // Most joinable first — the browse default.
+          spotsLeft: desc(availableSpotsSql),
+          // Soonest scheduled draft first; unscheduled leagues sink.
+          draftDate: sql`${draftDateSql} ASC NULLS LAST`,
+          // The UI labels this "Newest".
+          createdAt: desc(PublicSchema.leagues.createdAt),
+        }[sortBy];
+
         const rows = await context.db
           .select({
             id: PublicSchema.leagues.id,
@@ -1387,9 +1567,13 @@ builder.queryField('publicLeagues', (t) =>
             draftStatus: PublicSchema.leagues.draftStatus,
             playerPool: PublicSchema.leagues.playerPool,
             isPublic: PublicSchema.leagues.isPublic,
+            eraFilter: PublicSchema.leagues.baseballEraFilter,
             totalSpots: sql<number>`COALESCE(${teamCounts.count}, 0)`,
             claimedSpots: sql<number>`COALESCE(${memberCounts.count}, 0)`,
             isAlreadyMember: sql<boolean>`${userMembership.leagueId} IS NOT NULL`,
+            selectionMethod: latestDrafts.selectionMethod,
+            draftOrder: latestDrafts.draftOrder,
+            draftDate: draftDateSql,
           })
           .from(PublicSchema.leagues)
           .leftJoin(
@@ -1404,8 +1588,13 @@ builder.queryField('publicLeagues', (t) =>
             userMembership,
             eq(userMembership.leagueId, PublicSchema.leagues.id),
           )
+          .leftJoin(
+            latestDrafts,
+            eq(latestDrafts.leagueId, PublicSchema.leagues.id),
+          )
           .where(and(...conditions))
-          .orderBy(PublicSchema.leagues.id)
+          // Tie-break on id so paging stays stable across equal sort keys.
+          .orderBy(orderBy, PublicSchema.leagues.id)
           .limit(limitVal)
           .offset(offsetVal);
 
@@ -1421,17 +1610,123 @@ builder.queryField('publicLeagues', (t) =>
             playerPool: row.playerPool,
             isPublic: row.isPublic,
             totalSpots: row.totalSpots,
+            numberOfTeams: row.totalSpots,
             availableSpots,
             isFull: availableSpots === 0,
             isAlreadyMember: Boolean(row.isAlreadyMember),
+            eraFilter: row.eraFilter,
+            selectionMethod: row.selectionMethod ?? null,
+            draftOrder: row.draftOrder ?? null,
+            draftDate:
+              row.draftDate instanceof Date
+                ? row.draftDate.toISOString()
+                : (row.draftDate ?? null),
           };
         });
       } catch (error) {
-        LOGGER.error('Error fetching public leagues', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        // Input validation (`buildPublicLeagueConditions`) runs inside this
+        // try, so rejected args arrive here as GraphQLErrors. Re-throw them
+        // untouched — collapsing them into a generic Error would report a
+        // client's bad `sport`/`playerPool` as INTERNAL_SERVER_ERROR.
+        if (error instanceof GraphQLError) throw error;
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Error fetching public leagues', err, { userId });
         throw new Error('Failed to fetch public leagues');
+      }
+    },
+  }),
+);
+
+/**
+ * Query: publicLeaguesCount
+ *
+ * Total number of public leagues matching the same filters `publicLeagues`
+ * accepts, ignoring limit/offset — the browse header's "{n} LEAGUES" count
+ * (LS-8812).
+ *
+ * Kept as a sibling query rather than folding a `totalCount` into
+ * `publicLeagues` so the existing `[PublicLeagueInfo!]!` return type — and
+ * every caller of it — stays unchanged.
+ */
+builder.queryField('publicLeaguesCount', (t) =>
+  t.int({
+    description:
+      'Total public leagues matching the given filters, ignoring pagination.',
+    nullable: false,
+    args: {
+      search: t.arg.string({ required: false }),
+      draftStatus: t.arg.string({ required: false }),
+      playerPool: t.arg.string({ required: false }),
+      sport: t.arg.string({ required: false }),
+      eraFilter: t.arg.string({ required: false }),
+      hasOpenSpots: t.arg.boolean({ required: false }),
+      minRosterSize: t.arg.int({ required: false }),
+      maxRosterSize: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to browse public leagues',
+        );
+      }
+
+      try {
+        const conditions = buildPublicLeagueConditions(args);
+
+        if (args.hasOpenSpots) {
+          const teamCounts = context.db
+            .select({
+              leagueId: PublicSchema.teams.leagueId,
+              count: sql<number>`count(*)::int`.as('team_count'),
+            })
+            .from(PublicSchema.teams)
+            .groupBy(PublicSchema.teams.leagueId)
+            .as('team_counts');
+
+          const memberCounts = context.db
+            .select({
+              leagueId: PublicSchema.leagueMembers.leagueId,
+              count: sql<number>`count(*)::int`.as('member_count'),
+            })
+            .from(PublicSchema.leagueMembers)
+            .groupBy(PublicSchema.leagueMembers.leagueId)
+            .as('member_counts');
+
+          conditions.push(
+            sql`GREATEST(COALESCE(${teamCounts.count}, 0) - COALESCE(${memberCounts.count}, 0), 0) > 0`,
+          );
+
+          const [openRow] = await context.db
+            .select({ total: count() })
+            .from(PublicSchema.leagues)
+            .leftJoin(
+              teamCounts,
+              eq(teamCounts.leagueId, PublicSchema.leagues.id),
+            )
+            .leftJoin(
+              memberCounts,
+              eq(memberCounts.leagueId, PublicSchema.leagues.id),
+            )
+            .where(and(...conditions));
+
+          return openRow?.total ?? 0;
+        }
+
+        const [row] = await context.db
+          .select({ total: count() })
+          .from(PublicSchema.leagues)
+          .where(and(...conditions));
+
+        return row?.total ?? 0;
+      } catch (error) {
+        // See the matching note in `publicLeagues` — rejected args must keep
+        // their BAD_USER_INPUT code rather than being masked as a 500.
+        if (error instanceof GraphQLError) throw error;
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Error counting public leagues', err, {
+          userId: context.user.id,
+        });
+        throw new Error('Failed to count public leagues');
       }
     },
   }),

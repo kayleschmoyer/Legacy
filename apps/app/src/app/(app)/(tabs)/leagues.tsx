@@ -82,7 +82,7 @@ export default function LeaguesTab() {
       onViewLeague={viewLeague}
       onCreateLeague={() => router.navigate('/league/create')}
       onJoinLeague={() => router.navigate('/league/join')}
-      onBrowseLeagues={() => router.navigate('/league-discovery')}
+      onBrowseLeagues={() => router.navigate('/league/join?tab=browse')}
       refreshControl={refreshControl}
     />
   );
