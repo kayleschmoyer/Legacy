@@ -363,6 +363,40 @@ class ProfileSurface {
 
   // ── Actions ───────────────────────────────────────────────────────
 
+  /** Click a preset avatar tile in the App Avatar picker (LS-7212). */
+  async selectAvatarPreset(label: string): Promise<void> {
+    await this.#driver.byRole('img', { name: label, exact: true }).tap();
+  }
+
+  /** Type a URL into the App Avatar picker's custom-URL input (LS-7212). */
+  async fillCustomAvatarUrl(url: string): Promise<void> {
+    await this.#driver.byLabel('Custom avatar URL').fill(url);
+  }
+
+  /** Click the picker's custom-URL "Apply" button (LS-7212). */
+  async clickApplyCustomAvatarUrl(): Promise<void> {
+    await this.#driver.byRole('button', { name: 'Apply' }).tap();
+  }
+
+  /** Click the picker's "Save" button (LS-7212). The avatar section is the
+   * last "Save" on the page — the username editor's Save only renders while
+   * editing. */
+  async clickSaveAvatar(): Promise<void> {
+    await this.#driver.byRole('button', { name: 'Save' }).last().tap();
+  }
+
+  /** Click the picker's "Clear" button (LS-7212). */
+  async clickClearAvatar(): Promise<void> {
+    await this.#driver.byRole('button', { name: 'Clear' }).tap();
+  }
+
+  /** Assert the picker preview caption (LS-7212). */
+  async expectAvatarPreviewCaption(
+    caption: 'Custom URL or preset selected' | 'No image selected',
+  ): Promise<void> {
+    await this.#driver.byText(caption, { exact: true }).expectVisible();
+  }
+
   /** Click the "Set as primary" button for a non-canonical identity. */
   async clickSetAsPrimary(): Promise<void> {
     await this.#driver.byRole('button', { name: 'Set as primary' }).tap();

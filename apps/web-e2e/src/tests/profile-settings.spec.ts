@@ -260,6 +260,132 @@ test.describe('Profile Settings Page @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-7212: App Avatar picker — preset + custom-URL selection.
+//
+// The picker offers presets and a custom URL only; it has no file-upload path,
+// so there is no client-side size / MIME / EXIF validation to exercise. These
+// tests pin what does exist: which value each control sends to the
+// `UpdateUserAvatar` mutation.
+// ---------------------------------------------------------------------------
+
+/** Mock the profile page and record every UpdateUserAvatar `avatarUrl`. */
+async function setupAvatarGraphQL(
+  page: import('@playwright/test').Page,
+): Promise<Array<string | null>> {
+  const sent: Array<string | null> = [];
+  await page.route(
+    (url) => isGraphQLEndpoint(url),
+    async (route, request) => {
+      const body = request.postDataJSON() as {
+        operationName?: string;
+        variables?: { avatarUrl?: string | null };
+      };
+
+      if (body.operationName === 'GetUserById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: MOCK_USER_DATA }),
+        });
+        return;
+      }
+
+      if (body.operationName === 'UpdateUserAvatar') {
+        sent.push(body.variables?.avatarUrl ?? null);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              updateUserAvatar: {
+                __typename: 'User',
+                id: 1,
+                avatarUrl: body.variables?.avatarUrl ?? null,
+              },
+            },
+          }),
+        });
+        return;
+      }
+
+      await unmockedGraphQLFallback(route);
+    },
+  );
+  return sent;
+}
+
+test.describe('Profile Settings Page — App Avatar picker (LS-7212) @regression', () => {
+  test('saving a preset sends its page-origin-resolved URL', async ({
+    page,
+    settingsPage,
+  }) => {
+    const sent = await setupAvatarGraphQL(page);
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
+
+    await settingsPage.profile.selectAvatarPreset('Astronaut');
+    await settingsPage.profile.expectAvatarPreviewCaption(
+      'Custom URL or preset selected',
+    );
+    await settingsPage.profile.clickSaveAvatar();
+
+    // Presets are stored relative (/presets/x.png) in the picker but must be
+    // resolved against the page origin so the DB value passes URL validation.
+    const origin = new URL(page.url()).origin;
+    await expect
+      .poll(() => sent)
+      .toEqual([`${origin}/presets/avatar-astronaut.png`]);
+  });
+
+  test('applying a custom URL then saving sends that URL unchanged', async ({
+    page,
+    settingsPage,
+  }) => {
+    const sent = await setupAvatarGraphQL(page);
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.fillCustomAvatarUrl(
+      '  https://cdn.example.com/me.png  ',
+    );
+    await settingsPage.profile.clickApplyCustomAvatarUrl();
+    await settingsPage.profile.expectAvatarPreviewCaption(
+      'Custom URL or preset selected',
+    );
+    await settingsPage.profile.clickSaveAvatar();
+
+    // Surrounding whitespace is trimmed on Apply.
+    await expect.poll(() => sent).toEqual(['https://cdn.example.com/me.png']);
+  });
+
+  test('applying a blank custom URL selects nothing', async ({
+    page,
+    settingsPage,
+  }) => {
+    const sent = await setupAvatarGraphQL(page);
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.fillCustomAvatarUrl('   ');
+    await settingsPage.profile.clickApplyCustomAvatarUrl();
+    await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
+    expect(sent).toEqual([]);
+  });
+
+  test('Clear resets the preview and sends a null avatar', async ({
+    page,
+    settingsPage,
+  }) => {
+    const sent = await setupAvatarGraphQL(page);
+    await settingsPage.profile.goto();
+
+    await settingsPage.profile.selectAvatarPreset('Astronaut');
+    await settingsPage.profile.clickClearAvatar();
+
+    await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
+    await expect.poll(() => sent).toEqual([null]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-9135: the Appearance / theme section that LS-4912 added to this page was
 // removed — theme selection now lives solely on /preferences (the canonical
 // location per docs/design/UUCswUjg_28Xzcqii7Rt2Q), eliminating the
