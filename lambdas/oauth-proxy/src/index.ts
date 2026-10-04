@@ -621,7 +621,7 @@ const baseOAuthHandler = async (
           const result = await withRateLimit(
             event,
             { route: 'oauth.discord.authorize', ...AUTH_RATE_LIMIT },
-            () => Promise.resolve(handleDiscordAuthorize(event)),
+            () => handleDiscordAuthorize(event),
           );
           return cors(result);
         }

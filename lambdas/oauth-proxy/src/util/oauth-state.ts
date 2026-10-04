@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
 /**
  * Cookie that stores the OAuth CSRF state token. Bound to the browser
@@ -164,4 +164,88 @@ export function verifyOauthState(
   } catch {
     return false;
   }
+}
+
+/**
+ * Domain-separation label mixed into the link-state MAC so a MAC minted here
+ * can never be replayed as a valid signature in any other context.
+ */
+const LINK_STATE_MAC_CONTEXT = 'ls-oauth-link-state';
+
+function linkStateMac(nonce: string, userId: string, secret: string): string {
+  return createHmac('sha256', secret)
+    .update(`${LINK_STATE_MAC_CONTEXT}|${nonce}|${userId}`)
+    .digest('hex');
+}
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build the state-cookie value for an account-link flow, binding the nonce
+ * sent to the provider to the LS user who started the flow (LS-7214).
+ *
+ * Format: `<nonce>.<userId>.<hmac>` where the HMAC (keyed with a server
+ * secret) covers both the nonce and the user id. Only the bare `nonce` is sent
+ * to the provider as the OAuth `state`; the user id never leaves the HttpOnly
+ * cookie. Signing means a cookie planted by an attacker (cookie tossing from a
+ * sibling subdomain) cannot claim an arbitrary user id, and a legitimately
+ * issued cookie for user A cannot be completed by user B's session.
+ */
+export function buildLinkStateCookieValue(
+  nonce: string,
+  userId: number,
+  secret: string,
+): string {
+  const uid = String(userId);
+  return `${nonce}${STATE_SEPARATOR}${uid}${STATE_SEPARATOR}${linkStateMac(nonce, uid, secret)}`;
+}
+
+export type LinkStateVerification =
+  | { ok: true }
+  | { ok: false; reason: 'invalid_state' | 'user_mismatch' };
+
+/**
+ * Verify an account-link callback against the cookie minted by
+ * {@link buildLinkStateCookieValue}. Fails closed:
+ *
+ * - `invalid_state` — cookie missing/malformed, the received `state` does not
+ *   match the cookie's nonce, or the cookie's signature is invalid.
+ * - `user_mismatch` — the cookie is authentic but was issued to a different
+ *   LS user than the one completing the callback (e.g. the session changed in
+ *   another tab mid-flow).
+ *
+ * All comparisons are constant-time.
+ */
+export function verifyLinkState(
+  receivedNonce: string | undefined | null,
+  cookieHeader: string | undefined,
+  cookieName: string,
+  userId: number,
+  secret: string,
+): LinkStateVerification {
+  const invalid: LinkStateVerification = { ok: false, reason: 'invalid_state' };
+  if (!receivedNonce) return invalid;
+  const cookieValue = parseOauthStateFromCookies(cookieHeader, cookieName);
+  if (!cookieValue) return invalid;
+
+  const parts = cookieValue.split(STATE_SEPARATOR);
+  if (parts.length !== 3) return invalid;
+  const [nonce, cookieUserId, mac] = parts as [string, string, string];
+  if (!nonce || !cookieUserId || !mac) return invalid;
+
+  if (!safeEqual(receivedNonce, nonce)) return invalid;
+  if (!safeEqual(mac, linkStateMac(nonce, cookieUserId, secret))) {
+    return invalid;
+  }
+  if (!safeEqual(cookieUserId, String(userId))) {
+    return { ok: false, reason: 'user_mismatch' };
+  }
+  return { ok: true };
 }

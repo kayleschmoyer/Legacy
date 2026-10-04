@@ -161,6 +161,32 @@ test.describe('Discord OAuth callback — error states @regression', () => {
     await discordCallbackScreen.expectErrorStateVisible();
   });
 
+  test('session changed mid-flow (state bound to another user) fails closed with a clear error', async ({
+    page,
+    discordCallbackScreen,
+  }) => {
+    // LS-7214: the oauth-proxy binds the link state to the user who clicked
+    // Connect Discord. If a different user is signed in by the time the
+    // callback lands (e.g. signed in as B in another tab), it rejects with
+    // 403 `state_user_mismatch` before exchanging the code. Body shape matches
+    // lambdas/oauth-proxy/src/handlers/Discord.ts `handleDiscordLink`.
+    await mockDiscordLink(page, {
+      status: 403,
+      body: {
+        error:
+          'You signed in as a different account while connecting Discord. Please start linking again from your profile settings.',
+        code: 'state_user_mismatch',
+      },
+    });
+
+    await discordCallbackScreen.goto('?code=race-code&state=nonce-123');
+
+    await discordCallbackScreen.expectErrorMessage(
+      /signed in as a different account/i,
+    );
+    await discordCallbackScreen.expectErrorStateVisible();
+  });
+
   test('user-denied (error=access_denied) shows the cancelled/denied error state', async ({
     discordCallbackScreen,
   }) => {

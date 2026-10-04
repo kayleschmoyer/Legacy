@@ -10,10 +10,16 @@ import {
 } from './Discord';
 import { resolveOrCreateUser } from './resolveOrCreateUser';
 import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
-import { verifyOauthState } from '../util/oauth-state';
+import {
+  buildLinkStateCookieValue,
+  buildOauthStateCookie,
+  verifyLinkState,
+  verifyOauthState,
+} from '../util/oauth-state';
 import {
   getAuthenticatedUser,
   getAuthenticatedUserId,
+  getNavigationUser,
   requireCsrf,
 } from '../util/authenticated-request';
 import { notifyNewUserSignup } from '../util/discord';
@@ -68,6 +74,7 @@ jest.mock('../util/jwt-cookie', () => ({
 jest.mock('../util/authenticated-request', () => ({
   getAuthenticatedUser: jest.fn(),
   getAuthenticatedUserId: jest.fn().mockResolvedValue(42),
+  getNavigationUser: jest.fn(),
   requireCsrf: jest.fn().mockReturnValue(null),
 }));
 
@@ -79,6 +86,10 @@ jest.mock('../util/oauth-state', () => ({
     (name = 'ls_oauth_state') => `${name}=; Max-Age=0`,
   ),
   generateOauthState: jest.fn().mockReturnValue('mock-state-token'),
+  buildLinkStateCookieValue: jest.fn(
+    (nonce: string, userId: number) => `${nonce}.${userId}.mac`,
+  ),
+  verifyLinkState: jest.fn(),
   verifyOauthState: jest.fn(),
   OAUTH_STATE_COOKIE_LOGIN: 'ls_oauth_state_login',
   OAUTH_STATE_COOKIE_LINK: 'ls_oauth_state_link',
@@ -108,6 +119,16 @@ jest.mock('../util', () => ({
 
 const mockVerifyOauthState = verifyOauthState as jest.MockedFunction<
   typeof verifyOauthState
+>;
+const mockVerifyLinkState = verifyLinkState as jest.MockedFunction<
+  typeof verifyLinkState
+>;
+const mockBuildLinkStateCookieValue =
+  buildLinkStateCookieValue as jest.MockedFunction<
+    typeof buildLinkStateCookieValue
+  >;
+const mockGetNavigationUser = getNavigationUser as jest.MockedFunction<
+  typeof getNavigationUser
 >;
 const mockResolveOrCreateUser = resolveOrCreateUser as jest.MockedFunction<
   typeof resolveOrCreateUser
@@ -528,10 +549,10 @@ describe('handleDiscordAuthorize', () => {
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
   });
 
-  it('302s to Discord with the generated state and sets the login-flow state cookie by default', () => {
+  it('302s to Discord with the generated state and sets the login-flow state cookie by default', async () => {
     const event = makeEvent({});
 
-    const result = handleDiscordAuthorize(event);
+    const result = await handleDiscordAuthorize(event);
 
     expect(result.statusCode).toBe(302);
     const location = (result.headers?.['Location'] as string | undefined) ?? '';
@@ -550,13 +571,21 @@ describe('handleDiscordAuthorize', () => {
     expect(setCookies).toEqual(
       expect.arrayContaining(['ls_oauth_state_login=stub']),
     );
+    // The sign-in flow has no session to bind to.
+    expect(mockGetNavigationUser).not.toHaveBeenCalled();
+    expect(mockBuildLinkStateCookieValue).not.toHaveBeenCalled();
   });
 
-  it('sets the link-flow state cookie when link=1 is present (LS-6661)', () => {
+  it('sets the link-flow state cookie when link=1 is present (LS-6661)', async () => {
+    mockGetNavigationUser.mockResolvedValue({
+      id: 42,
+      email: 'a@example.com',
+      isAdmin: false,
+    });
     const event = makeEvent({});
     event.queryStringParameters = { link: '1' };
 
-    const result = handleDiscordAuthorize(event);
+    const result = await handleDiscordAuthorize(event);
 
     expect(result.statusCode).toBe(302);
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
@@ -566,6 +595,45 @@ describe('handleDiscordAuthorize', () => {
     expect(setCookies).not.toEqual(
       expect.arrayContaining(['ls_oauth_state_login=stub']),
     );
+  });
+
+  it('binds the link-flow state cookie to the signed-in user, sending only the nonce to Discord (LS-7214)', async () => {
+    mockGetNavigationUser.mockResolvedValue({
+      id: 42,
+      email: 'a@example.com',
+      isAdmin: false,
+    });
+    const event = makeEvent({});
+    event.queryStringParameters = { link: '1' };
+
+    const result = await handleDiscordAuthorize(event);
+
+    expect(result.statusCode).toBe(302);
+    expect(mockBuildLinkStateCookieValue).toHaveBeenCalledWith(
+      'mock-state-token',
+      42,
+      'test-client-secret',
+    );
+    expect(buildOauthStateCookie).toHaveBeenCalledWith(
+      'mock-state-token.42.mac',
+      'ls_oauth_state_link',
+    );
+    const location = (result.headers?.['Location'] as string | undefined) ?? '';
+    expect(location).toMatch(/[?&]state=mock-state-token(&|$)/);
+    expect(location).not.toContain('mock-state-token.42');
+  });
+
+  it('rejects link=1 with 401 and sets no state cookie when there is no session (LS-7214)', async () => {
+    mockGetNavigationUser.mockResolvedValue(null);
+    const event = makeEvent({});
+    event.queryStringParameters = { link: '1' };
+
+    const result = await handleDiscordAuthorize(event);
+
+    expect(result.statusCode).toBe(401);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'auth_required' });
+    expect(result.multiValueHeaders?.['Set-Cookie']).toBeUndefined();
+    expect(result.headers?.['Location']).toBeUndefined();
   });
 });
 
@@ -578,7 +646,7 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
     process.env['DISCORD_REDIRECT_URI'] = 'https://example.com/callback';
     mockGetAuthenticatedUserId.mockResolvedValue(42);
     mockRequireCsrf.mockReturnValue(null);
-    mockVerifyOauthState.mockReturnValue(true);
+    mockVerifyLinkState.mockReturnValue({ ok: true });
 
     fetchSpy = jest
       .spyOn(globalThis, 'fetch')
@@ -643,15 +711,58 @@ describe('handleDiscordLink (LS-2549 — no Discord account enumeration)', () =>
     const result = await handleDiscordLink(event);
 
     expect(result.statusCode).toBe(200);
-    expect(mockVerifyOauthState).toHaveBeenCalledWith(
+    expect(mockVerifyLinkState).toHaveBeenCalledWith(
       'link-tok',
       'ls_oauth_state_link=link-tok',
       'ls_oauth_state_link',
+      42,
+      'test-client-secret',
     );
     const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
     expect(setCookies).toEqual(
       expect.arrayContaining([expect.stringContaining('ls_oauth_state_link=')]),
     );
+  });
+
+  it('rejects (403) a state issued to a different user without exchanging the code, and clears the cookie (LS-7214)', async () => {
+    // State minted for user A; the callback arrives under user B's session
+    // (e.g. B signed in in another tab mid-flow).
+    mockGetAuthenticatedUserId.mockResolvedValue(7);
+    mockVerifyLinkState.mockReturnValue({
+      ok: false,
+      reason: 'user_mismatch',
+    });
+
+    const result = await handleDiscordLink(
+      makeEvent({ code: 'auth-code', state: 'link-tok' }),
+    );
+
+    expect(result.statusCode).toBe(403);
+    expect(JSON.parse(result.body)).toMatchObject({
+      code: 'state_user_mismatch',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
+    const setCookies = result.multiValueHeaders?.['Set-Cookie'] ?? [];
+    expect(setCookies).toEqual(
+      expect.arrayContaining([expect.stringContaining('ls_oauth_state_link=')]),
+    );
+  });
+
+  it('rejects (400 invalid_state) a missing or forged state without exchanging the code', async () => {
+    mockVerifyLinkState.mockReturnValue({
+      ok: false,
+      reason: 'invalid_state',
+    });
+
+    const result = await handleDiscordLink(
+      makeEvent({ code: 'auth-code', state: 'forged' }),
+    );
+
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body)).toMatchObject({ code: 'invalid_state' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLinkProviderIdentity).not.toHaveBeenCalled();
   });
 });
 
@@ -874,11 +985,13 @@ describe('DISCORD_REDIRECT_URI allow-list self-check (LGN-015 / LS-6670)', () =>
       process.env['DISCORD_CLIENT_ID'] = 'test-client-id';
     });
 
-    it('handleDiscordAuthorize throws a specific error on a non-https redirect URI', () => {
+    it('handleDiscordAuthorize throws a specific error on a non-https redirect URI', async () => {
       process.env['DISCORD_REDIRECT_URI'] =
         'http://legacy-fantasy.com/callback';
 
-      expect(() => handleDiscordAuthorize(makeEvent({}))).toThrow(/https/);
+      await expect(handleDiscordAuthorize(makeEvent({}))).rejects.toThrow(
+        /https/,
+      );
     });
 
     it('the web exchange fails (401) with a specific logged error when the origin is not allow-listed', async () => {

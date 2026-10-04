@@ -1,5 +1,6 @@
 import {
   buildClearOauthStateCookie,
+  buildLinkStateCookieValue,
   buildOauthStateCookie,
   decodeOauthState,
   encodeOauthState,
@@ -8,6 +9,7 @@ import {
   OAUTH_STATE_COOKIE_LINK,
   OAUTH_STATE_COOKIE_LOGIN,
   parseOauthStateFromCookies,
+  verifyLinkState,
   verifyOauthState,
 } from './oauth-state';
 
@@ -216,6 +218,86 @@ describe('oauth-state', () => {
       expect(
         verifyOauthState('linktok', header, OAUTH_STATE_COOKIE_LOGIN),
       ).toBe(false);
+    });
+  });
+
+  // LS-7214: the account-link state cookie is signed and bound to the LS user
+  // who started the flow, so the callback can fail closed if the session
+  // changed (or the cookie was planted) mid-flow.
+  describe('link state bound to the initiating user (LS-7214)', () => {
+    const SECRET = 'test-secret';
+    const nonce = 'a'.repeat(64);
+    const cookieName = OAUTH_STATE_COOKIE_LINK;
+    const header = (value: string) => `${cookieName}=${value}`;
+
+    it('encodes the nonce and user id with a MAC, and round-trips for the same user', () => {
+      const value = buildLinkStateCookieValue(nonce, 42, SECRET);
+      const [n, uid, mac] = value.split('.');
+      expect(n).toBe(nonce);
+      expect(uid).toBe('42');
+      expect(mac).toMatch(/^[0-9a-f]{64}$/);
+
+      expect(
+        verifyLinkState(nonce, header(value), cookieName, 42, SECRET),
+      ).toEqual({ ok: true });
+    });
+
+    it('rejects a callback completed by a different user as user_mismatch', () => {
+      const value = buildLinkStateCookieValue(nonce, 42, SECRET);
+      expect(
+        verifyLinkState(nonce, header(value), cookieName, 7, SECRET),
+      ).toEqual({ ok: false, reason: 'user_mismatch' });
+    });
+
+    it('rejects a cookie whose user id was tampered with', () => {
+      const [n, , mac] = buildLinkStateCookieValue(nonce, 42, SECRET).split(
+        '.',
+      );
+      const forged = `${n}.7.${mac}`;
+      expect(
+        verifyLinkState(nonce, header(forged), cookieName, 7, SECRET),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
+    });
+
+    it('rejects a cookie signed with a different secret', () => {
+      const value = buildLinkStateCookieValue(nonce, 7, 'attacker-secret');
+      expect(
+        verifyLinkState(nonce, header(value), cookieName, 7, SECRET),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
+    });
+
+    it('rejects when the received state does not match the cookie nonce', () => {
+      const value = buildLinkStateCookieValue(nonce, 42, SECRET);
+      expect(
+        verifyLinkState('b'.repeat(64), header(value), cookieName, 42, SECRET),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
+    });
+
+    it('rejects a missing state, missing cookie, or a legacy unsigned cookie', () => {
+      const value = buildLinkStateCookieValue(nonce, 42, SECRET);
+      expect(
+        verifyLinkState(undefined, header(value), cookieName, 42, SECRET),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
+      expect(verifyLinkState(nonce, undefined, cookieName, 42, SECRET)).toEqual(
+        { ok: false, reason: 'invalid_state' },
+      );
+      // Pre-LS-7214 cookie: bare nonce, no user binding.
+      expect(
+        verifyLinkState(nonce, header(nonce), cookieName, 42, SECRET),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
+    });
+
+    it('only reads the link-flow cookie', () => {
+      const value = buildLinkStateCookieValue(nonce, 42, SECRET);
+      expect(
+        verifyLinkState(
+          nonce,
+          `${OAUTH_STATE_COOKIE_LOGIN}=${value}`,
+          cookieName,
+          42,
+          SECRET,
+        ),
+      ).toEqual({ ok: false, reason: 'invalid_state' });
     });
   });
 });

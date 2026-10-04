@@ -10,14 +10,17 @@ import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import {
   getAuthenticatedUser,
   getAuthenticatedUserId,
+  getNavigationUser,
   requireCsrf,
 } from '../util/authenticated-request';
 import {
   buildClearOauthStateCookie,
+  buildLinkStateCookieValue,
   buildOauthStateCookie,
   generateOauthState,
   OAUTH_STATE_COOKIE_LINK,
   OAUTH_STATE_COOKIE_LOGIN,
+  verifyLinkState,
   verifyOauthState,
 } from '../util/oauth-state';
 import { withDbClient } from '../util/db';
@@ -287,10 +290,13 @@ async function exchangeCodeForUser(
  *   sign-in. This selects which flow-specific state cookie is set
  *   (`ls_oauth_state_link` vs `ls_oauth_state_login`) so a sign-in tab and a
  *   link tab open at the same time do not clobber each other's state (LS-6661).
+ *   The link flow requires a signed-in session: the state cookie is signed and
+ *   bound to that user's id so `/oauth/discord/link` can reject a callback
+ *   completed under a different session (LS-7214).
  */
-export const handleDiscordAuthorize = (
+export const handleDiscordAuthorize = async (
   event: APIGatewayEvent,
-): APIGatewayProxyResult => {
+): Promise<APIGatewayProxyResult> => {
   const clientId = getDiscordClientId();
   const redirectUri = getDiscordRedirectUri();
   const state = generateOauthState();
@@ -303,6 +309,23 @@ export const handleDiscordAuthorize = (
   const stateCookieName = isLink
     ? OAUTH_STATE_COOKIE_LINK
     : OAUTH_STATE_COOKIE_LOGIN;
+
+  // Bind the link flow's state to the LS user who started it (LS-7214). This
+  // is a top-level navigation, so resolve the session from the JWT cookie
+  // without the CSRF header (safe: we only read identity to mint the cookie).
+  let stateCookieValue = state;
+  if (isLink) {
+    const user = await getNavigationUser(event);
+    if (!user) {
+      return errorResponse(
+        401,
+        'Sign in before linking a Discord account',
+        'auth_required',
+      );
+    }
+    const secret = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
+    stateCookieValue = buildLinkStateCookieValue(state, user.id, secret);
+  }
 
   // Omit `prompt` so Discord only shows the authorize screen when it is
   // actually needed (first authorization or a scope change). Forcing
@@ -327,7 +350,7 @@ export const handleDiscordAuthorize = (
     statusCode: 302,
     headers: { Location: authorizeUrl },
     multiValueHeaders: {
-      'Set-Cookie': [buildOauthStateCookie(state, stateCookieName)],
+      'Set-Cookie': [buildOauthStateCookie(stateCookieValue, stateCookieName)],
     },
     body: '',
   };
@@ -564,7 +587,9 @@ export const handleDiscordAuth = async (
  * Links a Discord account to the authenticated user.
  * Accepts { code, state } — `state` must match the cookie bound at
  * `/oauth/discord/authorize` time, preventing link-CSRF where an attacker
- * tricks a victim into linking the attacker's Discord account.
+ * tricks a victim into linking the attacker's Discord account. The cookie is
+ * also bound to the LS user who started the flow; a callback completed under a
+ * different session is rejected before the code is exchanged (LS-7214).
  */
 export const handleDiscordLink = async (
   event: APIGatewayEvent,
@@ -594,9 +619,26 @@ export const handleDiscordLink = async (
     );
   }
 
-  if (
-    !verifyOauthState(body.state, requestCookieHeader, OAUTH_STATE_COOKIE_LINK)
-  ) {
+  const stateSecret = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
+  const stateCheck = verifyLinkState(
+    body.state,
+    requestCookieHeader,
+    OAUTH_STATE_COOKIE_LINK,
+    userId,
+    stateSecret,
+  );
+  if (!stateCheck.ok) {
+    if (stateCheck.reason === 'user_mismatch') {
+      LOGGER.warn('Discord link rejected: state issued to a different user');
+      return withClearStateCookie(
+        errorResponse(
+          403,
+          'You signed in as a different account while connecting Discord. Please start linking again from your profile settings.',
+          'state_user_mismatch',
+        ),
+        clearState,
+      );
+    }
     LOGGER.warn('Discord link rejected: state mismatch');
     return withClearStateCookie(
       errorResponse(
