@@ -45,8 +45,26 @@ const NFLVERSE_RELEASE_BASE =
   'https://github.com/nflverse/nflverse-data/releases/download';
 const PLAYERS_URL = `${NFLVERSE_RELEASE_BASE}/players/players.csv`;
 const SCHEDULES_URL = `${NFLVERSE_RELEASE_BASE}/schedules/games.csv`;
-const weeklyStatsUrl = (season: number) =>
-  `${NFLVERSE_RELEASE_BASE}/player_stats/stats_player_week_${season}.csv`;
+// `stats_player` is the canonical release for these files. The similarly
+// named `player_stats` release mirrors only some of them and lacks 2002, 2019
+// and 2025 — those 404'd in a real dry-run (LS-10224).
+export const weeklyStatsUrl = (season: number) =>
+  `${NFLVERSE_RELEASE_BASE}/stats_player/stats_player_week_${season}.csv`;
+
+/**
+ * A season whose download fails is skipped so the remaining seasons still
+ * land (same as ingest-retrosheet), but the run must not then report success:
+ * an operator would ship a corpus with whole seasons missing and exit 0
+ * (LS-10224). Throwing here lets the CLI's top-level handler log it and exit 1.
+ */
+export function assertNoFailedSeasons(failedSeasons: number[]): void {
+  if (failedSeasons.length === 0) return;
+  throw new Error(
+    `nflverse ingest incomplete: ${failedSeasons.length} season(s) failed to download: ` +
+      `${failedSeasons.join(', ')}. Objects for every other season were written; ` +
+      're-run the same command to fill the gaps (existing objects are skipped unless --force).',
+  );
+}
 
 /** nflverse's unified weekly stats file starts at 1999 (play-by-play does
  * not exist before that — the league's own digitization limit, ADR 0022). */
@@ -88,9 +106,11 @@ async function fetchText(url: string): Promise<string> {
  * Fetch one season's weekly stats CSV, or `null` when nflverse has no file for
  * it (HTTP 404). Any other failure still throws.
  *
- * A 404 is a normal outcome, not an error (LS-10223): nflverse's series has
- * gaps inside 1999-present (2002 returns 404 while 1999 and 2003 both exist),
- * and the in-progress season's file is only posted once the season is under way.
+ * A 404 is only expected for the in-progress season, whose file is posted once
+ * the season is under way (LS-10223). The `stats_player` release covers every
+ * completed season from 1999, so a 404 for one of those is a failure the caller
+ * must surface (LS-10224) — the earlier "2002 is a gap year" reading came from
+ * the `player_stats` release, which was the wrong tag.
  */
 export async function fetchWeeklyStatsCsv(
   season: number,
@@ -133,8 +153,8 @@ export type SeasonRange =
  * Unlike Retrosheet (LS-10232), nflverse publishes the current season's weekly
  * stats *during* the season, so the default upper bound is the current season
  * rather than last year. Seasons beyond it cannot exist and are clamped away;
- * a season with no file (not posted yet, or a gap year such as 2002) 404s and
- * the season loop skips it (see `fetchWeeklyStatsCsv`).
+ * the in-progress season's file may not be posted yet, which 404s and the
+ * season loop skips it (see `fetchWeeklyStatsCsv`).
  */
 export function resolveSeasonRange(
   args: Pick<IngestNflverseFootballArgs, 'from' | 'to'>,
@@ -255,7 +275,7 @@ export async function handleIngestNflverseFootball(
   let totalTeamObjects = 0;
   let totalSkipped = 0;
   let totalUnmapped = 0;
-  const missingSeasons: number[] = [];
+  const failedSeasons: number[] = [];
   const currentSeason = currentNflSeason(new Date());
 
   for (let season = from; season <= to; season++) {
@@ -264,18 +284,23 @@ export async function handleIngestNflverseFootball(
       weeklyCsv = await fetchWeeklyStatsCsv(season);
     } catch (error) {
       LOGGER.error(`Season ${season}: download failed`, error as Error);
+      failedSeasons.push(season);
       continue;
     }
     if (weeklyCsv === null) {
-      // Expected, not a failure: no error object is logged. A past season with
-      // no file is a permanent gap in nflverse's series; only the in-progress
-      // season can simply be "not posted yet".
-      missingSeasons.push(season);
-      LOGGER.info(
-        season >= currentSeason
-          ? `Season ${season}: weekly stats not published yet, skipping`
-          : `Season ${season}: nflverse has no weekly stats file for this season, skipping`,
-      );
+      // Only the in-progress season can simply be "not posted yet". A completed
+      // season with no file means the URL is wrong or nflverse moved it, and
+      // the corpus would silently lack that season (LS-10224).
+      if (season >= currentSeason) {
+        LOGGER.info(
+          `Season ${season}: weekly stats not published yet, skipping`,
+        );
+      } else {
+        LOGGER.error(
+          `Season ${season}: no weekly stats file at ${weeklyStatsUrl(season)} (404)`,
+        );
+        failedSeasons.push(season);
+      }
       continue;
     }
 
@@ -364,11 +389,6 @@ export async function handleIngestNflverseFootball(
     `Ingest complete: ${totalPlayerObjects} player objects, ${totalTeamObjects} team-defense objects, ` +
       `${totalSkipped} skipped (already present), ${totalUnmapped} distinct unmapped nflverse players (no pfr_id crosswalk)`,
   );
-  if (missingSeasons.length > 0) {
-    // Name them: a season silently absent from the corpus is indistinguishable
-    // from one that was never requested when reading only the summary line.
-    LOGGER.info(
-      `Season(s) with no nflverse weekly stats file, ingested nothing: ${missingSeasons.join(', ')}`,
-    );
-  }
+
+  assertNoFailedSeasons(failedSeasons);
 }

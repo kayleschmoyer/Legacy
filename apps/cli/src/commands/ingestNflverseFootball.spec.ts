@@ -1,8 +1,10 @@
 import {
+  assertNoFailedSeasons,
   currentNflSeason,
   fetchWeeklyStatsCsv,
   FIRST_SEASON,
   resolveSeasonRange,
+  weeklyStatsUrl,
 } from './ingestNflverseFootball';
 
 // Mid-September 2026: the 2026 NFL season is under way, so nflverse is already
@@ -87,14 +89,12 @@ describe('fetchWeeklyStatsCsv (LS-10223)', () => {
     global.fetch = realFetch;
   });
 
-  it('returns null for a season nflverse has no file for (2002 is a gap year)', async () => {
+  it('returns null for a season nflverse has not posted yet', async () => {
     const fetchMock = respond(404);
     global.fetch = fetchMock;
 
-    await expect(fetchWeeklyStatsCsv(2002)).resolves.toBeNull();
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      'https://github.com/nflverse/nflverse-data/releases/download/player_stats/stats_player_week_2002.csv',
-    );
+    await expect(fetchWeeklyStatsCsv(2026)).resolves.toBeNull();
+    expect(fetchMock.mock.calls[0][0]).toBe(weeklyStatsUrl(2026));
   });
 
   it('returns the CSV body when the season exists', async () => {
@@ -109,5 +109,44 @@ describe('fetchWeeklyStatsCsv (LS-10223)', () => {
     global.fetch = respond(500);
 
     await expect(fetchWeeklyStatsCsv(2003)).rejects.toThrow('failed: 500');
+  });
+});
+
+describe('weeklyStatsUrl (LS-10224)', () => {
+  // The release TAG is the load-bearing part. nflverse's `player_stats`
+  // release only mirrors some stats_player_week_YYYY.csv files — it is missing
+  // 2002, 2019 and 2025, which 404'd in a real dry-run. The canonical
+  // `stats_player` release carries all of 1999-2025.
+  it('downloads weekly stats from the stats_player release', () => {
+    expect(weeklyStatsUrl(2002)).toBe(
+      'https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2002.csv',
+    );
+  });
+
+  it.each([2002, 2019, 2025])(
+    'does not use the player_stats release, which lacks %i',
+    (season) => {
+      expect(weeklyStatsUrl(season)).not.toContain('/player_stats/');
+    },
+  );
+});
+
+describe('assertNoFailedSeasons (LS-10224)', () => {
+  it('does nothing when every season downloaded', () => {
+    expect(() => assertNoFailedSeasons([])).not.toThrow();
+  });
+
+  // A failed season is skipped so the rest of the run still lands, but the
+  // run must not then report success: an operator would ship a corpus with
+  // whole seasons missing and exit code 0. The throw reaches the CLI's
+  // top-level catch in main.ts, which exits 1.
+  it('throws, naming every failed season, when any season failed', () => {
+    expect(() => assertNoFailedSeasons([2002, 2019, 2025])).toThrow(
+      /2002, 2019, 2025/,
+    );
+  });
+
+  it('tells the operator a re-run only fills the gaps', () => {
+    expect(() => assertNoFailedSeasons([2019])).toThrow(/re-run/i);
   });
 });
