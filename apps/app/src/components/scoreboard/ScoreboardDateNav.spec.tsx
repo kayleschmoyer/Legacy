@@ -4,13 +4,13 @@ import { ScoreboardDateNav } from './ScoreboardDateNav';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockTodayISO = jest.fn(() => '2024-06-15');
+const mockMaxDateISO = jest.fn(() => '2025-06-15');
 const mockOffsetDate = jest.fn(
   (iso: string, days: number) => `OFFSET(${iso},${days})`,
 );
 
 jest.mock('@legacy-sports/shared-components', () => ({
-  todayISO: () => mockTodayISO(),
+  maxScoreboardDateISO: () => mockMaxDateISO(),
   offsetDate: (iso: string, days: number) => mockOffsetDate(iso, days),
 }));
 
@@ -60,7 +60,8 @@ describe('ScoreboardDateNav', () => {
 
   beforeEach(() => {
     onChange.mockClear();
-    mockTodayISO.mockReturnValue('2024-06-15');
+    // Today is 2024-06-15; the picker may browse one year ahead (LS-10456).
+    mockMaxDateISO.mockReturnValue('2025-06-15');
     // Reset offsetDate to a real-ish implementation for most tests
     mockOffsetDate.mockImplementation((iso: string, days: number) => {
       const [y, m, d] = iso.split('-').map(Number);
@@ -76,15 +77,21 @@ describe('ScoreboardDateNav', () => {
     expect(screen.getByTestId('scoreboard-date-trigger')).toBeTruthy();
   });
 
-  it('disables the next arrow when date equals today', () => {
+  it('enables the next arrow on today so upcoming slates are reachable', () => {
     render(<ScoreboardDateNav date="2024-06-15" onChange={onChange} />);
+    fireEvent.press(screen.getByTestId('scoreboard-date-next'));
+    expect(onChange).toHaveBeenCalledWith('2024-06-16');
+  });
+
+  it('disables the next arrow on the last selectable date', () => {
+    render(<ScoreboardDateNav date="2025-06-15" onChange={onChange} />);
     const nextBtn = screen.getByTestId('scoreboard-date-next');
     fireEvent.press(nextBtn);
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('disables the next arrow when date is after today', () => {
-    render(<ScoreboardDateNav date="2024-06-16" onChange={onChange} />);
+  it('disables the next arrow when date is past the last selectable date', () => {
+    render(<ScoreboardDateNav date="2025-06-16" onChange={onChange} />);
     const nextBtn = screen.getByTestId('scoreboard-date-next');
     fireEvent.press(nextBtn);
     expect(onChange).not.toHaveBeenCalled();
@@ -125,13 +132,27 @@ describe('ScoreboardDateNav', () => {
     expect(screen.getByTestId('scoreboard-date-day-2024-06-30')).toBeTruthy();
   });
 
-  it('disables future days beyond maxDate (today)', () => {
-    // date = today so maxDate = 2024-06-15; days 16-30 should be disabled
+  it('selects a future day within the schedule window', () => {
     render(<ScoreboardDateNav date="2024-06-15" onChange={onChange} />);
     fireEvent.press(screen.getByTestId('scoreboard-date-trigger'));
-    const futureDay = screen.getByTestId('scoreboard-date-day-2024-06-16');
-    fireEvent.press(futureDay);
+    fireEvent.press(screen.getByTestId('scoreboard-date-day-2024-06-16'));
+    expect(onChange).toHaveBeenCalledWith('2024-06-16');
+    expect(screen.queryByTestId('scoreboard-date-calendar')).toBeNull();
+  });
+
+  it('disables days beyond the last selectable date', () => {
+    // maxDate = 2025-06-15; days 16-30 of June 2025 should be disabled
+    render(<ScoreboardDateNav date="2025-06-15" onChange={onChange} />);
+    fireEvent.press(screen.getByTestId('scoreboard-date-trigger'));
+    fireEvent.press(screen.getByTestId('scoreboard-date-day-2025-06-16'));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('disables next-month navigation past the last selectable month', () => {
+    render(<ScoreboardDateNav date="2025-06-10" onChange={onChange} />);
+    fireEvent.press(screen.getByTestId('scoreboard-date-trigger'));
+    fireEvent.press(screen.getByTestId('scoreboard-month-next'));
+    expect(screen.getByText('June 2025')).toBeTruthy();
   });
 
   it('calls onChange and closes modal when a past day is selected', () => {
@@ -151,8 +172,6 @@ describe('ScoreboardDateNav', () => {
   });
 
   it('navigates to the next month', () => {
-    // Use a past month so next-month is not blocked
-    mockTodayISO.mockReturnValue('2024-08-01');
     render(<ScoreboardDateNav date="2024-06-10" onChange={onChange} />);
     fireEvent.press(screen.getByTestId('scoreboard-date-trigger'));
     expect(screen.getByText('June 2024')).toBeTruthy();
@@ -161,7 +180,6 @@ describe('ScoreboardDateNav', () => {
   });
 
   it('wraps month navigation across year boundaries (Dec -> Jan)', () => {
-    mockTodayISO.mockReturnValue('2025-03-01');
     render(<ScoreboardDateNav date="2024-12-15" onChange={onChange} />);
     fireEvent.press(screen.getByTestId('scoreboard-date-trigger'));
     expect(screen.getByText('December 2024')).toBeTruthy();

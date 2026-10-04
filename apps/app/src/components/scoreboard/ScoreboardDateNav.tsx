@@ -3,15 +3,19 @@
  * (LS-7803). Supplies the platform-specific date control injected into the
  * shared `ScoreboardContainer`'s `dateNav` slot.
  *
- *  - Prev / Next day arrows (Next is disabled once the selected date is today)
+ *  - Prev / Next day arrows (Next is disabled on the last selectable date)
  *  - A tappable date pill that opens a lightweight, dependency-free month
- *    calendar in a modal. Future dates (after today) are not selectable, matching
- *    the web `<input type="date" max={today}>` behaviour.
+ *    calendar in a modal. Future dates are selectable so users can preview
+ *    upcoming slates (LS-10456), up to `maxScoreboardDateISO()` — matching the
+ *    web `<input type="date" max={maxDate}>` behaviour.
  */
 import React, { useState } from 'react';
 import { type GestureResponderEvent, Modal } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
-import { offsetDate, todayISO } from '@legacy-sports/shared-components';
+import {
+  maxScoreboardDateISO,
+  offsetDate,
+} from '@legacy-sports/shared-components';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTH_LABELS = [
@@ -94,8 +98,8 @@ export function ScoreboardDateNav({
   onChange: (next: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const today = todayISO();
-  const isToday = date >= today;
+  const maxDate = maxScoreboardDateISO();
+  const isAtMax = date >= maxDate;
 
   return (
     <>
@@ -142,7 +146,7 @@ export function ScoreboardDateNav({
           glyph="→"
           label="Next day"
           testID="scoreboard-date-next"
-          disabled={isToday}
+          disabled={isAtMax}
           onPress={() => onChange(offsetDate(date, 1))}
         />
       </XStack>
@@ -150,7 +154,7 @@ export function ScoreboardDateNav({
       <CalendarModal
         open={open}
         selected={date}
-        maxDate={today}
+        maxDate={maxDate}
         onClose={() => setOpen(false)}
         onSelect={(iso) => {
           onChange(iso);
@@ -186,6 +190,9 @@ function CalendarModal({
   }, [open, selected]);
 
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const nextMonthStart =
+    view.m === 11 ? toISO(view.y + 1, 0, 1) : toISO(view.y, view.m + 1, 1);
+  const isNextMonthDisabled = nextMonthStart > maxDate;
   const firstWeekday = new Date(view.y, view.m, 1).getDay();
   const cells: (number | null)[] = [
     ...Array.from({ length: firstWeekday }, () => null),
@@ -238,6 +245,7 @@ function CalendarModal({
               glyph="›"
               label="Next month"
               testID="scoreboard-month-next"
+              disabled={isNextMonthDisabled}
               onPress={() =>
                 setView((v) =>
                   v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 },

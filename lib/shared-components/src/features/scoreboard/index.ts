@@ -19,4 +19,6 @@ export {
   offsetDate,
   formatDisplayDate,
   formatLastUpdated,
+  maxScoreboardDateISO,
+  SCOREBOARD_MAX_FUTURE_DAYS,
 } from './dateUtils';

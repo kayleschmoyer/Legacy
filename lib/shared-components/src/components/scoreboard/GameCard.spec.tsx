@@ -93,6 +93,24 @@ describe('GameCard', () => {
     expect(getAllByText('–').length).toBe(2);
   });
 
+  it('shows an upcoming start time in the viewer’s local time zone (LS-10456)', () => {
+    const spy = jest.spyOn(Date.prototype, 'toLocaleTimeString');
+    try {
+      const { getByText } = render(<GameCard game={upcomingGame} />);
+      const expected = new Date(
+        upcomingGame.startTime ?? '',
+      ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      expect(getByText(expected)).toBeTruthy();
+      // No explicit timeZone — the device's local zone is used, never a
+      // fixed league/ET zone.
+      for (const [, options] of spy.mock.calls) {
+        expect(options?.timeZone).toBeUndefined();
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('does not render the linescore by default for live games', () => {
     const { queryByText } = render(<GameCard game={liveGame} />);
     // Header label "R" only appears once Linescore is mounted.

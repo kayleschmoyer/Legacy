@@ -352,7 +352,7 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
     expect(capturedDates).toContain('2026-04-09');
   });
 
-  test('Next day button is disabled when the selected date is today', async ({
+  test('Next day button is enabled on today so upcoming slates are reachable (LS-10456)', async ({
     page,
   }) => {
     await mockScoreboardGraphQL(page);
@@ -360,9 +360,83 @@ test.describe('Scoreboard — DateNav arrow buttons @regression', () => {
     await page.waitForLoadState('load');
     await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
 
-    // Scoreboard initialises to today — Next day must be disabled.
+    // Scoreboard initialises to today — Next day must be enabled so users can
+    // preview tomorrow's scheduled games.
     const nextBtn = page.getByRole('button', { name: 'Next day' });
-    await expect(nextBtn).toBeDisabled();
+    await expect(nextBtn).toBeEnabled();
+  });
+
+  test('clicking Next day sends GetScoreboard query with the following date', async ({
+    page,
+  }) => {
+    const capturedDates: string[] = [];
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const opName = extractOperationName(route).toLowerCase();
+      if (opName !== 'getscoreboard') {
+        await route.fallback();
+        return;
+      }
+
+      try {
+        const body = JSON.parse(route.request().postData() ?? '{}') as {
+          variables?: { date?: string };
+        };
+        if (body.variables?.date) {
+          capturedDates.push(body.variables.date);
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            scoreboard: {
+              __typename: 'Scoreboard',
+              date: '2026-04-01',
+              lastUpdated: FIXED_NOW_ISO,
+              games: [MOCK_PREVIEW_GAME],
+            },
+          },
+        }),
+      });
+    });
+
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+
+    const picker = page.getByTestId('scoreboard-date-picker');
+    await picker.fill('2026-04-10');
+    await picker.dispatchEvent('change');
+    await page.waitForTimeout(300);
+
+    await page.getByRole('button', { name: 'Next day' }).click();
+    await page.waitForTimeout(300);
+
+    expect(capturedDates).toContain('2026-04-11');
+  });
+
+  test('a date past the schedule window is clamped with a visible notice (LS-10456)', async ({
+    page,
+  }) => {
+    await mockScoreboardGraphQL(page);
+    await page.goto('/scoreboard');
+    await page.waitForLoadState('load');
+    await expect(page.getByTestId('scoreboard-heading')).toBeVisible();
+
+    const picker = page.getByTestId('scoreboard-date-picker');
+    const maxDate = await picker.getAttribute('max');
+    expect(maxDate).toBeTruthy();
+
+    await picker.fill('2099-01-01');
+
+    // Clamped to the bound — not silently reset to today.
+    await expect(picker).toHaveValue(maxDate ?? '');
+    await expect(page.getByTestId('scoreboard-date-clamped')).toBeVisible();
   });
 });
 

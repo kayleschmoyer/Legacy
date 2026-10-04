@@ -336,6 +336,23 @@ function ErrorView() {
   );
 }
 
+/**
+ * Empty-state body copy keyed to whether the date is past, today, or upcoming
+ * (LS-10456) — a future date with no games usually means the schedule isn't
+ * out yet, not that the league is dark.
+ */
+function emptyStateCopy(date: string): string {
+  const display = formatDisplayDate(date);
+  const today = todayISO();
+  if (date > today) {
+    return `Nothing is on the schedule for ${display} yet. Schedules can still change — check back closer to the date or browse another day.`;
+  }
+  if (date < today) {
+    return `The league was dark on ${display}. Try the previous day’s finals or jump ahead to the next slate.`;
+  }
+  return `The league is dark on ${display}. Try yesterday’s finals or jump ahead to tomorrow’s slate.`;
+}
+
 function EmptyView({ date }: { date: string }) {
   return (
     <Card
@@ -362,8 +379,7 @@ function EmptyView({ date }: { date: string }) {
           textAlign="center"
           maxWidth={520}
         >
-          The league is dark on {formatDisplayDate(date)}. Try yesterday’s
-          finals or jump ahead to tomorrow’s slate.
+          {emptyStateCopy(date)}
         </Text>
       </YStack>
     </Card>
@@ -415,7 +431,7 @@ function NflComingSoonView() {
   );
 }
 
-function NoDataView() {
+function NoDataView({ date }: { date: string }) {
   return (
     <Card
       bordered
@@ -441,8 +457,9 @@ function NoDataView() {
           textAlign="center"
           maxWidth={520}
         >
-          Today’s schedule hasn’t been published. Check back closer to first
-          pitch.
+          {date > todayISO()
+            ? `The schedule for ${formatDisplayDate(date)} hasn’t been published yet. Check back closer to the date.`
+            : 'Today’s schedule hasn’t been published. Check back closer to first pitch.'}
         </Text>
       </YStack>
     </Card>
@@ -659,7 +676,7 @@ export function ScoreboardContainer({
 
           {hasError && <ErrorView />}
 
-          {isUnavailable && <NoDataView />}
+          {isUnavailable && <NoDataView date={date} />}
 
           {!loading && !hasError && !isUnavailable && games.length === 0 && (
             <EmptyView date={date} />

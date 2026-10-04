@@ -20,6 +20,19 @@ export function offsetDate(iso: string, days: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * How far ahead the date picker may browse (LS-10456). MLB publishes the next
+ * season's schedule well under a year out, so a one-year window covers every
+ * date the schedule feed can return; dates inside the window that have no
+ * published games simply render the empty state.
+ */
+export const SCOREBOARD_MAX_FUTURE_DAYS = 365;
+
+/** Latest selectable scoreboard date as a local `YYYY-MM-DD` string. */
+export function maxScoreboardDateISO(): string {
+  return offsetDate(todayISO(), SCOREBOARD_MAX_FUTURE_DAYS);
+}
+
 /** Long, human-readable form of a `YYYY-MM-DD` string (e.g. "Monday, April 1, 2026"). */
 export function formatDisplayDate(iso: string): string {
   try {

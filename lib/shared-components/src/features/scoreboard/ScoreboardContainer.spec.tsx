@@ -2,7 +2,12 @@ import React from 'react';
 import { Text } from 'tamagui';
 import { ScoreboardContainer } from './ScoreboardContainer';
 import { partitionScoreboardGames, shouldPollScoreboard } from './partition';
-import { offsetDate, todayISO } from './dateUtils';
+import {
+  maxScoreboardDateISO,
+  offsetDate,
+  SCOREBOARD_MAX_FUTURE_DAYS,
+  todayISO,
+} from './dateUtils';
 import type { ScoreboardGame } from '../../components/scoreboard/types';
 import { fireEvent, render } from '../../test-utils';
 
@@ -93,6 +98,12 @@ describe('shouldPollScoreboard', () => {
 });
 
 describe('dateUtils', () => {
+  it('bounds future browsing to one year past today (LS-10456)', () => {
+    expect(SCOREBOARD_MAX_FUTURE_DAYS).toBe(365);
+    expect(maxScoreboardDateISO()).toBe(offsetDate(todayISO(), 365));
+    expect(maxScoreboardDateISO() > todayISO()).toBe(true);
+  });
+
   it('offsets dates across month boundaries', () => {
     expect(offsetDate('2026-04-01', -1)).toBe('2026-03-31');
     expect(offsetDate('2026-12-31', 1)).toBe('2027-01-01');
@@ -112,6 +123,48 @@ describe('ScoreboardContainer', () => {
   it('shows the empty state when there are no games', () => {
     const { getByTestId } = renderContainer({ games: [] });
     expect(getByTestId('scoreboard-empty')).toBeTruthy();
+  });
+
+  it('uses upcoming-schedule copy for an empty future date (LS-10456)', () => {
+    const { getByTestId, getByText } = renderContainer({
+      date: offsetDate(todayISO(), 30),
+      games: [],
+    });
+    expect(getByTestId('scoreboard-empty')).toBeTruthy();
+    expect(getByText(/Nothing is on the schedule for .* yet/)).toBeTruthy();
+  });
+
+  it('uses past-tense copy for an empty past date', () => {
+    const { getByText } = renderContainer({
+      date: offsetDate(todayISO(), -30),
+      games: [],
+    });
+    expect(getByText(/The league was dark on/)).toBeTruthy();
+  });
+
+  it('keeps the today copy pointing at tomorrow’s slate', () => {
+    const { getByText } = renderContainer({ date: todayISO(), games: [] });
+    expect(getByText(/jump ahead to tomorrow’s slate/)).toBeTruthy();
+  });
+
+  it('names the future date when its schedule is unavailable', () => {
+    const { getByTestId, getByText } = renderContainer({
+      date: offsetDate(todayISO(), 30),
+      isUnavailable: true,
+    });
+    expect(getByTestId('scoreboard-unavailable')).toBeTruthy();
+    expect(getByText(/hasn’t been published yet/)).toBeTruthy();
+  });
+
+  it('renders scheduled games for a future date in the Upcoming section', () => {
+    const { getByTestId, getAllByText, queryByTestId } = renderContainer({
+      date: offsetDate(todayISO(), 7),
+      games: [makeGame(2001, 'Preview'), makeGame(2002, 'Preview')],
+    });
+    expect(getByTestId('game-card-2001')).toBeTruthy();
+    expect(getByTestId('game-card-2002')).toBeTruthy();
+    expect(getAllByText('Upcoming').length).toBeGreaterThan(0);
+    expect(queryByTestId('scoreboard-empty')).toBeNull();
   });
 
   it('renders game cards grouped by status when games are present', () => {
