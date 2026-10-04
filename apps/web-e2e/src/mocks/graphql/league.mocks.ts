@@ -405,6 +405,20 @@ export function publicLeaguesResponse(leagues?: Partial<MockPublicLeague>[]) {
   };
 }
 
+/**
+ * A run of `count` distinct public leagues, ids starting at `startId`
+ * (default 1) — for pagination/infinite-scroll specs (LS-10251) that need a
+ * full page's worth of results.
+ */
+export function mockPublicLeagues(
+  count: number,
+  startId = 1,
+): MockPublicLeague[] {
+  return Array.from({ length: count }, (_, i) =>
+    mockPublicLeague({ id: startId + i, name: `Public League ${startId + i}` }),
+  );
+}
+
 /** Mock response for GetPublicLeagues query — empty results. */
 export function publicLeaguesEmptyResponse() {
   return { data: { publicLeagues: [] } };

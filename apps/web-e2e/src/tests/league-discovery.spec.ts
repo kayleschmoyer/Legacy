@@ -17,11 +17,9 @@
  * - Advanced filtering: draft-status + player-pool filters combined in one
  *   query, search combined with an active filter, results count updating
  *   after a filter narrows the result set (LS-2117)
- *
- * Pagination/infinite-scroll is NOT covered here: LeagueDiscoveryPage fetches
- * a single fixed `limit: 50, offset: 0` page with no load-more control and no
- * scroll-triggered fetch, so there is no such behavior to test yet. Tracked
- * as a feature gap in LS-10251.
+ * - Pagination/infinite-scroll: "Load More" visibility for a full vs. short
+ *   page, loading and appending the next page, and filter changes resetting
+ *   back to the first page (LS-10251)
  *
  * Page-object migration (LS-8092 / ADR-0015): all locators live on
  * `leaguePage` and the `LeagueCard` component — specs are selector-free.
@@ -36,10 +34,18 @@ import {
 import {
   joinPublicLeagueResponse,
   mockPublicLeague,
+  mockPublicLeagues,
   publicLeaguesEmptyResponse,
   publicLeaguesResponse,
 } from '../mocks/graphql/league.mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+/**
+ * Must match `LEAGUES_PAGE_SIZE` in `LeagueDiscoveryPage.tsx` — the page's
+ * "load more" heuristic treats a full page (this many results) as a signal
+ * more may exist server-side.
+ */
+const DISCOVERY_PAGE_SIZE = 20;
 
 /** Matches GraphQL API calls but not source-file imports. */
 type GraphQLHandlers = Record<string, unknown>;
@@ -445,6 +451,117 @@ test.describe('League Discovery — filters @regression', () => {
 
     // A new network call should have been made
     await expect.poll(() => callCount).toBeGreaterThan(initialCount);
+  });
+});
+
+// ── regression: pagination / infinite scroll ─────────────────────
+
+test.describe('League Discovery — pagination @regression', () => {
+  test('shows a "Load More Leagues" control when a full page of results comes back', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      getpublicleagues: publicLeaguesResponse(
+        mockPublicLeagues(DISCOVERY_PAGE_SIZE),
+      ),
+    });
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.cardById(1).text('Public League 1').expectVisible();
+    await leaguePage.discoveryLoadMoreButton.expectVisible();
+  });
+
+  test('does not show a "Load More Leagues" control when fewer results come back', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      getpublicleagues: publicLeaguesResponse(mockPublicLeagues(3)),
+    });
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.cardById(1).text('Public League 1').expectVisible();
+    await leaguePage.discoveryLoadMoreButton.expectHidden();
+  });
+
+  test('clicking "Load More Leagues" requests and appends the next page', async ({
+    page,
+    leaguePage,
+  }) => {
+    const firstPage = mockPublicLeagues(DISCOVERY_PAGE_SIZE);
+    const secondPage = mockPublicLeagues(2, DISCOVERY_PAGE_SIZE + 1);
+    let secondPageRequested = false;
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation !== 'getpublicleagues') {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      const variables = extractOperationVariables(route);
+      if (variables.offset === DISCOVERY_PAGE_SIZE) {
+        secondPageRequested = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(publicLeaguesResponse(secondPage)),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(publicLeaguesResponse(firstPage)),
+      });
+    });
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+
+    await leaguePage.cardById(1).text('Public League 1').expectVisible();
+    await leaguePage.discoveryLoadMoreButton.expectVisible();
+
+    await leaguePage.discoveryLoadMoreButton.tap();
+
+    await expect.poll(() => secondPageRequested).toBe(true);
+    await leaguePage
+      .cardById(DISCOVERY_PAGE_SIZE + 1)
+      .text(`Public League ${DISCOVERY_PAGE_SIZE + 1}`)
+      .expectVisible();
+
+    // The second page came back short of a full page, so no more to load.
+    await leaguePage.discoveryLoadMoreButton.expectHidden();
+  });
+
+  test('changing a filter resets the list back to the first page', async ({
+    page,
+    leaguePage,
+  }) => {
+    await routeGraphQL(page, {
+      getpublicleagues: publicLeaguesResponse(
+        mockPublicLeagues(DISCOVERY_PAGE_SIZE),
+      ),
+    });
+
+    await leaguePage.gotoDiscovery();
+    await leaguePage.expectDiscoveryLoaded();
+    await leaguePage.discoveryLoadMoreButton.expectVisible();
+
+    // Swap in a short response for the re-issued query once the filter changes.
+    await routeGraphQL(page, {
+      getpublicleagues: publicLeaguesResponse([
+        mockPublicLeague({ id: 501, name: 'Queued Only League' }),
+      ]),
+    });
+    await leaguePage.clickButton('Queued', { exact: true });
+
+    await leaguePage.cardById(501).text('Queued Only League').expectVisible();
+    await leaguePage.discoveryLoadMoreButton.expectHidden();
   });
 });
 

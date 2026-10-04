@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Spinner, YStack } from 'tamagui';
 import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
@@ -10,6 +10,7 @@ import { Search } from '@tamagui/lucide-icons/icons/Search';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import {
   GetPublicLeagues,
+  type GetPublicLeaguesQuery,
   Sport,
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
@@ -22,6 +23,11 @@ import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 type DraftStatusFilter = 'all' | 'open' | 'queued' | 'in-progress';
 type PlayerPoolFilter = 'all' | 'nl' | 'al';
+
+// Page size for the public-leagues list (LS-10251). `hasMore` is derived
+// heuristically — a full page came back — since publicLeagues returns a
+// plain array with no totalCount/pageInfo to page against.
+const LEAGUES_PAGE_SIZE = 20;
 
 interface DraftStatusMeta {
   short: string;
@@ -903,6 +909,14 @@ export function LeagueDiscoveryPage({
   const [joinedLeagueId, setJoinedLeagueId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const [accumulatedLeagues, setAccumulatedLeagues] = useState<
+    GetPublicLeaguesQuery['publicLeagues']
+  >([]);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -915,29 +929,55 @@ export function LeagueDiscoveryPage({
     };
   }, []);
 
-  const { data, loading, error, refetch } = useGetPublicLeaguesQuery({
-    variables: {
-      sport: sportEnum,
-      search: debouncedSearch || undefined,
-      draftStatus:
-        draftFilter !== 'all'
-          ? draftFilter === 'open'
-            ? 'not-started'
-            : draftFilter
-          : undefined,
-      playerPool: poolFilter !== 'all' ? poolFilter : undefined,
-      limit: 50,
-      offset: 0,
+  const { data, loading, error, refetch, fetchMore } = useGetPublicLeaguesQuery(
+    {
+      variables: {
+        sport: sportEnum,
+        search: debouncedSearch || undefined,
+        draftStatus:
+          draftFilter !== 'all'
+            ? draftFilter === 'open'
+              ? 'not-started'
+              : draftFilter
+            : undefined,
+        playerPool: poolFilter !== 'all' ? poolFilter : undefined,
+        limit: LEAGUES_PAGE_SIZE,
+        offset: 0,
+      },
+      fetchPolicy: 'cache-and-network',
     },
-    fetchPolicy: 'cache-and-network',
-  });
+  );
 
   const [joinPublicLeague, { loading: submitting }] =
     useJoinPublicLeagueMutation({
       refetchQueries: [{ query: GetPublicLeagues }],
     });
 
-  const leagues = data?.publicLeagues ?? [];
+  // Reset the accumulated pages whenever the first page's result changes —
+  // a fresh search/filter combo, a manual refresh, or a post-join refetch
+  // all land here as a new `data.publicLeagues` reference for offset 0.
+  useEffect(() => {
+    if (!data?.publicLeagues) return;
+    setAccumulatedLeagues(data.publicLeagues);
+    setPageOffset(data.publicLeagues.length);
+    setHasMore(data.publicLeagues.length >= LEAGUES_PAGE_SIZE);
+  }, [data?.publicLeagues]);
+
+  const leagues = accumulatedLeagues;
+
+  const handleLoadMoreLeagues = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const result = await fetchMore({ variables: { offset: pageOffset } });
+      const newLeagues = result.data?.publicLeagues ?? [];
+      setAccumulatedLeagues((prev) => [...prev, ...newLeagues]);
+      setPageOffset((prev) => prev + newLeagues.length);
+      setHasMore(newLeagues.length >= LEAGUES_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchMore, hasMore, loadingMore, pageOffset]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -991,6 +1031,26 @@ export function LeagueDiscoveryPage({
   const showEmptyFiltered = !loading && leagues.length === 0 && isSearchActive;
   const showEmpty = !loading && leagues.length === 0 && !isSearchActive;
   const showPopulated = leagues.length > 0;
+
+  // Infinite scroll: load the next page once the sentinel below the list
+  // enters the viewport. The "Load More" button rendered alongside it is
+  // the same trigger, kept for keyboard/reduced-motion access and so E2E
+  // coverage doesn't depend on simulating a real scroll gesture.
+  useEffect(() => {
+    if (!showPopulated || !hasMore) return;
+    const node = loadMoreSentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void handleLoadMoreLeagues();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [showPopulated, hasMore, handleLoadMoreLeagues]);
 
   // ── Styles ──────────────────────────────────────────────────────────────────
 
@@ -1755,6 +1815,57 @@ export function LeagueDiscoveryPage({
               );
             })}
           </div>
+
+          {/* Load more / infinite scroll sentinel */}
+          {hasMore && (
+            <div
+              ref={loadMoreSentinelRef}
+              data-testid="discovery-load-more-sentinel"
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '28px 0 4px',
+              }}
+            >
+              {loadingMore ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontFamily: FONT_BODY,
+                    fontSize: 13,
+                    color: 'var(--textMuted)',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  <Spinner size="small" color="var(--brandGold)" />
+                  Loading more leagues…
+                </span>
+              ) : (
+                <button
+                  onClick={() => void handleLoadMoreLeagues()}
+                  data-testid="discovery-load-more-button"
+                  className="ls-discovery-btn-lift"
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: 700,
+                    fontSize: 12,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    padding: '11px 20px',
+                    borderRadius: 12,
+                    border: `1px solid ${'var(--glassBorderHover)'}`,
+                    background: 'transparent',
+                    color: 'var(--color12)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Load More Leagues
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Footer CTA */}
           <div

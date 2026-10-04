@@ -460,6 +460,16 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byText(/Can't find the right league\?/i);
   }
 
+  /**
+   * The discovery infinite-scroll "Load More Leagues" button (LS-10251).
+   * Rendered alongside the scroll-triggered sentinel whenever a full page of
+   * results suggests more may exist — it's the deterministic way specs
+   * advance pagination without simulating a real scroll gesture.
+   */
+  get discoveryLoadMoreButton(): UIElement {
+    return this.driver.byTestId('discovery-load-more-button');
+  }
+
   // ── Reads: named join getters ────────────────────────────────────
 
   /** The join page `<h1>` ("Join League"). */
