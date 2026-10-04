@@ -35,6 +35,15 @@ on:
         required: false
         default: ""
         type: string
+      base_sha:
+        description: >-
+          LS-10571: base commit for a PR-less run, used by the merge queue's
+          batch test refs (mq/test/*). Scopes lint/format/affected to the diff
+          base_sha..HEAD (the union of the batched PRs) instead of the whole
+          repo. Ignored when pr_number is set.
+        required: false
+        default: ""
+        type: string
       debug_mode:
         description: "Enable debug mode for detailed logging"
         required: false
@@ -263,8 +272,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ inputs.pr_number }}
+          BASE_SHA_INPUT: ${{ inputs.base_sha }}
         run: |
           set -eo pipefail
+
+          # LS-10571: merge-queue batch refs dispatch with base_sha and no
+          # pr_number — scope the run to base_sha..HEAD (no PR to post to).
+          if [ -z "$PR_NUMBER" ] && [ -n "$BASE_SHA_INPUT" ]; then
+            if ! [[ "$BASE_SHA_INPUT" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::base_sha '$BASE_SHA_INPUT' is not a full commit SHA"
+              exit 1
+            fi
+            echo "Batch run — base=$BASE_SHA_INPUT head=$GITHUB_SHA"
+            echo "base-sha=$BASE_SHA_INPUT" >> "$GITHUB_OUTPUT"
+            echo "head-sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           if [ -z "$PR_NUMBER" ]; then
             WARN_MSG="workflow_dispatch was triggered without pr_number"

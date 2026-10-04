@@ -761,6 +761,23 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     );
   });
 
+  it('posts on a merge-queue batch tip with no PR and no SHA-currency re-fetch (LS-10571)', async () => {
+    const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext(null),
+      core,
+      results: allPass(),
+      batchHeadSha: HEAD_SHA,
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+    assert.strictEqual(calls.get, 0, 'a batch ref has no PR to re-fetch');
+  });
+
   it('the payload PR takes precedence over explicit prNumber/headSha when both are present', async () => {
     const OTHER_SHA = '1111111111111111111111111111111111111111';
     const { github, calls } = makeGithub({ currentSha: HEAD_SHA });

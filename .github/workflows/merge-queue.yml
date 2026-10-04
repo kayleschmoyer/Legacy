@@ -51,7 +51,8 @@ on:
   # accompanying review submission" gap is now covered by the manual
   # `gh workflow run merge-queue.yml` dispatch and by the workflow_run
   # rerun on the next CI Orchestrator completion.
-  # Trigger when CI Orchestrator workflow completes for PR branches (not push-to-main)
+  # Trigger when CI Orchestrator workflow completes for PR branches (not push-to-main),
+  # and for batch test refs (mq/test/*, dispatched by the queue itself — LS-10571)
   workflow_run:
     workflows: ["Legacy Sports CI Orchestrator"]
     types: [completed]
@@ -65,6 +66,7 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'workflow_run' && (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'pull_request_review')) ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && startsWith(github.event.workflow_run.head_branch, 'mq/test/')) ||
         github.event_name == 'pull_request_review' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
@@ -262,6 +264,7 @@ jobs:
         env:
           ESCALATION_WEBHOOK_URL: ${{ secrets.ESCALATION_WEBHOOK_URL }}
           CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
+          MERGE_QUEUE_MODE: ${{ vars.MERGE_QUEUE_MODE }}
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           script: |
@@ -269,7 +272,10 @@ jobs:
             const forceCheck = ${{ github.event.inputs.force_check || false }};
             const isRetry = ${{ github.event.inputs.is_retry || false }};
             const ciAppToken = process.env.CI_APP_TOKEN || undefined;
+            // LS-10571: batched merging with bisection; set the MERGE_QUEUE_MODE
+            // repo variable to 'serial' to fall back to one-at-a-time merges.
+            const batchMode = process.env.MERGE_QUEUE_MODE !== 'serial';
             // LS-10559: github-script's own getOctokit — @actions/github is not
             // require()-able from the repo script path.
             const octokitFactory = typeof getOctokit === 'function' ? getOctokit : undefined;
-            await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry, ciAppToken, octokitFactory });
+            await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry, ciAppToken, octokitFactory, batchMode });

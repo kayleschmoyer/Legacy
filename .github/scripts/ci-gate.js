@@ -1261,6 +1261,10 @@ async function postCiGate({
   results,
   prNumber,
   headSha,
+  // LS-10571: head of a merge-queue batch ref (mq/test/*). Batch runs have no
+  // PR; the gate is posted on the batch tip commit, where the merge queue
+  // reads it as the batch verdict.
+  batchHeadSha,
   sleep = defaultSleep,
 }) {
   const { owner, repo } = context.repo;
@@ -1271,9 +1275,14 @@ async function postCiGate({
   // orchestrator's concurrency group) carries no `pull_request` in the event
   // payload. When the orchestrator resolved a PR for such a run, the caller
   // passes prNumber/headSha explicitly — fall back to those before giving up.
+  // A batch run has no PR number; 'mq-batch' only labels the log lines.
   const pr =
     payloadPr ||
-    (prNumber && headSha ? { number: prNumber, head: { sha: headSha } } : null);
+    (prNumber && headSha
+      ? { number: prNumber, head: { sha: headSha } }
+      : null) ||
+    (batchHeadSha ? { number: 'mq-batch', head: { sha: batchHeadSha } } : null);
+  const isBatch = !payloadPr && !prNumber && Boolean(batchHeadSha);
 
   if (!pr) {
     core.info(
@@ -1285,20 +1294,23 @@ async function postCiGate({
 
   const targetSha = pr.head.sha;
 
-  // SHA-currency guard — re-read the PR's live head.
+  // SHA-currency guard — re-read the PR's live head. A batch ref is never
+  // pushed to after its CI is dispatched, so it has no live head to compare.
   let currentSha = targetSha;
-  try {
-    const { data: fresh } = await github.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: pr.number,
-    });
-    currentSha = fresh.head.sha;
-  } catch (e) {
-    core.warning(
-      `CI Gate: could not re-fetch PR #${pr.number} head SHA (${e.message}) — ` +
-        `proceeding with the event head ${targetSha}.`,
-    );
+  if (!isBatch) {
+    try {
+      const { data: fresh } = await github.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: pr.number,
+      });
+      currentSha = fresh.head.sha;
+    } catch (e) {
+      core.warning(
+        `CI Gate: could not re-fetch PR #${pr.number} head SHA (${e.message}) — ` +
+          `proceeding with the event head ${targetSha}.`,
+      );
+    }
   }
 
   if (currentSha !== targetSha) {

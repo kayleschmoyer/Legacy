@@ -4318,3 +4318,119 @@ describe('merge-queue-processor — Discord #reviews per-PR threads', () => {
     assert.ok(!discord.requests[1].body.includes('thread_name'));
   });
 });
+
+describe('merge-queue-processor — batch mode (LS-10571)', () => {
+  function withBatchApi(github, calls) {
+    const basePaginate = github.paginate;
+    github.paginate = async (fn, args) =>
+      fn === github.rest.git.listMatchingRefs ? [] : basePaginate(fn, args);
+    calls.batchRefs = [];
+    calls.batchMerges = [];
+    github.rest.git = {
+      ...github.rest.git,
+      getRef: async () => ({ data: { object: { sha: 'main-tip' } } }),
+      listMatchingRefs: async () => ({ data: [] }),
+      createRef: async ({ ref }) => {
+        calls.batchRefs.push(ref);
+        return { data: {} };
+      },
+      getCommit: async () => ({ data: { tree: { sha: 'tree' } } }),
+      createCommit: async () => ({ data: { sha: 'meta-sha' } }),
+      updateRef: async () => ({ data: {} }),
+    };
+    github.rest.repos = {
+      ...github.rest.repos,
+      merge: async ({ head }) => {
+        calls.batchMerges.push(head);
+        return { status: 201, data: { sha: `m-${head}` } };
+      },
+    };
+    github.rest.actions = {
+      ...github.rest.actions,
+      createWorkflowDispatch: async (params) => {
+        calls.dispatches.push(params);
+        return { data: {} };
+      },
+    };
+  }
+
+  it('queues a ready main-targeting PR for batch testing instead of merging it', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(calls.merges.length, 0, 'should not merge inline');
+    assert.strictEqual(calls.batchRefs.length, 1, 'should build one batch ref');
+    assert.match(calls.batchRefs[0], /^refs\/heads\/mq\/test\//);
+    assert.deepStrictEqual(calls.batchMerges, [HEAD_SHA]);
+    const dispatch = calls.dispatches.find(
+      (d) => d.workflow_id === 'ci-orchestrator.yml',
+    );
+    assert.ok(dispatch, 'should dispatch batch CI');
+    assert.deepStrictEqual(dispatch.inputs, {
+      base_sha: 'main-tip',
+      run_security: 'false',
+    });
+    // The batch CI subsumes the staleness guard — no gap compares.
+    assert.strictEqual(validationCompares(calls).length, 0);
+  });
+
+  it('keeps a GitHub-blocked PR (e.g. awaiting code owner) out of batches', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      pr: makePR({ mergeable_state: 'blocked' }),
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(calls.merges.length, 0);
+    assert.strictEqual(calls.batchRefs.length, 0, 'should not batch');
+  });
+
+  it('still merges PRs targeting a parent branch one at a time', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      pr: makePR({
+        base: { ref: 'feature/parent' },
+        labels: [{ name: 'merge-when-ready' }, { name: 'merge-to-parent' }],
+      }),
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(calls.merges.length, 1, 'should merge inline');
+    assert.strictEqual(calls.batchRefs.length, 0, 'should not batch');
+  });
+});

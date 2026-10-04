@@ -1535,7 +1535,9 @@ jobs:
       # PR-scoped dispatch still posts.
       - name: "Post CI Gate aggregate status"
         id: post-ci-gate
-        if: always() && (github.event.pull_request.number || inputs.pr-number)
+        # LS-10571: also post for merge-queue batch runs (base-sha set, no PR)
+        # — the queue reads the gate on the batch tip as the batch verdict.
+        if: always() && (github.event.pull_request.number || inputs.pr-number || inputs.base-sha)
         # Never let a transient status-post failure (or a fork PR's read-only
         # GITHUB_TOKEN) fail the summarize job — CI Gate is informational during
         # bake, and once required a missing status blocks merge on its own.
@@ -1557,6 +1559,7 @@ jobs:
             }
           DISPATCH_PR_NUMBER: ${{ inputs.pr-number }}
           DISPATCH_HEAD_SHA: ${{ inputs.head-sha }}
+          BATCH_HEAD_SHA: ${{ !inputs.pr-number && inputs.base-sha && inputs.head-sha || '' }}
         with:
           # LS-9571 follow-up: both the Agent Author app and the Merge Queue
           # app 403'd this specific call with "Resource not accessible by
@@ -1581,6 +1584,7 @@ jobs:
               results,
               prNumber: dispatchPrNumber ? Number(dispatchPrNumber) : undefined,
               headSha: dispatchHeadSha || undefined,
+              batchHeadSha: process.env.BATCH_HEAD_SHA || undefined,
             });
             // LS-10322: a verdict that exhausted its post retries must not
             // read as a green job — see "Fail when CI Gate verdict was lost".

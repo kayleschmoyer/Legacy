@@ -230,7 +230,7 @@ Epics with the Jira label `pinned-status` are excluded from automatic transition
 
 - `pull_request` labeled/unlabeled (`merge-when-ready` or `merge-to-parent`)
 - `pull_request_review` submitted
-- `workflow_run` completed (CI Orchestrator for PR branches)
+- `workflow_run` completed (CI Orchestrator for PR branches, and for the queue's own `mq/test/*` batch dispatches — LS-10571)
 - `workflow_dispatch` (manual)
 
 ### Concurrency
@@ -253,6 +253,18 @@ Before merging, each PR must pass all of these:
 | 6   | No pending checks                          | Waits for in-progress checks silently (no blocker comment)                                                                                         |
 
 > **Config union (LS-7963):** `validateStatusChecks` unions the live required set with the config-tracked contexts in `.github/ruleset.json` (`loadConfigRequiredChecks` in `merge-queue-processor.js`), so the checked-in config can tighten the queue's gate ahead of the owner-gated live apply — never loosen it. Staging model: [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
+
+### Batched Merging with Bisection (LS-10571)
+
+PRs that pass every check above and target `main` are not merged one at a time. `merge-queue-batch.js` handles them instead; [merge-queue-guide.md](../../../../docs/ci-cd/merge-queue-guide.md#batched-merging-ls-10571) has the full description.
+
+1. **Build.** Up to 16 PRs, lowest number first, are merged onto the `main` tip in an `mq/test/<id>` ref. The tip commit message carries the set's metadata, so the refs hold all queue state.
+2. **Test.** The orchestrator is dispatched there with `base_sha` set. CI Gate posted on the batch tip is the batch verdict.
+3. **Land (green).** Each PR is squash-merged in order, one commit per PR, then main's tree is asserted equal to the tested tree.
+4. **Bisect (red).** A failed set splits into halves, which are tested in parallel; the first green half lands. A failing single PR is ejected: its label is removed and a comment links the run.
+5. **Infra failures** (no terminal gate) re-run once, then requeue. They never bisect or eject.
+
+Batch CI replaces the LS-9662 staleness guard. `merge-to-parent` PRs and the `MERGE_QUEUE_MODE=serial` repo variable both use the serial path below.
 
 ### Self-Heal for Missing `bot-review` (LS-8289)
 

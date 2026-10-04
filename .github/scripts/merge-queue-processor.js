@@ -18,6 +18,8 @@ const { pathToFileURL } = require('url');
 // Shared with the CI Gate poster (LS-7991) — the gate's target_url is the
 // staleness guard's pointer to the run that validated the head SHA (LS-9662).
 const { CI_GATE_CONTEXT, runIdFromTargetUrl } = require('./ci-gate.js');
+// LS-10571: batched merging with bisection on failure.
+const { runBatchQueue } = require('./merge-queue-batch.js');
 
 // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
 // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
@@ -299,6 +301,11 @@ module.exports = async ({
   // minted). Tests inject a fake factory so the ciAppToken path can be
   // exercised without constructing a real Octokit client.
   octokitFactory,
+  // LS-10571: when true, ready PRs targeting main are tested together in
+  // batches (merge-queue-batch.js) instead of merged one at a time.
+  // merge-queue.yml enables it unless the MERGE_QUEUE_MODE repo variable is
+  // 'serial' (the rollback switch).
+  batchMode = false,
 }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -400,6 +407,9 @@ module.exports = async ({
   let reviewRemediationsThisRun = 0;
   let ciRerunsThisRun = 0;
   const processedPRNumbers = new Set();
+  // LS-10571: PRs that passed every gate and target main, collected for the
+  // batch queue instead of being merged inline.
+  const batchReadyPRs = [];
 
   for (const pr of mergeReadyPRs) {
     processedPRNumbers.add(pr.number);
@@ -418,7 +428,14 @@ module.exports = async ({
       // the head SHA that will be pinned in the merge API call.
       const validationResult = await validatePRForMerge(prDetails.data);
 
-      if (validationResult.canMerge) {
+      if (
+        validationResult.canMerge &&
+        batchMode &&
+        isBatchable(validationResult.pr)
+      ) {
+        console.log(`✅ PR #${pr.number} is ready — queued for batch testing`);
+        batchReadyPRs.push(validationResult.pr);
+      } else if (validationResult.canMerge) {
         console.log(`✅ PR #${pr.number} is ready for merge`);
 
         if (!isDryRun) {
@@ -442,6 +459,23 @@ module.exports = async ({
         `💥 Error processing PR #${pr.number}: ${sanitizeLog(error.message)}`,
       );
       await reportProcessingError(pr, error);
+    }
+  }
+
+  if (batchMode) {
+    try {
+      await runBatchQueue({
+        github,
+        owner,
+        repo,
+        readyPRs: batchReadyPRs,
+        isDryRun,
+        mergePR: performMerge,
+      });
+    } catch (error) {
+      console.error(
+        `💥 Batch queue processing failed: ${sanitizeLog(error.message)}`,
+      );
     }
   }
 
@@ -491,6 +525,12 @@ module.exports = async ({
   }
 
   // ── Helper Functions ──────────────────────────────────────────────────────
+
+  // LS-10571: only main-targeting PRs are batched; stacked PRs merging into a
+  // parent branch (merge-to-parent) keep the one-at-a-time path.
+  function isBatchable(pr) {
+    return pr.base.ref === 'main';
+  }
 
   async function validatePRForMerge(pr) {
     if (pr.draft) {
@@ -635,6 +675,25 @@ module.exports = async ({
         isPending: true,
         pendingChecks: checksResult.pendingChecks,
       };
+    }
+
+    // LS-10571: in batch mode the batch CI run validates every PR against the
+    // current main tip, which subsumes the staleness guard.
+    if (batchMode && isBatchable(pr)) {
+      // Every required status is green here, so `blocked` means GitHub is
+      // withholding the merge for something the gates above cannot see —
+      // typically a path-scoped CODEOWNERS review (LS-8297). Landing would stop
+      // at this PR, and as the oldest PR it would head every batch and stall
+      // the queue, so it stays out of batches until GitHub unblocks it.
+      if (pr.mergeable_state === 'blocked') {
+        return {
+          canMerge: false,
+          reason:
+            'GitHub reports this PR as blocked even though every queue gate passed — ' +
+            'usually a required CODEOWNER approval for sensitive path(s)',
+        };
+      }
+      return { canMerge: true, pr, stalenessVerdict: 'superseded-by-batch-ci' };
     }
 
     // LS-9662: all gates are green — last stop before the merge. Check whether
@@ -2009,7 +2068,7 @@ module.exports = async ({
             `(${pr.head.sha} → ${currentSha}). ` +
             `Skipping merge — will re-evaluate on next trigger.`,
         );
-        return;
+        return { merged: false };
       }
 
       // Sanitize commit message: remove null bytes and control characters that cause HTTP 500.
@@ -2095,6 +2154,7 @@ module.exports = async ({
           );
         }
       }
+      return { merged: true, sha: mergeResult.data.sha };
     } catch (error) {
       // 422 with a head-SHA mismatch message means the branch advanced between
       // our pre-merge check and the merge API call (residual race window). This
@@ -2111,7 +2171,7 @@ module.exports = async ({
           `⚠️ PR #${pr.number}: merge rejected with 422 (head branch modified) — ` +
             `branch advanced during merge window. Will re-evaluate on next trigger.`,
         );
-        return;
+        return { merged: false };
       }
 
       // Surface GitHub's actual 405 body verbatim before any processor
@@ -2164,7 +2224,7 @@ module.exports = async ({
             `Will re-evaluate on next trigger.`,
         );
         hasPendingPRs = true;
-        return;
+        return { merged: false };
       }
 
       // 405 "Waiting on code owner review" (LS-8297): path-scoped CODEOWNERS
@@ -2187,7 +2247,7 @@ module.exports = async ({
           canMerge: false,
           reason: 'PR requires CODEOWNER approval for sensitive path(s)',
         });
-        return;
+        return { merged: false };
       }
 
       console.error(

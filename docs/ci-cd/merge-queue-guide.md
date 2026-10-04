@@ -16,12 +16,12 @@ The merge queue is a **label-based automated merge system** implemented as a Git
 
 The merge queue runs in response to:
 
-| Event                   | When                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------- |
-| **Label added/removed** | `merge-when-ready` or `merge-to-parent` label is toggled                         |
-| **Review submitted**    | Someone approves or requests changes                                             |
-| **CI completes**        | The CI Orchestrator workflow finishes on a PR branch                             |
-| **Manual dispatch**     | Triggered via the GitHub Actions UI (supports `dry_run` and `force_check` modes) |
+| Event                   | When                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| **Label added/removed** | `merge-when-ready` or `merge-to-parent` label is toggled                          |
+| **Review submitted**    | Someone approves or requests changes                                              |
+| **CI completes**        | The CI Orchestrator workflow finishes on a PR branch or a batch ref (`mq/test/*`) |
+| **Manual dispatch**     | Triggered via the GitHub Actions UI (supports `dry_run` and `force_check` modes)  |
 
 ### Concurrency and Debounce
 
@@ -33,9 +33,32 @@ When triggered by CI completion (`workflow_run`) or a review submission (`pull_r
 
 1. The workflow collects all open PRs with the `merge-when-ready` label
 2. Each PR is validated against the merge conditions (see below)
-3. PRs that pass all conditions are squash-merged
+3. PRs that pass all conditions and target `main` go to the batch queue (see [Batched merging](#batched-merging-ls-10571)); PRs targeting a parent branch (`merge-to-parent`) are squash-merged directly
 4. PRs that fail receive a comment explaining the blocker and how to fix it
 5. PRs with pending checks are silently skipped (no comment) — they'll be retried on the next trigger
+
+### Batched merging (LS-10571)
+
+Ready PRs that target `main` are tested together and landed as a set. The logic is in `.github/scripts/merge-queue-batch.js`.
+
+1. **Build.** Up to **16** ready PRs, lowest PR number first, are merged on top of the current `main` tip into a temporary branch `mq/test/<id>`. The branch's tip commit records the set's metadata: base SHA, PRs and their tested head SHAs.
+2. **Test.** The CI Orchestrator is dispatched on that branch with `base_sha` set to the `main` tip, so the run covers everything the PRs change together. Its CI Gate status on the batch tip is the batch verdict.
+3. **Land.** When the gate is green and `main` hasn't moved, the queue squash-merges each PR through the merge API, in order. Each PR keeps its own commit on `main`, so you can revert it on its own. After landing, the queue checks that `main`'s tree equals the tested tree.
+4. **Bisect.** When a batch of N > 1 fails, the queue splits it into two halves and tests both at once on the current `main`:
+   - The first green half lands.
+   - If both halves are green, the failure came from how they interact. The first half lands and the second is retested on the new `main`.
+   - A single PR that fails is **ejected**: the queue removes its `merge-when-ready` label and leaves a comment linking the failed run.
+   - PRs whose changes textually conflict with each other are split the same way, without running CI.
+
+The rules that keep this safe:
+
+- Only one batch, or one pair of bisect halves, is in flight at a time.
+- If any PR in a set gets a new push, loses the label or fails a gate, the set is discarded and its PRs requeue.
+- Infra failures never trigger a bisect or an ejection. This covers a run that finished without a terminal CI Gate (runner loss): it is re-run once, then requeued.
+- A PR that GitHub reports as `blocked` even though every queue gate passes stays out of batches until it unblocks. This is usually a path-scoped CODEOWNER approval, and it keeps one PR from stalling every batch behind it.
+- The batch CI validates every PR against the current `main`, so it replaces the per-PR staleness guard (LS-9662).
+
+**Rollback.** Set the repository variable `MERGE_QUEUE_MODE=serial` to return to one-at-a-time merging. You can delete any leftover `mq/test/*` branches; the queue ignores them in serial mode.
 
 ## Conditions for a Successful Merge
 
