@@ -1,14 +1,21 @@
 /**
- * League Premium Gate — E2E Tests (LS-5030)
+ * League Premium Gate — E2E Tests (LS-5030, LS-10427)
  *
  * Covers premium gating on:
  *   - /baseball/league/:id        → LeagueDetailPageV2 wrapped in PremiumGate
+ *
+ * LS-10427 owner decision: a league's creator keeps access to their league
+ * even after downgrading — only NEW premium decisions stay gated, inline on
+ * the individual controls. So the page-level gate no longer applies to the
+ * creator. Free non-creator members still see it (pending owner
+ * confirmation — see LS-10427).
  *
  * The live draft route (/baseball/league/:id/draft) is intentionally NOT gated
  * — drafting is a free, core feature (PR #5283 un-gated EliteDraftBoard).
  *
  * Scenarios:
- *   - Free user sees premium overlay on the league detail route
+ *   - Free league creator sees the league (no page-level overlay)
+ *   - Free non-creator member sees premium overlay on the league detail route
  *   - Premium user sees content (no overlay) on the league detail route
  *   - "Upgrade to Premium" CTA opens the UpgradeModal
  *
@@ -116,7 +123,15 @@ const MOCK_POSITIONS = [
 // alongside it.
 // ---------------------------------------------------------------------------
 
-async function mockLeagueGraphQL(page: import('@playwright/test').Page) {
+// The hermetic E2E JWT identifies the signed-in user as id 1, so `owner: 1`
+// makes them the league's creator and `owner: 2` makes them a non-creator
+// member (they still hold team 1 via GetUserTeamId).
+const MOCK_LEAGUE_OWNED_BY_OTHER = { ...MOCK_LEAGUE, owner: 2 };
+
+async function mockLeagueGraphQL(
+  page: import('@playwright/test').Page,
+  league: typeof MOCK_LEAGUE = MOCK_LEAGUE,
+) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const op = extractOperationName(route);
 
@@ -146,7 +161,7 @@ async function mockLeagueGraphQL(page: import('@playwright/test').Page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+        body: JSON.stringify({ data: { league } }),
       });
     } else if (op === 'GetLeagueTeams') {
       await route.fulfill({
@@ -186,14 +201,40 @@ const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
 const premiumUserTest = createCustomAuthTest('premiumuser@test.com', 'none');
 
 // ---------------------------------------------------------------------------
-// Tests: Free user sees premium gate on league detail @regression
+// Tests: Free league creator keeps access to their league @regression
 // ---------------------------------------------------------------------------
 
 freeUserTest.describe(
-  'League Detail – premium gate for free users @regression',
+  'League Detail – free league creator keeps access (LS-10427) @regression',
   () => {
     freeUserTest.beforeEach(async ({ page }) => {
       await mockLeagueGraphQL(page);
+      await useTier(page, 'free');
+      await page.goto('/baseball/league/1');
+      await page.waitForLoadState('load');
+    });
+
+    freeUserTest(
+      'renders the league without the page-level premium gate',
+      async ({ page }) => {
+        await expect(page.getByText(/test league/i).first()).toBeVisible();
+        await expect(
+          page.getByTestId('premium-feature-gate'),
+        ).not.toBeVisible();
+      },
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests: Free non-creator member sees premium gate on league detail @regression
+// ---------------------------------------------------------------------------
+
+freeUserTest.describe(
+  'League Detail – premium gate for free non-creator members @regression',
+  () => {
+    freeUserTest.beforeEach(async ({ page }) => {
+      await mockLeagueGraphQL(page, MOCK_LEAGUE_OWNED_BY_OTHER);
       await useTier(page, 'free');
       await page.goto('/baseball/league/1');
       await page.waitForLoadState('load');
@@ -214,6 +255,22 @@ freeUserTest.describe(
             .getByTestId('premium-feature-gate')
             .getByRole('button', { name: /upgrade to premium/i }),
         ).toBeVisible();
+      },
+    );
+
+    freeUserTest(
+      'keeps the upgrade CTA in the viewport at phone width (LS-10427)',
+      async ({ page }) => {
+        // The gate spans the whole multi-screen league page; a centred lock
+        // card landed below the fold on phones, leaving blurred tabs that
+        // looked tappable with no visible explanation. The sticky card must
+        // be on-screen without scrolling.
+        await page.setViewportSize({ width: 500, height: 363 });
+        await expect(
+          page
+            .getByTestId('premium-feature-gate')
+            .getByRole('button', { name: /upgrade to premium/i }),
+        ).toBeInViewport();
       },
     );
 

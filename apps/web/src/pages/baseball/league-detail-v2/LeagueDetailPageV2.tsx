@@ -384,8 +384,20 @@ export function LeagueDetailPageV2(): React.JSX.Element {
         title={`${league.name ?? 'League'} · Legacy Sports`}
         description={`Manage and view ${league.name ?? 'your league'} — matchups, roster, standings, trades and more.`}
       />
+      {/* The league's creator (`league.owner` — there is no commissioner
+          transfer, so owner === creator) keeps full access to their league
+          even after downgrading (owner decision on LS-10427). Only NEW premium
+          decisions stay gated, and those are gated inline on the individual
+          controls (Commish tab → DraftSettingsControl, LeagueSettingsControl,
+          FAAB processing, etc.) via the real `isPremium`, plus server-side
+          `requireEntitlement` / `requireFreshEntitlement` checks. Non-creator
+          free members still see the page-level gate pending owner
+          confirmation; `stickyOverlay` keeps its upgrade CTA in view on
+          phones instead of centring it below the fold. */}
       <PremiumGate
-        isPremium={isPremium}
+        isPremium={isPremium || isCommissioner}
+        isUserLoaded={!authLoading}
+        stickyOverlay
         featureName="Fantasy League"
         featureDescription="Full league access — roster management, live draft, commissioner tools, and advanced stats — is available on the Premium plan."
       >

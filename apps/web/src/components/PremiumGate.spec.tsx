@@ -281,4 +281,33 @@ describe('PremiumGate', () => {
     const gatedContent = screen.getByText('preview content');
     expect(gatedContent.closest('[aria-hidden="true"]')).toBeNull();
   });
+
+  it('pins the lock card to the viewport with position: sticky when stickyOverlay is set (LS-10427)', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Fantasy League" stickyOverlay>
+        <div>locked content</div>
+      </PremiumGate>,
+    );
+
+    const card = screen.getByTestId('premium-feature-gate')
+      .firstElementChild as HTMLElement;
+    expect(card.style.position).toBe('sticky');
+    // overflow: hidden on the wrapper would make it the sticky scroll
+    // container and stop the card sticking; it must use clip instead.
+    const wrapper = screen.getByTestId('premium-feature-gate')
+      .parentElement as HTMLElement;
+    expect(wrapper.style.overflow).toBe('clip');
+  });
+
+  it('keeps the lock card centred (not sticky) by default', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Player Comparison">
+        <div>locked content</div>
+      </PremiumGate>,
+    );
+
+    const card = screen.getByTestId('premium-feature-gate')
+      .firstElementChild as HTMLElement;
+    expect(card.style.position).not.toBe('sticky');
+  });
 });

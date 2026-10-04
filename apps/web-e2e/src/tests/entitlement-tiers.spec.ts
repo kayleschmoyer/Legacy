@@ -14,6 +14,7 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { extractOperationName, useTier } from '../fixtures/shared-mocks';
+import { leagueByIdResponse } from '../mocks/graphql/league.mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,20 @@ test.describe('Entitlement tiers – premium is the default @regression', () => 
 
 test.describe('Entitlement tiers – free via useTier @regression', () => {
   test('useTier("free") surfaces the premium gate', async ({ page }) => {
+    // A league's creator keeps access after downgrading (LS-10427), so the
+    // page-level gate only applies to non-creator members. The default mocked
+    // league is owned by the signed-in user (id 1) — make someone else own it.
+    await page.route(isGraphQLEndpoint, async (route) => {
+      if (extractOperationName(route) === 'GetLeagueById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(leagueByIdResponse({ owner: 2 })),
+        });
+        return;
+      }
+      await route.fallback();
+    });
     await useTier(page, 'free');
     await page.goto('/baseball/league/1');
     await page.waitForLoadState('load');

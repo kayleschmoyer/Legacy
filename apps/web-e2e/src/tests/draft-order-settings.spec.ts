@@ -353,10 +353,15 @@ test.describe('Draft Settings Control — free user premium gate @regression', (
     await setupFreeUserGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
 
-    // LeagueDetailPageV2 wraps the entire league shell in the web PremiumGate
-    // (apps/web/src/components/PremiumGate.tsx), which renders a blur overlay
-    // with data-testid="premium-feature-gate" for free users — not the
-    // shared-components card that shows "Available with Premium leagues."
-    await expect(page.getByTestId('premium-feature-gate')).toBeVisible();
+    // The league's creator (owner 1 = the signed-in user) keeps access to
+    // their league after downgrading (LS-10427), so there is no page-level
+    // gate here. Draft settings are a NEW premium decision, so the section
+    // itself is locked inline by the shared-components PremiumGate card.
+    await expandDraftSettings(page);
+    const region = page.getByRole('region', { name: 'Draft Settings' });
+    await expect(region.getByTestId('premium-feature-gate')).toBeVisible();
+    await expect(
+      region.getByText(/available with premium leagues/i),
+    ).toBeVisible();
   });
 });

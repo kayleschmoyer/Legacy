@@ -51,6 +51,14 @@ export interface PremiumGateProps {
    * tree presence.
    */
   hideBlurredContentFromAssistiveTech?: boolean;
+  /**
+   * Pin the lock card near the top of the viewport (CSS `position: sticky`)
+   * instead of centring it in the gated area. Use for page-height gates: a
+   * centred card on a multi-screen page lands below the fold on phones,
+   * leaving the user with blurred, untappable content and no visible
+   * explanation or upgrade CTA (LS-10427). Defaults to `false`.
+   */
+  stickyOverlay?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +103,7 @@ export function PremiumGate({
   testId = 'premium-feature-gate',
   children,
   hideBlurredContentFromAssistiveTech = false,
+  stickyOverlay = false,
 }: PremiumGateProps): React.ReactNode {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   // Live monthly-equivalent price (annual total / 12). Falls back to display
@@ -129,10 +138,19 @@ export function PremiumGate({
         width="100%"
         maxWidth="100%"
         position={isPremium ? undefined : 'relative'}
-        overflow={isPremium ? undefined : 'hidden'}
+        overflow={isPremium || stickyOverlay ? undefined : 'hidden'}
         borderRadius={isPremium ? undefined : '$4'}
         minHeight={isPremium ? undefined : 240}
-        style={isPremium ? undefined : { minWidth: 0 }}
+        // `overflow: hidden` would make this box the sticky card's scroll
+        // container (it never scrolls, so the card would never stick);
+        // `clip` crops the same way without creating a scroll container.
+        style={
+          isPremium
+            ? undefined
+            : stickyOverlay
+              ? { minWidth: 0, overflow: 'clip' }
+              : { minWidth: 0 }
+        }
       >
         {/* Content — blurred tease for free users, normal for premium */}
         <YStack
@@ -162,7 +180,7 @@ export function PremiumGate({
             right={0}
             bottom={0}
             alignItems="center"
-            justifyContent="center"
+            justifyContent={stickyOverlay ? 'flex-start' : 'center'}
             style={{
               background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.7)} 0%, ${BRAND_NAVY} 100%)`,
             }}
@@ -179,9 +197,13 @@ export function PremiumGate({
               $gtSm={{ paddingHorizontal: '$6' }}
               paddingVertical="$5"
               marginHorizontal="$3"
+              marginTop={stickyOverlay ? '$6' : undefined}
               style={{
                 boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.5)}`,
                 boxSizing: 'border-box',
+                ...(stickyOverlay
+                  ? { position: 'sticky' as const, top: 24 }
+                  : undefined),
               }}
             >
               <Lock size={30} color={BRAND_GOLD_LIGHT} />
