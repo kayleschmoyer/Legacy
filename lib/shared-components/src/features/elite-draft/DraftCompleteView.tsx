@@ -8,6 +8,11 @@ import {
 } from '@legacy-sports/design-tokens';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { BaseballCard } from './BaseballCard';
+import {
+  getDraftCompletionActions,
+  resolveDraftedPlayers,
+} from './draftCompletion';
+import type { SportKind } from '../../config/sports';
 
 interface DraftCompleteViewProps {
   /**
@@ -16,6 +21,8 @@ interface DraftCompleteViewProps {
    */
   draftSummary: { isMockDraft?: boolean; name?: string } | null | undefined;
   leagueId: number | null;
+  /** Routes the CTAs to this sport's pages (LS-10528). */
+  sport: SportKind;
   pickHistory: DraftPickRecord[];
   myTeamId: number | null;
   myTeam: DraftPlayer[];
@@ -88,6 +95,7 @@ function RosterCardGrid({
 export function DraftCompleteView({
   draftSummary,
   leagueId,
+  sport,
   pickHistory,
   myTeamId,
   myTeam,
@@ -109,30 +117,15 @@ export function DraftCompleteView({
   );
 
   const selectedTeamPlayers: DraftPlayer[] = useMemo(
-    () =>
-      selectedTeamPicks.map((pick) => {
-        const player = statsLookup.get(pick.playerId);
-        if (player) return player;
-        const name = pick.player
-          ? `${pick.player.firstName} ${pick.player.lastName}`
-          : `Unknown Player (ID: ${pick.playerId})`;
-        return {
-          id: pick.playerId,
-          name,
-          position: 'UTIL',
-          avg: 0,
-          hr: 0,
-          rbi: 0,
-          runs: 0,
-          sb: 0,
-          games: 0,
-          hits: 0,
-          obp: 0,
-          slg: 0,
-        };
-      }),
+    () => resolveDraftedPlayers(selectedTeamPicks, statsLookup),
     [selectedTeamPicks, statsLookup],
   );
+
+  const actions = getDraftCompletionActions({
+    sport,
+    isMockDraft: draftSummary?.isMockDraft === true,
+    leagueId,
+  });
 
   const selectedTeamName = useMemo(() => {
     if (!selectedTeamId) return 'Your Roster';
@@ -207,31 +200,19 @@ export function DraftCompleteView({
             : `All ${pickHistory.length} picks have been made. Your roster is set!`}
         </Text>
 
-        {/* Action buttons — shown for real (non-mock) drafts */}
-        {!draftSummary?.isMockDraft && (
-          <XStack
-            gap="$3"
-            flexWrap="wrap"
-            justifyContent="center"
-            marginTop="$2"
-          >
+        {/* Next-step CTAs — mock: Practice Again / My Leagues; league:
+            Set My Lineup / Back to League. Routed by sport (LS-10528). */}
+        <XStack gap="$3" flexWrap="wrap" justifyContent="center" marginTop="$2">
+          {actions.map((action) => (
             <Button
-              onPress={() => onNavigate(`/baseball/league/${leagueId}/roster`)}
-              backgroundColor="$brandGold"
-              color="white"
-              fontWeight="700"
-              fontSize={14}
-              height={44}
-              paddingHorizontal={28}
-              borderRadius="$4"
-              pressStyle={{ scale: 0.98 }}
-              hoverStyle={{ backgroundColor: '$brandGoldDark' }}
-            >
-              Set My Lineup
-            </Button>
-            <Button
-              onPress={() => onNavigate(`/baseball/league/${leagueId}`)}
-              backgroundColor={withAlpha(darkText.fg1Strong, 0.1)}
+              key={action.key}
+              testID={`draft-complete-cta-${action.key}`}
+              onPress={() => onNavigate(action.path)}
+              backgroundColor={
+                action.primary
+                  ? '$brandGold'
+                  : withAlpha(darkText.fg1Strong, 0.1)
+              }
               color="white"
               fontWeight="700"
               fontSize={14}
@@ -240,54 +221,15 @@ export function DraftCompleteView({
               borderRadius="$4"
               pressStyle={{ scale: 0.98 }}
               hoverStyle={{
-                backgroundColor: withAlpha(darkText.fg1Strong, 0.16),
+                backgroundColor: action.primary
+                  ? '$brandGoldDark'
+                  : withAlpha(darkText.fg1Strong, 0.16),
               }}
             >
-              Back to League
+              {action.label}
             </Button>
-          </XStack>
-        )}
-
-        {/* Mock draft buttons */}
-        {draftSummary?.isMockDraft && (
-          <XStack
-            gap="$3"
-            flexWrap="wrap"
-            justifyContent="center"
-            marginTop="$2"
-          >
-            <Button
-              onPress={() => onNavigate('/baseball/mock-draft')}
-              backgroundColor="$brandGold"
-              color="white"
-              fontWeight="700"
-              fontSize={14}
-              height={44}
-              paddingHorizontal={28}
-              borderRadius="$4"
-              pressStyle={{ scale: 0.98 }}
-              hoverStyle={{ backgroundColor: '$brandGoldDark' }}
-            >
-              Practice Again
-            </Button>
-            <Button
-              onPress={() => onNavigate('/baseball')}
-              backgroundColor={withAlpha(darkText.fg1Strong, 0.1)}
-              color="white"
-              fontWeight="700"
-              fontSize={14}
-              height={44}
-              paddingHorizontal={28}
-              borderRadius="$4"
-              pressStyle={{ scale: 0.98 }}
-              hoverStyle={{
-                backgroundColor: withAlpha(darkText.fg1Strong, 0.16),
-              }}
-            >
-              Go to My Leagues
-            </Button>
-          </XStack>
-        )}
+          ))}
+        </XStack>
 
         {/* Team selector + roster cards */}
         {leagueTeams.length > 0 && (

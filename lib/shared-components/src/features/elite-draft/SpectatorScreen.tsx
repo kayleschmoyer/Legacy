@@ -172,6 +172,7 @@ export function SpectatorScreen({
             : null
         }
         leagueId={leagueId}
+        sport={sport}
         pickHistory={data.pickHistory}
         myTeamId={null}
         myTeam={[]}

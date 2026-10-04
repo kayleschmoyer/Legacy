@@ -48,6 +48,7 @@ function buildLargeRoster(count: number): {
 const defaultProps = {
   league: { isMockDraft: false, name: 'Test League' },
   leagueId: 1,
+  sport: 'baseball' as const,
   pickHistory: [],
   myTeamId: 1,
   myTeam: [],
@@ -130,5 +131,37 @@ describe('DraftCompleteView', () => {
     expect(getByText('Go to My Leagues')).toBeTruthy();
     expect(getByText('Your Roster (15 players)')).toBeTruthy();
     expect(getAllByText(/Player \d+/)).toHaveLength(15);
+  });
+
+  // LS-10528: CTAs route by the draft's sport instead of hard-coding baseball.
+  it('routes the league CTAs to football pages for a football draft', () => {
+    const onNavigate = jest.fn();
+    const { getByText } = render(
+      <DraftCompleteView
+        {...defaultProps}
+        sport="football"
+        onNavigate={onNavigate}
+      />,
+    );
+    getByText('Set My Lineup').click();
+    expect(onNavigate).toHaveBeenLastCalledWith('/football/league/1/roster');
+    getByText('Back to League').click();
+    expect(onNavigate).toHaveBeenLastCalledWith('/football/league/1');
+  });
+
+  it('sends a football mock draft home to /football', () => {
+    const onNavigate = jest.fn();
+    const { getByText } = render(
+      <DraftCompleteView
+        {...defaultProps}
+        sport="football"
+        draftSummary={{ isMockDraft: true, name: 'Mock' }}
+        onNavigate={onNavigate}
+      />,
+    );
+    getByText('Practice Again').click();
+    expect(onNavigate).toHaveBeenLastCalledWith('/baseball/mock-draft');
+    getByText('Go to My Leagues').click();
+    expect(onNavigate).toHaveBeenLastCalledWith('/football');
   });
 });

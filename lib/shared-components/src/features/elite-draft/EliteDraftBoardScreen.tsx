@@ -1302,7 +1302,8 @@ export function EliteDraftBoardScreen({
     queries.currentPickInfo?.isComplete
   ) {
     // Draft Room v2 (LS-9402): the compact branch gets the new recap —
-    // README "Draft-complete recap" — reusing LS-9400's roster-slot-row.
+    // README "Draft-complete recap" — reusing LS-9400's roster-slot-row,
+    // plus the same CTAs and team selector as the wide view (LS-10528).
     // The wide-viewport branch is out of scope for this redesign and keeps
     // the pre-v2 DraftCompleteView unchanged.
     if (isCompact) {
@@ -1319,6 +1320,11 @@ export function EliteDraftBoardScreen({
           teamNameById={queries.teamNameById}
           leagueName={queries.draftTitle ?? undefined}
           onDownloadPacket={onDownloadDraftPacket}
+          isMockDraft={isMockDraft}
+          leagueId={leagueId}
+          myTeamId={queries.myTeamId}
+          leagueTeams={queries.leagueTeams}
+          onNavigate={onNavigate}
         />
       );
     }
@@ -1336,6 +1342,7 @@ export function EliteDraftBoardScreen({
             : null
         }
         leagueId={leagueId}
+        sport={sport}
         pickHistory={queries.pickHistory}
         myTeamId={queries.myTeamId}
         myTeam={playerData.myTeam}

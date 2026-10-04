@@ -434,7 +434,35 @@ jest.mock('./DraftMyPickAnnouncement', () => ({
     ) : null,
 }));
 jest.mock('./DraftRoomRecap', () => ({
-  DraftRoomRecap: () => <div data-testid="draft-room-recap" />,
+  DraftRoomRecap: ({
+    isMockDraft,
+    leagueId,
+    myTeamId,
+    leagueTeams,
+    sport,
+    onNavigate,
+  }: {
+    isMockDraft: boolean;
+    leagueId: number | null;
+    myTeamId: number | null;
+    leagueTeams: unknown[];
+    sport: string;
+    onNavigate: (path: string) => void;
+  }) => (
+    <div
+      data-testid="draft-room-recap"
+      data-is-mock-draft={String(isMockDraft)}
+      data-league-id={String(leagueId)}
+      data-my-team-id={String(myTeamId)}
+      data-team-count={String(leagueTeams.length)}
+      data-sport={sport}
+    >
+      <button
+        data-testid="recap-navigate"
+        onClick={() => onNavigate('/somewhere')}
+      />
+    </div>
+  ),
 }));
 jest.mock('./DraftPlayersTab', () => ({
   DraftPlayersTab: ({
@@ -997,6 +1025,35 @@ describe('EliteDraftBoardScreen — draft-complete recap viewport swap (LS-9402)
 
     expect(getByTestId('draft-room-recap')).toBeTruthy();
     expect(queryByTestId('draft-complete-view')).toBeNull();
+  });
+
+  // LS-10528: the compact recap must get what it needs to offer the wide
+  // view's CTAs and team selector at phone/tablet widths and on native.
+  it('passes the compact recap its CTA routing and team-selector inputs', () => {
+    mockUseDraftViewportTier.mockReturnValue('phone');
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        isMockDraft: true,
+        leagueTeams: [
+          { id: '1', name: 'Mine', leagueId: 1 },
+          { id: '2', name: 'CPU', leagueId: 1, isCpu: true },
+        ],
+      }),
+    );
+    const onNavigate = jest.fn();
+
+    const { getByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} onNavigate={onNavigate} />,
+    );
+
+    const recap = getByTestId('draft-room-recap');
+    expect(recap.getAttribute('data-is-mock-draft')).toBe('true');
+    expect(recap.getAttribute('data-league-id')).toBe('1');
+    expect(recap.getAttribute('data-my-team-id')).toBe('1');
+    expect(recap.getAttribute('data-team-count')).toBe('2');
+    getByTestId('recap-navigate').click();
+    expect(onNavigate).toHaveBeenCalledWith('/somewhere');
   });
 
   it('keeps rendering DraftCompleteView (not DraftRoomRecap) on the wide viewport', () => {

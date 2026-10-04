@@ -5,14 +5,24 @@
  * callout, and the full roster list — reusing LS-9400's
  * {@link DraftRosterSlotRow} verbatim (not a reimplementation) via the same
  * bucket-fill logic DraftTeamTab already uses.
+ *
+ * LS-10528: the recap is the only completion screen at phone/tablet widths
+ * and on native, so it carries the same next steps as the wide
+ * DraftCompleteView — a sticky CTA bar (Practice Again / My Leagues, or Set
+ * My Lineup / Back to League) and a team selector for reviewing every other
+ * team's roster — without changing the LS-9402 recap styling.
  */
-import React, { useMemo } from 'react';
-import { ScrollView, Text, XStack, YStack } from 'tamagui';
+import React, { useMemo, useState } from 'react';
+import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { buildDepthChartBuckets } from './DraftPlayerBoard';
 import { DraftPacketSection } from './DraftPacketSection';
 import { DraftRosterSlotRow } from './DraftRosterSlotRow';
+import {
+  getDraftCompletionActions,
+  resolveDraftedPlayers,
+} from './draftCompletion';
 import { useDraftPalette } from './nativeDraftPalette';
-import type { DraftPickRecord, DraftPlayer } from './types';
+import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
 import type { SportKind } from '../../config/sports';
 
@@ -32,6 +42,13 @@ export interface DraftRoomRecapProps {
   teamNameById: (teamId: number | null | undefined) => string;
   leagueName?: string | null;
   onDownloadPacket?: (contents: string, filename: string) => void;
+  /** Mock drafts offer Practice Again; league drafts offer the league. */
+  isMockDraft: boolean;
+  leagueId: number | null;
+  myTeamId: number | null;
+  /** Every team in the draft — drives the roster team selector. */
+  leagueTeams: LeagueTeam[];
+  onNavigate: (path: string) => void;
 }
 
 interface PickValue {
@@ -125,8 +142,19 @@ export function DraftRoomRecap({
   teamNameById,
   leagueName,
   onDownloadPacket,
+  isMockDraft,
+  leagueId,
+  myTeamId,
+  leagueTeams,
+  onNavigate,
 }: DraftRoomRecapProps): React.JSX.Element {
   const palette = useDraftPalette();
+  const myTeamKey = myTeamId == null ? null : String(myTeamId);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
+    myTeamKey,
+  );
+  const isViewingOwnTeam =
+    selectedTeamId == null || selectedTeamId === myTeamKey;
 
   const pickValues = useMemo<PickValue[]>(() => {
     const adpRanks = buildAdpRanks(pickHistory, statsLookup);
@@ -154,16 +182,41 @@ export function DraftRoomRecap({
   );
   const grade = gradeFor(totalValue, myTeamPicks.length);
 
+  // The roster list follows the team selector; the stat cards and BEST
+  // VALUE callout above it always describe the viewer's own draft.
+  const rosterPicks = useMemo(
+    () =>
+      isViewingOwnTeam
+        ? myTeamPicks
+        : pickHistory.filter((p) => String(p.teamId) === selectedTeamId),
+    [isViewingOwnTeam, myTeamPicks, pickHistory, selectedTeamId],
+  );
+  const rosterPlayers = useMemo(
+    () =>
+      isViewingOwnTeam
+        ? myTeam
+        : resolveDraftedPlayers(rosterPicks, statsLookup),
+    [isViewingOwnTeam, myTeam, rosterPicks, statsLookup],
+  );
+
   const pickByPlayerId = useMemo(() => {
     const map = new Map<number, DraftPickRecord>();
-    myTeamPicks.forEach((pick) => map.set(pick.playerId, pick));
+    rosterPicks.forEach((pick) => map.set(pick.playerId, pick));
     return map;
-  }, [myTeamPicks]);
+  }, [rosterPicks]);
 
   const buckets = useMemo(
-    () => buildDepthChartBuckets(leaguePositions, myTeam, sport, maxRosterSize),
-    [leaguePositions, myTeam, sport, maxRosterSize],
+    () =>
+      buildDepthChartBuckets(
+        leaguePositions,
+        rosterPlayers,
+        sport,
+        maxRosterSize,
+      ),
+    [leaguePositions, rosterPlayers, sport, maxRosterSize],
   );
+
+  const actions = getDraftCompletionActions({ sport, isMockDraft, leagueId });
 
   const slotRows = useMemo(
     () =>
@@ -270,6 +323,53 @@ export function DraftRoomRecap({
           </XStack>
         )}
 
+        {leagueTeams.length > 1 && (
+          <YStack testID="draft-recap-team-selector" marginBottom={10}>
+            <Text
+              fontSize={9}
+              fontWeight="700"
+              letterSpacing={1.2}
+              textTransform="uppercase"
+              color="$fg4"
+              paddingHorizontal="$4"
+              marginBottom={6}
+            >
+              Rosters
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap={6} paddingHorizontal="$4">
+                {leagueTeams.map((team) => {
+                  const teamKey = String(team.id);
+                  const isActive = isViewingOwnTeam
+                    ? teamKey === myTeamKey
+                    : teamKey === selectedTeamId;
+                  return (
+                    <Button
+                      key={team.id}
+                      testID={`draft-recap-team-${teamKey}`}
+                      aria-pressed={isActive}
+                      onPress={() => setSelectedTeamId(teamKey)}
+                      size="$2"
+                      borderRadius={999}
+                      borderWidth={1}
+                      borderColor={isActive ? '$brandGold' : '$outlineDefault'}
+                      backgroundColor={
+                        isActive
+                          ? withAlpha(palette.gold.gold, 0.15)
+                          : '$surfaceCard'
+                      }
+                      color={isActive ? '$brandGoldLight' : '$fg3'}
+                      fontWeight={isActive ? '700' : '500'}
+                    >
+                      {`${team.name}${teamKey === myTeamKey ? ' (You)' : ''}`}
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </ScrollView>
+          </YStack>
+        )}
+
         <YStack paddingHorizontal="$3" paddingBottom="$4">
           {slotRows.map((row) => (
             <DraftRosterSlotRow
@@ -291,6 +391,34 @@ export function DraftRoomRecap({
           onDownload={onDownloadPacket}
         />
       </ScrollView>
+
+      {/* Sticky so the next steps stay reachable however long the roster
+          is (LS-10528) — mirrors DraftCompleteView's CTAs. */}
+      <XStack
+        testID="draft-recap-actions"
+        gap={10}
+        paddingHorizontal="$4"
+        paddingVertical="$3"
+        borderTopWidth={1}
+        borderTopColor="$outlineDefault"
+        backgroundColor="$background"
+      >
+        {actions.map((action) => (
+          <Button
+            key={action.key}
+            testID={`draft-recap-cta-${action.key}`}
+            flex={1}
+            onPress={() => onNavigate(action.path)}
+            backgroundColor={action.primary ? '$brandGold' : '$surfaceCard'}
+            color={action.primary ? '$textOnAccent' : '$color'}
+            fontWeight="700"
+            borderRadius={12}
+            pressStyle={{ scale: 0.98 }}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </XStack>
     </YStack>
   );
 }
