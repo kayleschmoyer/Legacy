@@ -8,7 +8,7 @@ const GAMES_LIST = [
     accent: 'navy',
     icon: 'icons/draft.svg',
     stat: { label: 'Games Active', value: '3' },
-    meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career-w/-Team'],
+    meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career w/ Team'],
     cta: 'Enter Lobby',
   },
   {

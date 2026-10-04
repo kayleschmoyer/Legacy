@@ -30,6 +30,12 @@ describe('GAME_TEMPLATES', () => {
       ['mock-draft', 'navy'],
     ]);
   });
+
+  it('names the Season Draft modes the way the create/join screens do (LS-10448)', () => {
+    const seasonDraft = GAME_TEMPLATES.find((t) => t.id === 'season-draft');
+
+    expect(seasonDraft?.meta).toContain('Season or Career w/ Team');
+  });
 });
 
 describe('statFor', () => {

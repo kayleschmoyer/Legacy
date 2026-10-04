@@ -79,7 +79,7 @@ export const GAME_TEMPLATES: MinigameTemplate[] = [
     desc: 'Draft hitters or pitchers across eras. Pick the right season, fill your roster, rack up the counting stats. Last one standing with the biggest number wins.',
     accent: 'navy',
     iconKind: 'draft',
-    meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career-w/-Team'],
+    meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career w/ Team'],
     cta: 'Enter Lobby',
   },
   {
