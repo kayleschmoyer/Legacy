@@ -515,6 +515,36 @@ test.describe('Scoreboard — sport filter @regression', () => {
     await expect(page.getByTestId('scoreboard-heading')).toContainText(
       'MLB Scoreboard',
     );
+
+    // Poll the request count until it has stopped changing for a few
+    // consecutive checks. Used both before capturing the baseline and before
+    // the final assertion: a fixed sleep is a race by construction (LS-10018),
+    // so wait exactly as long as the count keeps moving (up to the timeout).
+    const waitForRequestCountToSettle = async (): Promise<void> => {
+      let lastObservedCount = -1;
+      let stableChecks = 0;
+      await expect
+        .poll(
+          () => {
+            if (scoreboardRequestCount === lastObservedCount) {
+              stableChecks += 1;
+            } else {
+              lastObservedCount = scoreboardRequestCount;
+              stableChecks = 0;
+            }
+            return stableChecks;
+          },
+          { timeout: 2000, intervals: [25, 25, 50, 50, 100, 100, 200] },
+        )
+        .toBeGreaterThanOrEqual(3);
+    };
+
+    // The heading renders as soon as the first response lands, but a second
+    // mount-time GetScoreboard (StrictMode double-effect, a cache-and-network
+    // refetch, the first poll tick) can still arrive after that and before the
+    // NFL click (LS-10317). Capture the baseline only once mount-time requests
+    // have settled so a late mount request is never attributed to the switch.
+    await waitForRequestCountToSettle();
     const requestsAfterMount = scoreboardRequestCount;
     expect(requestsAfterMount).toBeGreaterThan(0);
 
@@ -535,26 +565,10 @@ test.describe('Scoreboard — sport filter @regression', () => {
     // any (unexpected) re-render-driven refetch a chance to land before we
     // check. A fixed sleep here is a race by construction (LS-10018): too
     // short under CI contention and a slow refetch reads as a false pass.
-    // Instead poll the request count until it has stopped changing for a
-    // few consecutive checks — this waits exactly as long as needed for the
-    // count to settle, and keeps waiting (up to the timeout) if a refetch is
-    // still in flight, so a genuinely-late unwanted request is still caught.
-    let lastObservedCount = -1;
-    let stableChecks = 0;
-    await expect
-      .poll(
-        () => {
-          if (scoreboardRequestCount === lastObservedCount) {
-            stableChecks += 1;
-          } else {
-            lastObservedCount = scoreboardRequestCount;
-            stableChecks = 0;
-          }
-          return stableChecks;
-        },
-        { timeout: 2000, intervals: [25, 25, 50, 50, 100, 100, 200] },
-      )
-      .toBeGreaterThanOrEqual(3);
+    // Instead wait for the count to settle — this keeps waiting (up to the
+    // timeout) if a refetch is still in flight, so a genuinely-late unwanted
+    // request is still caught.
+    await waitForRequestCountToSettle();
     expect(scoreboardRequestCount).toBe(requestsAfterMount);
 
     // Switch back to MLB — placeholder hides, MLB cards return.
