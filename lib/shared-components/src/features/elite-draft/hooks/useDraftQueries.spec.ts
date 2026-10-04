@@ -29,6 +29,19 @@ const mockRecordedCalls: {
 // query failure without needing a real Apollo error shape per case.
 let mockDraftError: unknown;
 
+// One stable refetch spy per operation (LS-10464), so a test can tell which
+// query a returned `refetch*` callback actually re-runs.
+const mockRefetchByOperation = new Map<string, jest.Mock>();
+function mockRefetchFor(opName: string | undefined): jest.Mock {
+  const key = opName ?? '';
+  let fn = mockRefetchByOperation.get(key);
+  if (!fn) {
+    fn = jest.fn();
+    mockRefetchByOperation.set(key, fn);
+  }
+  return fn;
+}
+
 const mockLoggerError = jest.fn();
 const mockLoggerWarn = jest.fn();
 jest.mock('@legacy-sports/logging', () => ({
@@ -63,7 +76,7 @@ jest.mock('@apollo/client/react', () => ({
         data: { league: { id: 1, draftStatus: 'in-progress' } },
         loading: false,
         error: undefined,
-        refetch: jest.fn(),
+        refetch: mockRefetchFor(opName),
       };
     }
     if (opName === 'GetLiveDraftLeagueDraft') {
@@ -73,14 +86,14 @@ jest.mock('@apollo/client/react', () => ({
           : { getLeagueDraft: { id: 99, selectionMethod: 'snake' } },
         loading: false,
         error: mockDraftError,
-        refetch: jest.fn(),
+        refetch: mockRefetchFor(opName),
       };
     }
     return {
       data: undefined,
       loading: false,
       error: undefined,
-      refetch: jest.fn(),
+      refetch: mockRefetchFor(opName),
     };
   },
 }));
@@ -202,5 +215,49 @@ describe('useDraftQueries — getLeagueDraft error log level (LS-9492)', () => {
       '[Draft] getLeagueDraft error:',
       mockDraftError,
     );
+  });
+});
+
+// LS-10464 — the mock-draft room has no league, so GetLiveDraftLeagueDraft
+// (`$leagueId: Int!`) is skipped. Its `refetch` still fires a network request
+// with `leagueId: null` when the timer/websocket call `refetchDraft`, so in
+// room mode `refetchDraft` must re-run the draft-room query instead.
+describe('useDraftQueries — refetchDraft in draft-room mode (LS-10464)', () => {
+  beforeEach(() => {
+    mockRecordedCalls.length = 0;
+    mockRefetchByOperation.clear();
+    mockDraftError = undefined;
+  });
+
+  it('refetches the draft room, never the league draft, for a mock draft', () => {
+    const { result } = renderHook(() =>
+      useDraftQueries({
+        leagueId: null,
+        draftId: 13800,
+        playerSearch: '',
+        selectedPosition: '',
+        viewMode: 'grid',
+      }),
+    );
+
+    void result.current.refetchDraft();
+
+    expect(mockRefetchFor('GetDraftRoom')).toHaveBeenCalledTimes(1);
+    expect(mockRefetchFor('GetLiveDraftLeagueDraft')).not.toHaveBeenCalled();
+  });
+
+  it('still refetches the league draft on a league draft board', () => {
+    const { result } = renderHook(() =>
+      useDraftQueries({
+        leagueId: 1,
+        playerSearch: '',
+        selectedPosition: '',
+        viewMode: 'grid',
+      }),
+    );
+
+    void result.current.refetchDraft();
+
+    expect(mockRefetchFor('GetLiveDraftLeagueDraft')).toHaveBeenCalledTimes(1);
   });
 });

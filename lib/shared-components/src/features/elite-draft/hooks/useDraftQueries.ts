@@ -776,7 +776,9 @@ export function useDraftQueries({
     draftId,
     draftError,
     isAuctionDraft,
-    refetchDraft,
+    // GetLiveDraftLeagueDraft requires a non-null leagueId and is skipped in
+    // room mode; refetching it there would send `leagueId: null` (LS-10464).
+    refetchDraft: isRoomMode ? refetchRoom : refetchDraft,
     // Current pick
     currentPickInfo,
     currentPickTeamId,
