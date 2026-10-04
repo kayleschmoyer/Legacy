@@ -62,6 +62,9 @@ export interface DraftPlayersTabProps {
   currentPickInfo: CurrentDraftPickInfo | null;
   boardOrderedTeams: LeagueTeam[];
   myTeamId: number | null;
+  /** The draft's `draftOrder` — places the inline "YOUR PICK" markers on the
+   *  real overall picks in a `linear` draft (LS-10569). */
+  draftOrder?: string | null;
   queuedPlayerIds: ReadonlySet<number>;
   onToggleQueue: (playerId: number) => void;
   onDraftPlayer: (playerId: number) => void;
@@ -97,6 +100,7 @@ export function DraftPlayersTab({
   currentPickInfo,
   boardOrderedTeams,
   myTeamId,
+  draftOrder,
   queuedPlayerIds,
   onToggleQueue,
   onDraftPlayer,
@@ -143,9 +147,10 @@ export function DraftPlayersTab({
         currentPickInfo,
         teamCount: boardOrderedTeams.length,
         myTeamIndex,
+        draftOrder,
         count: 2,
       }),
-    [currentPickInfo, boardOrderedTeams.length, myTeamIndex],
+    [currentPickInfo, boardOrderedTeams.length, myTeamIndex, draftOrder],
   );
 
   // Markers only show with no filter/search applied — otherwise "N players

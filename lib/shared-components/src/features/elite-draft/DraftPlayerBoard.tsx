@@ -268,6 +268,9 @@ interface DraftPlayerBoardProps {
   untimed?: boolean;
   /** Commissioner has paused the draft. */
   draftPaused?: boolean;
+  /** The draft's `draftOrder` — numbers the board grid's empty cells
+   *  (LS-10506). */
+  draftOrder?: string | null;
   onSetSearchTerm: (v: string) => void;
   onSetSelectedPosition: (v: string) => void;
   onSetViewMode: (v: ViewMode) => void;
@@ -642,6 +645,7 @@ export function DraftPlayerBoard({
   pickTimeLimitSeconds = 0,
   untimed = false,
   draftPaused = false,
+  draftOrder,
   onSetSearchTerm,
   onSetSelectedPosition,
   onSetViewMode,
@@ -859,10 +863,11 @@ export function DraftPlayerBoard({
         currentPickInfo,
         teamCount: boardOrderedTeams.length,
         myTeamIndex,
+        draftOrder,
         count: 1,
       })[0]?.overallPick ?? null
     );
-  }, [boardOrderedTeams, myTeamId, currentPickInfo]);
+  }, [boardOrderedTeams, myTeamId, currentPickInfo, draftOrder]);
   const pickOnClock = currentPickInfo != null && !currentPickInfo.isComplete;
   const dockClockLabel = !pickOnClock
     ? null
@@ -983,6 +988,7 @@ export function DraftPlayerBoard({
             pickTimeLimitSeconds={pickTimeLimitSeconds}
             untimed={untimed}
             paused={draftPaused}
+            draftOrder={draftOrder}
           />
         )}
         {viewMode === 'board' && !showBoardTimeline && (
@@ -1008,6 +1014,7 @@ export function DraftPlayerBoard({
                 : 20
             }
             onlineTeamIds={onlineTeamIds}
+            draftOrder={draftOrder}
           />
         )}
 

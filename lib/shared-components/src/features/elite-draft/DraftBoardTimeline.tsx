@@ -77,6 +77,9 @@ export interface DraftBoardTimelineProps {
   untimed?: boolean;
   /** Commissioner has paused the draft. */
   paused?: boolean;
+  /** The draft's `draftOrder`. A `linear` draft's even rounds list picks in
+   *  board order rather than reversed (LS-10569). */
+  draftOrder?: string | null;
 }
 
 /** The countdown ring beside the on-the-clock team — the mock's `.tl-ring`. */
@@ -222,6 +225,7 @@ export function DraftBoardTimeline({
   pickTimeLimitSeconds,
   untimed = false,
   paused = false,
+  draftOrder,
 }: DraftBoardTimelineProps): React.JSX.Element | null {
   const rounds = useMemo(
     () =>
@@ -231,8 +235,9 @@ export function DraftBoardTimeline({
         currentPickInfo,
         myTeamId,
         statsLookup,
+        draftOrder,
       }),
-    [teams, picks, currentPickInfo, myTeamId, statsLookup],
+    [teams, picks, currentPickInfo, myTeamId, statsLookup, draftOrder],
   );
 
   const initialOpen = defaultOpenRound(rounds);

@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import type { BoardCell } from './nativeDraftBoard';
-import { snakePickInRound } from './nativeDraftBoard';
+import { isSnakeDraftOrder, pickInRoundForColumn } from './nativeDraftBoard';
 import type { DraftPlayer, LeagueTeam } from './types';
 
 /**
@@ -68,8 +68,9 @@ export interface RoundSummary {
   /** `"#37–48"` — the overall-pick span this round covers. */
   rangeLabel: string;
   /** Snake order for this round: odd rounds run left to right, even rounds
-   *  reverse. Mirrors {@link snakePickInRound}, which numbers the tiles. */
-  snakeDirection: 'left-to-right' | 'right-to-left';
+   *  reverse. Mirrors {@link pickInRoundForColumn}, which numbers the tiles.
+   *  Null for a linear draft, which has no snake to describe (LS-10506). */
+  snakeDirection: 'left-to-right' | 'right-to-left' | null;
   /** Position mix among completed picks, most-drafted first. Empty for a
    *  round that has not started. */
   mix: RoundMixSegment[];
@@ -111,11 +112,14 @@ export function buildRoundTiles({
   teams,
   round,
   statsLookup,
+  draftOrder,
 }: {
   cells: BoardCell[];
   teams: LeagueTeam[];
   round: number;
   statsLookup: Map<number, DraftPlayer>;
+  /** The draft's `draftOrder` — decides whether even rounds reverse. */
+  draftOrder: string | null | undefined;
 }): RoundTile[] {
   const teamCount = teams.length;
   const nameById = new Map(teams.map((team) => [String(team.id), team.name]));
@@ -123,7 +127,7 @@ export function buildRoundTiles({
   return cells.map((cell, columnIndex) => {
     const pickInRound = cell.pick
       ? cell.pick.pickNumber
-      : snakePickInRound({ round, columnIndex, teamCount });
+      : pickInRoundForColumn({ round, columnIndex, teamCount, draftOrder });
     const player = cell.pick
       ? (statsLookup.get(cell.pick.playerId) ?? null)
       : null;
@@ -188,11 +192,13 @@ export function buildRoundSummary({
   round,
   teamCount,
   currentRound,
+  draftOrder,
 }: {
   cells: BoardCell[];
   round: number;
   teamCount: number;
   currentRound: number | null;
+  draftOrder: string | null | undefined;
 }): RoundSummary {
   const made = cells.filter((cell) => cell.pick !== null);
 
@@ -220,7 +226,11 @@ export function buildRoundSummary({
     picksMade: made.length,
     totalPicks: teamCount,
     rangeLabel: `#${(round - 1) * teamCount + 1}–${round * teamCount}`,
-    snakeDirection: round % 2 === 0 ? 'right-to-left' : 'left-to-right',
+    snakeDirection: !isSnakeDraftOrder(draftOrder)
+      ? null
+      : round % 2 === 0
+        ? 'right-to-left'
+        : 'left-to-right',
     mix,
     hasStarted,
     unlocksAfterRound: hasStarted || round <= 1 ? null : round - 1,

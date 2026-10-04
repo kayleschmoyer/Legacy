@@ -34,7 +34,7 @@ export type PickInspectorState = 'made' | 'on-the-clock' | 'upcoming';
 export interface PickInspectorInput {
   round: number;
   /** `"{round}.{slot}"`, zero-padded slot — callers already compute this
-   *  (`DraftRoundBoard`'s `RoundTile.pickLabel`, or `snakePickInRound` /
+   *  (`DraftRoundBoard`'s `RoundTile.pickLabel`, or `pickInRoundForColumn` /
    *  `pick.pickNumber` elsewhere) since the slot numbering rule differs by
    *  surface (fixed team columns on the grid vs. snake order on the phone
    *  tiles and timeline). */

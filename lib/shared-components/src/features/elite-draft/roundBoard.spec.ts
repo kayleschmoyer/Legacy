@@ -71,8 +71,12 @@ describe('cellsForRound', () => {
 describe('buildRoundTiles', () => {
   const statsLookup = new Map<number, DraftPlayer>();
 
-  function tilesFor(cells: BoardCell[], round = 1) {
-    return buildRoundTiles({ cells, teams, round, statsLookup });
+  function tilesFor(
+    cells: BoardCell[],
+    round = 1,
+    draftOrder: string | null = 'snake',
+  ) {
+    return buildRoundTiles({ cells, teams, round, statsLookup, draftOrder });
   }
 
   it('marks a completed pick by another team as drafted', () => {
@@ -140,6 +144,28 @@ describe('buildRoundTiles', () => {
       .toEqual(['2.03', '2.02', '2.01']);
   });
 
+  it('numbers unfilled tiles in board order every round in a linear draft (LS-10506)', () => {
+    const cells = teams.map((team) =>
+      cell({ key: `2-${team.id}`, teamId: team.id, round: 2 }),
+    );
+
+    expect(tilesFor(cells, 1, 'linear').map((t) => t.pickLabel)) //
+      .toEqual(['1.01', '1.02', '1.03']);
+    expect(tilesFor(cells, 2, 'linear').map((t) => t.pickLabel)) //
+      .toEqual(['2.01', '2.02', '2.03']);
+  });
+
+  it('keeps snake numbering for reverse-standings and unloaded orders', () => {
+    const cells = teams.map((team) =>
+      cell({ key: `2-${team.id}`, teamId: team.id, round: 2 }),
+    );
+
+    expect(tilesFor(cells, 2, 'reverse_standings').map((t) => t.pickLabel)) //
+      .toEqual(['2.03', '2.02', '2.01']);
+    expect(tilesFor(cells, 2, null).map((t) => t.pickLabel)) //
+      .toEqual(['2.03', '2.02', '2.01']);
+  });
+
   it('resolves the team name from the roster, not the raw id', () => {
     const [tile] = tilesFor([cell({ teamId: '2' })]);
     expect(tile.teamName).toBe('Bronx Bombers');
@@ -157,6 +183,7 @@ describe('buildRoundTiles', () => {
       teams,
       round: 1,
       statsLookup: lookup,
+      draftOrder: 'snake',
     });
     expect(fromLookup.club).toBe('NYY');
 
@@ -178,6 +205,7 @@ describe('buildRoundTiles', () => {
       teams,
       round: 1,
       statsLookup: lookup,
+      draftOrder: 'snake',
     });
     expect(fromRecord.club).toBe('ATL');
   });
@@ -201,6 +229,7 @@ describe('buildRoundSummary', () => {
       round: 3,
       teamCount: 3,
       currentRound: 3,
+      draftOrder: 'snake',
     });
 
     expect(summary.picksMade).toBe(2);
@@ -219,6 +248,7 @@ describe('buildRoundSummary', () => {
       round: 1,
       teamCount: 4,
       currentRound: 1,
+      draftOrder: 'snake',
     });
 
     expect(summary.mix).toEqual([
@@ -229,7 +259,12 @@ describe('buildRoundSummary', () => {
   });
 
   it('reports snake direction — odd left to right, even right to left', () => {
-    const args = { cells: [], teamCount: 3, currentRound: 9 };
+    const args = {
+      cells: [],
+      teamCount: 3,
+      currentRound: 9,
+      draftOrder: 'snake',
+    };
     expect(buildRoundSummary({ ...args, round: 1 }).snakeDirection).toBe(
       'left-to-right',
     );
@@ -238,12 +273,24 @@ describe('buildRoundSummary', () => {
     );
   });
 
+  it('reports no snake direction for a linear draft (LS-10506)', () => {
+    const args = {
+      cells: [],
+      teamCount: 3,
+      currentRound: 9,
+      draftOrder: 'linear',
+    };
+    expect(buildRoundSummary({ ...args, round: 1 }).snakeDirection).toBeNull();
+    expect(buildRoundSummary({ ...args, round: 2 }).snakeDirection).toBeNull();
+  });
+
   it('treats the round on the clock as started even with no picks in yet', () => {
     const summary = buildRoundSummary({
       cells: [cell({ isCurrent: true })],
       round: 4,
       teamCount: 3,
       currentRound: 4,
+      draftOrder: 'snake',
     });
 
     expect(summary.hasStarted).toBe(true);
@@ -256,6 +303,7 @@ describe('buildRoundSummary', () => {
       round: 6,
       teamCount: 3,
       currentRound: 4,
+      draftOrder: 'snake',
     });
 
     expect(summary.hasStarted).toBe(false);
@@ -269,6 +317,7 @@ describe('buildRoundSummary', () => {
       round: 1,
       teamCount: 3,
       currentRound: null,
+      draftOrder: 'snake',
     });
     expect(summary.unlocksAfterRound).toBeNull();
   });
@@ -279,6 +328,7 @@ describe('buildRoundSummary', () => {
       round: 2,
       teamCount: 3,
       currentRound: null,
+      draftOrder: 'snake',
     });
     expect(summary.hasStarted).toBe(true);
   });

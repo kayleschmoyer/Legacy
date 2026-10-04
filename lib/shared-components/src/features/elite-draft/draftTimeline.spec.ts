@@ -56,6 +56,7 @@ describe('buildTimelineRounds — time ordering (LS-10003)', () => {
       picks: [pick({ round: 2, teamId: 3, overallPick: 4, playerId: 1 })],
       currentPickInfo: onClock({ round: 2, teamId: 2, pickNumber: 2 }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -73,6 +74,7 @@ describe('buildTimelineRounds — time ordering (LS-10003)', () => {
       picks: [],
       currentPickInfo: onClock({ round: 2, pickNumber: 1 }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -85,6 +87,7 @@ describe('buildTimelineRounds — time ordering (LS-10003)', () => {
       picks: [],
       currentPickInfo: null,
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -101,6 +104,7 @@ describe('buildTimelineRounds — time ordering (LS-10003)', () => {
         picks: [pick()],
         currentPickInfo: null,
         myTeamId: null,
+        draftOrder: 'snake',
         statsLookup: new Map(),
       }),
     ).toEqual([]);
@@ -113,6 +117,7 @@ describe('buildTimelineRounds — pick states (LS-10003)', () => {
     picks: [pick({ round: 1, teamId: 1, overallPick: 1, playerId: 7 })],
     currentPickInfo: onClock({ teamId: 2, pickNumber: 2, overallPick: 2 }),
     myTeamId: 2,
+    draftOrder: 'snake',
     statsLookup: new Map([[7, player(7, 'Rod Carew', '2B')]]),
   });
   const [made, now, up] = rounds[0].picks;
@@ -155,6 +160,7 @@ describe('buildTimelineRounds — data fidelity (LS-10003)', () => {
       picks: [pick({ round: 1, teamId: 3, overallPick: 2, playerId: 9 })],
       currentPickInfo: null,
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map([[9, player(9, 'Tony Gwynn', 'OF')]]),
     });
 
@@ -182,6 +188,7 @@ describe('buildTimelineRounds — data fidelity (LS-10003)', () => {
       ],
       currentPickInfo: null,
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -195,6 +202,7 @@ describe('buildTimelineRounds — data fidelity (LS-10003)', () => {
       picks: [],
       currentPickInfo: onClock({ round: 2, pickNumber: 1 }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -208,12 +216,46 @@ describe('buildTimelineRounds — data fidelity (LS-10003)', () => {
       picks: [pick({ round: 1, teamId: 1, playerId: 1 })],
       currentPickInfo: onClock({ isComplete: true }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
     expect(rounds.some((r) => r.isCurrent)).toBe(false);
     expect(rounds[0].picks.some((p) => p.state === 'now')).toBe(false);
   });
+});
+
+describe('buildTimelineRounds — draft order (LS-10569)', () => {
+  const build = (draftOrder: string | null) =>
+    buildTimelineRounds({
+      teams: TEAMS,
+      picks: [pick({ round: 2, teamId: 1, overallPick: 4, playerId: 1 })],
+      currentPickInfo: onClock({ round: 2, teamId: 2, pickNumber: 2 }),
+      myTeamId: null,
+      statsLookup: new Map(),
+      draftOrder,
+    });
+
+  it('lists a linear draft’s even rounds in board order', () => {
+    const [round2, round1] = build('linear');
+
+    expect(round1.picks.map((p) => p.teamId)).toEqual(['1', '2', '3']);
+    expect(round2.picks.map((p) => p.teamId)).toEqual(['1', '2', '3']);
+    expect(round2.picks.map((p) => p.pickInRound)).toEqual([1, 2, 3]);
+    // Round 2 on a 3-team linear board is overall picks 4–6, team 1 first.
+    expect(round2.picks.map((p) => p.overallPick)).toEqual([4, 5, 6]);
+    expect(round2.picks.map((p) => p.state)).toEqual(['made', 'now', 'up']);
+  });
+
+  it.each(['snake', 'reverse_standings', null])(
+    'reverses even rounds for a %s draft',
+    (draftOrder) => {
+      const [round2] = build(draftOrder);
+
+      expect(round2.picks.map((p) => p.teamId)).toEqual(['3', '2', '1']);
+      expect(round2.picks.map((p) => p.pickInRound)).toEqual([1, 2, 3]);
+    },
+  );
 });
 
 describe('defaultOpenRound (LS-10003)', () => {
@@ -223,6 +265,7 @@ describe('defaultOpenRound (LS-10003)', () => {
       picks: [],
       currentPickInfo: onClock({ round: 2, pickNumber: 1 }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -235,6 +278,7 @@ describe('defaultOpenRound (LS-10003)', () => {
       picks: [pick({ round: 2, teamId: 1, playerId: 1 })],
       currentPickInfo: onClock({ isComplete: true }),
       myTeamId: null,
+      draftOrder: 'snake',
       statsLookup: new Map(),
     });
 
@@ -252,6 +296,7 @@ describe('timelinePickMeta (LS-10003)', () => {
     picks: [pick({ round: 1, teamId: 1, playerId: 7 })],
     currentPickInfo: null,
     myTeamId: null,
+    draftOrder: 'snake',
     statsLookup: new Map([[7, player(7, 'Rod Carew', '2B')]]),
   })[0].picks;
 

@@ -286,3 +286,22 @@ describe('DraftBoardTimeline — pick inspector (LS-10163)', () => {
     );
   });
 });
+
+describe('DraftBoardTimeline — draft order (LS-10569)', () => {
+  const roundTwoTeamOrder = (container: HTMLElement): string[] =>
+    Array.from(
+      container.querySelectorAll('[data-testid^="draft-timeline-pick-2-"]'),
+    ).map((el) => el.getAttribute('data-testid')?.split('-').pop() ?? '');
+
+  it('lists a linear draft’s even round in board order', () => {
+    const { container } = renderTimeline({ draftOrder: 'linear' });
+
+    expect(roundTwoTeamOrder(container)).toEqual(['1', '2', '3']);
+  });
+
+  it('keeps snake order when the draft snakes', () => {
+    const { container } = renderTimeline({ draftOrder: 'snake' });
+
+    expect(roundTwoTeamOrder(container)).toEqual(['3', '2', '1']);
+  });
+});

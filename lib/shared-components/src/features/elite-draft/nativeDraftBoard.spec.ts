@@ -5,9 +5,10 @@ import {
   formatClock,
   formatLastPickLine,
   initialsOf,
+  isSnakeDraftOrder,
   MIN_BOARD_ROUNDS,
+  pickInRoundForColumn,
   resolveBoardRounds,
-  snakePickInRound,
   statLineFor,
 } from './nativeDraftBoard';
 import type {
@@ -349,6 +350,7 @@ describe('computeMyUpcomingPicks', () => {
       currentPickInfo,
       teamCount: 4,
       myTeamIndex: 1,
+      draftOrder: 'snake',
       count: 2,
     });
 
@@ -363,6 +365,7 @@ describe('computeMyUpcomingPicks', () => {
       currentPickInfo: { ...currentPickInfo, teamId: 1, overallPick: 2 },
       teamCount: 4,
       myTeamIndex: 1,
+      draftOrder: 'snake',
       count: 2,
     });
 
@@ -378,37 +381,104 @@ describe('computeMyUpcomingPicks', () => {
         currentPickInfo: null,
         teamCount: 4,
         myTeamIndex: 1,
+        draftOrder: 'snake',
       }),
     ).toEqual([]);
     expect(
-      computeMyUpcomingPicks({ currentPickInfo, teamCount: 0, myTeamIndex: 1 }),
+      computeMyUpcomingPicks({
+        currentPickInfo,
+        teamCount: 0,
+        myTeamIndex: 1,
+        draftOrder: 'snake',
+      }),
     ).toEqual([]);
     expect(
       computeMyUpcomingPicks({
         currentPickInfo,
         teamCount: 4,
         myTeamIndex: -1,
+        draftOrder: 'snake',
       }),
     ).toEqual([]);
   });
 });
 
-describe('snakePickInRound', () => {
-  it('runs left-to-right on odd rounds', () => {
-    expect(snakePickInRound({ round: 1, columnIndex: 0, teamCount: 8 })).toBe(
-      1,
-    );
-    expect(snakePickInRound({ round: 1, columnIndex: 7, teamCount: 8 })).toBe(
-      8,
-    );
+describe('computeMyUpcomingPicks — draft order (LS-10569)', () => {
+  const currentPickInfo: CurrentDraftPickInfo = {
+    draftId: 42,
+    teamId: 1,
+    round: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    isComplete: false,
+  };
+
+  it('returns the real overall picks in a linear draft (same slot every round)', () => {
+    const picks = computeMyUpcomingPicks({
+      currentPickInfo,
+      teamCount: 4,
+      myTeamIndex: 1,
+      draftOrder: 'linear',
+      count: 3,
+    });
+
+    expect(picks).toEqual([
+      { round: 1, roundPickNumber: 2, overallPick: 2, picksUntil: 1 },
+      { round: 2, roundPickNumber: 2, overallPick: 6, picksUntil: 5 },
+      { round: 3, roundPickNumber: 2, overallPick: 10, picksUntil: 9 },
+    ]);
   });
 
-  it('reverses on even rounds', () => {
-    expect(snakePickInRound({ round: 2, columnIndex: 0, teamCount: 8 })).toBe(
-      8,
-    );
-    expect(snakePickInRound({ round: 2, columnIndex: 7, teamCount: 8 })).toBe(
-      1,
-    );
+  it.each(['snake', 'reverse_standings', null, undefined])(
+    'keeps snake order for a %s draft',
+    (draftOrder) => {
+      const picks = computeMyUpcomingPicks({
+        currentPickInfo,
+        teamCount: 4,
+        myTeamIndex: 1,
+        draftOrder,
+        count: 2,
+      });
+
+      expect(picks.map((p) => p.overallPick)).toEqual([2, 7]);
+    },
+  );
+});
+
+describe('pickInRoundForColumn', () => {
+  const at = (round: number, columnIndex: number, draftOrder: string | null) =>
+    pickInRoundForColumn({ round, columnIndex, teamCount: 8, draftOrder });
+
+  it('runs left-to-right on odd rounds in either order', () => {
+    expect(at(1, 0, 'snake')).toBe(1);
+    expect(at(1, 7, 'snake')).toBe(8);
+    expect(at(1, 0, 'linear')).toBe(1);
+    expect(at(1, 7, 'linear')).toBe(8);
+  });
+
+  it('reverses on even rounds in a snake draft', () => {
+    expect(at(2, 0, 'snake')).toBe(8);
+    expect(at(2, 7, 'snake')).toBe(1);
+  });
+
+  it('never reverses in a linear draft (LS-10506)', () => {
+    expect(at(2, 0, 'linear')).toBe(1);
+    expect(at(2, 7, 'linear')).toBe(8);
+    expect(at(4, 3, 'linear')).toBe(4);
+  });
+
+  it('snakes reverse-standings and unloaded orders, like the server', () => {
+    expect(at(2, 0, 'reverse_standings')).toBe(8);
+    expect(at(2, 0, null)).toBe(8);
+  });
+});
+
+describe('isSnakeDraftOrder', () => {
+  it('is false only for linear', () => {
+    expect(isSnakeDraftOrder('linear')).toBe(false);
+    expect(isSnakeDraftOrder('snake')).toBe(true);
+    expect(isSnakeDraftOrder('reverse_standings')).toBe(true);
+    expect(isSnakeDraftOrder(null)).toBe(true);
+    expect(isSnakeDraftOrder(undefined)).toBe(true);
   });
 });

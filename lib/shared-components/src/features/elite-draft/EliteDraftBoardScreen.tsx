@@ -446,6 +446,7 @@ function CompactLiveDraftBoard({
             statsLookup={playerData.statsLookup}
             rounds={boardRounds}
             sport={sport}
+            draftOrder={queries.leagueDraft?.draftOrder}
             onMakePick={openPickSheet}
           />
 
@@ -605,6 +606,7 @@ function CompactLiveDraftBoard({
             currentPickInfo={queries.currentPickInfo}
             boardOrderedTeams={boardTeams}
             myTeamId={queries.myTeamId}
+            draftOrder={queries.leagueDraft?.draftOrder}
             queuedPlayerIds={queries.queuedPlayerIds}
             onToggleQueue={handleToggleQueue}
             onDraftPlayer={handleSheetDraft}
@@ -1659,6 +1661,7 @@ export function EliteDraftBoardScreen({
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
           untimed={untimed}
           draftPaused={ui.draftPaused}
+          draftOrder={queries.leagueDraft?.draftOrder}
           myTeam={playerData.myTeam}
           positionCounts={playerData.positionCounts}
           leaguePositions={queries.leaguePositions}

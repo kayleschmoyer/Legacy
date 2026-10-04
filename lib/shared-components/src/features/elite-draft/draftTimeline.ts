@@ -20,7 +20,7 @@ import type {
   DraftPlayer,
   LeagueTeam,
 } from './types';
-import { initialsOf } from './nativeDraftBoard';
+import { initialsOf, isSnakeDraftOrder } from './nativeDraftBoard';
 
 /** Where a slot sits relative to the pick currently on the clock. */
 export type TimelinePickState = 'made' | 'now' | 'up';
@@ -29,7 +29,7 @@ export interface TimelinePick {
   /** Stable React key — `${round}-${teamId}`, matching `BoardCell.key`. */
   key: string;
   round: number;
-  /** 1-indexed slot within the round, in snake order. */
+  /** 1-indexed slot within the round, in the draft's real order. */
   pickInRound: number;
   /** Overall pick number. Taken from the record when the pick was made, so an
    *  executed draft-slot trade keeps its real number rather than a recomputed
@@ -60,8 +60,9 @@ export interface TimelineRound {
 }
 
 /**
- * Projects the board into rounds, newest first, each round's picks in snake
- * order.
+ * Projects the board into rounds, newest first, each round's picks in the
+ * order they are taken — snake (even rounds reverse) or linear (every round
+ * repeats round 1's order, LS-10569), per `draftOrder`.
  *
  * Round *ordering* is descending because the timeline reads backwards from
  * now: the mock stacks the live round at the top with the completed rounds
@@ -84,12 +85,15 @@ export function buildTimelineRounds({
   currentPickInfo,
   myTeamId,
   statsLookup,
+  draftOrder,
 }: {
   teams: LeagueTeam[];
   picks: DraftPickRecord[];
   currentPickInfo: CurrentDraftPickInfo | null;
   myTeamId: number | null;
   statsLookup: Map<number, DraftPlayer>;
+  /** The draft's `draftOrder` — decides whether even rounds reverse. */
+  draftOrder: string | null | undefined;
 }): TimelineRound[] {
   const teamCount = teams.length;
   if (teamCount === 0) return [];
@@ -110,17 +114,19 @@ export function buildTimelineRounds({
   // At least round 1, so an untouched draft still renders a shell rather than
   // an empty pane.
   const lastRound = Math.max(1, currentRound ?? 0, deepestPickRound);
+  const snake = isSnakeDraftOrder(draftOrder);
 
   const rounds: TimelineRound[] = [];
   for (let round = lastRound; round >= 1; round--) {
     const roundPicks: TimelinePick[] = [];
     let madeCount = 0;
 
-    // Snake order: the slot's column index mirrors `snakePickInRound`'s
-    // mapping, read in the other direction — for each slot, which column
-    // holds it. Odd rounds run left to right, even rounds reverse.
+    // The slot's column index mirrors `pickInRoundForColumn`'s mapping, read
+    // in the other direction — for each slot, which column holds it. Odd
+    // rounds run left to right; even rounds reverse only in a snake draft.
+    const reversed = snake && round % 2 === 0;
     for (let slot = 1; slot <= teamCount; slot++) {
-      const columnIndex = round % 2 === 0 ? teamCount - slot : slot - 1;
+      const columnIndex = reversed ? teamCount - slot : slot - 1;
       const team = teams[columnIndex];
       const teamId = String(team.id);
       const pick = byRoundTeam.get(`${round}-${teamId}`) ?? null;

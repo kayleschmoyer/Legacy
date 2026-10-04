@@ -78,6 +78,10 @@ export interface DraftRoundBoardProps {
   /** Drives tile position tinting. Required, never defaulted: a baseball
    *  default once silently mis-colored football boards (LS-8784). */
   sport: SportKind;
+  /** The draft's `draftOrder`. A `linear` draft never reverses its even
+   *  rounds, so tiles are numbered in board order and the snake caption is
+   *  hidden (LS-10506); anything else — including not-yet-loaded — snakes. */
+  draftOrder?: string | null;
   /** Fires when the viewer taps their own on-the-clock tile — the phone
    *  board's route into the Players tab. */
   onMakePick: () => void;
@@ -254,18 +258,21 @@ function RoundSummaryHeader({
                 {`${segment.count} ${segment.position}`}
               </Text>
             ))}
-            <Text
-              testID="draft-round-board-snake"
-              fontFamily="$heading"
-              fontSize={9}
-              fontWeight="700"
-              letterSpacing={0.55}
-              color={palette.text.fg4}
-            >
-              {summary.snakeDirection === 'left-to-right'
-                ? 'SNAKE LEFT TO RIGHT'
-                : 'SNAKE RIGHT TO LEFT'}
-            </Text>
+            {/* A linear draft has no snake to describe (LS-10506). */}
+            {summary.snakeDirection !== null && (
+              <Text
+                testID="draft-round-board-snake"
+                fontFamily="$heading"
+                fontSize={9}
+                fontWeight="700"
+                letterSpacing={0.55}
+                color={palette.text.fg4}
+              >
+                {summary.snakeDirection === 'left-to-right'
+                  ? 'SNAKE LEFT TO RIGHT'
+                  : 'SNAKE RIGHT TO LEFT'}
+              </Text>
+            )}
           </XStack>
         </>
       ) : (
@@ -479,6 +486,7 @@ export function DraftRoundBoard({
   statsLookup,
   rounds,
   sport,
+  draftOrder,
   onMakePick,
 }: DraftRoundBoardProps): React.JSX.Element | null {
   const palette = useDraftPalette();
@@ -546,8 +554,9 @@ export function DraftRoundBoard({
         round: selectedRound,
         teamCount,
         currentRound,
+        draftOrder,
       }),
-    [roundCells, selectedRound, teamCount, currentRound],
+    [roundCells, selectedRound, teamCount, currentRound, draftOrder],
   );
 
   const tiles = useMemo(
@@ -557,8 +566,9 @@ export function DraftRoundBoard({
         teams,
         round: selectedRound,
         statsLookup,
+        draftOrder,
       }),
-    [roundCells, teams, selectedRound, statsLookup],
+    [roundCells, teams, selectedRound, statsLookup, draftOrder],
   );
 
   // Pick inspector (LS-10163): every tile — made, on the clock, or still

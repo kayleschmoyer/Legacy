@@ -275,6 +275,28 @@ describe('DraftRoundBoard', () => {
     expect(screen.getByLabelText('Team 1, pick 2.12, upcoming')).toBeTruthy();
   });
 
+  it('numbers upcoming tiles in board order in a linear draft (LS-10506)', () => {
+    renderBoard({
+      draftOrder: 'linear',
+      currentPickInfo: currentPick({ round: 2, teamId: 12 }),
+    });
+
+    // Linear never reverses: team 1 still picks first, team 12 last.
+    expect(screen.getByLabelText('Team 1, pick 2.01, upcoming')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Team 12, pick 2.12, on the clock'),
+    ).toBeTruthy();
+  });
+
+  it('hides the snake caption in a linear draft (LS-10506)', () => {
+    renderBoard({
+      draftOrder: 'linear',
+      currentPickInfo: currentPick({ round: 2, teamId: 1 }),
+    });
+
+    expect(screen.queryByTestId('draft-round-board-snake')).toBeNull();
+  });
+
   // -------------------------------------------------------------------------
   // Make-pick routing
   // -------------------------------------------------------------------------

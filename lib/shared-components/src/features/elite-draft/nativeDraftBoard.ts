@@ -193,9 +193,11 @@ export interface UpcomingPick {
 }
 
 /**
- * The viewer's next `count` picks, computed from standard snake order (round
- * direction alternates — mirrors the Board tab's `R{n}` arrow, README "Board
- * tab" §3). `myTeamIndex` is the viewer's 0-based slot in the draft's team
+ * The viewer's next `count` picks, computed from the draft's `draftOrder`:
+ * a snake draft alternates round direction (mirrors the Board tab's `R{n}`
+ * arrow, README "Board tab" §3), a linear draft repeats round 1's order every
+ * round (LS-10569) — the same mapping as {@link pickInRoundForColumn}.
+ * `myTeamIndex` is the viewer's 0-based slot in the draft's team
  * order (`boardOrderedTeams`); a negative index (team not found) yields no
  * picks. Only strictly-future picks are returned — the pick currently on the
  * clock, even if it's the viewer's, is never "next" (Players tab inline
@@ -205,11 +207,14 @@ export function computeMyUpcomingPicks({
   currentPickInfo,
   teamCount,
   myTeamIndex,
+  draftOrder,
   count = 2,
 }: {
   currentPickInfo: CurrentDraftPickInfo | null;
   teamCount: number;
   myTeamIndex: number;
+  /** The draft's `draftOrder` — decides whether even rounds reverse. */
+  draftOrder: string | null | undefined;
   count?: number;
 }): UpcomingPick[] {
   if (!currentPickInfo || teamCount <= 0 || myTeamIndex < 0) return [];
@@ -222,8 +227,12 @@ export function computeMyUpcomingPicks({
     results.length < count && round <= currentPickInfo.round + count;
     round++
   ) {
-    const roundPickNumber =
-      round % 2 === 1 ? myTeamIndex + 1 : teamCount - myTeamIndex;
+    const roundPickNumber = pickInRoundForColumn({
+      round,
+      columnIndex: myTeamIndex,
+      teamCount,
+      draftOrder,
+    });
     const overallPick = (round - 1) * teamCount + roundPickNumber;
     if (overallPick > currentOverall) {
       results.push({
@@ -238,20 +247,34 @@ export function computeMyUpcomingPicks({
 }
 
 /**
- * 1-indexed pick number within a round for a snake-ordered board column
- * (LS-9398 Board tab empty cells) — odd rounds run left-to-right, even
- * rounds reverse, mirroring the `→`/`←` gutter arrow.
+ * Whether a draft's even rounds reverse. Every order except `linear` snakes —
+ * `reverse_standings` included (LS-8929), matching the server's `isSnake` in
+ * `lambdas/db/src/schema/drafts/helpers.ts`. An unknown or not-yet-loaded
+ * order (`null`) keeps the snake default the board has always assumed.
  */
-export function snakePickInRound({
+export function isSnakeDraftOrder(
+  draftOrder: string | null | undefined,
+): boolean {
+  return draftOrder !== 'linear';
+}
+
+/**
+ * 1-indexed pick number within a round for a board column (LS-9398 Board tab
+ * empty cells). Odd rounds run left-to-right; even rounds reverse only in a
+ * snake draft — a linear draft repeats round 1's order every round (LS-10506).
+ */
+export function pickInRoundForColumn({
   round,
   columnIndex,
   teamCount,
+  draftOrder,
 }: {
   round: number;
   columnIndex: number;
   teamCount: number;
+  draftOrder: string | null | undefined;
 }): number {
-  const reversed = round % 2 === 0;
+  const reversed = isSnakeDraftOrder(draftOrder) && round % 2 === 0;
   return (reversed ? teamCount - 1 - columnIndex : columnIndex) + 1;
 }
 

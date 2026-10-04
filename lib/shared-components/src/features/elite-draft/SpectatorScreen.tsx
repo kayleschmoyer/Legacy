@@ -277,6 +277,7 @@ export function SpectatorScreen({
             statsLookup={data.statsLookup}
             maxRounds={maxRounds}
             sport={sport}
+            draftOrder={data.leagueDraft?.draftOrder}
           />
         </section>
 

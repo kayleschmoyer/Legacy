@@ -310,3 +310,71 @@ describe('DraftGrid — pick inspector (LS-10163)', () => {
     expect(screen.queryByTestId('draft-grid-pick-inspector')).toBeNull();
   });
 });
+
+describe('DraftGrid — empty-cell numbering by draft order (LS-10506)', () => {
+  // The QA repro: a 4-team draft, round 2, the first three seats have picked
+  // and the fourth column's team is on the clock at overall #8.
+  const teams = [team('1'), team('2'), team('3'), team('4')];
+
+  const renderRound2 = (
+    draftOrder: string | null,
+    onClockTeamId: number,
+    pickedTeamIds: number[],
+  ) =>
+    render(
+      <DraftGrid
+        teams={teams}
+        picks={pickedTeamIds.map((teamId, index) =>
+          pick({
+            id: `r2-${teamId}`,
+            round: 2,
+            teamId,
+            playerId: 100 + teamId,
+            pickNumber: index + 1,
+            overallPick: 5 + index,
+          }),
+        )}
+        currentPickInfo={{
+          draftId: 1,
+          teamId: onClockTeamId,
+          round: 2,
+          pickNumber: 4,
+          overallPick: 8,
+          isComplete: false,
+        }}
+        myTeamId={4}
+        statsLookup={new Map()}
+        maxRounds={2}
+        sport="baseball"
+        draftOrder={draftOrder}
+      />,
+    );
+
+  const labelOf = (round: number, teamId: string): string | null =>
+    screen
+      .getByTestId(`draft-grid-cell-${round}-${teamId}`)
+      .getAttribute('aria-label');
+
+  it('labels the on-the-clock cell with its real pick in a linear draft', () => {
+    renderRound2('linear', 4, [1, 2, 3]);
+
+    expect(labelOf(2, '4')).toBe('Pick 2.04: on the clock');
+  });
+
+  it('numbers every empty even-round cell in board order in a linear draft', () => {
+    renderRound2('linear', 1, []);
+
+    expect(labelOf(2, '1')).toBe('Pick 2.01: on the clock');
+    expect(labelOf(2, '2')).toBe('Pick 2.02: not yet made');
+    expect(labelOf(2, '3')).toBe('Pick 2.03: not yet made');
+    expect(labelOf(2, '4')).toBe('Pick 2.04: not yet made');
+  });
+
+  it('still reverses empty even-round cells in a snake draft', () => {
+    renderRound2('snake', 4, []);
+
+    expect(labelOf(2, '4')).toBe('Pick 2.01: on the clock');
+    expect(labelOf(2, '3')).toBe('Pick 2.02: not yet made');
+    expect(labelOf(2, '1')).toBe('Pick 2.04: not yet made');
+  });
+});

@@ -11,7 +11,7 @@ import {
   buildPickInspectorData,
   type PickInspectorData,
 } from './draftPickInspectorModel';
-import { snakePickInRound } from './nativeDraftBoard';
+import { pickInRoundForColumn } from './nativeDraftBoard';
 import { getPositionColor, normalizeTeamId } from './utils';
 import {
   formatDelta,
@@ -351,6 +351,7 @@ export function DraftGrid({
   sport,
   autoPickTeamIds = new Set<string>(),
   onlineTeamIds = new Set<string>(),
+  draftOrder,
 }: {
   teams: LeagueTeam[];
   picks: DraftPickRecord[];
@@ -367,6 +368,10 @@ export function DraftGrid({
   autoPickTeamIds?: ReadonlySet<string>;
   /** Set of team IDs whose managers are currently online (LS-478) */
   onlineTeamIds?: ReadonlySet<string>;
+  /** The draft's `draftOrder`. Empty cells in a `linear` draft's even rounds
+   *  keep board order rather than reversing (LS-10506); anything else —
+   *  including not-yet-loaded — numbers them in snake order. */
+  draftOrder?: string | null;
 }) {
   // Build a grid: rows = rounds, cols = teams
   const pickGrid = useMemo(() => {
@@ -599,10 +604,11 @@ export function DraftGrid({
                 );
               }
 
-              const pickInRound = snakePickInRound({
+              const pickInRound = pickInRoundForColumn({
                 round,
                 columnIndex,
                 teamCount: teams.length,
+                draftOrder,
               });
               const pickLabel = `${round}.${String(pickInRound).padStart(2, '0')}`;
               const openInspector = (): void =>
