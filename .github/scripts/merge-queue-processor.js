@@ -292,15 +292,12 @@ module.exports = async ({
   forceCheck,
   isRetry,
   ciAppToken,
-  // Test seam: production always uses the real @actions/github getOctokit;
-  // tests inject a fake factory so the ciAppToken path can be exercised
-  // without constructing a real Octokit client (which would make genuine
-  // HTTP requests when its methods are called). Deliberately NOT a default
-  // parameter — those are evaluated eagerly on every call regardless of
-  // whether ciAppToken is set, which would require('@actions/github') (a
-  // module that only exists inside the real Actions runner's github-script
-  // sandbox, not this repo's own node_modules) on every single processor
-  // invocation, breaking every test that doesn't pass ciAppToken.
+  // Builds the CI app client from ciAppToken. Production (merge-queue.yml)
+  // passes github-script's own `getOctokit` — `require('@actions/github')`
+  // does NOT resolve from this repo-checkout script path (LS-10559: "Cannot
+  // find module '@actions/github'" the first time the CI App token actually
+  // minted). Tests inject a fake factory so the ciAppToken path can be
+  // exercised without constructing a real Octokit client.
   octokitFactory,
 }) => {
   const { owner, repo } = context.repo;
@@ -314,11 +311,21 @@ module.exports = async ({
   // class of write; use a second client authenticated as that app for just
   // those two calls. Falls back to `github` itself when no token is
   // supplied — the unit-test harness's mock `github` client, or a failed
-  // mint upstream — so behavior degrades to today's (broken) state rather
-  // than throwing.
-  const statusGithub = ciAppToken
-    ? (octokitFactory || require('@actions/github').getOctokit)(ciAppToken)
-    : github;
+  // mint upstream — or when no factory was passed / it throws, so behavior
+  // degrades to the Merge Queue app client rather than failing the job.
+  let statusGithub = github;
+  if (ciAppToken) {
+    try {
+      if (typeof octokitFactory !== 'function') {
+        throw new Error('no octokitFactory supplied');
+      }
+      statusGithub = octokitFactory(ciAppToken);
+    } catch (e) {
+      console.log(
+        `::warning::CI app client unavailable (${e.message}); status writes fall back to the Merge Queue app client`,
+      );
+    }
+  }
 
   // Log X-RateLimit-Remaining/Used after every GitHub API call so run logs
   // show budget consumption over time. Only log when the bucket (per-100) drops

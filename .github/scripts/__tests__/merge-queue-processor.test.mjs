@@ -2022,6 +2022,51 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
     );
   });
 
+  for (const [label, octokitFactory] of [
+    ['no octokitFactory is supplied', undefined],
+    [
+      'octokitFactory throws',
+      () => {
+        throw new Error("Cannot find module '@actions/github'");
+      },
+    ],
+  ]) {
+    it(`LS-10559: falls back to the Merge Queue app client when ciAppToken is set but ${label}`, async () => {
+      const { github, calls } = makeGithub({
+        reviews: APPROVED_BOT_REVIEW,
+        branchRules: BOT_REVIEW_RULES,
+        checkRuns: DEFAULT_CHECK_RUNS,
+        commitStatuses: [],
+        pr: makePR({
+          labels: [
+            { name: 'merge-when-ready' },
+            { name: 'bot:ready-for-review' },
+          ],
+        }),
+      });
+
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+        ciAppToken: 'fake-ci-app-token',
+        octokitFactory,
+      });
+
+      assert.ok(
+        calls.statuses.some(
+          (s) =>
+            s.context === 'bot-review' &&
+            s.state === 'pending' &&
+            s.description.includes('self-heal re-trigger #1'),
+        ),
+        'the status write should fall back to the Merge Queue app client',
+      );
+    });
+  }
+
   it('re-triggers the reviewer when CHANGES_REQUESTED is stale (no bot-review status on head SHA)', async () => {
     const { github, calls } = makeGithub({
       reviews: [],

@@ -128,6 +128,28 @@ jobs:
           client-id: 3158619
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
 
+      # LS-10559: RUNNER_GITHUB_APP_KEY_BASE64 holds a base64-encoded PKCS#8
+      # PEM (see scripts/rotate-runner-secrets.sh; Terraform decodes it for the
+      # runner module). create-github-app-token needs the raw PEM — passing the
+      # base64 straight through failed every run with "Invalid keyData". Decode
+      # it here and mask every line before it reaches the step input below. An
+      # empty secret (fork PRs) or an undecodable value leaves the output empty,
+      # so the mint fails and the existing GITHUB_TOKEN fallback still applies.
+      - name: "Decode CI App Key"
+        id: ci-app-key
+        continue-on-error: true
+        shell: bash
+        env:
+          KEY_BASE64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+        run: |
+          [ -n "$KEY_BASE64" ] || exit 0
+          key="$(printf '%s' "$KEY_BASE64" | base64 -d)"
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then echo "::add-mask::$line"; fi
+          done <<< "$key"
+          delim="PRIVATE_KEY_EOF_$RANDOM$RANDOM"
+          { echo "private-key<<$delim"; printf '%s\n' "$key"; echo "$delim"; } >> "$GITHUB_OUTPUT"
+
       # LS-9776: separate token for the commit-status post below, following
       # the LS-9571/LS-9775 pattern — Agent Author does not hold "Commit
       # statuses: write". Legacy Sports CI does, and minting it here draws
@@ -139,7 +161,7 @@ jobs:
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
-          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          private-key: ${{ steps.ci-app-key.outputs.private-key }}
 
       # Resolves prNumber/headSha from either the normal pull_request trigger
       # or, on a manual workflow_dispatch retrigger, via the API using the
