@@ -25,14 +25,41 @@ const mockRunWithPublicClient = jest.fn();
 jest.mock('@legacy-sports/db-client', () => ({
   runWithPublicClient: (...args: unknown[]): unknown =>
     mockRunWithPublicClient(...args),
-  PublicSchema: {},
+  PublicSchema: {
+    gameFootballPassing: { name: 'game_football_passing' },
+    gameFootballRushing: { name: 'game_football_rushing' },
+    gameFootballReceiving: { name: 'game_football_receiving' },
+    gameFootballKicking: { name: 'game_football_kicking' },
+    gameFootballDefense: { name: 'game_football_defense' },
+    gameFootballDefenseIdp: { name: 'game_football_defense_idp' },
+    matchupPlayerGames: { name: 'matchup_player_games' },
+  },
 }));
 
-jest.mock('@legacy-sports/pfr-client', () => ({
-  CareerStats: { getGameLog: jest.fn() },
-  IDPStats: { getGameLog: jest.fn() },
-  TeamDefense: { getGameLog: jest.fn() },
+jest.mock('drizzle-orm', () => ({
+  and: jest.fn(() => 'and'),
+  eq: jest.fn(() => 'eq'),
 }));
+
+const mockGetCareerGameLog = jest.fn();
+const mockGetIdpGameLog = jest.fn();
+const mockGetTeamDefenseGameLog = jest.fn();
+
+jest.mock('./football-game-stats-source', () => {
+  class FootballCorpusUnavailableError extends Error {}
+  return {
+    FootballCorpusUnavailableError,
+    getFootballGameStatsSource: jest.fn(() => ({
+      name: 'nflverse',
+      getCareerGameLog: (...args: unknown[]): unknown =>
+        mockGetCareerGameLog(...args),
+      getIdpGameLog: (...args: unknown[]): unknown =>
+        mockGetIdpGameLog(...args),
+      getTeamDefenseGameLog: (...args: unknown[]): unknown =>
+        mockGetTeamDefenseGameLog(...args),
+    })),
+  };
+});
 
 jest.mock('./load-game-types', () => ({
   PLAYER_PROCESSING_BUDGET_MS: 30000,
@@ -222,5 +249,187 @@ describe('load-football-game handler', () => {
     expect(result.batchItemFailures).toEqual([{ itemIdentifier: 'msg-1' }]);
     expect(mockEmitSuccess).toHaveBeenCalledTimes(1);
     expect(mockEmitFailure).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Per-player corpus loading (LS-10214) ────────────────────────────────────
+
+/**
+ * Minimal drizzle stand-in: every cache-check SELECT finds nothing, and every
+ * INSERT / UPDATE is recorded so tests can assert what was written.
+ */
+function makeFakeDb() {
+  const inserts: { table: unknown; rows: unknown[] }[] = [];
+  const updates: { table: unknown; values: unknown }[] = [];
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([]) }),
+      }),
+    }),
+    insert: (table: unknown) => ({
+      values: (rows: unknown[]) => {
+        inserts.push({ table, rows });
+        return { onConflictDoNothing: () => Promise.resolve() };
+      },
+    }),
+    update: (table: unknown) => ({
+      set: (values: unknown) => {
+        updates.push({ table, values });
+        return { where: () => Promise.resolve() };
+      },
+    }),
+  };
+  return { db, inserts, updates };
+}
+
+function playerBody(season: number, overrides: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    type: 'football-game-stats',
+    matchupId: 7,
+    players: [
+      {
+        playerId: 42,
+        pfrId: 'MahoPa00',
+        season,
+        isDst: false,
+        position: 'QB',
+        nflTeam: 'KAN',
+        matchupPlayerId: 900,
+        ...overrides,
+      },
+    ],
+  });
+}
+
+describe('load-football-game per-player corpus loading', () => {
+  let fake: ReturnType<typeof makeFakeDb>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fake = makeFakeDb();
+    mockEmitSuccess.mockResolvedValue(undefined);
+    mockEmitFailure.mockResolvedValue(undefined);
+    mockRunWithPublicClient.mockImplementation(
+      (_opts: unknown, fn: (db: unknown) => Promise<unknown>) => fn(fake.db),
+    );
+    mockUpdateMatchupStatus.mockResolvedValue(undefined);
+    mockSelectAndAssignFootballGameIdentifiers.mockResolvedValue(undefined);
+    mockCheckMatchupCompletion.mockResolvedValue('completed');
+  });
+
+  it('writes corpus rows with the app playerId on a hit', async () => {
+    mockGetCareerGameLog.mockResolvedValueOnce({
+      passing: [
+        {
+          season: 2023,
+          gameNum: 1,
+          gameIdentifier: '2023-09-07-KC',
+          cmp: 21,
+          att: 39,
+          yds: 226,
+          td: 2,
+          int: 1,
+          sacked: 2,
+          sackYds: 14,
+          rating: null,
+        },
+      ],
+      rushing: [],
+      receiving: [],
+      kicking: [],
+    });
+
+    const result = await handler(makeSqsEvent([playerBody(2023)]));
+
+    expect(result.batchItemFailures).toEqual([]);
+    expect(mockGetCareerGameLog).toHaveBeenCalledWith('MahoPa00', 2023);
+    expect(fake.inserts).toHaveLength(1);
+    expect(fake.inserts[0]?.rows).toEqual([
+      expect.objectContaining({
+        playerId: 42,
+        season: 2023,
+        gameIdentifier: '2023-09-07-KC',
+        interceptions: 1,
+      }),
+    ]);
+    expect(mockSelectAndAssignFootballGameIdentifiers).toHaveBeenCalledWith(
+      fake.db,
+      900,
+      42,
+      2023,
+      false,
+      'QB',
+    );
+  });
+
+  it('reads DST games by nflTeam from the corpus', async () => {
+    mockGetTeamDefenseGameLog.mockResolvedValueOnce([
+      {
+        season: 1999,
+        gameNum: 1,
+        gameIdentifier: '1999-09-12-KC',
+        sacks: 3,
+        int: 1,
+        fumRec: 0,
+        defTd: 0,
+        safeties: 0,
+        ptsAllowed: 17,
+        ydsAllowed: 310,
+        passYdsAllowed: 210,
+        rushYdsAllowed: 100,
+      },
+    ]);
+
+    await handler(
+      makeSqsEvent([
+        playerBody(1999, { isDst: true, position: 'DST', pfrId: 'kan' }),
+      ]),
+    );
+
+    expect(mockGetTeamDefenseGameLog).toHaveBeenCalledWith('KAN', 1999);
+    expect(fake.inserts[0]?.rows).toEqual([
+      expect.objectContaining({ playerId: 42, fumblesRec: 0, ptsAllowed: 17 }),
+    ]);
+  });
+
+  it('records a corpus miss as no data without throwing', async () => {
+    mockGetCareerGameLog.mockResolvedValueOnce(null);
+
+    const result = await handler(makeSqsEvent([playerBody(2010)]));
+
+    expect(result.batchItemFailures).toEqual([]);
+    expect(fake.inserts).toEqual([]);
+    // selectAndAssignFootballGameIdentifiers is what stamps
+    // noGameDataFound when no game rows exist for the player-season.
+    expect(mockSelectAndAssignFootballGameIdentifiers).toHaveBeenCalled();
+    expect(fake.updates).not.toContainEqual(
+      expect.objectContaining({ values: { statsLoadingStatus: 'failed' } }),
+    );
+    expect(mockUpdateMatchupStatus).toHaveBeenCalledWith(
+      fake.db,
+      7,
+      'completed',
+      expect.anything(),
+    );
+  });
+
+  it('fails the player on a non-404 S3 error instead of treating it as a miss', async () => {
+    mockGetCareerGameLog.mockRejectedValueOnce(
+      Object.assign(new Error('Access Denied'), { name: 'AccessDenied' }),
+    );
+
+    await handler(makeSqsEvent([playerBody(2010)]));
+
+    expect(mockSelectAndAssignFootballGameIdentifiers).not.toHaveBeenCalled();
+    expect(fake.updates).toContainEqual(
+      expect.objectContaining({ values: { statsLoadingStatus: 'failed' } }),
+    );
+    expect(mockUpdateMatchupStatus).toHaveBeenCalledWith(
+      fake.db,
+      7,
+      'failed',
+      expect.anything(),
+    );
   });
 });

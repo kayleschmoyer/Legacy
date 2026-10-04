@@ -9,7 +9,10 @@ import {
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { createNotificationPublisher } from '@legacy-sports/aws-utils';
-import { CareerStats, IDPStats, TeamDefense } from '@legacy-sports/pfr-client';
+import {
+  FootballCorpusUnavailableError,
+  getFootballGameStatsSource,
+} from './football-game-stats-source';
 import type {
   LoadFootballMatchupStatsMessage,
   RetryableError,
@@ -64,6 +67,23 @@ export function isFootballGameMessage(
   );
 }
 
+/**
+ * A corpus miss is not an error: the player simply has no object for this
+ * season (crosswalk gap, or no games played). Nothing is inserted, and
+ * selectAndAssignFootballGameIdentifiers then records no_game_data_found.
+ */
+function logCorpusMiss(
+  sourceName: string,
+  kind: string,
+  playerId: number,
+  pfrId: string,
+  season: number,
+): void {
+  LOGGER.info(
+    `No ${kind} game log in the ${sourceName} corpus for player ${playerId} (${pfrId}) season ${season}`,
+  );
+}
+
 async function loadFootballPlayerGameStats(
   db: PublicDb,
   player: LoadFootballMatchupStatsMessage['players'][0],
@@ -74,7 +94,7 @@ async function loadFootballPlayerGameStats(
   validatePfrId(pfrId);
   if (isDst && nflTeam) validateNflTeam(nflTeam);
 
-  const pfrPlayer = { id: playerId, pfrId };
+  const source = getFootballGameStatsSource(season);
 
   LOGGER.info(
     `Loading football stats for player ${playerId} (${pfrId}), season ${season}, isDst=${String(isDst)}, position=${position}`,
@@ -101,15 +121,18 @@ async function loadFootballPlayerGameStats(
 
       if (existing.length === 0) {
         LOGGER.info(
-          `No DST stats cached for player ${playerId} season ${season}, loading from PFR`,
+          `No DST stats cached for player ${playerId} season ${season}, loading from ${source.name} corpus`,
         );
-        const games = await TeamDefense.getGameLog(pfrPlayer, nflTeam, season);
-        if (games.length > 0) {
+        const games =
+          (await source.getTeamDefenseGameLog(nflTeam, season)) ?? [];
+        if (games.length === 0) {
+          logCorpusMiss(source.name, 'DST', playerId, pfrId, season);
+        } else {
           await db
             .insert(PublicSchema.gameFootballDefense)
             .values(
               games.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -148,15 +171,17 @@ async function loadFootballPlayerGameStats(
 
       if (existing.length === 0) {
         LOGGER.info(
-          `No IDP stats cached for player ${playerId} season ${season}, loading from PFR`,
+          `No IDP stats cached for player ${playerId} season ${season}, loading from ${source.name} corpus`,
         );
-        const games = await IDPStats.getGameLog(pfrPlayer, season);
-        if (games.length > 0) {
+        const games = (await source.getIdpGameLog(pfrId, season)) ?? [];
+        if (games.length === 0) {
+          logCorpusMiss(source.name, 'IDP', playerId, pfrId, season);
+        } else {
           await db
             .insert(PublicSchema.gameFootballDefenseIdp)
             .values(
               games.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -182,7 +207,7 @@ async function loadFootballPlayerGameStats(
         );
       }
     } else {
-      // Offensive / kicking player — check if ANY offensive stat exists before scraping
+      // Offensive / kicking player — check if ANY offensive stat exists before loading
       const [
         existingPassing,
         existingRushing,
@@ -239,16 +264,29 @@ async function loadFootballPlayerGameStats(
 
       if (!hasAny) {
         LOGGER.info(
-          `No offensive stats cached for player ${playerId} season ${season}, loading from PFR`,
+          `No offensive stats cached for player ${playerId} season ${season}, loading from ${source.name} corpus`,
         );
-        const gameLog = await CareerStats.getGameLog(pfrPlayer, season);
+        const gameLog = (await source.getCareerGameLog(pfrId, season)) ?? {
+          passing: [],
+          rushing: [],
+          receiving: [],
+          kicking: [],
+        };
+        if (
+          gameLog.passing.length === 0 &&
+          gameLog.rushing.length === 0 &&
+          gameLog.receiving.length === 0 &&
+          gameLog.kicking.length === 0
+        ) {
+          logCorpusMiss(source.name, 'offensive', playerId, pfrId, season);
+        }
 
         if (gameLog.passing.length > 0) {
           await db
             .insert(PublicSchema.gameFootballPassing)
             .values(
               gameLog.passing.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -273,7 +311,7 @@ async function loadFootballPlayerGameStats(
             .insert(PublicSchema.gameFootballRushing)
             .values(
               gameLog.rushing.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -295,7 +333,7 @@ async function loadFootballPlayerGameStats(
             .insert(PublicSchema.gameFootballReceiving)
             .values(
               gameLog.receiving.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -318,7 +356,7 @@ async function loadFootballPlayerGameStats(
             .insert(PublicSchema.gameFootballKicking)
             .values(
               gameLog.kicking.map((g) => ({
-                playerId: g.playerId,
+                playerId,
                 season: g.season,
                 gameNum: g.gameNum,
                 gameIdentifier: g.gameIdentifier,
@@ -396,7 +434,14 @@ async function loadFootballPlayerGameStats(
       throw retryableError;
     }
 
-    LOGGER.error(`Failed to load football stats for player ${playerId}`, err, {
+    // An unreadable corpus (bucket unset, PFA not wired yet) is a known
+    // configuration gap, not a per-player fault: warn once per player rather
+    // than paging Rollbar for every pre-1999 player in the batch.
+    const log =
+      error instanceof FootballCorpusUnavailableError
+        ? LOGGER.warn.bind(LOGGER)
+        : LOGGER.error.bind(LOGGER);
+    log(`Failed to load football stats for player ${playerId}`, err, {
       playerId,
       pfrId,
       season,

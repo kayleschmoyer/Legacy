@@ -1615,6 +1615,9 @@ importers:
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
+      '@legacy-sports/football-game-stats-provider':
+        specifier: workspace:*
+        version: link:../../lib/football-game-stats-provider
       '@legacy-sports/game-stats-provider':
         specifier: workspace:*
         version: link:../../lib/game-stats-provider

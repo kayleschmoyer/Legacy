@@ -247,6 +247,12 @@ resource "aws_lambda_function" "stats" {
       # Reference scraper, so an environment without this bucket keeps the
       # previous behaviour unchanged.
       RETROSHEET_S3_BUCKET = aws_s3_bucket.retrosheet_corpus.bucket
+
+      # Football corpus (LS-10214): nflverse/v1 for 1999+, pfa/v1 for
+      # 1960-1998. Unlike Retrosheet there is no scraper fallback (PFR 403s
+      # every scripted request), so football game loads fail loudly without it.
+      FOOTBALL_CORPUS_S3_BUCKET = aws_s3_bucket.football_corpus.bucket
+
       # Legacy support - keep SQS_QUEUE_URL for backward compatibility
       SQS_QUEUE_URL = aws_sqs_queue.load_season_stats.url
 
