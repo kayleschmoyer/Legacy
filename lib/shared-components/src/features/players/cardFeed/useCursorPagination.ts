@@ -18,7 +18,8 @@
  * bridges the two: the cursor hook flags a reset when `queryKey` changes
  * (e.g. position/search/sort — an unrelated query, not the next page), and
  * the accumulation hook consumes that flag to replace the list instead of
- * appending to it.
+ * appending to it — and, while the reset query is still loading, to clear
+ * the list so the previous query's rows never linger on screen.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -54,7 +55,18 @@ export function useAccumulatedPages<T>(
   const prevCursorRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) {
+      // A pending reset means the in-flight request is for a *different*
+      // query (new position/search/sort), so the rows on screen no longer
+      // answer it. Drop them so consumers fall back to their initial-loading
+      // state instead of rendering stale rows next to the new query's count
+      // (LS-10435/LS-10438). A plain next-page load (no reset) keeps the
+      // accumulated rows visible underneath the "loading more" indicator.
+      if (isResetRef.current) {
+        setAccumulated((prev) => (prev.length === 0 ? prev : []));
+      }
+      return;
+    }
     if (isResetRef.current) {
       setAccumulated(data);
       isResetRef.current = false;

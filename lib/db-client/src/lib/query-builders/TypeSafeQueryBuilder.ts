@@ -21,7 +21,9 @@ import type { PublicDb } from '../client/PublicDbClient';
  * branch uses the identical expression with a lowercased pattern to allow
  * Postgres to use the index.
  */
-function buildPlayerNameSearch(searchTerm: string): SQL<unknown> | undefined {
+export function buildPlayerNameSearch(
+  searchTerm: string,
+): SQL<unknown> | undefined {
   const searchPattern = `%${searchTerm}%`;
   const fullNamePattern = `%${searchTerm.toLowerCase()}%`;
   return or(

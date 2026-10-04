@@ -127,3 +127,114 @@ describe('useAccumulatedPages', () => {
     expect(result.current).toEqual(['x']);
   });
 });
+
+describe('useAccumulatedPages — stale rows across a query reset (LS-10435/LS-10438)', () => {
+  test('clears the accumulated rows while a reset query is loading', () => {
+    const isResetRef = { current: true };
+    const { result, rerender } = renderHook(
+      ({ data, loading }) =>
+        useAccumulatedPages<string>(data, loading, undefined, isResetRef),
+      {
+        initialProps: {
+          data: ['aaron', 'cobb', 'bonds', 'ruth'] as readonly string[],
+          loading: false,
+        },
+      },
+    );
+    expect(result.current).toEqual(['aaron', 'cobb', 'bonds', 'ruth']);
+
+    // Search changes: reset flagged, the new (network-only) request is in
+    // flight and has no data yet.
+    isResetRef.current = true;
+    rerender({ data: [], loading: true });
+
+    expect(result.current).toEqual([]);
+    // The flag stays set so the arriving page replaces rather than appends.
+    expect(isResetRef.current).toBe(true);
+
+    rerender({ data: ['ruth'], loading: false });
+    expect(result.current).toEqual(['ruth']);
+    expect(isResetRef.current).toBe(false);
+  });
+
+  test('keeps the accumulated rows while a next page (no reset) is loading', () => {
+    const isResetRef = { current: true };
+    const { result, rerender } = renderHook(
+      ({ data, loading, cursor }) =>
+        useAccumulatedPages<string>(data, loading, cursor, isResetRef),
+      {
+        initialProps: {
+          data: ['a', 'b'] as readonly string[],
+          loading: false,
+          cursor: undefined as string | undefined,
+        },
+      },
+    );
+
+    rerender({ data: [], loading: true, cursor: 'cursor-1' });
+    expect(result.current).toEqual(['a', 'b']);
+  });
+
+  test('wired together with useResettableCursor: a filter change never shows the old rows once the new query is loading', () => {
+    // Mirrors the card feeds' wiring: queryKey → cursor hook → query → pages.
+    const { result, rerender } = renderHook(
+      ({ queryKey, data, loading }) => {
+        const { cursor, setCursor, isResetRef } = useResettableCursor(queryKey);
+        const rows = useAccumulatedPages<string>(
+          data,
+          loading,
+          cursor,
+          isResetRef,
+        );
+        return { rows, cursor, setCursor };
+      },
+      {
+        initialProps: {
+          queryKey: 'ALL|',
+          data: ['brady', 'rice', 'manning'] as readonly string[],
+          loading: false,
+        },
+      },
+    );
+    expect(result.current.rows).toEqual(['brady', 'rice', 'manning']);
+
+    // Scroll to a second page first so the reset also has a cursor to clear.
+    // (Real queries flip to loading in the same render the cursor advances.)
+    rerender({ queryKey: 'ALL|', data: [], loading: true });
+    act(() => result.current.setCursor('cursor-1'));
+    expect(result.current.rows).toEqual(['brady', 'rice', 'manning']);
+    rerender({ queryKey: 'ALL|', data: ['moss'], loading: false });
+    expect(result.current.rows).toEqual(['brady', 'rice', 'manning', 'moss']);
+
+    // Click the RB chip: new key, request in flight.
+    rerender({ queryKey: 'RB|', data: [], loading: true });
+    expect(result.current.cursor).toBeUndefined();
+    expect(result.current.rows).toEqual([]);
+
+    rerender({ queryKey: 'RB|', data: ['smith', 'payton'], loading: false });
+    expect(result.current.rows).toEqual(['smith', 'payton']);
+  });
+
+  test('wired together: switching to a filter whose first render is already loading clears the rows even without a cursor', () => {
+    const { result, rerender } = renderHook(
+      ({ queryKey, data, loading }) => {
+        const { cursor, isResetRef } = useResettableCursor(queryKey);
+        return useAccumulatedPages<string>(data, loading, cursor, isResetRef);
+      },
+      {
+        initialProps: {
+          queryKey: 'ALL|',
+          data: ['aaron', 'ruth'] as readonly string[],
+          loading: false,
+        },
+      },
+    );
+    expect(result.current).toEqual(['aaron', 'ruth']);
+
+    rerender({ queryKey: 'ALL|Babe Ruth', data: [], loading: true });
+    expect(result.current).toEqual([]);
+
+    rerender({ queryKey: 'ALL|Babe Ruth', data: ['ruth'], loading: false });
+    expect(result.current).toEqual(['ruth']);
+  });
+});

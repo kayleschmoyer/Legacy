@@ -1,6 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   battingPlayerTypeFilter,
+  buildPlayerNameSearch,
   getCareerBattingOrderByClause,
   positionEligibilityFilter,
   type QueryOptions,
@@ -136,4 +137,18 @@ describe('positionEligibilityFilter (LS-8835)', () => {
       expect(sql).toMatch(/player_eligible_positions/);
     },
   );
+});
+
+describe('buildPlayerNameSearch (shared by career batting + pitching search)', () => {
+  it('matches first name, last name, or the lowercased full name', () => {
+    const condition = buildPlayerNameSearch('Babe Ruth');
+    if (!condition) throw new Error('expected a name-search condition');
+    const query = dialect.sqlToQuery(condition);
+    expect(query.sql).toMatch(/"players"\."first_name" ilike \$1/);
+    expect(query.sql).toMatch(/"players"\."last_name" ilike \$2/);
+    expect(query.sql).toMatch(
+      /lower\("players"\."first_name" \|\| ' ' \|\| "players"\."last_name"\) ilike \$3/,
+    );
+    expect(query.params).toEqual(['%Babe Ruth%', '%Babe Ruth%', '%babe ruth%']);
+  });
 });

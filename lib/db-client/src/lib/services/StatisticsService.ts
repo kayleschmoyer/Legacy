@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, or, sql, SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -13,6 +13,7 @@ import {
   SeasonPitching,
 } from '../../types/DatabaseTypes';
 import {
+  buildPlayerNameSearch,
   CareerBattingQueryBuilder,
   QueryOptions,
   StatisticsQueryFilters,
@@ -425,12 +426,9 @@ export class StatisticsService {
         const searchTerm = queryOptions.filters?.searchTerm;
 
         if (searchTerm) {
-          // JOIN with players table to enable name search
-          const searchPattern = `%${searchTerm}%`;
-          const searchCondition = or(
-            ilike(PublicSchema.players.firstName, searchPattern),
-            ilike(PublicSchema.players.lastName, searchPattern),
-          );
+          // JOIN with players table to enable name search (first, last, or
+          // full name — same matcher as career batting)
+          const searchCondition = buildPlayerNameSearch(searchTerm);
           const allConditions = searchCondition
             ? [...conditions, searchCondition]
             : conditions;
@@ -1162,12 +1160,9 @@ export class StatisticsService {
       const conditions = filters ? this.buildPitchingFilters(filters) : [];
 
       if (filters?.searchTerm) {
-        // JOIN with players table to enable name-based count
-        const searchPattern = `%${filters.searchTerm}%`;
-        const searchCondition = or(
-          ilike(PublicSchema.players.firstName, searchPattern),
-          ilike(PublicSchema.players.lastName, searchPattern),
-        );
+        // JOIN with players table to enable name-based count (first, last,
+        // or full name — same matcher as career batting)
+        const searchCondition = buildPlayerNameSearch(filters.searchTerm);
         const allConditions = searchCondition
           ? [...conditions, searchCondition]
           : conditions;
