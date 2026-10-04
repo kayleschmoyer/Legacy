@@ -18,6 +18,14 @@
 
 name: "Run Playwright Tests"
 
+# Automated (workflow_run) runs are titled so a green check in the Actions run
+# list is never read as "the full suite passed" (LS-10309): most automated runs
+# are debounced by the `gate` job and skip every test job, concluding
+# `success`. run-name is evaluated at trigger time — before the gate decides —
+# so it cannot carry the debounce verdict itself; that lives in the gate's step
+# summary/annotation and in the "Debounced — last real attempt: …" job name.
+run-name: ${{ github.event_name == 'workflow_run' && 'Run Playwright Tests · post-deploy (debounce-gated — green may be a skip)' || 'Run Playwright Tests' }}
+
 on:
   # Automated full suite: fires after the umbrella Deploy workflow completes on
   # main (success or failure — a red deploy still merged code worth testing).
@@ -172,6 +180,15 @@ jobs:
   # suite on every merge (four executions in five hours on 2026-09-30). The
   # script also echoes the decision to the job log, because step summaries
   # are not readable through the Actions API.
+  #
+  # Debounced runs deliberately stay `success` rather than cancelled/failed
+  # (LS-10309): workflow_run runs attach their check-runs to main's HEAD, and a
+  # non-success conclusion there reads as "main is red" to base-branch tooling
+  # (.github/scripts/reviewer/lib/base-branch-ci.mjs treats cancelled/failure
+  # as failing). Instead the gate script surfaces the prior real attempt's
+  # conclusion (step summary + annotation + `skip-label` output) and the
+  # `debounced` job below carries it in its name, so neither the run page nor
+  # main's check list implies a pass.
   # ---------------------------------------------------------------------------
   gate:
     name: "Full-Suite Gate"
@@ -179,6 +196,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
+      skip-label: ${{ steps.decide.outputs.skip-label }}
     steps:
       - name: "Checkout (gate script only)"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -196,6 +214,27 @@ jobs:
           GATE_WORKFLOW_FILE: run-playwright-tests.yml
           GATE_SENTINEL_JOB: "Prepare Matrix"
         run: node .github/scripts/full-suite-gate.mjs
+  # ---------------------------------------------------------------------------
+  # Debounce/skip marker (LS-10309). Runs only when the gate skipped the suite;
+  # its job name — evaluated after the gate — states the prior real attempt's
+  # conclusion, so the run's job list and main's check-runs show e.g.
+  # "Debounced — last real attempt: failure (run 123), full suite NOT run"
+  # instead of an unqualified green. The debounce check above keys on
+  # "Prepare Matrix" only, so this job never counts as a real attempt.
+  # ---------------------------------------------------------------------------
+  debounced:
+    name: ${{ needs.gate.outputs.skip-label || 'Full suite NOT run (gate skipped)' }}
+    needs: [gate]
+    if: needs.gate.outputs.should-run == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: "Report skip"
+        shell: bash
+        env:
+          SKIP_LABEL: ${{ needs.gate.outputs.skip-label }}
+        run: echo "${SKIP_LABEL:-Full suite NOT run (gate skipped)} — see the Full-Suite Gate step summary."
+
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
   # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards,

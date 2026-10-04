@@ -105,6 +105,20 @@ export function createGhApi(exec) {
       }
       return n;
     },
+
+    /**
+     * Conclusion of a prior run (or its status while still in flight), used
+     * only to label a debounced run (LS-10309) — never to make the decision.
+     */
+    getRunConclusion({ repo, runId }) {
+      const out = exec([
+        'api',
+        `repos/${repo}/actions/runs/${runId}`,
+        '--jq',
+        '.conclusion // .status',
+      ]);
+      return out.trim();
+    },
   };
 }
 
@@ -113,6 +127,21 @@ function elapsedSeconds(run) {
   const updated = Date.parse(run.updated_at ?? '');
   if (Number.isNaN(started) || Number.isNaN(updated)) return null;
   return (updated - started) / 1000;
+}
+
+/**
+ * Best-effort conclusion of the prior real attempt, so a debounced run — whose
+ * own conclusion is a green "success" with every job skipped — can say what
+ * the last real full-suite attempt actually did (LS-10309). Any error degrades
+ * to "unknown"; it must never change the skip decision (LS-9329).
+ */
+function priorConclusionOf(api, repo, runId) {
+  if (typeof api.getRunConclusion !== 'function') return 'unknown';
+  try {
+    return api.getRunConclusion({ repo, runId }) || 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }
 
 /**
@@ -132,7 +161,7 @@ function elapsedSeconds(run) {
  *   minute; a real attempt takes far longer). Keeps job introspection to a
  *   handful of calls on a busy lane. Runs with missing timestamps are probed.
  * @param {{ listRuns: Function, countSentinelJobs: Function }} api
- * @returns {{ decision: string, reason: string, inspected: number, foundRunId?: number|string, error?: string }}
+ * @returns {{ decision: string, reason: string, inspected: number, foundRunId?: number|string, priorConclusion?: string, error?: string }}
  */
 export function decideFullSuiteGate(opts, api) {
   const {
@@ -198,6 +227,7 @@ export function decideFullSuiteGate(opts, api) {
         decision: DECISION.SKIP_DEBOUNCED,
         reason: `Debounced — run ${run.id} already made a real attempt (non-skipped "${sentinelJob}") within the interval.`,
         foundRunId: run.id,
+        priorConclusion: priorConclusionOf(api, repo, run.id),
         inspected,
       };
     }
@@ -229,6 +259,14 @@ export function renderGateDecision(result, ctx) {
         ? `Inconclusive — ${result.reason}; skipping rather than re-running the full suite blind.`
         : result.reason;
     outputLines.push(`skip-reason=${skipReason.replace(/\r?\n/g, ' ')}`);
+    // Human-facing label for a skipped run (LS-10309), e.g. a job name in the
+    // run's job list and main's check-runs, so a green skipped run is never
+    // read as a passing full suite.
+    const skipLabel =
+      result.decision === DECISION.SKIP_DEBOUNCED
+        ? `Debounced — last real attempt: ${result.priorConclusion ?? 'unknown'} (run ${result.foundRunId}), full suite NOT run`
+        : 'Skipped — gate inconclusive (gh api error), full suite NOT run';
+    outputLines.push(`skip-label=${skipLabel}`);
   }
 
   const heading =
@@ -251,6 +289,7 @@ export function renderGateDecision(result, ctx) {
         : `\`${result.foundRunId}\``;
     summaryLines.push(
       `- Decision: **debounced → skip** — run ${link} already made a real attempt within the last ${interval}.`,
+      `- **Last real attempt: \`${result.priorConclusion ?? 'unknown'}\`** — this run's green status means *skipped*, not *passed*.`,
     );
   } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
     summaryLines.push(
@@ -268,6 +307,18 @@ export function renderGateDecision(result, ctx) {
     `[${title}] ${result.reason}`,
   ];
   if (result.error) logLines.push(`[${title}] gh error: ${result.error}`);
+  // Workflow-command annotation (stdout) so the skip is visible on the run page.
+  if (result.decision === DECISION.SKIP_DEBOUNCED) {
+    const prior = result.priorConclusion ?? 'unknown';
+    const level = prior === 'success' ? 'notice' : 'warning';
+    logLines.push(
+      `::${level} title=${title} — debounced (full suite NOT run)::Last real attempt (run ${result.foundRunId}) concluded ${prior}.`,
+    );
+  } else if (result.decision === DECISION.SKIP_INCONCLUSIVE) {
+    logLines.push(
+      `::warning title=${title} — full suite NOT run::Gate inconclusive (${result.reason.replace(/\r?\n/g, ' ')}) — skipped fail-open (LS-9329). This green run tested nothing.`,
+    );
+  }
 
   return { outputLines, summaryLines, logLines };
 }

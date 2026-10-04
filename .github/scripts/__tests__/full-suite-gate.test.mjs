@@ -53,10 +53,22 @@ const RATE_LIMIT_403 = () =>
   ghFailure(1, 'API rate limit exceeded for installation ID 1234. (HTTP 403)');
 
 /** In-memory api: `runs` is the list result, `jobs` maps runId → count | Error. */
-function fakeApi({ runs = [], jobs = {}, listError = null }) {
+function fakeApi({
+  runs = [],
+  jobs = {},
+  listError = null,
+  conclusions = undefined,
+}) {
   const probed = [];
   return {
     probed,
+    ...(conclusions && {
+      getRunConclusion({ runId }) {
+        const v = conclusions[runId];
+        if (v instanceof Error) throw v;
+        return v ?? '';
+      },
+    }),
     listRuns() {
       if (listError) throw listError;
       return runs;
@@ -108,6 +120,28 @@ describe('decideFullSuiteGate', () => {
     assert.equal(r.decision, DECISION.SKIP_DEBOUNCED);
     assert.equal(r.foundRunId, 2);
     assert.deepEqual(api.probed, [3, 2]);
+  });
+
+  it("LS-10309: a debounced skip carries the prior real attempt's conclusion", () => {
+    const api = fakeApi({
+      runs: [{ id: 3 }, { id: 2 }],
+      jobs: { 3: 0, 2: 1 },
+      conclusions: { 2: 'failure' },
+    });
+    const r = decideFullSuiteGate(BASE_OPTS, api);
+    assert.equal(r.decision, DECISION.SKIP_DEBOUNCED);
+    assert.equal(r.priorConclusion, 'failure');
+  });
+
+  it('LS-10309: a failed conclusion lookup degrades to "unknown" and still skips', () => {
+    const api = fakeApi({
+      runs: [{ id: 2 }],
+      jobs: { 2: 1 },
+      conclusions: { 2: RATE_LIMIT_403() },
+    });
+    const r = decideFullSuiteGate(BASE_OPTS, api);
+    assert.equal(r.decision, DECISION.SKIP_DEBOUNCED);
+    assert.equal(r.priorConclusion, 'unknown');
   });
 
   it('skips (inconclusive) when the prior-run LIST call fails (LS-9329)', () => {
@@ -219,6 +253,17 @@ describe('createGhApi', () => {
     assert.match(calls[0][3], /\.conclusion != "skipped"/);
   });
 
+  it("LS-10309: reads a prior run's conclusion (falling back to status)", () => {
+    const calls = [];
+    const api = createGhApi((args) => {
+      calls.push(args);
+      return 'failure\n';
+    });
+    assert.equal(api.getRunConclusion({ repo: REPO, runId: 42 }), 'failure');
+    assert.equal(calls[0][1], `repos/${REPO}/actions/runs/42`);
+    assert.equal(calls[0][3], '.conclusion // .status');
+  });
+
   it('propagates a gh non-zero exit (403) as a throw, not as 0', () => {
     const api = createGhApi(() => {
       throw RATE_LIMIT_403();
@@ -312,6 +357,58 @@ describe('renderGateDecision', () => {
     assert.match(r.logLines[0], /decision=skip-debounced should-run=false/);
   });
 
+  it('LS-10309: debounced → skip-label, summary and a warning annotation name the prior conclusion', () => {
+    const r = renderGateDecision(
+      {
+        decision: DECISION.SKIP_DEBOUNCED,
+        reason: 'Debounced — run 2 already made a real attempt.',
+        foundRunId: 2,
+        priorConclusion: 'failure',
+        inspected: 2,
+      },
+      ctx,
+    );
+    assert.equal(
+      r.outputLines[2],
+      'skip-label=Debounced — last real attempt: failure (run 2), full suite NOT run',
+    );
+    assert.ok(
+      r.summaryLines.some((l) => l.includes('Last real attempt: `failure`')),
+    );
+    const annotation = r.logLines.find((l) => l.startsWith('::warning '));
+    assert.ok(annotation, 'warning annotation emitted');
+    // Annotation property values must not contain unescaped `,` or `:`.
+    const title = annotation.slice('::warning '.length).split('::')[0];
+    assert.ok(!/[,:]/.test(title.slice('title='.length)));
+  });
+
+  it('LS-10309: a passing prior attempt is a notice, not a warning', () => {
+    const r = renderGateDecision(
+      {
+        decision: DECISION.SKIP_DEBOUNCED,
+        reason: 'Debounced.',
+        foundRunId: 2,
+        priorConclusion: 'success',
+        inspected: 1,
+      },
+      ctx,
+    );
+    assert.ok(r.logLines.some((l) => l.startsWith('::notice ')));
+    assert.ok(!r.logLines.some((l) => l.startsWith('::warning ')));
+  });
+
+  it('LS-10309: inconclusive → skip-label says the suite was NOT run', () => {
+    const r = renderGateDecision(
+      { decision: DECISION.SKIP_INCONCLUSIVE, reason: 'x', inspected: 0 },
+      ctx,
+    );
+    assert.equal(
+      r.outputLines[2],
+      'skip-label=Skipped — gate inconclusive (gh api error), full suite NOT run',
+    );
+    assert.ok(r.logLines.some((l) => l.startsWith('::warning ')));
+  });
+
   it('run → should-run=true, no skip-reason, RUNNING heading, note omitted', () => {
     const r = renderGateDecision(
       {
@@ -334,8 +431,8 @@ describe('renderGateDecision', () => {
       { decision: DECISION.SKIP_INCONCLUSIVE, reason: 'a\nb', inspected: 0 },
       ctx,
     );
-    assert.equal(r.outputLines.length, 2);
-    assert.ok(!r.outputLines[1].includes('\n'));
+    assert.equal(r.outputLines.length, 3);
+    assert.ok(r.outputLines.every((l) => !l.includes('\n')));
   });
 });
 
