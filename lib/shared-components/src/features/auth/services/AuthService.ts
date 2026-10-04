@@ -97,6 +97,16 @@ export class AuthService {
    */
   private currentJwt: string | null = null;
 
+  /**
+   * Monotonically-incrementing counter bumped by `clearTokens()` on every
+   * logout. `refreshJwt()` snapshots it before its network round-trip and
+   * checks it again once the response arrives — if a logout happened while
+   * the request was in flight, the (now-stale) refreshed token and CSRF
+   * value are discarded instead of being written back to storage, which
+   * would otherwise silently resurrect cleared auth state (LS-2107).
+   */
+  private logoutGeneration = 0;
+
   constructor(config: OAuthConfig) {
     this.config = config;
 
@@ -605,6 +615,7 @@ export class AuthService {
    */
   clearTokens(): void {
     this.currentJwt = null;
+    this.logoutGeneration += 1;
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('auth_jwt'); // legacy cleanup
@@ -683,6 +694,10 @@ export class AuthService {
    * @returns The new JWT string on success, or null if refresh is not possible.
    */
   async refreshJwt(): Promise<string | null> {
+    // Snapshot the logout generation before the round-trip so a logout that
+    // happens while this request is in flight can be detected once it
+    // resolves (see `logoutGeneration` above).
+    const requestGeneration = this.logoutGeneration;
     try {
       // The JWT is in the HttpOnly ls_jwt cookie (sent via credentials: 'include').
       // During impersonation, the server also reads the ls_imp_jwt cookie
@@ -725,6 +740,13 @@ export class AuthService {
 
       if (!result.jwt) {
         LOGGER.warn('AuthService: JWT refresh endpoint did not return a jwt');
+        return null;
+      }
+
+      // A logout cleared local state while this request was in flight —
+      // discard the (now-stale) refreshed token instead of writing it back
+      // and resurrecting cleared auth storage.
+      if (this.logoutGeneration !== requestGeneration) {
         return null;
       }
 
