@@ -367,6 +367,7 @@ describe('AuthProvider – hydrateSession', () => {
 describe('AuthProvider – auth:session-expired event', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('clears tokens and logs out when auth:session-expired is dispatched', async () => {
@@ -427,6 +428,44 @@ describe('AuthProvider – auth:session-expired event', () => {
 
     // clearTokens must be called to remove stale localStorage state
     expect(mockInstance.clearTokens).toHaveBeenCalled();
+
+    // The login screen is told why the user was signed out (LS-10447)
+    expect(sessionStorage.getItem('ls_session_expired_notice')).toBe('1');
+  });
+
+  it('does not arm the session-expired notice when no one was signed in (LS-10447)', async () => {
+    // Override the signed-in implementation left by the previous case.
+    jest.mocked(AuthService).mockImplementation(
+      () =>
+        ({
+          getStoredUserProfile: jest.fn(() => null),
+          getStoredTokenExpiry: jest.fn(() => null),
+          getStoredAdminProfile: jest.fn(() => null),
+          getStoredImpersonatedUserProfile: jest.fn(() => null),
+          clearAdminProfile: jest.fn(),
+          clearImpersonatedUserProfile: jest.fn(),
+          clearTokens: jest.fn(),
+          refreshJwt: jest.fn(() => Promise.resolve(null)),
+          getStoredToken: jest.fn(() => null),
+          getCurrentToken: jest.fn(() => null),
+        }) as unknown as AuthService,
+    );
+
+    render(
+      <AuthProvider config={testConfig}>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('no-user')).toBeTruthy();
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    });
+
+    expect(sessionStorage.getItem('ls_session_expired_notice')).toBeNull();
   });
 });
 

@@ -12,6 +12,7 @@ import {
   buildImpersonationCookie,
   CSRF_HEADER,
   generateCsrfToken,
+  parseCsrfFromCookies,
   parseImpersonationJwtFromCookies,
   parseJwtFromCookies,
   validateCsrf,
@@ -104,7 +105,9 @@ export const handleRefreshJwt = async (
     };
   }
 
-  // When auth is cookie-based (not Bearer header), validate CSRF double-submit
+  // When auth is cookie-based (not Bearer header), validate CSRF double-submit.
+  // The validated token is carried forward into the refreshed cookies below.
+  let validatedCsrfToken: string | null = null;
   if (!authHeader?.startsWith('Bearer ')) {
     const csrfHeaderValue =
       event.headers[CSRF_HEADER] ?? event.headers['X-CSRF-Token'];
@@ -115,6 +118,7 @@ export const handleRefreshJwt = async (
         body: JSON.stringify({ error: 'CSRF validation failed' }),
       };
     }
+    validatedCsrfToken = parseCsrfFromCookies(cookieHeader);
   }
 
   // Read the JWT signing secret
@@ -215,8 +219,17 @@ export const handleRefreshJwt = async (
 
     LOGGER.info('handleRefreshJwt: issued fresh JWT', { userId: user.id });
 
-    // Set updated HttpOnly cookie + CSRF cookie
-    const csrfToken = generateCsrfToken();
+    // Set updated HttpOnly cookie + CSRF cookie. Keep the CSRF token the
+    // request just proved it holds instead of rotating it (LS-10447): the
+    // web app has several independent refresh callers (AuthService's mount /
+    // proactive refresh, the Apollo error link, useIsPremium) plus multiple
+    // tabs, and rotating here let a request whose X-CSRF-Token header was read
+    // before a sibling refresh's Set-Cookie landed arrive with the NEW cookie
+    // and the OLD header — a 403 that signed the user out. The double-submit
+    // check only needs an unguessable value bound to this browser; rotation
+    // added no protection. Bearer-auth refreshes have no prior CSRF cookie and
+    // still get a fresh one.
+    const csrfToken = validatedCsrfToken ?? generateCsrfToken();
     const authCookies = buildAuthCookies(newJwt, csrfToken);
     const allCookies = [...authCookies];
 

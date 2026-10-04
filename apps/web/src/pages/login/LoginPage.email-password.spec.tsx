@@ -45,6 +45,8 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 // controlled inputs in jsdom. It mirrors the real card's contract for the
 // props this suite exercises.
 jest.mock('@legacy-sports/shared-components/auth', () => ({
+  consumeSessionExpiredNotice: () => false,
+  SESSION_EXPIRED_MESSAGE: 'Your session expired.',
   useAuth: () => ({
     config: { googleClientId: 'test', oauthProxyUrl: 'http://localhost:5001' },
     login: mockLogin,

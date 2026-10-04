@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { AuthService, AuthSessionExpiredError } from '../services/AuthService';
+import { markSessionExpiredNotice } from '../services/sessionExpiredNotice';
 import type {
   OAuthConfig,
   OAuthResponse,
@@ -282,6 +283,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const { user, isLoading, error, isImpersonating, adminUser, token } =
     authState;
 
+  // Read by the session-expired listener so a 401/403 refresh rejection while
+  // already signed out (e.g. a public page's query) never arms the
+  // "session expired" login notice (LS-10447).
+  const isSignedInRef = useRef(false);
+  isSignedInRef.current = !!user;
+
   const authService = useMemo(() => new AuthService(config), [config]);
 
   /** Decode a JWT string into a User object (no signature verification). */
@@ -405,6 +412,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           .catch((err: unknown) => {
             if (err instanceof AuthSessionExpiredError) {
               authService.clearTokens();
+              markSessionExpiredNotice();
               dispatchAuth({ type: 'AUTH_LOGOUT' });
               return;
             }
@@ -472,6 +480,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       // and inadvertently re-trigger network requests or update auth state.
       clearRefreshTimer();
       authService.clearTokens();
+      if (isSignedInRef.current) markSessionExpiredNotice();
       dispatchAuth({ type: 'AUTH_LOGOUT' });
     };
 
@@ -557,6 +566,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                   if (err instanceof AuthSessionExpiredError && isMounted) {
                     clearRefreshTimer();
                     authService.clearTokens();
+                    markSessionExpiredNotice();
                     dispatchAuth({ type: 'AUTH_LOGOUT' });
                     return;
                   }
@@ -592,6 +602,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           // Server definitively rejected the session (401/403) — force logout
           clearRefreshTimer();
           authService.clearTokens();
+          markSessionExpiredNotice();
           if (isMounted) {
             dispatchAuth({ type: 'AUTH_LOGOUT' });
           }

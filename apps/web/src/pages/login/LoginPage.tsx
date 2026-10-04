@@ -10,7 +10,11 @@ import {
   OAuthErrorCode,
   OAuthProvider,
 } from '@legacy-sports/shared-components/ui';
-import { useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  consumeSessionExpiredNotice,
+  SESSION_EXPIRED_MESSAGE,
+  useAuth,
+} from '@legacy-sports/shared-components/auth';
 import {
   isClientRejection,
   lastVisitedLeaguePath,
@@ -187,6 +191,13 @@ export function LoginPage(): React.JSX.Element {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Explain an involuntary sign-out (LS-10447): the AuthProvider arms this
+  // one-shot notice when the server rejects a session refresh. The URL is left
+  // untouched on logout, so signing back in lands on the same page.
+  useEffect(() => {
+    if (consumeSessionExpiredNotice()) setErrorMessage(SESSION_EXPIRED_MESSAGE);
+  }, []);
 
   // Synchronous re-entrancy latch for handleSignIn. `isLoading` is React state
   // and is not committed until after the current synchronous task finishes, so a

@@ -17,6 +17,10 @@ export type { UseStepUpGateResult } from './hooks/useStepUpGate';
 export { consumeBillingNotice } from './services/billingNotice';
 export type { BillingNoticeStatus } from './services/billingNotice';
 export {
+  consumeSessionExpiredNotice,
+  SESSION_EXPIRED_MESSAGE,
+} from './services/sessionExpiredNotice';
+export {
   buildGoogleAuthPayload,
   exchangeGoogleCode,
   OAuthServiceError,

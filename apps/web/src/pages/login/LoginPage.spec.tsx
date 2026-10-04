@@ -279,6 +279,28 @@ describe('LoginPage Discord callback — missing oauthProxyUrl hard-fail (LGN-01
   });
 });
 
+describe('LoginPage session-expired notice (LS-10447)', () => {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('explains an involuntary sign-out once, after the session was rejected', async () => {
+    sessionStorage.setItem('ls_session_expired_notice', '1');
+
+    renderPage();
+
+    expect(await screen.findByText(/your session expired/i)).toBeTruthy();
+    expect(sessionStorage.getItem('ls_session_expired_notice')).toBeNull();
+  });
+
+  it('shows no session-expired notice on a normal visit', async () => {
+    renderPage();
+    await waitForSignInButton();
+
+    expect(screen.queryByText(/your session expired/i)).toBeNull();
+  });
+});
+
 describe('LoginPage handleSignIn catch block', () => {
   it('does not log an error or show a message when the user cancels the popup', async () => {
     const cancelledError = Object.assign(
