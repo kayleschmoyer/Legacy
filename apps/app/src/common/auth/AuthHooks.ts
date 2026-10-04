@@ -127,6 +127,44 @@ export async function readKeychainValue(
   }
 }
 
+/**
+ * Unlink the Discord identity from the signed-in user. Native has no cookie
+ * session, so the internal JWT goes as a Bearer token (the oauth-proxy unlink
+ * handler accepts Bearer without CSRF — LS-10411). Rejects with the server's
+ * message (e.g. the 409 "Cannot unlink your only sign-in method").
+ */
+export async function unlinkDiscordAccount(): Promise<void> {
+  const { oauthProxyUrl } = getMobileOAuthConfig();
+  if (!oauthProxyUrl) {
+    throw new Error('Authentication unavailable. Please try again later.');
+  }
+  const token = await readKeychainValue(Secret.INTERNAL_JWT);
+  if (!token) {
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  const response = await fetch(`${oauthProxyUrl}/discord/unlink`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (response.ok) return;
+
+  let message = `Discord unlink failed: ${response.status}`;
+  try {
+    const errorData = JSON.parse(await response.text()) as {
+      message?: string;
+      error?: string;
+    };
+    message = errorData.message ?? errorData.error ?? message;
+  } catch {
+    // keep default message
+  }
+  throw new Error(message);
+}
+
 export async function getJwt(): Promise<LegacySportsJwt | null> {
   const internalJwt = await readKeychainValue(Secret.INTERNAL_JWT);
   return internalJwt === null ? null : jwtDecode(internalJwt);

@@ -17,6 +17,8 @@ const mockLogout = jest.fn();
 const mockUpdateUsername = jest.fn();
 const mockUpdateAvatar = jest.fn();
 const mockRefetchUser = jest.fn();
+const mockRefetchIdentities = jest.fn();
+const mockUnlinkDiscordAccount = jest.fn();
 const mockNavigate = jest.fn();
 const mockUseCurrentUserInfo = jest.fn();
 const mockUseGetUserByIdQuery = jest.fn();
@@ -110,6 +112,8 @@ jest.mock('../../common/auth/AuthHooks', () => ({
   }),
   useCurrentUserInfo: (...args: unknown[]): unknown =>
     mockUseCurrentUserInfo(...args),
+  unlinkDiscordAccount: (...args: unknown[]): unknown =>
+    mockUnlinkDiscordAccount(...args),
 }));
 
 let mockSubscriptionState: {
@@ -287,6 +291,8 @@ describe('ProfileSettingsScreen', () => {
     mockUpdateUsername.mockResolvedValue({});
     mockUpdateAvatar.mockResolvedValue({});
     mockRefetchUser.mockResolvedValue({});
+    mockRefetchIdentities.mockResolvedValue({});
+    mockUnlinkDiscordAccount.mockResolvedValue(undefined);
     mockUseCurrentUserInfo.mockReturnValue({
       data: {
         id: 1,
@@ -303,6 +309,7 @@ describe('ProfileSettingsScreen', () => {
       data: { myIdentities: [googleIdentity] },
       loading: false,
       error: undefined,
+      refetch: (...args: unknown[]): unknown => mockRefetchIdentities(...args),
     });
   });
 
@@ -426,6 +433,96 @@ describe('ProfileSettingsScreen', () => {
       };
       render(<ProfileSettingsScreen />);
       expect(screen.getByTestId('connected-accounts-card')).toBeTruthy();
+    });
+  });
+
+  describe('disconnect Discord (LS-10413)', () => {
+    const linkedDiscord = (): void => {
+      mockUseMyIdentitiesQuery.mockReturnValue({
+        data: { myIdentities: [googleIdentity, discordIdentity] },
+        loading: false,
+        refetch: (...args: unknown[]): unknown =>
+          mockRefetchIdentities(...args),
+      });
+    };
+
+    it('shows Disconnect only on a linked Discord row', () => {
+      render(<ProfileSettingsScreen />);
+      expect(screen.queryByTestId('disconnect-discord')).toBeNull();
+
+      linkedDiscord();
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByTestId('disconnect-discord')).toBeTruthy();
+    });
+
+    it('opens the confirmation without making a request', () => {
+      linkedDiscord();
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      expect(screen.getByText('Disconnect Discord?')).toBeTruthy();
+      expect(screen.getByText('Keep connected')).toBeTruthy();
+      expect(mockUnlinkDiscordAccount).not.toHaveBeenCalled();
+    });
+
+    it('cancel dismisses the confirmation and makes no request', () => {
+      linkedDiscord();
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-cancel'));
+      expect(screen.queryByTestId('confirm-dialog')).toBeNull();
+      expect(mockUnlinkDiscordAccount).not.toHaveBeenCalled();
+      expect(mockRefetchIdentities).not.toHaveBeenCalled();
+    });
+
+    it('confirming unlinks, then refetches identities and the user', async () => {
+      linkedDiscord();
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-confirm'));
+
+      await waitFor(() => expect(mockRefetchIdentities).toHaveBeenCalled());
+      expect(mockUnlinkDiscordAccount).toHaveBeenCalledTimes(1);
+      expect(mockRefetchUser).toHaveBeenCalled();
+      expect(screen.queryByTestId('unlink-error')).toBeNull();
+    });
+
+    it('shows the server message inline and skips the refetch on a 409', async () => {
+      linkedDiscord();
+      mockUnlinkDiscordAccount.mockRejectedValue(
+        new Error('Cannot unlink your only sign-in method'),
+      );
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-confirm'));
+
+      expect(
+        await screen.findByText('Cannot unlink your only sign-in method'),
+      ).toBeTruthy();
+      expect(mockRefetchIdentities).not.toHaveBeenCalled();
+    });
+
+    it('disables Disconnect and shows a spinner while the request is in flight', async () => {
+      linkedDiscord();
+      let resolveUnlink: () => void = () => undefined;
+      mockUnlinkDiscordAccount.mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveUnlink = resolve;
+        }),
+      );
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      fireEvent.press(screen.getByTestId('confirm-dialog-confirm'));
+
+      await waitFor(() => expect(mockUnlinkDiscordAccount).toHaveBeenCalled());
+      // The mocked Button drops onPress while disabled, so a second tap is inert.
+      fireEvent.press(screen.getByTestId('disconnect-discord'));
+      expect(screen.queryByTestId('confirm-dialog')).toBeNull();
+
+      await act(() => {
+        resolveUnlink();
+        return Promise.resolve();
+      });
+      await waitFor(() => expect(mockRefetchIdentities).toHaveBeenCalled());
     });
   });
 

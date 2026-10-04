@@ -34,6 +34,7 @@ import {
 import { brand } from '@legacy-sports/design-tokens';
 import { validateUsername } from '@legacy-sports/utils';
 import {
+  unlinkDiscordAccount,
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
@@ -94,6 +95,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
     data: identitiesData,
     loading: identitiesLoading,
     error: identitiesError,
+    refetch: refetchIdentities,
   } = useMyIdentitiesQuery({ skip: !userId });
   const identities = identitiesData?.myIdentities ?? [];
   const hasDiscordIdentity = identities.some(
@@ -106,6 +108,11 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
           .map((identity) => getProviderLabel(identity.provider))
           .join(', ')
       : 'Unknown';
+
+  // Discord disconnect state (LS-10413)
+  const [confirmingDiscordUnlink, setConfirmingDiscordUnlink] = useState(false);
+  const [unlinkingDiscord, setUnlinkingDiscord] = useState(false);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
 
   // Username editing state
   const [editingUsername, setEditingUsername] = useState(false);
@@ -134,6 +141,24 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
       setLoggingOut(false);
     }
   };
+
+  const handleDisconnectDiscord = useCallback(async () => {
+    setConfirmingDiscordUnlink(false);
+    setUnlinkingDiscord(true);
+    setUnlinkError(null);
+    try {
+      await unlinkDiscordAccount();
+      await Promise.all([refetchUser(), refetchIdentities()]);
+    } catch (error) {
+      setUnlinkError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to disconnect Discord',
+      );
+    } finally {
+      setUnlinkingDiscord(false);
+    }
+  }, [refetchUser, refetchIdentities]);
 
   const handleStartEditUsername = useCallback(() => {
     setUsernameInput(user?.username ?? currentUser?.username ?? '');
@@ -636,6 +661,23 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                             {showUnverified ? ' (unverified)' : ''}
                           </Paragraph>
                         </YStack>
+                        {identity.provider === 'discord' ? (
+                          <Button
+                            size="$2"
+                            chromeless
+                            color={brand.seamRed}
+                            onPress={() => setConfirmingDiscordUnlink(true)}
+                            disabled={unlinkingDiscord}
+                            icon={
+                              unlinkingDiscord ? (
+                                <Spinner size="small" />
+                              ) : undefined
+                            }
+                            testID="disconnect-discord"
+                          >
+                            Disconnect
+                          </Button>
+                        ) : null}
                       </XStack>
                     );
                   })}
@@ -658,7 +700,24 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   ) : null}
                 </>
               )}
+              {unlinkError ? (
+                <Paragraph size="$3" color="$red10" testID="unlink-error">
+                  {unlinkError}
+                </Paragraph>
+              ) : null}
             </YStack>
+            <Dialog
+              open={confirmingDiscordUnlink}
+              onOpenChange={setConfirmingDiscordUnlink}
+              eyebrow="Connected accounts"
+              title="Disconnect Discord?"
+              description="You will no longer be able to sign in with Discord. You can reconnect it at any time."
+              confirmLabel="Disconnect"
+              cancelLabel="Keep connected"
+              destructive
+              onCancel={() => setConfirmingDiscordUnlink(false)}
+              onConfirm={() => void handleDisconnectDiscord()}
+            />
           </YStack>
 
           {/* Subscription & Billing */}

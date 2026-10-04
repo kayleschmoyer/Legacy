@@ -8,6 +8,7 @@ import {
   getJwt,
   readKeychainValue,
   Secret,
+  unlinkDiscordAccount,
   useAuthHandlers,
   useCurrentUserInfo,
 } from './AuthHooks';
@@ -270,6 +271,65 @@ describe('AuthHooks', () => {
 
       const result = await readKeychainValue(Secret.INTERNAL_JWT);
       expect(result).toBeNull();
+    });
+  });
+
+  // ── unlinkDiscordAccount ────────────────────────────────────────────────
+
+  describe('unlinkDiscordAccount', () => {
+    it('POSTs to /discord/unlink with the JWT as a Bearer token and no CSRF/cookie', async () => {
+      mockSecureStorage['INTERNAL_JWT'] = TEST_JWT;
+      mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await expect(unlinkDiscordAccount()).resolves.toBeUndefined();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0] as [
+        string,
+        { method: string; headers: Record<string, string> },
+      ];
+      expect(url).toBe('https://oauth-proxy.example.com/discord/unlink');
+      expect(init.method).toBe('POST');
+      expect(init.headers.Authorization).toBe(`Bearer ${TEST_JWT}`);
+      expect(init.headers).not.toHaveProperty('X-CSRF-Token');
+    });
+
+    it('rejects with the server message on a 409', async () => {
+      mockSecureStorage['INTERNAL_JWT'] = TEST_JWT;
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 409,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              message: 'Cannot unlink your only sign-in method',
+            }),
+          ),
+      });
+
+      await expect(unlinkDiscordAccount()).rejects.toThrow(
+        'Cannot unlink your only sign-in method',
+      );
+    });
+
+    it('falls back to a status message when the error body is not JSON', async () => {
+      mockSecureStorage['INTERNAL_JWT'] = TEST_JWT;
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('boom'),
+      });
+
+      await expect(unlinkDiscordAccount()).rejects.toThrow(
+        'Discord unlink failed: 500',
+      );
+    });
+
+    it('rejects without a request when there is no stored token', async () => {
+      await expect(unlinkDiscordAccount()).rejects.toThrow(
+        'Session expired. Please sign in again.',
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
