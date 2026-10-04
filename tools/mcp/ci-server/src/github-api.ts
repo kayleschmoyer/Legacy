@@ -297,21 +297,25 @@ export async function getToken(): Promise<string> {
  * Always mints a fresh installation token via `generateGitHubAppToken()`
  * (`AGENT_AUTHOR_APP_PRIVATE_KEY`) instead of going through `resolveToken()`'s
  * GH_TOKEN/GITHUB_TOKEN-first precedence — so the result is guaranteed to be
- * the installation bucket, never whatever token a caller's env happens to
- * have set. Workflow steps authenticate with tokens minted from the same App
- * (`actions/create-github-app-token` + `secrets.AGENT_AUTHOR_APP_PRIVATE_KEY`,
- * app id 3158619 — see `.github/workflows/check-schema.yml`), so this reports
- * the exact budget `secrets.GITHUB_TOKEN` draws from in those steps. This is
- * a different bucket from `gh api rate_limit`, which reports whatever token
- * the CLI is authenticated as (a user or PAT token) — a healthy number there
- * says nothing about whether the installation bucket workflows depend on is
- * exhausted.
+ * the Agent Author App installation bucket, never whatever token a caller's
+ * env happens to have set.
+ *
+ * This is NOT the budget most workflow steps draw from (LS-10491). Steps that
+ * authenticate with `github.token` / `secrets.GITHUB_TOKEN` use the per-repo
+ * Actions token, whose budget is separate and cannot be queried from outside a
+ * running workflow; steps that mint from a different App (Reviewer Bot, the
+ * runner App) use that App's own bucket. Only steps that mint from
+ * `secrets.AGENT_AUTHOR_APP_PRIVATE_KEY` share this bucket — and only when the
+ * mint succeeds; a failed mint silently falls back to another token. It is
+ * also a different bucket from `gh api rate_limit`, which reports whatever
+ * token the CLI is authenticated as (a user or PAT token).
  *
  * Throws if AGENT_AUTHOR_APP_PRIVATE_KEY isn't configured or the API call
  * fails — callers should surface this as "installation rate limit unknown",
  * not silently fall back to a different token's bucket.
  */
 export async function getInstallationRateLimit(): Promise<{
+  appId: string;
   limit: number;
   remaining: number;
   resetsAt: string;
@@ -344,6 +348,7 @@ export async function getInstallationRateLimit(): Promise<{
   }
 
   return {
+    appId: process.env['GITHUB_APP_ID']?.trim() || DEFAULT_APP_ID,
     limit: data.rate.limit,
     remaining: data.rate.remaining,
     resetsAt: new Date(data.rate.reset * 1000).toISOString(),

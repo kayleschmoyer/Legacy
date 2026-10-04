@@ -15,6 +15,7 @@ import { forceCancelRun } from './tools/force-cancel-run.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
+import { installationRateLimit } from './tools/installation-rate-limit.js';
 import { isHeadSha } from './tools/is-head-sha.js';
 import { listRuns } from './tools/list-runs.js';
 import { retryRunnerFlake } from './tools/retry-runner-flake.js';
@@ -30,7 +31,6 @@ import {
   buildHeaders,
   formatGithubApiError,
   getDeploysTokenDiagnostics,
-  getInstallationRateLimit,
   getToken,
 } from './github-api.js';
 
@@ -1240,56 +1240,26 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_installation_rate_limit',
-    "Report the GitHub App installation token's core rate limit (remaining/limit/reset) — the SAME budget " +
-      'secrets.GITHUB_TOKEN draws from in workflows. Always mints a fresh installation token via ' +
-      'AGENT_AUTHOR_APP_PRIVATE_KEY and queries GET /rate_limit directly, bypassing GH_TOKEN/GITHUB_TOKEN env ' +
-      "precedence, so it's always the installation bucket — unlike ci_auth_status's rateLimit field. " +
-      "`gh api rate_limit` reports a DIFFERENT bucket (the CLI's own user/PAT token) and does not answer " +
-      '"is CI rate limited?" (LS-9570). Call this when a CI step failed with "API rate limit exceeded for ' +
-      'installation", or silently withheld a status/verdict it otherwise computed correctly (a rate-limit ' +
-      'signature, not a real verdict). Remedy: wait until resetsAt, then re-run — not an immediate retry.',
-    {},
-    async () => {
-      try {
-        const rateLimit = await getInstallationRateLimit();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  configured: true,
-                  source: 'github-app-installation',
-                  rateLimit,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (err) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  configured: false,
-                  error: err instanceof Error ? err.message : String(err),
-                  hint:
-                    'Set AGENT_AUTHOR_APP_PRIVATE_KEY in cloud env settings to enable installation-bucket ' +
-                    'rate-limit checks. Do not fall back to `gh api rate_limit` — it reports a different ' +
-                    "bucket (the CLI's own user/PAT token), not the installation budget workflows draw from.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      }
+    "Report the Agent Author App installation token's core rate limit. NOT the budget of workflow steps using " +
+      'github.token/secrets.GITHUB_TOKEN (separate per-repo budget, unreadable here) or other Apps — healthy here ' +
+      'does not mean CI is not rate limited (LS-10491). After a CI rate-limit 403 or withheld status, pass its ' +
+      'runId/jobId: the tool scans the logs for rate-limit 403s and App-token mint failures and returns a verdict ' +
+      'on which bucket was hit. Never re-run immediately.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Failing run to scan'),
+      jobId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Failing job to scan'),
     },
+    async (params) => installationRateLimit(params),
   );
 
   server.tool(

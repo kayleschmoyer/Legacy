@@ -879,6 +879,7 @@ describe('getInstallationRateLimit (LS-9570)', () => {
     const result = await getInstallationRateLimit();
 
     expect(result).toEqual({
+      appId: '3158619',
       limit: 5000,
       remaining: 12,
       resetsAt: new Date(resetEpoch * 1000).toISOString(),

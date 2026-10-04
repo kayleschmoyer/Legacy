@@ -191,8 +191,8 @@ All three **look like a verdict was reached and something else went wrong** — 
 
 **Confirm and remedy:**
 
-1. Call `ci_installation_rate_limit` (not `gh api rate_limit` — that reports a different token's bucket and will misleadingly show plenty of headroom; see [mcp-first § Installation rate limit vs. `gh api rate_limit`](../../mcp-first/references/auth-and-routing.md#installation-vs-user-rate-limit-ls-9570)). A low/zero `remaining` confirms this failure mode.
-2. Wait until the returned `resetsAt`.
+1. Call `ci_installation_rate_limit({ runId })` with the failing run (not `gh api rate_limit` — that reports the CLI's own token). Read its `verdict`, not just `remaining`: most workflow steps use `github.token`, whose per-repo budget is separate from the Agent Author bucket the tool measures, so a healthy `remaining` alongside `verdict: "workflow-bucket-separate"` still confirms this failure mode (LS-10491). See [mcp-first § Installation rate limit vs. `gh api rate_limit`](../../mcp-first/references/auth-and-routing.md#installation-vs-user-rate-limit-ls-9570).
+2. Wait until the reset — `rateLimit.resetsAt` for `agent-author-bucket-low`; for `workflow-bucket-separate`, the `x-ratelimit-reset`/`retry-after` in the run's log, or else the rolling hour.
 3. Re-run only the reporting/summarize job that failed to post (`ci_rerun`/`github_retrigger_check` as appropriate) — do not push a new commit or otherwise widen the PR to "fix" it.
 
 Since LS-10322, `ci-gate.js` waits (up to 5 min) for the `retry-after`/`x-ratelimit-reset` window before its final status post, and if the `CI Gate` post still fails the Summarize job **fails** ("Fail when CI Gate verdict was lost") instead of reporting green — a red Summarize job with a seeded `pending` gate is this failure mode, not a code failure.
