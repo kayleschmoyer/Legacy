@@ -3,7 +3,12 @@ import {
   getAllGameFieldingStats as scrapeAllGameFieldingStats,
   getAllGamePitchingStats as scrapeAllGamePitchingStats,
 } from '@legacy-sports/bref-client';
-import type { Player } from '@legacy-sports/db-client';
+import type {
+  GameBatting,
+  GameFielding,
+  GamePitching,
+  Player,
+} from '@legacy-sports/db-client';
 
 import {
   getAllGameBattingStats,
@@ -126,5 +131,59 @@ describe('game-stats provider', () => {
     mockGetSeasonPayload.mockResolvedValue(null);
     await getAllGameBattingStats(player, 2024);
     expect(mockScrapeBatting).toHaveBeenCalledWith(player, 2024);
+  });
+
+  // LS-10395: BBRef serves another year's game log when the requested year
+  // has none, and the scraper stamps those rows with the requested season.
+  describe('rows whose game_identifier year is not the requested season', () => {
+    const dalyGame = {
+      season: 1890,
+      gameNum: 1,
+      gameIdentifier: 'BLN189809290',
+    };
+
+    beforeEach(() => {
+      mockGetSeasonPayload.mockResolvedValue(null);
+    });
+
+    it('drops scraped batting rows from another year', async () => {
+      mockScrapeBatting.mockResolvedValue([dalyGame as GameBatting]);
+      expect(await getAllGameBattingStats(player, 1890)).toEqual([]);
+    });
+
+    it('drops scraped pitching rows from another year', async () => {
+      mockScrapePitching.mockResolvedValue([dalyGame as GamePitching]);
+      expect(await getAllGamePitchingStats(player, 1890)).toEqual([]);
+    });
+
+    it('drops scraped fielding rows from another year', async () => {
+      mockScrapeFielding.mockResolvedValue([dalyGame as GameFielding]);
+      expect(await getAllGameFieldingStats(player, 1890, 'C')).toEqual([]);
+    });
+
+    it('drops payload rows from another year', async () => {
+      mockGetSeasonPayload.mockResolvedValue(
+        payload({
+          batting: [{ ...battingRow, gameIdentifier: 'LAN202503270' }],
+        }),
+      );
+      expect(await getAllGameBattingStats(player, 2024)).toEqual([]);
+    });
+
+    it('keeps the in-season rows of a mixed page', async () => {
+      const inSeason = { ...dalyGame, gameIdentifier: 'BLN189004190' };
+      mockScrapeBatting.mockResolvedValue([
+        dalyGame,
+        inSeason,
+      ] as GameBatting[]);
+      expect(await getAllGameBattingStats(player, 1890)).toEqual([inSeason]);
+    });
+
+    it('drops rows whose game_identifier cannot be parsed', async () => {
+      mockScrapeBatting.mockResolvedValue([
+        { ...dalyGame, gameIdentifier: '' },
+      ] as GameBatting[]);
+      expect(await getAllGameBattingStats(player, 1890)).toEqual([]);
+    });
   });
 });

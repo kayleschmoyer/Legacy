@@ -33,6 +33,44 @@ import { getSeasonPayload } from './s3-store';
  * permanent rather than a migration shim.
  */
 
+// Retrosheet and Baseball Reference share the `TTTYYYYMMDDG` game id format.
+const GAME_IDENTIFIER_YEAR = /^\w{3}(\d{4})\d{4}\d$/;
+
+/**
+ * Drop rows whose game_identifier year is not the requested season (LS-10395).
+ *
+ * The scraper stamps every row with the season it ASKED for, but takes the
+ * game_identifier from the page Baseball Reference actually SERVED. When BBRef
+ * has no game log for the requested year it serves another year's log
+ * instead, so rows for (say) 1898 games got cached under seasons 1884-1897.
+ * Those rows are then picked as that season's games in matchups. Filtering
+ * here covers both sources and both call sites (stats Lambda and CLI). A row
+ * whose id cannot be parsed is dropped too, since its season cannot be
+ * verified.
+ */
+function dropWrongSeasonRows<T extends { gameIdentifier: string }>(
+  rows: T[],
+  player: Player,
+  season: number,
+  statType: 'batting' | 'pitching' | 'fielding',
+): T[] {
+  const kept: T[] = [];
+  const dropped: string[] = [];
+  for (const row of rows) {
+    if (GAME_IDENTIFIER_YEAR.exec(row.gameIdentifier)?.[1] === String(season)) {
+      kept.push(row);
+    } else {
+      dropped.push(row.gameIdentifier);
+    }
+  }
+  if (dropped.length > 0) {
+    LOGGER.warn(
+      `Dropped ${dropped.length} of ${rows.length} ${statType} rows for ${player.brefId} ${season} whose game_identifier is not from ${season}. Samples: ${dropped.slice(0, 3).join(', ')}`,
+    );
+  }
+  return kept;
+}
+
 async function loadPayload(player: Player, season: number) {
   if (!player.brefId) {
     return null;
@@ -59,10 +97,11 @@ export async function getAllGameBattingStats(
   season: number,
 ): Promise<GameBatting[]> {
   const payload = await loadPayload(player, season);
-  if (payload === null) {
-    return scrapeAllGameBattingStats(player, season);
-  }
-  return payload.batting.map((row) => ({ ...row, playerId: player.id }));
+  const rows =
+    payload === null
+      ? await scrapeAllGameBattingStats(player, season)
+      : payload.batting.map((row) => ({ ...row, playerId: player.id }));
+  return dropWrongSeasonRows(rows, player, season, 'batting');
 }
 
 export async function getAllGamePitchingStats(
@@ -70,15 +109,16 @@ export async function getAllGamePitchingStats(
   season: number,
 ): Promise<GamePitching[]> {
   const payload = await loadPayload(player, season);
-  if (payload === null) {
-    return scrapeAllGamePitchingStats(player, season);
-  }
   // `outsRecorded` is intentionally absent: Postgres GENERATES it from `ip`,
   // so including it in an INSERT is rejected. The cast mirrors how the
   // scraper's `parseRow` builds these rows.
-  return payload.pitching.map(
-    (row) => ({ ...row, playerId: player.id }) as GamePitching,
-  );
+  const rows =
+    payload === null
+      ? await scrapeAllGamePitchingStats(player, season)
+      : payload.pitching.map(
+          (row) => ({ ...row, playerId: player.id }) as GamePitching,
+        );
+  return dropWrongSeasonRows(rows, player, season, 'pitching');
 }
 
 export async function getAllGameFieldingStats(
@@ -90,7 +130,12 @@ export async function getAllGameFieldingStats(
   if (payload === null) {
     // Preserve the scraper's existing contract exactly, including its
     // return-empty-when-position-is-missing behaviour.
-    return scrapeAllGameFieldingStats(player, season, pos);
+    return dropWrongSeasonRows(
+      await scrapeAllGameFieldingStats(player, season, pos),
+      player,
+      season,
+      'fielding',
+    );
   }
 
   // The `pos` argument is intentionally unused on this path. The scraper needs
@@ -105,5 +150,10 @@ export async function getAllGameFieldingStats(
       `Serving fielding for ${player.brefId} ${season} from Retrosheet despite absent position (scraper would have returned [])`,
     );
   }
-  return payload.fielding.map((row) => ({ ...row, playerId: player.id }));
+  return dropWrongSeasonRows(
+    payload.fielding.map((row) => ({ ...row, playerId: player.id })),
+    player,
+    season,
+    'fielding',
+  );
 }
