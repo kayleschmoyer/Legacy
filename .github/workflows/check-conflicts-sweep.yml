@@ -148,14 +148,21 @@ jobs:
             echo "PR #${PR_NUM}: ${CONCLUSION}"
 
             # Compare against the recorded "No Merge Conflicts" commit-status
-            # state on the head SHA. The combined-status endpoint already
-            # returns the latest status per context, so no id/timestamp
-            # comparison is needed (unlike the check-run world this replaced).
+            # state on the head SHA: the newest status for the context, so no
+            # id/timestamp comparison is needed (unlike the check-run world
+            # this replaced).
             # An API failure or absent status yields an empty string, which
             # falls through to the refresh path — fail open toward
             # re-checking, never toward stale.
-            RECORDED_STATE=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/status" \
-              --jq '.statuses[] | select(.context == "No Merge Conflicts") | .state' \
+            #
+            # LS-10561: a status posted by any app other than github-actions[bot]
+            # (e.g. the Legacy Sports CI app, between LS-10559 and LS-10561) is
+            # rejected at merge time by branch protection's app binding, so treat
+            # it as absent and re-post it through STATUS_TOKEN (GITHUB_TOKEN).
+            # The list endpoint (newest first) is used instead of the combined
+            # /status endpoint because only it carries `creator`.
+            RECORDED_STATE=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/statuses?per_page=100" \
+              --jq '[.[] | select(.context == "No Merge Conflicts")][0] | select(. != null and .creator.login == "github-actions[bot]") | .state' \
               2>/dev/null || true)
             if [ -n "$RECORDED_STATE" ]; then
               RECORDED_STATUS="completed"

@@ -156,41 +156,6 @@ jobs:
         with:
           client-id: 3158619
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
-      # LS-10559: RUNNER_GITHUB_APP_KEY_BASE64 holds a base64-encoded PKCS#8
-      # PEM (see scripts/rotate-runner-secrets.sh; Terraform decodes it for the
-      # runner module). create-github-app-token needs the raw PEM — passing the
-      # base64 straight through failed every run with "Invalid keyData". Decode
-      # it here and mask every line before it reaches the step input below. An
-      # empty secret (fork PRs) or an undecodable value leaves the output empty,
-      # so the mint fails and the existing GITHUB_TOKEN fallback still applies.
-      - name: "Decode CI App Key"
-        id: ci-app-key
-        continue-on-error: true
-        shell: bash
-        env:
-          KEY_BASE64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
-        run: |
-          [ -n "$KEY_BASE64" ] || exit 0
-          key="$(printf '%s' "$KEY_BASE64" | base64 -d)"
-          while IFS= read -r line; do
-            if [ -n "$line" ]; then echo "::add-mask::$line"; fi
-          done <<< "$key"
-          delim="PRIVATE_KEY_EOF_$RANDOM$RANDOM"
-          { echo "private-key<<$delim"; printf '%s\n' "$key"; echo "$delim"; } >> "$GITHUB_OUTPUT"
-
-      # LS-9775: separate token for the commit-status post below. Agent Author
-      # (above) does not hold "Commit statuses: write" (confirmed via
-      # LS-9571). Legacy Sports CI does — mint it here, alongside the plain
-      # GITHUB_TOKEN this job already relies on, so the status post draws
-      # from a separate installation budget instead of the one shared across
-      # every concurrently-running workflow in the repo.
-      - name: Generate CI App Token
-        id: ci-app-token
-        continue-on-error: true
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
-        with:
-          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
-          private-key: ${{ steps.ci-app-key.outputs.private-key }}
       - name: Resolve PR info
         id: pr-info
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -285,14 +250,14 @@ jobs:
         env:
           MERGEABLE: ${{ steps.test-merge.outputs.mergeable }}
         with:
-          # LS-9775: prefer the Legacy Sports CI app token (separate
-          # installation budget, proven Commit statuses: write) over the
-          # default GITHUB_TOKEN, whose REST quota is shared across every
-          # concurrently-running workflow in the repo — the same class of
-          # risk that caused LS-9571. Falls back to GITHUB_TOKEN (this
-          # workflow's own `statuses: write` permission grant covers it) if
-          # minting fails, e.g. on a fork PR where secrets aren't available.
-          github-token: ${{ steps.ci-app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          # LS-10561: post with GITHUB_TOKEN (github-actions[bot]), NOT the
+          # Legacy Sports CI app. Branch protection on main binds this required
+          # context to the github-actions app; a status from any other app is
+          # rejected at merge time with 405 "Required status check ... was not
+          # set by the expected GitHub app" — which froze the merge queue for
+          # every PR after LS-10559 made the CI app token mint succeed.
+          # check-conflicts-sweep.yml re-posts any status left by another app.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const mergeable = process.env.MERGEABLE === 'true';
