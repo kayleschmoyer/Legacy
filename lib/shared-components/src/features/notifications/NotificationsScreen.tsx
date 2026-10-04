@@ -202,7 +202,7 @@ export function NotificationsScreen({
           No notifications yet
         </H2>
         <Text color="$gray11" textAlign="center">
-          When something happens in your leagues, you{"'"} ll see it here.
+          When something happens in your leagues, you&apos;ll see it here.
         </Text>
       </YStack>
     );

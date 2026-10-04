@@ -50,9 +50,10 @@ export class NotificationsPage extends BaseScreen {
   // The page `<h1>` — rendered in every state (populated / empty / error), so
   // it is the stable readiness gate for the route.
   readonly #pageHeading: UIElement;
-  // Empty-state `<h2>` + its "all caught up" subtitle copy.
+  // Empty-state `<h2>` + its "all caught up" subtitle and body copy.
   readonly #emptyHeading: UIElement;
   readonly #caughtUpSubtitle: UIElement;
+  readonly #emptyBody: UIElement;
   // Error-state `<h2>` + its retry button.
   readonly #errorHeading: UIElement;
   readonly #retryButton: UIElement;
@@ -84,6 +85,10 @@ export class NotificationsPage extends BaseScreen {
       name: 'No notifications yet',
     });
     this.#caughtUpSubtitle = driver.byText('You’re all caught up');
+    // Exact copy guards the LS-10426 "you' ll" stray-space regression.
+    this.#emptyBody = driver.byText(
+      "When something happens in your leagues, you'll see it here.",
+    );
     this.#errorHeading = driver.byRole('heading', {
       level: 2,
       name: 'Unable to load your notifications',
@@ -154,12 +159,13 @@ export class NotificationsPage extends BaseScreen {
   }
 
   /**
-   * Assert the empty state: the "No notifications yet" heading and the
-   * "all caught up" subtitle copy.
+   * Assert the empty state: the "No notifications yet" heading, the
+   * "all caught up" subtitle copy, and the body copy.
    */
   async expectEmptyState(): Promise<void> {
     await this.#emptyHeading.expectVisible();
     await this.#caughtUpSubtitle.expectVisible();
+    await this.#emptyBody.expectVisible();
   }
 
   /**
