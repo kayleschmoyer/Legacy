@@ -382,7 +382,7 @@ unauthTest.describe(
   'New user onboarding flow with auth redirect @regression',
   () => {
     unauthTest(
-      'first login redirects to home and auto-triggers onboarding; completing it dismisses the tutorial and stays on home (LS-2098)',
+      'first login redirects to home and auto-triggers onboarding; completing it dismisses the tutorial and routes to league creation (LS-2098, LS-6908)',
       async ({ page }) => {
         await mockGoogleLogin(page, 501);
 
@@ -405,12 +405,14 @@ unauthTest.describe(
 
         await completeTutorial(page);
 
-        // Completion dismisses the tutorial and leaves the user on home —
-        // no further redirect away from "/".
+        // "Get Started" dismisses the tutorial and, because this user has no
+        // leagues, routes straight to league creation (LS-6908).
         await expect(page.getByRole('dialog')).not.toBeVisible({
           timeout: 10000,
         });
-        await expect(page).toHaveURL('/');
+        await expect(page).toHaveURL(/\/baseball\/league\/create/, {
+          timeout: 10000,
+        });
 
         // Completion status persisted so the tutorial does not reopen.
         const completed = await page.evaluate(() =>

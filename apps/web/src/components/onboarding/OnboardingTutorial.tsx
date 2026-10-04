@@ -33,6 +33,12 @@ import {
 interface OnboardingTutorialProps {
   /** Called when the user completes or explicitly skips the tutorial */
   onClose: () => void;
+  /**
+   * Called instead of `onClose` when the user finishes the tutorial via the
+   * final "Get Started" button (LS-6908). Skip, Escape and backdrop dismissals
+   * still call `onClose`. Falls back to `onClose` when omitted.
+   */
+  onGetStarted?: () => void;
   /** Step index to open on (e.g. restored after a reload). Clamped to range. */
   initialStep?: number;
   /** Called with the new step index whenever the user navigates */
@@ -649,6 +655,7 @@ function useModalDialogFocus(
  */
 export function OnboardingTutorial({
   onClose,
+  onGetStarted,
   initialStep = 0,
   onStepChange,
 }: OnboardingTutorialProps) {
@@ -685,15 +692,21 @@ export function OnboardingTutorial({
     trackOnboardingStepViewed(step.id, currentStep);
   }, [step.id, currentStep]);
 
-  const finish = (method: OnboardingSkipMethod | 'completed') => {
+  const finish = (
+    method: OnboardingSkipMethod | 'completed',
+    done: () => void = onClose,
+  ) => {
     if (!closedRef.current) {
       closedRef.current = true;
       if (method === 'completed') trackOnboardingCompleted();
       else trackOnboardingSkipped(stepRef.current, method);
     }
-    onClose();
+    done();
   };
   const complete = () => finish('completed');
+  // The final "Get Started" button hands off to `onGetStarted` (LS-6908) so
+  // the host can route onward; it still counts as a completed run.
+  const getStarted = () => finish('completed', onGetStarted ?? onClose);
 
   useModalDialogFocus(backdropRef, () => finish('escape'));
   const bodyContent =
@@ -703,7 +716,7 @@ export function OnboardingTutorial({
 
   const handleNext = () => {
     if (isLast) {
-      complete();
+      getStarted();
     } else {
       setCurrentStep(currentStep + 1);
     }

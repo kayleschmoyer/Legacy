@@ -173,6 +173,63 @@ describe('OnboardingTutorial — modal focus management (LS-6902)', () => {
   });
 });
 
+describe('OnboardingTutorial — Get Started routing (LS-6908)', () => {
+  function advanceToLastStep() {
+    // The final step swaps "Next →" for "🚀 Get Started".
+    while (screen.queryByText('🚀 Get Started') === null) {
+      fireEvent.click(screen.getByText('Next →'));
+    }
+  }
+
+  it('calls onGetStarted, not onClose, from the final Get Started button', () => {
+    const onClose = jest.fn();
+    const onGetStarted = jest.fn();
+    render(
+      <OnboardingTutorial onClose={onClose} onGetStarted={onGetStarted} />,
+    );
+
+    advanceToLastStep();
+    fireEvent.click(screen.getByText('🚀 Get Started'));
+
+    expect(onGetStarted).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still emits a single completed event when Get Started hands off to onGetStarted', () => {
+    jest.clearAllMocks();
+    render(<OnboardingTutorial onClose={jest.fn()} onGetStarted={jest.fn()} />);
+
+    advanceToLastStep();
+    fireEvent.click(screen.getByText('🚀 Get Started'));
+
+    expect(analytics.trackOnboardingCompleted).toHaveBeenCalledTimes(1);
+    expect(analytics.trackOnboardingSkipped).not.toHaveBeenCalled();
+  });
+
+  it('falls back to onClose on Get Started when onGetStarted is omitted', () => {
+    const onClose = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} />);
+
+    advanceToLastStep();
+    fireEvent.click(screen.getByText('🚀 Get Started'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onClose, not onGetStarted, when the tutorial is skipped', () => {
+    const onClose = jest.fn();
+    const onGetStarted = jest.fn();
+    render(
+      <OnboardingTutorial onClose={onClose} onGetStarted={onGetStarted} />,
+    );
+
+    fireEvent.click(screen.getByText('Skip'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onGetStarted).not.toHaveBeenCalled();
+  });
+});
+
 describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
   beforeEach(() => jest.clearAllMocks());
 

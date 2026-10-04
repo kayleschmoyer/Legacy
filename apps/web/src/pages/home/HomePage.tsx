@@ -242,6 +242,15 @@ export function HomePage(): React.JSX.Element {
     }
   };
 
+  // "Get Started" on the final step sends a user with no leagues straight to
+  // league creation (LS-6908). Skip / Escape / backdrop still call
+  // handleTutorialClose and leave them on Home, whose empty state carries the
+  // create-league CTA. A user re-launching the tutorial with leagues stays put.
+  const handleTutorialGetStarted = () => {
+    handleTutorialClose();
+    if (!hasLeagues) navigate(CREATE_BASEBALL_LEAGUE_ROUTE);
+  };
+
   const handleTutorialStepChange = (step: number) => {
     if (!userId) return;
     try {
@@ -292,6 +301,7 @@ export function HomePage(): React.JSX.Element {
       {tutorialOpen && (
         <OnboardingTutorial
           onClose={handleTutorialClose}
+          onGetStarted={handleTutorialGetStarted}
           initialStep={tutorialInitialStep}
           onStepChange={handleTutorialStepChange}
         />
