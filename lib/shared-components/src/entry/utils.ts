@@ -10,6 +10,7 @@ export * from '../utils/PositionModels';
 export * from '../utils/styles';
 export * from '../utils/scoreFormatting';
 export * from '../utils/lastVisitedLeague';
+export * from '../features/onboarding';
 export * from '../utils/playerFormatting';
 export * from '../utils/draftStatus';
 export * from '../utils/colors';

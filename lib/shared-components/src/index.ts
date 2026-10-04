@@ -88,6 +88,9 @@ export * from './features/minigames-hub';
 // 20 Questions Minigame
 export * from './features/twenty-questions';
 
+// Onboarding content + completion helpers
+export * from './features/onboarding';
+
 // Player components
 export * from './features/players';
 

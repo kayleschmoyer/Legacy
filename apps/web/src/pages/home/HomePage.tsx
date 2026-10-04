@@ -27,10 +27,12 @@ import {
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import {
-  getOnboardingStepKey,
+  getOnboardingKey,
   migrateLegacyOnboardingFlag,
-  readOnboardingStep,
-} from './onboardingStorage';
+  parseOnboardingComplete,
+  serializeOnboardingComplete,
+} from '@legacy-sports/shared-components/utils';
+import { getOnboardingStepKey, readOnboardingStep } from './onboardingStorage';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
@@ -197,17 +199,15 @@ export function HomePage(): React.JSX.Element {
   const userName = formatDisplayName(auth?.user?.username || 'Manager');
 
   /* ── Onboarding tutorial: show once for new users with no leagues ── */
-  const getOnboardingKey = (uid: number) => `ls_onboarding_complete_${uid}`;
-
   useEffect(() => {
     if (!userId) return;
     if (!hasLeagues && !summariesLoading) {
       const key = getOnboardingKey(userId);
       try {
         if (migrateLegacyOnboardingFlag(window.localStorage, key)) return;
-        const stored = window.localStorage.getItem(key);
-        const completed =
-          stored !== null ? (JSON.parse(stored) as boolean) : false;
+        const completed = parseOnboardingComplete(
+          window.localStorage.getItem(key),
+        );
         if (!completed) {
           setTutorialInitialStep(
             readOnboardingStep(
@@ -233,7 +233,7 @@ export function HomePage(): React.JSX.Element {
       try {
         window.localStorage.setItem(
           getOnboardingKey(userId),
-          JSON.stringify(true),
+          serializeOnboardingComplete(true),
         );
         window.localStorage.removeItem(getOnboardingStepKey(userId));
       } catch (caught) {

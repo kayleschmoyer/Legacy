@@ -1,4 +1,14 @@
-export const LEGACY_ONBOARDING_KEY = 'ls_onboarding_complete';
+/**
+ * Web wrapper for the onboarding persistence helpers. The completion key,
+ * serialization, and legacy-flag migration live in
+ * `@legacy-sports/shared-components` (LS-10379); this module re-exports them
+ * so existing import paths stay stable, and owns the web-only step-resume
+ * helpers.
+ */
+export {
+  LEGACY_ONBOARDING_KEY,
+  migrateLegacyOnboardingFlag,
+} from '@legacy-sports/shared-components/utils';
 
 export const getOnboardingStepKey = (uid: number) =>
   `ls_onboarding_step_${uid}`;
@@ -16,32 +26,4 @@ export function readOnboardingStep(
   if (raw === null) return 0;
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-/**
- * Migrates the legacy global onboarding flag to the per-user key.
- *
- * Returns true when the legacy flag marks onboarding as complete. A legacy
- * value that is present but unparseable still counts as complete: the old
- * code only ever wrote the key on completion, so its presence is the signal.
- * Storage access errors propagate to the caller.
- */
-export function migrateLegacyOnboardingFlag(
-  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
-  userKey: string,
-): boolean {
-  const legacyRaw = storage.getItem(LEGACY_ONBOARDING_KEY);
-  if (legacyRaw === null) return false;
-
-  let legacyDone: boolean;
-  try {
-    legacyDone = Boolean(JSON.parse(legacyRaw));
-  } catch {
-    legacyDone = true;
-  }
-  if (!legacyDone) return false;
-
-  storage.setItem(userKey, JSON.stringify(true));
-  storage.removeItem(LEGACY_ONBOARDING_KEY);
-  return true;
 }
