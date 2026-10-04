@@ -18,6 +18,8 @@ export interface NotificationListProps {
   notifications: NotificationHistoryItem[];
   onNotificationPress?: (notification: NotificationHistoryItem) => void;
   onMarkAsRead?: (notificationId: number) => Promise<void>;
+  /** Extra controls under a card, e.g. Accept/Decline on an invite (LS-10078). */
+  renderActions?: (notification: NotificationHistoryItem) => React.ReactNode;
 }
 
 function formatTimeAgo(timestamp: string): string {
@@ -62,10 +64,12 @@ function NotificationCard({
   item,
   onNotificationPress,
   onMarkAsRead,
+  renderActions,
 }: {
   item: NotificationHistoryItem;
   onNotificationPress?: (notification: NotificationHistoryItem) => void;
   onMarkAsRead?: (notificationId: number) => Promise<void>;
+  renderActions?: (notification: NotificationHistoryItem) => React.ReactNode;
 }) {
   return (
     <Card
@@ -104,6 +108,8 @@ function NotificationCard({
           )}
         </XStack>
 
+        {renderActions?.(item)}
+
         <XStack justifyContent="space-between" alignItems="center">
           <Text fontSize="$2" color="$gray10">
             {item.sentAt ? formatTimeAgo(item.sentAt) : 'Unknown time'}
@@ -139,6 +145,7 @@ export function NotificationList({
   notifications,
   onNotificationPress,
   onMarkAsRead,
+  renderActions,
 }: NotificationListProps) {
   const dayGroups = groupNotificationsByDay(notifications);
 
@@ -153,6 +160,7 @@ export function NotificationList({
               item={item}
               onNotificationPress={onNotificationPress}
               onMarkAsRead={onMarkAsRead}
+              renderActions={renderActions}
             />
           ))}
         </React.Fragment>

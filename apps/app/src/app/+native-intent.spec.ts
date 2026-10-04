@@ -215,6 +215,34 @@ describe('redirectSystemPath', () => {
     ).toBe('/legacy-subscription/success');
   });
 
+  describe('invite links (LS-10078)', () => {
+    it('passes the universal /join/<code> route through unchanged', () => {
+      expect(
+        redirectSystemPath({ path: '/join/ABCD2345', initial: true }),
+      ).toBe('/join/ABCD2345');
+    });
+
+    it.each([
+      ['/baseball/league/join/ABCD2345', '/join/ABCD2345'],
+      ['/football/league/join/ABCD2345/', '/join/ABCD2345'],
+      [
+        '/baseball/league/join/ABCD2345?src=share&platform=ios',
+        '/join/ABCD2345',
+      ],
+      ['/baseball/mock-draft/join/MOCK2345', '/join/MOCK2345'],
+      ['/baseball/mock-draft/join', '/join'],
+      ['baseball/mock-draft/join/MOCK2345', '/join/MOCK2345'],
+    ])('rewrites the legacy invite link %s to %s', (path, expected) => {
+      expect(redirectSystemPath({ path, initial: true })).toBe(expected);
+    });
+
+    it('leaves the bare league join page (public leagues) alone', () => {
+      expect(
+        redirectSystemPath({ path: '/baseball/league/join', initial: true }),
+      ).toBe('/baseball/league/join');
+    });
+  });
+
   it('returns the original path and logs when rewriting throws', () => {
     // A malformed percent-encoding makes decodeURIComponent throw, exercising
     // the try/catch fallback: the original path is returned and the error logged.

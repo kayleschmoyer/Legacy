@@ -1099,6 +1099,16 @@ type DraftRoom {
   The owning league, or null for a mock draft (LS-10076). The league draft route loads the league itself through GetLeagueById; the draft room deliberately carries only the id, so the board renders from one league-independent shape.
   """
   leagueId: Int
+
+  """
+  Seats a public joiner or invite-code holder can still take: open seats minus those pending invitations reserve (LS-10078). 0 for a league draft.
+  """
+  openSeatCount: Int
+
+  """
+  Slots held for a pending direct invitation (LS-10078) — the lobby shows them as reserved rather than open.
+  """
+  reservedSlots: [Int!]
   rules: DraftRulesInfo
   seats: [DraftSeat!]
   sport: String
@@ -1933,6 +1943,35 @@ type ImpersonateUserResult {
   token: String
 }
 
+"""
+A direct invite to a mock draft or a league (LS-10078). A pending mock invite holds `reservedSlot` so no public joiner can take it.
+"""
+type Invitation {
+  createdAt: String
+  draftId: Int
+  expiresAt: String
+  id: Int
+  invitedById: Int
+  invitedByUsername: String
+  invitedUserId: Int
+  invitedUsername: String
+  kind: InviteTargetKind
+  leagueId: Int
+  reservedSlot: Int
+  sport: Sport
+  status: InviteStatus
+  targetName: String
+}
+
+"""
+A page of invites, newest first. Pass `endCursor` back as `after` for the next page.
+"""
+type InvitationConnection {
+  endCursor: String
+  hasNextPage: Boolean
+  nodes: [Invitation!]
+}
+
 type InviteCodeInfo {
   availableSpots: Int
   isAlreadyMember: Boolean
@@ -1940,6 +1979,24 @@ type InviteCodeInfo {
   leagueId: Int
   leagueName: String
   totalSpots: Int
+}
+
+"""
+What an invite code points at (LS-10078): a mock-draft lobby or a league.
+"""
+union InvitePreview = LeagueInvitePreview | MockDraftInvitePreview
+
+enum InviteStatus {
+  accepted
+  declined
+  expired
+  pending
+  revoked
+}
+
+enum InviteTargetKind {
+  league
+  mock
 }
 
 type JoinLeaguePayload {
@@ -2251,6 +2308,17 @@ type LeagueDuesSettings {
   reminderDayOfWeek: Int
   reminderEnabled: Boolean
   updatedAt: String
+}
+
+type LeagueInvitePreview {
+  code: String
+  draftScheduledAt: String
+  isAlreadyMember: Boolean
+  leagueId: Int
+  name: String
+  openTeams: Int
+  sport: Sport
+  totalTeams: Int
 }
 
 """
@@ -2704,6 +2772,30 @@ type MinigamesStats {
   Total number of distinct players tracked
   """
   playersTracked: Int
+}
+
+type MockDraftInvitePreview {
+  code: String
+  draftId: Int
+  filledSeats: Int
+  hostUsername: String
+  isAlreadySeated: Boolean
+
+  """
+  Online, not started, unexpired, and at least one open seat.
+  """
+  isJoinable: Boolean
+  lobbyExpiresAt: String
+
+  """
+  Open seats minus pending invite reservations.
+  """
+  openSeats: Int
+  pickTimeLimitSeconds: Int
+  playerPool: String
+  rounds: Int
+  sport: Sport
+  totalSeats: Int
 }
 
 """
@@ -3294,6 +3386,19 @@ type Mutation {
   respondDraftSlotTrade(accept: Boolean!, tradeId: Int!): DraftSlotTrade
 
   """
+  Accept or decline a direct invite (invitee only). Accepting a mock invite takes its reserved seat; accepting a league invite joins the league, subject to the active-league cap (LS-10078). Fails with a clear message once the invite is revoked or has expired.
+  """
+  respondToInvite(
+    accept: Boolean!
+    inviteId: Int!
+
+    """
+    Defaults to "<username>'s Team".
+    """
+    teamName: String
+  ): Invitation
+
+  """
   Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions.
   """
   restoreApplePurchases(
@@ -3323,6 +3428,11 @@ type Mutation {
   Revoke a previously granted consent
   """
   revokeConsent(consentType: ConsentType!): UserConsent
+
+  """
+  Withdraw a pending invite (the mock draft host or the league commissioner). A mock invite releases its reserved seat (LS-10078).
+  """
+  revokeInvite(inviteId: Int!): Invitation
   sendDirectMessage(
     leagueId: Int
     messageText: String!
@@ -3343,6 +3453,11 @@ type Mutation {
   Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement.
   """
   sendDiscordWeeklyRecaps(leagueId: Int): SendDiscordWeeklyRecapsResult
+
+  """
+  Invite a user by username to a mock draft (host only — reserves a seat) or a league (commissioner only). Exactly one of draftId / leagueId. Notifies the invitee in-app and by push (LS-10078).
+  """
+  sendDraftInvite(draftId: Int, leagueId: Int, username: String!): Invitation
 
   """
   Post a message to a mock draft's chat. Seat holders only.
@@ -4546,6 +4661,19 @@ type Query {
   List the authenticated user's linked authentication provider identities.
   """
   myIdentities: [UserIdentity!]!
+
+  """
+  The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these.
+  """
+  myInvites(
+    after: String
+    first: Int
+
+    """
+    'mock' or 'league' to filter; both when omitted.
+    """
+    kind: String
+  ): InvitationConnection
   myLeagues(sport: Sport): [League!]!
 
   """
@@ -4602,6 +4730,11 @@ type Query {
     """
     month: Int!
   ): [OnThisDayEvent!]
+
+  """
+  A mock draft's or league's pending invites, for the host's / commissioner's invite panel (LS-10078). Exactly one of draftId / leagueId.
+  """
+  pendingInvites(draftId: Int, leagueId: Int): [Invitation!]
   player(id: Int!): Player
   playerByBrefId(brefId: String!): Player
 
@@ -4676,6 +4809,11 @@ type Query {
     search: String
     sport: Sport
   ): [PublicLeagueInfo!]!
+
+  """
+  Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data.
+  """
+  resolveInviteCode(code: String!): InvitePreview
 
   """
   Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev).

@@ -713,6 +713,7 @@
       "apps/web/src/components/MockDraftBoard.tsx",
       "lib/shared-components/src/features/elite-draft/**",
       "lib/shared-components/src/features/draft/**",
+      "lib/shared-components/src/features/invites/**",
       "apps/web/src/components/EliteDraftBoard.tsx",
       "lambdas/draft-processor/**",
       "apps/web/src/components/**",
@@ -1086,6 +1087,7 @@
     ],
     "apps/web-e2e/src/tests/commissioner-league-settings.spec.ts": [
       "apps/web/src/pages/management/**",
+      "lib/shared-components/src/features/invites/**",
       "apps/web/src/features/commissioner/**",
       "apps/web/src/features/management/**",
       "apps/web/src/components/commissioner/**",
@@ -5868,27 +5870,6 @@
       "lib/shared-components/src/features/auth/**",
       "lib/shared-components/src/features/auth/hooks/**",
       "lib/shared-components/src/features/auth/services/**"
-    ],
-    "apps/web-e2e/src/tests/mock-draft-join-link.spec.ts": [
-      "apps/web/src/app/app.tsx",
-      "apps/web/src/pages/draft/**",
-      "lib/shared-components/src/features/draft/**",
-      "apps/web/src/components/**",
-      "apps/web/src/config/**",
-      "apps/web/src/constants/**",
-      "apps/web/src/hooks/**",
-      "apps/web/src/pages/login/**",
-      "apps/web/src/store/**",
-      "apps/web/src/utils/**",
-      "lib/app-config/src/lib/**",
-      "lib/design-tokens/src/lib/**",
-      "lib/env-utilities/src/lib/**",
-      "lib/graphql/src/**",
-      "lib/logging/src/**",
-      "lib/rollbar/src/**",
-      "lib/tamagui-config/src/lib/**",
-      "lib/utils/src/lib/**",
-      "lib/shared-components/src/features/auth/**"
     ],
     "apps/web-e2e/src/tests/mock-draft-simulator.spec.ts": [
       "apps/web/src/pages/draft/**",
@@ -11087,6 +11068,31 @@
       "lib/shared-components/src/features/players/services/**",
       "lib/shared-components/src/features/players/shell/**",
       "lib/shared-components/src/features/stats/**"
+    ],
+    "apps/web-e2e/src/tests/draft-invites.spec.ts": [
+      "apps/web/src/app/app.tsx",
+      "apps/web/src/main.tsx",
+      "apps/web/src/pages/join/**",
+      "apps/web/src/pages/notifications/**",
+      "lib/shared-components/src/features/invites/**",
+      "lib/shared-components/src/features/notifications/**",
+      "lib/graphql/src/invites.graphql",
+      "apps/web/src/components/**",
+      "apps/web/src/config/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/graphql/src/**",
+      "lib/logging/src/**",
+      "lib/rollbar/src/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/utils/src/lib/**",
+      "lib/shared-components/src/features/auth/**"
     ]
   }
 }

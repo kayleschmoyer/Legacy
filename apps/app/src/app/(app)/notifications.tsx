@@ -62,6 +62,17 @@ export default function NotificationsScreen(): React.JSX.Element {
             },
           })
         }
+        onNavigateToInviteTarget={(target) => {
+          // An accepted invite (LS-10078) lands in the mock draft or league.
+          if (target.kind === 'mock') {
+            router.push({
+              pathname: '/mock-draft/[draftId]',
+              params: { draftId: String(target.draftId) },
+            });
+          } else {
+            router.push(`/${target.sport}/league/${String(target.leagueId)}`);
+          }
+        }}
       />
     </View>
   );

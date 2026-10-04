@@ -19,6 +19,7 @@ import {
   SeasonAwardsControl,
   WaiverProcessControl,
 } from '@legacy-sports/shared-components/commissioner';
+import { DraftInvitePanel } from '@legacy-sports/shared-components/draft';
 import { Sport } from '@legacy-sports/graphql';
 import type { AppLeagueFragment } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -169,6 +170,12 @@ export function CommissionerScreen({
           onError={handleError}
         />
       ),
+    },
+    {
+      // Direct invites by username (LS-10078): accepting joins the league.
+      id: 'invite-users',
+      label: 'Invite Users',
+      content: <DraftInvitePanel target={{ leagueId }} />,
     },
     {
       id: 'league-settings',

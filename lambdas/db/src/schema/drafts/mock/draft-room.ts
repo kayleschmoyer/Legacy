@@ -15,6 +15,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 
+import { getSeatAvailability, type SeatAvailability } from './shared';
 import { type DraftRules, loadDraftRules } from '../draft-rules';
 import {
   authorizeLoadedDraft,
@@ -32,6 +33,8 @@ interface DraftRoomShape {
   rules: DraftRules;
   seats: DraftSeat[];
   auth: DraftAuthorization;
+  /** Mock drafts only — a league draft has no lobby to fill. */
+  availability: SeatAvailability | null;
 }
 
 const DraftSeatType = builder.objectRef<DraftSeat>('DraftSeat').implement({
@@ -135,6 +138,20 @@ const DraftRoom = builder.objectRef<DraftRoomShape>('DraftRoom').implement({
         };
       },
     }),
+    openSeatCount: t.int({
+      description:
+        'Seats a public joiner or invite-code holder can still take: open ' +
+        'seats minus those pending invitations reserve (LS-10078). 0 for a ' +
+        'league draft.',
+      resolve: (room) => room.availability?.openSlots.length ?? 0,
+    }),
+    reservedSlots: t.intList({
+      description:
+        'Slots held for a pending direct invitation (LS-10078) — the lobby ' +
+        'shows them as reserved rather than open.',
+      resolve: (room) =>
+        [...(room.availability?.reservedSlots ?? [])].sort((a, b) => a - b),
+    }),
     leagueId: t.int({
       nullable: true,
       description:
@@ -180,12 +197,15 @@ builder.queryField('draftRoom', (t) =>
         inviteCode,
       });
 
-      const [rules, seats] = await Promise.all([
+      const [rules, seats, availability] = await Promise.all([
         loadDraftRules(context.db, draftId),
         getDraftSeats(context.db, draftId),
+        draft.kind === 'mock'
+          ? getSeatAvailability(context.db, draftId)
+          : Promise.resolve(null),
       ]);
 
-      return { draft, rules, seats, auth };
+      return { draft, rules, seats, auth, availability };
     },
   }),
 );

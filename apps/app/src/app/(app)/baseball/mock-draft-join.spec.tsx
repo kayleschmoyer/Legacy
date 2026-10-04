@@ -1,113 +1,37 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 
-import JoinMockDraftScreen from './mock-draft-join';
+import BaseballMockDraftJoinRedirect from './mock-draft-join';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockNavigate = jest.fn();
-const mockBack = jest.fn();
+const mockParams: { inviteCode?: string } = {};
+const mockRedirect = jest.fn<null, [{ href: unknown }]>(() => null);
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate, back: mockBack }),
-  useLocalSearchParams: () => ({}),
-}));
-
-jest.mock('@legacy-sports/logging', () => ({
-  LOGGER: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
-
-jest.mock('tamagui', () => {
-  const mocks = jest.requireActual<
-    typeof import('../../../__test-utils__/tamagui-mocks')
-  >('../../../__test-utils__/tamagui-mocks');
-  return mocks.tamaguiMocks;
-});
-
-const mockJoinMockDraft = jest.fn();
-jest.mock('@legacy-sports/graphql', () => ({
-  useJoinMockDraftMutation: () => [mockJoinMockDraft, { loading: false }],
+  useLocalSearchParams: () => mockParams,
+  Redirect: (props: { href: unknown }) => mockRedirect(props),
 }));
 
 jest.mock('../_screenErrorBoundary', () => ({ ScreenErrorBoundary: null }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('JoinMockDraftScreen', () => {
+describe('BaseballMockDraftJoinRedirect (LS-10078)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockJoinMockDraft.mockResolvedValue({
-      data: {
-        // LS-10076: the joiner claims a seat in a league-less draft, so the
-        // mutation returns draftId/seatId instead of a team.
-        joinMockDraft: { draftId: 42, seatId: 7, sport: 'baseball' },
-      },
+    delete mockParams.inviteCode;
+  });
+
+  it('sends a code-carrying link to the universal join route', () => {
+    mockParams.inviteCode = 'MOCK2345';
+    render(<BaseballMockDraftJoinRedirect />);
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: { pathname: '/join/[code]', params: { code: 'MOCK2345' } },
     });
   });
 
-  it('renders the form', () => {
-    render(<JoinMockDraftScreen />);
-    expect(screen.getByText('🎟️ Join Mock Draft')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Enter 8-character code')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Enter your team name')).toBeTruthy();
-  });
-
-  it('joins and navigates to the mock draft room on success', async () => {
-    render(<JoinMockDraftScreen />);
-
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Enter 8-character code'),
-      'abc12xyz',
-    );
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Enter your team name'),
-      'My Team',
-    );
-    fireEvent.press(screen.getByText('Join Draft'));
-
-    await waitFor(() => {
-      expect(mockJoinMockDraft).toHaveBeenCalledWith({
-        variables: { inviteCode: 'ABC12XYZ', teamName: 'My Team' },
-      });
-    });
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/mock-draft/[draftId]',
-      params: { draftId: '42' },
-    });
-  });
-
-  it('surfaces a rejected mutation as an inline error', async () => {
-    mockJoinMockDraft.mockRejectedValue(new Error('This mock draft is full.'));
-    render(<JoinMockDraftScreen />);
-
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Enter 8-character code'),
-      'abc12xyz',
-    );
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Enter your team name'),
-      'My Team',
-    );
-    fireEvent.press(screen.getByText('Join Draft'));
-
-    await waitFor(() => {
-      expect(screen.getByText('This mock draft is full.')).toBeTruthy();
-    });
-    expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it('calls router.back on cancel', () => {
-    render(<JoinMockDraftScreen />);
-    fireEvent.press(screen.getByText('Cancel'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
+  it('sends the bare join screen to /join', () => {
+    render(<BaseballMockDraftJoinRedirect />);
+    expect(mockRedirect).toHaveBeenCalledWith({ href: '/join' });
   });
 });

@@ -103,7 +103,8 @@ export interface DraftLobbyUpdatedNotification {
     | 'seat-kicked'
     | 'settings'
     | 'host'
-    | 'expired';
+    | 'expired'
+    | 'invite';
   filledSeats: number;
   totalSeats: number;
   updatedAt: string;

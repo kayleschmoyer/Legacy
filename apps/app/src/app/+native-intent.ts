@@ -15,6 +15,10 @@ import { LOGGER } from '@legacy-sports/logging';
  * the league page reads `initialTab` from query params instead, so we rewrite
  * to the flat league route with `initialTab=trades`.
  *
+ * Invite links (LS-10078): `/<sport>/league/join/<code>` and
+ * `/baseball/mock-draft/join[/<code>]` are rewritten to the universal
+ * `/join/<code>` route, which previews either kind of code.
+ *
  * Stripe return links (`legacysports://subscription/success|cancel|
  * portal-return`, set by `SubscriptionSettingsScreen`) have no matching file
  * route — the subscription screen lives at `/subscription-settings` — so they
@@ -42,6 +46,24 @@ export function redirectSystemPath({
     if (seasonDraftMatch) {
       const inviteCode = decodeURIComponent(seasonDraftMatch[1]);
       return `/season-draft/join?inviteCode=${encodeURIComponent(inviteCode)}`;
+    }
+
+    // Invite links (LS-10078). `/join/<code>` is already a native route;
+    // the legacy per-sport league links and the mock-draft join links carry
+    // the same code and land on the universal join route too, so a link
+    // shared before /join existed still opens the join preview.
+    // The bare `/<sport>/league/join` page (public-league browsing) is left
+    // alone; only a link carrying a code is an invite.
+    const leagueJoinMatch = pathname.match(
+      /^\/?(?:baseball|football)\/league\/join\/([^/]+)\/?$/,
+    );
+    const mockJoinMatch = pathname.match(
+      /^\/?baseball\/mock-draft\/join(?:\/([^/]+))?\/?$/,
+    );
+    const joinMatch = leagueJoinMatch ?? mockJoinMatch;
+    if (joinMatch) {
+      const inviteCode = joinMatch[1] ? decodeURIComponent(joinMatch[1]) : '';
+      return inviteCode ? `/join/${encodeURIComponent(inviteCode)}` : '/join';
     }
 
     // Match `/baseball/league/<id>/trades` or `/football/league/<id>/trades`.

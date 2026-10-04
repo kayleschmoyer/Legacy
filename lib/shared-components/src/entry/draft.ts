@@ -5,6 +5,7 @@ export * from '../features/draft/ChatPanel';
 export * from '../features/draft/FootballMockPoolPreview';
 export * from '../features/draft/MockDraftSetup';
 export * from '../features/draft/MockDraftInviteCard';
-export * from '../features/draft/JoinMockDraftForm';
 // The mock draft's own pre-draft lobby (LS-10076).
 export * from '../features/elite-draft/MockDraftLobby';
+// Invites (LS-10078): universal /join/:code screen, invite panel, accept/decline.
+export * from '../features/invites';

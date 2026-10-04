@@ -15,6 +15,7 @@ import React from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 
 import { MockDraftInviteCard } from '../draft/MockDraftInviteCard';
+import { DraftInvitePanel } from '../invites/DraftInvitePanel';
 
 export interface MockDraftLobbySeat {
   id: number;
@@ -25,7 +26,13 @@ export interface MockDraftLobbySeat {
 }
 
 export interface MockDraftLobbyProps {
+  /** The lobby's draft — the host's invite panel targets it (LS-10078). */
+  draftId?: number | null;
   seats: MockDraftLobbySeat[];
+  /** Slots a pending direct invite holds — shown as reserved, not open. */
+  reservedSlots?: number[];
+  /** Refetch the room after an invite is sent or revoked. */
+  onInvitesChanged?: () => void;
   /** The caller's own seat, so their row can be marked. */
   mySeatId: number | null;
   isHost: boolean;
@@ -42,14 +49,17 @@ export interface MockDraftLobbyProps {
   onLeave: () => void;
 }
 
-function seatStatus(seat: MockDraftLobbySeat): string {
+function seatStatus(seat: MockDraftLobbySeat, reserved: boolean): string {
   if (seat.userId !== null) return 'Ready';
   if (seat.controller === 'ai') return 'CPU';
-  return 'Open';
+  return reserved ? 'Reserved' : 'Open';
 }
 
 export function MockDraftLobby({
+  draftId = null,
   seats,
+  reservedSlots = [],
+  onInvitesChanged,
   mySeatId,
   isHost,
   inviteCode,
@@ -87,6 +97,10 @@ export function MockDraftLobby({
         <MockDraftInviteCard inviteCode={inviteCode} onContinue={onStart} />
       ) : null}
 
+      {isHost && draftId != null ? (
+        <DraftInvitePanel target={{ draftId }} onChanged={onInvitesChanged} />
+      ) : null}
+
       <YStack gap="$2" testID="mock-draft-lobby-seats">
         {seats.map((seat) => (
           <XStack
@@ -106,7 +120,9 @@ export function MockDraftLobby({
               </Text>
             </XStack>
             <XStack alignItems="center" gap="$3">
-              <Text opacity={0.7}>{seatStatus(seat)}</Text>
+              <Text opacity={0.7}>
+                {seatStatus(seat, reservedSlots.includes(seat.slot))}
+              </Text>
               {isHost && seat.userId !== null && seat.id !== mySeatId ? (
                 <Button
                   size="$2"

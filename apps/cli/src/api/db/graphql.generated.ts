@@ -860,6 +860,10 @@ export type DraftRoom = {
   kind?: Maybe<DraftKind>;
   /** The owning league, or null for a mock draft (LS-10076). The league draft route loads the league itself through GetLeagueById; the draft room deliberately carries only the id, so the board renders from one league-independent shape. */
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Seats a public joiner or invite-code holder can still take: open seats minus those pending invitations reserve (LS-10078). 0 for a league draft. */
+  openSeatCount?: Maybe<Scalars['Int']['output']>;
+  /** Slots held for a pending direct invitation (LS-10078) — the lobby shows them as reserved rather than open. */
+  reservedSlots?: Maybe<Array<Scalars['Int']['output']>>;
   rules?: Maybe<DraftRulesInfo>;
   seats?: Maybe<Array<DraftSeat>>;
   sport?: Maybe<Scalars['String']['output']>;
@@ -1567,6 +1571,33 @@ export type ImpersonateUserResult = {
   token?: Maybe<Scalars['String']['output']>;
 };
 
+/** A direct invite to a mock draft or a league (LS-10078). A pending mock invite holds `reservedSlot` so no public joiner can take it. */
+export type Invitation = {
+  __typename?: 'Invitation';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  invitedById?: Maybe<Scalars['Int']['output']>;
+  invitedByUsername?: Maybe<Scalars['String']['output']>;
+  invitedUserId?: Maybe<Scalars['Int']['output']>;
+  invitedUsername?: Maybe<Scalars['String']['output']>;
+  kind?: Maybe<InviteTargetKind>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  reservedSlot?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  status?: Maybe<InviteStatus>;
+  targetName?: Maybe<Scalars['String']['output']>;
+};
+
+/** A page of invites, newest first. Pass `endCursor` back as `after` for the next page. */
+export type InvitationConnection = {
+  __typename?: 'InvitationConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage?: Maybe<Scalars['Boolean']['output']>;
+  nodes?: Maybe<Array<Invitation>>;
+};
+
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
@@ -1576,6 +1607,22 @@ export type InviteCodeInfo = {
   leagueName?: Maybe<Scalars['String']['output']>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
+
+/** What an invite code points at (LS-10078): a mock-draft lobby or a league. */
+export type InvitePreview = LeagueInvitePreview | MockDraftInvitePreview;
+
+export enum InviteStatus {
+  Accepted = 'accepted',
+  Declined = 'declined',
+  Expired = 'expired',
+  Pending = 'pending',
+  Revoked = 'revoked',
+}
+
+export enum InviteTargetKind {
+  League = 'league',
+  Mock = 'mock',
+}
 
 export type JoinLeaguePayload = {
   __typename?: 'JoinLeaguePayload';
@@ -1800,6 +1847,18 @@ export type LeagueDuesSettings = {
   reminderDayOfWeek?: Maybe<Scalars['Int']['output']>;
   reminderEnabled?: Maybe<Scalars['Boolean']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type LeagueInvitePreview = {
+  __typename?: 'LeagueInvitePreview';
+  code?: Maybe<Scalars['String']['output']>;
+  draftScheduledAt?: Maybe<Scalars['String']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  openTeams?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a league */
@@ -2160,6 +2219,25 @@ export type MinigamesStats = {
   playersTracked?: Maybe<Scalars['Int']['output']>;
 };
 
+export type MockDraftInvitePreview = {
+  __typename?: 'MockDraftInvitePreview';
+  code?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  filledSeats?: Maybe<Scalars['Int']['output']>;
+  hostUsername?: Maybe<Scalars['String']['output']>;
+  isAlreadySeated?: Maybe<Scalars['Boolean']['output']>;
+  /** Online, not started, unexpired, and at least one open seat. */
+  isJoinable?: Maybe<Scalars['Boolean']['output']>;
+  lobbyExpiresAt?: Maybe<Scalars['String']['output']>;
+  /** Open seats minus pending invite reservations. */
+  openSeats?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  rounds?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
 /** What a mock-draft maintenance sweep did (LS-10076). */
 export type MockDraftMaintenanceResult = {
   __typename?: 'MockDraftMaintenanceResult';
@@ -2356,6 +2434,8 @@ export type Mutation = {
   resolveHighlightVideos?: Maybe<HighlightVideoResolveResult>;
   /** Accept or decline a proposed draft slot trade, as the counterpart team. */
   respondDraftSlotTrade?: Maybe<DraftSlotTrade>;
+  /** Accept or decline a direct invite (invitee only). Accepting a mock invite takes its reserved seat; accepting a league invite joins the league, subject to the active-league cap (LS-10078). Fails with a clear message once the invite is revoked or has expired. */
+  respondToInvite?: Maybe<Invitation>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
   restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
   /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
@@ -2363,6 +2443,8 @@ export type Mutation = {
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
+  /** Withdraw a pending invite (the mock draft host or the league commissioner). A mock invite releases its reserved seat (LS-10078). */
+  revokeInvite?: Maybe<Invitation>;
   sendDirectMessage?: Maybe<DirectMessage>;
   /** Check all active leagues for upcoming matchup locks and send Discord reminders. Triggered hourly by EventBridge. */
   sendDiscordLineupReminders?: Maybe<SendDiscordLineupRemindersResult>;
@@ -2370,6 +2452,8 @@ export type Mutation = {
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   /** Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement. */
   sendDiscordWeeklyRecaps?: Maybe<SendDiscordWeeklyRecapsResult>;
+  /** Invite a user by username to a mock draft (host only — reserves a seat) or a league (commissioner only). Exactly one of draftId / leagueId. Notifies the invitee in-app and by push (LS-10078). */
+  sendDraftInvite?: Maybe<Invitation>;
   /** Post a message to a mock draft's chat. Seat holders only. */
   sendDraftMessage?: Maybe<DraftMessage>;
   /** Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge. */
@@ -2917,6 +3001,12 @@ export type MutationRespondDraftSlotTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
 
+export type MutationRespondToInviteArgs = {
+  accept: Scalars['Boolean']['input'];
+  inviteId: Scalars['Int']['input'];
+  teamName?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type MutationRestoreApplePurchasesArgs = {
   jwsTransaction: Scalars['String']['input'];
 };
@@ -2932,6 +3022,10 @@ export type MutationResumeDraftArgs = {
 
 export type MutationRevokeConsentArgs = {
   consentType: ConsentType;
+};
+
+export type MutationRevokeInviteArgs = {
+  inviteId: Scalars['Int']['input'];
 };
 
 export type MutationSendDirectMessageArgs = {
@@ -2950,6 +3044,12 @@ export type MutationSendDiscordScoreAlertsArgs = {
 
 export type MutationSendDiscordWeeklyRecapsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSendDraftInviteArgs = {
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  username: Scalars['String']['input'];
 };
 
 export type MutationSendDraftMessageArgs = {
@@ -3748,6 +3848,8 @@ export type Query = {
   myEntitlements: Array<Scalars['String']['output']>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
+  /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
+  myInvites?: Maybe<InvitationConnection>;
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
@@ -3759,6 +3861,8 @@ export type Query = {
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
   onThisDayEvents?: Maybe<Array<OnThisDayEvent>>;
+  /** A mock draft's or league's pending invites, for the host's / commissioner's invite panel (LS-10078). Exactly one of draftId / leagueId. */
+  pendingInvites?: Maybe<Array<Invitation>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   /** Look up a player by their MLB Stats API player ID. Returns null if no mapping exists. */
@@ -3779,6 +3883,8 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
+  /** Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data. */
+  resolveInviteCode?: Maybe<InvitePreview>;
   /** Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev). */
   scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
@@ -4242,6 +4348,12 @@ export type QueryMyAwardVotesArgs = {
   season: Scalars['Int']['input'];
 };
 
+export type QueryMyInvitesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  kind?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QueryMyLeaguesArgs = {
   sport?: InputMaybe<Sport>;
 };
@@ -4264,6 +4376,11 @@ export type QueryOnThisDayEventsArgs = {
   day: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   month: Scalars['Int']['input'];
+};
+
+export type QueryPendingInvitesArgs = {
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryPlayerArgs = {
@@ -4341,6 +4458,10 @@ export type QueryPublicLeaguesArgs = {
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryResolveInviteCodeArgs = {
+  code: Scalars['String']['input'];
 };
 
 export type QueryScoreboardArgs = {

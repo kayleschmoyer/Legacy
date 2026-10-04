@@ -20,7 +20,11 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
-import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import {
+  createGraphQLRouter,
+  fulfillJson,
+  isGraphQLEndpoint,
+} from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -359,5 +363,87 @@ test.describe('Commissioner League Settings @critical', () => {
         .getByRole('status')
         .filter({ hasText: /League settings saved successfully/i }),
     ).toBeVisible();
+  });
+});
+
+test.describe('Commissioner invites users by username (LS-10078) @regression', () => {
+  test('sends a league invite and revokes it', async ({ page }) => {
+    await setupGraphQL(page);
+
+    const state: { pending: boolean; sent: unknown[]; revoked: unknown[] } = {
+      pending: false,
+      sent: [],
+      revoked: [],
+    };
+    const invite = {
+      __typename: 'Invitation',
+      id: 41,
+      kind: 'league',
+      status: 'pending',
+      draftId: null,
+      leagueId: 1,
+      sport: 'baseball',
+      targetName: 'Test League',
+      invitedUserId: 7,
+      invitedUsername: 'rookie',
+      invitedById: 1,
+      invitedByUsername: 'testuser',
+      reservedSlot: null,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      createdAt: '2026-10-01T00:00:00.000Z',
+    };
+    // Registered after setupGraphQL, so it answers first; everything else
+    // falls back to the league mocks.
+    await createGraphQLRouter(page, {
+      pendinginvites: (route) =>
+        fulfillJson(route, {
+          data: { pendingInvites: state.pending ? [invite] : [] },
+        }),
+      searchusersfordraft: (route) =>
+        fulfillJson(route, {
+          data: {
+            searchUsers: [
+              {
+                __typename: 'User',
+                id: 7,
+                username: 'rookie',
+                avatarUrl: null,
+              },
+            ],
+          },
+        }),
+      senddraftinvite: (route, { variables }) => {
+        state.sent.push(variables);
+        state.pending = true;
+        return fulfillJson(route, { data: { sendDraftInvite: invite } });
+      },
+      revokeinvite: (route, { variables }) => {
+        state.revoked.push(variables);
+        state.pending = false;
+        return fulfillJson(route, {
+          data: { revokeInvite: { ...invite, status: 'revoked' } },
+        });
+      },
+    });
+
+    await page.goto('/baseball/league/1/commissioner');
+    const toggle = page.getByRole('button', {
+      name: 'Invite Users',
+      exact: true,
+    });
+    await toggle.click();
+    await expect(page.getByTestId('draft-invite-panel')).toBeVisible();
+
+    await page.getByLabel('Search usernames').fill('rookie');
+    await page.getByTestId('draft-invite-send-rookie').click();
+
+    await expect(page.getByTestId('draft-invite-pending-41')).toContainText(
+      '@rookie',
+    );
+    expect(state.sent).toEqual([{ leagueId: 1, username: 'rookie' }]);
+
+    await page.getByTestId('draft-invite-revoke-41').click();
+    await expect(page.getByTestId('draft-invite-pending-41')).toHaveCount(0);
+    expect(state.revoked).toEqual([{ inviteId: 41 }]);
   });
 });

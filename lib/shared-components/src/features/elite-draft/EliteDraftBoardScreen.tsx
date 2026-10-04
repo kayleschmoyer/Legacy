@@ -1375,6 +1375,11 @@ export function EliteDraftBoardScreen({
     if (isMockDraft) {
       return (
         <MockDraftLobby
+          draftId={queries.draftId ?? null}
+          reservedSlots={queries.room?.reservedSlots ?? []}
+          onInvitesChanged={() => {
+            void queries.refetchRoom();
+          }}
           seats={(queries.room?.seats ?? []).flatMap((seat) =>
             seat.id == null || seat.slot == null
               ? []

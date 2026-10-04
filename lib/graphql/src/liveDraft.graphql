@@ -544,6 +544,8 @@ query GetDraftRoom($draftId: Int!, $inviteCode: String) {
     status
     sport
     leagueId
+    openSeatCount
+    reservedSlots
     draft {
       id
       leagueId

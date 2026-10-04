@@ -17,6 +17,7 @@ import './notifications';
 import './user-preferences';
 import './chat-and-tiebreakers';
 import './drafts';
+import './invites';
 import './gdpr';
 import './achievements';
 import './badges';

@@ -34,6 +34,13 @@ export interface CapturedMockDraftResolvers {
   sendDraftMessage: CapturedResolver;
   expireMockDraftLobbies: CapturedResolver<ResolverPayload>;
   purgeStaleOfflineMockDrafts: CapturedResolver<ResolverPayload>;
+  // Invites (LS-10078) — mock and league targets share one module.
+  resolveInviteCode: CapturedResolver<ResolverPayload | null>;
+  sendDraftInvite: CapturedResolver<ResolverPayload>;
+  respondToInvite: CapturedResolver<ResolverPayload>;
+  revokeInvite: CapturedResolver<ResolverPayload>;
+  myInvites: CapturedResolver<ResolverPayload>;
+  pendingInvites: CapturedResolver<ResolverPayload[]>;
 }
 
 /** The shape a `t.field({...})` definition has, as far as this kit cares. */
@@ -50,6 +57,8 @@ interface FieldDefinition {
 export const testEntitlements = {
   unlimitedMockDrafts: true,
   controlAllTeams: true,
+  /** The free-tier 3-league cap a league invite's accept honours (LS-10078). */
+  unlimitedLeagues: true,
 };
 
 /**
@@ -102,12 +111,17 @@ export async function captureMockDraftResolvers(): Promise<CapturedMockDraftReso
     }),
   }));
 
+  // Only the entitlement gate is stubbed; membership lookups stay real, since
+  // the invite resolvers authorize commissioners against real rows.
   jest.doMock('../../authorization', () => ({
+    ...jest.requireActual<Record<string, unknown>>('../../authorization'),
     hasEntitlement: (_context: unknown, entitlement: string) =>
       Promise.resolve(
         entitlement === 'mock_draft_control_all_teams'
           ? testEntitlements.controlAllTeams
-          : testEntitlements.unlimitedMockDrafts,
+          : entitlement === 'unlimited_leagues'
+            ? testEntitlements.unlimitedLeagues
+            : testEntitlements.unlimitedMockDrafts,
       ),
     requireEntitlement: (_context: unknown, entitlement: string) => {
       if (
@@ -127,6 +141,8 @@ export async function captureMockDraftResolvers(): Promise<CapturedMockDraftReso
   await import('./draft-room');
   await import('./chat');
   await import('./jobs');
+  await import('../../invites/resolve-invite-code');
+  await import('../../invites/direct-invites');
 
   return captured as unknown as CapturedMockDraftResolvers;
 }

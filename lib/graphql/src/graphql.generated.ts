@@ -866,6 +866,10 @@ export type DraftRoom = {
   kind?: Maybe<DraftKind>;
   /** The owning league, or null for a mock draft (LS-10076). The league draft route loads the league itself through GetLeagueById; the draft room deliberately carries only the id, so the board renders from one league-independent shape. */
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Seats a public joiner or invite-code holder can still take: open seats minus those pending invitations reserve (LS-10078). 0 for a league draft. */
+  openSeatCount?: Maybe<Scalars['Int']['output']>;
+  /** Slots held for a pending direct invitation (LS-10078) — the lobby shows them as reserved rather than open. */
+  reservedSlots?: Maybe<Array<Scalars['Int']['output']>>;
   rules?: Maybe<DraftRulesInfo>;
   seats?: Maybe<Array<DraftSeat>>;
   sport?: Maybe<Scalars['String']['output']>;
@@ -1573,6 +1577,33 @@ export type ImpersonateUserResult = {
   token?: Maybe<Scalars['String']['output']>;
 };
 
+/** A direct invite to a mock draft or a league (LS-10078). A pending mock invite holds `reservedSlot` so no public joiner can take it. */
+export type Invitation = {
+  __typename?: 'Invitation';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  invitedById?: Maybe<Scalars['Int']['output']>;
+  invitedByUsername?: Maybe<Scalars['String']['output']>;
+  invitedUserId?: Maybe<Scalars['Int']['output']>;
+  invitedUsername?: Maybe<Scalars['String']['output']>;
+  kind?: Maybe<InviteTargetKind>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  reservedSlot?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  status?: Maybe<InviteStatus>;
+  targetName?: Maybe<Scalars['String']['output']>;
+};
+
+/** A page of invites, newest first. Pass `endCursor` back as `after` for the next page. */
+export type InvitationConnection = {
+  __typename?: 'InvitationConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage?: Maybe<Scalars['Boolean']['output']>;
+  nodes?: Maybe<Array<Invitation>>;
+};
+
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
@@ -1582,6 +1613,22 @@ export type InviteCodeInfo = {
   leagueName?: Maybe<Scalars['String']['output']>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
+
+/** What an invite code points at (LS-10078): a mock-draft lobby or a league. */
+export type InvitePreview = LeagueInvitePreview | MockDraftInvitePreview;
+
+export enum InviteStatus {
+  Accepted = 'accepted',
+  Declined = 'declined',
+  Expired = 'expired',
+  Pending = 'pending',
+  Revoked = 'revoked',
+}
+
+export enum InviteTargetKind {
+  League = 'league',
+  Mock = 'mock',
+}
 
 export type JoinLeaguePayload = {
   __typename?: 'JoinLeaguePayload';
@@ -1806,6 +1853,18 @@ export type LeagueDuesSettings = {
   reminderDayOfWeek?: Maybe<Scalars['Int']['output']>;
   reminderEnabled?: Maybe<Scalars['Boolean']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type LeagueInvitePreview = {
+  __typename?: 'LeagueInvitePreview';
+  code?: Maybe<Scalars['String']['output']>;
+  draftScheduledAt?: Maybe<Scalars['String']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  openTeams?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A member of a league */
@@ -2166,6 +2225,25 @@ export type MinigamesStats = {
   playersTracked?: Maybe<Scalars['Int']['output']>;
 };
 
+export type MockDraftInvitePreview = {
+  __typename?: 'MockDraftInvitePreview';
+  code?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  filledSeats?: Maybe<Scalars['Int']['output']>;
+  hostUsername?: Maybe<Scalars['String']['output']>;
+  isAlreadySeated?: Maybe<Scalars['Boolean']['output']>;
+  /** Online, not started, unexpired, and at least one open seat. */
+  isJoinable?: Maybe<Scalars['Boolean']['output']>;
+  lobbyExpiresAt?: Maybe<Scalars['String']['output']>;
+  /** Open seats minus pending invite reservations. */
+  openSeats?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  rounds?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
 /** What a mock-draft maintenance sweep did (LS-10076). */
 export type MockDraftMaintenanceResult = {
   __typename?: 'MockDraftMaintenanceResult';
@@ -2362,6 +2440,8 @@ export type Mutation = {
   resolveHighlightVideos?: Maybe<HighlightVideoResolveResult>;
   /** Accept or decline a proposed draft slot trade, as the counterpart team. */
   respondDraftSlotTrade?: Maybe<DraftSlotTrade>;
+  /** Accept or decline a direct invite (invitee only). Accepting a mock invite takes its reserved seat; accepting a league invite joins the league, subject to the active-league cap (LS-10078). Fails with a clear message once the invite is revoked or has expired. */
+  respondToInvite?: Maybe<Invitation>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
   restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
   /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
@@ -2369,6 +2449,8 @@ export type Mutation = {
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
+  /** Withdraw a pending invite (the mock draft host or the league commissioner). A mock invite releases its reserved seat (LS-10078). */
+  revokeInvite?: Maybe<Invitation>;
   sendDirectMessage?: Maybe<DirectMessage>;
   /** Check all active leagues for upcoming matchup locks and send Discord reminders. Triggered hourly by EventBridge. */
   sendDiscordLineupReminders?: Maybe<SendDiscordLineupRemindersResult>;
@@ -2376,6 +2458,8 @@ export type Mutation = {
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   /** Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement. */
   sendDiscordWeeklyRecaps?: Maybe<SendDiscordWeeklyRecapsResult>;
+  /** Invite a user by username to a mock draft (host only — reserves a seat) or a league (commissioner only). Exactly one of draftId / leagueId. Notifies the invitee in-app and by push (LS-10078). */
+  sendDraftInvite?: Maybe<Invitation>;
   /** Post a message to a mock draft's chat. Seat holders only. */
   sendDraftMessage?: Maybe<DraftMessage>;
   /** Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge. */
@@ -2923,6 +3007,12 @@ export type MutationRespondDraftSlotTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
 
+export type MutationRespondToInviteArgs = {
+  accept: Scalars['Boolean']['input'];
+  inviteId: Scalars['Int']['input'];
+  teamName?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type MutationRestoreApplePurchasesArgs = {
   jwsTransaction: Scalars['String']['input'];
 };
@@ -2938,6 +3028,10 @@ export type MutationResumeDraftArgs = {
 
 export type MutationRevokeConsentArgs = {
   consentType: ConsentType;
+};
+
+export type MutationRevokeInviteArgs = {
+  inviteId: Scalars['Int']['input'];
 };
 
 export type MutationSendDirectMessageArgs = {
@@ -2956,6 +3050,12 @@ export type MutationSendDiscordScoreAlertsArgs = {
 
 export type MutationSendDiscordWeeklyRecapsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSendDraftInviteArgs = {
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  username: Scalars['String']['input'];
 };
 
 export type MutationSendDraftMessageArgs = {
@@ -3754,6 +3854,8 @@ export type Query = {
   myEntitlements: Array<Scalars['String']['output']>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
+  /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
+  myInvites?: Maybe<InvitationConnection>;
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
@@ -3765,6 +3867,8 @@ export type Query = {
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
   onThisDayEvents?: Maybe<Array<OnThisDayEvent>>;
+  /** A mock draft's or league's pending invites, for the host's / commissioner's invite panel (LS-10078). Exactly one of draftId / leagueId. */
+  pendingInvites?: Maybe<Array<Invitation>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   /** Look up a player by their MLB Stats API player ID. Returns null if no mapping exists. */
@@ -3785,6 +3889,8 @@ export type Query = {
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
+  /** Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data. */
+  resolveInviteCode?: Maybe<InvitePreview>;
   /** Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev). */
   scoreboard?: Maybe<Scoreboard>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
@@ -4248,6 +4354,12 @@ export type QueryMyAwardVotesArgs = {
   season: Scalars['Int']['input'];
 };
 
+export type QueryMyInvitesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  kind?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QueryMyLeaguesArgs = {
   sport?: InputMaybe<Sport>;
 };
@@ -4270,6 +4382,11 @@ export type QueryOnThisDayEventsArgs = {
   day: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   month: Scalars['Int']['input'];
+};
+
+export type QueryPendingInvitesArgs = {
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryPlayerArgs = {
@@ -4347,6 +4464,10 @@ export type QueryPublicLeaguesArgs = {
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryResolveInviteCodeArgs = {
+  code: Scalars['String']['input'];
 };
 
 export type QueryScoreboardArgs = {
@@ -12742,6 +12863,198 @@ export type InitializeDraftMutation = {
   } | null;
 };
 
+export type InvitationFieldsFragment = {
+  __typename?: 'Invitation';
+  id?: number | null;
+  kind?: InviteTargetKind | null;
+  status?: InviteStatus | null;
+  draftId?: number | null;
+  leagueId?: number | null;
+  sport?: Sport | null;
+  targetName?: string | null;
+  invitedUserId?: number | null;
+  invitedUsername?: string | null;
+  invitedById?: number | null;
+  invitedByUsername?: string | null;
+  reservedSlot?: number | null;
+  expiresAt?: string | null;
+  createdAt?: string | null;
+};
+
+export type ResolveInviteCodeQueryVariables = Exact<{
+  code: Scalars['String']['input'];
+}>;
+
+export type ResolveInviteCodeQuery = {
+  __typename?: 'Query';
+  resolveInviteCode?:
+    | {
+        __typename: 'LeagueInvitePreview';
+        code?: string | null;
+        leagueId?: number | null;
+        sport?: Sport | null;
+        name?: string | null;
+        totalTeams?: number | null;
+        openTeams?: number | null;
+        draftScheduledAt?: string | null;
+        isAlreadyMember?: boolean | null;
+      }
+    | {
+        __typename: 'MockDraftInvitePreview';
+        code?: string | null;
+        draftId?: number | null;
+        sport?: Sport | null;
+        hostUsername?: string | null;
+        playerPool?: string | null;
+        filledSeats?: number | null;
+        totalSeats?: number | null;
+        openSeats?: number | null;
+        pickTimeLimitSeconds?: number | null;
+        rounds?: number | null;
+        lobbyExpiresAt?: string | null;
+        isJoinable?: boolean | null;
+        isAlreadySeated?: boolean | null;
+      }
+    | null;
+};
+
+export type MyInvitesQueryVariables = Exact<{
+  first?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+  kind?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type MyInvitesQuery = {
+  __typename?: 'Query';
+  myInvites?: {
+    __typename?: 'InvitationConnection';
+    endCursor?: string | null;
+    hasNextPage?: boolean | null;
+    nodes?: Array<{
+      __typename?: 'Invitation';
+      id?: number | null;
+      kind?: InviteTargetKind | null;
+      status?: InviteStatus | null;
+      draftId?: number | null;
+      leagueId?: number | null;
+      sport?: Sport | null;
+      targetName?: string | null;
+      invitedUserId?: number | null;
+      invitedUsername?: string | null;
+      invitedById?: number | null;
+      invitedByUsername?: string | null;
+      reservedSlot?: number | null;
+      expiresAt?: string | null;
+      createdAt?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type PendingInvitesQueryVariables = Exact<{
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type PendingInvitesQuery = {
+  __typename?: 'Query';
+  pendingInvites?: Array<{
+    __typename?: 'Invitation';
+    id?: number | null;
+    kind?: InviteTargetKind | null;
+    status?: InviteStatus | null;
+    draftId?: number | null;
+    leagueId?: number | null;
+    sport?: Sport | null;
+    targetName?: string | null;
+    invitedUserId?: number | null;
+    invitedUsername?: string | null;
+    invitedById?: number | null;
+    invitedByUsername?: string | null;
+    reservedSlot?: number | null;
+    expiresAt?: string | null;
+    createdAt?: string | null;
+  }> | null;
+};
+
+export type SendDraftInviteMutationVariables = Exact<{
+  draftId?: InputMaybe<Scalars['Int']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  username: Scalars['String']['input'];
+}>;
+
+export type SendDraftInviteMutation = {
+  __typename?: 'Mutation';
+  sendDraftInvite?: {
+    __typename?: 'Invitation';
+    id?: number | null;
+    kind?: InviteTargetKind | null;
+    status?: InviteStatus | null;
+    draftId?: number | null;
+    leagueId?: number | null;
+    sport?: Sport | null;
+    targetName?: string | null;
+    invitedUserId?: number | null;
+    invitedUsername?: string | null;
+    invitedById?: number | null;
+    invitedByUsername?: string | null;
+    reservedSlot?: number | null;
+    expiresAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type RespondToInviteMutationVariables = Exact<{
+  inviteId: Scalars['Int']['input'];
+  accept: Scalars['Boolean']['input'];
+  teamName?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type RespondToInviteMutation = {
+  __typename?: 'Mutation';
+  respondToInvite?: {
+    __typename?: 'Invitation';
+    id?: number | null;
+    kind?: InviteTargetKind | null;
+    status?: InviteStatus | null;
+    draftId?: number | null;
+    leagueId?: number | null;
+    sport?: Sport | null;
+    targetName?: string | null;
+    invitedUserId?: number | null;
+    invitedUsername?: string | null;
+    invitedById?: number | null;
+    invitedByUsername?: string | null;
+    reservedSlot?: number | null;
+    expiresAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type RevokeInviteMutationVariables = Exact<{
+  inviteId: Scalars['Int']['input'];
+}>;
+
+export type RevokeInviteMutation = {
+  __typename?: 'Mutation';
+  revokeInvite?: {
+    __typename?: 'Invitation';
+    id?: number | null;
+    kind?: InviteTargetKind | null;
+    status?: InviteStatus | null;
+    draftId?: number | null;
+    leagueId?: number | null;
+    sport?: Sport | null;
+    targetName?: string | null;
+    invitedUserId?: number | null;
+    invitedUsername?: string | null;
+    invitedById?: number | null;
+    invitedByUsername?: string | null;
+    reservedSlot?: number | null;
+    expiresAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
 export type JoinSeasonDraftGameMutationVariables = Exact<{
   inviteCode: Scalars['String']['input'];
 }>;
@@ -13657,6 +13970,8 @@ export type GetDraftRoomQuery = {
     status?: string | null;
     sport?: string | null;
     leagueId?: number | null;
+    openSeatCount?: number | null;
+    reservedSlots?: Array<number> | null;
     draft?: {
       __typename?: 'Draft';
       id?: number | null;
@@ -17193,6 +17508,24 @@ export const FootballPlayerSeasonStatsFragmentDoc = gql`
   ${FootballSeasonKickingStatsFragmentDoc}
   ${FootballSeasonDefenseStatsFragmentDoc}
   ${FootballSeasonDefenseIdpStatsFragmentDoc}
+`;
+export const InvitationFieldsFragmentDoc = gql`
+  fragment InvitationFields on Invitation {
+    id
+    kind
+    status
+    draftId
+    leagueId
+    sport
+    targetName
+    invitedUserId
+    invitedUsername
+    invitedById
+    invitedByUsername
+    reservedSlot
+    expiresAt
+    createdAt
+  }
 `;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
@@ -31254,6 +31587,459 @@ export type InitializeDraftMutationOptions = BaseMutationOptions<
   InitializeDraftMutation,
   InitializeDraftMutationVariables
 >;
+export const ResolveInviteCode = gql`
+  query ResolveInviteCode($code: String!) {
+    resolveInviteCode(code: $code) {
+      __typename
+      ... on MockDraftInvitePreview {
+        code
+        draftId
+        sport
+        hostUsername
+        playerPool
+        filledSeats
+        totalSeats
+        openSeats
+        pickTimeLimitSeconds
+        rounds
+        lobbyExpiresAt
+        isJoinable
+        isAlreadySeated
+      }
+      ... on LeagueInvitePreview {
+        code
+        leagueId
+        sport
+        name
+        totalTeams
+        openTeams
+        draftScheduledAt
+        isAlreadyMember
+      }
+    }
+  }
+`;
+
+/**
+ * __useResolveInviteCodeQuery__
+ *
+ * To run a query within a React component, call `useResolveInviteCodeQuery` and pass it any options that fit your needs.
+ * When your component renders, `useResolveInviteCodeQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useResolveInviteCodeQuery({
+ *   variables: {
+ *      code: // value for 'code'
+ *   },
+ * });
+ */
+export function useResolveInviteCodeQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    ResolveInviteCodeQuery,
+    ResolveInviteCodeQueryVariables
+  > &
+    (
+      | { variables: ResolveInviteCodeQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    ResolveInviteCodeQuery,
+    ResolveInviteCodeQueryVariables
+  >(ResolveInviteCode, options);
+}
+export function useResolveInviteCodeLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    ResolveInviteCodeQuery,
+    ResolveInviteCodeQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    ResolveInviteCodeQuery,
+    ResolveInviteCodeQueryVariables
+  >(ResolveInviteCode, options);
+}
+export function useResolveInviteCodeSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        ResolveInviteCodeQuery,
+        ResolveInviteCodeQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    ResolveInviteCodeQuery,
+    ResolveInviteCodeQueryVariables
+  >(
+    ResolveInviteCode,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          ResolveInviteCodeQuery,
+          ResolveInviteCodeQueryVariables
+        >,
+  );
+}
+export type ResolveInviteCodeQueryHookResult = ReturnType<
+  typeof useResolveInviteCodeQuery
+>;
+export type ResolveInviteCodeLazyQueryHookResult = ReturnType<
+  typeof useResolveInviteCodeLazyQuery
+>;
+export type ResolveInviteCodeSuspenseQueryHookResult = ReturnType<
+  typeof useResolveInviteCodeSuspenseQuery
+>;
+export type ResolveInviteCodeQueryResult = Apollo.QueryResult<
+  ResolveInviteCodeQuery,
+  ResolveInviteCodeQueryVariables
+>;
+export const MyInvites = gql`
+  query MyInvites($first: Int, $after: String, $kind: String) {
+    myInvites(first: $first, after: $after, kind: $kind) {
+      nodes {
+        ...InvitationFields
+      }
+      endCursor
+      hasNextPage
+    }
+  }
+  ${InvitationFieldsFragmentDoc}
+`;
+
+/**
+ * __useMyInvitesQuery__
+ *
+ * To run a query within a React component, call `useMyInvitesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyInvitesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyInvitesQuery({
+ *   variables: {
+ *      first: // value for 'first'
+ *      after: // value for 'after'
+ *      kind: // value for 'kind'
+ *   },
+ * });
+ */
+export function useMyInvitesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    MyInvitesQuery,
+    MyInvitesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<MyInvitesQuery, MyInvitesQueryVariables>(
+    MyInvites,
+    options,
+  );
+}
+export function useMyInvitesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    MyInvitesQuery,
+    MyInvitesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<MyInvitesQuery, MyInvitesQueryVariables>(
+    MyInvites,
+    options,
+  );
+}
+export function useMyInvitesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<MyInvitesQuery, MyInvitesQueryVariables>,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<MyInvitesQuery, MyInvitesQueryVariables>(
+    MyInvites,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          MyInvitesQuery,
+          MyInvitesQueryVariables
+        >,
+  );
+}
+export type MyInvitesQueryHookResult = ReturnType<typeof useMyInvitesQuery>;
+export type MyInvitesLazyQueryHookResult = ReturnType<
+  typeof useMyInvitesLazyQuery
+>;
+export type MyInvitesSuspenseQueryHookResult = ReturnType<
+  typeof useMyInvitesSuspenseQuery
+>;
+export type MyInvitesQueryResult = Apollo.QueryResult<
+  MyInvitesQuery,
+  MyInvitesQueryVariables
+>;
+export const PendingInvites = gql`
+  query PendingInvites($draftId: Int, $leagueId: Int) {
+    pendingInvites(draftId: $draftId, leagueId: $leagueId) {
+      ...InvitationFields
+    }
+  }
+  ${InvitationFieldsFragmentDoc}
+`;
+
+/**
+ * __usePendingInvitesQuery__
+ *
+ * To run a query within a React component, call `usePendingInvitesQuery` and pass it any options that fit your needs.
+ * When your component renders, `usePendingInvitesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = usePendingInvitesQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function usePendingInvitesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    PendingInvitesQuery,
+    PendingInvitesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<PendingInvitesQuery, PendingInvitesQueryVariables>(
+    PendingInvites,
+    options,
+  );
+}
+export function usePendingInvitesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    PendingInvitesQuery,
+    PendingInvitesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<PendingInvitesQuery, PendingInvitesQueryVariables>(
+    PendingInvites,
+    options,
+  );
+}
+export function usePendingInvitesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        PendingInvitesQuery,
+        PendingInvitesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    PendingInvitesQuery,
+    PendingInvitesQueryVariables
+  >(
+    PendingInvites,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          PendingInvitesQuery,
+          PendingInvitesQueryVariables
+        >,
+  );
+}
+export type PendingInvitesQueryHookResult = ReturnType<
+  typeof usePendingInvitesQuery
+>;
+export type PendingInvitesLazyQueryHookResult = ReturnType<
+  typeof usePendingInvitesLazyQuery
+>;
+export type PendingInvitesSuspenseQueryHookResult = ReturnType<
+  typeof usePendingInvitesSuspenseQuery
+>;
+export type PendingInvitesQueryResult = Apollo.QueryResult<
+  PendingInvitesQuery,
+  PendingInvitesQueryVariables
+>;
+export const SendDraftInvite = gql`
+  mutation SendDraftInvite($draftId: Int, $leagueId: Int, $username: String!) {
+    sendDraftInvite(
+      draftId: $draftId
+      leagueId: $leagueId
+      username: $username
+    ) {
+      ...InvitationFields
+    }
+  }
+  ${InvitationFieldsFragmentDoc}
+`;
+export type SendDraftInviteMutationFn = MutationFunction<
+  SendDraftInviteMutation,
+  SendDraftInviteMutationVariables
+>;
+
+/**
+ * __useSendDraftInviteMutation__
+ *
+ * To run a mutation, you first call `useSendDraftInviteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSendDraftInviteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [sendDraftInviteMutation, { data, loading, error }] = useSendDraftInviteMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      leagueId: // value for 'leagueId'
+ *      username: // value for 'username'
+ *   },
+ * });
+ */
+export function useSendDraftInviteMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SendDraftInviteMutation,
+    SendDraftInviteMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SendDraftInviteMutation,
+    SendDraftInviteMutationVariables
+  >(SendDraftInvite, options);
+}
+export type SendDraftInviteMutationHookResult = ReturnType<
+  typeof useSendDraftInviteMutation
+>;
+export type SendDraftInviteMutationResult =
+  Apollo.MutationResult<SendDraftInviteMutation>;
+export type SendDraftInviteMutationOptions = BaseMutationOptions<
+  SendDraftInviteMutation,
+  SendDraftInviteMutationVariables
+>;
+export const RespondToInvite = gql`
+  mutation RespondToInvite(
+    $inviteId: Int!
+    $accept: Boolean!
+    $teamName: String
+  ) {
+    respondToInvite(inviteId: $inviteId, accept: $accept, teamName: $teamName) {
+      ...InvitationFields
+    }
+  }
+  ${InvitationFieldsFragmentDoc}
+`;
+export type RespondToInviteMutationFn = MutationFunction<
+  RespondToInviteMutation,
+  RespondToInviteMutationVariables
+>;
+
+/**
+ * __useRespondToInviteMutation__
+ *
+ * To run a mutation, you first call `useRespondToInviteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRespondToInviteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [respondToInviteMutation, { data, loading, error }] = useRespondToInviteMutation({
+ *   variables: {
+ *      inviteId: // value for 'inviteId'
+ *      accept: // value for 'accept'
+ *      teamName: // value for 'teamName'
+ *   },
+ * });
+ */
+export function useRespondToInviteMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RespondToInviteMutation,
+    RespondToInviteMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RespondToInviteMutation,
+    RespondToInviteMutationVariables
+  >(RespondToInvite, options);
+}
+export type RespondToInviteMutationHookResult = ReturnType<
+  typeof useRespondToInviteMutation
+>;
+export type RespondToInviteMutationResult =
+  Apollo.MutationResult<RespondToInviteMutation>;
+export type RespondToInviteMutationOptions = BaseMutationOptions<
+  RespondToInviteMutation,
+  RespondToInviteMutationVariables
+>;
+export const RevokeInvite = gql`
+  mutation RevokeInvite($inviteId: Int!) {
+    revokeInvite(inviteId: $inviteId) {
+      ...InvitationFields
+    }
+  }
+  ${InvitationFieldsFragmentDoc}
+`;
+export type RevokeInviteMutationFn = MutationFunction<
+  RevokeInviteMutation,
+  RevokeInviteMutationVariables
+>;
+
+/**
+ * __useRevokeInviteMutation__
+ *
+ * To run a mutation, you first call `useRevokeInviteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRevokeInviteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [revokeInviteMutation, { data, loading, error }] = useRevokeInviteMutation({
+ *   variables: {
+ *      inviteId: // value for 'inviteId'
+ *   },
+ * });
+ */
+export function useRevokeInviteMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RevokeInviteMutation,
+    RevokeInviteMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RevokeInviteMutation,
+    RevokeInviteMutationVariables
+  >(RevokeInvite, options);
+}
+export type RevokeInviteMutationHookResult = ReturnType<
+  typeof useRevokeInviteMutation
+>;
+export type RevokeInviteMutationResult =
+  Apollo.MutationResult<RevokeInviteMutation>;
+export type RevokeInviteMutationOptions = BaseMutationOptions<
+  RevokeInviteMutation,
+  RevokeInviteMutationVariables
+>;
 export const JoinSeasonDraftGame = gql`
   mutation JoinSeasonDraftGame($inviteCode: String!) {
     joinSeasonDraftGame(inviteCode: $inviteCode)
@@ -34524,6 +35310,8 @@ export const GetDraftRoom = gql`
       status
       sport
       leagueId
+      openSeatCount
+      reservedSlots
       draft {
         id
         leagueId

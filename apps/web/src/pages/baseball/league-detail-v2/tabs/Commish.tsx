@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
+import { DraftInvitePanel } from '@legacy-sports/shared-components/draft';
 import {
   type LeagueFragment,
   Sport,
@@ -324,6 +325,14 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       content: leagueId ? (
         <CommissionerAnnouncementsPanel leagueId={leagueId} isCommissioner />
       ) : null,
+    },
+    {
+      // Direct invites by username (LS-10078): accepting joins the league.
+      id: 'invite-users',
+      label: 'Invite Users',
+      iconClass: 'gold',
+      icon: <I.Users size={16} />,
+      content: leagueId ? <DraftInvitePanel target={{ leagueId }} /> : null,
     },
     {
       id: 'league-settings',

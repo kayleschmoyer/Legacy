@@ -13,9 +13,13 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
-import { broadcastLobbyUpdate, lockMockDraft, reservedSlots } from './shared';
+import {
+  broadcastLobbyUpdate,
+  getSeatAvailability,
+  lockMockDraft,
+} from './shared';
 import { builder } from '../../builder';
 import { SportKindEnum } from '../../leagues/types';
 import { AuthenticationError, UserInputError } from '../../graphql-errors';
@@ -127,30 +131,15 @@ builder.mutationField('joinMockDraft', (t) =>
           throw UserInputError('This mock draft lobby has expired.');
         }
 
-        const seats = await tx
-          .select({
-            id: PublicSchema.draftParticipants.id,
-            slot: PublicSchema.draftParticipants.slot,
-            userId: PublicSchema.draftParticipants.userId,
-            controller: PublicSchema.draftParticipants.controller,
-          })
-          .from(PublicSchema.draftParticipants)
-          .where(eq(PublicSchema.draftParticipants.draftId, draft.id))
-          .orderBy(asc(PublicSchema.draftParticipants.slot));
+        const { seats, openSlots } = await getSeatAvailability(tx, draft.id);
 
         if (seats.some((s) => s.userId === userId)) {
           throw UserInputError('You have already joined this mock draft.');
         }
 
         // A slot held by a pending invitation is reserved for that user, not
-        // for whoever pastes the code first.
-        const reserved = await reservedSlots(tx, draft.id);
-        const openSeat = seats.find(
-          (s) =>
-            s.userId === null &&
-            s.controller === 'open' &&
-            !reserved.has(s.slot),
-        );
+        // for whoever pastes the code first — openSlots already excludes it.
+        const openSeat = seats.find((s) => s.slot === openSlots[0]);
 
         if (!openSeat) {
           throw UserInputError(

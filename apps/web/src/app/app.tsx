@@ -20,6 +20,7 @@ import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { prefetchHomePage } from '../utils/prefetchHomePage';
 import { PlayersStatsRedirectPage } from '../pages/players/PlayersStatsRedirectPage';
+import { LegacyJoinRedirect } from '../pages/join/LegacyJoinRedirect';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
@@ -123,9 +124,9 @@ const MockDraftBoardScreen = lazyWithRetry(() =>
     default: m.MockDraftBoardScreen,
   })),
 );
-const JoinMockDraftPage = lazyWithRetry(() =>
-  import('../pages/draft/JoinMockDraftPage').then((m) => ({
-    default: m.JoinMockDraftPage,
+const JoinByCodePage = lazyWithRetry(() =>
+  import('../pages/join/JoinByCodePage').then((m) => ({
+    default: m.JoinByCodePage,
   })),
 );
 const SeasonDraftGamePage = lazyWithRetry(
@@ -882,11 +883,11 @@ function App() {
             />
             <Route
               path="/baseball/mock-draft/join"
-              element={<JoinMockDraftPage />}
+              element={<LegacyJoinRedirect />}
             />
             <Route
               path="/baseball/mock-draft/join/:inviteCode"
-              element={<JoinMockDraftPage />}
+              element={<LegacyJoinRedirect />}
             />
             <Route
               path="/baseball/league/create"
@@ -900,6 +901,9 @@ function App() {
               path="/baseball/league/join/:inviteCode"
               element={<JoinLeagueByCodePage />}
             />
+            {/* The universal invite route (LS-10078): league and mock-draft codes. */}
+            <Route path="/join" element={<JoinByCodePage />} />
+            <Route path="/join/:code" element={<JoinByCodePage />} />
             <Route
               path="/baseball/leagues"
               element={<LeagueDiscoveryPage sport="baseball" />}

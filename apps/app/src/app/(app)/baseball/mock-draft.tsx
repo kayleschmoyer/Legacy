@@ -322,7 +322,7 @@ export function MockDraftPage(): React.JSX.Element {
           footballMockEnabled={footballMockEnabled}
           usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
-          onJoinInstead={() => router.navigate('/baseball/mock-draft-join')}
+          onJoinInstead={() => router.navigate('/join')}
           isControlAllTeamsEntitled={isControlAllTeamsEntitled}
           onControlAllTeamsUpgrade={handleControlAllTeamsUpgrade}
         />

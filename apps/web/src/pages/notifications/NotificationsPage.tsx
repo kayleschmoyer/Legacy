@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { NotificationsScreen } from '@legacy-sports/shared-components/notifications';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
+import { joinedTargetPath } from '../join/joinedTargetPath';
 import { env } from '../../config/environment';
 
 const NotificationsPage: React.FC = () => {
@@ -29,6 +30,9 @@ const NotificationsPage: React.FC = () => {
         }
         onNavigateToTrades={(leagueId: number) =>
           navigate(`/baseball/league/${leagueId}/trades`)
+        }
+        onNavigateToInviteTarget={(target) =>
+          navigate(joinedTargetPath(target))
         }
       />
     </>

@@ -32,6 +32,7 @@ function draftRoomPayload(options: {
   canHost: boolean;
   seatId: number | null;
   isPublic?: boolean;
+  reservedSlots?: number[];
 }) {
   return {
     __typename: 'DraftRoom',
@@ -39,6 +40,12 @@ function draftRoomPayload(options: {
     status: 'not-started',
     sport: 'baseball',
     leagueId: null,
+    openSeatCount: options.seats.filter(
+      (s) =>
+        s.controller === 'open' &&
+        !(options.reservedSlots ?? []).includes(s.slot),
+    ).length,
+    reservedSlots: options.reservedSlots ?? [],
     draft: {
       __typename: 'Draft',
       id: DRAFT_ID,
@@ -146,6 +153,94 @@ test.describe('Mock draft room @regression', () => {
     // The host can free another holder's seat, but never their own.
     await expect(page.getByTestId('mock-draft-kick-2')).toBeVisible();
     await expect(page.getByTestId('mock-draft-kick-1')).toHaveCount(0);
+  });
+
+  test('the host invites a user, reserving a seat, then revokes it (LS-10078)', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { canHost: true, seatId: 11 });
+
+    // Registered after setupGraphQL, so it answers first (Playwright routes
+    // are LIFO); anything it does not handle falls back to the lobby mocks.
+    const state: { pending: boolean; sent: unknown[]; revoked: unknown[] } = {
+      pending: false,
+      sent: [],
+      revoked: [],
+    };
+    const pendingInvite = {
+      __typename: 'Invitation',
+      id: 31,
+      kind: 'mock',
+      status: 'pending',
+      draftId: DRAFT_ID,
+      leagueId: null,
+      sport: 'baseball',
+      targetName: "HostHarry's mock draft",
+      invitedUserId: 5,
+      invitedUsername: 'pal',
+      invitedById: 1,
+      invitedByUsername: 'HostHarry',
+      reservedSlot: 3,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      createdAt: '2026-10-01T00:00:00.000Z',
+    };
+    await createGraphQLRouter(page, {
+      getdraftroom: (route) =>
+        fulfillJson(route, {
+          data: {
+            draftRoom: draftRoomPayload({
+              seats: SEATS,
+              canHost: true,
+              seatId: 11,
+              reservedSlots: state.pending ? [3] : [],
+            }),
+          },
+        }),
+      pendinginvites: (route) =>
+        fulfillJson(route, {
+          data: { pendingInvites: state.pending ? [pendingInvite] : [] },
+        }),
+      searchusersfordraft: (route) =>
+        fulfillJson(route, {
+          data: {
+            searchUsers: [
+              { __typename: 'User', id: 5, username: 'pal', avatarUrl: null },
+            ],
+          },
+        }),
+      senddraftinvite: (route, { variables }) => {
+        state.sent.push(variables);
+        state.pending = true;
+        return fulfillJson(route, { data: { sendDraftInvite: pendingInvite } });
+      },
+      revokeinvite: (route, { variables }) => {
+        state.revoked.push(variables);
+        state.pending = false;
+        return fulfillJson(route, {
+          data: { revokeInvite: { ...pendingInvite, status: 'revoked' } },
+        });
+      },
+    });
+
+    await page.goto(`/baseball/mock-draft/${String(DRAFT_ID)}`);
+    await expect(page.getByTestId('draft-invite-panel')).toBeVisible();
+
+    await page.getByLabel('Search usernames').fill('pal');
+    await page.getByTestId('draft-invite-send-pal').click();
+
+    await expect(page.getByTestId('draft-invite-pending-31')).toContainText(
+      'seat 3 reserved',
+    );
+    await expect(page.getByTestId('mock-draft-seat-3')).toContainText(
+      'Reserved',
+    );
+    expect(state.sent).toEqual([{ draftId: DRAFT_ID, username: 'pal' }]);
+
+    await page.getByTestId('draft-invite-revoke-31').click();
+
+    await expect(page.getByTestId('draft-invite-pending-31')).toHaveCount(0);
+    await expect(page.getByTestId('mock-draft-seat-3')).toContainText('Open');
+    expect(state.revoked).toEqual([{ inviteId: 31 }]);
   });
 
   test('a seat holder who is not the host gets no host controls', async ({

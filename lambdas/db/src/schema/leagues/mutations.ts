@@ -1817,7 +1817,7 @@ export async function claimUnassignedTeamForUser(
  * equally against the cap (BBH-034). A user with 2 self-created leagues + 1
  * joined league is at the 3-league cap and cannot join a 4th.
  */
-async function requireJoinLeagueCapacity(
+export async function requireJoinLeagueCapacity(
   context: Context,
   userId: number,
 ): Promise<{ hasUnlimitedLeagues: boolean }> {

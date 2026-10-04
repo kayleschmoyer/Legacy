@@ -8,7 +8,11 @@
           "/reset-password",
           "/reset-password/*",
           "/football/league/*",
-          "/baseball/league/*"
+          "/baseball/league/*",
+          "/join",
+          "/join/*",
+          "/baseball/mock-draft/join",
+          "/baseball/mock-draft/join/*"
         ]
       }
     ]

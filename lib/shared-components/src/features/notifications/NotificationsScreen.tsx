@@ -11,11 +11,22 @@ import {
   YStack,
 } from 'tamagui';
 import { Bell } from '@tamagui/lucide-icons/icons/Bell';
+import { useQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
-import { type NotificationHistoryItem } from '@legacy-sports/graphql';
+import {
+  MyInvites as MY_INVITES,
+  type MyInvitesQuery,
+  type MyInvitesQueryVariables,
+  type NotificationHistoryItem,
+} from '@legacy-sports/graphql';
 import { NotificationList } from './components/NotificationList';
 import { NotificationSettings } from './components/NotificationSettings';
 import { useNotifications } from './hooks/useNotifications';
+import type { JoinedTarget } from '../invites/hooks/useInviteCode';
+import {
+  inviteIdFromNotification,
+  InviteResponseActions,
+} from '../invites/InviteResponseActions';
 import { BRAND_GOLD_LIGHT } from '../../utils/colors';
 
 export interface NotificationsScreenProps {
@@ -35,7 +46,12 @@ export interface NotificationsScreenProps {
   onNavigateToMatchup?: (matchupId: number, leagueId: number) => void;
   onNavigateToLeague?: (leagueId: number) => void;
   onNavigateToTrades?: (leagueId: number, tradeOfferId?: number) => void;
+  /** Where an accepted invite lands: the mock draft or the league (LS-10078). */
+  onNavigateToInviteTarget?: (target: JoinedTarget) => void;
 }
+
+/** Enough pending invites to cover any realistic notifications page. */
+const PENDING_INVITES_PAGE = 50;
 
 export function NotificationsScreen({
   userId,
@@ -44,6 +60,7 @@ export function NotificationsScreen({
   onNavigateToMatchup,
   onNavigateToLeague,
   onNavigateToTrades,
+  onNavigateToInviteTarget,
 }: NotificationsScreenProps): React.JSX.Element {
   const {
     notifications,
@@ -64,6 +81,33 @@ export function NotificationsScreen({
     websocketUrl,
     token: websocketToken,
   });
+
+  // A DRAFT_INVITE card offers Accept/Decline only while its invite is still
+  // pending — the notification row outlives a revoke or an expiry.
+  const { data: invitesData, refetch: refetchInvites } = useQuery<
+    MyInvitesQuery,
+    MyInvitesQueryVariables
+  >(MY_INVITES, {
+    variables: { first: PENDING_INVITES_PAGE },
+    fetchPolicy: 'cache-and-network',
+  });
+  const pendingInviteIds = new Set(
+    (invitesData?.myInvites?.nodes ?? []).map((invite) => invite.id),
+  );
+
+  const renderInviteActions = (notification: NotificationHistoryItem) => {
+    const inviteId = inviteIdFromNotification(notification);
+    if (inviteId === null || !pendingInviteIds.has(inviteId)) return null;
+    return (
+      <InviteResponseActions
+        inviteId={inviteId}
+        onAccepted={onNavigateToInviteTarget}
+        onResponded={() => {
+          void refetchInvites();
+        }}
+      />
+    );
+  };
 
   const handleNotificationPress = (notification: NotificationHistoryItem) => {
     if (!notification.read && notification.id) {
@@ -169,6 +213,7 @@ export function NotificationsScreen({
           notifications={notifications}
           onNotificationPress={handleNotificationPress}
           onMarkAsRead={markAsRead}
+          renderActions={renderInviteActions}
         />
         <XStack
           alignItems="center"

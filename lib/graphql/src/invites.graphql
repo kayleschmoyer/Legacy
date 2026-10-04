@@ -1,0 +1,88 @@
+# Invites (LS-10078): the universal /join/:code preview and direct user
+# invites to mock drafts and leagues.
+
+fragment InvitationFields on Invitation {
+  id
+  kind
+  status
+  draftId
+  leagueId
+  sport
+  targetName
+  invitedUserId
+  invitedUsername
+  invitedById
+  invitedByUsername
+  reservedSlot
+  expiresAt
+  createdAt
+}
+
+query ResolveInviteCode($code: String!) {
+  resolveInviteCode(code: $code) {
+    __typename
+    ... on MockDraftInvitePreview {
+      code
+      draftId
+      sport
+      hostUsername
+      playerPool
+      filledSeats
+      totalSeats
+      openSeats
+      pickTimeLimitSeconds
+      rounds
+      lobbyExpiresAt
+      isJoinable
+      isAlreadySeated
+    }
+    ... on LeagueInvitePreview {
+      code
+      leagueId
+      sport
+      name
+      totalTeams
+      openTeams
+      draftScheduledAt
+      isAlreadyMember
+    }
+  }
+}
+
+query MyInvites($first: Int, $after: String, $kind: String) {
+  myInvites(first: $first, after: $after, kind: $kind) {
+    nodes {
+      ...InvitationFields
+    }
+    endCursor
+    hasNextPage
+  }
+}
+
+query PendingInvites($draftId: Int, $leagueId: Int) {
+  pendingInvites(draftId: $draftId, leagueId: $leagueId) {
+    ...InvitationFields
+  }
+}
+
+mutation SendDraftInvite($draftId: Int, $leagueId: Int, $username: String!) {
+  sendDraftInvite(draftId: $draftId, leagueId: $leagueId, username: $username) {
+    ...InvitationFields
+  }
+}
+
+mutation RespondToInvite(
+  $inviteId: Int!
+  $accept: Boolean!
+  $teamName: String
+) {
+  respondToInvite(inviteId: $inviteId, accept: $accept, teamName: $teamName) {
+    ...InvitationFields
+  }
+}
+
+mutation RevokeInvite($inviteId: Int!) {
+  revokeInvite(inviteId: $inviteId) {
+    ...InvitationFields
+  }
+}

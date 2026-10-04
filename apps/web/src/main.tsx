@@ -113,6 +113,10 @@ const PUBLIC_PATHS = [
   // prior authentication. The join mutation itself requires auth and
   // will surface an error if the user is not signed in (LS-3702).
   `${basePath}/baseball/league/join`,
+  // The universal invite route /join/:code (LS-10078): an invite link opened
+  // signed-out shows a sign-in prompt that returns to the same code, rather
+  // than bouncing to the landing page and losing it.
+  `${basePath}/join`,
   // /terms and /privacy are legal pages linked from the login page —
   // must be accessible without authentication (LS-3696).
   `${basePath}/terms`,

@@ -156,6 +156,21 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   // GetUserLeagues also fetches userLeagueCount (LS-9101) — the authoritative
   // total the free-tier league-cap gate reads instead of userLeagues.length.
   getuserleagues: { data: { userLeagues: [], userLeagueCount: 0 } },
+  // Invites (LS-10078): the notifications page reads the caller's pending
+  // invites to decide which DRAFT_INVITE cards get Accept/Decline, and the
+  // commissioner / mock-lobby invite panel lists pending invites. Empty by
+  // default; invite specs register their own.
+  myinvites: {
+    data: {
+      myInvites: {
+        __typename: 'InvitationConnection',
+        nodes: [],
+        endCursor: null,
+        hasNextPage: false,
+      },
+    },
+  },
+  pendinginvites: { data: { pendingInvites: [] } },
   // Football Home's top/trending-players preview fires FootballPlayers on every
   // /football load (LS-5411). An empty connection renders the preview section's
   // loading-then-empty transition cleanly without asserting on player content —

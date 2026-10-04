@@ -231,7 +231,13 @@ export function cpuSeatName(slot: number): string {
 export async function broadcastLobbyUpdate(
   context: Context,
   draftId: number,
-  reason: 'seat-claimed' | 'seat-freed' | 'seat-kicked' | 'settings' | 'host',
+  reason:
+    | 'seat-claimed'
+    | 'seat-freed'
+    | 'seat-kicked'
+    | 'settings'
+    | 'host'
+    | 'invite',
 ): Promise<void> {
   const { notificationService } = context;
   if (!notificationService) return;
@@ -271,4 +277,48 @@ export async function reservedSlots(
       .map((r) => r.reservedSlot)
       .filter((slot): slot is number => slot !== null),
   );
+}
+
+/** A lobby's seats, split the one way every caller must count them. */
+export interface SeatAvailability {
+  seats: Awaited<ReturnType<typeof getLobbySeats>>;
+  /** Slots held by a pending, unexpired invitation. */
+  reservedSlots: Set<number>;
+  /** Unheld, unreserved seats in slot order — what a public joiner can take. */
+  openSlots: number[];
+  filledSeats: number;
+  totalSeats: number;
+}
+
+/**
+ * The single definition of "open seat" (LS-10078): `controller = 'open'` with
+ * no holder, minus the slots pending invitations reserve. The lobby, the
+ * invite-code preview, `joinMockDraft`'s guard, `sendDraftInvite`'s slot pick
+ * and the public lobby list (LS-10079) all read it from here, so none of them
+ * can disagree about whether a lobby is full.
+ *
+ * Pass the transaction holding `lockMockDraft` when the answer gates a write.
+ */
+export async function getSeatAvailability(
+  db: PublicDb,
+  draftId: number,
+  now: Date = new Date(),
+): Promise<SeatAvailability> {
+  const [seats, reserved] = await Promise.all([
+    getLobbySeats(db, draftId),
+    reservedSlots(db, draftId, now),
+  ]);
+
+  return {
+    seats,
+    reservedSlots: reserved,
+    openSlots: seats
+      .filter(
+        (s) =>
+          s.userId === null && s.controller === 'open' && !reserved.has(s.slot),
+      )
+      .map((s) => s.slot),
+    filledSeats: seats.filter((s) => s.userId !== null).length,
+    totalSeats: seats.length,
+  };
 }

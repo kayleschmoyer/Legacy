@@ -1,6 +1,6 @@
 # Join League by Invite Code — Reference
 
-**Route**: `/baseball/league/join` · `/baseball/league/join/:inviteCode`  
+**Route**: `/baseball/league/join` · `/baseball/league/join/:inviteCode` (the universal [`/join/:code`](../../join.md) also accepts league codes, LS-10078)  
 **File**: `apps/web/src/pages/baseball/JoinLeagueByCodePage.tsx`
 
 ---

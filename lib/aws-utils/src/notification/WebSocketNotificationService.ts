@@ -123,7 +123,8 @@ export interface DraftLobbyUpdatedNotification {
     | 'seat-kicked'
     | 'settings'
     | 'host'
-    | 'expired';
+    | 'expired'
+    | 'invite';
   /** Seats currently held by a user, for the lobby's seat counter. */
   filledSeats: number;
   totalSeats: number;

@@ -367,7 +367,7 @@ describe('MockDraftPage', () => {
       fireEvent.press(
         screen.getByText("Have an invite code? Join a friend's draft →"),
       );
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft-join');
+      expect(mockNavigate).toHaveBeenCalledWith('/join');
     });
   });
 
