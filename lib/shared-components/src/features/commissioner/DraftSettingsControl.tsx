@@ -182,11 +182,18 @@ export function DraftSettingsControl({
   const {
     data: draftData,
     loading: draftLoading,
+    error: draftError,
     refetch: refetchDraft,
   } = useGetLeagueDraftQuery({
     variables: { leagueId },
     fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true,
   });
+  // LS-10467: with cache-and-network, `loading` stays true during the
+  // background refresh even when cached data is already rendered — only block
+  // on the spinner before the first result. Until the draft has loaded, the
+  // form shows defaults rather than the real settings, so Save stays disabled.
+  const draftLoaded = draftData !== undefined;
 
   const [updateDraftSettings, { loading: saving }] =
     useUpdateDraftSettingsMutation();
@@ -594,10 +601,25 @@ export function DraftSettingsControl({
             </Card>
           )}
 
-          {draftLoading ? (
+          {!draftLoaded && draftLoading ? (
             <YStack alignItems="center" padding="$4" gap="$2">
               <Spinner size="large" />
               <Text color="$gray10">Loading draft settings...</Text>
+            </YStack>
+          ) : !draftLoaded ? (
+            <YStack alignItems="center" padding="$4" gap="$3">
+              <Text color="$red10" textAlign="center">
+                {draftError
+                  ? `Couldn't load draft settings: ${draftError.message}`
+                  : "Couldn't load draft settings."}
+              </Text>
+              <Button
+                size="$3"
+                // A failed retry is surfaced through the hook's `error`.
+                onPress={() => void refetchDraft().catch(() => undefined)}
+              >
+                Retry
+              </Button>
             </YStack>
           ) : (
             <YStack gap="$5">
@@ -893,7 +915,7 @@ export function DraftSettingsControl({
                     pressStyle={{ backgroundColor: '$brandNavyDark' }}
                     size="$3"
                     onPress={() => void handleSave()}
-                    disabled={!hasChanges || saving}
+                    disabled={!hasChanges || saving || !draftLoaded}
                     opacity={!hasChanges ? 0.5 : 1}
                     icon={saving ? <Spinner size="small" /> : undefined}
                   >
