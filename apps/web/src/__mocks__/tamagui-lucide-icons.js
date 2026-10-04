@@ -77,6 +77,12 @@ export const Crown = () => 'Crown';
 export const Flame = () => 'Flame';
 export const Target = () => 'Target';
 
+// Icons used by MobileNavDrawer (LS-10440)
+export const Bug = () => 'Bug';
+export const ListOrdered = () => 'ListOrdered';
+export const Shuffle = () => 'Shuffle';
+export const SlidersHorizontal = () => 'SlidersHorizontal';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;

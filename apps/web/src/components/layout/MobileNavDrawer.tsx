@@ -12,7 +12,6 @@ import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import { Shuffle } from '@tamagui/lucide-icons/icons/Shuffle';
 import { SlidersHorizontal } from '@tamagui/lucide-icons/icons/SlidersHorizontal';
 import { Ticket } from '@tamagui/lucide-icons/icons/Ticket';
-import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { User } from '@tamagui/lucide-icons/icons/User';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { X } from '@tamagui/lucide-icons/icons/X';
@@ -84,6 +83,20 @@ export const MobileNavDrawer: React.FC<Props> = ({
   const currentLeague = leagues[0] ?? null;
 
   const isPathActive = (prefix: string) => location.pathname.startsWith(prefix);
+
+  // Standings shortcut opens the league the user is currently in (LS-10440);
+  // outside a league, `/standings` falls back to last-visited, then first.
+  const leagueRouteMatch = location.pathname.match(
+    /^\/(baseball|football)\/league\/(\d+)(?:\/|$)/,
+  );
+  const standingsPath = leagueRouteMatch
+    ? `/${leagueRouteMatch[1]}/league/${leagueRouteMatch[2]}/standings`
+    : '/standings';
+  const isStandingsActive =
+    isPathActive('/standings') ||
+    /^\/(baseball|football)\/league\/\d+\/standings(?:\/|$)/.test(
+      location.pathname,
+    );
 
   const handleNav = (to: string) => {
     navigate(to);
@@ -404,14 +417,8 @@ export const MobileNavDrawer: React.FC<Props> = ({
           {
             Icon: ListOrdered,
             label: 'Standings',
-            to: '/standings',
-            active: isPathActive('/standings'),
-          },
-          {
-            Icon: Trophy,
-            label: 'Trophy Case',
-            to: '/profile/settings',
-            active: false,
+            to: standingsPath,
+            active: isStandingsActive,
           },
         ].map((item) => (
           <button
