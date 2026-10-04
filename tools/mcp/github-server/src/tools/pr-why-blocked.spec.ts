@@ -7,6 +7,11 @@ jest.mock('../required-checks', () => ({
   evaluatePRChecks: jest.fn(),
   requiresCodeOwnerReview: jest.fn(),
 }));
+jest.mock('../ci-run-diagnosis', () => ({
+  diagnoseNeverRegistered: jest.fn(),
+  fetchWorkflowRunsForSha: jest.fn(),
+  fetchLatestCompletedRunForBranch: jest.fn(),
+}));
 
 import { diagnose, prWhyBlocked } from './pr-why-blocked';
 import type { Diagnosis } from './pr-why-blocked';
@@ -14,6 +19,11 @@ import { githubGraphQL, githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
 import { evaluatePRChecks, requiresCodeOwnerReview } from '../required-checks';
 import type { CIPartition } from '../required-checks';
+import {
+  diagnoseNeverRegistered,
+  fetchLatestCompletedRunForBranch,
+  fetchWorkflowRunsForSha,
+} from '../ci-run-diagnosis';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -28,6 +38,17 @@ const mockedEvaluatePRChecks = evaluatePRChecks as jest.MockedFunction<
 const mockedRequiresCodeOwnerReview =
   requiresCodeOwnerReview as jest.MockedFunction<
     typeof requiresCodeOwnerReview
+  >;
+const mockedFetchRunsForSha = fetchWorkflowRunsForSha as jest.MockedFunction<
+  typeof fetchWorkflowRunsForSha
+>;
+const mockedFetchLatestBranchRun =
+  fetchLatestCompletedRunForBranch as jest.MockedFunction<
+    typeof fetchLatestCompletedRunForBranch
+  >;
+const mockedDiagnoseNeverRegistered =
+  diagnoseNeverRegistered as jest.MockedFunction<
+    typeof diagnoseNeverRegistered
   >;
 
 // ── CI partition helper ───────────────────────────────────────────────────────
@@ -62,6 +83,7 @@ function makePR(overrides: Partial<PRInput> = {}): PRInput {
     reviewDecision: null,
     headRefOid: 'deadbeef',
     baseRefName: 'main',
+    headRefName: 'feature-branch',
     autoMergeRequest: null,
     labels: { pageInfo: { hasNextPage: false }, nodes: [] },
     reviews: {
@@ -296,6 +318,79 @@ describe('diagnose', () => {
       expect((result.details as { mergeable: string }).mergeable).toBe(
         'UNKNOWN',
       );
+    });
+
+    // LS-9335: "CI Gate (not yet registered)" used to render identically to a
+    // genuinely queued check, telling an agent to "wait" for a pipeline that
+    // will never run because every orchestrator run for the head SHA was
+    // cancelled.
+    describe('CI never registered (LS-9335)', () => {
+      it('returns BLOCKED/CI_NEVER_RAN with a re-run nextAction when every run for the head SHA was cancelled (AC1)', () => {
+        const result = diagnose(
+          makePR({ headRefOid: 'cdaf1c2' }),
+          ci({ pending: ['CI Gate (not yet registered)'] }),
+          false,
+          null,
+          {
+            neverRan: true,
+            cancelledRunIds: [31421732904, 31422037097],
+          },
+        );
+        expect(result.status).toBe('BLOCKED');
+        expect(result.reason).toBe('CI_NEVER_RAN');
+        expect(result.nextAction).not.toContain('Wait for CI to finish');
+        expect(result.nextAction).toContain('ci_rerun');
+        expect(result.nextAction).toContain('31422037097');
+        expect(
+          (result.details as { cancelledRunIds: number[] }).cancelledRunIds,
+        ).toEqual([31421732904, 31422037097]);
+      });
+
+      it('leaves CI_PENDING/"wait" behaviour unchanged when a run for the head SHA is queued or in progress (AC2)', () => {
+        const result = diagnose(
+          makePR(),
+          ci({ pending: ['CI Gate (not yet registered)'] }),
+          false,
+          null,
+          { neverRan: false, cancelledRunIds: [] },
+        );
+        expect(result.status).toBe('WAITING');
+        expect(result.reason).toBe('CI_PENDING');
+        expect(result.nextAction).toBe('Wait for CI to finish.');
+      });
+
+      it('leaves CI_PENDING/"wait" behaviour unchanged when neverRegistered was not computed at all (AC2)', () => {
+        const result = diagnose(
+          makePR(),
+          ci({ pending: ['CI Gate (not yet registered)'] }),
+        );
+        expect(result.status).toBe('WAITING');
+        expect(result.reason).toBe('CI_PENDING');
+      });
+
+      it('surfaces staleCompletedRun details and names the superseded commit in nextAction, distinct from the head SHA (AC3)', () => {
+        const result = diagnose(
+          makePR({ headRefOid: 'cdaf1c2' }),
+          ci({ pending: ['CI Gate (not yet registered)'] }),
+          false,
+          null,
+          {
+            neverRan: true,
+            cancelledRunIds: [31421732904, 31422037097],
+            staleCompletedRun: {
+              runId: 31419427766,
+              sha: 'e812d4b',
+              conclusion: 'failure',
+            },
+          },
+        );
+        expect(
+          (result.details as { staleCompletedRun: { sha: string } })
+            .staleCompletedRun.sha,
+        ).toBe('e812d4b');
+        expect(result.nextAction).toContain('superseded commit');
+        expect(result.nextAction).toContain('e812d4b');
+      });
     });
   });
 
@@ -755,5 +850,90 @@ describe('prWhyBlocked', () => {
     expect(payload.reason).toBe('CI_FAILING');
     expect(payload.behindBy).toBe(2);
     expect(payload.hint).toBe('STALE_BASE');
+  });
+
+  // LS-9335 end-to-end: the Actions-runs lookup only fires when a required
+  // check is genuinely ambiguous ("not yet registered"), and its result flows
+  // through to the final diagnosis.
+  describe('CI never registered (LS-9335)', () => {
+    it('only calls the Actions-runs lookup when a required check reads "not yet registered"', async () => {
+      mockedGraphQL.mockResolvedValueOnce({
+        data: { repository: { pullRequest: makePR() } },
+      });
+      mockedEvaluatePRChecks.mockResolvedValue(
+        ci({ pending: ['build (in_progress)'] }),
+      );
+
+      await prWhyBlocked({ number: 42 });
+
+      expect(mockedFetchRunsForSha).not.toHaveBeenCalled();
+      expect(mockedFetchLatestBranchRun).not.toHaveBeenCalled();
+    });
+
+    it('fetches workflow runs for the head SHA and branch, then feeds the result into diagnose (AC1/AC3)', async () => {
+      mockedGraphQL.mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: makePR({
+              headRefOid: 'cdaf1c2',
+              headRefName: 'ls-9247',
+            }),
+          },
+        },
+      });
+      mockedEvaluatePRChecks.mockResolvedValue(
+        ci({ pending: ['CI Gate (not yet registered)'] }),
+      );
+      const cancelledRuns = [
+        {
+          id: 31421732904,
+          status: 'completed',
+          conclusion: 'cancelled',
+          head_sha: 'cdaf1c2',
+          head_branch: 'ls-9247',
+          created_at: '2026-08-10T00:00:00Z',
+        },
+        {
+          id: 31422037097,
+          status: 'completed',
+          conclusion: 'cancelled',
+          head_sha: 'cdaf1c2',
+          head_branch: 'ls-9247',
+          created_at: '2026-08-10T00:01:00Z',
+        },
+      ];
+      const staleRun = {
+        id: 31419427766,
+        status: 'completed',
+        conclusion: 'failure',
+        head_sha: 'e812d4b',
+        head_branch: 'ls-9247',
+        created_at: '2026-08-09T00:00:00Z',
+      };
+      mockedFetchRunsForSha.mockResolvedValue(cancelledRuns);
+      mockedFetchLatestBranchRun.mockResolvedValue(staleRun);
+      mockedDiagnoseNeverRegistered.mockReturnValue({
+        neverRan: true,
+        cancelledRunIds: [31421732904, 31422037097],
+        staleCompletedRun: {
+          runId: 31419427766,
+          sha: 'e812d4b',
+          conclusion: 'failure',
+        },
+      });
+
+      const result = await prWhyBlocked({ number: 6935 });
+      const payload = JSON.parse(result.content[0].text) as Diagnosis;
+
+      expect(mockedFetchRunsForSha).toHaveBeenCalledWith('o', 'r', 'cdaf1c2');
+      expect(mockedFetchLatestBranchRun).toHaveBeenCalledWith(
+        'o',
+        'r',
+        'ls-9247',
+      );
+      expect(payload.status).toBe('BLOCKED');
+      expect(payload.reason).toBe('CI_NEVER_RAN');
+      expect(payload.nextAction).toContain('ci_rerun');
+    });
   });
 });

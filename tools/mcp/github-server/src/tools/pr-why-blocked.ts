@@ -1,6 +1,12 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import {
+  diagnoseNeverRegistered,
+  fetchLatestCompletedRunForBranch,
+  fetchWorkflowRunsForSha,
+} from '../ci-run-diagnosis.js';
+import type { NeverRegisteredDiagnosis } from '../ci-run-diagnosis.js';
+import {
   detectConflictSignals,
   isConflictCheckFailure,
   isStaleConflictSignalOnly,
@@ -68,6 +74,9 @@ interface PRWhyBlockedGraphQLResponse {
       // (the merge-queue-aligned path) instead of GraphQL statusCheckRollup.
       headRefOid: string;
       baseRefName: string;
+      // Head branch name — used to look up the branch's most recent completed
+      // workflow run (LS-9335: distinguishing it from the current head SHA).
+      headRefName: string;
       labels: {
         pageInfo: { hasNextPage: boolean };
         nodes: Array<{ name: string }>;
@@ -115,6 +124,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       reviewDecision
       headRefOid
       baseRefName
+      headRefName
       autoMergeRequest { enabledBy { login } }
       labels(first: 100) {
         pageInfo { hasNextPage }
@@ -181,6 +191,7 @@ export function diagnose(
   ci: CIPartition,
   requireCodeOwnerReview = false,
   staleBase: StaleBaseHint | null = null,
+  neverRegistered: NeverRegisteredDiagnosis | null = null,
 ): Diagnosis {
   const labels = new Set(pr.labels.nodes.map((l) => l.name));
   const hasReadyLabel = labels.has('bot:ready-for-review');
@@ -454,6 +465,35 @@ export function diagnose(
   }
 
   if (ci.pending.length > 0) {
+    // A required check that has posted no run/status at all reads as
+    // "(not yet registered)" whether CI is still about to start it or every
+    // orchestrator run for this commit was cancelled before it could — the
+    // two look identical from evaluatePRChecks() alone. neverRegistered is
+    // only populated (by prWhyBlocked) when that ambiguity is actually
+    // present, and only reports neverRan when no run for the head SHA is
+    // queued/in_progress (AC2: a genuinely in-flight run leaves this branch
+    // untouched).
+    if (neverRegistered?.neverRan) {
+      const lastRunId =
+        neverRegistered.cancelledRunIds[
+          neverRegistered.cancelledRunIds.length - 1
+        ];
+      return {
+        status: 'BLOCKED',
+        reason: 'CI_NEVER_RAN',
+        summary: `${ci.pending.length} required CI check${ci.pending.length === 1 ? '' : 's'} will never register — every workflow run for commit ${pr.headRefOid.slice(0, 7)} was cancelled.`,
+        details: {
+          pendingChecks: ci.pending,
+          passingChecks: ci.passing,
+          cancelledRunIds: neverRegistered.cancelledRunIds,
+          ...(neverRegistered.staleCompletedRun
+            ? { staleCompletedRun: neverRegistered.staleCompletedRun }
+            : {}),
+        },
+        nextAction: `Re-run the cancelled orchestrator — ci_rerun({ runId: ${lastRunId}, failedOnly: false }) — no pipeline exists for this commit.${neverRegistered.staleCompletedRun ? ` Note: the latest completed run on this branch (${neverRegistered.staleCompletedRun.runId}, conclusion "${neverRegistered.staleCompletedRun.conclusion}") belongs to a superseded commit (${neverRegistered.staleCompletedRun.sha.slice(0, 7)}), not the current head — do not treat its conclusion as this commit's status.` : ''}`,
+      };
+    }
+
     return {
       status: 'WAITING',
       reason: 'CI_PENDING',
@@ -602,7 +642,29 @@ export async function prWhyBlocked(
       pr.reviews.pageInfo.hasNextPage = false;
     }
 
-    const diagnosis = diagnose(pr, ci, requireCodeOwnerReview, staleBase);
+    // Only pay for the Actions Runs lookups when the ambiguity they resolve
+    // actually exists — a required check that never posted any run/status
+    // (LS-9335). Ordinary in-progress pending checks skip this entirely.
+    let neverRegistered: NeverRegisteredDiagnosis | null = null;
+    if (ci.pending.some((p) => p.endsWith('(not yet registered)'))) {
+      const [runsForSha, latestBranchRun] = await Promise.all([
+        fetchWorkflowRunsForSha(repo.owner, repo.name, pr.headRefOid),
+        fetchLatestCompletedRunForBranch(repo.owner, repo.name, pr.headRefName),
+      ]);
+      neverRegistered = diagnoseNeverRegistered(
+        runsForSha,
+        pr.headRefOid,
+        latestBranchRun,
+      );
+    }
+
+    const diagnosis = diagnose(
+      pr,
+      ci,
+      requireCodeOwnerReview,
+      staleBase,
+      neverRegistered,
+    );
 
     return {
       content: [
