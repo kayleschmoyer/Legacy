@@ -260,11 +260,12 @@ test.describe('Profile Settings Page @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-7212: App Avatar picker — preset + custom-URL selection.
+// LS-7212: App Avatar picker — preset selection.
 //
-// The picker offers presets and a custom URL only; it has no file-upload path,
-// so there is no client-side size / MIME / EXIF validation to exercise. These
-// tests pin what does exist: which value each control sends to the
+// User avatars are presets-only (LS-10443 removed the custom-URL input; its
+// absence is pinned in profile-league-branding.spec.ts), and there is no
+// file-upload path, so there is no client-side size / MIME / EXIF validation
+// to exercise. These tests pin which value each control sends to the
 // `UpdateUserAvatar` mutation.
 // ---------------------------------------------------------------------------
 
@@ -324,9 +325,7 @@ test.describe('Profile Settings Page — App Avatar picker (LS-7212) @regression
     await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
 
     await settingsPage.profile.selectAvatarPreset('Astronaut');
-    await settingsPage.profile.expectAvatarPreviewCaption(
-      'Custom URL or preset selected',
-    );
+    await settingsPage.profile.expectAvatarPreviewCaption('Image selected');
     await settingsPage.profile.clickSaveAvatar();
 
     // Presets are stored relative (/presets/x.png) in the picker but must be
@@ -335,39 +334,6 @@ test.describe('Profile Settings Page — App Avatar picker (LS-7212) @regression
     await expect
       .poll(() => sent)
       .toEqual([`${origin}/presets/avatar-astronaut.png`]);
-  });
-
-  test('applying a custom URL then saving sends that URL unchanged', async ({
-    page,
-    settingsPage,
-  }) => {
-    const sent = await setupAvatarGraphQL(page);
-    await settingsPage.profile.goto();
-
-    await settingsPage.profile.fillCustomAvatarUrl(
-      '  https://cdn.example.com/me.png  ',
-    );
-    await settingsPage.profile.clickApplyCustomAvatarUrl();
-    await settingsPage.profile.expectAvatarPreviewCaption(
-      'Custom URL or preset selected',
-    );
-    await settingsPage.profile.clickSaveAvatar();
-
-    // Surrounding whitespace is trimmed on Apply.
-    await expect.poll(() => sent).toEqual(['https://cdn.example.com/me.png']);
-  });
-
-  test('applying a blank custom URL selects nothing', async ({
-    page,
-    settingsPage,
-  }) => {
-    const sent = await setupAvatarGraphQL(page);
-    await settingsPage.profile.goto();
-
-    await settingsPage.profile.fillCustomAvatarUrl('   ');
-    await settingsPage.profile.clickApplyCustomAvatarUrl();
-    await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
-    expect(sent).toEqual([]);
   });
 
   test('Clear resets the preview and sends a null avatar', async ({

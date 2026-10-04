@@ -28,6 +28,7 @@ describe('captureMockDraftResolvers', () => {
       'sendDraftMessage',
       'expireMockDraftLobbies',
       'purgeStaleOfflineMockDrafts',
+      'myActiveMockDrafts',
     ] as const;
 
     for (const name of expected) {

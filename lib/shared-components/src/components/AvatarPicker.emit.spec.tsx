@@ -5,7 +5,9 @@
  * URL — so there is no size / MIME / EXIF validation to test. These cover the
  * value contract the profile page's `UpdateUserAvatar` mutation depends on:
  * presets resolved through `resolveUrl`, custom URLs trimmed and never
- * resolved, blank input ignored, and Clear emitting null.
+ * resolved, blank input ignored, and Clear emitting null. The custom URL
+ * input exists only on the `team` variant (LS-10443), so those cases render
+ * the team picker.
  *
  * Pressing a preset tile is covered by the Playwright spec for
  * /profile/settings, not here: this package's Jest `tamagui` mock drops
@@ -54,9 +56,15 @@ describe('AvatarPicker emit contract (LS-7212)', () => {
   });
 
   it('saves an applied custom URL trimmed and never resolved', () => {
-    render(<AvatarPicker onSelect={onSelect} resolveUrl={resolveUrl} />);
+    render(
+      <AvatarPicker
+        onSelect={onSelect}
+        resolveUrl={resolveUrl}
+        variant="team"
+      />,
+    );
 
-    fireEvent.change(screen.getByLabelText('Custom avatar URL'), {
+    fireEvent.change(screen.getByLabelText('Custom logo URL'), {
       target: { value: '  https://cdn.example.com/me.png  ' },
     });
     press(screen.getByText('Apply'));
@@ -66,9 +74,9 @@ describe('AvatarPicker emit contract (LS-7212)', () => {
   });
 
   it('does not save a custom URL that was typed but never applied', () => {
-    render(<AvatarPicker onSelect={onSelect} />);
+    render(<AvatarPicker onSelect={onSelect} variant="team" />);
 
-    fireEvent.change(screen.getByLabelText('Custom avatar URL'), {
+    fireEvent.change(screen.getByLabelText('Custom logo URL'), {
       target: { value: 'https://cdn.example.com/me.png' },
     });
     press(screen.getByText('Save'));
@@ -77,9 +85,9 @@ describe('AvatarPicker emit contract (LS-7212)', () => {
   });
 
   it('ignores Apply on a blank custom URL', () => {
-    render(<AvatarPicker onSelect={onSelect} />);
+    render(<AvatarPicker onSelect={onSelect} variant="team" />);
 
-    fireEvent.change(screen.getByLabelText('Custom avatar URL'), {
+    fireEvent.change(screen.getByLabelText('Custom logo URL'), {
       target: { value: '   ' },
     });
     press(screen.getByText('Apply'));

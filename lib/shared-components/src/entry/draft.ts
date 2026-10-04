@@ -9,3 +9,5 @@ export * from '../features/draft/MockDraftInviteCard';
 export * from '../features/elite-draft/MockDraftLobby';
 // Invites (LS-10078): universal /join/:code screen, invite panel, accept/decline.
 export * from '../features/invites';
+// Resume banner for unfinished mock drafts (LS-10465).
+export * from '../features/draft/ResumeMockDraftBanner';

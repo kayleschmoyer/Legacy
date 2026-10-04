@@ -122,6 +122,21 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
       <button onClick={onContinue}>Continue to Draft Room</button>
     </div>
   ),
+  ResumeMockDraftBanner: ({
+    drafts,
+    onResume,
+  }: {
+    drafts: { draftId: number; sport: string }[];
+    onResume: (draft: { draftId: number; sport: string }) => void;
+  }) => (
+    <div data-testid="resume-mock-draft-banner">
+      {drafts.map((d) => (
+        <button key={d.draftId} onClick={() => onResume(d)}>
+          Resume {d.draftId}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({
@@ -169,8 +184,14 @@ const mockCreateMockDraft = jest.fn(() =>
   Promise.resolve({ data: { createMockDraft: { draftId: 42 } } }),
 );
 
+// LS-10465: unfinished mock drafts for the resume banner. Empty by default.
+let mockActiveDrafts: Record<string, unknown>[] = [];
+
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMyMockDraftUsageQuery: () => mockUsageResult,
+  useGetMyActiveMockDraftsQuery: () => ({
+    data: { myActiveMockDrafts: mockActiveDrafts },
+  }),
   useCreateMockDraftMutation: () => [
     mockCreateMockDraft,
     { loading: false, error: undefined },
@@ -438,5 +459,47 @@ describe('MockDraftPage — Shared-mode invite pause (LS-9181)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Join instead/i }));
 
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft/join');
+  });
+});
+
+describe('MockDraftPage — resume banner (LS-10465)', () => {
+  afterEach(() => {
+    mockActiveDrafts = [];
+    jest.clearAllMocks();
+  });
+
+  const lobby = {
+    draftId: 77,
+    sport: 'football',
+    status: 'not-started',
+    mode: 'ONLINE',
+    isHost: true,
+    totalSeats: 8,
+  };
+
+  it('hides the banner when the user has no unfinished mock drafts', () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    renderPage();
+    expect(
+      screen.queryByTestId('resume-mock-draft-banner'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists an unfinished draft on the setup screen and links to its room', () => {
+    mockActiveDrafts = [lobby];
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume 77' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/football/mock-draft/77');
+  });
+
+  it('still offers the resume link once the weekly cap is reached', () => {
+    mockActiveDrafts = [lobby];
+    setUsage({ used: 2, limit: 2, remaining: 0, isUnlimited: false });
+    renderPage();
+
+    expect(screen.getByTestId('mock-draft-limit-reached')).toBeInTheDocument();
+    expect(screen.getByTestId('resume-mock-draft-banner')).toBeInTheDocument();
   });
 });

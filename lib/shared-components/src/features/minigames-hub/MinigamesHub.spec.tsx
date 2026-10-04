@@ -192,4 +192,15 @@ describe('MinigamesHub', () => {
       queryError,
     );
   });
+
+  it('renders the optional banner slot (LS-10465)', () => {
+    const { getByText } = render(
+      <MinigamesHub
+        onNavigate={jest.fn()}
+        isNarrow={false}
+        banner={<span>Resume your mock draft</span>}
+      />,
+    );
+    expect(getByText('Resume your mock draft')).toBeTruthy();
+  });
 });

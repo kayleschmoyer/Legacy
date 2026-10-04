@@ -368,16 +368,6 @@ class ProfileSurface {
     await this.#driver.byRole('img', { name: label, exact: true }).tap();
   }
 
-  /** Type a URL into the App Avatar picker's custom-URL input (LS-7212). */
-  async fillCustomAvatarUrl(url: string): Promise<void> {
-    await this.#driver.byLabel('Custom avatar URL').fill(url);
-  }
-
-  /** Click the picker's custom-URL "Apply" button (LS-7212). */
-  async clickApplyCustomAvatarUrl(): Promise<void> {
-    await this.#driver.byRole('button', { name: 'Apply' }).tap();
-  }
-
   /** Click the picker's "Save" button (LS-7212). The avatar section is the
    * last "Save" on the page — the username editor's Save only renders while
    * editing. */
@@ -392,7 +382,7 @@ class ProfileSurface {
 
   /** Assert the picker preview caption (LS-7212). */
   async expectAvatarPreviewCaption(
-    caption: 'Custom URL or preset selected' | 'No image selected',
+    caption: 'Image selected' | 'No image selected',
   ): Promise<void> {
     await this.#driver.byText(caption, { exact: true }).expectVisible();
   }

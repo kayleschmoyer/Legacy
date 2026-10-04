@@ -75,6 +75,18 @@ export type ActiveDisclosureGame = {
   totalClues?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A mock draft the caller hosts or is seated in that has not finished (LS-10465) — a lobby or a live draft to resume. */
+export type ActiveMockDraft = {
+  __typename?: 'ActiveMockDraft';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  isHost?: Maybe<Scalars['Boolean']['output']>;
+  mode?: Maybe<MockDraftMode>;
+  sport?: Maybe<Sport>;
+  /** 'not-started' for a lobby; otherwise the draft is live. */
+  status?: Maybe<Scalars['String']['output']>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdminRevenueStats = {
   __typename?: 'AdminRevenueStats';
   arrCents?: Maybe<Scalars['Int']['output']>;
@@ -3872,6 +3884,8 @@ export type Query = {
   minigamePersonalStats: MinigamePersonalStats;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
+  /** Unfinished mock drafts the caller hosts or holds a seat in, most recently active first (LS-10465). Expired lobbies are left out. */
+  myActiveMockDrafts?: Maybe<Array<ActiveMockDraft>>;
   /** Get the current user's votes for a league season */
   myAwardVotes?: Maybe<Array<MyAwardVote>>;
   /** Get all consent records for the authenticated user */
@@ -14508,6 +14522,23 @@ export type MatchupWinProbabilityFragmentFragment = {
   team1ProjectedScore: number;
   team2ProjectedScore: number;
   simulationCount: number;
+};
+
+export type GetMyActiveMockDraftsQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetMyActiveMockDraftsQuery = {
+  __typename?: 'Query';
+  myActiveMockDrafts?: Array<{
+    __typename?: 'ActiveMockDraft';
+    draftId?: number | null;
+    sport?: Sport | null;
+    status?: string | null;
+    mode?: MockDraftMode | null;
+    isHost?: boolean | null;
+    totalSeats?: number | null;
+  }> | null;
 };
 
 export type MyEntitlementsQueryVariables = Exact<{ [key: string]: never }>;
@@ -36213,6 +36244,96 @@ export type MatchupScoresSuspenseQueryHookResult = ReturnType<
 export type MatchupScoresQueryResult = Apollo.QueryResult<
   MatchupScoresQuery,
   MatchupScoresQueryVariables
+>;
+export const GetMyActiveMockDrafts = gql`
+  query GetMyActiveMockDrafts {
+    myActiveMockDrafts {
+      draftId
+      sport
+      status
+      mode
+      isHost
+      totalSeats
+    }
+  }
+`;
+
+/**
+ * __useGetMyActiveMockDraftsQuery__
+ *
+ * To run a query within a React component, call `useGetMyActiveMockDraftsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyActiveMockDraftsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyActiveMockDraftsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyActiveMockDraftsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyActiveMockDraftsQuery,
+    GetMyActiveMockDraftsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyActiveMockDraftsQuery,
+    GetMyActiveMockDraftsQueryVariables
+  >(GetMyActiveMockDrafts, options);
+}
+export function useGetMyActiveMockDraftsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyActiveMockDraftsQuery,
+    GetMyActiveMockDraftsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyActiveMockDraftsQuery,
+    GetMyActiveMockDraftsQueryVariables
+  >(GetMyActiveMockDrafts, options);
+}
+export function useGetMyActiveMockDraftsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyActiveMockDraftsQuery,
+        GetMyActiveMockDraftsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyActiveMockDraftsQuery,
+    GetMyActiveMockDraftsQueryVariables
+  >(
+    GetMyActiveMockDrafts,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyActiveMockDraftsQuery,
+          GetMyActiveMockDraftsQueryVariables
+        >,
+  );
+}
+export type GetMyActiveMockDraftsQueryHookResult = ReturnType<
+  typeof useGetMyActiveMockDraftsQuery
+>;
+export type GetMyActiveMockDraftsLazyQueryHookResult = ReturnType<
+  typeof useGetMyActiveMockDraftsLazyQuery
+>;
+export type GetMyActiveMockDraftsSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyActiveMockDraftsSuspenseQuery
+>;
+export type GetMyActiveMockDraftsQueryResult = Apollo.QueryResult<
+  GetMyActiveMockDraftsQuery,
+  GetMyActiveMockDraftsQueryVariables
 >;
 export const MyEntitlements = gql`
   query MyEntitlements {

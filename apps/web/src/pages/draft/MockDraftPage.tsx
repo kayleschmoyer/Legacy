@@ -24,6 +24,7 @@ import {
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { PageMeta } from '../../components/PageMeta';
+import { ResumeMockDraftBanner } from '../../components/ResumeMockDraftBanner';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
@@ -182,6 +183,9 @@ function SetupScreen({
           </Paragraph>
         </YStack>
 
+        {/* Unfinished drafts to get back into (LS-10465) */}
+        <ResumeMockDraftBanner marginBottom="$4" />
+
         {/* Settings Card */}
         <YStack
           backgroundColor={SURFACE_CARD}
@@ -338,6 +342,9 @@ function LimitReachedScreen({
             Mock Draft Simulator
           </H1>
         </YStack>
+
+        {/* Unfinished drafts to get back into (LS-10465) */}
+        <ResumeMockDraftBanner marginBottom="$4" />
 
         {/* Limit card */}
         <YStack

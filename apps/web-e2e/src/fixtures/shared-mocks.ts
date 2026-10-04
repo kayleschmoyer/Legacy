@@ -233,6 +233,10 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
       },
     },
   },
+  // LS-10465: the mock-draft setup page and the minigames hub load the
+  // "Resume your mock draft" banner. Empty renders no banner; specs that
+  // assert on it register their own override.
+  getmyactivemockdrafts: { data: { myActiveMockDrafts: [] } },
 
   // ── League detail (fires when visiting /baseball/league/:id) ──────
   getleaguebyid: leagueByIdResponse(),

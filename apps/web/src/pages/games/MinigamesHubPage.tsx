@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MinigamesHub } from '@legacy-sports/shared-components/games';
 import { PageMeta } from '../../components/PageMeta';
+import { ResumeMockDraftBanner } from '../../components/ResumeMockDraftBanner';
 
 /**
  * Minigames Hub Page
@@ -19,6 +20,7 @@ export const MinigamesHubPage: React.FC = () => {
         description="Quick-draft showdowns and trivia built on 150 years of archived baseball statistics."
       />
       <MinigamesHub
+        banner={<ResumeMockDraftBanner />}
         onNavigate={(id) => {
           if (id === 'season-draft') navigate('/games/season-draft');
           else if (id === 'disclosure') navigate('/games/disclosure');

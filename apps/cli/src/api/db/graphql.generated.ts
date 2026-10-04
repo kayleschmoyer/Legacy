@@ -69,6 +69,18 @@ export type ActiveDisclosureGame = {
   totalClues?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A mock draft the caller hosts or is seated in that has not finished (LS-10465) — a lobby or a live draft to resume. */
+export type ActiveMockDraft = {
+  __typename?: 'ActiveMockDraft';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  isHost?: Maybe<Scalars['Boolean']['output']>;
+  mode?: Maybe<MockDraftMode>;
+  sport?: Maybe<Sport>;
+  /** 'not-started' for a lobby; otherwise the draft is live. */
+  status?: Maybe<Scalars['String']['output']>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdminRevenueStats = {
   __typename?: 'AdminRevenueStats';
   arrCents?: Maybe<Scalars['Int']['output']>;
@@ -3866,6 +3878,8 @@ export type Query = {
   minigamePersonalStats: MinigamePersonalStats;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
+  /** Unfinished mock drafts the caller hosts or holds a seat in, most recently active first (LS-10465). Expired lobbies are left out. */
+  myActiveMockDrafts?: Maybe<Array<ActiveMockDraft>>;
   /** Get the current user's votes for a league season */
   myAwardVotes?: Maybe<Array<MyAwardVote>>;
   /** Get all consent records for the authenticated user */

@@ -287,6 +287,7 @@ const GameCard: React.FC<{
 export function MinigamesHub({
   onNavigate,
   isNarrow: isNarrowProp,
+  banner,
 }: MinigamesHubProps): React.JSX.Element {
   const isNarrowHook = useIsNarrow();
   const isNarrow = isNarrowProp ?? isNarrowHook;
@@ -518,6 +519,8 @@ export function MinigamesHub({
             </YStack>
           )}
         </XStack>
+
+        {banner}
 
         {/* Game cards */}
         <XStack flexWrap="wrap" gap={18}>

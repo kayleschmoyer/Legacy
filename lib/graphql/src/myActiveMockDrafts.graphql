@@ -1,0 +1,11 @@
+# Resume banner (LS-10465): unfinished mock drafts the caller hosts or sits in.
+query GetMyActiveMockDrafts {
+  myActiveMockDrafts {
+    draftId
+    sport
+    status
+    mode
+    isHost
+    totalSeats
+  }
+}

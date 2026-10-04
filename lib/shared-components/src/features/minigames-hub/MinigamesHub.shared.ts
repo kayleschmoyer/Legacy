@@ -9,6 +9,7 @@
  * glyph name.
  */
 
+import type { ReactNode } from 'react';
 import { DISCLOSURE_MIN_CLUES } from '@legacy-sports/utils';
 
 export type MinigameId =
@@ -63,6 +64,11 @@ export interface MinigamesHubProps {
   onNavigate: (gameId: MinigameId) => void;
   /** Override the narrow-viewport detection — pass the result of useWindowDimensions on native. */
   isNarrow?: boolean;
+  /**
+   * Optional content rendered between the hero and the game cards — the web
+   * hub passes its "Resume your mock draft" banner here (LS-10465).
+   */
+  banner?: ReactNode;
 }
 
 export const GAME_TEMPLATES: MinigameTemplate[] = [
