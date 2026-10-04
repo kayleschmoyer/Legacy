@@ -28,6 +28,7 @@ import { getSessionStatus } from './sessionStatus';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
 import { trackSignOut } from '../../utils/analytics';
 
@@ -317,6 +318,11 @@ const ProfileSettingsPage: React.FC = () => {
       setEditedUsername(dbUsername);
     }
   }, [dbUsername, isEditingUsername]);
+
+  useUnsavedChangesGuard(
+    isEditingUsername && editedUsername !== dbUsername,
+    'Discard unsaved changes?',
+  );
 
   // LS-7237: closing/reloading the tab while the username save is in flight
   // would abandon the request with no signal of whether the server applied it.

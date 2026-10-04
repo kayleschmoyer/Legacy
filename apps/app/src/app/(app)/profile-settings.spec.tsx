@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import {
   act,
   fireEvent,
@@ -38,12 +38,17 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { error: jest.fn() },
 }));
 
+const mockBack = jest.fn();
+
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   return {
     useRouter: () => ({
       navigate: (...args: unknown[]): void => {
         mockNavigate(...args);
+      },
+      back: (): void => {
+        mockBack();
       },
     }),
     // Run the focus effect on mount, like a focused screen would.
@@ -549,6 +554,72 @@ describe('ProfileSettingsScreen', () => {
           screen.getByText('Failed to update username. Please try again.'),
         ).toBeTruthy();
       });
+    });
+  });
+
+  describe('unsaved-changes guard (LS-7235)', () => {
+    const backHandlers: Array<() => boolean> = [];
+    let alertSpy: jest.SpyInstance<void, Parameters<typeof Alert.alert>>;
+
+    beforeEach(() => {
+      backHandlers.length = 0;
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {
+        /* no-op */
+      });
+      jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_event, handler) => {
+          backHandlers.push(handler as () => boolean);
+          return {
+            remove: jest.fn(() => {
+              const idx = backHandlers.indexOf(handler as () => boolean);
+              if (idx !== -1) backHandlers.splice(idx, 1);
+            }),
+          };
+        });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('does not intercept back when not editing or when the input is unchanged', () => {
+      render(<ProfileSettingsScreen />);
+      expect(backHandlers).toHaveLength(0);
+      fireEvent.press(screen.getByText('Edit'));
+      expect(backHandlers).toHaveLength(0);
+    });
+
+    it('intercepts back once the username input is dirty and offers Keep editing / Discard', () => {
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Edit'));
+      fireEvent.changeText(screen.getByDisplayValue('testuser'), 'changed');
+      expect(backHandlers).toHaveLength(1);
+
+      expect(backHandlers[0]()).toBe(true);
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Discard unsaved changes?',
+        undefined,
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Keep editing' }),
+          expect.objectContaining({ text: 'Discard' }),
+        ]),
+      );
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('discards the edit and navigates back when Discard is chosen', () => {
+      render(<ProfileSettingsScreen />);
+      fireEvent.press(screen.getByText('Edit'));
+      fireEvent.changeText(screen.getByDisplayValue('testuser'), 'changed');
+      backHandlers[0]();
+
+      const buttons = alertSpy.mock.calls[0][2] ?? [];
+      const discard = buttons.find((b) => b.text === 'Discard');
+      void act(() => {
+        void discard?.onPress?.();
+      });
+      expect(mockBack).toHaveBeenCalledTimes(1);
     });
   });
 

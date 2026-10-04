@@ -1,5 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import {
   Button,
   H1,
@@ -174,6 +179,28 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
       }
     },
     [updateAvatar, updatingAvatar, refetchUser],
+  );
+
+  // Android hardware back / edge-swipe would otherwise pop the route and
+  // silently discard a dirty username edit (LS-7235). Sign-out's own back
+  // swallow (above) takes precedence while it is in flight.
+  const savedUsername = user?.username ?? currentUser?.username ?? '';
+  useSystemBackAction(
+    !loggingOut && editingUsername && usernameInput.trim() !== savedUsername,
+    () => {
+      Alert.alert('Discard unsaved changes?', undefined, [
+        { text: 'Keep editing', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            setEditingUsername(false);
+            setUsernameError(null);
+            router.back();
+          },
+        },
+      ]);
+    },
   );
 
   const userName = user?.username ?? currentUser?.username ?? '';
