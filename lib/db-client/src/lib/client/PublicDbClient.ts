@@ -235,6 +235,20 @@ export async function refreshPlayerEligiblePositions(
 }
 
 /**
+ * ANALYZE the season stat tables so planner stats are fresh after a bulk
+ * stats-load run (LS-10554).
+ *
+ * Call once after the run, not per player. Autovacuum only revisits a table
+ * once its pgstat modification counters cross a threshold, and those counters
+ * are lost on a stats reset, so a bulk load must not rely on it alone.
+ */
+export async function analyzeSeasonStatTables(db: PublicDb): Promise<void> {
+  await db.execute(
+    sql`ANALYZE public.season_batting, public.season_fielding, public.season_pitching`,
+  );
+}
+
+/**
  * Refresh the player_scoring_cache table for a given league (or the default
  * NULL baseline).
  *

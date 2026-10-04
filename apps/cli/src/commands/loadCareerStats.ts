@@ -4,6 +4,7 @@ import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import {
+  analyzeSeasonStatTables,
   getPlayersOrderedByLastFetch,
   getPlayersWithoutStats,
   getStatsRefreshSummary,
@@ -202,6 +203,17 @@ export async function handleLoadCareerStats(
           LOGGER.error(
             'Failed to refresh player_eligible_positions:',
             String(refreshError),
+          );
+        }
+
+        // Refresh planner stats on the tables this run just wrote (LS-10554).
+        try {
+          await analyzeSeasonStatTables(db);
+          LOGGER.info('Season stat tables analyzed.');
+        } catch (analyzeError) {
+          LOGGER.error(
+            'Failed to analyze season stat tables:',
+            String(analyzeError),
           );
         }
       }

@@ -578,6 +578,12 @@ export class DisclosureGameService {
     LOGGER.info(
       `DisclosureGameService.seedPlayerFacts: inserted ${inserted} new facts`,
     );
+
+    // Refresh planner stats after the bulk seed — autovacuum only reacts to
+    // pgstat counters, which a stats reset wipes (LS-10554).
+    if (inserted > 0) {
+      await this.db.execute(sql`ANALYZE public.player_facts`);
+    }
     return inserted;
   }
 

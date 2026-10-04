@@ -1,8 +1,11 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   DisclosureGameService,
   MIN_FACT_COUNT,
   TIER_SORT_ORDER,
 } from './DisclosureGameService';
+import type { PublicDb } from '../client/PublicDbClient';
 
 /**
  * Unit tests for DisclosureGameService pure/static logic.
@@ -114,6 +117,79 @@ describe('DisclosureGameService', () => {
       expect(DisclosureGameService.calculateScore(5, 10)).toBe(
         DisclosureGameService.calculateScore(5, 10),
       );
+    });
+  });
+
+  describe('seedPlayerFacts — planner stats refresh (LS-10554)', () => {
+    // Drizzle builders are chainable thenables: every builder method returns
+    // the chain, and awaiting it resolves to `rows`.
+    function chain(rows: unknown[]): unknown {
+      const proxy: unknown = new Proxy(
+        {},
+        {
+          get: (_target, prop) =>
+            prop === 'then'
+              ? (resolve: (value: unknown[]) => unknown) => resolve(rows)
+              : () => proxy,
+        },
+      );
+      return proxy;
+    }
+
+    const hallOfFamer = {
+      id: 1,
+      firstName: 'Test',
+      lastName: 'Player',
+      allStarSelections: 0,
+      goldGloves: 0,
+      silverSluggers: 0,
+      mvpAwards: 0,
+      cyYoungAwards: 0,
+      worldSeriesRings: 0,
+      hallOfFame: true,
+      rookieOfTheYear: false,
+    };
+
+    function makeDb(insertedRows: unknown[]) {
+      const execute = jest
+        .fn<Promise<unknown>, [SQL]>()
+        .mockResolvedValue(undefined);
+      const db = {
+        // First select returns the player list; every per-player stat
+        // lookup after that returns no rows.
+        select: jest
+          .fn()
+          .mockReturnValueOnce(chain([hallOfFamer]))
+          .mockReturnValue(chain([])),
+        insert: jest.fn(() => chain(insertedRows)),
+        execute,
+      } as unknown as PublicDb;
+      return { db, execute };
+    }
+
+    const render = (query: SQL) => new PgDialect().sqlToQuery(query).sql;
+
+    it('ANALYZEs player_facts after inserting new facts', async () => {
+      const { db, execute } = makeDb([{ id: 10 }]);
+
+      await expect(
+        new DisclosureGameService(db).seedPlayerFacts(),
+      ).resolves.toBe(1);
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(render(execute.mock.calls[0][0])).toBe(
+        'ANALYZE public.player_facts',
+      );
+    });
+
+    it('skips ANALYZE when the seed inserted nothing', async () => {
+      const { db, execute } = makeDb([]);
+
+      await expect(
+        new DisclosureGameService(db).seedPlayerFacts(),
+      ).resolves.toBe(0);
+
+      expect(execute).not.toHaveBeenCalled();
     });
   });
 });
