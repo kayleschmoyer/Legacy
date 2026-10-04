@@ -679,7 +679,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             textTransform="uppercase"
             color="#9caac5"
           >
-            Sign In
+            Sign in or sign up
           </Text>
           <Text
             testID="login-title"

@@ -415,6 +415,14 @@ describe('LoginPage fullBleed variant (LS-9433 — mobile sign-in redesign)', ()
       'Step up to the plate',
     );
   });
+
+  // LS-10431: OAuth is the only way in, so the same buttons both sign in and
+  // create accounts — the card header must say so.
+  it('labels the card header "Sign in or sign up"', () => {
+    render(<LoginPage onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.getByText('Sign in or sign up')).toBeTruthy();
+  });
 });
 
 describe('LoginPage legal links (LS-10432)', () => {
