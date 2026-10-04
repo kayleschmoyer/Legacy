@@ -1400,26 +1400,11 @@ export function PlayerStatsRoute() {
       // brefId-style id (e.g. 'troutmi01') can't be represented as a numeric
       // `?playerId`, so fall back to the standalone `/players/:id` route with the
       // raw id — never coerced to NaN (PST-050 / LS-7123). Pushing history means
-      // Back closes the modal / returns to the list.
+      // Back closes the modal / returns to the list. Free viewers always go to
+      // the standalone page: the in-place modal is premium-only, so writing
+      // `?playerId` for them was a silent no-op (LS-10428).
       const rawId = String(player.id);
-      if (/^\d+$/.test(rawId)) {
-        const params = new URLSearchParams(searchParams);
-        params.set('playerId', rawId);
-        setSearchParams(params);
-      } else {
-        navigate(`/players/${rawId}`);
-      }
-    },
-    [searchParams, setSearchParams, navigate],
-  );
-
-  // Card-feed player press (LS-9075): PlayersCardFeed rows carry a bare
-  // numeric id string (career-stats `playerId`), not a full PlayerWithStats —
-  // mirrors handlePlayerDetails' numeric branch above so both presentations
-  // open the identical in-place modal via the same `?playerId` URL contract.
-  const handleCardPlayerPress = useCallback(
-    (rawId: string) => {
-      if (/^\d+$/.test(rawId)) {
+      if (isPremium && /^\d+$/.test(rawId)) {
         const params = new URLSearchParams(searchParams);
         params.set('playerId', rawId);
         setSearchParams(params);
@@ -1427,7 +1412,25 @@ export function PlayerStatsRoute() {
         navigate(`/players/${encodeURIComponent(rawId)}`);
       }
     },
-    [searchParams, setSearchParams, navigate],
+    [isPremium, searchParams, setSearchParams, navigate],
+  );
+
+  // Card-feed player press (LS-9075): PlayersCardFeed rows carry a bare
+  // numeric id string (career-stats `playerId`), not a full PlayerWithStats —
+  // mirrors handlePlayerDetails' numeric branch above so both presentations
+  // open the identical in-place modal via the same `?playerId` URL contract
+  // (premium) or the standalone page (free, LS-10428).
+  const handleCardPlayerPress = useCallback(
+    (rawId: string) => {
+      if (isPremium && /^\d+$/.test(rawId)) {
+        const params = new URLSearchParams(searchParams);
+        params.set('playerId', rawId);
+        setSearchParams(params);
+      } else {
+        navigate(`/players/${encodeURIComponent(rawId)}`);
+      }
+    },
+    [isPremium, searchParams, setSearchParams, navigate],
   );
 
   // Close the in-place modal by stripping only the playerId param; filters are
@@ -1709,15 +1712,30 @@ export function PlayerStatsRoute() {
     [setSearchParams],
   );
 
-  // A row click writes ?playerId, opening the detail modal in place (pushes
-  // history so Back closes it), matching the MLB deep-link behaviour.
+  // A premium row click writes ?playerId, opening the detail modal in place
+  // (pushes history so Back closes it), matching the MLB deep-link behaviour.
+  // Free viewers can't see the premium-only modal, so they go to the
+  // standalone /football/players/:id page instead (LS-10428).
   const handleNflPlayerDetails = useCallback(
     (playerId: number) => {
+      if (!isPremium) {
+        navigate(`/football/players/${playerId}`);
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       params.set('playerId', String(playerId));
       setSearchParams(params);
     },
-    [setSearchParams],
+    [isPremium, navigate, setSearchParams],
+  );
+
+  // NFL card-feed press: rows carry a numeric id string. Routes through the
+  // NFL handler so free viewers land on the football page, not /players/:id.
+  const handleNflCardPlayerPress = useCallback(
+    (rawId: string) => {
+      if (/^\d+$/.test(rawId)) handleNflPlayerDetails(Number(rawId));
+    },
+    [handleNflPlayerDetails],
   );
 
   const handleNflViewFullPage = useCallback(() => {
@@ -1800,7 +1818,7 @@ export function PlayerStatsRoute() {
             isPremium={isPremium}
             showSportToggle={false}
             onSportChange={handleSelectSport}
-            onPlayerPress={handleCardPlayerPress}
+            onPlayerPress={handleNflCardPlayerPress}
             onCompare={() => navigate('/players/compare')}
             onPremiumPress={handleCardFeedPremiumPress}
           />
@@ -1822,10 +1840,9 @@ export function PlayerStatsRoute() {
             onLeagueChange={setFootballLeagueId}
           />
         )}
-        {/* Detail modal gated on the same entitlement as the stats list,
-            matching the MLB branch's PlayerDetailModal gating above (LS-9346:
-            this guard was previously missing on the NFL branch, letting free
-            viewers open the modal here while baseball already blocked it). */}
+        {/* Premium-only in-place detail modal, matching the MLB branch's
+            PlayerDetailModal gating (LS-9346). Free viewers never write
+            ?playerId — their taps go to /football/players/:id (LS-10428). */}
         {isPremium && selectedPlayerId !== null && (
           <FootballPlayerDetailModal
             open={true}
@@ -2047,11 +2064,12 @@ export function PlayerStatsRoute() {
           the filtered list when ?playerId=X is present — opened by a row click or
           restored on reload of a shared deep link — and offers an "open full
           page" affordance (onViewFullPage) to navigate externally to the
-          standalone /players/:id route (PST-050 reconciliation). Gated on the
-          same entitlement as the stats list, since the modal surfaces premium
-          career stats and /players/:id already handles the non-premium case. The
-          modal resolves the player's name from its own query, so the deep-link
-          mount (no name in the URL) renders correctly with a fallback. */}
+          standalone /players/:id route (PST-050 reconciliation). Premium-only:
+          the modal surfaces premium career stats. The list itself is public
+          (LS-9347), so free viewers' taps navigate to /players/:id instead,
+          which renders its own gated free view (LS-10428). The modal resolves
+          the player's name from its own query, so the deep-link mount (no name
+          in the URL) renders correctly with a fallback. */}
       {isPremium && selectedPlayerId !== null && (
         <PlayerDetailModal
           open={true}

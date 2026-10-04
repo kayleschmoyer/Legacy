@@ -432,6 +432,93 @@ describe('PlayerStatsRoute detail-modal gate consistency (LS-9346)', () => {
   });
 });
 
+// LS-10428: the in-place detail modal is premium-only, but the list is public
+// (LS-9347) — so a free viewer's tap used to write ?playerId and silently do
+// nothing. Free taps now navigate to the standalone player page for the sport;
+// premium taps keep the in-place modal.
+describe('PlayerStatsRoute free-viewer player tap (LS-10428)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+    mockOnPlayerDetailsRef.current = undefined;
+  });
+
+  it('navigates a free viewer to /players/:id from the MLB table', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 2 });
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/players/2');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+
+  it('navigates a free viewer to /players/:id from the MLB card feed', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockBaseballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('2'));
+    expect(mockNavigate).toHaveBeenCalledWith('/players/2');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+
+  it('navigates a free viewer to /football/players/:id from the NFL table', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    const onPlayerDetails = mockFootballStatsPageProps.onPlayerDetails as (
+      id: number,
+    ) => void;
+    act(() => onPlayerDetails(42));
+    expect(mockNavigate).toHaveBeenCalledWith('/football/players/42');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+
+  it('navigates a free viewer to /football/players/:id from the NFL card feed', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockFootballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('42'));
+    expect(mockNavigate).toHaveBeenCalledWith('/football/players/42');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+
+  it('keeps the in-place modal (?playerId) for a premium viewer on both sports', async () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    const { unmount } = render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 2 });
+    });
+    expect(
+      (mockSetSearchParams.mock.calls[0][0] as URLSearchParams).get('playerId'),
+    ).toBe('2');
+    unmount();
+
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    act(() =>
+      (mockFootballStatsPageProps.onPlayerDetails as (id: number) => void)(42),
+    );
+    expect(
+      (mockSetSearchParams.mock.calls[0][0] as URLSearchParams).get('playerId'),
+    ).toBe('42');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
 describe('PlayerStatsRoute sport switcher', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
