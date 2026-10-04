@@ -31,6 +31,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
 import { trackSignOut } from '../../utils/analytics';
+import { showToast } from '../../components/layout/SuccessToast';
 
 /** Preset avatars are stored as relative paths; the API requires absolute HTTPS URLs. */
 const resolvePresetUrl = (url: string): string =>
@@ -319,9 +320,14 @@ const ProfileSettingsPage: React.FC = () => {
     }
   }, [dbUsername, isEditingUsername]);
 
+  const isUsernameDirty = isEditingUsername && editedUsername !== dbUsername;
+  // LS-7236: a preset pick saves immediately, so the "unsaved" window is the
+  // in-flight mutation — leaving now would hide whether the pick stuck.
   useUnsavedChangesGuard(
-    isEditingUsername && editedUsername !== dbUsername,
-    'Discard unsaved changes?',
+    isUsernameDirty || avatarLoading,
+    isUsernameDirty
+      ? 'Discard unsaved changes?'
+      : 'Your avatar is still saving. Leave anyway?',
   );
 
   // LS-7237: closing/reloading the tab while the username save is in flight
@@ -350,10 +356,16 @@ const ProfileSettingsPage: React.FC = () => {
   }, [searchParams, navigate, refetchUser, refetchIdentities]);
 
   const handleAvatarSelect = (url: string | null) => {
-    void updateUserAvatar({
-      variables: { avatarUrl: url },
-      onCompleted: () => void refetchUser(),
-    });
+    // Resolve from the promise, not onCompleted: Apollo skips per-call
+    // callbacks once the component unmounts, and the user may have navigated
+    // away. Failures already surface via the global apollo:error toast.
+    updateUserAvatar({ variables: { avatarUrl: url } })
+      .then((result) => {
+        if (result.error) return;
+        showToast(url ? 'Avatar updated' : 'Avatar removed');
+        void refetchUser();
+      })
+      .catch(() => undefined);
   };
 
   const handleUsernameEdit = useCallback(() => {

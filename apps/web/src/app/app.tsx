@@ -36,6 +36,7 @@ import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { PostLoginBillingBanner } from '../components/PostLoginBillingBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
+import { SuccessToast } from '../components/layout/SuccessToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
 import { useFeatureValue } from '../context/GrowthBookProvider';
@@ -671,6 +672,7 @@ function App() {
       <PostLoginBillingBanner />
       {/* Global toast for uncaught Apollo/GraphQL errors */}
       <ApolloErrorToast />
+      <SuccessToast />
       {!isImmersiveRoute && <Navigation />}
       {/* Live scores ticker — renders only when today's MLB games are available.
           The spacer inside ScoreboardTicker ensures no blank strip on empty days. */}
