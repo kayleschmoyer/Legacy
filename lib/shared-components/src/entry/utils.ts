@@ -19,3 +19,4 @@ export * from '../utils/SecureStorage';
 export * from '../utils/httpErrors';
 export * from '../constants/presets';
 export * from '../hooks/useReducedMotion';
+export * from '../utils/defaultSport';

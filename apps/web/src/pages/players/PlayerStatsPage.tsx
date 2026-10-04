@@ -32,6 +32,12 @@ import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
+  DEFAULT_SPORT_FALLBACK,
+  type DefaultSport,
+  parseDefaultSport,
+  USER_PREFERENCES_STORAGE_KEY,
+} from '@legacy-sports/shared-components/utils';
+import {
   Sport,
   useGetPlayerIdByBrefIdQuery,
   useGetUserLeaguesQuery,
@@ -921,11 +927,9 @@ export function buildXlsxExport(data: PlayerStatsExportData): Uint8Array {
   ]);
 }
 
-const PREFS_STORAGE_KEY = 'ls_user_preferences';
-
 export function readStatsFormat(): 'standard' | 'expanded' {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const raw = localStorage.getItem(USER_PREFERENCES_STORAGE_KEY);
     if (!raw) return 'standard';
     const parsed = JSON.parse(raw) as { statsFormat?: string };
     if (
@@ -943,7 +947,7 @@ export function readStatsFormat(): 'standard' | 'expanded' {
     // argument and extra context goes in the third (.github/reviewer-rules.md).
     const error = err instanceof Error ? err : new Error(String(err));
     LOGGER.warn('readStatsFormat parse failed', error, {
-      storageKey: PREFS_STORAGE_KEY,
+      storageKey: USER_PREFERENCES_STORAGE_KEY,
     });
     return 'standard';
   }
@@ -958,7 +962,7 @@ export function readStatsFormat(): 'standard' | 'expanded' {
  */
 export function readVisibleColumnsPref(): string[] | null {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const raw = localStorage.getItem(USER_PREFERENCES_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { statsVisibleColumns?: unknown };
     return typeof parsed.statsVisibleColumns === 'string'
@@ -970,7 +974,7 @@ export function readVisibleColumnsPref(): string[] | null {
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     LOGGER.warn('readVisibleColumnsPref parse failed', error, {
-      storageKey: PREFS_STORAGE_KEY,
+      storageKey: USER_PREFERENCES_STORAGE_KEY,
     });
     return null;
   }
@@ -984,7 +988,7 @@ export function readVisibleColumnsPref(): string[] | null {
  */
 export function writeVisibleColumnsPref(cols: string[] | null): void {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const raw = localStorage.getItem(USER_PREFERENCES_STORAGE_KEY);
     const parsed = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
     const serialized = serializeVisibleColumns(cols);
     if (serialized === null) {
@@ -992,11 +996,11 @@ export function writeVisibleColumnsPref(cols: string[] | null): void {
     } else {
       parsed.statsVisibleColumns = serialized;
     }
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(parsed));
+    localStorage.setItem(USER_PREFERENCES_STORAGE_KEY, JSON.stringify(parsed));
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     LOGGER.warn('writeVisibleColumnsPref failed', error, {
-      storageKey: PREFS_STORAGE_KEY,
+      storageKey: USER_PREFERENCES_STORAGE_KEY,
     });
   }
 }
@@ -1010,10 +1014,10 @@ function persistStatsFormatToLocalStorage(
   statsFormat: 'standard' | 'expanded',
 ): void {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const raw = localStorage.getItem(USER_PREFERENCES_STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     localStorage.setItem(
-      PREFS_STORAGE_KEY,
+      USER_PREFERENCES_STORAGE_KEY,
       JSON.stringify({ ...parsed, statsFormat }),
     );
   } catch {
@@ -1021,14 +1025,13 @@ function persistStatsFormatToLocalStorage(
   }
 }
 
-function readDefaultSport(): 'baseball' | 'football' {
+function readDefaultSport(): DefaultSport {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
-    if (!raw) return 'baseball';
-    const parsed = JSON.parse(raw) as { defaultSport?: string };
-    return parsed.defaultSport === 'football' ? 'football' : 'baseball';
+    return parseDefaultSport(
+      localStorage.getItem(USER_PREFERENCES_STORAGE_KEY),
+    );
   } catch {
-    return 'baseball';
+    return DEFAULT_SPORT_FALLBACK;
   }
 }
 

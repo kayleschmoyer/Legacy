@@ -33,6 +33,7 @@ import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContex
 import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
 import { useSystemBackAction } from '../../../common/hooks/useSystemBackAction';
 import { toPlayerDetailIdParam } from '../../../common/utilities/RouteUtils';
+import { useDefaultSport } from '../../../common/utilities/useDefaultSport';
 import BaseballHomeScreen from '../../../screens/BaseballHomeScreen';
 import FootballHomeScreen from '../../../screens/FootballHomeScreen';
 
@@ -70,6 +71,9 @@ export default function HomeTab() {
   const { top: topInset } = useSafeAreaInsets();
   const userInfo = useAuthorizedUserInfo();
   const { resolvedTheme } = useThemeContext();
+  // Stored Default Sport (Preferences) — orders the sport sections and picks
+  // the Create League default, matching web (LS-10386).
+  const defaultSport = useDefaultSport();
   const [showArchived, setShowArchived] = useState(false);
 
   // Active sport is tracked locally; no router navigation is used for sport
@@ -298,6 +302,7 @@ export default function HomeTab() {
           archivedLeagues={archivedLeagues}
           archivedCount={archivedCount}
           primarySport={primarySport}
+          defaultSport={defaultSport}
           showArchived={showArchived}
           archivedLoading={archivedLoading}
           loading={loading}

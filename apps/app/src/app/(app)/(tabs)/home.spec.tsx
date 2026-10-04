@@ -122,6 +122,7 @@ type HomeScreenMockProps = {
   onSetLineup?: (summary: Record<string, unknown>) => void;
   refreshControl?: PullToRefreshControlElement;
   primarySport?: 'baseball' | 'football' | null;
+  defaultSport?: 'baseball' | 'football';
 };
 
 // Capture the refreshControl element so pull-to-refresh tests can assert it's
@@ -132,6 +133,14 @@ let capturedRefreshControl: HomeScreenMockProps['refreshControl'] | null = null;
 let capturedScrollRef: HomeScreenMockProps['scrollRef'] | null = null;
 // Capture the computed primarySport prop so tests can assert it (LS-6285).
 let capturedPrimarySport: HomeScreenMockProps['primarySport'] | undefined;
+// Capture the defaultSport prop so tests can assert the stored preference is forwarded (LS-10386).
+let capturedDefaultSport: HomeScreenMockProps['defaultSport'];
+// The stored Default Sport the mocked hook resolves; the hook itself is unit-tested in useDefaultSport.spec.ts.
+let mockDefaultSport: 'baseball' | 'football' = 'baseball';
+
+jest.mock('../../../common/utilities/useDefaultSport', () => ({
+  useDefaultSport: () => mockDefaultSport,
+}));
 
 jest.mock('@legacy-sports/shared-components', () => ({
   // Use the real `computePrimarySport` rather than a local
@@ -179,6 +188,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onSetLineup,
     refreshControl,
     primarySport,
+    defaultSport,
   }: HomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
@@ -193,6 +203,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedRefreshControl = refreshControl ?? null;
     capturedScrollRef = scrollRef ?? null;
     capturedPrimarySport = primarySport;
+    capturedDefaultSport = defaultSport;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -301,6 +312,8 @@ describe('HomeTab sport switching (LS-5814)', () => {
     capturedOnShowArchived = null;
     capturedOnHideArchived = null;
     capturedShowArchived = undefined;
+    capturedDefaultSport = undefined;
+    mockDefaultSport = 'baseball';
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -329,6 +342,17 @@ describe('HomeTab sport switching (LS-5814)', () => {
   it('renders the HomeScreen dashboard by default', () => {
     render(<HomeTab />);
     expect(screen.getByTestId('home-screen')).toBeTruthy();
+  });
+
+  it('forwards a stored football Default Sport to HomeScreen (LS-10386)', () => {
+    mockDefaultSport = 'football';
+    render(<HomeTab />);
+    expect(capturedDefaultSport).toBe('football');
+  });
+
+  it('forwards the baseball fallback to HomeScreen when no preference is stored (LS-10386)', () => {
+    render(<HomeTab />);
+    expect(capturedDefaultSport).toBe('baseball');
   });
 
   it('forwards the top safe-area inset to HomeScreen (LS-8625)', () => {

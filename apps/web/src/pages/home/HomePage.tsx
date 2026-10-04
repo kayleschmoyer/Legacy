@@ -12,6 +12,12 @@ import {
 } from '@legacy-sports/shared-components/leagues';
 import { HomeScreen } from '@legacy-sports/shared-components/sports';
 import {
+  DEFAULT_SPORT_FALLBACK,
+  type DefaultSport,
+  parseDefaultSport,
+  USER_PREFERENCES_STORAGE_KEY,
+} from '@legacy-sports/shared-components/utils';
+import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
   useGetMyMockDraftUsageQuery,
@@ -68,16 +74,13 @@ function leagueMockDraftRoute(
 
 /* ─── Default sport preference ─── */
 
-const PREFS_STORAGE_KEY = 'ls_user_preferences';
-
-function readDefaultSport(): 'baseball' | 'football' {
+function readDefaultSport(): DefaultSport {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
-    if (!raw) return 'baseball';
-    const parsed = JSON.parse(raw) as { defaultSport?: string };
-    return parsed.defaultSport === 'football' ? 'football' : 'baseball';
+    return parseDefaultSport(
+      localStorage.getItem(USER_PREFERENCES_STORAGE_KEY),
+    );
   } catch {
-    return 'baseball';
+    return DEFAULT_SPORT_FALLBACK;
   }
 }
 
