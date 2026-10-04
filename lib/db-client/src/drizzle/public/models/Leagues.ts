@@ -213,7 +213,6 @@ export const leagues = pgTable(
   },
   (table) => {
     return {
-      inviteCodeIdx: index('leagues_invite_code_idx').on(table.inviteCode),
       ownerIdx: index('leagues_owner_idx').on(table.owner),
       currentMatchupIdx: index('leagues_current_matchup_idx').on(
         table.currentMatchup,
@@ -660,10 +659,6 @@ export const draftPicks = pgTable(
       draftIdIdx: index('draft_picks_draft_id_idx').on(table.draftId),
       teamIdIdx: index('draft_picks_team_id_idx').on(table.teamId),
       playerIdIdx: index('draft_picks_player_id_idx').on(table.playerId),
-      overallPickIdx: index('draft_picks_overall_pick_idx').on(
-        table.draftId,
-        table.overallPick,
-      ),
     };
   },
 );
@@ -817,6 +812,9 @@ export const teamMembers = pgTable(
       teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
       playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
       leagueIdIdx: index('team_members_league_id_idx').on(table.leagueId),
+      // FK index for the league_positions ON DELETE CASCADE lookup (LS-10551) —
+      // team_members_uk_team_position leads with team_id so cannot serve it.
+      positionIdIdx: index('team_members_position_id_idx').on(table.positionId),
     };
   },
 );

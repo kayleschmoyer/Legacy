@@ -197,6 +197,10 @@ export const matchupPlayers = pgTable(
       matchupPlayerTeamUnique: unique(
         'matchup_players_matchup_player_team_unique',
       ).on(table.matchupId, table.playerId, table.teamId),
+      // FK index for the league_positions ON DELETE SET NULL lookup (LS-10551).
+      positionIdIdx: index('matchup_players_position_id_idx')
+        .on(table.positionId)
+        .where(sql`${table.positionId} IS NOT NULL`),
     };
   },
 );

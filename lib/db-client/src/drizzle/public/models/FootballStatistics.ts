@@ -37,9 +37,6 @@ export const gameFootballPassing = pgTable(
       table.playerId,
       table.season,
     ),
-    playerIdSeasonGameNumIdx: index(
-      'game_football_passing_player_id_season_game_num_idx',
-    ).on(table.playerId, table.season, table.gameNum),
     gameIdentifierIdx: index('game_football_passing_game_identifier_idx').on(
       table.gameIdentifier,
     ),
@@ -75,9 +72,6 @@ export const gameFootballRushing = pgTable(
       table.playerId,
       table.season,
     ),
-    playerIdSeasonGameNumIdx: index(
-      'game_football_rushing_player_id_season_game_num_idx',
-    ).on(table.playerId, table.season, table.gameNum),
     gameIdentifierIdx: index('game_football_rushing_game_identifier_idx').on(
       table.gameIdentifier,
     ),
@@ -114,9 +108,6 @@ export const gameFootballReceiving = pgTable(
       table.playerId,
       table.season,
     ),
-    playerIdSeasonGameNumIdx: index(
-      'game_football_receiving_player_id_season_game_num_idx',
-    ).on(table.playerId, table.season, table.gameNum),
     gameIdentifierIdx: index('game_football_receiving_game_identifier_idx').on(
       table.gameIdentifier,
     ),
@@ -162,9 +153,6 @@ export const gameFootballKicking = pgTable(
       table.playerId,
       table.season,
     ),
-    playerIdSeasonGameNumIdx: index(
-      'game_football_kicking_player_id_season_game_num_idx',
-    ).on(table.playerId, table.season, table.gameNum),
     gameIdentifierIdx: index('game_football_kicking_game_identifier_idx').on(
       table.gameIdentifier,
     ),
@@ -204,9 +192,6 @@ export const gameFootballDefense = pgTable(
       table.playerId,
       table.season,
     ),
-    playerIdSeasonGameNumIdx: index(
-      'game_football_defense_player_id_season_game_num_idx',
-    ).on(table.playerId, table.season, table.gameNum),
     gameIdentifierIdx: index('game_football_defense_game_identifier_idx').on(
       table.gameIdentifier,
     ),

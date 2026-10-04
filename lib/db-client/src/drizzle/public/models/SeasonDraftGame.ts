@@ -91,9 +91,6 @@ export const seasonDraftGames = pgTable(
       createdByIdx: index('season_draft_games_created_by_idx').on(
         table.createdBy,
       ),
-      inviteCodeIdx: index('season_draft_games_invite_code_idx').on(
-        table.inviteCode,
-      ),
     };
   },
 );

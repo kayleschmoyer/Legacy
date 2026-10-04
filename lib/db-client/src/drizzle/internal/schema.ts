@@ -104,14 +104,6 @@ export const usersInAppInternal = appInternal.table(
   },
   (table) => {
     return {
-      idx: index('users__index').using(
-        'btree',
-        table.username.asc().nullsLast(),
-      ),
-      canonicalEmailIdx: index().using(
-        'btree',
-        table.canonicalEmail.asc().nullsLast(),
-      ),
       usersUsernameUk: unique('users_username_uk').on(table.username),
       usersCanonicalEmailUk: unique('users_canonical_email_uk').on(
         table.canonicalEmail,
