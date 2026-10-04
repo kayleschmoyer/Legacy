@@ -366,7 +366,7 @@ describe('MockDraftPage — draft mode threading (LS-9144, LS-10076)', () => {
     );
   });
 
-  it('forwards mode=ONLINE, a 90s time limit and the lobby visibility when mode is shared', async () => {
+  it('forwards mode=ONLINE, the chosen pick timer and the lobby visibility when mode is shared', async () => {
     setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
     mockStartSettings = {
       numTeams: 8,
@@ -376,6 +376,7 @@ describe('MockDraftPage — draft mode threading (LS-9144, LS-10076)', () => {
       sport: 'baseball',
       mode: 'shared',
       isPublic: true,
+      pickTimeLimitSeconds: 60,
     };
     renderPage();
 
@@ -386,7 +387,8 @@ describe('MockDraftPage — draft mode threading (LS-9144, LS-10076)', () => {
       expect.objectContaining({
         variables: expect.objectContaining({
           mode: 'ONLINE',
-          pickTimeLimitSeconds: 90,
+          // The setup form's Pick Timer choice is forwarded (LS-10466).
+          pickTimeLimitSeconds: 60,
           // Shared lobbies carry the Private/Public choice through (LS-10076).
           isPublic: true,
         }),

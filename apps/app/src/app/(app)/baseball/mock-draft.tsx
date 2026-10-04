@@ -30,9 +30,6 @@ import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
  */
 const FOOTBALL_MOCK_PLAYERS_FLAG = 'football-mock-players';
 
-// Pick-time limit mirrors the web Mock Draft Simulator (90s per pick).
-const PICK_TIME_LIMIT_SECONDS = 90;
-
 const MOCK_DRAFT_FEATURE_NAME = 'Mock Draft Simulator';
 
 /**
@@ -212,7 +209,9 @@ export function MockDraftPage(): React.JSX.Element {
         // run the sport's full default roster, derived server-side.
         pickPosition: settings.userPickPosition,
         // Offline mode ignores this and uses its own untimed sentinel server-side.
-        pickTimeLimitSeconds: isOffline ? undefined : PICK_TIME_LIMIT_SECONDS,
+        pickTimeLimitSeconds: isOffline
+          ? undefined
+          : settings.pickTimeLimitSeconds,
         draftOrder: settings.draftOrder,
         playerPool: settings.playerPool,
         sport: settings.sport === 'football' ? Sport.Football : Sport.Baseball,

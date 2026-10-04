@@ -47,6 +47,8 @@ describe('MockDraftSetup', () => {
       controlAllTeams: false,
       // Shared lobbies default to private (LS-10076).
       isPublic: false,
+      // Shared drafts default to the 90s clock (LS-10466).
+      pickTimeLimitSeconds: 90,
     });
   });
 
@@ -201,6 +203,7 @@ describe('MockDraftSetup', () => {
       mode: 'shared',
       controlAllTeams: false,
       isPublic: false,
+      pickTimeLimitSeconds: 90,
     });
   });
 
@@ -307,5 +310,51 @@ describe('MockDraftSetup', () => {
     expect(
       queryByText("Have an invite code? Join a friend's draft →"),
     ).toBeNull();
+  });
+
+  // LS-10466 — Shared (online) drafts expose a pick-timer; Offline and
+  // Control All Teams drafts are untimed by design, so it is hidden there.
+  it('reflects the Pick Timer selection in the onStart payload for Shared drafts (LS-10466)', () => {
+    const onStart = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} />,
+    );
+
+    expect(getByText('Pick Timer')).toBeTruthy();
+    expect(getByText('30s')).toBeTruthy();
+    expect(getByText('60s')).toBeTruthy();
+    expect(getByText('90s')).toBeTruthy();
+    fireEvent.click(getByText('120s'));
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'shared', pickTimeLimitSeconds: 120 }),
+    );
+  });
+
+  it('hides the Pick Timer in Offline mode (LS-10466)', () => {
+    const { getByText, queryByText } = render(
+      <MockDraftSetup onStart={noop} onCancel={noop} />,
+    );
+
+    fireEvent.click(getByText('Offline'));
+
+    expect(queryByText('Pick Timer')).toBeNull();
+    expect(queryByText('90s')).toBeNull();
+  });
+
+  it('hides the Pick Timer when Control All Teams is on (LS-10466)', () => {
+    const { getByText, queryByText } = render(
+      <MockDraftSetup
+        onStart={noop}
+        onCancel={noop}
+        isControlAllTeamsEntitled
+      />,
+    );
+
+    // "On" is the Control All Teams option; it forces Offline mode.
+    fireEvent.click(getByText('On'));
+
+    expect(queryByText('Pick Timer')).toBeNull();
   });
 });

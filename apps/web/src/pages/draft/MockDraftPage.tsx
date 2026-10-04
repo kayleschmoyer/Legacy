@@ -480,7 +480,7 @@ export function MockDraftPage(): React.JSX.Element {
         // run the sport's full default roster, derived server-side.
         pickPosition: s.userPickPosition,
         // Offline mode ignores this and uses its own untimed sentinel server-side.
-        pickTimeLimitSeconds: isOffline ? undefined : 90,
+        pickTimeLimitSeconds: isOffline ? undefined : s.pickTimeLimitSeconds,
         draftOrder: s.draftOrder,
         playerPool: s.playerPool,
         sport: s.sport === 'football' ? Sport.Football : Sport.Baseball,

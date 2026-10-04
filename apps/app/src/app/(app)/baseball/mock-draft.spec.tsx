@@ -187,6 +187,21 @@ describe('MockDraftPage', () => {
       });
     });
 
+    it('forwards the chosen Pick Timer for a Shared draft (LS-10466)', async () => {
+      render(<MockDraftPage />);
+      fireEvent.press(screen.getByText('60s'));
+      fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));
+
+      await waitFor(() => expect(mockCreateMutate).toHaveBeenCalled());
+      const [{ variables }] = mockCreateMutate.mock.calls[0] as [
+        { variables: Record<string, unknown> },
+      ];
+      expect(variables).toMatchObject({
+        mode: 'ONLINE',
+        pickTimeLimitSeconds: 60,
+      });
+    });
+
     it('navigates to the mock draft room on success', async () => {
       render(<MockDraftPage />);
       fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));

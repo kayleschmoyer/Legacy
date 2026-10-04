@@ -4,8 +4,9 @@
  * Extracted from the canonical web `MockDraftPage` setup screen (LS-7711) so
  * web and native render the same battle-tested settings form instead of
  * maintaining parallel forks. This component owns the interactive settings
- * (team count, draft position, draft order, player pool, optional
- * sport toggle) plus the Start/Cancel actions and inline error/usage surfaces.
+ * (team count, draft position, draft order, player pool, Shared-mode pick
+ * timer, optional sport toggle) plus the Start/Cancel actions and inline
+ * error/usage surfaces.
  *
  * Page-level chrome stays with each consumer: web wraps this in its gradient
  * background + "Practice Mode" card and supplies premium gating + data fetching;
@@ -65,6 +66,12 @@ export interface MockDraftSettings {
    * its link, without an invite code. Ignored for Offline.
    */
   isPublic: boolean;
+  /**
+   * Per-pick clock in seconds for a Shared (online) draft (LS-10466). Always
+   * populated; consumers drop it for Offline / Control All Teams drafts, which
+   * are untimed by design (the server applies its own untimed sentinel).
+   */
+  pickTimeLimitSeconds: number;
 }
 
 export interface MockDraftSetupProps {
@@ -133,6 +140,14 @@ const DRAFT_MODE_OPTIONS: {
     helper: 'No clock — pause and pick at your own pace.',
   },
 ];
+
+/**
+ * Pick-timer choices for Shared (online) drafts (LS-10466). All within the
+ * 10–300s range `createMockDraft` accepts; 90s matches the previous fixed
+ * clock so the default experience is unchanged.
+ */
+const PICK_TIMER_OPTIONS = [30, 60, 90, 120] as const;
+const DEFAULT_PICK_TIME_LIMIT_SECONDS = 90;
 
 /** Shared-lobby visibility (LS-10076). */
 const VISIBILITY_OPTIONS: { label: string; value: boolean }[] = [
@@ -331,6 +346,8 @@ export function MockDraftSetup({
   const [mode, setMode] = React.useState<MockDraftMode>('shared');
   const [controlAllTeams, setControlAllTeams] = React.useState(false);
   const [isPublic, setIsPublic] = React.useState(false);
+  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] =
+    React.useState<number>(DEFAULT_PICK_TIME_LIMIT_SECONDS);
 
   // Changing sport resets the pool to the sport-neutral 'all' so a stale
   // baseball pool (nl/al) can never be submitted with sport=football — the
@@ -355,6 +372,7 @@ export function MockDraftSetup({
       // Only a Shared lobby can be public — an offline draft has no one to
       // join it (server CHECK drafts_public_mock_ck).
       isPublic: !controlAllTeams && mode === 'shared' && isPublic,
+      pickTimeLimitSeconds,
     });
   };
 
@@ -465,6 +483,40 @@ export function MockDraftSetup({
           </XStack>
         )}
       </FieldSection>
+
+      {/* Pick Timer — Shared (online) drafts only (LS-10466). Offline and
+          Control All Teams drafts are untimed by design, so the control is
+          hidden there (Control All Teams forces the mode to Offline). */}
+      {mode === 'shared' && (
+        <FieldSection
+          label="Pick Timer"
+          labelId="pick-timer-label"
+          helper={
+            <Paragraph
+              fontFamily="$body"
+              fontSize={12}
+              color="$gray10"
+              textAlign="center"
+              margin={0}
+            >
+              How long each drafter has to make a pick.
+            </Paragraph>
+          }
+        >
+          <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+            {PICK_TIMER_OPTIONS.map((seconds) => (
+              <OptionButton
+                key={seconds}
+                label={`${seconds}s`}
+                selected={pickTimeLimitSeconds === seconds}
+                accent={EMERALD}
+                onPress={() => setPickTimeLimitSeconds(seconds)}
+                testID={`mock-draft-pick-timer-${seconds}`}
+              />
+            ))}
+          </XStack>
+        </FieldSection>
+      )}
 
       {/* Control All Teams — premium (LS-9253). Visible to free users but
           gated: selecting "On" without the entitlement routes to the upgrade
