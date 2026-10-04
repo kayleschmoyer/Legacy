@@ -15,8 +15,8 @@
 # Schedule-free CI policy (ADR 0010 amendment, LS-8487): no `schedule:` cron.
 # Anchored instead on ci-orchestrator.yml completions (the natural signal that
 # there is new run history worth analyzing) and debounced to at most once per
-# CI_HEALTH_REPORT_MIN_INTERVAL_HOURS (repo var, default 168h == weekly),
-# mirroring the gate job in run-maestro-sweep.yml / run-playwright-tests.yml.
+# CI_HEALTH_REPORT_MIN_INTERVAL_HOURS (repo var, default 168h == weekly) via
+# a marker artifact the Analyze job uploads (O(1) API calls — LS-10558).
 # Manual dispatch always runs, for on-demand reports.
 # =============================================================================
 
@@ -42,7 +42,7 @@ on:
 permissions:
   contents: read
   issues: write
-  actions: read # gate job inspects prior runs of this workflow for debouncing
+  actions: read # gate job lists this workflow's debounce marker artifact
 
 # Serialize automated (workflow_run-triggered) reports; manual dispatches keep
 # their own unique group so an on-demand report is never queued behind one.
@@ -52,10 +52,14 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Debounce gate (schedule-free CI policy). Mirrors the `gate` job in
-  # run-maestro-sweep.yml: a debounced run skips the analyze job entirely, so
-  # the debounce check inspects prior runs' "Analyze" job (non-skipped = a
-  # real attempt) rather than run-level conclusions.
+  # Debounce gate (schedule-free CI policy). This workflow fires on every
+  # orchestrator completion, so the gate must be cheap: it makes exactly ONE
+  # API call — the newest `ci-health-report-marker` artifact, which the
+  # Analyze job of every automated run uploads as its first step — and skips
+  # when that marker is newer than the cutoff (LS-10558; the old gate called
+  # /actions/runs/{id}/jobs once per run in the window and exhausted the
+  # repo's GITHUB_TOKEN budget). Any gh api error → skip, never red.
+  # Decision + tests: .github/scripts/ci-health-report-gate.mjs.
   # ---------------------------------------------------------------------------
   gate:
     name: "CI Health Report Gate"
@@ -64,44 +68,19 @@ jobs:
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
     steps:
+      - name: "Checkout (gate script only)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/ci-health-report-gate.mjs
+          sparse-checkout-cone-mode: false
       - name: "Decide whether to run"
         id: decide
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           MIN_INTERVAL_HOURS: ${{ vars.CI_HEALTH_REPORT_MIN_INTERVAL_HOURS || '168' }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "workflow_run" ]; then
-            echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-          # This workflow runs on every ci-orchestrator.yml completion (i.e.
-          # roughly every PR push), far more often than it actually analyzes —
-          # most of those runs get debounced below without reaching "Analyze".
-          # A busy repo can rack up well over one page of them inside the
-          # debounce window, so --paginate (rather than a single per_page=30
-          # request) is required to see runs older in the window, not just the
-          # newest page.
-          RUN_IDS=$(gh api --paginate \
-            "repos/${{ github.repository }}/actions/workflows/ci-health-report.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=100" \
-            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
-
-          for id in $RUN_IDS; do
-            ANALYZED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-              --jq '[.jobs[] | select(.name == "Analyze" and .conclusion != null and .conclusion != "skipped")] | length')
-            if [ "$ANALYZED" -gt 0 ]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "Debounced — a CI health report (run ${id}) already ran within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-          done
-
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "No CI health report in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+        run: node .github/scripts/ci-health-report-gate.mjs
 
   # ---------------------------------------------------------------------------
   # Analyze last N ci-orchestrator runs and file the report issue.
@@ -113,6 +92,24 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
+      # Debounce marker read by the gate above. Uploaded FIRST so a failed
+      # analysis still counts as an attempt; automated runs only, so manual
+      # dispatches never debounce the automated report. retention-days must
+      # exceed CI_HEALTH_REPORT_MIN_INTERVAL_HOURS (clamped to the repo max).
+      - name: Write debounce marker
+        if: github.event_name == 'workflow_run'
+        shell: bash
+        run: echo "${{ github.run_id }}" > "$RUNNER_TEMP/ci-health-report-marker.txt"
+
+      - name: Upload debounce marker
+        if: github.event_name == 'workflow_run'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ci-health-report-marker
+          path: ${{ runner.temp }}/ci-health-report-marker.txt
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Checkout (analysis script only)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
