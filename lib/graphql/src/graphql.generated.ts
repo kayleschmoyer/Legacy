@@ -5209,6 +5209,8 @@ export type SubscriptionInfo = {
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
   currentPeriodEnd?: Maybe<Scalars['String']['output']>;
   gracePeriodEndsAt?: Maybe<Scalars['String']['output']>;
+  /** Billing system that owns this subscription: 'stripe', 'apple', or 'google'. */
+  managedBy?: Maybe<Scalars['String']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   tier?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['String']['output']>;
@@ -9477,6 +9479,7 @@ export type SubscriptionInfoFragment = {
   cancelAtPeriodEnd?: boolean | null;
   gracePeriodEndsAt?: string | null;
   trialEndsAt?: string | null;
+  managedBy?: string | null;
 };
 
 export type GetMySubscriptionQueryVariables = Exact<{ [key: string]: never }>;
@@ -9491,6 +9494,7 @@ export type GetMySubscriptionQuery = {
     cancelAtPeriodEnd?: boolean | null;
     gracePeriodEndsAt?: string | null;
     trialEndsAt?: string | null;
+    managedBy?: string | null;
   } | null;
 };
 
@@ -17079,6 +17083,7 @@ export const SubscriptionInfoFragmentDoc = gql`
     cancelAtPeriodEnd
     gracePeriodEndsAt
     trialEndsAt
+    managedBy
   }
 `;
 export const TeamFragmentDoc = gql`

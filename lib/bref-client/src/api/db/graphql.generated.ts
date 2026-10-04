@@ -5203,6 +5203,8 @@ export type SubscriptionInfo = {
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
   currentPeriodEnd?: Maybe<Scalars['String']['output']>;
   gracePeriodEndsAt?: Maybe<Scalars['String']['output']>;
+  /** Billing system that owns this subscription: 'stripe', 'apple', or 'google'. */
+  managedBy?: Maybe<Scalars['String']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   tier?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['String']['output']>;

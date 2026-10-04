@@ -310,14 +310,37 @@ export function shouldContinueActivationPolling(
 
 /* ─── Sub-Components ─── */
 
+const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
+const GOOGLE_SUBSCRIPTIONS_URL =
+  'https://play.google.com/store/account/subscriptions';
+
+/**
+ * LS-7403: store-managed subscriptions have no Stripe customer, so the billing
+ * portal rejects them. Returns the store's subscription-management link, or
+ * null for Stripe-managed (or unknown) subscriptions.
+ */
+export function getStoreManagement(
+  managedBy: string | null | undefined,
+): { label: string; url: string } | null {
+  if (managedBy === 'apple') {
+    return { label: 'Manage via App Store', url: APPLE_SUBSCRIPTIONS_URL };
+  }
+  if (managedBy === 'google') {
+    return { label: 'Manage via Play Store', url: GOOGLE_SUBSCRIPTIONS_URL };
+  }
+  return null;
+}
+
 function PastDueBanner({
   onRetry,
   loading,
   gracePeriodEndsAt,
+  actionLabel = 'Fix Payment',
 }: {
   onRetry: () => void;
   loading: boolean;
   gracePeriodEndsAt?: string | null;
+  actionLabel?: string;
 }) {
   return (
     <SectionCard
@@ -351,7 +374,7 @@ function PastDueBanner({
           icon={loading ? <RefreshCw size={16} /> : undefined}
           flexShrink={0}
         >
-          {loading ? 'Loading...' : 'Fix Payment'}
+          {loading ? 'Loading...' : actionLabel}
         </CtaButton>
       </XStack>
     </SectionCard>
@@ -702,6 +725,7 @@ const SubscriptionPage: React.FC = () => {
   const statusAccent = getStatusAccent(subscription?.status);
   const isFree = !subscription || subscription.status === null;
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+  const storeManagement = getStoreManagement(subscription?.managedBy);
 
   // Keep the tier badge fresh when a subscription change lands out-of-band
   // (Android verifyGooglePurchase, Stripe webhook, or the grace-period-expiry
@@ -921,6 +945,12 @@ const SubscriptionPage: React.FC = () => {
     );
   };
 
+  const openStoreManagement = () => {
+    if (storeManagement) {
+      window.open(storeManagement.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const handleManageSubscription = () => {
     requireStepUp(() => void handleManageSubscriptionAction());
   };
@@ -973,9 +1003,14 @@ const SubscriptionPage: React.FC = () => {
           {/* ── Past Due Warning Banner ── */}
           {isPastDue && (
             <PastDueBanner
-              onRetry={() => void handleManageSubscription()}
-              loading={portalLoading}
+              onRetry={
+                storeManagement
+                  ? openStoreManagement
+                  : () => void handleManageSubscription()
+              }
+              loading={storeManagement ? false : portalLoading}
               gracePeriodEndsAt={subscription?.gracePeriodEndsAt}
+              actionLabel={storeManagement?.label}
             />
           )}
 
@@ -1176,31 +1211,49 @@ const SubscriptionPage: React.FC = () => {
                     flexWrap="wrap"
                     $sm={{ flexDirection: 'column' }}
                   >
-                    <CtaButton
-                      onPress={() => void handleManageSubscription()}
-                      disabled={portalLoading}
-                      style={
-                        {
-                          background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, ${BRAND_NAVY} 100%)`,
-                          borderWidth: 1,
-                          borderColor: withAlpha(BRAND_GOLD, 0.3),
-                          color: 'white',
-                        } as React.CSSProperties
-                      }
-                    >
-                      {portalLoading ? 'Loading…' : 'Manage Subscription'}
-                    </CtaButton>
-
-                    {!cancelAtPeriodEnd && (isPremium || isPastDue) && (
+                    {storeManagement ? (
                       <CtaButton
-                        onPress={() => setShowCancelDialog(true)}
-                        backgroundColor="transparent"
-                        borderWidth={1}
-                        borderColor={withAlpha(RED, 0.35)}
-                        style={{ color: RED } as React.CSSProperties}
+                        onPress={openStoreManagement}
+                        style={
+                          {
+                            background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, ${BRAND_NAVY} 100%)`,
+                            borderWidth: 1,
+                            borderColor: withAlpha(BRAND_GOLD, 0.3),
+                            color: 'white',
+                          } as React.CSSProperties
+                        }
                       >
-                        Cancel Subscription
+                        {storeManagement.label}
                       </CtaButton>
+                    ) : (
+                      <>
+                        <CtaButton
+                          onPress={() => void handleManageSubscription()}
+                          disabled={portalLoading}
+                          style={
+                            {
+                              background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, ${BRAND_NAVY} 100%)`,
+                              borderWidth: 1,
+                              borderColor: withAlpha(BRAND_GOLD, 0.3),
+                              color: 'white',
+                            } as React.CSSProperties
+                          }
+                        >
+                          {portalLoading ? 'Loading…' : 'Manage Subscription'}
+                        </CtaButton>
+
+                        {!cancelAtPeriodEnd && (isPremium || isPastDue) && (
+                          <CtaButton
+                            onPress={() => setShowCancelDialog(true)}
+                            backgroundColor="transparent"
+                            borderWidth={1}
+                            borderColor={withAlpha(RED, 0.35)}
+                            style={{ color: RED } as React.CSSProperties}
+                          >
+                            Cancel Subscription
+                          </CtaButton>
+                        )}
+                      </>
                     )}
                   </XStack>
                 </YStack>

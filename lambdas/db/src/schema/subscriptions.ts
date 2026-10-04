@@ -244,6 +244,25 @@ TemporaryPremiumGrantResultRef.implement({
   }),
 });
 
+export type SubscriptionManagedBy = 'stripe' | 'apple' | 'google';
+
+/**
+ * Which billing system owns a subscription row (LS-7403). Web clients use it to
+ * avoid routing Apple/Google-managed subscribers into the Stripe billing
+ * portal, which rejects rows without a `stripeCustomerId`. Legacy/unknown rows
+ * fall back to 'stripe' so existing behavior is unchanged.
+ */
+export function deriveSubscriptionManagedBy(subscription: {
+  stripeCustomerId: string | null;
+  appleOriginalTransactionId: string | null;
+  googlePurchaseToken: string | null;
+}): SubscriptionManagedBy {
+  if (subscription.stripeCustomerId) return 'stripe';
+  if (subscription.appleOriginalTransactionId) return 'apple';
+  if (subscription.googlePurchaseToken) return 'google';
+  return 'stripe';
+}
+
 /**
  * Map a Stripe recurring interval to the billing interval exposed on
  * `SubscriptionInfo` (LS-7171). Anything other than a monthly or yearly
@@ -266,6 +285,7 @@ const SubscriptionInfoRef = builder.objectRef<{
   cancelAtPeriodEnd: boolean;
   trialEndsAt: string | null;
   gracePeriodEndsAt: string | null;
+  managedBy: SubscriptionManagedBy;
   stripeSubscriptionId: string | null;
 }>('SubscriptionInfo');
 
@@ -277,6 +297,10 @@ SubscriptionInfoRef.implement({
     cancelAtPeriodEnd: t.exposeBoolean('cancelAtPeriodEnd'),
     trialEndsAt: t.exposeString('trialEndsAt', { nullable: true }),
     gracePeriodEndsAt: t.exposeString('gracePeriodEndsAt', { nullable: true }),
+    managedBy: t.exposeString('managedBy', {
+      description:
+        "Billing system that owns this subscription: 'stripe', 'apple', or 'google'.",
+    }),
     // LS-7171: the interval lives in Stripe, not the subscriptions table, so it
     // is resolved lazily — only queries that select this field pay for the
     // Stripe round-trip. Null for Apple/Google-managed subscriptions (no Stripe
@@ -488,6 +512,7 @@ builder.queryField('mySubscription', (t) =>
         trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
         gracePeriodEndsAt:
           subscription.gracePeriodEndsAt?.toISOString() ?? null,
+        managedBy: deriveSubscriptionManagedBy(subscription),
         stripeSubscriptionId: subscription.stripeSubscriptionId ?? null,
       };
     },
@@ -1161,6 +1186,9 @@ export async function getSubscriptionForUser(userId: number) {
         gracePeriodEndsAt: InternalSchema.subscriptions.gracePeriodEndsAt,
         stripeCustomerId: InternalSchema.subscriptions.stripeCustomerId,
         stripeSubscriptionId: InternalSchema.subscriptions.stripeSubscriptionId,
+        appleOriginalTransactionId:
+          InternalSchema.subscriptions.appleOriginalTransactionId,
+        googlePurchaseToken: InternalSchema.subscriptions.googlePurchaseToken,
       })
       .from(InternalSchema.subscriptions)
       .where(eq(InternalSchema.subscriptions.userId, userId))

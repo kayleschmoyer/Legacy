@@ -5667,6 +5667,11 @@ type SubscriptionInfo {
   cancelAtPeriodEnd: Boolean
   currentPeriodEnd: String
   gracePeriodEndsAt: String
+
+  """
+  Billing system that owns this subscription: 'stripe', 'apple', or 'google'.
+  """
+  managedBy: String
   status: String
   tier: String
   trialEndsAt: String

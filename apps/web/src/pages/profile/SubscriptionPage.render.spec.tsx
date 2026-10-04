@@ -27,6 +27,7 @@ type SubscriptionMock = {
   cancelAtPeriodEnd: boolean;
   trialEndsAt?: string | null;
   gracePeriodEndsAt?: string | null;
+  managedBy?: string;
 };
 
 type MySubscriptionQueryMock = {
@@ -302,6 +303,93 @@ describe('SubscriptionPage — trialing status (LS-7391)', () => {
     renderPage();
 
     expect(screen.queryByText('Trial ends')).not.toBeInTheDocument();
+  });
+});
+
+describe('SubscriptionPage — store-managed subscriptions (LS-7403)', () => {
+  let mockWindowOpen: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+    mockWindowOpen = jest.spyOn(window, 'open').mockImplementation(() => null);
+  });
+
+  afterEach(() => {
+    mockWindowOpen.mockRestore();
+  });
+
+  function mockSubscription(overrides: Record<string, unknown>) {
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'active',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+          managedBy: 'stripe',
+          ...overrides,
+        },
+      },
+      loading: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('replaces Stripe buttons with an App Store link for Apple-managed subscribers', () => {
+    mockSubscription({ managedBy: 'apple' });
+
+    renderPage();
+
+    expect(screen.queryByText('Manage Subscription')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cancel Subscription')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Manage via App Store'));
+    expect(mockWindowOpen).toHaveBeenCalledWith(
+      'https://apps.apple.com/account/subscriptions',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  it('shows a Play Store link for Google-managed subscribers', () => {
+    mockSubscription({ managedBy: 'google' });
+
+    renderPage();
+
+    expect(screen.queryByText('Manage Subscription')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Manage via Play Store'));
+    expect(mockWindowOpen).toHaveBeenCalledWith(
+      'https://play.google.com/store/account/subscriptions',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('routes the past-due retry to the store link for store-managed subscribers', () => {
+    mockSubscription({ managedBy: 'apple', status: 'past_due' });
+
+    renderPage();
+
+    expect(screen.queryByText('Fix Payment')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('Manage via App Store')[0]);
+    expect(mockWindowOpen).toHaveBeenCalledTimes(1);
+    expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps Stripe Manage/Cancel buttons for Stripe-managed subscribers', () => {
+    mockSubscription({ managedBy: 'stripe' });
+
+    renderPage();
+
+    expect(screen.getByText('Manage Subscription')).toBeInTheDocument();
+    expect(screen.getByText('Cancel Subscription')).toBeInTheDocument();
+    expect(screen.queryByText('Manage via App Store')).not.toBeInTheDocument();
   });
 });
 

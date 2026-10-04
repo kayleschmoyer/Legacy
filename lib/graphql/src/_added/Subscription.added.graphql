@@ -5,6 +5,7 @@ fragment SubscriptionInfo on SubscriptionInfo {
   cancelAtPeriodEnd
   gracePeriodEndsAt
   trialEndsAt
+  managedBy
 }
 
 query GetMySubscription {

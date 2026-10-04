@@ -90,6 +90,7 @@ import {
   billingIntervalFromStripe,
   buildCheckoutTrialParams,
   computeRevenueCents,
+  deriveSubscriptionManagedBy,
   expireSubscriptionGracePeriods,
   fetchStripePrices,
   getCachedAdminRevenueStats,
@@ -713,6 +714,36 @@ describe('getSubscriptionForUser (LS-5201, LS-7383)', () => {
     );
 
     expect(await getSubscriptionForUser(99)).toBeNull();
+  });
+});
+
+describe('deriveSubscriptionManagedBy (LS-7403)', () => {
+  const none = {
+    stripeCustomerId: null,
+    appleOriginalTransactionId: null,
+    googlePurchaseToken: null,
+  };
+
+  it('returns stripe when a Stripe customer exists', () => {
+    expect(
+      deriveSubscriptionManagedBy({ ...none, stripeCustomerId: 'cus_1' }),
+    ).toBe('stripe');
+  });
+
+  it('returns apple when only an Apple transaction id exists', () => {
+    expect(
+      deriveSubscriptionManagedBy({ ...none, appleOriginalTransactionId: '1' }),
+    ).toBe('apple');
+  });
+
+  it('returns google when only a Google purchase token exists', () => {
+    expect(
+      deriveSubscriptionManagedBy({ ...none, googlePurchaseToken: 'tok' }),
+    ).toBe('google');
+  });
+
+  it('falls back to stripe for legacy rows with no billing identifiers', () => {
+    expect(deriveSubscriptionManagedBy(none)).toBe('stripe');
   });
 });
 
