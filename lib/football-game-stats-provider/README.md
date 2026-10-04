@@ -74,3 +74,24 @@ See `VALIDATION-REPORT.md` for a larger, dedicated sample.
   weekly output; schedule's final score), not read from a single nflverse
   "team defense" table — nflverse does not publish one. See the doc-comment
   on `buildTeamDefenseGames` in `transform.ts`.
+
+## PFA read path, 1960-1998 (LS-9997)
+
+`PfaCareerStats.getGameLog(player, season)` (`src/lib/pfa-provider.ts`)
+reads `pfa/v1/<pfrId>/<season>.json.gz` from the same bucket
+(`FOOTBALL_CORPUS_S3_BUCKET`/`FOOTBALL_CORPUS_S3_PREFIX`, same memo cache)
+and returns the same `GameLog` shape as `CareerStats.getGameLog`. The objects
+are written by the PFA ingest (LS-9995), and `src/lib/pfa-types.ts` mirrors
+that ingest's payload shape.
+
+- **This is the PFA half only.** It is not wired into a season-boundary
+  router, and `load-football-game.ts` does not call it. LS-10214 owns the
+  1960-1998 -> PFA / 1999+ -> nflverse routing.
+- **No data comes back as `null`.** A NoSuchKey miss (crosswalk miss, no games
+  that season), a season outside 1960-1998, or no bucket configured all
+  return `null`. There is no `pfr-client` fallback, because PFR cannot be
+  reached from a server (LS-9908).
+- **Errors throw.** A non-404 S3 error throws. So does a corrupt or
+  wrong-shaped object, as `PfaPayloadError`.
+- **Permanent gaps (ADR 0022):** `fumbles` is always `null` (unknown, never
+  `0`). There is no PFA IDP or team-defense game log.

@@ -1,7 +1,20 @@
 export { CareerStats, IDPStats, TeamDefense } from './lib/provider';
 
+// PFA (1960-1998) half — LS-9997. Not wired into a season router yet (LS-10214).
+export { PfaCareerStats } from './lib/pfa-provider';
+export {
+  buildPfaObjectKey,
+  isPfaSeason,
+  PFA_FIRST_SEASON,
+  PFA_LAST_SEASON,
+  PFA_PAYLOAD_VERSION,
+  PfaPayloadError,
+  type PfaPlayerSeasonPayload,
+} from './lib/pfa-types';
+
 export {
   clearFootballCorpusCache,
+  getPfaPlayerSeasonPayload,
   getPlayerSeasonPayload,
   getTeamDefenseSeasonPayload,
   isFootballCorpusConfigured,

@@ -3,6 +3,13 @@ import { LOGGER } from '@legacy-sports/logging';
 import { gunzipSync } from 'node:zlib';
 
 import {
+  buildPfaObjectKey,
+  isPfaSeason,
+  PFA_PAYLOAD_VERSION,
+  PfaPayloadError,
+  type PfaPlayerSeasonPayload,
+} from './pfa-types';
+import {
   buildPlayerObjectKey,
   buildTeamDefenseObjectKey,
   type NflversePlayerSeasonPayload,
@@ -45,6 +52,7 @@ const teamDefenseCache = new Map<
   string,
   CacheEntry<NflverseTeamDefenseSeasonPayload>
 >();
+const pfaCache = new Map<string, CacheEntry<PfaPlayerSeasonPayload>>();
 
 let client: S3Client | null = null;
 
@@ -82,6 +90,13 @@ function isNotFound(error: unknown): boolean {
 }
 
 async function getObjectJson<T>(key: string): Promise<T | null> {
+  const compressed = await getObjectBytes(key);
+  return compressed === null
+    ? null
+    : (JSON.parse(gunzipSync(compressed).toString('utf-8')) as T);
+}
+
+async function getObjectBytes(key: string): Promise<Buffer | null> {
   const bucket = process.env[BUCKET_ENV];
   if (!bucket) return null;
 
@@ -90,8 +105,7 @@ async function getObjectJson<T>(key: string): Promise<T | null> {
       new GetObjectCommand({ Bucket: bucket, Key: key }),
     );
     if (!response.Body) return null;
-    const compressed = Buffer.from(await response.Body.transformToByteArray());
-    return JSON.parse(gunzipSync(compressed).toString('utf-8')) as T;
+    return Buffer.from(await response.Body.transformToByteArray());
   } catch (error) {
     if (isNotFound(error)) {
       LOGGER.debug(`Football corpus S3 MISS for ${key}`);
@@ -159,10 +173,96 @@ export function getTeamDefenseSeasonPayload(
   );
 }
 
+/**
+ * Decode and shape-check a PFA object. Any failure here (bad gzip, bad JSON,
+ * wrong version, missing arrays, or a pfrId/season that does not match the
+ * key it was stored under) throws {@link PfaPayloadError}: the object exists,
+ * so reporting it as a corpus miss would hide corrupt data.
+ */
+function decodePfaPayload(
+  key: string,
+  compressed: Buffer,
+  pfrId: string,
+  season: number,
+): PfaPlayerSeasonPayload {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(gunzipSync(compressed).toString('utf-8'));
+  } catch (error) {
+    throw new PfaPayloadError(
+      key,
+      `cannot decode (${(error as Error).message})`,
+    );
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new PfaPayloadError(key, 'not a JSON object');
+  }
+  const payload = parsed as Partial<
+    Record<keyof PfaPlayerSeasonPayload, unknown>
+  >;
+  if (payload.v !== PFA_PAYLOAD_VERSION) {
+    throw new PfaPayloadError(key, `unsupported version ${String(payload.v)}`);
+  }
+  if (payload.pfrId !== pfrId || payload.season !== season) {
+    throw new PfaPayloadError(
+      key,
+      `holds ${String(payload.pfrId)} ${String(payload.season)}, expected ${pfrId} ${season}`,
+    );
+  }
+  for (const family of [
+    'passing',
+    'rushing',
+    'receiving',
+    'kicking',
+  ] as const) {
+    const rows = payload[family];
+    if (!Array.isArray(rows)) {
+      throw new PfaPayloadError(key, `"${family}" is not an array`);
+    }
+    for (const row of rows as unknown[]) {
+      const r = row as { gameNum?: unknown; gameIdentifier?: unknown } | null;
+      if (
+        typeof r !== 'object' ||
+        r === null ||
+        typeof r.gameNum !== 'number' ||
+        typeof r.gameIdentifier !== 'string'
+      ) {
+        throw new PfaPayloadError(key, `"${family}" has a malformed row`);
+      }
+    }
+  }
+  return parsed as PfaPlayerSeasonPayload;
+}
+
+/**
+ * Load the PFA payload for a 1960-1998 player-season, or `null` when the
+ * corpus has no object for it (crosswalk miss, no games that season, a
+ * season outside 1960-1998, or no bucket configured). A non-404 S3 error or
+ * a malformed object throws.
+ */
+export function getPfaPlayerSeasonPayload(
+  pfrId: string,
+  season: number,
+): Promise<PfaPlayerSeasonPayload | null> {
+  if (!isFootballCorpusConfigured() || !isPfaSeason(season)) {
+    return Promise.resolve(null);
+  }
+
+  const key = buildPfaObjectKey(process.env[PREFIX_ENV] ?? '', pfrId, season);
+  return memoize(pfaCache, `${pfrId}:${season}`, async () => {
+    const compressed = await getObjectBytes(key);
+    return compressed === null
+      ? null
+      : decodePfaPayload(key, compressed, pfrId, season);
+  });
+}
+
 /** Test/maintenance helper mirroring `clearRetrosheetCache`. */
 export function clearFootballCorpusCache(): void {
   playerCache.clear();
   teamDefenseCache.clear();
+  pfaCache.clear();
 }
 
 /** Test helper: allows injecting a stubbed S3 client. */
