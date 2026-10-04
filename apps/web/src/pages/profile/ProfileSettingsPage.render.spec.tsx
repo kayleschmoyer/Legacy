@@ -21,7 +21,7 @@ type AuthMock = {
     email: string;
     picture: string | null;
     accessLevel: string;
-  };
+  } | null;
 };
 
 const mockUseAuth = jest.fn<AuthMock, []>();
@@ -122,6 +122,10 @@ jest.mock('../../components/profile/TwoFactorSection', () => ({
 
 jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
+}));
+
+jest.mock('../../components/auth/AuthPendingFallback', () => ({
+  AuthPendingFallback: () => <div data-testid="auth-pending-fallback" />,
 }));
 
 function renderPage(picture: string | null) {
@@ -234,5 +238,14 @@ describe('ProfileSettingsPage sign-out confirmation (LS-7221)', () => {
 
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('ProfileSettingsPage without a user (LS-10457)', () => {
+  it('renders the auth fallback instead of a blank page', () => {
+    mockUseAuth.mockReturnValue({ config: {}, user: null });
+    render(<ProfileSettingsPage />);
+    expect(screen.getByTestId('auth-pending-fallback')).toBeTruthy();
+    expect(screen.queryByText('Profile Settings')).toBeNull();
   });
 });

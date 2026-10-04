@@ -28,6 +28,7 @@ import { getSessionStatus } from './sessionStatus';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
 import { PageMeta } from '../../components/PageMeta';
+import { AuthPendingFallback } from '../../components/auth/AuthPendingFallback';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
 import { trackSignOut } from '../../utils/analytics';
@@ -478,7 +479,7 @@ const ProfileSettingsPage: React.FC = () => {
     : 'account';
 
   if (!user) {
-    return null;
+    return <AuthPendingFallback />;
   }
 
   return (

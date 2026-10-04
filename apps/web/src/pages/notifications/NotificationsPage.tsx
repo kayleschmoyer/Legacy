@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { NotificationsScreen } from '@legacy-sports/shared-components/notifications';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { PageMeta } from '../../components/PageMeta';
+import { AuthPendingFallback } from '../../components/auth/AuthPendingFallback';
 import { joinedTargetPath } from '../join/joinedTargetPath';
 import { env } from '../../config/environment';
 
@@ -10,7 +11,7 @@ const NotificationsPage: React.FC = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
-  if (!user) return null;
+  if (!user) return <AuthPendingFallback />;
 
   return (
     <>

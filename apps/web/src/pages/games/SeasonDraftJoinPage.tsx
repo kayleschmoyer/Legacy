@@ -4,6 +4,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { SeasonDraftJoin } from '@legacy-sports/shared-components/season-draft';
 import { Text, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
+import { AuthPendingFallback } from '../../components/auth/AuthPendingFallback';
 
 /**
  * Season Draft Join Page
@@ -25,7 +26,7 @@ export const SeasonDraftJoinPage: React.FC = () => {
   }
 
   if (!user) {
-    return null;
+    return <AuthPendingFallback />;
   }
 
   return (
