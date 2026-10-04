@@ -2006,15 +2006,17 @@ builder.queryField('getUserLeagueSummaries', (t) =>
 
       const leagueIds = leagues.map((l) => l.id);
 
-      // 2. Batch: team counts per league
+      // 2. Batch: team counts per league. Count `teams` rows, not
+      // `league_members` — bot/unclaimed teams have no member row, so a member
+      // count under-reports the league size (LS-10429).
       const teamCountRows = await context.db
         .select({
-          leagueId: PublicSchema.leagueMembers.leagueId,
+          leagueId: PublicSchema.teams.leagueId,
           cnt: count(),
         })
-        .from(PublicSchema.leagueMembers)
-        .where(inArray(PublicSchema.leagueMembers.leagueId, leagueIds))
-        .groupBy(PublicSchema.leagueMembers.leagueId);
+        .from(PublicSchema.teams)
+        .where(inArray(PublicSchema.teams.leagueId, leagueIds))
+        .groupBy(PublicSchema.teams.leagueId);
 
       const teamCountMap = new Map(
         teamCountRows.map((r) => [r.leagueId, Number(r.cnt)]),
@@ -2236,14 +2238,15 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
 
       const leagueIds = leagues.map((l) => l.id);
 
+      // Count `teams` rows, not `league_members` (LS-10429).
       const teamCountRows = await context.db
         .select({
-          leagueId: PublicSchema.leagueMembers.leagueId,
+          leagueId: PublicSchema.teams.leagueId,
           cnt: count(),
         })
-        .from(PublicSchema.leagueMembers)
-        .where(inArray(PublicSchema.leagueMembers.leagueId, leagueIds))
-        .groupBy(PublicSchema.leagueMembers.leagueId);
+        .from(PublicSchema.teams)
+        .where(inArray(PublicSchema.teams.leagueId, leagueIds))
+        .groupBy(PublicSchema.teams.leagueId);
 
       const teamCountMap = new Map(
         teamCountRows.map((r) => [r.leagueId, Number(r.cnt)]),
