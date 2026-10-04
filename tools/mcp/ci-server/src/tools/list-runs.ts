@@ -141,6 +141,7 @@ interface ListRunsParams {
   commit?: string;
   user?: string;
   limit?: number;
+  created?: string;
 }
 
 interface GitHubWorkflowRun {
@@ -201,6 +202,7 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
   if (params.commit)
     queryParams.head_sha = await resolveCommitSha(params.commit);
   if (params.user) queryParams.actor = params.user;
+  if (params.created) queryParams.created = params.created;
 
   try {
     // If a workflow filter is specified, resolve the identifier (display name,

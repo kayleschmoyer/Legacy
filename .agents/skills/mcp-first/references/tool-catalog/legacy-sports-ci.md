@@ -77,13 +77,13 @@ Trigger a GitHub Actions workflow_dispatch event. Accepts a workflow file name (
 
 ### `ci_download_artifact`
 
-Prefer this over `gh run download` via shell. Download a named GitHub Actions artifact (uploaded via actions/upload-artifact) from a workflow run. Without outDir, file contents are returned inline in the response (UTF-8 text where safe, base64 for binary, capped at ~200KB total across all files — the only option in hosted sessions with no shared filesystem). With outDir, every file is extracted to that local directory instead and only their paths are returned.
+Prefer this over `gh run download` via shell. Download a named GitHub Actions artifact from a workflow run. Without outDir, file contents return inline (UTF-8 or base64, ~200KB cap — the only option in hosted sessions). With outDir, files are extracted there and only paths returned.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `runId` | number | **required** | coerced, integer, > 0 | Workflow run ID that produced the artifact |
-| `artifactName` | string | **required** | min 1 | Exact artifact name as uploaded via actions/upload-artifact (falls back to a case-insensitive match if no exact match is found) |
-| `outDir` | string |  | — | Local directory to extract the artifact into. Omit to get file contents back inline instead. |
+| `artifactName` | string | **required** | min 1 | Exact artifact name (falls back to a case-insensitive match) |
+| `outDir` | string |  | — | Local directory to extract into. Omit for inline contents. |
 
 ### `ci_find_session`
 
@@ -108,22 +108,22 @@ Last resort for a run ci_cancel_run cannot actually evict — e.g. a job queued 
 
 ### `ci_get_logs`
 
-Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job, failed steps only by default. Response is a minified-JSON metadata line followed by raw log text with real newlines, so grep and chunked Read work directly against it when the response is persisted to a file.
+Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job, failed steps only by default. Response is a minified-JSON metadata line followed by raw log text.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
 | `runId` | number |  | coerced, integer, > 0 | Run ID (required when jobId and runIds are not provided) |
-| `runIds` | number[] |  | min 1, max 10, coerced, integer, > 0 | Batch mode: up to 10 runs in one call, each returned as a "=== run <id> ===" section. Runs whose log archive is gone (expired) are isolated to missing[] rather than failing the call. Not with jobId. |
+| `runIds` | number[] |  | min 1, max 10, coerced, integer, > 0 | Batch mode: up to 10 runs, each a "=== run <id> ===" section; runs with expired logs go to missing[]. Not with jobId. |
 | `jobId` | number |  | coerced, integer, > 0 | Job ID |
-| `jobName` | string |  | — | Job name — exact match preferred, else substring; errors listing candidates if ambiguous. |
+| `jobName` | string |  | — | Job name — exact match, else substring; errors if ambiguous. |
 | `failedOnly` | boolean |  | — | Failed steps only (default: true) |
 | `attempt` | number |  | coerced, integer, > 0 | Attempt number |
 | `maxLines` | number |  | coerced, integer, > 0, max 5000 | Max lines returned (cap 5000). Default 500, or up to 10000 when errorSummary is set. |
 | `maxChars` | number |  | coerced, integer, > 0, max 200000 | Hard cap on total characters (default 50000), applied regardless of maxLines. |
-| `truncateLineLength` | number |  | coerced, integer, > 0, max 10000 | Truncate individual lines past this length; truncated lines are suffixed ...[line truncated]. |
+| `truncateLineLength` | number |  | coerced, integer, > 0, max 10000 | Truncate individual lines past this length. |
 | `errorSummary` | boolean |  | — | Extract only error/failure lines with context (~200 lines max). |
-| `offset` | number |  | coerced, integer, >= 0 | Skip this many lines from the start of the fetched window before applying maxChars, like Read offset. Pages a log across calls; response meta returns hint/linesRemainingInWindow with the next offset. |
-| `grep` | string |  | — | Regex filter over the full log, e.g. "foo\|bar" (not just the maxLines tail). Overrides errorSummary. Case-insensitive unless caseSensitive. Capped at 300 matches. |
+| `offset` | number |  | coerced, integer, >= 0 | Skip this many lines before applying maxChars, to page a log across calls; response meta gives the next offset. |
+| `grep` | string |  | — | Regex filter over the full log, e.g. "foo\|bar". Overrides errorSummary. Capped at 300 matches. |
 | `caseSensitive` | boolean |  | — | Case-sensitive grep (default false). |
 
 ### `ci_get_playwright_report`
@@ -179,6 +179,9 @@ Prefer this over `gh run list` or `mcp__github__actions_list` (can silently drop
 | `commit` | string |  | — | Commit SHA filter |
 | `user` | string |  | — | GitHub username filter |
 | `limit` | number |  | coerced, integer, > 0, max 100 | Max results (default: 10, max: 100) |
+| `created` | string |  | — | Created date: YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD |
+| `groupBy` | enum |  | — | Runner-minutes mode: self-hosted vs GitHub-hosted job minutes over `created` (required), grouped by this. |
+| `workflows` | string[] |  | — | Workflow filter (groupBy only) |
 
 ### `ci_rerun`
 

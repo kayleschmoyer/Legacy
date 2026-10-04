@@ -18,6 +18,7 @@ import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
 import { isHeadSha } from './tools/is-head-sha.js';
 import { listRuns } from './tools/list-runs.js';
 import { retryRunnerFlake } from './tools/retry-runner-flake.js';
+import { runnerMinutes } from './tools/runner-minutes.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { unwedgeOrchestrator } from './tools/unwedge-orchestrator.js';
@@ -89,8 +90,7 @@ export function createServer(): McpServer {
   server.tool(
     'ci_get_logs',
     'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job, failed steps ' +
-      'only by default. Response is a minified-JSON metadata line followed by raw log text with real ' +
-      'newlines, so grep and chunked Read work directly against it when the response is persisted to a file.',
+      'only by default. Response is a minified-JSON metadata line followed by raw log text.',
     {
       runId: z.coerce
         .number()
@@ -104,15 +104,14 @@ export function createServer(): McpServer {
         .max(10)
         .optional()
         .describe(
-          'Batch mode: up to 10 runs in one call, each returned as a "=== run <id> ===" section. Runs whose ' +
-            'log archive is gone (expired) are isolated to missing[] rather than failing the call. Not with jobId.',
+          'Batch mode: up to 10 runs, each a "=== run <id> ===" section; runs with expired logs go to missing[]. Not with jobId.',
         ),
       jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
       jobName: z
         .string()
         .optional()
         .describe(
-          'Job name — exact match preferred, else substring; errors listing candidates if ambiguous.',
+          'Job name — exact match, else substring; errors if ambiguous.',
         ),
       failedOnly: coercedBoolean
         .default(true)
@@ -147,9 +146,7 @@ export function createServer(): McpServer {
         .positive()
         .max(10_000)
         .optional()
-        .describe(
-          'Truncate individual lines past this length; truncated lines are suffixed ...[line truncated].',
-        ),
+        .describe('Truncate individual lines past this length.'),
       errorSummary: coercedBoolean
         .default(false)
         .describe(
@@ -161,13 +158,13 @@ export function createServer(): McpServer {
         .nonnegative()
         .optional()
         .describe(
-          'Skip this many lines from the start of the fetched window before applying maxChars, like Read offset. Pages a log across calls; response meta returns hint/linesRemainingInWindow with the next offset.',
+          'Skip this many lines before applying maxChars, to page a log across calls; response meta gives the next offset.',
         ),
       grep: z
         .string()
         .optional()
         .describe(
-          'Regex filter over the full log, e.g. "foo|bar" (not just the maxLines tail). Overrides errorSummary. Case-insensitive unless caseSensitive. Capped at 300 matches.',
+          'Regex filter over the full log, e.g. "foo|bar". Overrides errorSummary. Capped at 300 matches.',
         ),
       caseSensitive: coercedBoolean
         .default(false)
@@ -179,10 +176,8 @@ export function createServer(): McpServer {
   server.tool(
     'ci_download_artifact',
     'Prefer this over `gh run download` via shell. Download a named GitHub Actions artifact ' +
-      '(uploaded via actions/upload-artifact) from a workflow run. Without outDir, file contents ' +
-      'are returned inline in the response (UTF-8 text where safe, base64 for binary, capped at ' +
-      '~200KB total across all files — the only option in hosted sessions with no shared filesystem). ' +
-      'With outDir, every file is extracted to that local directory instead and only their paths are returned.',
+      'from a workflow run. Without outDir, file contents return inline (UTF-8 or base64, ~200KB cap — ' +
+      'the only option in hosted sessions). With outDir, files are extracted there and only paths returned.',
     {
       runId: z.coerce
         .number()
@@ -193,14 +188,12 @@ export function createServer(): McpServer {
         .string()
         .min(1)
         .describe(
-          'Exact artifact name as uploaded via actions/upload-artifact (falls back to a case-insensitive match if no exact match is found)',
+          'Exact artifact name (falls back to a case-insensitive match)',
         ),
       outDir: z
         .string()
         .optional()
-        .describe(
-          'Local directory to extract the artifact into. Omit to get file contents back inline instead.',
-        ),
+        .describe('Local directory to extract into. Omit for inline contents.'),
     },
     async (params) => downloadArtifact(params),
   );
@@ -225,8 +218,25 @@ export function createServer(): McpServer {
         .max(100)
         .default(10)
         .describe('Max results (default: 10, max: 100)'),
+      created: z
+        .string()
+        .optional()
+        .describe('Created date: YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD'),
+      groupBy: z
+        .enum(['workflow', 'label', 'day'])
+        .optional()
+        .describe(
+          'Runner-minutes mode: self-hosted vs GitHub-hosted job minutes over `created` (required), grouped by this.',
+        ),
+      workflows: z
+        .array(z.string())
+        .optional()
+        .describe('Workflow filter (groupBy only)'),
     },
-    async (params) => listRuns(params),
+    async ({ groupBy, workflows, ...params }) =>
+      groupBy
+        ? runnerMinutes({ created: params.created, workflows, groupBy })
+        : listRuns(params),
   );
 
   server.tool(

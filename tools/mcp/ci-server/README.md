@@ -10,7 +10,7 @@ GitHub Actions workflow run triage and management for Legacy Sports.
 
 ### Workflow Runs
 
-- **ci_list_runs** — List recent workflow runs with optional branch, workflow, status, event, and commit filters
+- **ci_list_runs** — List recent workflow runs with optional branch, workflow, status, event, commit, and `created` date filters. With `groupBy` (`workflow` | `label` | `day`) plus `created` (a day or `A..B` range, max 31 days) and optional `workflows[]`, it switches to runner-minutes mode: job minutes split self-hosted vs GitHub-hosted across every run in the window (LS-10342). Only jobs with a non-empty `runner_name` and a positive duration count — a job cancelled while queued has timestamps but never ran — and `ranRuns`/`gatedOutRuns` separate runs that executed from `workflow_run` executions whose jobs were all skipped. Any API error (including a 403 rate limit) fails the call rather than returning a partial sum
 - **ci_view_run** — Inspect a workflow run summary, including jobs and conclusions. Pass `runIds` (array, max 50) instead of `runId` to inspect several runs in one call (partial-failure result shape)
 - **ci_is_head_sha** — Check whether a SHA (from a webhook check-run/CI-comment event) is still a PR's current head, in one call — replaces the manual `pull_request_read` + `ci_list_runs`/`ci_view_run` cross-check for staleness
 - **ci_get_logs** — Retrieve full or failed-only logs for a run or specific job
