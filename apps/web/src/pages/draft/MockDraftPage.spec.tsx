@@ -10,6 +10,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { formatDraftDate } from '@legacy-sports/utils';
 import { MockDraftPage } from './MockDraftPage';
 
 const mockNavigate = jest.fn();
@@ -169,6 +170,7 @@ type Usage = {
   limit: number;
   remaining: number;
   isUnlimited: boolean;
+  resetsAt?: string | null;
 } | null;
 
 // Safe default so rendering before an explicit setUsage() can't crash the
@@ -267,6 +269,25 @@ describe('MockDraftPage — weekly limit reflected in UI (LS-5178)', () => {
     expect(
       screen.getByRole('button', { name: /Upgrade to Premium/i }),
     ).toBeInTheDocument();
+  });
+
+  it('tells a capped user when their next free draft opens (LS-10455)', () => {
+    const resetsAt = '2026-10-09T16:00:00.000Z';
+    setUsage({ used: 2, limit: 2, remaining: 0, isUnlimited: false, resetsAt });
+    renderPage();
+    // Local-time rendering via formatDraftDate (zone-independent assertion).
+    expect(
+      screen.getByText(
+        new RegExp(`your next free draft opens ${formatDraftDate(resetsAt)}`),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/check back next week/i)).not.toBeInTheDocument();
+  });
+
+  it('falls back to "check back next week" when the reset time is unknown', () => {
+    setUsage({ used: 2, limit: 2, remaining: 0, isUnlimited: false });
+    renderPage();
+    expect(screen.getByText(/check back next week/i)).toBeInTheDocument();
   });
 
   it('renders the form without a usage helper for unlimited (premium) users', () => {

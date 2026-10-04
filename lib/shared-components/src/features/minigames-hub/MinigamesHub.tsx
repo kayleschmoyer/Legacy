@@ -251,6 +251,16 @@ const GameCard: React.FC<{
           >
             {game.stat.label}
           </Text>
+          {game.stat.note ? (
+            <Text
+              fontSize={isNarrow ? 12 : 11}
+              color="$textMuted"
+              marginTop={4}
+              testID={`minigame-stat-note-${game.id}`}
+            >
+              {game.stat.note}
+            </Text>
+          ) : null}
         </YStack>
         <XStack
           alignItems="center"
@@ -349,6 +359,8 @@ export function MinigamesHub({
     mockDraftUsageData?.getMyMockDraftUsage?.remaining ?? null;
   const mockDraftsUnlimited =
     mockDraftUsageData?.getMyMockDraftUsage?.isUnlimited === true;
+  const mockDraftsResetAt =
+    mockDraftUsageData?.getMyMockDraftUsage?.resetsAt ?? null;
 
   const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
     ...template,
@@ -357,6 +369,7 @@ export function MinigamesHub({
       bestScore,
       mockDraftsRemaining,
       mockDraftsUnlimited,
+      mockDraftsResetAt,
     }),
   }));
 

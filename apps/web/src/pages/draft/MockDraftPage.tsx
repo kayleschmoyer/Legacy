@@ -21,7 +21,7 @@ import {
   useCreateMockDraftMutation,
   useGetMyMockDraftUsageQuery,
 } from '@legacy-sports/graphql';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { ENTITLEMENTS, formatDraftDate } from '@legacy-sports/utils';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { PageMeta } from '../../components/PageMeta';
 import { ResumeMockDraftBanner } from '../../components/ResumeMockDraftBanner';
@@ -280,6 +280,8 @@ interface LimitReachedScreenProps {
   used: number;
   /** Free-tier weekly mock-draft cap. */
   limit: number;
+  /** ISO instant the next free mock draft opens (LS-10455), if known. */
+  resetsAt?: string | null;
 }
 
 /**
@@ -291,8 +293,11 @@ interface LimitReachedScreenProps {
 function LimitReachedScreen({
   used,
   limit,
+  resetsAt,
 }: LimitReachedScreenProps): React.JSX.Element {
   const navigate = useNavigate();
+  // Local time zone (LS-10455); '' when unknown, which keeps the generic copy.
+  const nextFreeDraftAt = formatDraftDate(resetsAt);
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
 
   return (
@@ -378,8 +383,10 @@ function LimitReachedScreen({
               maxWidth={420}
             >
               You've used all {limit} of your free mock drafts this week.
-              Upgrade to Premium for unlimited mock drafts, or check back next
-              week.
+              Upgrade to Premium for unlimited mock drafts, or{' '}
+              {nextFreeDraftAt
+                ? `your next free draft opens ${nextFreeDraftAt}.`
+                : 'check back next week.'}
             </Paragraph>
           </YStack>
 
@@ -536,7 +543,13 @@ export function MockDraftPage(): React.JSX.Element {
     usage.remaining != null &&
     usage.remaining <= 0
   ) {
-    return <LimitReachedScreen used={usage.used} limit={usage.limit} />;
+    return (
+      <LimitReachedScreen
+        used={usage.used}
+        limit={usage.limit}
+        resetsAt={usage.resetsAt}
+      />
+    );
   }
 
   const usageLabel =

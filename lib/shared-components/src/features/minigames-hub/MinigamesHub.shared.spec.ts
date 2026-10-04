@@ -1,7 +1,9 @@
+import { formatDraftDate } from '@legacy-sports/utils';
 import {
   compactStatFor,
   GAME_TEMPLATES,
   type MinigameId,
+  mockDraftResetNote,
   STAT_PLACEHOLDER,
   statFor,
   UNLIMITED_STAT,
@@ -71,6 +73,53 @@ describe('statFor', () => {
         mockDraftsUnlimited: true,
       }),
     ).toEqual({ label: 'Drafts Left', value: UNLIMITED_STAT });
+  });
+});
+
+describe('mockDraftResetNote (LS-10455)', () => {
+  const resetsAt = '2026-10-09T16:00:00.000Z';
+  // formatDraftDate renders in the runner's local time zone — compare against
+  // it rather than a hard-coded string so the test is zone-independent.
+  const expected = `Next free draft ${formatDraftDate(resetsAt)}`;
+
+  it('explains when the next free draft opens once none remain', () => {
+    expect(mockDraftResetNote(0, resetsAt)).toBe(expected);
+    expect(
+      statFor('mock-draft', {
+        activeGamesCount: null,
+        bestScore: null,
+        mockDraftsRemaining: 0,
+        mockDraftsResetAt: resetsAt,
+      }),
+    ).toEqual({ label: 'Drafts Left', value: '0', note: expected });
+    expect(
+      compactStatFor('mock-draft', {
+        ...NO_STATS,
+        mockDraftsRemaining: 0,
+        mockDraftsResetAt: resetsAt,
+      }).note,
+    ).toBe(expected);
+  });
+
+  it('stays hidden for unlimited users, whose remaining is null (LS-10463)', () => {
+    expect(
+      compactStatFor('mock-draft', {
+        ...NO_STATS,
+        mockDraftsRemaining: null,
+        mockDraftsUnlimited: true,
+        mockDraftsResetAt: null,
+      }),
+    ).toEqual({ label: 'Left', value: UNLIMITED_STAT, tone: 'neutral' });
+  });
+
+  it('stays hidden while drafts remain or the count is unknown', () => {
+    expect(mockDraftResetNote(1, resetsAt)).toBeUndefined();
+    expect(mockDraftResetNote(null, resetsAt)).toBeUndefined();
+  });
+
+  it('stays hidden when the reset time is missing or unparseable', () => {
+    expect(mockDraftResetNote(0, null)).toBeUndefined();
+    expect(mockDraftResetNote(0, 'not-a-date')).toBeUndefined();
   });
 });
 

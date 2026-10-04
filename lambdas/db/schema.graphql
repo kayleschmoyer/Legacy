@@ -2858,6 +2858,11 @@ type MockDraftUsage {
   remaining: Int
 
   """
+  ISO-8601 UTC instant when the next free mock draft frees up (a counted draft ages out of the 7-day window). Null when unlimited or no drafts are counted.
+  """
+  resetsAt: String
+
+  """
   Mock drafts the user has created within the trailing 7-day window.
   """
   used: Int

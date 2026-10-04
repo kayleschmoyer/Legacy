@@ -297,6 +297,7 @@ test.describe('Premium gating — Mock Draft Control All Teams (LS-9253) @critic
               getMyMockDraftUsage: {
                 __typename: 'MockDraftUsage',
                 isUnlimited: true,
+                resetsAt: null,
                 used: 0,
                 limit: 2,
                 // Unlimited users get remaining: null (LS-10463).

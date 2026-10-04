@@ -4,5 +4,6 @@ query GetMyMockDraftUsage {
     limit
     remaining
     isUnlimited
+    resetsAt
   }
 }

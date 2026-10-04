@@ -124,6 +124,7 @@ async function setupGraphQL(
             getMyMockDraftUsage: {
               __typename: 'MockDraftUsage',
               isUnlimited: true,
+              resetsAt: null,
               used: 0,
               limit: 2,
               remaining: 2,

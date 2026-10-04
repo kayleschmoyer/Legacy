@@ -7,10 +7,13 @@
  *   1. Unauthenticated → UNAUTHENTICATED.
  *   2. Unlimited entitlement → isUnlimited=true, remaining null (LS-10463).
  *   3. Free tier → remaining = max(0, limit - used).
+ * Plus `resetsAt` (LS-10455): the next-slot instant for free users, null for
+ * unlimited users.
  */
 
 const hasEntitlement = jest.fn();
 const countRecentMockDrafts = jest.fn();
+const getNextMockDraftSlotAt = jest.fn();
 
 async function captureGetMyMockDraftUsageResolver(): Promise<
   (...args: unknown[]) => Promise<unknown>
@@ -74,6 +77,7 @@ async function captureGetMyMockDraftUsageResolver(): Promise<
   jest.doMock('./helpers', () => ({
     getCurrentDraftPickInfo: jest.fn(),
     countRecentMockDrafts,
+    getNextMockDraftSlotAt,
     MOCK_DRAFT_FREE_WEEKLY_LIMIT: 2,
   }));
 
@@ -110,6 +114,8 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
   beforeEach(() => {
     hasEntitlement.mockReset();
     countRecentMockDrafts.mockReset();
+    getNextMockDraftSlotAt.mockReset();
+    getNextMockDraftSlotAt.mockResolvedValue(null);
   });
 
   it('rejects unauthenticated callers with UNAUTHENTICATED', async () => {
@@ -139,7 +145,10 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
       limit: 2,
       remaining: null,
       isUnlimited: true,
+      resetsAt: null,
     });
+    // Unlimited users never wait on a slot — no lookup.
+    expect(getNextMockDraftSlotAt).not.toHaveBeenCalled();
   });
 
   it('reports remaining drafts for a free user below the cap', async () => {
@@ -159,6 +168,7 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
       limit: 2,
       remaining: 1,
       isUnlimited: false,
+      resetsAt: null,
     });
   });
 
@@ -166,6 +176,9 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
     const resolve = await captureGetMyMockDraftUsageResolver();
     hasEntitlement.mockResolvedValue(false);
     countRecentMockDrafts.mockResolvedValue(2);
+    getNextMockDraftSlotAt.mockResolvedValue(
+      new Date('2026-10-09T16:00:00.000Z'),
+    );
 
     const result = await resolve(
       {},
@@ -179,7 +192,9 @@ describe('getMyMockDraftUsage resolver — LS-5178', () => {
       limit: 2,
       remaining: 0,
       isUnlimited: false,
+      resetsAt: '2026-10-09T16:00:00.000Z',
     });
+    expect(getNextMockDraftSlotAt).toHaveBeenCalledWith({}, 7, 2, 2);
   });
 });
 

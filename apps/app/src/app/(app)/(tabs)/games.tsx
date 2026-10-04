@@ -136,6 +136,8 @@ export default function GamesTab() {
     !mockDraftUsageLoading &&
     !mockDraftUsageError &&
     mockDraftUsageData?.getMyMockDraftUsage?.isUnlimited === true;
+  const mockDraftsResetAt =
+    mockDraftUsageData?.getMyMockDraftUsage?.resetsAt ?? null;
 
   const personalStats = useMemo(() => {
     if (personalStatsLoading || personalStatsError) {
@@ -210,6 +212,7 @@ export default function GamesTab() {
       tokens={tokens}
       mockDraftsRemaining={mockDraftsRemaining}
       mockDraftsUnlimited={mockDraftsUnlimited}
+      mockDraftsResetAt={mockDraftsResetAt}
       resumeGame={resumeGame}
       personalStats={personalStats}
       onSelectGame={handleSelectGame}

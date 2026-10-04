@@ -634,6 +634,7 @@ export const MockDraftUsage = builder.objectRef<{
   limit: number;
   remaining: number | null;
   isUnlimited: boolean;
+  resetsAt: string | null;
 }>('MockDraftUsage');
 
 MockDraftUsage.implement({
@@ -655,6 +656,11 @@ MockDraftUsage.implement({
     isUnlimited: t.exposeBoolean('isUnlimited', {
       description:
         'True when the user has the unlimited_mock_drafts entitlement (cap does not apply).',
+    }),
+    resetsAt: t.exposeString('resetsAt', {
+      nullable: true,
+      description:
+        'ISO-8601 UTC instant when the next free mock draft frees up (a counted draft ages out of the 7-day window). Null when unlimited or no drafts are counted.',
     }),
   }),
 });

@@ -68,6 +68,42 @@ export async function countRecentMockDrafts(
   return Number(mockDraftCount);
 }
 
+/**
+ * When the user's next free mock-draft slot opens up (LS-10455): the moment
+ * enough counted drafts have aged out of {@link MOCK_DRAFT_WINDOW_MS} for
+ * `remaining` to rise by one. Below the cap that is the oldest counted draft's
+ * `createdAt` + window; at (or over) the cap it is the
+ * `(used - limit + 1)`-th oldest. Reads the same rows
+ * {@link countRecentMockDrafts} counts — it does not change the accounting.
+ *
+ * Returns `null` when nothing is counted (`used <= 0`).
+ */
+export async function getNextMockDraftSlotAt(
+  db: PublicDb,
+  userId: number,
+  used: number,
+  limit: number,
+): Promise<Date | null> {
+  if (used <= 0) return null;
+  const windowStart = new Date(Date.now() - MOCK_DRAFT_WINDOW_MS);
+  const [row] = await db
+    .select({ createdAt: PublicSchema.drafts.createdAt })
+    .from(PublicSchema.drafts)
+    .where(
+      and(
+        eq(PublicSchema.drafts.kind, 'mock'),
+        eq(PublicSchema.drafts.createdBy, userId),
+        gte(PublicSchema.drafts.createdAt, windowStart),
+      ),
+    )
+    .orderBy(asc(PublicSchema.drafts.createdAt))
+    .offset(Math.max(0, used - limit))
+    .limit(1);
+  return row
+    ? new Date(new Date(row.createdAt).getTime() + MOCK_DRAFT_WINDOW_MS)
+    : null;
+}
+
 // â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CommitDraftPickParams {

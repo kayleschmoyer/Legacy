@@ -15,7 +15,7 @@ import {
   useGetMyMockDraftUsageQuery,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { ENTITLEMENTS, formatDraftDate } from '@legacy-sports/utils';
 import {
   useHasEntitlement,
   useSubscription,
@@ -86,11 +86,16 @@ function PremiumUpsell(): React.JSX.Element {
 function LimitReachedScreen({
   used,
   limit,
+  resetsAt,
 }: {
   used: number;
   limit: number;
+  /** ISO instant the next free mock draft opens (LS-10455), if known. */
+  resetsAt?: string | null;
 }): React.JSX.Element {
   const router = useRouter();
+  // Local time zone (LS-10455); '' when unknown, which hides the line.
+  const nextFreeDraftAt = formatDraftDate(resetsAt);
 
   const onUpgrade = () => {
     trackPremiumFeatureClick(MOCK_DRAFT_FEATURE_NAME);
@@ -132,6 +137,16 @@ function LimitReachedScreen({
             <Text color="$gray11" fontSize="$3" textAlign="center">
               {used} of {limit} free mock drafts used this week
             </Text>
+            {nextFreeDraftAt ? (
+              <Text
+                color="$gray11"
+                fontSize="$3"
+                textAlign="center"
+                testID="mock-draft-next-free-draft"
+              >
+                Next free draft opens {nextFreeDraftAt}
+              </Text>
+            ) : null}
           </YStack>
           <Text color="$gray11" fontSize="$3" textAlign="center">
             Upgrade to Premium for unlimited mock drafts and uninterrupted draft
@@ -256,6 +271,7 @@ export function MockDraftPage(): React.JSX.Element {
       <LimitReachedScreen
         used={usage.used as number}
         limit={usage.limit as number}
+        resetsAt={usage.resetsAt}
       />
     );
   }

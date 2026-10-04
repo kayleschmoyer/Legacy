@@ -2280,6 +2280,8 @@ export type MockDraftUsage = {
   limit?: Maybe<Scalars['Int']['output']>;
   /** Mock drafts still allowed this window (max(0, limit - used)); null for unlimited users, who are not capped. */
   remaining?: Maybe<Scalars['Int']['output']>;
+  /** ISO-8601 UTC instant when the next free mock draft frees up (a counted draft ages out of the 7-day window). Null when unlimited or no drafts are counted. */
+  resetsAt?: Maybe<Scalars['String']['output']>;
   /** Mock drafts the user has created within the trailing 7-day window. */
   used?: Maybe<Scalars['Int']['output']>;
 };
@@ -7841,6 +7843,7 @@ export type GetMyMockDraftUsageQuery = {
     limit?: number | null;
     remaining?: number | null;
     isUnlimited?: boolean | null;
+    resetsAt?: string | null;
   } | null;
 };
 
@@ -22165,6 +22168,7 @@ export const GetMyMockDraftUsage = gql`
       limit
       remaining
       isUnlimited
+      resetsAt
     }
   }
 `;

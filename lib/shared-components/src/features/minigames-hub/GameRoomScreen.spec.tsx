@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react';
+import { formatDraftDate } from '@legacy-sports/utils';
 import {
   GameRoomScreen,
   type GameRoomScreenProps,
@@ -59,6 +60,25 @@ describe('GameRoomScreen', () => {
     expect(getByText('40')).toBeTruthy();
     expect(getByText('Left')).toBeTruthy();
     expect(getByText('1')).toBeTruthy();
+  });
+
+  it('shows when the next free mock draft opens once none remain (LS-10455)', () => {
+    const { getByTestId } = renderScreen({
+      mockDraftsRemaining: 0,
+      mockDraftsResetAt: '2026-10-09T16:00:00.000Z',
+    });
+
+    expect(getByTestId('games-entry-note-mock-draft').textContent).toBe(
+      `Next free draft ${formatDraftDate('2026-10-09T16:00:00.000Z')}`,
+    );
+  });
+
+  it('omits the reset note while mock drafts remain (LS-10455)', () => {
+    const { queryByTestId } = renderScreen({
+      mockDraftsResetAt: '2026-10-09T16:00:00.000Z',
+    });
+
+    expect(queryByTestId('games-entry-note-mock-draft')).toBeNull();
   });
 
   it('falls back to an em dash for every stat that is null', () => {

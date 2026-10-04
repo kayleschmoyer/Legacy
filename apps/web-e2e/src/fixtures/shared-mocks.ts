@@ -230,6 +230,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
         limit: null,
         remaining: null,
         isUnlimited: true,
+        resetsAt: null,
       },
     },
   },

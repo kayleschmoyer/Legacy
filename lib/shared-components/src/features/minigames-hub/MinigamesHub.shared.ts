@@ -10,7 +10,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { DISCLOSURE_MIN_CLUES } from '@legacy-sports/utils';
+import { DISCLOSURE_MIN_CLUES, formatDraftDate } from '@legacy-sports/utils';
 
 export type MinigameId =
   | 'season-draft'
@@ -37,6 +37,9 @@ export type MinigameIconKind = 'draft' | 'stats' | 'quiz' | 'mockDraft';
 export interface MinigameStat {
   label: string;
   value: string;
+  /** Optional secondary line under the stat — e.g. when the next free mock
+   *  draft opens (LS-10455). */
+  note?: string;
 }
 
 /** Whether a compact stat chip reads as a personal achievement or a balance. */
@@ -47,6 +50,8 @@ export interface MinigameCompactStat {
   label: string;
   value: string;
   tone: MinigameStatTone;
+  /** Optional secondary line shown under the row's tag (LS-10455). */
+  note?: string;
 }
 
 export interface MinigameTemplate {
@@ -133,6 +138,21 @@ function mockDraftsValue(remaining: number | null, unlimited?: boolean) {
   return unlimited === true ? UNLIMITED_STAT : statValue(remaining);
 }
 
+/**
+ * "Next free draft Oct 9, 8:00 PM" once the free weekly allowance is used up
+ * (LS-10455), so a bare "0 Drafts Left" explains when it refills. Rendered in
+ * the viewer's local time zone via `formatDraftDate`. Undefined while drafts
+ * remain, or when the reset time is unknown/unparseable.
+ */
+export function mockDraftResetNote(
+  remaining: number | null,
+  resetsAt: string | null,
+): string | undefined {
+  if (remaining !== 0) return undefined;
+  const when = formatDraftDate(resetsAt);
+  return when ? `Next free draft ${when}` : undefined;
+}
+
 /** Shared stat-selection logic — identical business rules on both platforms. */
 export function statFor(
   id: MinigameId,
@@ -142,6 +162,7 @@ export function statFor(
     mockDraftsRemaining: number | null;
     /** True for premium users — the weekly cap does not apply. */
     mockDraftsUnlimited?: boolean;
+    mockDraftsResetAt?: string | null;
   },
 ): MinigameStat {
   switch (id) {
@@ -160,6 +181,10 @@ export function statFor(
         value: mockDraftsValue(
           args.mockDraftsRemaining,
           args.mockDraftsUnlimited,
+        ),
+        note: mockDraftResetNote(
+          args.mockDraftsRemaining,
+          args.mockDraftsResetAt ?? null,
         ),
       };
   }
@@ -183,6 +208,7 @@ export function compactStatFor(
     mockDraftsRemaining: number | null;
     /** True for premium users — the weekly cap does not apply. */
     mockDraftsUnlimited?: boolean;
+    mockDraftsResetAt?: string | null;
   },
 ): MinigameCompactStat {
   switch (id) {
@@ -212,6 +238,10 @@ export function compactStatFor(
           args.mockDraftsUnlimited,
         ),
         tone: 'neutral',
+        note: mockDraftResetNote(
+          args.mockDraftsRemaining,
+          args.mockDraftsResetAt ?? null,
+        ),
       };
   }
 }

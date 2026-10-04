@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+import { formatDraftDate } from '@legacy-sports/utils';
 import { MockDraftPage } from './mock-draft';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ interface MockDraftUsage {
   limit: number;
   remaining: number;
   isUnlimited: boolean;
+  resetsAt?: string | null;
 }
 let mockUsageData: { getMyMockDraftUsage: MockDraftUsage | null } | undefined =
   undefined;
@@ -303,6 +305,25 @@ describe('MockDraftPage', () => {
         screen.getByText('2 of 2 free mock drafts used this week'),
       ).toBeTruthy();
       expect(screen.getByText('Upgrade to Premium')).toBeTruthy();
+    });
+
+    it('shows when the next free draft opens (LS-10455)', () => {
+      mockUsageData = {
+        getMyMockDraftUsage: {
+          used: 2,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: false,
+          resetsAt: '2026-10-09T16:00:00.000Z',
+        },
+      };
+      render(<MockDraftPage />);
+      expect(screen.getByTestId('mock-draft-next-free-draft')).toBeTruthy();
+      expect(
+        screen.getByText(
+          `Next free draft opens ${formatDraftDate('2026-10-09T16:00:00.000Z')}`,
+        ),
+      ).toBeTruthy();
     });
 
     it('does not show the setup form when limit is reached', () => {

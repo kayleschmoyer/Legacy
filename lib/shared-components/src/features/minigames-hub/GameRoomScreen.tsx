@@ -73,6 +73,9 @@ export interface GameRoomScreenProps {
   mockDraftsRemaining: number | null;
   /** True for premium users (no weekly cap) — the chip shows ∞. */
   mockDraftsUnlimited?: boolean;
+  /** ISO instant the next free mock draft opens (LS-10455); shown under the
+   *  Mock Draft row once none remain. Null/omitted hides it. */
+  mockDraftsResetAt?: string | null;
   /** Hidden entirely when null — the layout flows up with no gap. */
   resumeGame: GameRoomResumeGame | null;
   personalStats: GameRoomPersonalStats;
@@ -269,6 +272,16 @@ function GameRow({
         <Text fontSize={12} color="$fg3" numberOfLines={1}>
           {template.tag}
         </Text>
+        {stat.note ? (
+          <Text
+            fontSize={12}
+            color="$fg3"
+            numberOfLines={1}
+            testID={`games-entry-note-${template.id}`}
+          >
+            {stat.note}
+          </Text>
+        ) : null}
       </YStack>
 
       <StatChip stat={stat} />
@@ -414,6 +427,7 @@ export function GameRoomScreen({
   tokens: tokenBalance,
   mockDraftsRemaining,
   mockDraftsUnlimited,
+  mockDraftsResetAt = null,
   resumeGame,
   personalStats,
   onSelectGame,
@@ -458,6 +472,7 @@ export function GameRoomScreen({
                 tokens: tokenBalance,
                 mockDraftsRemaining,
                 mockDraftsUnlimited,
+                mockDraftsResetAt,
               })}
               onPress={() => onSelectGame(template.id)}
             />

@@ -22,6 +22,7 @@ import {
   countRecentMockDrafts,
   eligibleStatPositionsForUnfilledSlots,
   getCurrentDraftPickInfo,
+  getNextMockDraftSlotAt,
   getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
@@ -1814,6 +1815,15 @@ builder.queryField('getMyMockDraftUsage', (t) =>
       );
       const used = await countRecentMockDrafts(context.db, context.user.id);
       const limit = MOCK_DRAFT_FREE_WEEKLY_LIMIT;
+      // Unlimited users never wait on a slot, so skip the lookup (LS-10455).
+      const resetsAt = isUnlimited
+        ? null
+        : await getNextMockDraftSlotAt(
+            context.db,
+            context.user.id,
+            used,
+            limit,
+          );
 
       return {
         used,
@@ -1822,6 +1832,7 @@ builder.queryField('getMyMockDraftUsage', (t) =>
         // to surface — null keeps clients from rendering a phantom cap (LS-10463).
         remaining: isUnlimited ? null : Math.max(0, limit - used),
         isUnlimited,
+        resetsAt: resetsAt?.toISOString() ?? null,
       };
     },
   }),

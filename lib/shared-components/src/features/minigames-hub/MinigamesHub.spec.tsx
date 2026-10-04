@@ -7,6 +7,7 @@ import {
   useGetMyMockDraftUsageQuery,
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
+import { formatDraftDate } from '@legacy-sports/utils';
 import { MinigamesHub } from './MinigamesHub';
 import { render } from '../../test-utils';
 
@@ -91,6 +92,32 @@ describe('MinigamesHub', () => {
     expect(getByText('1')).toBeTruthy();
   });
 
+  it('shows when the next free mock draft opens once none remain (LS-10455)', () => {
+    const resetsAt = '2026-10-09T16:00:00.000Z';
+    jest.mocked(useGetMyMockDraftUsageQuery).mockReturnValue({
+      data: {
+        getMyMockDraftUsage: {
+          used: 2,
+          limit: 2,
+          remaining: 0,
+          isUnlimited: false,
+          resetsAt,
+        },
+      },
+      loading: false,
+      error: undefined,
+    } as unknown as ReturnType<typeof useGetMyMockDraftUsageQuery>);
+
+    const { getByTestId } = render(
+      <MinigamesHub onNavigate={jest.fn()} isNarrow={false} />,
+    );
+
+    // Local time zone via formatDraftDate (zone-independent assertion).
+    expect(getByTestId('minigame-stat-note-mock-draft').textContent).toBe(
+      `Next free draft ${formatDraftDate(resetsAt)}`,
+    );
+  });
+
   it('shows ∞ on the Mock Draft card for unlimited (premium) users (LS-10463)', () => {
     jest.mocked(useGetMyMockDraftUsageQuery).mockReturnValue({
       data: {
@@ -99,17 +126,19 @@ describe('MinigamesHub', () => {
           limit: 2,
           remaining: null,
           isUnlimited: true,
+          resetsAt: null,
         },
       },
       loading: false,
       error: undefined,
     } as unknown as ReturnType<typeof useGetMyMockDraftUsageQuery>);
 
-    const { getByText } = render(
+    const { getByText, queryByTestId } = render(
       <MinigamesHub onNavigate={jest.fn()} isNarrow={false} />,
     );
 
     expect(getByText('∞')).toBeTruthy();
+    expect(queryByTestId('minigame-stat-note-mock-draft')).toBeNull();
   });
 
   it('falls back to em-dash while stat queries are loading', () => {
