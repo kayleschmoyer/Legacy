@@ -731,6 +731,9 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 8: Matchups', async ({ commissionerPage: page }) => {
+    // Two reload-recovery gates (Week header + BATTERS) can each spend their
+    // budget under backend throttling — more than the 120s config default.
+    test.setTimeout(180_000);
     await test.step('Verify matchups exist on commissioner panel', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
       await page.waitForLoadState('load');
@@ -755,11 +758,17 @@ test.describe
     });
 
     await test.step('Verify matchup scoreboard and lineups', async () => {
-      // The matchup page should show the week header and VS badge.
-      // Allow extra time: the matchup tab loads data fresh after navigation
-      // from the commissioner panel and can be slower on a cold Apollo cache.
-      await expect(page.getByText(/Week 1/i).first()).toBeVisible({
-        timeout: 30000,
+      // The matchup page should show the week header and VS badge. The header
+      // renders only once the browser-side league/matchup queries resolve.
+      // LS-10372: during a nightly backend brownout (graphql Lambda 30s
+      // timeouts) the page's single first-wave load came back degraded, the
+      // follow-up matchup queries never fired, and a plain 30s wait on that
+      // one load could not recover. Re-fire the queries within a bounded
+      // budget, as the BATTERS gate below already does (LS-8138).
+      await reloadUntilVisible(page, page.getByText(/Week 1/i).first(), {
+        budgetMs: 75_000,
+        pollTimeoutMs: 20_000,
+        cooldownMs: 0,
       });
       await expect(page.getByText('VS').first()).toBeVisible();
 
