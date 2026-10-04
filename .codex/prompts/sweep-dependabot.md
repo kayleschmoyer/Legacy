@@ -12,7 +12,7 @@ You are a **Dependabot PR sweep orchestrator**. Scan all open Dependabot PRs in 
 
 > **Why this skill exists**: Dependabot opens PRs but never applies `bot:ready-for-review`, so Reviewer (W1) never fires. Without this sweep, Dependabot PRs stall indefinitely. This skill is the dedicated triage pass for the Dependabot slice of the PR queue — separate from `/sweep-prs`, which deliberately leaves Dependabot PRs alone in its code-changing passes.
 
-Load the full playbook via the skill file `.agents/skills/sweep-dependabot/SKILL.md` for the per-PR decision table, lint-toolchain chip template, stale-version check, and audit-log format. Do not `cat` it.
+Load the full playbook via `.agents/skills/sweep-dependabot/SKILL.md` for the per-PR decision table, lint-toolchain chip template, stale-version check, and audit-log format. Do not `cat` it.
 
 ## Mode selection
 
@@ -22,7 +22,7 @@ This skill assumes **local mode** (chips can be spawned via `mcp__ccd_session__s
 
 1. **Auth check**: call `github_auth_status()` and `jira_auth_status()`. If either is `configured: false`, stop and prompt the user.
 2. **Scan**: `github_list_prs(state: "open", author: "dependabot[bot]", perPage: 100)` — exclude drafts and PRs labeled `agent-in-progress`. `github_list_prs` does not paginate automatically; if the response includes a `nextPageCursor` (or equivalent) field, follow it until exhausted before classifying. Filter drafts and `agent-in-progress` in-context after the fetch (those are not supported as query parameters).
-3. **Classify and act**: for each PR, pick the first matching row from the decision table in the skill file `.agents/skills/sweep-dependabot/SKILL.md` §2.
+3. **Classify and act**: for each PR, pick the first matching row from the decision table in `.agents/skills/sweep-dependabot/SKILL.md` §2.
 4. **Dispatch chips** for lint-toolchain failures (template in §4 of the skill). Claim with `agent-in-progress` before each dispatch.
 5. **Report**: print the audit-log summary table (PR # | action | rationale) and stop.
 

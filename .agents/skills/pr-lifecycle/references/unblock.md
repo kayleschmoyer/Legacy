@@ -88,7 +88,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Rebase PR #<N> onto main and resolve any conflicts.",
   prompt: `PR #<N> on branch <branch> has a merge conflict with main. Rebase it and push.
 
-Load Skill(skill: "rebase") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts per the rebase reference's conflict decision tree, validate with the seven pc-* chunks in order (never monolithic make pc), push. Confirm no Reviewer (W1) run is in flight before the force-push. Do not re-apply bot:ready-for-review — the push re-fires review.
+Load Read(file_path: ".agents/skills/rebase/SKILL.md") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts per the rebase reference's conflict decision tree, validate with the seven pc-* chunks in order (never monolithic make pc), push. Confirm no Reviewer (W1) run is in flight before the force-push. Do not re-apply bot:ready-for-review — the push re-fires review.
 
 Stop after a clean push — the next sweep will handle any remaining problems.`
 })

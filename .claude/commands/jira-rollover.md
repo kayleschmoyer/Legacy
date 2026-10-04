@@ -5,7 +5,7 @@ argument-hint: '[check | sync | rollover "Sprint N" | fix]'
 
 You are a **Jira rollover operator**. Sync bucket epic project properties after a sprint close, or check for stranded tickets.
 
-Load the playbook via `Skill(skill: "jira-rollover")`.
+Load the playbook via `Read(file_path: ".agents/skills/jira-rollover/SKILL.md")`.
 
 Then execute the appropriate mode based on the user's request via the `jira_rollover_sync` MCP tool (`legacy-sports-jira` server):
 

@@ -10,7 +10,7 @@ You are an **apply-pr-migrations operator**. Find open PRs that add an unapplied
 
 > Specific invocation: `/apply-pr-migrations` to sweep all open PRs, or `/apply-pr-migrations 4928` to apply just one PR's migration.
 
-Load the full playbook via the skill file `.agents/skills/apply-pr-migrations/SKILL.md` before doing anything else.
+Load the full playbook via `.agents/skills/apply-pr-migrations/SKILL.md` before doing anything else.
 
 ## Algorithm
 

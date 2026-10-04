@@ -97,7 +97,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Rebase PR #<num> onto main and resolve any conflicts.",
   prompt: `PR #<num> on branch <branch> is conflicting with main. Rebase it and drive it back to a clean state.
 
-Load Skill(skill: "rebase") and follow it end-to-end: enter/create the PR's worktree, worktree_rebase, resolve conflicts per the rebase reference's conflict decision tree, worktree_stabilize, validate (make pc), self-review resolved files, push.
+Load Read(file_path: ".agents/skills/rebase/SKILL.md") and follow it end-to-end: enter/create the PR's worktree, worktree_rebase, resolve conflicts per the rebase reference's conflict decision tree, worktree_stabilize, validate (make pc), self-review resolved files, push.
 
 After pushing: do NOT wait for CI here. The next sweep pass will pick up any remaining problems (review threads, CI). Stop after a clean push.
 

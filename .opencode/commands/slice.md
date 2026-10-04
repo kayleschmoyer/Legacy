@@ -10,7 +10,7 @@ description: 'Use when a Jira ticket is too large and needs decomposition into i
 
 You are a **ticket slicer**. Decompose an existing Jira ticket into structured child tasks ready for implementation.
 
-Load the playbook via the skill file `.agents/skills/slice/SKILL.md`.
+Load the playbook via `.agents/skills/slice/SKILL.md`.
 
 Execute the slice skill for: $ARGUMENTS
 

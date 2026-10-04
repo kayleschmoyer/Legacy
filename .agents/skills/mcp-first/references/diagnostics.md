@@ -360,24 +360,24 @@ use the per-service checks instead: `github_auth_status`, `jira_auth_status`, `c
 
 **This check is credential-presence only — it cannot detect a live-session failure** like [Mid-Session Auth-Server Incompatibility](#mid-session-auth-server-incompatibility-does-not-support-dynamic-client-registration-ls-9439) above, which reported `allAuthenticated: true` throughout a real outage (LS-9439). Trust an actual tool-call error over a green `auth_check_all` result.
 
-## Skill Tool Returns Boilerplate Instead of SKILL.md Content (LS-8719)
+## Skill Tool Returns This Command Instead of SKILL.md Content (LS-8719)
 
 Distinct from the MCP server connectivity failures above — this is the `Skill` tool itself (not an MCP server), and it can misbehave even when every MCP server is healthy.
 
-**Symptom:** `Skill(skill: "<name>", args: "...")` returns a generic, self-referential turn instructing the agent to "invoke `Skill(skill: '<name>')` immediately" — i.e. a directive to call the same tool again — instead of delivering the actual `SKILL.md` procedure text. A follow-up `Skill(skill: "<name>")` call made per that instruction can also **drop the passed argument entirely** (e.g. a ticket key rendered as `****` or substituted with an unrelated key from earlier in the transcript), so retrying doesn't recover the lost context either. Observed repeatedly across sessions and environments (LS-8503, LS-6259, and again live during LS-8719 itself, where the ticket key was corrupted to a different ticket's key on retry) — this is a harness/platform-level defect in the `Skill` tool invocation mechanism, not a per-skill or per-repo issue, and is outside this repo's fix surface.
+**Symptom:** `Skill(skill: "<name>", args: "...")` returns a short, self-referential turn instructing the agent to "invoke `Skill(skill: '<name>')` immediately" instead of the actual `SKILL.md` procedure, and a follow-up call made per that instruction **drops the passed argument** (e.g. a ticket key rendered empty or as `****`). Agents have reported it as "Skill returned boilerplate (LS-8719 defect)".
 
-**Do not loop on retrying `Skill(...)`.** A second or third call has been observed returning the same non-actionable boilerplate, or actively corrupting the argument — it will not converge to the real content.
+**Root cause (repo-side, deterministic):** Claude Code discovers skills only under `.claude/skills/` and also exposes every `.claude/commands/<name>.md` as a skill of the same name. This repo deliberately has no `.claude/skills/` (see [skill-routing.md](../../../../docs/dev-process/skill-routing.md)), so `Skill(skill: "<name>")` can only ever resolve to the **command** file — never to `.agents/skills/<name>/SKILL.md`. Commands that told the agent to "load `Skill(skill: "<name>")`" with their own name (or another command's name that did the same) therefore re-loaded themselves; the re-invocation carried no `args`, so `$ARGUMENTS` rendered empty. This was earlier misdiagnosed as a harness defect (LS-8503, LS-6259, LS-8719).
 
-**Recovery — read the skill's files directly from disk:**
+**Fix:** commands and skills load skill playbooks with `Read(file_path: ".agents/skills/<name>/SKILL.md")`, never `Skill(skill: "<name>")`. Reserve `Skill(...)` for invoking a **slash command** (`.claude/commands/<name>.md`) whose body does not route back to itself (e.g. `review`, `mcp-gap-audit`). `scripts/sync-agent-prompts.mjs` already renders `Read(file_path: "...")` as a plain path in the Copilot/Cursor/OpenCode/Codex mirrors.
+
+**If you still hit it** (e.g. a stale command on an old branch): do not retry `Skill(...)`. Read the skill directly instead — this preserves any ticket key you were passed:
 
 ```
 Glob(pattern: ".agents/skills/<skill-name>/**")
 Read(file_path: ".agents/skills/<skill-name>/SKILL.md")
 ```
 
-Then `Read` any `references/*.md` files the `SKILL.md` frontmatter/body points to for the mode you're routing into (e.g. `references/leaf-mode.md` for `work-ticket`). This delivers the identical procedure content the `Skill` tool would have loaded, and preserves any ticket key or argument you were passed — it never round-trips through the tool call that lost it. Continue following the skill's steps exactly as if `Skill(...)` had returned them; nothing else about the workflow changes.
-
-This is a documented stopgap, not a fix for the underlying tool-invocation defect — apply it whenever `Skill(...)` returns generic re-invocation boilerplate or loses an argument, for any skill, not just `work-ticket`.
+Then `Read` any `references/*.md` the `SKILL.md` points to for the mode you're routing into (e.g. `references/leaf-mode.md` for `work-ticket`), and fix the offending `Skill(...)` reference in the same PR.
 
 ## DesignSync Tool Absent From Subagent Tool Inventory (LS-9985)
 
@@ -385,7 +385,7 @@ Distinct from the MCP server connectivity failures above — `DesignSync` is a C
 
 **Symptom:** an `Agent`-dispatched subagent runs `ToolSearch({ query: "select:DesignSync" })` (or any keyword/name-constrained variant) and gets `"No matching deferred tools found."` The main session that spawned the subagent has full `DesignSync` access throughout. Confirmed with five parallel general-purpose subagents dispatched to pull disjoint file sets for one design sync (LS-9981) — all five hit the identical result and correctly refused to fabricate content, writing nothing.
 
-**Do not loop on retrying `ToolSearch` inside the subagent or re-dispatching with different phrasing** — the tool is absent from that inventory by harness-level design, not a transient miss; no query variant surfaces it. This is the same category of out-of-repo-fix-surface limitation as the [Skill Tool boilerplate defect](#skill-tool-returns-boilerplate-instead-of-skillmd-content-ls-8719) above: there is no `.mcp.json` entry, agent definition, or server-side registration this repo controls that grants a subagent a main-session-only built-in tool.
+**Do not loop on retrying `ToolSearch` inside the subagent or re-dispatching with different phrasing** — the tool is absent from that inventory by harness-level design, not a transient miss; no query variant surfaces it. This is the same category of out-of-repo-fix-surface limitation as the [Skill Tool command-resolution issue](#skill-tool-returns-this-command-instead-of-skillmd-content-ls-8719) above: there is no `.mcp.json` entry, agent definition, or server-side registration this repo controls that grants a subagent a main-session-only built-in tool.
 
 **Recovery:** run every `DesignSync` call (`get_project`, `list_files`, `get_file`, and the write flow) from the main session, never from a dispatched subagent. Pace a bulk pull in-context instead of trying to parallelize it away — see [design-sync/references/designsync-tool.md § Main-session only](../../design-sync/references/designsync-tool.md#main-session-only--not-exposed-to-subagents-ls-9985) for the workaround and the file-size cost asymmetry to plan around.
 

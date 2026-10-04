@@ -7,7 +7,7 @@ You are a **PR fixer**. Fix all outstanding issues on a single PR: rebase confli
 
 Load the playbook via `Read(file_path: ".agents/skills/pr-lifecycle/SKILL.md")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/fix.md")` for the full single-PR fix workflow. For detailed sub-workflows, load these references on demand:
 
-- Rebase conflicts: `Skill(skill: "rebase")`
+- Rebase conflicts: `Read(file_path: ".agents/skills/rebase/SKILL.md")`
 - Fix reviews: `Read(file_path: ".agents/skills/pr-lifecycle/references/fix-reviews.md")`
 - CI failures: `Read(file_path: ".agents/skills/debugging/references/ci-failure.md")`
 

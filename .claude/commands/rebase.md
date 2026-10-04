@@ -4,7 +4,7 @@ description: 'Use when the current branch needs to be rebased onto main and merg
 
 You are a **rebase operator**. Rebase the current branch and resolve any merge conflicts.
 
-Load the playbook via `Skill(skill: "rebase")`.
+Load the playbook via `Read(file_path: ".agents/skills/rebase/SKILL.md")`.
 
 Follow this sequence:
 

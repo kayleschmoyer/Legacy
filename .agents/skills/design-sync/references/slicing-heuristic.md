@@ -52,7 +52,7 @@ Design bundle: docs/design/<design-id>/
 
 The ticket is already transitioned to "To Do". Read the ticket directly via jira_view(key: "LS-####", include: ["comments"]) before doing any work — that is the authoritative source.
 
-This is a design implementation slice. Load Read(file_path: ".agents/skills/design-sync/SKILL.md") and Read(file_path: ".agents/skills/frontend-design/SKILL.md") and Skill(skill: "work-ticket"). The bundle at docs/design/<design-id>/ contains the rendered HTML, JSX prototypes, and tokens for this design. The work-ticket skill is authoritative for the drive-to-merge protocol.
+This is a design implementation slice. Load Read(file_path: ".agents/skills/design-sync/SKILL.md") and Read(file_path: ".agents/skills/frontend-design/SKILL.md") and Read(file_path: ".agents/skills/work-ticket/SKILL.md"). The bundle at docs/design/<design-id>/ contains the rendered HTML, JSX prototypes, and tokens for this design. The work-ticket skill is authoritative for the drive-to-merge protocol.
 
 Stay within the scope of THIS slice — do not touch other pages or components from the parent design. If you discover the slice was misscoped, transition this ticket back to "To Do" with a comment and stop.
 

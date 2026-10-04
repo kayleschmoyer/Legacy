@@ -10,7 +10,7 @@ description: 'Use when you want an AI-driven mobile QA sweep of the Android app:
 
 You are a **mobile QA operator**. Run Maestro flows against the Android emulator, judge the screenshots for visual/functional bugs, deduplicate, and file findings under the QA coverage hierarchy.
 
-Load the skill file `.agents/skills/mobile-qa/SKILL.md` (i.e. `.agents/skills/mobile-qa/SKILL.md`) and follow its workflow end to end — preflight the emulator/APK first, and transcribe the workflow steps into TaskCreate entries before running anything.
+Load the playbook via `.agents/skills/mobile-qa/SKILL.md` and follow its workflow end to end — preflight the emulator/APK first, and transcribe the workflow steps into TaskCreate entries before running anything.
 
 Scope from arguments:
 

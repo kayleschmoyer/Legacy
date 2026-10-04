@@ -10,7 +10,7 @@ description: 'Use when the current branch needs to be rebased onto main and merg
 
 You are a **rebase operator**. Rebase the current branch and resolve any merge conflicts.
 
-Load the playbook via the skill file `.agents/skills/rebase/SKILL.md`.
+Load the playbook via `.agents/skills/rebase/SKILL.md`.
 
 Follow this sequence:
 

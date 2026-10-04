@@ -49,7 +49,7 @@ Load the authoritative playbook via `Read(file_path: ".agents/skills/design-sync
 
 When all three thresholds hold (≤2 pages, ≤8 components, 0 new tokens):
 
-- Proceed with the standard work-ticket flow (`Skill(skill: "work-ticket")`).
+- Proceed with the standard work-ticket flow (`Read(file_path: ".agents/skills/work-ticket/SKILL.md")`).
 - Implementation references:
   - Visual targets: `docs/design/<id>/<slug>/project/*.html` (plus any JSX previews like `design-canvas.jsx` or `components/*.jsx`)
   - Tokens: `docs/design/<id>/<slug>/project/colors_and_type.css` (and `project/ds/` if present)
