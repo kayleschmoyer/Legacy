@@ -24,17 +24,3 @@ export function formatDraftDate(d?: Date): string {
     minute: '2-digit',
   });
 }
-
-/** Formats a Date as a human-readable UTC timestamp. */
-export function formatDateAsUTC(d: Date): string {
-  return (
-    d.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: 'UTC',
-    }) + ' UTC'
-  );
-}

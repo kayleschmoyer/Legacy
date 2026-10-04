@@ -96,8 +96,10 @@ export function formatDraftDayShort(iso: string | null | undefined): string {
     });
   } catch {
     // Hermes release builds without full ICU data can leave
-    // toLocaleDateString undefined — mirror formatDraftDate's fallback.
-    return d.toISOString().slice(5, 10);
+    // toLocaleDateString undefined — local MM-DD, mirroring formatDraftDate's
+    // local fallback (LS-10471).
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 }
 

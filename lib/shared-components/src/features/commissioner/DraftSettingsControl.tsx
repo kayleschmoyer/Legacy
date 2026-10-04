@@ -30,6 +30,13 @@ import {
 } from '../../config/sports';
 
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
+import {
+  formatLocalDateTime,
+  getLocalTimeZoneLabel,
+  localDateTimeInputToIso,
+  parseLocalDateTimeInput,
+  toLocalDateTimeInput,
+} from '../../utils/DateUtilities';
 
 export interface DraftSettingsControlProps {
   leagueId: number;
@@ -211,7 +218,7 @@ export function DraftSettingsControl({
   const [customEraEndYearLocal, setCustomEraEndYearLocal] = useState<
     number | undefined
   >(undefined);
-  /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
+  /** Local wall-clock `YYYY-MM-DDTHH:MM` (user's time zone), or '' for no schedule */
   const [scheduledAt, setScheduledAt] = useState('');
   const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState('120');
   const [hasChanges, setHasChanges] = useState(false);
@@ -229,12 +236,8 @@ export function DraftSettingsControl({
       setSelectionMethod(String(draft.selectionMethod ?? 'standard'));
       setDraftOrder(String(draft.draftOrder ?? 'snake'));
       setPickTimeLimitSeconds(String(draft.pickTimeLimitSeconds ?? 120));
-      // Sync scheduledAt: convert ISO-8601 to datetime-local (UTC slice for input)
-      setScheduledAt(
-        draft.scheduledAt
-          ? new Date(draft.scheduledAt).toISOString().slice(0, 16)
-          : '',
-      );
+      // Sync scheduledAt: stored UTC instant → local wall-clock (LS-10471)
+      setScheduledAt(toLocalDateTimeInput(draft.scheduledAt));
     }
   }, [draftData]);
 
@@ -286,11 +289,9 @@ export function DraftSettingsControl({
       const originalPlayerPool = String(leaguePlayerPool ?? 'all');
       const originalEraFilter = String(eraFilter ?? 'all');
       const originalHofOnly = baseballHofOnly ?? false;
-      const originalScheduledAt = draftData?.getLeagueDraft?.scheduledAt
-        ? new Date(draftData.getLeagueDraft.scheduledAt)
-            .toISOString()
-            .slice(0, 16)
-        : '';
+      const originalScheduledAt = toLocalDateTimeInput(
+        draftData?.getLeagueDraft?.scheduledAt,
+      );
       const originalPickTimeLimitSeconds = String(
         draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120,
       );
@@ -505,9 +506,8 @@ export function DraftSettingsControl({
                 ? (customEraEndYearLocal ?? null)
                 : null,
             // LS-423: send null to clear the schedule, ISO-8601 string to set it
-            scheduledAt: scheduledAt
-              ? new Date(scheduledAt + 'Z').toISOString()
-              : null,
+            // LS-10471: the input is local wall-clock time; store the UTC instant.
+            scheduledAt: localDateTimeInputToIso(scheduledAt) ?? null,
           },
         },
       });
@@ -533,11 +533,9 @@ export function DraftSettingsControl({
       draftData?.getLeagueDraft?.draftOrder ?? 'snake',
     );
     const originalPlayerPool = String(leaguePlayerPool ?? 'all');
-    const originalScheduledAt = draftData?.getLeagueDraft?.scheduledAt
-      ? new Date(draftData.getLeagueDraft.scheduledAt)
-          .toISOString()
-          .slice(0, 16)
-      : '';
+    const originalScheduledAt = toLocalDateTimeInput(
+      draftData?.getLeagueDraft?.scheduledAt,
+    );
 
     setDraftMode(originalDraftMode);
     setSelectionMethod(originalSelectionMethod);
@@ -553,6 +551,8 @@ export function DraftSettingsControl({
     setScheduledAt(originalScheduledAt);
     setHasChanges(false);
   };
+
+  const scheduledDate = parseLocalDateTimeInput(scheduledAt);
 
   return (
     <PremiumGate isPremium={isPremium} featureName="Draft Settings">
@@ -839,19 +839,15 @@ export function DraftSettingsControl({
                   <Text fontSize="$2" color="$gray10">
                     Set a date and time for the draft to automatically begin.
                     The draft room opens 30 minutes before. Leave blank for
-                    manual start. All times are in UTC.
+                    manual start. Times are in your local time zone (
+                    {getLocalTimeZoneLabel(scheduledDate)}).
                   </Text>
                 </YStack>
                 <XStack gap="$2" alignItems="center">
                   <DateTimePicker
-                    value={scheduledAt ? new Date(scheduledAt) : undefined}
+                    value={scheduledDate}
                     onChange={(date) => {
-                      // Reconstruct local-time string (YYYY-MM-DDTHH:MM) to match
-                      // the datetime-local input convention; the component treats
-                      // this string as UTC (the label says "All times are in UTC").
-                      const pad = (n: number) => String(n).padStart(2, '0');
-                      const localStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-                      handleScheduledAtChange(localStr);
+                      handleScheduledAtChange(toLocalDateTimeInput(date));
                     }}
                     minDate={new Date(Date.now() + 60_000)}
                     disabled={isDraftLocked || saving}
@@ -883,16 +879,13 @@ export function DraftSettingsControl({
                     </Button>
                   )}
                 </XStack>
-                {scheduledAt && (
+                {scheduledDate && (
                   <Text fontSize="$2" color="$brandGoldLight">
                     Draft room opens at{' '}
-                    {new Date(
-                      new Date(scheduledAt).getTime() - 30 * 60 * 1000,
-                    ).toLocaleString('en-US', { timeZoneName: 'short' })}
-                    {' — '}draft starts at{' '}
-                    {new Date(scheduledAt).toLocaleString('en-US', {
-                      timeZoneName: 'short',
-                    })}
+                    {formatLocalDateTime(
+                      new Date(scheduledDate.getTime() - 30 * 60 * 1000),
+                    )}
+                    {' — '}draft starts at {formatLocalDateTime(scheduledDate)}
                   </Text>
                 )}
               </YStack>

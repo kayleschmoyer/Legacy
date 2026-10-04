@@ -31,6 +31,8 @@ export function formatDraftDate(iso: string | null | undefined): string {
   } catch {
     // Hermes release builds without full ICU/Intl data can leave
     // toLocaleDateString/toLocaleTimeString undefined, throwing here.
-    return d.toISOString().slice(0, 16).replace('T', ' ');
+    // Use local getters so the fallback stays in the user's time zone (LS-10471).
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 }

@@ -78,7 +78,6 @@ import {
   parseLeagueSettingsExport,
 } from '../../utils/leagueSettingsExport';
 import {
-  formatDateAsUTC,
   formatDraftDate,
   getUserTimezoneLabel,
 } from '../../utils/draftDateUtils';
@@ -4004,13 +4003,6 @@ export function LeagueCreatePage(): React.JSX.Element {
                           >
                             Local: {formatDraftDate(formData.draftDate)} —{' '}
                             {getUserTimezoneLabel()}
-                          </Text>
-                          <Text
-                            fontFamily="$body"
-                            fontSize={12}
-                            color="$gray10"
-                          >
-                            UTC: {formatDateAsUTC(formData.draftDate)}
                           </Text>
                         </YStack>
                       ) : (

@@ -388,10 +388,12 @@ test.describe('League Creation @critical', () => {
     await leaguePage.selectDraftDate(tomorrow);
 
     // Once applied, the placeholder timezone hint is replaced by the
-    // resolved Local/UTC timestamp lines — proof the picked date/time made
-    // it into `formData.draftDate`, not just a transient popover selection.
+    // resolved local timestamp line — proof the picked date/time made it
+    // into `formData.draftDate`, not just a transient popover selection.
+    // Times are shown only in the user's local zone (LS-10471), so there is
+    // no separate UTC line.
     await leaguePage.text(/^Local:/).expectVisible();
-    await leaguePage.text(/^UTC:/).expectVisible();
+    await leaguePage.text(/^UTC:/).expectHidden();
   });
 
   test('should display loading state during submission', async ({
