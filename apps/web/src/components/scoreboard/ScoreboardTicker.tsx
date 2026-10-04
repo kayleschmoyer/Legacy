@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { styled, Text, XStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
@@ -367,7 +367,31 @@ export function ScoreboardTicker() {
   }, [shouldPoll, startPolling, stopPolling]);
 
   const [paused, setPaused] = useState(false);
-  const innerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Marquee only when one copy of the chips is wider than the visible strip
+  // (LS-10425). The translateX(-50%) loop needs the chips rendered twice; when
+  // they already fit, both copies are visible at once (A·B·C A·B·C), so render
+  // a single static copy instead. Measured before paint so the animated
+  // layout never flashes, and re-measured when the viewport, the game list,
+  // or font loading changes either width.
+  const [overflows, setOverflows] = useState(false);
+  const hasGames = isAuthenticated && games.length > 0;
+  useLayoutEffect(() => {
+    if (!hasGames || prefersReducedMotion) return;
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+    const measure = () =>
+      setOverflows(content.scrollWidth > viewport.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [hasGames, prefersReducedMotion]);
 
   // Inject keyframes once per document lifecycle. No-op when reduced motion is
   // active since the animation class is not applied in that path.
@@ -409,12 +433,14 @@ export function ScoreboardTicker() {
 
   const scrollDuration = scrollDurationSecs(games.length);
 
-  const chips = games.map((game, idx) => (
-    <React.Fragment key={game.gamePk}>
-      <GameChip game={game} />
-      {idx < games.length - 1 && <Separator />}
-    </React.Fragment>
-  ));
+  const renderChips = (keyPrefix: string) =>
+    games.map((game, idx) => (
+      <React.Fragment key={`${keyPrefix}${game.gamePk}`}>
+        <GameChip game={game} />
+        {idx < games.length - 1 && <Separator />}
+      </React.Fragment>
+    ));
+  const chips = renderChips('');
 
   return (
     <>
@@ -458,31 +484,62 @@ export function ScoreboardTicker() {
           </ScrollOuter>
         ) : (
           /*
-           * Animated layout: chips are duplicated so the scroll loops
-           * seamlessly. The outer container clips the content.
-           * Duplicate chips are aria-hidden to avoid screen-reader repetition.
+           * Default layout. When one copy of the chips fits the strip it
+           * renders once, static. When it overflows, the chips are duplicated
+           * so the translateX(-50%) scroll loops seamlessly: each copy ends
+           * with a separator so the halves are equal width and the seam reads
+           * "…C · A…". The duplicate is aria-hidden to avoid screen-reader
+           * repetition. The first copy stays mounted in both modes so its
+           * width can be measured without remounting.
            */
           <ScrollOuter>
             <div
-              ref={innerRef}
-              className="scoreboard-ticker-inner"
+              ref={viewportRef}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                flexShrink: 0,
-                willChange: 'transform',
-                animation: `ticker-scroll ${scrollDuration}s linear infinite`,
-                animationPlayState: paused ? 'paused' : 'running',
+                flex: 1,
+                minWidth: 0,
+                height: '100%',
+                overflow: 'hidden',
               }}
             >
-              {chips}
-              <div aria-hidden="true" style={{ display: 'contents' }}>
-                {games.map((game, idx) => (
-                  <React.Fragment key={`dup-${game.gamePk}`}>
-                    <GameChip game={game} />
-                    {idx < games.length - 1 && <Separator />}
-                  </React.Fragment>
-                ))}
+              <div
+                className="scoreboard-ticker-inner"
+                data-testid="scoreboard-ticker-track"
+                data-marquee={overflows ? 'true' : 'false'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                  ...(overflows
+                    ? {
+                        willChange: 'transform',
+                        animation: `ticker-scroll ${scrollDuration}s linear infinite`,
+                        animationPlayState: paused ? 'paused' : 'running',
+                      }
+                    : {}),
+                }}
+              >
+                <div
+                  ref={contentRef}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {chips}
+                </div>
+                {overflows && (
+                  <>
+                    <Separator />
+                    <div aria-hidden="true" style={{ display: 'contents' }}>
+                      {renderChips('dup-')}
+                      <Separator />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </ScrollOuter>
