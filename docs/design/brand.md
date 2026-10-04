@@ -32,7 +32,7 @@ Fantasy sports players (25–45) who are league commissioners and active partici
   - `#FFFFFF` — max-contrast headline text only
   - `#DEE6FF` — secondary text
   - `#9CAAC5` — muted metadata / labels
-  - `#6C80BA` — quietest / disabled text
+  - `#8296CA` — quietest tertiary text (helper text, small labels). Still meets WCAG AA (≥4.5:1) on every surface up to `#1C2A47` — every text tier must; use the dimmed disabled foreground `#3E4E71` only for genuinely disabled/inactive UI, never readable content
 - **System-status hues** (semantic only — never decorative, never used for win/loss which stay gold/seam-red):
   - Success `#4AAE7C` — form validation, connection/sync status, positive system state
   - Warning `#C89452` — degraded state, non-critical alerts

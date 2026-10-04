@@ -21,6 +21,7 @@
 import {
   brand,
   darkSurface,
+  darkText,
   lightSurface,
   shadowBase,
   withAlpha as withAlphaToken,
@@ -183,7 +184,7 @@ export const TEXT_SECONDARY = '#8A9BB5';
 /** Dim/separator text — separators, decorative mid-tone accents. */
 export const TEXT_SEPARATOR = '#445676';
 /** Tertiary text — further muted, de-emphasized content. */
-export const TEXT_TERTIARY = '#6C80BA';
+export const TEXT_TERTIARY = darkText.fg4;
 /** Interface text — high-contrast on dark backgrounds (lighter than TEXT_PRIMARY). */
 export const TEXT_INTERFACE = '#E8EDF5';
 

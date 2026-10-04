@@ -19,6 +19,7 @@ import {
   baseballPositionBadges,
   brand,
   darkSurface,
+  darkText,
   footballPositionBadges,
   getPositionColor as getPositionColorToken,
   ledger,
@@ -156,7 +157,7 @@ export const TEXT_SECONDARY = '#8A9BB5';
  * canvases. Shared across the Players/Stats redesign slices. */
 export const TEXT_NEUTRAL_FG3 = '#9CAAC5';
 /** Tertiary text — further muted, de-emphasized content. */
-export const TEXT_TERTIARY = '#6C80BA';
+export const TEXT_TERTIARY = darkText.fg4;
 /** Disabled foreground — unreachable wizard steps, unavailable chip options. */
 export const TEXT_DISABLED = ledger.disabledFg;
 

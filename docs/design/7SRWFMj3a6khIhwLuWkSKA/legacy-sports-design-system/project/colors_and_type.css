@@ -221,7 +221,7 @@
   --fg1-strong:  #FFFFFF;   /* max contrast headline */
   --fg2:         #DEE6FF;   /* secondary */
   --fg3:         #9CAAC5;   /* muted metadata */
-  --fg4:         #6C80BA;   /* quietest / disabled */
+  --fg4:         #8296CA;   /* quietest text — still WCAG AA (≥4.5:1) on every surface */
   --fg-on-accent:#F8FAFC;   /* text on navy/gold/red */
 
   /* ── Status / semantic ───────────────────────────────────────

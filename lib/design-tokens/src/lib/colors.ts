@@ -29,7 +29,9 @@ export const darkText = {
   fg1Strong: '#FFFFFF',
   fg2: '#DEE6FF',
   fg3: '#9CAAC5',
-  fg4: '#6C80BA',
+  // LS-10452: was #6C80BA (3.69:1 on surfaceRaised). Every text tier must
+  // clear WCAG AA (4.5:1) on every surface — enforced in colors.spec.ts.
+  fg4: '#8296CA',
   fgOnAccent: '#F8FAFC',
 } as const;
 
@@ -52,7 +54,8 @@ export const lightText = {
   fg1Strong: '#000000',
   fg2: '#1F2937',
   fg3: '#4A6080',
-  fg4: '#7D8EAD',
+  // LS-10452: was #7D8EAD (2.92:1 on surfaceSubtle).
+  fg4: '#606D85',
   // Accent surfaces (navy/gold/red) are dark in both themes, so the
   // foreground on them stays the dark-theme value — the source bundle
   // intentionally does not override --fg-on-accent in `.theme-light`.

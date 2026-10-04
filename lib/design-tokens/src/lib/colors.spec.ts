@@ -2,8 +2,12 @@ import {
   baseballPositionBadges,
   contrastRatio,
   darkSurface,
+  darkText,
   DERIVED_TEXT_CONTRAST_TARGET,
+  ledger,
   lightenForContrast,
+  lightSurface,
+  lightText,
   relativeLuminance,
 } from './colors';
 
@@ -70,5 +74,67 @@ describe('lightenForContrast', () => {
     const strictTarget = lightenForContrast(baseballPositionBadges.OF, BG, 10);
     expect(contrastRatio(looseTarget, BG)).toBeGreaterThanOrEqual(4.45);
     expect(contrastRatio(strictTarget, BG)).toBeGreaterThanOrEqual(9.9);
+  });
+});
+
+// LS-10452: every text tier must meet WCAG AA for normal text (4.5:1) on
+// every surface it can sit on. Outlines/borders are not text surfaces, and
+// `fgOnAccent` sits on navy/gold/red accent fills, so both are excluded.
+describe('text tokens meet WCAG AA (4.5:1) on every surface', () => {
+  const WCAG_AA_NORMAL_TEXT = 4.5;
+  const textSurfaceKeys = [
+    'bg',
+    'bgHover',
+    'bgPress',
+    'surfaceSubtle',
+    'surfacePanel',
+    'surfaceCard',
+    'surfaceRaised',
+  ] as const;
+  const textKeys = ['fg1', 'fg1Strong', 'fg2', 'fg3', 'fg4'] as const;
+
+  const themes = [
+    { theme: 'dark', text: darkText, surface: darkSurface },
+    { theme: 'light', text: lightText, surface: lightSurface },
+  ] as const;
+
+  const cases = themes.flatMap(({ theme, text, surface }) =>
+    textKeys.flatMap((textKey) =>
+      textSurfaceKeys.map(
+        (surfaceKey) =>
+          [
+            theme,
+            textKey,
+            surfaceKey,
+            text[textKey],
+            surface[surfaceKey],
+          ] as const,
+      ),
+    ),
+  );
+
+  it.each(cases)(
+    '%s %s on %s (%s on %s)',
+    (_theme, _textKey, _surfaceKey, fg, bg) => {
+      expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+    },
+  );
+
+  it.each(themes)(
+    '$theme fg4 stays visually distinct from fg3 (quieter tier, not a duplicate)',
+    ({ text, surface }) => {
+      expect(text.fg4).not.toBe(text.fg3);
+      // fg4 is the quieter tier: lower contrast against the page than fg3.
+      expect(contrastRatio(text.fg4, surface.bg)).toBeLessThan(
+        contrastRatio(text.fg3, surface.bg),
+      );
+    },
+  );
+
+  it('keeps the disabled foreground out of the readable-text ramp', () => {
+    // `ledger.disabledFg` is intentionally sub-AA (inactive UI is exempt
+    // under WCAG 1.4.3); it must never be reused as an enabled text tier.
+    expect(Object.values(darkText)).not.toContain(ledger.disabledFg);
+    expect(Object.values(lightText)).not.toContain(ledger.disabledFg);
   });
 });

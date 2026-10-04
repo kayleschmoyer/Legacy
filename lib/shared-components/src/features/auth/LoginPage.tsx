@@ -54,7 +54,7 @@ interface EmailPasswordPalette {
 
 const CARD_EMAIL_PASSWORD_PALETTE: EmailPasswordPalette = {
   label: '#9caac5',
-  placeholder: '#6c80ba',
+  placeholder: '#8296ca',
   inputBg: '#0D1526',
   inputBorder: 'rgba(255,255,255,0.12)',
   inputText: '#ffffff',
@@ -64,7 +64,7 @@ const CARD_EMAIL_PASSWORD_PALETTE: EmailPasswordPalette = {
   submitPressBg: '#16314e',
   submitText: 'white',
   dividerLine: '#1f2d48',
-  dividerText: '#6c80ba',
+  dividerText: '#8296ca',
 };
 
 const FULL_BLEED_EMAIL_PASSWORD_PALETTE: EmailPasswordPalette = {
@@ -852,7 +852,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         >
           <Text
             fontSize={12}
-            color="#6c80ba"
+            color="#8296ca"
             textAlign="center"
             lineHeight={18}
           >

@@ -429,7 +429,9 @@ export function WizardTextField({
       borderRadius={RADIUS_CHIP}
       borderColor={invalid === true ? INLINE_ERROR : PANEL_BORDER}
       focusStyle={{ borderColor: invalid === true ? INLINE_ERROR : BRAND_GOLD }}
-      placeholderTextColor={TEXT_DISABLED}
+      // LS-10452: placeholders are readable content, not disabled UI — the
+      // disabled foreground (#3E4E71, ~2:1) fails WCAG AA here.
+      placeholderTextColor={TEXT_TERTIARY}
     />
   );
 }
