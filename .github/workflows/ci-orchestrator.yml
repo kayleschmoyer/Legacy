@@ -787,13 +787,21 @@ jobs:
               }));
               core.info(`Label added: ${label}`);
             } else if (!shouldHaveLabel && hasLabel) {
-              await withRetry(() => github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                name: label,
-              }));
-              core.info(`Label removed: ${label}`);
+              // An overlapping run on the same PR can remove the label between
+              // pulls.get and this call; GitHub then answers 404 "Label does not
+              // exist" (meaning: not on this PR). That is the outcome we wanted.
+              try {
+                await withRetry(() => github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                }));
+                core.info(`Label removed: ${label}`);
+              } catch (e) {
+                if (e.status !== 404) throw e;
+                core.info(`Label already removed: ${label}`);
+              }
             }
 
   # ============================================================================
@@ -999,12 +1007,21 @@ jobs:
               return;
             }
 
-            await github.rest.issues.removeLabel({
-              owner,
-              repo,
-              issue_number: prNumber,
-              name: 'merge-when-ready'
-            });
+            // An overlapping run can strip the label between pulls.get and this
+            // call (404 "Label does not exist"). That run also posts the failure
+            // comment, so stop here rather than posting a duplicate.
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: 'merge-when-ready'
+              });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              console.log(`merge-when-ready already removed from PR #${prNumber}, skipping`);
+              return;
+            }
             console.log(`Removed merge-when-ready label from PR #${prNumber}`);
 
             await github.rest.issues.createComment({

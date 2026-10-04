@@ -457,6 +457,173 @@ describe('ci-orchestrator.yml — seed-ci-gate sparse checkout covers ci-gate.js
 });
 
 /**
+ * Regression test for LS-10542.
+ *
+ * On PR #8316 the "🏷️ Label PR" job read "CI: Security" off the PR via
+ * pulls.get, then called issues.removeLabel — but an overlapping orchestrator
+ * run on the same PR removed the label in between. GitHub answers a DELETE for
+ * a label the issue no longer carries with 404 "Label does not exist", and
+ * withRetry only retries rate limits, so the job went red. The same
+ * read-then-remove race applies to remove-merge-label-on-failure's
+ * merge-when-ready strip.
+ *
+ * These tests execute the github-script bodies against a mocked Octokit whose
+ * removeLabel reproduces that 404.
+ */
+const noop = () => undefined;
+const AsyncFunction = Object.getPrototypeOf(async () => undefined).constructor;
+
+function labelNotPresentError() {
+  const err = new Error('Label does not exist');
+  err.status = 404;
+  return err;
+}
+
+function mockGithub({ prLabels, removeLabel }) {
+  const calls = { addLabels: [], removeLabel: [], createComment: [] };
+  return {
+    calls,
+    github: {
+      rest: {
+        pulls: {
+          get: async () => ({
+            data: { labels: prLabels.map((name) => ({ name })) },
+          }),
+        },
+        issues: {
+          addLabels: async (args) => {
+            calls.addLabels.push(args);
+            return { data: [] };
+          },
+          removeLabel: async (args) => {
+            calls.removeLabel.push(args);
+            return removeLabel(args);
+          },
+          createComment: async (args) => {
+            calls.createComment.push(args);
+            return { data: {} };
+          },
+        },
+      },
+    },
+  };
+}
+
+const mockCore = { info: noop, warning: noop, notice: noop };
+const mockContext = {
+  repo: { owner: 'bkrupa', repo: 'legacy-sports' },
+  issue: { number: 8316 },
+  payload: { pull_request: { number: 8316 } },
+};
+const quietConsole = { log: noop };
+
+function stepScript(jobName, stepName) {
+  const { parsed } = loadOrchestrator();
+  const step = parsed.jobs[jobName].steps.find((s) => s.name === stepName);
+  assert.ok(step, `${jobName} must have a "${stepName}" step`);
+  return step.with.script;
+}
+
+function runScript(script, { github, securityResult = 'success' }) {
+  const body = script.replaceAll(
+    '${{ needs.security-scanning.result }}',
+    securityResult,
+  );
+  return new AsyncFunction('github', 'context', 'core', 'console', body)(
+    github,
+    mockContext,
+    mockCore,
+    quietConsole,
+  );
+}
+
+describe('ci-orchestrator.yml — label removal is idempotent under overlapping runs (LS-10542)', () => {
+  it('label-pr succeeds when "CI: Security" was already removed by another run', async () => {
+    const { github, calls } = mockGithub({
+      prLabels: ['CI: Security'],
+      removeLabel: async () => {
+        throw labelNotPresentError();
+      },
+    });
+    await runScript(stepScript('label-pr', 'Label PR on Security Failure'), {
+      github,
+      securityResult: 'success',
+    });
+    assert.equal(calls.removeLabel.length, 1, 'the remove was attempted once');
+  });
+
+  it('label-pr still surfaces non-404 removeLabel errors', async () => {
+    const { github } = mockGithub({
+      prLabels: ['CI: Security'],
+      removeLabel: async () => {
+        const err = new Error('Server Error');
+        err.status = 500;
+        throw err;
+      },
+    });
+    await assert.rejects(
+      runScript(stepScript('label-pr', 'Label PR on Security Failure'), {
+        github,
+        securityResult: 'success',
+      }),
+      /Server Error/,
+    );
+  });
+
+  it('label-pr still adds the label on a security failure', async () => {
+    const { github, calls } = mockGithub({
+      prLabels: [],
+      removeLabel: async () => ({ data: [] }),
+    });
+    await runScript(stepScript('label-pr', 'Label PR on Security Failure'), {
+      github,
+      securityResult: 'failure',
+    });
+    assert.deepEqual(
+      calls.addLabels.map((c) => c.labels),
+      [['CI: Security']],
+    );
+  });
+
+  it('remove-merge-label-on-failure succeeds, without a duplicate comment, when merge-when-ready was already removed', async () => {
+    const { github, calls } = mockGithub({
+      prLabels: ['merge-when-ready'],
+      removeLabel: async () => {
+        throw labelNotPresentError();
+      },
+    });
+    await runScript(
+      stepScript(
+        'remove-merge-label-on-failure',
+        'Remove merge-when-ready label',
+      ),
+      { github },
+    );
+    assert.equal(calls.removeLabel.length, 1, 'the remove was attempted once');
+    assert.equal(
+      calls.createComment.length,
+      0,
+      'the run that actually removed the label already posted the failure comment',
+    );
+  });
+
+  it('remove-merge-label-on-failure still comments after a successful removal', async () => {
+    const { github, calls } = mockGithub({
+      prLabels: ['merge-when-ready'],
+      removeLabel: async () => ({ data: [] }),
+    });
+    await runScript(
+      stepScript(
+        'remove-merge-label-on-failure',
+        'Remove merge-when-ready label',
+      ),
+      { github },
+    );
+    assert.equal(calls.createComment.length, 1);
+  });
+});
+
+/**
  * LS-10297 — the runner-shutdown classifier must not be able to fail the
  * cleanup jobs that consume it.
  *
