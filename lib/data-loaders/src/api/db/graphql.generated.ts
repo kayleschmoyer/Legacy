@@ -5703,6 +5703,7 @@ export type UserPreference = {
   audioEnabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  onboardingCompletedAt?: Maybe<Scalars['String']['output']>;
   statsFormat?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
@@ -5710,6 +5711,7 @@ export type UserPreference = {
 
 export type UserPreferenceInput = {
   audioEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  markOnboardingComplete?: InputMaybe<Scalars['Boolean']['input']>;
   statsFormat?: InputMaybe<Scalars['String']['input']>;
 };
 

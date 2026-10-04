@@ -11,6 +11,9 @@ const UserPreferenceInput = builder.inputType('UserPreferenceInput', {
   fields: (t) => ({
     statsFormat: t.string({ required: false }),
     audioEnabled: t.boolean({ required: false }),
+    // Set-once: `true` stamps onboarding complete; an existing timestamp is
+    // never cleared or overwritten, and `false`/omitted is a no-op (LS-10378).
+    markOnboardingComplete: t.boolean({ required: false }),
   }),
 });
 
@@ -20,6 +23,7 @@ const UserPreferenceRef = builder.objectRef<{
   userId: number;
   statsFormat: string;
   audioEnabled: boolean;
+  onboardingCompletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }>('UserPreference');
@@ -30,6 +34,10 @@ UserPreferenceRef.implement({
     userId: t.exposeInt('userId'),
     statsFormat: t.exposeString('statsFormat'),
     audioEnabled: t.exposeBoolean('audioEnabled'),
+    onboardingCompletedAt: t.string({
+      nullable: true,
+      resolve: (parent) => parent.onboardingCompletedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({
       resolve: (parent) => parent.createdAt.toISOString(),
     }),
@@ -58,6 +66,7 @@ builder.queryField('getUserPreferences', (t) =>
         userId: Number(prefs.userId),
         statsFormat: prefs.statsFormat,
         audioEnabled: prefs.audioEnabled,
+        onboardingCompletedAt: prefs.onboardingCompletedAt,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
       };
@@ -94,6 +103,8 @@ builder.mutationField('updateUserPreferences', (t) =>
             typeof input.audioEnabled === 'boolean'
               ? input.audioEnabled
               : undefined,
+          markOnboardingComplete:
+            input.markOnboardingComplete === true ? true : undefined,
         },
       );
       return {
@@ -101,6 +112,7 @@ builder.mutationField('updateUserPreferences', (t) =>
         userId: Number(prefs.userId),
         statsFormat: prefs.statsFormat,
         audioEnabled: prefs.audioEnabled,
+        onboardingCompletedAt: prefs.onboardingCompletedAt,
         createdAt: prefs.createdAt,
         updatedAt: prefs.updatedAt,
       };

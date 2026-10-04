@@ -5,6 +5,8 @@
  *   - getUserPreferences: UNAUTHENTICATED, null prefs, returns mapped prefs
  *   - updateUserPreferences: UNAUTHENTICATED, returns mapped prefs, drops
  *     invalid statsFormat values before they reach the service
+ *   - onboardingCompletedAt (LS-10378): default null, set, idempotent re-set,
+ *     unauthenticated rejection, caller-scoped (never another user's row)
  */
 
 import type { GraphQLSchema } from 'graphql';
@@ -26,6 +28,8 @@ describe('user-preferences resolver', () => {
     id: 2,
     userId: 10,
     statsFormat: 'expanded',
+    audioEnabled: false,
+    onboardingCompletedAt: null as Date | null,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -288,5 +292,117 @@ describe('user-preferences resolver', () => {
     expect(
       mockUserPreferencesService.updateUserPreferences,
     ).toHaveBeenCalledWith(10, { statsFormat: undefined });
+  });
+
+  // ── onboardingCompletedAt (LS-10378) ──────────────────────────────────────
+
+  const ONBOARDED_AT = new Date('2026-10-01T12:00:00.000Z');
+
+  it('getUserPreferences: onboardingCompletedAt defaults to null', async () => {
+    mockUserPreferencesService.getUserPreferences.mockResolvedValueOnce(
+      MOCK_PREFS_RAW,
+    );
+    const result = (await getQueryResolver('getUserPreferences')(
+      {},
+      {},
+      mockContext,
+      undefined as never,
+    )) as { onboardingCompletedAt: Date | null };
+    expect(result.onboardingCompletedAt).toBeNull();
+  });
+
+  it('getUserPreferences: surfaces a stored onboardingCompletedAt', async () => {
+    mockUserPreferencesService.getUserPreferences.mockResolvedValueOnce({
+      ...MOCK_PREFS_RAW,
+      onboardingCompletedAt: ONBOARDED_AT,
+    });
+    const result = (await getQueryResolver('getUserPreferences')(
+      {},
+      {},
+      mockContext,
+      undefined as never,
+    )) as { onboardingCompletedAt: Date | null };
+    expect(result.onboardingCompletedAt).toEqual(ONBOARDED_AT);
+  });
+
+  it('updateUserPreferences: markOnboardingComplete sets the timestamp', async () => {
+    mockUserPreferencesService.updateUserPreferences.mockResolvedValueOnce({
+      ...MOCK_PREFS_RAW,
+      onboardingCompletedAt: ONBOARDED_AT,
+    });
+    const result = await getMutationResolver('updateUserPreferences')(
+      {},
+      { input: { markOnboardingComplete: true } },
+      mockContext,
+      undefined as never,
+    );
+    expect(result).toMatchObject({ onboardingCompletedAt: ONBOARDED_AT });
+    expect(
+      mockUserPreferencesService.updateUserPreferences,
+    ).toHaveBeenCalledWith(10, { markOnboardingComplete: true });
+  });
+
+  it('updateUserPreferences: re-marking is idempotent and returns the original timestamp', async () => {
+    // The service enforces set-once (COALESCE); the resolver must forward the
+    // flag each time and surface whatever timestamp the service returns.
+    mockUserPreferencesService.updateUserPreferences.mockResolvedValue({
+      ...MOCK_PREFS_RAW,
+      onboardingCompletedAt: ONBOARDED_AT,
+    });
+    const run = () =>
+      getMutationResolver('updateUserPreferences')(
+        {},
+        { input: { markOnboardingComplete: true } },
+        mockContext,
+        undefined as never,
+      ) as Promise<{ onboardingCompletedAt: Date }>;
+    const first = await run();
+    const second = await run();
+    expect(second.onboardingCompletedAt).toEqual(first.onboardingCompletedAt);
+    expect(second.onboardingCompletedAt).toEqual(ONBOARDED_AT);
+  });
+
+  it('updateUserPreferences: markOnboardingComplete false/omitted never reaches the service as a write', async () => {
+    await getMutationResolver('updateUserPreferences')(
+      {},
+      { input: { statsFormat: 'expanded', markOnboardingComplete: false } },
+      mockContext,
+      undefined as never,
+    );
+    const [, updates] =
+      mockUserPreferencesService.updateUserPreferences.mock.calls[0];
+    expect(updates.markOnboardingComplete).toBeUndefined();
+  });
+
+  it('updateUserPreferences: rejects an unauthenticated mark-complete', async () => {
+    mockContext.user = null;
+    await expect(
+      getMutationResolver('updateUserPreferences')(
+        {},
+        { input: { markOnboardingComplete: true } },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Authentication required');
+    expect(
+      mockUserPreferencesService.updateUserPreferences,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('updateUserPreferences: only ever targets the caller, never another user', async () => {
+    // The input has no userId; the target is derived from the auth context, so
+    // a smuggled userId cannot redirect the write to another user's row.
+    await getMutationResolver('updateUserPreferences')(
+      {},
+      { input: { markOnboardingComplete: true, userId: 999 } },
+      mockContext,
+      undefined as never,
+    );
+    expect(
+      mockUserPreferencesService.updateUserPreferences,
+    ).toHaveBeenCalledWith(10, { markOnboardingComplete: true });
+    expect(
+      mockUserPreferencesService.updateUserPreferences,
+    ).not.toHaveBeenCalledWith(999, expect.anything());
   });
 });

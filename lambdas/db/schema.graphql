@@ -6239,6 +6239,7 @@ type UserPreference {
   audioEnabled: Boolean
   createdAt: String
   id: Int
+  onboardingCompletedAt: String
   statsFormat: String
   updatedAt: String
   userId: Int
@@ -6246,6 +6247,7 @@ type UserPreference {
 
 input UserPreferenceInput {
   audioEnabled: Boolean
+  markOnboardingComplete: Boolean
   statsFormat: String
 }
 

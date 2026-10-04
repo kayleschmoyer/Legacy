@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
@@ -10,6 +10,7 @@ export interface UserPreferences {
   userId: number;
   statsFormat: StatsFormat;
   audioEnabled: boolean;
+  onboardingCompletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +18,8 @@ export interface UserPreferences {
 export interface UserPreferencesUpdate {
   statsFormat?: StatsFormat;
   audioEnabled?: boolean;
+  /** When true, stamps onboarding as completed — a no-op if already set (LS-10378). */
+  markOnboardingComplete?: boolean;
 }
 
 const VALID_STATS_FORMATS: readonly StatsFormat[] = ['standard', 'expanded'];
@@ -58,6 +61,7 @@ export class UserPreferencesService {
         userId: Number(pref.userId),
         statsFormat: normalizeStatsFormat(pref.statsFormat),
         audioEnabled: pref.audioEnabled ?? false,
+        onboardingCompletedAt: pref.onboardingCompletedAt ?? null,
         createdAt: pref.createdAt,
         updatedAt: pref.updatedAt,
       };
@@ -86,6 +90,8 @@ export class UserPreferencesService {
       cleaned.audioEnabled = updates.audioEnabled;
     }
 
+    const markOnboardingComplete = updates.markOnboardingComplete === true;
+
     return runWithPublicClient(this.options, async (db) => {
       const existing = await db
         .select()
@@ -95,7 +101,7 @@ export class UserPreferencesService {
 
       let result;
       if (existing.length > 0) {
-        if (Object.keys(cleaned).length === 0) {
+        if (Object.keys(cleaned).length === 0 && !markOnboardingComplete) {
           // Nothing valid to change — return the existing row unchanged. This
           // also avoids an empty `.set()` clause, which Drizzle rejects.
           result = existing[0];
@@ -104,7 +110,15 @@ export class UserPreferencesService {
           // BEFORE UPDATE trigger, so it is intentionally not set here.
           [result] = await db
             .update(PublicSchema.userPreferences)
-            .set({ ...cleaned })
+            .set({
+              ...cleaned,
+              // Set-once, atomically in SQL: COALESCE keeps any existing
+              // timestamp, so a concurrent or repeated call never overwrites it
+              // and nothing ever clears it (LS-10378).
+              ...(markOnboardingComplete && {
+                onboardingCompletedAt: sql`COALESCE(${PublicSchema.userPreferences.onboardingCompletedAt}, now())`,
+              }),
+            })
             .where(eq(PublicSchema.userPreferences.userId, userId))
             .returning();
         }
@@ -114,6 +128,9 @@ export class UserPreferencesService {
           .values({
             userId,
             ...cleaned,
+            ...(markOnboardingComplete && {
+              onboardingCompletedAt: new Date(),
+            }),
           })
           .returning();
       }
@@ -123,6 +140,7 @@ export class UserPreferencesService {
         userId: Number(result.userId),
         statsFormat: normalizeStatsFormat(result.statsFormat),
         audioEnabled: result.audioEnabled ?? false,
+        onboardingCompletedAt: result.onboardingCompletedAt ?? null,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
       };

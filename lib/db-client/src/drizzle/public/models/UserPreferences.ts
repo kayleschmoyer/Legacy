@@ -33,6 +33,9 @@ export const userPreferences = pgTable(
     // Opt-in gate for in-app sound effects (LS-10111). Defaults to false —
     // audio never plays unless the user explicitly turns it on.
     audioEnabled: boolean('audio_enabled').notNull().default(false),
+    // When the user first completed onboarding (LS-10378). NULL = not completed.
+    // Set-once: never cleared or overwritten once populated.
+    onboardingCompletedAt: timestamp('onboarding_completed_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

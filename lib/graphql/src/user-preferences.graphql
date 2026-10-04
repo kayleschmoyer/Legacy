@@ -3,6 +3,7 @@ fragment UserPreference on UserPreference {
   userId
   statsFormat
   audioEnabled
+  onboardingCompletedAt
   createdAt
   updatedAt
 }

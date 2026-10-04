@@ -98,6 +98,7 @@ describe('UserPreferencesService', () => {
         userId: 10,
         statsFormat: 'expanded',
         audioEnabled: false,
+        onboardingCompletedAt: null,
         createdAt: NOW,
         updatedAt: NOW,
       });
@@ -232,6 +233,89 @@ describe('UserPreferencesService', () => {
       expect(result.audioEnabled).toBe(false);
     });
 
+    it('stamps onboarding_completed_at set-once (COALESCE) on an existing row', async () => {
+      const DONE = new Date('2026-10-01T00:00:00.000Z');
+      const update = makeUpdate([
+        {
+          id: 7,
+          userId: 70,
+          statsFormat: 'standard',
+          audioEnabled: false,
+          onboardingCompletedAt: DONE,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ]);
+      runWith({
+        select: jest.fn(() => makeSelect([{ id: 7, userId: 70 }])),
+        update: jest.fn(() => update),
+        insert: jest.fn(() => makeInsert([])),
+      });
+
+      const result = await service.updateUserPreferences(70, {
+        markOnboardingComplete: true,
+      });
+
+      // The write is a SQL expression (COALESCE keeps an existing value), not a
+      // JS Date — so a repeat call can never overwrite the first timestamp.
+      const set = (update.set.mock.calls[0] as [Record<string, unknown>])[0];
+      expect(set.onboardingCompletedAt).toBeDefined();
+      expect(set.onboardingCompletedAt).not.toBeInstanceOf(Date);
+      expect(result.onboardingCompletedAt).toEqual(DONE);
+    });
+
+    it('stamps onboarding_completed_at on first insert', async () => {
+      const insert = makeInsert([
+        {
+          id: 8,
+          userId: 80,
+          statsFormat: 'standard',
+          audioEnabled: false,
+          onboardingCompletedAt: NOW,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ]);
+      runWith({
+        select: jest.fn(() => makeSelect([])),
+        insert: jest.fn(() => insert),
+        update: jest.fn(() => makeUpdate([])),
+      });
+
+      await service.updateUserPreferences(80, { markOnboardingComplete: true });
+
+      expect(insert.values).toHaveBeenCalledWith({
+        userId: 80,
+        onboardingCompletedAt: expect.any(Date) as Date,
+      });
+    });
+
+    it('never writes onboarding_completed_at unless explicitly marked', async () => {
+      const update = makeUpdate([
+        {
+          id: 9,
+          userId: 90,
+          statsFormat: 'expanded',
+          audioEnabled: false,
+          onboardingCompletedAt: null,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ]);
+      runWith({
+        select: jest.fn(() => makeSelect([{ id: 9, userId: 90 }])),
+        update: jest.fn(() => update),
+        insert: jest.fn(() => makeInsert([])),
+      });
+
+      await service.updateUserPreferences(90, {
+        statsFormat: 'expanded',
+        markOnboardingComplete: false,
+      });
+
+      expect(update.set).toHaveBeenCalledWith({ statsFormat: 'expanded' });
+    });
+
     it('defaults audio_enabled to false for a row predating the column', async () => {
       runWith({
         select: jest.fn(() =>
@@ -309,6 +393,7 @@ describe('UserPreferencesService', () => {
         userId: 50,
         statsFormat: 'expanded',
         audioEnabled: false,
+        onboardingCompletedAt: null,
         createdAt: NOW,
         updatedAt: NOW,
       });
