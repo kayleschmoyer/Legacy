@@ -89,6 +89,9 @@ jobs:
   jira-link-check:
     name: "Jira Link Check"
     needs: [check-runner-access]
+    # Dependabot PRs have no Jira ticket and cannot carry the marker; skip the
+    # job. A skipped job reports as passing for required status checks.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 5
     # Job-level block replaces the workflow-level `contents: read` wholesale —
