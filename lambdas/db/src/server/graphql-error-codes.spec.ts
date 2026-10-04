@@ -16,6 +16,7 @@ describe('CLIENT_FACING_CODES', () => {
     'DRAFT_START_FAILED',
     'SCOREBOARD_FETCH_FAILED',
     'POSITION_INELIGIBLE',
+    'ROSTER_OVER_LIMIT',
   ])('classifies %s as client-facing', (code) => {
     expect(CLIENT_FACING_CODES.has(code)).toBe(true);
   });

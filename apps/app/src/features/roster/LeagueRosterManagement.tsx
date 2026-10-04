@@ -8,6 +8,7 @@ import {
   PendingWaiverClaims,
   RosterActionBar,
   RosterBoard,
+  RosterOverLimitNotice,
   RosterScoreboard,
   type RosterScorelineTeam,
   RosterStatusBanners,
@@ -197,6 +198,10 @@ export function LeagueRosterManagement({
             />
           ) : (
             <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+          )}
+
+          {!isViewingOther && myTeamId != null && leagueId != null && (
+            <RosterOverLimitNotice leagueId={leagueId} teamId={myTeamId} />
           )}
 
           {isCurrent && myTeamId != null && (

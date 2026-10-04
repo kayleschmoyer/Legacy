@@ -1,7 +1,14 @@
 /**
  * Waivers domain — Mutation resolvers
  *
- * Mutations: cancelWaiverClaim, claimFreeAgent, processWaiverClaims
+ * Mutations: cancelWaiverClaim, claimFreeAgent, processWaiverClaims,
+ *            releasePlayer
+ *
+ * Roster limit lock (LS-10477): a team over the league's roster limit (e.g.
+ * after an uneven trade) may only release players. claimFreeAgent is blocked
+ * for it (an add/drop claim nets zero, so it would keep the team over) and
+ * releasePlayer is the way back under. Lineup/slot moves are NOT roster moves
+ * — they never change roster size — so they stay allowed.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
@@ -11,8 +18,11 @@ import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
 import { validateFaabBudget } from './helpers';
 import { assertCapSpace, computeTeamPayroll } from '../../services/cap-service';
 import {
+  assertRosterNotOverLimit,
   checkRosterCapacity,
+  getRosterLimitStatus,
   isPlayerOnRoster,
+  removePlayerFromRoster,
 } from '../../services/roster-service';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
@@ -24,6 +34,7 @@ import {
   UserInputError,
 } from '../graphql-errors';
 import { assertSportCompatibility } from '../sport-eligibility';
+import { RosterLimitStatusType } from '../leagues/types';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -281,6 +292,15 @@ builder.mutationField('claimFreeAgent', (t) =>
         );
       }
 
+      // Roster limit lock (LS-10477): an over-limit team may only release
+      // players, so no claim (with or without a drop) is allowed.
+      await assertRosterNotOverLimit(db, {
+        teamId,
+        leagueId,
+        maxRosterSize: leagueRow[0].maxRosterSize,
+        netChange: dropPlayerId ? 0 : 1,
+      });
+
       const { isFull: rosterFull } = await checkRosterCapacity(
         db,
         teamId,
@@ -400,6 +420,102 @@ builder.mutationField('processWaiverClaims', (t) =>
         context.notificationService,
       );
       return processor.process({ leagueId: args.leagueId });
+    },
+  }),
+);
+
+// Release a player from an over-limit roster immediately (LS-10477). A team
+// pushed over the roster limit (e.g. by an uneven trade) is locked from every
+// other roster move, and an add/drop waiver claim nets zero, so this is the
+// path back under the limit. The released player becomes a free agent and is
+// re-acquired through the normal waiver-claim flow per league settings.
+// Restricted to over-limit teams: a general-purpose standalone drop is a
+// separate product decision.
+builder.mutationField('releasePlayer', (t) =>
+  t.field({
+    type: RosterLimitStatusType,
+    description:
+      "Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release.",
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      playerId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const { leagueId, playerId } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      const membership = await db
+        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0 || !membership[0].teamId) {
+        throw ForbiddenError('You do not have a team in this league');
+      }
+      const teamId = membership[0].teamId;
+
+      const [league] = await db
+        .select({ maxRosterSize: PublicSchema.leagues.maxRosterSize })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!league) {
+        throw UserInputError('League not found');
+      }
+
+      const before = await getRosterLimitStatus(
+        db,
+        teamId,
+        leagueId,
+        league.maxRosterSize,
+      );
+      if (!before.isOverLimit) {
+        throw UserInputError(
+          'Your roster is not over the limit. To drop a player, submit a waiver claim with a drop instead.',
+        );
+      }
+
+      const released = await removePlayerFromRoster(db, {
+        teamId,
+        leagueId,
+        playerId,
+      });
+      if (!released) {
+        throw UserInputError('That player is not on your roster');
+      }
+
+      LOGGER.info('Player released from over-limit roster', {
+        leagueId,
+        teamId,
+        playerId,
+        userId,
+        rosterSizeBefore: before.rosterSize,
+        maxRosterSize: league.maxRosterSize,
+      });
+
+      try {
+        await context.notificationService?.notifyRosterUpdate(leagueId);
+      } catch (notifyErr) {
+        LOGGER.warn(
+          'Failed to send roster update notification after release (non-fatal)',
+          notifyErr instanceof Error ? notifyErr : undefined,
+          { leagueId, teamId },
+        );
+      }
+
+      return getRosterLimitStatus(db, teamId, leagueId, league.maxRosterSize);
     },
   }),
 );

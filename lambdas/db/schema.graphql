@@ -3345,6 +3345,11 @@ type Mutation {
   Reject a pending trade offer as the receiving team manager.
   """
   rejectTrade(tradeId: Int!): TradeOffer
+
+  """
+  Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release.
+  """
+  releasePlayer(leagueId: Int!, playerId: Int!): RosterLimitStatus
   removeAssistantManager(teamId: Int!, userId: Int!): Boolean
 
   """
@@ -5107,6 +5112,20 @@ enum RosterContinuity {
   redraft
 }
 
+"""
+A team's roster size relative to the league roster limit. When isOverLimit is true the team is locked from every roster move except releasing players.
+"""
+type RosterLimitStatus {
+  isOverLimit: Boolean!
+  maxRosterSize: Int!
+
+  """
+  How many players the team must release to get back to the limit (0 when not over).
+  """
+  playersToRelease: Int!
+  rosterSize: Int!
+}
+
 input RosterSlotInput {
   count: Int!
   positionType: String!
@@ -5776,6 +5795,11 @@ type Team {
   managerId: Int
   name: String
   primaryColor: String
+
+  """
+  Roster size vs. the league roster limit (LS-10477). Null if the league no longer exists.
+  """
+  rosterLimitStatus: RosterLimitStatus
   secondaryColor: String
 
   """

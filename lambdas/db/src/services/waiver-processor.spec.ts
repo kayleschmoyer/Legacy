@@ -339,3 +339,52 @@ describe('WaiverClaimProcessor — sortByPriority', () => {
     });
   });
 });
+
+// ── Roster limit lock (LS-10477) ─────────────────────────────────────────────
+
+describe('WaiverClaimProcessor — over-limit roster lock (LS-10477)', () => {
+  function makeDb(rosterSize: number) {
+    const setMock = jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    });
+    const db: any = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([{ total: rosterSize }]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: setMock }),
+      transaction: jest.fn(),
+    };
+    return { db, setMock };
+  }
+
+  it('fails an add/drop claim for an over-limit team without dropping anyone', async () => {
+    const { db, setMock } = makeDb(28);
+    const processor = new WaiverClaimProcessor(db, null);
+    const claim = { ...makeClaim({ id: 7, teamId: 10, playerId: 100 }) };
+    (claim as { dropPlayerId: number | null }).dropPlayerId = 55;
+
+    const outcome = await (processor as any).handleRosterAndDrop(claim, 26);
+
+    expect(outcome).toBe('failed');
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        errorMessage: expect.stringContaining('release 2 player(s)'),
+      }),
+    );
+    // No roster delete was attempted.
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('lets a claim through for a team under the limit', async () => {
+    const { db } = makeDb(25);
+    const processor = new WaiverClaimProcessor(db, null);
+    const claim = makeClaim({ id: 8, teamId: 10, playerId: 100 });
+
+    await expect(
+      (processor as any).handleRosterAndDrop(claim, 26),
+    ).resolves.toBe('ok');
+  });
+});

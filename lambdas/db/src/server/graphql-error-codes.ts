@@ -86,4 +86,8 @@ export const CLIENT_FACING_CODES = new Set([
   // reported every rejection to Rollbar as `GraphQL internal error` (LS-9879 /
   // LS-9878).
   'POSITION_INELIGIBLE',
+  // A roster move rejected because the team is over the league's roster limit
+  // and may only release players until it is back under (LS-10477). Expected
+  // user-facing state, not a server defect.
+  'ROSTER_OVER_LIMIT',
 ]);

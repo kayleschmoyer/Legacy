@@ -76,6 +76,7 @@ import {
 import { Button } from '../../Button';
 import { Dropdown } from '../../Dropdown';
 import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
+import { RosterOverLimitNotice } from '../roster/RosterOverLimitBanner';
 import {
   BLACK,
   BRAND_GOLD_LIGHT,
@@ -1885,6 +1886,9 @@ export function TradingCenter({
           )}
         </Tooltip>
       </XStack>
+
+      {/* Roster limit lock (LS-10477): over-limit teams may only release. */}
+      <RosterOverLimitNotice leagueId={leagueId} teamId={userTeamId} />
 
       {actionError && (
         <Card

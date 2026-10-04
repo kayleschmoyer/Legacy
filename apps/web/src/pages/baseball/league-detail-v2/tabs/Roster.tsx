@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   RosterActionBar,
   RosterBoard,
+  RosterOverLimitNotice,
   type RosterPlayerStats,
   RosterScoreboard,
   type RosterScorelineTeam,
@@ -458,6 +459,10 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       />
 
       <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+
+      {league.id != null && (
+        <RosterOverLimitNotice leagueId={league.id} teamId={myTeamId} />
+      )}
 
       {lockedPlayerNotice && (
         <XStack

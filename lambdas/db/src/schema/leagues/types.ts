@@ -11,6 +11,7 @@ import type {
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 import { AuthenticationError } from '../graphql-errors';
+import type { RosterLimitStatus } from '../../services/roster-service';
 
 // Sport kind enum (LS-4628) — discriminator for multi-sport leagues. Mirrors
 // the `sport_kind` Postgres enum. Lowercase values match the DB enum directly
@@ -339,6 +340,25 @@ League.implement({
   }),
 });
 
+// Roster-limit lock state for a team (LS-10477). A team over the limit may
+// only release players until it is back at or below `maxRosterSize`.
+export const RosterLimitStatusType = builder
+  .objectRef<RosterLimitStatus>('RosterLimitStatus')
+  .implement({
+    description:
+      "A team's roster size relative to the league roster limit. When isOverLimit is true the team is locked from every roster move except releasing players.",
+    fields: (t) => ({
+      rosterSize: t.exposeInt('rosterSize', { nullable: false }),
+      maxRosterSize: t.exposeInt('maxRosterSize', { nullable: false }),
+      isOverLimit: t.exposeBoolean('isOverLimit', { nullable: false }),
+      playersToRelease: t.exposeInt('playersToRelease', {
+        nullable: false,
+        description:
+          'How many players the team must release to get back to the limit (0 when not over).',
+      }),
+    }),
+  });
+
 // Team type — several branding fields are optional in the parent since legacy
 // resolvers use explicit column selections that may omit them; field resolvers
 // default to null/false.
@@ -445,6 +465,17 @@ Team.implement({
         });
         return config.salaryCap - payroll;
       },
+    }),
+    rosterLimitStatus: t.field({
+      type: RosterLimitStatusType,
+      nullable: true,
+      description:
+        'Roster size vs. the league roster limit (LS-10477). Null if the league no longer exists.',
+      resolve: (parent, _args, context) =>
+        context.loaders.teamRosterLimitStatus.load({
+          teamId: parent.id,
+          leagueId: parent.leagueId,
+        }),
     }),
   }),
 });

@@ -13,6 +13,7 @@ jest.mock('@legacy-sports/db-client', () => ({
       salaryCapEnabled: 'leagues.salaryCapEnabled',
       salaryCap: 'leagues.salaryCap',
       luxuryTaxThreshold: 'leagues.luxuryTaxThreshold',
+      maxRosterSize: 'leagues.maxRosterSize',
     },
     teamMembers: {
       teamId: 'teamMembers.teamId',
@@ -86,6 +87,7 @@ import {
   createLeaguePositionByIdLoader,
   createPlayerClubLoader,
   createTeamPayrollLoader,
+  createTeamRosterLimitStatusLoader,
   createTeamsLoader,
 } from './entity-loaders';
 
@@ -239,6 +241,45 @@ describe('createTeamPayrollLoader (LS-2506)', () => {
     ]);
 
     expect(calls).toHaveLength(2);
+  });
+});
+
+describe('createTeamRosterLimitStatusLoader (LS-10477)', () => {
+  it('batches a league into one limit read plus one GROUP BY count', async () => {
+    const { db, calls } = makeMockDb((chain) =>
+      chain.groupByArg
+        ? [
+            { teamId: 10, total: 28 },
+            { teamId: 11, total: 26 },
+            // teamId 12 has no roster rows
+          ]
+        : [{ maxRosterSize: 26 }],
+    );
+    const loader = createTeamRosterLimitStatusLoader(db);
+
+    const [a, b, c] = await Promise.all([
+      loader.load({ teamId: 10, leagueId: 1 }),
+      loader.load({ teamId: 11, leagueId: 1 }),
+      loader.load({ teamId: 12, leagueId: 1 }),
+    ]);
+
+    expect(calls).toHaveLength(2);
+    expect(a).toEqual({
+      rosterSize: 28,
+      maxRosterSize: 26,
+      isOverLimit: true,
+      playersToRelease: 2,
+    });
+    expect(b).toMatchObject({ isOverLimit: false, playersToRelease: 0 });
+    expect(c).toMatchObject({ rosterSize: 0, isOverLimit: false });
+  });
+
+  it('resolves null when the league does not exist', async () => {
+    const { db } = makeMockDb(() => []);
+    const loader = createTeamRosterLimitStatusLoader(db);
+    await expect(
+      loader.load({ teamId: 10, leagueId: 999 }),
+    ).resolves.toBeNull();
   });
 });
 

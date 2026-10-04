@@ -7,6 +7,12 @@
  *   rejectTrade    — receiving manager declines the offer
  *   cancelTrade    — proposing manager withdraws the offer
  *   vetoTrade      — league commissioner reverses an accepted trade
+ *
+ * Roster limit (LS-10477): an accepted trade always completes even if it takes
+ * a team over `maxRosterSize`. A team that is already over the limit may only
+ * propose or accept trades that bring it back to (or under) the limit — see
+ * assertRosterNotOverLimit. The receiving team's lock is checked at accept
+ * time, not at propose time, since it may release players before accepting.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
@@ -23,6 +29,7 @@ import {
 } from '../../services/cap-service';
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
+import { assertRosterNotOverLimit } from '../../services/roster-service';
 import { notifyDiscordTradeEvent } from '../../services/discord-league';
 import {
   AuthenticationError,
@@ -525,6 +532,7 @@ builder.mutationField('proposeTrade', (t) =>
         .select({
           leaguePhase: PublicSchema.leagues.leaguePhase,
           sport: PublicSchema.leagues.sport,
+          maxRosterSize: PublicSchema.leagues.maxRosterSize,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
@@ -627,6 +635,15 @@ builder.mutationField('proposeTrade', (t) =>
           "One or more players you are requesting are not on the other team's roster",
         );
       }
+
+      // 4a. Roster limit lock (LS-10477): an over-limit proposing team may only
+      // propose trades that bring it back to the limit.
+      await assertRosterNotOverLimit(db, {
+        teamId: proposingTeamId,
+        leagueId,
+        maxRosterSize: leagueCheck.maxRosterSize,
+        netChange: requestingPlayerIds.length - offeringPlayerIds.length,
+      });
 
       // 4b. Sport-compatibility guard: all players must match the league's sport.
       // Also capture names here for the trade history snapshot (LS-7524).
@@ -907,6 +924,7 @@ builder.mutationField('acceptTrade', (t) =>
           salaryCap: PublicSchema.leagues.salaryCap,
           minSalary: PublicSchema.leagues.minSalary,
           sport: PublicSchema.leagues.sport,
+          maxRosterSize: PublicSchema.leagues.maxRosterSize,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, trade.leagueId))
@@ -923,6 +941,25 @@ builder.mutationField('acceptTrade', (t) =>
           .from(PublicSchema.players)
           .where(inArray(PublicSchema.players.id, allPlayerIds));
         assertSportCompatibility(tradedPlayerSports, leagueCapRow.sport);
+
+        // Roster limit lock (LS-10477): the trade completes even if it takes
+        // either team over the limit, but a team that is ALREADY over may only
+        // accept a trade that brings it back to the limit. Checked for both
+        // sides — the proposing team may have gone over since proposing.
+        await assertRosterNotOverLimit(db, {
+          teamId: receivingTeamId,
+          leagueId: trade.leagueId,
+          maxRosterSize: leagueCapRow.maxRosterSize,
+          netChange: toReceiving.length - toProposing.length,
+        });
+        await assertRosterNotOverLimit(db, {
+          teamId: proposingTeamId,
+          leagueId: trade.leagueId,
+          maxRosterSize: leagueCapRow.maxRosterSize,
+          netChange: toProposing.length - toReceiving.length,
+          isOwnTeam: false,
+          teamName: trade.proposingTeamName,
+        });
       }
 
       if (leagueCapRow?.salaryCapEnabled && leagueCapRow.salaryCap != null) {

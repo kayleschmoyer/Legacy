@@ -1,0 +1,27 @@
+# Roster limit lock (LS-10477): a team over the league roster limit may only
+# release players until it is back at or below the limit.
+
+fragment RosterLimitStatus on RosterLimitStatus {
+  rosterSize
+  maxRosterSize
+  isOverLimit
+  playersToRelease
+}
+
+# Selects only `id` + `rosterLimitStatus` so it merges into the cached Team
+# entity without clobbering fields other queries own. Player names for the
+# release list come from GetTeamMembers (already cached on the roster page).
+query GetTeamRosterLimit($teamId: Int!) {
+  team: teamById(teamId: $teamId) {
+    id
+    rosterLimitStatus {
+      ...RosterLimitStatus
+    }
+  }
+}
+
+mutation ReleasePlayer($leagueId: Int!, $playerId: Int!) {
+  releasePlayer(leagueId: $leagueId, playerId: $playerId) {
+    ...RosterLimitStatus
+  }
+}

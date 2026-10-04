@@ -159,6 +159,7 @@ export {
 export * from './features/roster/rosterUtils';
 export * from './features/roster/MatchupRosterComparison';
 export * from './features/roster/MatchupRosterEditorView';
+export * from './features/roster/RosterOverLimitBanner';
 
 // Stats components (updated)
 export * from './features/stats/FieldingStatsTable';

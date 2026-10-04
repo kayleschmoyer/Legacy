@@ -85,6 +85,9 @@ const mockRefetch = jest.fn().mockResolvedValue({});
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueByIdQuery: jest.fn(() => mockLeagueByIdReturn),
+  // Roster-limit notice (LS-10477) — not over the limit in these tests.
+  useGetTeamRosterLimitQuery: jest.fn(() => ({ data: undefined })),
+  useReleasePlayerMutation: jest.fn(() => [jest.fn(), {}]),
   useGetTeamTradeOffersQuery: jest.fn(
     (options: { variables?: { status?: string } }) => {
       // Pending query uses status: 'pending'; deep-link lookup omits status

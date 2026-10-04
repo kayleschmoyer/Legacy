@@ -200,3 +200,38 @@ export function MatchupLockedError(
     extensions: { code: 'MATCHUP_LOCKED', status },
   });
 }
+
+/**
+ * Throw when a roster move is rejected because the team is over the league's
+ * roster limit (LS-10477). A trade always completes even if it takes a team
+ * over `maxRosterSize`; afterwards that team is locked from every roster move
+ * except releasing players until it is back at or below the limit.
+ *
+ * Maps to Apollo code `ROSTER_OVER_LIMIT`. `rosterSize`, `maxRosterSize` and
+ * `playersToRelease` travel in `extensions` so the client can tell the user
+ * exactly how many players to release without parsing the message.
+ */
+export function RosterOverLimitError(details: {
+  teamId: number;
+  teamName?: string | null;
+  rosterSize: number;
+  maxRosterSize: number;
+  /** True when the locked team is the caller's own team. */
+  isOwnTeam: boolean;
+}): GraphQLError {
+  const { teamId, teamName, rosterSize, maxRosterSize, isOwnTeam } = details;
+  const playersToRelease = Math.max(0, rosterSize - maxRosterSize);
+  const plural = playersToRelease === 1 ? 'player' : 'players';
+  const message = isOwnTeam
+    ? `Your roster has ${rosterSize} players, over the ${maxRosterSize}-player limit. Release ${playersToRelease} ${plural} before making any other roster moves.`
+    : `${teamName ?? 'The other team'} has ${rosterSize} players, over the ${maxRosterSize}-player limit, and must release ${playersToRelease} ${plural} before this move can go through.`;
+  return new GraphQLError(message, {
+    extensions: {
+      code: 'ROSTER_OVER_LIMIT',
+      teamId,
+      rosterSize,
+      maxRosterSize,
+      playersToRelease,
+    },
+  });
+}

@@ -4,9 +4,19 @@ describe('Trades Resolver', () => {
   let schema: GraphQLSchema;
   let mockDb: any;
   let mockContext: any;
+  let mockAssertRosterNotOverLimit: jest.Mock;
 
   beforeEach(async () => {
     jest.resetModules();
+
+    // Roster limit lock (LS-10477) — the guard's own counting logic is covered
+    // in services/roster-service.spec.ts; here we assert how trades call it.
+    mockAssertRosterNotOverLimit = jest.fn().mockResolvedValue(undefined);
+    jest.doMock('../services/roster-service', () => ({
+      ...jest.requireActual('../services/roster-service'),
+      assertRosterNotOverLimit: (...a: unknown[]) =>
+        mockAssertRosterNotOverLimit(...a),
+    }));
 
     // Fluent mock for Drizzle DB chain
     mockDb = {
@@ -1047,6 +1057,66 @@ describe('Trades Resolver', () => {
         message: expect.stringContaining('too many trade proposals'),
       });
     });
+
+    it('blocks an over-limit proposing team with ROSTER_OVER_LIMIT, passing the net roster change (LS-10477)', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball', maxRosterSize: 26 },
+      ]); // league check
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'general_manager' },
+      ]); // resolveUserTeam membership
+      mockDb.limit.mockResolvedValueOnce([{ isLocked: false }]); // resolveUserTeam teams check
+      mockDb.limit.mockResolvedValueOnce([{ id: 2, name: 'Receiving Team' }]); // receiving team exists
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]); // name snapshot
+      mockDb.then
+        .mockImplementationOnce((resolve: (v: unknown) => void) =>
+          resolve([{ total: 0 }]),
+        ) // rate limit
+        .mockImplementationOnce((resolve: (v: unknown) => void) =>
+          resolve([{ playerId: 10 }]),
+        ) // offering players on proposing roster
+        .mockImplementationOnce((resolve: (v: unknown) => void) =>
+          resolve([{ playerId: 20 }, { playerId: 21 }, { playerId: 22 }]),
+        ); // requested players on receiving roster
+
+      const { RosterOverLimitError } =
+        jest.requireActual<typeof import('./graphql-errors')>(
+          './graphql-errors',
+        );
+      mockAssertRosterNotOverLimit.mockRejectedValueOnce(
+        RosterOverLimitError({
+          teamId: 1,
+          rosterSize: 27,
+          maxRosterSize: 26,
+          isOwnTeam: true,
+        }),
+      );
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 2,
+            offeringPlayerIds: [10],
+            requestingPlayerIds: [20, 21, 22],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'ROSTER_OVER_LIMIT', playersToRelease: 1 },
+      });
+      expect(mockAssertRosterNotOverLimit).toHaveBeenCalledWith(mockDb, {
+        teamId: 1,
+        leagueId: 1,
+        maxRosterSize: 26,
+        netChange: 2,
+      });
+      // The offer is never created.
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
   });
 
   // ── acceptTrade ────────────────────────────────────────────────────────────
@@ -1068,6 +1138,109 @@ describe('Trades Resolver', () => {
       ).rejects.toMatchObject({
         extensions: { code: 'NOT_FOUND' },
         message: expect.stringContaining('Trade offer not found'),
+      });
+    });
+
+    describe('roster limit lock (LS-10477)', () => {
+      // 2-for-1: the receiving team (2) gains a net +1, the proposing team (1) −1.
+      function setUpAccept() {
+        const trade = {
+          id: 5,
+          leagueId: 1,
+          proposingTeamId: 1,
+          receivingTeamId: 2,
+          proposingTeamName: 'Team Alpha',
+          status: 'pending',
+        };
+        const legs = [
+          { tradeOfferId: 5, playerId: 42, fromTeamId: 1 },
+          { tradeOfferId: 5, playerId: 43, fromTeamId: 1 },
+          { tradeOfferId: 5, playerId: 99, fromTeamId: 2 },
+        ];
+        mockDb.where.mockReturnValueOnce(mockDb);
+        mockDb.limit.mockResolvedValueOnce([trade]); // trade fetch
+        mockDb.where.mockReturnValueOnce(mockDb);
+        mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]); // membership
+        mockDb.where.mockResolvedValueOnce(legs); // player legs
+        mockDb.where.mockReturnValueOnce(mockDb);
+        mockDb.limit.mockResolvedValueOnce([
+          {
+            salaryCapEnabled: false,
+            salaryCap: null,
+            minSalary: 1,
+            sport: 'baseball',
+            maxRosterSize: 26,
+          },
+        ]); // league settings
+        mockDb.where.mockResolvedValueOnce([
+          { playerId: 42, sport: 'baseball' },
+          { playerId: 43, sport: 'baseball' },
+          { playerId: 99, sport: 'baseball' },
+        ]); // sport compatibility
+        mockDb.transaction = jest.fn();
+      }
+
+      function overLimit(teamId: number, isOwnTeam: boolean) {
+        const { RosterOverLimitError } =
+          jest.requireActual<typeof import('./graphql-errors')>(
+            './graphql-errors',
+          );
+        return RosterOverLimitError({
+          teamId,
+          teamName: isOwnTeam ? null : 'Team Alpha',
+          rosterSize: 27,
+          maxRosterSize: 26,
+          isOwnTeam,
+        });
+      }
+
+      it('checks both teams with their net roster change', async () => {
+        setUpAccept();
+        mockAssertRosterNotOverLimit
+          .mockResolvedValueOnce(undefined)
+          .mockRejectedValueOnce(overLimit(1, false));
+
+        const resolver = getResolver('mutation', 'acceptTrade');
+        await expect(
+          resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+        ).rejects.toMatchObject({
+          extensions: { code: 'ROSTER_OVER_LIMIT', teamId: 1 },
+          message: expect.stringContaining('Team Alpha has 27 players'),
+        });
+
+        expect(mockAssertRosterNotOverLimit).toHaveBeenNthCalledWith(
+          1,
+          mockDb,
+          { teamId: 2, leagueId: 1, maxRosterSize: 26, netChange: 1 },
+        );
+        expect(mockAssertRosterNotOverLimit).toHaveBeenNthCalledWith(
+          2,
+          mockDb,
+          {
+            teamId: 1,
+            leagueId: 1,
+            maxRosterSize: 26,
+            netChange: -1,
+            isOwnTeam: false,
+            teamName: 'Team Alpha',
+          },
+        );
+        // Rosters are never touched.
+        expect(mockDb.transaction).not.toHaveBeenCalled();
+      });
+
+      it('blocks an over-limit receiving team before any roster swap', async () => {
+        setUpAccept();
+        mockAssertRosterNotOverLimit.mockRejectedValueOnce(overLimit(2, true));
+
+        const resolver = getResolver('mutation', 'acceptTrade');
+        await expect(
+          resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+        ).rejects.toMatchObject({
+          extensions: { code: 'ROSTER_OVER_LIMIT', teamId: 2 },
+          message: expect.stringContaining('Your roster has 27 players'),
+        });
+        expect(mockDb.transaction).not.toHaveBeenCalled();
       });
     });
 

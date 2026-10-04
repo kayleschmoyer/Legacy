@@ -233,6 +233,7 @@ describe('NodeRollbarImplementation', () => {
       'GAME_UNAVAILABLE',
       'GRAPHQL_VALIDATION_FAILED',
       'POSITION_INELIGIBLE',
+      'ROSTER_OVER_LIMIT',
     ])('returns true for GraphQLError with %s code', (code) => {
       const err = Object.assign(new Error('client'), {
         name: 'GraphQLError',

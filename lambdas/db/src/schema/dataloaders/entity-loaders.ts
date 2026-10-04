@@ -3,13 +3,18 @@
  */
 
 import DataLoader from 'dataloader';
-import { and, eq, inArray, sql, sum } from 'drizzle-orm';
+import { and, count, eq, inArray, sql, sum } from 'drizzle-orm';
 import {
   type GenericDatabase,
   inArrayAny,
   PublicSchema,
   withPoolTimeoutRetry,
 } from '@legacy-sports/db-client';
+
+import {
+  computeRosterLimitStatus,
+  type RosterLimitStatus,
+} from '../../services/roster-service';
 
 // ---------------------------------------------------------------------------
 // Module-level eligible-positions cache (LS-434)
@@ -268,6 +273,74 @@ export const createTeamPayrollLoader = (
 
       return keys.map(
         (key) => totals.get(`${key.leagueId}:${key.teamId}`) ?? 0,
+      );
+    },
+    { cacheKeyFn: (key) => `${key.leagueId}:${key.teamId}` },
+  );
+
+/**
+ * DataLoader for per-team roster-limit status (LS-10477)
+ * Key: { teamId, leagueId } (composite, serialized via cacheKeyFn)
+ * Returns: RosterLimitStatus, or null when the league row does not exist.
+ *
+ * Per league in the batch: one `leagues.max_roster_size` read plus one
+ * `GROUP BY teamId` count, so Team.rosterLimitStatus across N teams costs two
+ * queries instead of 2N.
+ */
+export const createTeamRosterLimitStatusLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<TeamPayrollKey, RosterLimitStatus | null, string>(
+    async (keys) => {
+      const byLeague = new Map<number, Set<number>>();
+      for (const key of keys) {
+        let teamIds = byLeague.get(key.leagueId);
+        if (!teamIds) {
+          teamIds = new Set();
+          byLeague.set(key.leagueId, teamIds);
+        }
+        teamIds.add(key.teamId);
+      }
+
+      const statuses = new Map<string, RosterLimitStatus>();
+      await Promise.all(
+        [...byLeague.entries()].map(async ([leagueId, teamIdSet]) => {
+          const teamIds = [...teamIdSet];
+          const [leagueRows, countRows] = await Promise.all([
+            db
+              .select({ maxRosterSize: PublicSchema.leagues.maxRosterSize })
+              .from(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.id, leagueId)),
+            db
+              .select({
+                teamId: PublicSchema.teamMembers.teamId,
+                total: count(),
+              })
+              .from(PublicSchema.teamMembers)
+              .where(
+                and(
+                  eq(PublicSchema.teamMembers.leagueId, leagueId),
+                  inArray(PublicSchema.teamMembers.teamId, teamIds),
+                ),
+              )
+              .groupBy(PublicSchema.teamMembers.teamId),
+          ]);
+          const maxRosterSize = leagueRows[0]?.maxRosterSize;
+          if (maxRosterSize == null) return;
+          const sizes = new Map(
+            countRows.map((row) => [row.teamId, Number(row.total ?? 0)]),
+          );
+          for (const teamId of teamIds) {
+            statuses.set(
+              `${leagueId}:${teamId}`,
+              computeRosterLimitStatus(sizes.get(teamId) ?? 0, maxRosterSize),
+            );
+          }
+        }),
+      );
+
+      return keys.map(
+        (key) => statuses.get(`${key.leagueId}:${key.teamId}`) ?? null,
       );
     },
     { cacheKeyFn: (key) => `${key.leagueId}:${key.teamId}` },

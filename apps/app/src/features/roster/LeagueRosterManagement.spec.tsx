@@ -69,6 +69,9 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
     ),
     PendingTradeOffers: () => <RNText>pending-trades</RNText>,
     PendingWaiverClaims: () => <RNText>pending-waivers</RNText>,
+    RosterOverLimitNotice: ({ teamId }: { teamId: number }) => (
+      <RNText>{`over-limit-notice-${teamId}`}</RNText>
+    ),
     OtherTeamViewingBanner: ({
       teamName,
       onBackToMyRoster,
@@ -121,6 +124,8 @@ describe('LeagueRosterManagement', () => {
     expect(screen.getByText('pending-waivers')).toBeTruthy();
     expect(screen.getByText('board-readonly-false')).toBeTruthy();
     expect(screen.getByText('action-bar')).toBeTruthy();
+    // Roster-limit notice for the viewer's own team (LS-10477).
+    expect(screen.getByText('over-limit-notice-50')).toBeTruthy();
   });
 
   it('hides week navigation when no current week is provided', () => {
@@ -172,6 +177,8 @@ describe('LeagueRosterManagement', () => {
     expect(screen.queryByText('pending-trades')).toBeNull();
     expect(screen.queryByText('pending-waivers')).toBeNull();
     expect(screen.queryByText('action-bar')).toBeNull();
+    // The roster-limit notice is only for the viewer's own roster (LS-10477).
+    expect(screen.queryByText('over-limit-notice-50')).toBeNull();
 
     fireEvent.press(screen.getByText('back-to-my-roster'));
     expect(onBackToMyRoster).toHaveBeenCalledTimes(1);

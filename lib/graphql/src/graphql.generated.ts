@@ -2424,6 +2424,8 @@ export type Mutation = {
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
+  /** Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release. */
+  releasePlayer?: Maybe<RosterLimitStatus>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2965,6 +2967,11 @@ export type MutationRegisterDeviceTokenArgs = {
 
 export type MutationRejectTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationReleasePlayerArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationRemoveAssistantManagerArgs = {
@@ -4719,6 +4726,16 @@ export enum RosterContinuity {
   Redraft = 'redraft',
 }
 
+/** A team's roster size relative to the league roster limit. When isOverLimit is true the team is locked from every roster move except releasing players. */
+export type RosterLimitStatus = {
+  __typename?: 'RosterLimitStatus';
+  isOverLimit: Scalars['Boolean']['output'];
+  maxRosterSize: Scalars['Int']['output'];
+  /** How many players the team must release to get back to the limit (0 when not over). */
+  playersToRelease: Scalars['Int']['output'];
+  rosterSize: Scalars['Int']['output'];
+};
+
 export type RosterSlotInput = {
   count: Scalars['Int']['input'];
   positionType: Scalars['String']['input'];
@@ -5287,6 +5304,8 @@ export type Team = {
   managerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
+  /** Roster size vs. the league roster limit (LS-10477). Null if the league no longer exists. */
+  rosterLimitStatus?: Maybe<RosterLimitStatus>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   /** Total salary cap payroll for this team (sum of team_members.salary). Null if the league does not have salary cap enabled. */
   totalPayroll?: Maybe<Scalars['Int']['output']>;
@@ -15020,6 +15039,49 @@ export type RenewLeagueMutation = {
   } | null;
 };
 
+export type RosterLimitStatusFragment = {
+  __typename?: 'RosterLimitStatus';
+  rosterSize: number;
+  maxRosterSize: number;
+  isOverLimit: boolean;
+  playersToRelease: number;
+};
+
+export type GetTeamRosterLimitQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamRosterLimitQuery = {
+  __typename?: 'Query';
+  team?: {
+    __typename?: 'Team';
+    id?: number | null;
+    rosterLimitStatus?: {
+      __typename?: 'RosterLimitStatus';
+      rosterSize: number;
+      maxRosterSize: number;
+      isOverLimit: boolean;
+      playersToRelease: number;
+    } | null;
+  } | null;
+};
+
+export type ReleasePlayerMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type ReleasePlayerMutation = {
+  __typename?: 'Mutation';
+  releasePlayer?: {
+    __typename?: 'RosterLimitStatus';
+    rosterSize: number;
+    maxRosterSize: number;
+    isOverLimit: boolean;
+    playersToRelease: number;
+  } | null;
+};
+
 export type GetLeagueScoringProfileQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -18034,6 +18096,14 @@ export const PlayoffBracketFragmentDoc = gql`
     }
   }
   ${PlayoffMatchupFragmentDoc}
+`;
+export const RosterLimitStatusFragmentDoc = gql`
+  fragment RosterLimitStatus on RosterLimitStatus {
+    rosterSize
+    maxRosterSize
+    isOverLimit
+    playersToRelease
+  }
 `;
 export const LeagueSeasonAwardFragmentDoc = gql`
   fragment LeagueSeasonAward on LeagueSeasonAward {
@@ -37317,6 +37387,152 @@ export type RenewLeagueMutationResult =
 export type RenewLeagueMutationOptions = BaseMutationOptions<
   RenewLeagueMutation,
   RenewLeagueMutationVariables
+>;
+export const GetTeamRosterLimit = gql`
+  query GetTeamRosterLimit($teamId: Int!) {
+    team: teamById(teamId: $teamId) {
+      id
+      rosterLimitStatus {
+        ...RosterLimitStatus
+      }
+    }
+  }
+  ${RosterLimitStatusFragmentDoc}
+`;
+
+/**
+ * __useGetTeamRosterLimitQuery__
+ *
+ * To run a query within a React component, call `useGetTeamRosterLimitQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamRosterLimitQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamRosterLimitQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamRosterLimitQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamRosterLimitQuery,
+    GetTeamRosterLimitQueryVariables
+  > &
+    (
+      | { variables: GetTeamRosterLimitQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamRosterLimitQuery,
+    GetTeamRosterLimitQueryVariables
+  >(GetTeamRosterLimit, options);
+}
+export function useGetTeamRosterLimitLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamRosterLimitQuery,
+    GetTeamRosterLimitQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamRosterLimitQuery,
+    GetTeamRosterLimitQueryVariables
+  >(GetTeamRosterLimit, options);
+}
+export function useGetTeamRosterLimitSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamRosterLimitQuery,
+        GetTeamRosterLimitQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamRosterLimitQuery,
+    GetTeamRosterLimitQueryVariables
+  >(
+    GetTeamRosterLimit,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamRosterLimitQuery,
+          GetTeamRosterLimitQueryVariables
+        >,
+  );
+}
+export type GetTeamRosterLimitQueryHookResult = ReturnType<
+  typeof useGetTeamRosterLimitQuery
+>;
+export type GetTeamRosterLimitLazyQueryHookResult = ReturnType<
+  typeof useGetTeamRosterLimitLazyQuery
+>;
+export type GetTeamRosterLimitSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamRosterLimitSuspenseQuery
+>;
+export type GetTeamRosterLimitQueryResult = Apollo.QueryResult<
+  GetTeamRosterLimitQuery,
+  GetTeamRosterLimitQueryVariables
+>;
+export const ReleasePlayer = gql`
+  mutation ReleasePlayer($leagueId: Int!, $playerId: Int!) {
+    releasePlayer(leagueId: $leagueId, playerId: $playerId) {
+      ...RosterLimitStatus
+    }
+  }
+  ${RosterLimitStatusFragmentDoc}
+`;
+export type ReleasePlayerMutationFn = MutationFunction<
+  ReleasePlayerMutation,
+  ReleasePlayerMutationVariables
+>;
+
+/**
+ * __useReleasePlayerMutation__
+ *
+ * To run a mutation, you first call `useReleasePlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useReleasePlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [releasePlayerMutation, { data, loading, error }] = useReleasePlayerMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useReleasePlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ReleasePlayerMutation,
+    ReleasePlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ReleasePlayerMutation,
+    ReleasePlayerMutationVariables
+  >(ReleasePlayer, options);
+}
+export type ReleasePlayerMutationHookResult = ReturnType<
+  typeof useReleasePlayerMutation
+>;
+export type ReleasePlayerMutationResult =
+  Apollo.MutationResult<ReleasePlayerMutation>;
+export type ReleasePlayerMutationOptions = BaseMutationOptions<
+  ReleasePlayerMutation,
+  ReleasePlayerMutationVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {

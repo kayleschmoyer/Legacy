@@ -2418,6 +2418,8 @@ export type Mutation = {
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
+  /** Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release. */
+  releasePlayer?: Maybe<RosterLimitStatus>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2959,6 +2961,11 @@ export type MutationRegisterDeviceTokenArgs = {
 
 export type MutationRejectTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationReleasePlayerArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationRemoveAssistantManagerArgs = {
@@ -4713,6 +4720,16 @@ export enum RosterContinuity {
   Redraft = 'redraft',
 }
 
+/** A team's roster size relative to the league roster limit. When isOverLimit is true the team is locked from every roster move except releasing players. */
+export type RosterLimitStatus = {
+  __typename?: 'RosterLimitStatus';
+  isOverLimit: Scalars['Boolean']['output'];
+  maxRosterSize: Scalars['Int']['output'];
+  /** How many players the team must release to get back to the limit (0 when not over). */
+  playersToRelease: Scalars['Int']['output'];
+  rosterSize: Scalars['Int']['output'];
+};
+
 export type RosterSlotInput = {
   count: Scalars['Int']['input'];
   positionType: Scalars['String']['input'];
@@ -5281,6 +5298,8 @@ export type Team = {
   managerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
+  /** Roster size vs. the league roster limit (LS-10477). Null if the league no longer exists. */
+  rosterLimitStatus?: Maybe<RosterLimitStatus>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   /** Total salary cap payroll for this team (sum of team_members.salary). Null if the league does not have salary cap enabled. */
   totalPayroll?: Maybe<Scalars['Int']['output']>;

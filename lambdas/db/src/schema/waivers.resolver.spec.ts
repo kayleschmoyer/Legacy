@@ -5,6 +5,11 @@ describe('Waivers Resolver', () => {
   let mockDb: any;
   let mockContext: any;
   let mockWaiverProcessor: any;
+  let mockRosterService: {
+    assertRosterNotOverLimit: jest.Mock;
+    getRosterLimitStatus: jest.Mock;
+    removePlayerFromRoster: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.resetModules();
@@ -147,11 +152,22 @@ describe('Waivers Resolver', () => {
       fetchPlayerSalaries: jest.fn().mockResolvedValue(new Map()),
     }));
 
+    mockRosterService = {
+      assertRosterNotOverLimit: jest.fn().mockResolvedValue(undefined),
+      getRosterLimitStatus: jest.fn(),
+      removePlayerFromRoster: jest.fn().mockResolvedValue(true),
+    };
     jest.doMock('../services/roster-service', () => ({
       checkRosterCapacity: jest
         .fn()
         .mockResolvedValue({ isFull: false, count: 5 }),
       isPlayerOnRoster: jest.fn().mockResolvedValue(false),
+      assertRosterNotOverLimit: (...a: unknown[]) =>
+        mockRosterService.assertRosterNotOverLimit(...a),
+      getRosterLimitStatus: (...a: unknown[]) =>
+        mockRosterService.getRosterLimitStatus(...a),
+      removePlayerFromRoster: (...a: unknown[]) =>
+        mockRosterService.removePlayerFromRoster(...a),
     }));
 
     jest.doMock('../services/waiver-processor', () => ({
@@ -636,6 +652,179 @@ describe('Waivers Resolver', () => {
       ).rejects.toThrow(
         'Free agent claims are not available until the draft has been completed',
       );
+    });
+  });
+
+  describe('claimFreeAgent roster limit lock (LS-10477)', () => {
+    const activeLeague = {
+      draftStatus: 'completed',
+      leaguePhase: 'active',
+      waiverEnabled: true,
+      waiverType: 'standard',
+      maxRosterSize: 26,
+      salaryCapEnabled: false,
+      minSalary: 1,
+      salaryCap: null,
+      sport: 'baseball',
+    };
+
+    function setUpClaim() {
+      mockDb.limit
+        .mockResolvedValueOnce([{ teamId: 2 }]) // membership
+        .mockResolvedValueOnce([activeLeague]) // leagueRow
+        .mockResolvedValueOnce([]) // claimed player sport row (none → skip)
+        .mockResolvedValueOnce([]); // existing pending claim
+    }
+
+    it.each([
+      ['a straight add', {}, 1],
+      ['an add/drop claim (nets zero, still over)', { dropPlayerId: 55 }, 0],
+    ])(
+      'blocks %s for an over-limit team',
+      async (_label, extraArgs, netChange) => {
+        setUpClaim();
+        const { RosterOverLimitError } =
+          jest.requireActual<typeof import('./graphql-errors')>(
+            './graphql-errors',
+          );
+        mockRosterService.assertRosterNotOverLimit.mockRejectedValueOnce(
+          RosterOverLimitError({
+            teamId: 2,
+            rosterSize: 28,
+            maxRosterSize: 26,
+            isOwnTeam: true,
+          }),
+        );
+
+        const resolver = getMutation('claimFreeAgent');
+        await expect(
+          resolver(
+            {},
+            { leagueId: 1, playerId: 10, ...extraArgs },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({
+          extensions: { code: 'ROSTER_OVER_LIMIT', playersToRelease: 2 },
+        });
+        expect(mockRosterService.assertRosterNotOverLimit).toHaveBeenCalledWith(
+          mockDb,
+          {
+            teamId: 2,
+            leagueId: 1,
+            maxRosterSize: 26,
+            netChange,
+          },
+        );
+        expect(mockDb.insert).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  // ── releasePlayer ──────────────────────────────────────────────────────────
+
+  describe('releasePlayer mutation (LS-10477)', () => {
+    const over = {
+      rosterSize: 27,
+      maxRosterSize: 26,
+      isOverLimit: true,
+      playersToRelease: 1,
+    };
+    const atLimit = {
+      rosterSize: 26,
+      maxRosterSize: 26,
+      isOverLimit: false,
+      playersToRelease: 0,
+    };
+
+    function setUpTeamAndLeague() {
+      mockDb.limit
+        .mockResolvedValueOnce([{ teamId: 2 }]) // membership
+        .mockResolvedValueOnce([{ maxRosterSize: 26 }]); // league
+    }
+
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('releasePlayer');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('throws FORBIDDEN when the user has no team in the league', async () => {
+      mockDb.limit.mockResolvedValueOnce([]);
+      const resolver = getMutation('releasePlayer');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('rejects a release when the roster is not over the limit', async () => {
+      setUpTeamAndLeague();
+      mockRosterService.getRosterLimitStatus.mockResolvedValueOnce(atLimit);
+
+      const resolver = getMutation('releasePlayer');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('not over the limit'),
+      });
+      expect(mockRosterService.removePlayerFromRoster).not.toHaveBeenCalled();
+    });
+
+    it('rejects a player who is not on the roster', async () => {
+      setUpTeamAndLeague();
+      mockRosterService.getRosterLimitStatus.mockResolvedValueOnce(over);
+      mockRosterService.removePlayerFromRoster.mockResolvedValueOnce(false);
+
+      const resolver = getMutation('releasePlayer');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('That player is not on your roster');
+    });
+
+    it('releases the player and returns the post-release status', async () => {
+      setUpTeamAndLeague();
+      mockRosterService.getRosterLimitStatus
+        .mockResolvedValueOnce(over)
+        .mockResolvedValueOnce(atLimit);
+
+      const resolver = getMutation('releasePlayer');
+      const result = await resolver(
+        {},
+        { leagueId: 1, playerId: 10 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockRosterService.removePlayerFromRoster).toHaveBeenCalledWith(
+        mockDb,
+        { teamId: 2, leagueId: 1, playerId: 10 },
+      );
+      expect(
+        mockContext.notificationService.notifyRosterUpdate,
+      ).toHaveBeenCalledWith(1);
+      expect(result).toEqual(atLimit);
     });
   });
 

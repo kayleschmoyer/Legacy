@@ -45,6 +45,9 @@ const CLIENT_FACING_GRAPHQL_CODES: ReadonlySet<string> = new Set([
   // not a server defect. Missing here meant every rejection was reported to
   // Rollbar as an unexpected error (LS-9879 / LS-9878).
   'POSITION_INELIGIBLE',
+  // A roster move rejected because the team is over the league's roster limit
+  // (LS-10477) — an expected user-facing state, not a server defect.
+  'ROSTER_OVER_LIMIT',
 ]);
 
 /**

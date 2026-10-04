@@ -289,6 +289,25 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   getpendingtradeoffers: { data: { pendingTradeOffers: [] } },
   getleaguetradeoffers: { data: { leagueTradeOffers: [] } },
   getteamtradeoffers: { data: { teamTradeOffers: [] } },
+  // Roster-limit notice (LS-10477) on the Roster tab and Trading Center. The
+  // query only selects Team.id + rosterLimitStatus, so echoing the requested
+  // teamId merges into the cached Team without clobbering GetTeamById data;
+  // not over the limit, so the banner renders nothing.
+  getteamrosterlimit: (variables: Record<string, unknown>) => ({
+    data: {
+      team: {
+        __typename: 'Team',
+        id: variables['teamId'] ?? 0,
+        rosterLimitStatus: {
+          __typename: 'RosterLimitStatus',
+          rosterSize: 0,
+          maxRosterSize: 26,
+          isOverLimit: false,
+          playersToRelease: 0,
+        },
+      },
+    },
+  }),
 
   // ── Draft ─────────────────────────────────────────────────────────
   getleaguedraft: { data: { getLeagueDraft: null } },

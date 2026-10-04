@@ -36,6 +36,7 @@ import {
   createPlayerClubLoader,
   createPlayersLoader,
   createTeamPayrollLoader,
+  createTeamRosterLimitStatusLoader,
   createTeamsLoader,
   createUsersLoader,
 } from './entity-loaders';
@@ -107,6 +108,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   leaguePositionById: createLeaguePositionByIdLoader(db),
   leaguePayrollConfig: createLeaguePayrollConfigLoader(db),
   teamPayroll: createTeamPayrollLoader(db),
+  teamRosterLimitStatus: createTeamRosterLimitStatusLoader(db),
   lockedTeamMembers: createLockedTeamMembersLoader(db),
   latestScoringChangeAt: createLatestScoringChangeAtLoader(db),
   scoringChangeLog: createScoringChangeLogLoader(db),
