@@ -1284,6 +1284,237 @@ describe('updateUserTheme mutation', () => {
   });
 });
 
+describe('updateUsername mutation rate limit (LS-7239)', () => {
+  let schema: GraphQLSchema;
+  let mockContext: {
+    user: { id: number; email: string; username: string; isAdmin: boolean };
+    db: Record<string, never>;
+  };
+  let mockUpdateUsername: jest.Mock;
+  let mockCheckAndIncrementRateLimit: jest.Mock;
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockUpdateUsername = jest.fn();
+    mockCheckAndIncrementRateLimit = jest
+      .fn()
+      .mockResolvedValue({ allowed: true });
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/logging', () => ({
+      LOGGER: {
+        info: jest.fn(),
+        debug: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+    }));
+
+    jest.doMock('jsonwebtoken', () => ({
+      sign: jest.fn(),
+      verify: jest.fn(),
+      decode: jest.fn(),
+    }));
+
+    jest.doMock('../server/context', () => ({
+      getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
+    }));
+
+    jest.doMock('./rate-limit', () => ({
+      checkAndIncrementRateLimit: mockCheckAndIncrementRateLimit,
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(() => ({
+        users: {
+          getUserById: jest.fn(),
+          updateUsername: mockUpdateUsername,
+        },
+        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
+      })),
+      runWithPublicClient: jest.fn(),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          name: 'name',
+          currentWeek: 'cw',
+          currentMatchup: 'cm',
+        },
+        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'l',
+          userId: 'u',
+          teamId: 't',
+          permissionLevel: 'p',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 't',
+          leagueId: 'l',
+          playerId: 'p',
+          positionId: 'pos',
+        },
+        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+        matchups: {
+          id: 'id',
+          leagueId: 'l',
+          weekNumber: 'w',
+          status: 's',
+          team1Id: 't1',
+          team2Id: 't2',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'm',
+          playerId: 'p',
+          teamId: 't',
+        },
+        leagueWeekPlayerSeasons: {
+          playerId: 'p',
+          season: 's',
+          leagueId: 'l',
+          weekNumber: 'w',
+        },
+        leagueSeasonAwards: {
+          id: 'id',
+          leagueId: 'l',
+          season: 's',
+          playerId: 'p',
+          awardType: 'a',
+          notes: 'n',
+          createdAt: 'c',
+          updatedAt: 'u',
+        },
+        leagueActivityLog: {
+          id: 'id',
+          leagueId: 'l',
+          eventType: 'e',
+          occurredAt: 'o',
+        },
+        leagueActivityEventType: { enumValues: [] },
+        users: { id: 'id', accessLevel: 'accessLevel' },
+      },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
+      },
+      PublicDb: {},
+    }));
+
+    jest.doMock('../services/standings-service', () => ({
+      StandingsService: {
+        getHeadToHead: jest.fn(),
+        getSeasonSummary: jest.fn(),
+        getStandings: jest.fn(),
+        getMatchupStats: jest.fn(),
+      },
+    }));
+
+    const schemaModule = require('../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: {
+        id: 42,
+        email: 'user@example.com',
+        username: 'user42',
+        isAdmin: false,
+      },
+      db: {},
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const field = schema.getMutationType()?.getFields().updateUsername;
+    if (!field?.resolve) {
+      throw new Error('updateUsername resolver not found');
+    }
+    return field.resolve;
+  }
+
+  it('rate-limits per user at 5 attempts per minute and updates when allowed', async () => {
+    mockUpdateUsername.mockResolvedValue({
+      id: 42,
+      canonicalEmail: 'user@example.com',
+      username: 'newname',
+      accessLevel: 'none',
+      avatarUrl: null,
+    });
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { username: 'newname' },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledWith(
+      mockContext.db,
+      {
+        bucket: 'update_username',
+        userId: 42,
+        limit: 5,
+        windowMs: 60_000,
+      },
+    );
+    expect(mockUpdateUsername).toHaveBeenCalledWith(42, 'newname');
+    expect(result).toMatchObject({ id: 42, username: 'newname' });
+  });
+
+  it('rejects with RATE_LIMITED and skips the update once over the limit', async () => {
+    mockCheckAndIncrementRateLimit.mockResolvedValue({ allowed: false });
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { username: 'newname' }, mockContext, undefined as never),
+    ).rejects.toMatchObject({ extensions: { code: 'RATE_LIMITED' } });
+    expect(mockUpdateUsername).not.toHaveBeenCalled();
+  });
+
+  it('does not touch the limiter for unauthenticated requests', async () => {
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { username: 'newname' }, { user: null }, undefined as never),
+    ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
+    expect(mockCheckAndIncrementRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('counts invalid-username attempts against the limit', async () => {
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { username: 'a' }, mockContext, undefined as never),
+    ).rejects.toThrow(/between 3 and 50/i);
+    expect(mockCheckAndIncrementRateLimit).toHaveBeenCalledTimes(1);
+    expect(mockUpdateUsername).not.toHaveBeenCalled();
+  });
+});
+
 describe('myIdentities query', () => {
   let schema: GraphQLSchema;
   let mockContext: {

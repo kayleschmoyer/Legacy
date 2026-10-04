@@ -9,12 +9,18 @@ import { validateAvatarUrl } from './validate-avatar-url';
 import {
   AuthenticationError,
   ForbiddenError,
+  RateLimitedError,
   UserInputError,
 } from './graphql-errors';
+import { checkAndIncrementRateLimit } from './rate-limit';
 import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
+
+const UPDATE_USERNAME_RATE_LIMIT_BUCKET = 'update_username';
+const UPDATE_USERNAME_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const UPDATE_USERNAME_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
 // User type
 export const UserRef = builder.objectRef<{
@@ -415,6 +421,18 @@ builder.mutationField('updateUsername', (t) =>
     resolve: async (parent, { username }, context) => {
       if (!context.user) {
         throw AuthenticationError();
+      }
+
+      // Rate-limit attempts per user at resolver entry so a scripted loop
+      // cannot race to claim a just-vacated username (LS-7239 / PRS-038).
+      const rateLimit = await checkAndIncrementRateLimit(context.db, {
+        bucket: UPDATE_USERNAME_RATE_LIMIT_BUCKET,
+        userId: context.user.id,
+        limit: UPDATE_USERNAME_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: UPDATE_USERNAME_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
       }
 
       const trimmed = username.trim();
