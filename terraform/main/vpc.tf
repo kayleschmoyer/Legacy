@@ -18,12 +18,22 @@ resource "aws_internet_gateway" "main" {
   })
 }
 
+# Public subnet CIDRs, derived from variables only (LS-10423). The subnets
+# below and the per-CIDR RDS ingress rules in security_groups.tf both read
+# these locals. That way the ingress rules never take a dependency on subnet
+# *creation*: a failed CreateSubnet cannot hold back or remove runner→RDS
+# access.
+locals {
+  public_subnet_cidrs        = [for i, _ in var.availability_zones : "10.0.${i + 1}.0/24"]
+  runner_public_subnet_cidrs = [for i, _ in var.runner_extra_availability_zones : "10.0.${i + 30}.0/24"]
+}
+
 # Public Subnets
 resource "aws_subnet" "public" {
   count = length(var.availability_zones)
 
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.${count.index + 1}.0/24"
+  cidr_block              = local.public_subnet_cidrs[count.index]
   availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
 
@@ -42,7 +52,7 @@ resource "aws_subnet" "runner_public" {
   count = length(var.runner_extra_availability_zones)
 
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.${count.index + 30}.0/24"
+  cidr_block              = local.runner_public_subnet_cidrs[count.index]
   availability_zone       = var.runner_extra_availability_zones[count.index]
   map_public_ip_on_launch = true
 

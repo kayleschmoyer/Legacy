@@ -35,7 +35,7 @@ All 8 types are offered in us-east-1a/b/c/d/f and in none of them in us-east-1e 
 The runner subnets (`data.aws_subnets.public`, which come from `terraform/main` `aws_subnet.public`) cover only **us-east-1a and us-east-1b** (`var.availability_zones` in `terraform/main`). Adding us-east-1c/d/f takes three changes:
 
 1. new runner-only public subnets in `terraform/main/vpc.tf`, associated with the public route table. Widening `var.availability_zones` itself would also resize the Lambda/DB subnets and route tables.
-2. adding their CIDRs to `aws_security_group_rule.rds_from_ci_runners`.
+2. adding their CIDRs to `aws_security_group_rule.rds_from_ci_runners`. Since LS-10423 this is automatic: the rule is `for_each` over the `local.public_subnet_cidrs` and `local.runner_public_subnet_cidrs` locals in `vpc.tf`, one rule per CIDR, so new subnets only add rules. Never put the CIDRs back into one list-valued rule. A `cidr_blocks` change is destroy-then-create, and that is how the LS-10314 apply cut runners off from RDS.
 3. granting the CI apply role `ec2:CreateSubnet` / `ec2:ModifySubnetAttribute` / `ec2:AssociateRouteTable` (plus the matching delete/disassociate actions). None of these actions exist in any CI policy today.
 
 That's a different state, apply pipeline and blast radius, so it's tracked separately as **LS-10314**. The runners state picks up any new subnet named `<prefix>-public-*` automatically.

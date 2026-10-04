@@ -89,14 +89,30 @@ resource "aws_security_group_rule" "rds_from_proxy" {
 # =============================================================================
 
 # Self-Hosted CI Runner Access - runners are in the same VPC and connect via private IP
+#
+# GUARD (LS-10423), one rule per CIDR, keyed by the CIDR string:
+# - Do NOT go back to a single rule with a list in cidr_blocks. On
+#   aws_security_group_rule, any cidr_blocks change forces destroy-then-create.
+#   LS-10314 (#8272) appended the runner_public CIDRs to such a list. The apply
+#   destroyed the live rule at 07:01:52Z on 2026-10-02, then failed on
+#   CreateSubnet before re-creating it. Every self-hosted runner lost RDS
+#   access, and the required "Verify All Migrations Applied" check went red
+#   on every PR.
+# - With for_each keyed by CIDR, adding a subnet only ADDS a rule. Existing
+#   rules are never replaced.
+# - The CIDRs come from variable-derived locals (vpc.tf), not from
+#   aws_subnet.*.cidr_block, so the rules have no dependency on subnet
+#   creation succeeding.
+# - Never edit an existing instance in place (e.g. its description). That is
+#   also a destroy-then-create and reopens the same gap.
 resource "aws_security_group_rule" "rds_from_ci_runners" {
-  count = var.enable_ci_runner_db_access ? 1 : 0
+  for_each = var.enable_ci_runner_db_access ? toset(concat(local.public_subnet_cidrs, local.runner_public_subnet_cidrs)) : toset([])
 
   type              = "ingress"
   from_port         = 5432
   to_port           = 5432
   protocol          = "tcp"
-  cidr_blocks       = concat(aws_subnet.public[*].cidr_block, aws_subnet.runner_public[*].cidr_block)
+  cidr_blocks       = [each.value]
   security_group_id = aws_security_group.rds.id
   description       = "PostgreSQL from self-hosted CI runners (public subnet traffic)"
 }

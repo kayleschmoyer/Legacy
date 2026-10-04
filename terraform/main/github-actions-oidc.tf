@@ -1200,15 +1200,27 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
       # ARN *and* the VPC / route-table ARN, and only the subnet resource type
       # carries the ec2:Vpc condition key (vpc uses ec2:VpcID), so the
       # condition must live on a subnet-only statement.
+      #
+      # LS-10423: CreateSubnet is the exception. The subnet does not exist yet
+      # when the request is authorized, so ec2:Vpc is absent from the request
+      # context. A StringEquals on it never matches, and every apply 403'd on
+      # subnet/*. CreateSubnet therefore gets an unconditioned subnet/*
+      # statement. It is still confined to the main VPC, because CreateSubnet
+      # must also be allowed on the vpc resource, which the first statement
+      # pins to aws_vpc.main.
       {
         Effect   = "Allow"
         Action   = ["ec2:CreateSubnet"]
         Resource = ["arn:aws:ec2:${local.region}:${local.account_id}:vpc/${aws_vpc.main.id}"]
       },
       {
+        Effect   = "Allow"
+        Action   = ["ec2:CreateSubnet"]
+        Resource = ["arn:aws:ec2:${local.region}:${local.account_id}:subnet/*"]
+      },
+      {
         Effect = "Allow"
         Action = [
-          "ec2:CreateSubnet",
           "ec2:DeleteSubnet",
           "ec2:ModifySubnetAttribute",
           "ec2:AssociateRouteTable",
