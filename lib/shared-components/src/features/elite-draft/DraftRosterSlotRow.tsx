@@ -8,6 +8,7 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import type { DraftPickRecord, DraftPlayer } from './types';
+import { formatEligiblePositions } from './utils';
 import { PositionBadge } from '../../components/PositionBadge';
 import {
   getPositionColor,
@@ -49,7 +50,7 @@ export function DraftRosterSlotRow({
 
   const metaParts: string[] = [];
   if (player) {
-    metaParts.push(player.position);
+    metaParts.push(formatEligiblePositions(player));
     if (teamAbbr) metaParts.push(teamAbbr);
     if (byeWeek != null) metaParts.push(`Bye ${byeWeek}`);
     if (pick) metaParts.push(`Pick ${pick.round}.${pick.pickNumber}`);

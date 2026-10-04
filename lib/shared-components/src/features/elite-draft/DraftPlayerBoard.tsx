@@ -30,7 +30,7 @@ import {
 } from './draftDock';
 import { computeMyUpcomingPicks, formatClock } from './nativeDraftBoard';
 import { PlayerCard } from './PlayerCard';
-import { getPositionColor } from './utils';
+import { formatEligiblePositions, getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
 import { useDraftViewportTier } from './hooks/useDraftViewport';
 import type { SportKind } from '../../config/sports';
@@ -1170,7 +1170,7 @@ export function DraftPlayerBoard({
                         {rankMap.get(player.id) ?? idx + 1}
                       </Text>
                     </XStack>
-                    <XStack width={60} padding={8}>
+                    <XStack minWidth={60} padding={8}>
                       <XStack
                         paddingHorizontal={5}
                         paddingVertical={1}
@@ -1184,7 +1184,7 @@ export function DraftPlayerBoard({
                           fontFamily="'Big Shoulders Display', sans-serif"
                           letterSpacing={0.6}
                         >
-                          {player.position ?? '?'}
+                          {formatEligiblePositions(player) || '?'}
                         </Text>
                       </XStack>
                     </XStack>
@@ -1406,7 +1406,7 @@ export function DraftPlayerBoard({
                                     {player.name}
                                   </Text>
                                   <Text fontSize={10} color={TEXT_MUTED}>
-                                    {player.position}
+                                    {formatEligiblePositions(player)}
                                   </Text>
                                 </>
                               ) : (

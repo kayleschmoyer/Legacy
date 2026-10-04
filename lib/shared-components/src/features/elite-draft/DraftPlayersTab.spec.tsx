@@ -304,6 +304,28 @@ describe('DraftPlayersTab', () => {
 
   // LS-10002: the phone pick sheet re-hosts this browser for every sport, so
   // chips and roster buckets follow the league's sport rather than football.
+  it('labels a multi-eligible player with every eligible position, primary first (LS-10472)', () => {
+    render(
+      <DraftPlayersTab
+        {...baseProps({
+          sport: 'baseball',
+          leaguePositions: [{ positionType: 'C' }, { positionType: 'OF' }],
+          selectedPosition: 'C',
+          players: [
+            makePlayer({
+              name: 'Charlie Dexter',
+              position: 'OF',
+              eligiblePositions: ['OF', 'C'],
+            }),
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Charlie Dexter')).toBeTruthy();
+    expect(screen.getByText('OF, C')).toBeTruthy();
+  });
+
   it('offers baseball position chips and baseball roster buckets for a baseball league', () => {
     render(
       <DraftPlayersTab

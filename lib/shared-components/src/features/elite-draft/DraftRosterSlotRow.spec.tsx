@@ -37,6 +37,23 @@ function makePick(overrides: Partial<DraftPickRecord> = {}): DraftPickRecord {
 }
 
 describe('DraftRosterSlotRow', () => {
+  it('lists every eligible position, primary first, so slot placement reads correctly (LS-10472)', () => {
+    const { getByText } = render(
+      <DraftRosterSlotRow
+        slotPositionType="C"
+        sport="baseball"
+        player={makePlayer({
+          name: 'Charlie Dexter',
+          position: 'OF',
+          eligiblePositions: ['OF', 'C'],
+        })}
+        pick={makePick()}
+      />,
+    );
+
+    expect(getByText('OF, C · Pick 2.5')).toBeTruthy();
+  });
+
   it('renders italic "Empty" for an unfilled slot', () => {
     const { getByText } = render(
       <DraftRosterSlotRow

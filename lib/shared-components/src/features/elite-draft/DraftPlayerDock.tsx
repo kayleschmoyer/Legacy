@@ -24,6 +24,7 @@ import React, { useId, useState } from 'react';
 import type { DraftPlayer } from './types';
 import type { DockRowColumns } from './draftDock';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
+import { formatEligiblePositions } from './utils';
 import type { SportKind } from '../../config/sports';
 
 export interface DraftPlayerDockProps {
@@ -58,12 +59,12 @@ export interface DraftPlayerDockProps {
   onLoadMore: () => void;
 }
 
-/** "1B · NYY · 0.340 AVG" — position, franchise, then the sport's lead stat,
+/** "1B, OF · NYY · 0.340 AVG" — eligible positions (primary first), franchise, then the sport's lead stat,
  *  formatted by the same `STAT_COLUMNS_BY_SPORT` column the Data Table uses. */
 function rowMeta(player: DraftPlayer, sport: SportKind): string {
   const lead = STAT_COLUMNS_BY_SPORT[sport][0];
   return [
-    player.position,
+    formatEligiblePositions(player),
     player.club ?? '—',
     lead ? `${lead.render(player)} ${lead.label}` : null,
   ]

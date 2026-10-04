@@ -7,7 +7,7 @@ import {
 } from './DraftPlayerBoard';
 import { computeMyUpcomingPicks } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
-import { getPositionColor } from './utils';
+import { formatEligiblePositions, getPositionColor } from './utils';
 import type { CurrentDraftPickInfo, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
@@ -477,9 +477,9 @@ function PlayersTabRow({
         </YStack>
       </Pressable>
 
-      <YStack width={34} alignItems="center" gap={2}>
+      <YStack minWidth={34} alignItems="center" gap={2}>
         <PositionBadge
-          position={player.position}
+          position={formatEligiblePositions(player)}
           color={posColor}
           alpha={0.16}
           paddingHorizontal={6}

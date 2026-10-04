@@ -16,7 +16,9 @@ import {
   ReorderDraftQueue as REORDER_DRAFT_QUEUE,
 } from '@legacy-sports/graphql';
 import type { DraftPlayer } from './types';
+import { formatEligiblePositions } from './utils';
 import { PositionBadge } from '../../components/PositionBadge';
+import { getPositionColor } from '../../utils/colors';
 import type { SportKind } from '../../config/sports';
 
 type QueueEntry = NonNullable<GetMyDraftQueueQuery['getMyDraftQueue']>[number];
@@ -192,8 +194,8 @@ export function DraftQueueTab({
                 </Text>
                 {player && (
                   <PositionBadge
-                    position={player.position}
-                    sport={sport}
+                    position={formatEligiblePositions(player)}
+                    color={getPositionColor(sport, player.position)}
                     variant="solid"
                     fontSize={10}
                     borderRadius={5}
