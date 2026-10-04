@@ -5083,6 +5083,8 @@ export type SubscriberGrowthPoint = {
 
 export type SubscriptionInfo = {
   __typename?: 'SubscriptionInfo';
+  /** Billing cadence of the user's Stripe subscription: 'monthly' or 'annual'. Null when unknown (non-Stripe subscription or lookup failure). */
+  billingInterval?: Maybe<Scalars['String']['output']>;
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
   currentPeriodEnd?: Maybe<Scalars['String']['output']>;
   gracePeriodEndsAt?: Maybe<Scalars['String']['output']>;
@@ -9368,6 +9370,18 @@ export type GetMySubscriptionQuery = {
     cancelAtPeriodEnd?: boolean | null;
     gracePeriodEndsAt?: string | null;
     trialEndsAt?: string | null;
+  } | null;
+};
+
+export type GetMyBillingIntervalQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetMyBillingIntervalQuery = {
+  __typename?: 'Query';
+  mySubscription?: {
+    __typename?: 'SubscriptionInfo';
+    billingInterval?: string | null;
   } | null;
 };
 
@@ -23292,6 +23306,91 @@ export type GetMySubscriptionSuspenseQueryHookResult = ReturnType<
 export type GetMySubscriptionQueryResult = Apollo.QueryResult<
   GetMySubscriptionQuery,
   GetMySubscriptionQueryVariables
+>;
+export const GetMyBillingInterval = gql`
+  query GetMyBillingInterval {
+    mySubscription {
+      billingInterval
+    }
+  }
+`;
+
+/**
+ * __useGetMyBillingIntervalQuery__
+ *
+ * To run a query within a React component, call `useGetMyBillingIntervalQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyBillingIntervalQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyBillingIntervalQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyBillingIntervalQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyBillingIntervalQuery,
+    GetMyBillingIntervalQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyBillingIntervalQuery,
+    GetMyBillingIntervalQueryVariables
+  >(GetMyBillingInterval, options);
+}
+export function useGetMyBillingIntervalLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyBillingIntervalQuery,
+    GetMyBillingIntervalQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyBillingIntervalQuery,
+    GetMyBillingIntervalQueryVariables
+  >(GetMyBillingInterval, options);
+}
+export function useGetMyBillingIntervalSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyBillingIntervalQuery,
+        GetMyBillingIntervalQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyBillingIntervalQuery,
+    GetMyBillingIntervalQueryVariables
+  >(
+    GetMyBillingInterval,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyBillingIntervalQuery,
+          GetMyBillingIntervalQueryVariables
+        >,
+  );
+}
+export type GetMyBillingIntervalQueryHookResult = ReturnType<
+  typeof useGetMyBillingIntervalQuery
+>;
+export type GetMyBillingIntervalLazyQueryHookResult = ReturnType<
+  typeof useGetMyBillingIntervalLazyQuery
+>;
+export type GetMyBillingIntervalSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyBillingIntervalSuspenseQuery
+>;
+export type GetMyBillingIntervalQueryResult = Apollo.QueryResult<
+  GetMyBillingIntervalQuery,
+  GetMyBillingIntervalQueryVariables
 >;
 export const GetStripePrices = gql`
   query GetStripePrices {

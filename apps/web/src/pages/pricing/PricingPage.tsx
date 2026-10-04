@@ -31,6 +31,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
+import { useMyBillingInterval } from '../../hooks/useMyBillingInterval';
 import { useStripePrices } from '../../hooks/useStripePrices';
 
 /* ─── Styled Components ─── */
@@ -493,6 +494,16 @@ export default function PricingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
+  // LS-7171: only Premium users can have a Stripe billing interval, so skip the
+  // lookup for everyone else. Unknown (null) is treated as "not annual" so a
+  // monthly subscriber still sees the upgrade-to-annual savings.
+  const { billingInterval, isLoading: intervalLoading } = useMyBillingInterval({
+    skip: !isPremium,
+  });
+  const isAnnualSubscriber = isPremium && billingInterval === 'annual';
+  // While a Premium user's interval is still resolving, don't flash a savings
+  // badge they may turn out to already be getting.
+  const hideSavingsBadge = isPremium && intervalLoading;
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -610,65 +621,83 @@ export default function PricingPage() {
             </Paragraph>
 
             {/* Billing toggle */}
-            <ToggleContainer
-              role="radiogroup"
-              aria-label="Billing period"
-              onKeyDown={handleBillingKeyDown}
-            >
-              <ToggleOption
-                active={!isAnnual}
-                onPress={() => setIsAnnual(false)}
-                role="radio"
-                aria-checked={!isAnnual}
-                tabIndex={!isAnnual ? 0 : -1}
-                onKeyDown={onSelectKey(() => setIsAnnual(false))}
-              >
+            {isAnnualSubscriber ? (
+              // LS-7171: an annual subscriber already gets the discount, so the
+              // Monthly/Annual toggle and its "Save X%" badge would only
+              // advertise a saving they have. Show their current plan instead.
+              <ToggleContainer data-testid="billing-current-plan">
                 <Paragraph
                   marginBottom={0}
                   fontWeight="600"
-                  color={!isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
+                  color={BRAND_GOLD_LIGHT}
                   size="$3"
                 >
-                  Monthly
+                  Your plan: Annual
                 </Paragraph>
-              </ToggleOption>
-              <ToggleOption
-                active={isAnnual}
-                onPress={() => setIsAnnual(true)}
-                role="radio"
-                aria-checked={isAnnual}
-                aria-label={
-                  pricesLoading
-                    ? 'Annual billing'
-                    : `Annual billing, save ${ANNUAL_SAVINGS_PCT} compared with monthly`
-                }
-                tabIndex={isAnnual ? 0 : -1}
-                onKeyDown={onSelectKey(() => setIsAnnual(true))}
+              </ToggleContainer>
+            ) : (
+              <ToggleContainer
+                role="radiogroup"
+                aria-label="Billing period"
+                onKeyDown={handleBillingKeyDown}
               >
-                <Paragraph
-                  marginBottom={0}
-                  fontWeight="600"
-                  color={isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
-                  size="$3"
+                <ToggleOption
+                  active={!isAnnual}
+                  onPress={() => setIsAnnual(false)}
+                  role="radio"
+                  aria-checked={!isAnnual}
+                  tabIndex={!isAnnual ? 0 : -1}
+                  onKeyDown={onSelectKey(() => setIsAnnual(false))}
                 >
-                  Annual
-                </Paragraph>
-                <DiscountBadge>
-                  {pricesLoading ? (
-                    <PriceSkeleton width={40} height={12} radius={4} />
-                  ) : (
-                    <Paragraph
-                      marginBottom={0}
-                      size="$1"
-                      fontWeight="700"
-                      color={BRAND_SEAM_RED}
-                    >
-                      Save {ANNUAL_SAVINGS_PCT}
-                    </Paragraph>
+                  <Paragraph
+                    marginBottom={0}
+                    fontWeight="600"
+                    color={!isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
+                    size="$3"
+                  >
+                    Monthly
+                  </Paragraph>
+                </ToggleOption>
+                <ToggleOption
+                  active={isAnnual}
+                  onPress={() => setIsAnnual(true)}
+                  role="radio"
+                  aria-checked={isAnnual}
+                  aria-label={
+                    pricesLoading
+                      ? 'Annual billing'
+                      : `Annual billing, save ${ANNUAL_SAVINGS_PCT} compared with monthly`
+                  }
+                  tabIndex={isAnnual ? 0 : -1}
+                  onKeyDown={onSelectKey(() => setIsAnnual(true))}
+                >
+                  <Paragraph
+                    marginBottom={0}
+                    fontWeight="600"
+                    color={isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
+                    size="$3"
+                  >
+                    Annual
+                  </Paragraph>
+                  {!hideSavingsBadge && (
+                    <DiscountBadge>
+                      {pricesLoading ? (
+                        <PriceSkeleton width={40} height={12} radius={4} />
+                      ) : (
+                        <Paragraph
+                          marginBottom={0}
+                          size="$1"
+                          fontWeight="700"
+                          color={BRAND_SEAM_RED}
+                        >
+                          Save {ANNUAL_SAVINGS_PCT}
+                        </Paragraph>
+                      )}
+                    </DiscountBadge>
                   )}
-                </DiscountBadge>
-              </ToggleOption>
-            </ToggleContainer>
+                </ToggleOption>
+              </ToggleContainer>
+            )}
           </HeroSection>
 
           {/* ── Plan Cards ── */}
@@ -807,8 +836,9 @@ export default function PricingPage() {
 
                     {isAnnual ? (
                       <Paragraph size="$2" color="$gray11" marginBottom={0}>
-                        Billed annually (${annualTotal}/yr) — save{' '}
-                        {ANNUAL_SAVINGS_PCT} vs monthly
+                        Billed annually (${annualTotal}/yr)
+                        {!isAnnualSubscriber &&
+                          ` — save ${ANNUAL_SAVINGS_PCT} vs monthly`}
                       </Paragraph>
                     ) : (
                       <Paragraph size="$2" color="$gray11" marginBottom={0}>

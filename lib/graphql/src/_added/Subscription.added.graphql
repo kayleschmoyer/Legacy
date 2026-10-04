@@ -13,6 +13,14 @@ query GetMySubscription {
   }
 }
 
+# LS-7171: kept separate from SubscriptionInfo so only the pricing page pays for
+# the lazy Stripe lookup behind billingInterval.
+query GetMyBillingInterval {
+  mySubscription {
+    billingInterval
+  }
+}
+
 query GetStripePrices {
   stripePrices {
     monthlyPriceCents

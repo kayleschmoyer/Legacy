@@ -80,12 +80,14 @@ jest.mock('drizzle-orm', () => ({
   desc: (col: unknown) => `${String(col)}-desc`,
 }));
 
+import { isObjectType } from 'graphql';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 
 import {
   _resetAdminRevenueStatsCache,
   _resetStripePricesCache,
+  billingIntervalFromStripe,
   buildCheckoutTrialParams,
   computeRevenueCents,
   expireSubscriptionGracePeriods,
@@ -916,5 +918,83 @@ describe('createCheckoutSession resolver email guard (LS-7422)', () => {
 
     expect(result).toEqual({ url: 'https://portal' });
     expect(stripe.customers.create).not.toHaveBeenCalled();
+  });
+});
+
+// ─── SubscriptionInfo.billingInterval (LS-7171) ──────────────────────────────
+
+describe('billingIntervalFromStripe', () => {
+  it.each([
+    ['month', 'monthly'],
+    ['year', 'annual'],
+    ['week', null],
+    ['day', null],
+    [undefined, null],
+    [null, null],
+  ])('maps %s to %s', (interval, expected) => {
+    expect(billingIntervalFromStripe(interval)).toBe(expected);
+  });
+});
+
+describe('SubscriptionInfo.billingInterval resolver', () => {
+  function getResolver() {
+    const type = builder.toSchema().getType('SubscriptionInfo');
+    if (!isObjectType(type)) throw new Error('SubscriptionInfo not found');
+    const field = type.getFields()['billingInterval'];
+    if (!field?.resolve) throw new Error('billingInterval not found');
+    const resolve = field.resolve;
+    return (stripeSubscriptionId: string | null) =>
+      resolve({ stripeSubscriptionId }, {}, {}, {} as never) as Promise<
+        string | null
+      >;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    ['year', 'annual'],
+    ['month', 'monthly'],
+  ])('resolves a Stripe %s subscription to %s', async (interval, expected) => {
+    const retrieve = jest.fn().mockResolvedValue({
+      items: { data: [{ price: { recurring: { interval } } }] },
+    });
+    (getStripeClient as jest.Mock).mockResolvedValue({
+      subscriptions: { retrieve },
+    });
+
+    await expect(getResolver()('sub_123')).resolves.toBe(expected);
+    expect(retrieve).toHaveBeenCalledWith('sub_123');
+  });
+
+  it('returns null without calling Stripe when there is no Stripe subscription', async () => {
+    const retrieve = jest.fn();
+    (getStripeClient as jest.Mock).mockResolvedValue({
+      subscriptions: { retrieve },
+    });
+
+    await expect(getResolver()(null)).resolves.toBeNull();
+    expect(retrieve).not.toHaveBeenCalled();
+  });
+
+  it('returns null (unknown) when the Stripe lookup fails', async () => {
+    (getStripeClient as jest.Mock).mockResolvedValue({
+      subscriptions: {
+        retrieve: jest.fn().mockRejectedValue(new Error('stripe down')),
+      },
+    });
+
+    await expect(getResolver()('sub_123')).resolves.toBeNull();
+  });
+
+  it('returns null when the subscription has no line items', async () => {
+    (getStripeClient as jest.Mock).mockResolvedValue({
+      subscriptions: {
+        retrieve: jest.fn().mockResolvedValue({ items: { data: [] } }),
+      },
+    });
+
+    await expect(getResolver()('sub_123')).resolves.toBeNull();
   });
 });

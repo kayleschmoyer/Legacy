@@ -244,6 +244,21 @@ TemporaryPremiumGrantResultRef.implement({
   }),
 });
 
+/**
+ * Map a Stripe recurring interval to the billing interval exposed on
+ * `SubscriptionInfo` (LS-7171). Anything other than a monthly or yearly
+ * cadence (weekly, daily, missing) is reported as null rather than guessed.
+ *
+ * Exported for unit testing.
+ */
+export function billingIntervalFromStripe(
+  interval: string | null | undefined,
+): 'monthly' | 'annual' | null {
+  if (interval === 'month') return 'monthly';
+  if (interval === 'year') return 'annual';
+  return null;
+}
+
 const SubscriptionInfoRef = builder.objectRef<{
   status: string;
   tier: string;
@@ -251,6 +266,7 @@ const SubscriptionInfoRef = builder.objectRef<{
   cancelAtPeriodEnd: boolean;
   trialEndsAt: string | null;
   gracePeriodEndsAt: string | null;
+  stripeSubscriptionId: string | null;
 }>('SubscriptionInfo');
 
 SubscriptionInfoRef.implement({
@@ -261,6 +277,35 @@ SubscriptionInfoRef.implement({
     cancelAtPeriodEnd: t.exposeBoolean('cancelAtPeriodEnd'),
     trialEndsAt: t.exposeString('trialEndsAt', { nullable: true }),
     gracePeriodEndsAt: t.exposeString('gracePeriodEndsAt', { nullable: true }),
+    // LS-7171: the interval lives in Stripe, not the subscriptions table, so it
+    // is resolved lazily — only queries that select this field pay for the
+    // Stripe round-trip. Null for Apple/Google-managed subscriptions (no Stripe
+    // subscription) and whenever Stripe is unreachable; clients must treat null
+    // as "unknown", never as monthly.
+    billingInterval: t.string({
+      nullable: true,
+      description:
+        "Billing cadence of the user's Stripe subscription: 'monthly' or " +
+        "'annual'. Null when unknown (non-Stripe subscription or lookup failure).",
+      resolve: async (parent) => {
+        if (!parent.stripeSubscriptionId) return null;
+        try {
+          const stripe = await getStripeClient();
+          const subscription = await stripe.subscriptions.retrieve(
+            parent.stripeSubscriptionId,
+          );
+          return billingIntervalFromStripe(
+            subscription.items.data[0]?.price?.recurring?.interval,
+          );
+        } catch (err) {
+          LOGGER.warn('Failed to resolve subscription billing interval', {
+            error: err,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        }
+      },
+    }),
   }),
 });
 
@@ -443,6 +488,7 @@ builder.queryField('mySubscription', (t) =>
         trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
         gracePeriodEndsAt:
           subscription.gracePeriodEndsAt?.toISOString() ?? null,
+        stripeSubscriptionId: subscription.stripeSubscriptionId ?? null,
       };
     },
   }),

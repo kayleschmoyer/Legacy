@@ -297,6 +297,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },
+  // LS-7171: PricingPage asks for the billing interval of Premium users; null
+  // means "unknown", which keeps the default Monthly/Annual toggle.
+  getmybillinginterval: {
+    data: { mySubscription: { billingInterval: null } },
+  },
   getstripeprices: {
     data: {
       stripePrices: {

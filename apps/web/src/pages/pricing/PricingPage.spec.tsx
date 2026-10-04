@@ -122,7 +122,17 @@ jest.mock('../../hooks/useStripePrices', () => ({
   useStripePrices: (): unknown => mockUseStripePrices(),
 }));
 
+const mockUseMyBillingInterval = jest.fn();
+jest.mock('../../hooks/useMyBillingInterval', () => ({
+  useMyBillingInterval: (...args: unknown[]): unknown =>
+    mockUseMyBillingInterval(...args),
+}));
+
 beforeEach(() => {
+  mockUseMyBillingInterval.mockReturnValue({
+    billingInterval: null,
+    isLoading: false,
+  });
   mockUseAuth.mockReturnValue({ isAuthenticated: false });
   mockUseIsPremiumStatus.mockReturnValue({
     isPremium: false,
@@ -389,6 +399,91 @@ describe('PricingPage — billing toggle keyboard accessibility (LS-7167)', () =
     await user.keyboard('{ArrowRight}');
     expect(annual).toHaveAttribute('aria-checked', 'true');
     expect(annual).toHaveFocus();
+  });
+});
+
+// LS-7171: an already-annual Premium user must not be pushed toward annual
+// savings they already get.
+describe('PricingPage — billing toggle for Premium subscribers (LS-7171)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 9.99,
+      annualTotal: 99.99,
+      annualSavingsPct: '17%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  function setPremium(
+    billingInterval: 'monthly' | 'annual' | null,
+    isLoading = false,
+  ) {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+    mockUseMyBillingInterval.mockReturnValue({ billingInterval, isLoading });
+  }
+
+  it('shows "Your plan: Annual" instead of the toggle and savings copy for an annual Premium user', () => {
+    setPremium('annual');
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('billing-current-plan')).toHaveTextContent(
+      'Your plan: Annual',
+    );
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Save 17%/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/save 17%/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('plan-price-annual')).toBeInTheDocument();
+    expect(screen.getByText(/Billed annually \(\$99\.99\/yr\)/)).toBeVisible();
+  });
+
+  it('keeps the toggle and savings badge for a monthly Premium user', () => {
+    setPremium('monthly');
+
+    render(<PricingPage />);
+
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.getByText('Save 17%')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('billing-current-plan'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the toggle for a Premium user whose interval is unknown', () => {
+    setPremium(null);
+
+    render(<PricingPage />);
+
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.getByText('Save 17%')).toBeInTheDocument();
+  });
+
+  it("does not flash the savings badge while a Premium user's interval is loading", () => {
+    setPremium(null, true);
+
+    render(<PricingPage />);
+
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.queryByText('Save 17%')).not.toBeInTheDocument();
+  });
+
+  it('leaves the toggle and badge unchanged for non-Premium users and skips the interval lookup', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.getByText('Save 17%')).toBeInTheDocument();
+    expect(mockUseMyBillingInterval).toHaveBeenCalledWith({ skip: true });
   });
 });
 

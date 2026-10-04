@@ -159,6 +159,16 @@ test.describe('Pricing page — billing toggle @regression', () => {
     };
 
     // Annual (default): toggle badge + "save X% vs monthly" card subtext.
+    // The default hermetic user is Premium, and PricingPage holds the toggle
+    // badge back until that user's billing interval resolves (LS-7171) so an
+    // annual subscriber is never shown a saving they already get — so wait for
+    // the settled state instead of reading the page the moment the card
+    // subtext appears.
+    await expect
+      .poll(async () => (await collectSavePercentages()).length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(2);
     const annual = await collectSavePercentages();
     expect(annual.length).toBeGreaterThanOrEqual(2);
     expect(new Set(annual).size).toBe(1);

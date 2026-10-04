@@ -5077,6 +5077,8 @@ export type SubscriberGrowthPoint = {
 
 export type SubscriptionInfo = {
   __typename?: 'SubscriptionInfo';
+  /** Billing cadence of the user's Stripe subscription: 'monthly' or 'annual'. Null when unknown (non-Stripe subscription or lookup failure). */
+  billingInterval?: Maybe<Scalars['String']['output']>;
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
   currentPeriodEnd?: Maybe<Scalars['String']['output']>;
   gracePeriodEndsAt?: Maybe<Scalars['String']['output']>;

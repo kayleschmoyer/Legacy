@@ -5522,6 +5522,10 @@ type SubscriberGrowthPoint {
 }
 
 type SubscriptionInfo {
+  """
+  Billing cadence of the user's Stripe subscription: 'monthly' or 'annual'. Null when unknown (non-Stripe subscription or lookup failure).
+  """
+  billingInterval: String
   cancelAtPeriodEnd: Boolean
   currentPeriodEnd: String
   gracePeriodEndsAt: String
