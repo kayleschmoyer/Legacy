@@ -651,8 +651,10 @@ resource "aws_secretsmanager_secret" "mcp_readonly_db_credentials" {
   name_prefix = "${local.name_prefix}-mcp-readonly-db-creds-"
   description = "Read-only DB credentials for the hosted DB-admin MCP server (mcp_readonly Postgres role)"
 
-  # TODO: Automatic rotation requires a rotation Lambda and a mechanism to
-  # ALTER the mcp_readonly Postgres role password in sync. See LS-784.
+  # No rotation Lambda (LS-784). The mcp_readonly Postgres role password is kept in
+  # sync with this secret by the hosted mcp-db Lambda, which resyncs the role
+  # (ALTER ROLE ... PASSWORD) on its first 28P01 login failure (LS-10416,
+  # tools/mcp/db-admin-server/src/db.ts). Regenerating the password is safe.
 
   tags = merge(local.common_tags, {
     Component = "mcp"
@@ -688,8 +690,10 @@ resource "aws_secretsmanager_secret" "mcp_write_db_credentials" {
   name_prefix = "${local.name_prefix}-mcp-write-db-creds-"
   description = "DML-only DB credentials for the hosted DB-admin MCP server (mcp_write Postgres role)"
 
-  # TODO: Automatic rotation requires a rotation Lambda and a mechanism to
-  # ALTER the mcp_write Postgres role password in sync. See LS-784.
+  # No rotation Lambda (LS-784). The mcp_write Postgres role password is kept in
+  # sync with this secret by the hosted mcp-db Lambda, which resyncs the role
+  # (ALTER ROLE ... PASSWORD) on its first 28P01 login failure (LS-10416,
+  # tools/mcp/db-admin-server/src/db.ts). Regenerating the password is safe.
 
   tags = merge(local.common_tags, {
     Component = "mcp"

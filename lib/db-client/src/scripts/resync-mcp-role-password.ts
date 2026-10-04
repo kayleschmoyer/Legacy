@@ -24,6 +24,11 @@
  * permanently disagree until someone manually re-syncs them — this script is
  * that manual resync path.
  *
+ * Since LS-10416 this is the FALLBACK path: the hosted mcp-db Lambda now
+ * resyncs the role itself on its first 28P01 login failure
+ * (tools/mcp/db-admin-server/src/db.ts, `openRolePool`). Use this script only
+ * when that self-heal reports "automatic resync failed".
+ *
  * Run this LOCALLY (not from a hosted/cloud agent session — neither carries
  * AWS credentials): it needs `aws sso login` credentials to read the target
  * secret, and DB network access to connect as the privileged migration user

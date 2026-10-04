@@ -49,14 +49,14 @@ The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over 
 
 ## Decision Tree
 
-| Situation                                                                                     | Reference                                                                                                 |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Writing or applying a migration                                                               | [references/migrations.md](references/migrations.md)                                                      |
-| Running ad-hoc SQL or inspecting tables                                                       | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Ad-hoc Query section      |
-| Regenerating schema after Pothos changes                                                      | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Regenerate Schema section |
-| Dumping or restoring data                                                                     | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Dump/Restore sections     |
-| Schema table/column reference                                                                 | [repo-tooling/references/db-schema-reference.md](../repo-tooling/references/db-schema-reference.md)       |
-| `db_execute`/`db_query` fails "password authentication failed" for `mcp_write`/`mcp_readonly` | [references/mcp-role-password-drift.md](references/mcp-role-password-drift.md)                            |
+| Situation                                                                                                                                                | Reference                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Writing or applying a migration                                                                                                                          | [references/migrations.md](references/migrations.md)                                                      |
+| Running ad-hoc SQL or inspecting tables                                                                                                                  | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Ad-hoc Query section      |
+| Regenerating schema after Pothos changes                                                                                                                 | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Regenerate Schema section |
+| Dumping or restoring data                                                                                                                                | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Dump/Restore sections     |
+| Schema table/column reference                                                                                                                            | [repo-tooling/references/db-schema-reference.md](../repo-tooling/references/db-schema-reference.md)       |
+| `db_execute`/`db_query` fails "password authentication failed" (or "automatic resync failed") for `mcp_write`/`mcp_readonly` — self-heals since LS-10416 | [references/mcp-role-password-drift.md](references/mcp-role-password-drift.md)                            |
 
 ## Configuration
 

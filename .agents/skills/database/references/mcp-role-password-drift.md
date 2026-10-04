@@ -1,10 +1,16 @@
 # MCP DB role password drift (`mcp_write` / `mcp_readonly`)
 
-Symptom: `db_execute` (or `db_query`) fails with `password authentication failed
-for user "mcp_write"` (or `"mcp_readonly"`), not transiently — retries fail
-identically. The other role still works fine, which rules out general DB
-connectivity or MCP server health and isolates the fault to one role's
-credential.
+Symptom: `db_execute` (or `db_query` / `db_migration_status`) fails with
+`password authentication failed for user "mcp_write"` (or `"mcp_readonly"`),
+or with `... and the automatic resync failed: ...`. The other role still works
+fine, which rules out general DB connectivity or MCP server health and isolates
+the fault to one role's credential.
+
+**Since LS-10416 the hosted mcp-db Lambda heals this itself** (see
+[Automatic self-heal](#automatic-self-heal-ls-10416)) — a bare `password
+authentication failed` should no longer reach an agent. If you still see one,
+the self-heal did not run (Lambda not yet redeployed with LS-10416) or failed;
+the error text then names the manual fallback below.
 
 ## Root cause
 
@@ -33,9 +39,8 @@ the role) — it never carries `MCP_WRITE_DB_PASSWORD`/`MCP_READONLY_DB_PASSWORD
 (the value used to _set_ the role's password), so if the role-creation
 migration is ever (re-)applied through the hosted `db_migrate` tool without a
 human manually exporting the matching env var first, the ALTER ROLE silently
-falls back to the placeholder password. There is also no rotation Lambda
-linking the two long-term (see the `TODO`s in `secrets.tf` — LS-784 tracks
-building one). Either path — a placeholder-password migration run, or a later
+falls back to the placeholder password. There is no rotation Lambda
+linking the two (LS-784); the hosted self-heal below is what links them now. Either path — a placeholder-password migration run, or a later
 out-of-band secret rotation — permanently desyncs the live Postgres role from
 what the Lambda thinks the password is.
 
@@ -44,7 +49,36 @@ Why `db_migrate` can't self-heal this: its sandboxed migration `require` shim
 resolves `postgres` and `drizzle-orm[/*]` — a migration cannot `require` the
 AWS SDK to fetch the current secret value itself, even if it wanted to.
 
-## Fix / recovery
+## Automatic self-heal (LS-10416)
+
+[`tools/mcp/db-admin-server/src/db.ts`](../../../../tools/mcp/db-admin-server/src/db.ts)
+(`openRolePool`) probes each `mcp_readonly` / `mcp_write` pool with `SELECT 1`
+when it is first opened in a Lambda container. On SQLSTATE `28P01`
+(invalid_password) it:
+
+1. re-reads the role's secret and refuses unless its `username` matches the role;
+2. runs `ALTER ROLE <role> WITH PASSWORD <secret value>` over the
+   `DB_SECRET_NAME` connection — the RDS master user `postgres`
+   (`rds_superuser`, CREATEROLE) that `db_migrate` already uses, so the heal
+   grants the Lambda **no new privilege** (`migration_user` lacks CREATEROLE and
+   could not do this);
+3. reopens the pool, verifies login, and serves the original tool call.
+
+The heal is logged with `LOGGER.error` ("password drifted from Secrets
+Manager"), which forwards to Rollbar — that is the drift alert. If the resync
+itself fails, the tool returns `Database unavailable: ... automatic resync
+failed: <reason>. Manual fallback: pnpm --prefix lib/db-client run
+db:resync-role -- --role <role> --secret-name <secret>`.
+
+Covered triggers: a Terraform `random_password` regeneration (the next cold
+container heals), and a fresh-environment migrate that seeds the placeholder
+password (the first `db_query`/`db_execute` heals). Not covered: a role password
+changed underneath an already-warm container whose pooled connections are
+still authenticated — new connections in that container fail until it recycles.
+Nothing in the normal workflow does that; if you did it by hand, use the manual
+fallback or wait for a cold start.
+
+## Manual fallback
 
 Run [`lib/db-client/src/scripts/resync-mcp-role-password.ts`](../../../../lib/db-client/src/scripts/resync-mcp-role-password.ts)
 **locally** (it needs `aws sso login` credentials plus DB network access —
@@ -80,5 +114,5 @@ without first exporting the matching `MCP_WRITE_DB_PASSWORD` /
 `MCP_READONLY_DB_PASSWORD` env var to the _current_ Secrets Manager value —
 otherwise the ALTER ROLE silently reapplies the placeholder password. These
 migration files are landed and immutable (`scripts/check-migration-immutability.js`),
-so this note — not an edit to them — is the durable fix until LS-784
-(automatic rotation) lands.
+so the hosted self-heal above — not an edit to them — is the durable fix; it
+repairs the placeholder password on first use anyway.

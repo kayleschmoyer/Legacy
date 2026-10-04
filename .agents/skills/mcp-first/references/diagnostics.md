@@ -389,6 +389,14 @@ Distinct from the MCP server connectivity failures above — `DesignSync` is a C
 
 **Recovery:** run every `DesignSync` call (`get_project`, `list_files`, `get_file`, and the write flow) from the main session, never from a dispatched subagent. Pace a bulk pull in-context instead of trying to parallelize it away — see [design-sync/references/designsync-tool.md § Main-session only](../../design-sync/references/designsync-tool.md#main-session-only--not-exposed-to-subagents-ls-9985) for the workaround and the file-size cost asymmetry to plan around.
 
+## `db_execute` / `db_query` "password authentication failed" for `mcp_write` / `mcp_readonly` (LS-10416)
+
+**Symptom:** a hosted DB tool (`db_execute`, `db_query`, `db_migration_status`) returns `password authentication failed for user "mcp_write"` (or `"mcp_readonly"`), or `Database unavailable: ... automatic resync failed: ...`. The connector itself is connected and the other role works — this is **not** an MCP transport or OAuth problem, so none of the checks above apply and `/mcp` re-consent will not fix it.
+
+**Cause:** the Postgres role password drifted from its Secrets Manager value (seeded once by a migration; Terraform `random_password` owns the secret; nothing else links them).
+
+**Fix path:** the hosted mcp-db Lambda resyncs the role from its secret automatically on the first `28P01` in a container and logs a Rollbar error as the alert — normally an agent never sees this. If it surfaces anyway, retry once (a cold container may heal it); if the error names `automatic resync failed`, run the manual fallback it prints (`pnpm --prefix lib/db-client run db:resync-role -- --role <role> --secret-name <secret>`, local session with AWS creds + DB tunnel — user-run if it needs `aws sso login`). Full detail: [database/references/mcp-role-password-drift.md](../../database/references/mcp-role-password-drift.md).
+
 ## See Also
 
 - [LS-9439](https://bkrupa.atlassian.net/browse/LS-9439) — tracking ticket for the auth-server-incompatibility failure mode above; root cause still open
