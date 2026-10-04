@@ -21,7 +21,11 @@ export interface HelpContactItem {
   title: string;
   description: string;
   url?: string;
-  /** When set, the item triggers an in-app action (with `url` as fallback). */
+  /**
+   * When set, the item triggers an in-app action. When the in-app flow is
+   * unavailable (no Jira proxy configured), `url` is the fallback (LS-10437:
+   * Discord — the GitHub repo is private, so its links 404 for users).
+   */
   action?: 'bug-report' | 'feature-request';
 }
 
@@ -141,7 +145,7 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     title: 'Report a Bug',
     description:
       "Found something broken? Let us know and we'll prioritize a fix.",
-    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md',
+    url: DISCORD_URL,
     action: 'bug-report',
   },
   {
@@ -149,15 +153,8 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     title: 'Suggest a Feature',
     description:
       "Have an idea that would make Legacy Sports better? We'd love to hear it.",
-    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
+    url: DISCORD_URL,
     action: 'feature-request',
-  },
-  {
-    icon: '💬',
-    title: 'Community Discussions',
-    description:
-      'Chat with other managers, share tips, and get advice from the community.',
-    url: 'https://github.com/bkrupa/legacy-sports/discussions',
   },
   {
     icon: '🎮',

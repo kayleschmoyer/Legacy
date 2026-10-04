@@ -261,8 +261,8 @@ export default function HelpScreen(): React.JSX.Element {
                 // open the in-app flow when it's available, so the submission
                 // lands in Jira. External URLs are a genuine fallback only, and
                 // only when the in-app path is unavailable — not the default.
-                // Report a Bug falls back to Discord (faster human response);
-                // Suggest a Feature falls back to its GitHub issue template.
+                // Both fall back to Discord via `item.url` (LS-10437: the
+                // GitHub repo is private, so its issue links 404 for users).
                 const inAppKind: ReportKind | null =
                   item.action === 'bug-report'
                     ? 'bug'
@@ -273,14 +273,12 @@ export default function HelpScreen(): React.JSX.Element {
                 const onPress =
                   inAppKind && config.jiraProxyUrl
                     ? () => setReportKind(inAppKind)
-                    : item.action === 'bug-report'
-                      ? () => void Linking.openURL(DISCORD_URL)
-                      : item.url
-                        ? () => {
-                            const { url } = item;
-                            if (url) void Linking.openURL(url);
-                          }
-                        : undefined;
+                    : item.url
+                      ? () => {
+                          const { url } = item;
+                          if (url) void Linking.openURL(url);
+                        }
+                      : undefined;
 
                 return (
                   <YStack

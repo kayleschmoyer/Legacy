@@ -14,7 +14,6 @@ import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { Gamepad2 } from '@tamagui/lucide-icons/icons/Gamepad2';
 import { Lightbulb } from '@tamagui/lucide-icons/icons/Lightbulb';
-import { MessageCircle } from '@tamagui/lucide-icons/icons/MessageCircle';
 import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
@@ -56,7 +55,6 @@ const CONTACT_ICON_MAP: Record<
 > = {
   'Report a Bug': Bug,
   'Suggest a Feature': Lightbulb,
-  'Community Discussions': MessageCircle,
   'Join our Discord': Gamepad2,
 };
 

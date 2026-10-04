@@ -321,8 +321,12 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(page.getByText('Suggest a Feature')).toBeVisible();
   });
 
-  test('shows Community Discussions contact option', async ({ page }) => {
-    await expect(page.getByText('Community Discussions')).toBeVisible();
+  // LS-10437: the card linked to the private repo's (disabled) GitHub
+  // discussions and 404'd for every user — Discord is the community channel.
+  test('does not show a Community Discussions contact option', async ({
+    page,
+  }) => {
+    await expect(page.getByText('Community Discussions')).toHaveCount(0);
   });
 
   test('shows urgent account issues notice', async ({ page }) => {
@@ -364,11 +368,12 @@ test.describe('Help Page — contact and support @regression', () => {
     await expect(page.getByText(/tell us your idea/i)).toBeVisible();
   });
 
-  // Without jiraProxyUrl configured, the entry falls back to the external
-  // GitHub feature_request template — the safety net LS-9272 preserves.
+  // Without jiraProxyUrl configured, the entry falls back to Discord — the
+  // safety net LS-9272 preserves (GitHub was dropped in LS-10437: the repo is
+  // private, so its issue links 404 for users).
   // Asserting this with `page.waitForEvent('popup')` is the nightly-flake
   // source LS-7859: a real popup (a) escapes the page-scoped API isolation
-  // and loads github.com over the network — a hermeticity violation — and
+  // and loads the external site over the network — a hermeticity violation — and
   // (b) `window.open` with `noopener` does not reliably emit Playwright's
   // `popup` event under load, so the wait intermittently times out.
   // Intercept `window.open` to capture the intended URL deterministically
@@ -380,7 +385,7 @@ test.describe('Help Page — contact and support @regression', () => {
   // build-time VITE_JIRA_PROXY_URL, which isn't guaranteed empty across
   // every CI build lane. Without this override the test intermittently
   // hit the modal-open branch instead of the fallback link — see LS-9272.
-  test('Suggest a Feature falls back to GitHub issues when jiraProxyUrl is not configured', async ({
+  test('Suggest a Feature falls back to Discord when jiraProxyUrl is not configured', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -401,26 +406,7 @@ test.describe('Help Page — contact and support @regression', () => {
     const openedUrl = await page.evaluate(
       () => (window as unknown as Record<string, string>).__openedUrl,
     );
-    expect(openedUrl).toMatch(/github\.com.*issues.*labels=enhancement/i);
-  });
-
-  test('Community Discussions option opens GitHub discussions in a new tab', async ({
-    page,
-  }) => {
-    await page.evaluate(() => {
-      (window as unknown as Record<string, string>).__openedUrl = '';
-      window.open = (url?: string | URL) => {
-        (window as unknown as Record<string, string>).__openedUrl = String(
-          url ?? '',
-        );
-        return null;
-      };
-    });
-    await page.getByText('Community Discussions').click();
-    const openedUrl = await page.evaluate(
-      () => (window as unknown as Record<string, string>).__openedUrl,
-    );
-    expect(openedUrl).toMatch(/github\.com.*discussions/i);
+    expect(openedUrl).toMatch(/discord\.gg\/JBhRrE8ZtK/i);
   });
 
   test('shows Join our Discord contact option', async ({ page }) => {

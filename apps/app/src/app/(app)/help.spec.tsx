@@ -111,14 +111,9 @@ describe('HelpScreen — Report a Bug action routing (LS-8842)', () => {
     expect(openedUrl).not.toContain('github.com');
   });
 
-  it('still opens the URL directly for non-action contact entries (Community Discussions, Discord)', () => {
+  it('still opens the URL directly for non-action contact entries (Discord)', () => {
     setJiraProxyUrl('https://api.example.com/jira');
     render(<HelpScreen />);
-
-    fireEvent.press(screen.getByText('Community Discussions'));
-    expect(openUrlSpy).toHaveBeenCalledWith(
-      expect.stringContaining('github.com/bkrupa/legacy-sports/discussions'),
-    );
 
     fireEvent.press(screen.getByText('Join our Discord'));
     expect(openUrlSpy).toHaveBeenCalledWith(
@@ -126,6 +121,21 @@ describe('HelpScreen — Report a Bug action routing (LS-8842)', () => {
     );
 
     expect(mockModalVisible).not.toHaveBeenCalledWith(true);
+  });
+
+  // LS-10437: the GitHub repo is private and has discussions disabled, so the
+  // card 404'd for every user. Discord is the community channel.
+  it('does not render the Community Discussions card or any GitHub link', () => {
+    setJiraProxyUrl(undefined);
+    render(<HelpScreen />);
+
+    expect(screen.queryByText('Community Discussions')).toBeNull();
+    fireEvent.press(screen.getByText('Report a Bug'));
+    fireEvent.press(screen.getByText('Suggest a Feature'));
+    fireEvent.press(screen.getByText('Join our Discord'));
+    for (const [url] of openUrlSpy.mock.calls) {
+      expect(url).not.toContain('github.com');
+    }
   });
 });
 
@@ -154,7 +164,7 @@ describe('HelpScreen — Suggest a Feature action routing (LS-9247)', () => {
     expect(openUrlSpy).not.toHaveBeenCalled();
   });
 
-  it('falls back to the GitHub feature request template when jiraProxyUrl is unconfigured', () => {
+  it('falls back to the Discord support contact — not the GitHub issue tracker — when jiraProxyUrl is unconfigured', () => {
     setJiraProxyUrl(undefined);
     render(<HelpScreen />);
 
@@ -163,8 +173,8 @@ describe('HelpScreen — Suggest a Feature action routing (LS-9247)', () => {
     expect(mockModalVisible).not.toHaveBeenCalledWith(true);
     expect(openUrlSpy).toHaveBeenCalledTimes(1);
     const [openedUrl] = openUrlSpy.mock.calls[0];
-    expect(openedUrl).toContain('github.com');
-    expect(openedUrl).toContain('feature_request');
+    expect(openedUrl).toContain('discord.gg');
+    expect(openedUrl).not.toContain('github.com');
   });
 
   it('routes bug and feature entries to their own modal kinds independently', () => {
