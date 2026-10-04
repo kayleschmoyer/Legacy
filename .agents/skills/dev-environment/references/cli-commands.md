@@ -57,8 +57,8 @@ For schema changes never use `query-db` — migrations only ([database](../../da
 Retrosheet publishes each season's processed CSVs the winter after the season ends. `ingest-retrosheet` defaults to 1897 through last year, and an explicit `--to` can reach the current year. A season whose archive 404s (not published yet) is skipped with a warning, not an error (LS-10232). Until a season is ingested, its player-seasons fall back to the rate-limited Baseball Reference scraper.
 
 - **When:** once a year, after Retrosheet announces the new season on [retrosheet.org](https://www.retrosheet.org/) (usually December–February). Check that `https://www.retrosheet.org/downloads/<year>/<year>csvs.zip` downloads.
-- **Who:** a maintainer with AWS credentials for the target account. Agents cannot mint them.
-- **Command** (the bucket is Terraform-managed as `<name_prefix>-retrosheet-corpus`, the same value the stats lambda reads from `RETROSHEET_S3_BUCKET`):
+- **How:** dispatch the [Corpus Ingest workflow](../../../../.github/workflows/corpus-ingest.yml) (`.github/workflows/corpus-ingest.yml`) with `source=retrosheet`, `from=<year>`, `to=<year>`. Run it first with the default `dry_run=true`, then again with `dry_run=false`. Every run waits for the owner's approval on the `corpus-ingest` environment, and only that environment can assume the `<name_prefix>-corpus-ingest` OIDC role (read/write, no delete, on the two corpus buckets only; LS-10562). The workflow targets the Terraform-managed `<name_prefix>-retrosheet-corpus` bucket, the same value the stats lambda reads from `RETROSHEET_S3_BUCKET`, and writes the per-season lines to the run summary. Agents may dispatch dry runs; a `dry_run=false` run is the owner's call.
+- **Local fallback** (a maintainer with AWS credentials for the target account; agents cannot mint them):
 
   ```bash
   ./ls-cli.sh ingest-retrosheet --from <year> --to <year> --dry-run
@@ -80,15 +80,16 @@ Retrosheet publishes each season's processed CSVs the winter after the season en
 Unlike Retrosheet, nflverse publishes the **current** season's weekly stats while the season is being played, so the corpus can (and should) be topped up during the season rather than once a year. `ingest-nflverse-football` defaults to 1999 through the current season — the season that started in September, so January–August still resolves to the previous season's label. A season whose weekly file 404s (not posted yet) is skipped with a warning and named in the final summary, not treated as an error (LS-10235).
 
 - **When:** weekly during the NFL regular season and postseason (roughly September–February), and once more after the season ends to pick up any late corrections. Existing objects are skipped unless `--force`, so a re-run only writes what is new.
-- **Who:** a maintainer with AWS credentials for the target account. Agents cannot mint them.
-- **Command** (the bucket is Terraform-managed as `<name_prefix>-football-corpus`, the same value the stats lambda reads from `FOOTBALL_CORPUS_S3_BUCKET`):
+- **How:** a manual dispatch of the [Corpus Ingest workflow](../../../../.github/workflows/corpus-ingest.yml) (`.github/workflows/corpus-ingest.yml`) with `source=nflverse`, `from` and `to` set to the current season, `force=true`, and `dry_run=false` (it defaults to `true`; do a dry run first if in doubt). There is deliberately no scheduled trigger: the repo's CI is schedule-free (LS-8487), so each weekly refresh is a dispatch. Every run waits for the owner's approval on the `corpus-ingest` environment, and only that environment can assume the `<name_prefix>-corpus-ingest` OIDC role (LS-10562). The workflow targets the Terraform-managed `<name_prefix>-football-corpus` bucket, the same value the stats lambda reads from `FOOTBALL_CORPUS_S3_BUCKET`, and writes the per-season lines to the run summary. Agents may dispatch dry runs; a `dry_run=false` run is the owner's call.
+
+  Use `force=true` for an in-progress season: the weekly file grows each week, and without it the player-season objects written earlier in the season are skipped as already present.
+
+- **Local fallback** (a maintainer with AWS credentials for the target account; agents cannot mint them):
 
   ```bash
   ./ls-cli.sh ingest-nflverse-football --from <year> --to <year> --dry-run
   ./ls-cli.sh ingest-nflverse-football --from <year> --to <year> --force --bucket <name_prefix>-football-corpus
   ```
-
-  Pass `--force` for an in-progress season: the weekly file grows each week, and without it the player-season objects written earlier in the season are skipped as already present.
 
 - **Verify:** the `Season <year>: N players in nflverse ...` log line reports the expected player count and the `unmapped` count is small. Players who debuted that season may lack a `pfr_id` in the nflverse crosswalk until it catches up; a later re-run picks them up.
 

@@ -1,0 +1,190 @@
+# =============================================================================
+# Corpus Ingest
+# =============================================================================
+# Runs the S3 corpus ingests from Actions (LS-10562) so they no longer need a
+# maintainer with local AWS SSO credentials:
+#
+#   nflverse   -> ingest-nflverse-football -> legacy-sports-dev-football-corpus
+#   retrosheet -> ingest-retrosheet        -> legacy-sports-dev-retrosheet-corpus
+#
+# Runbook: .agents/skills/dev-environment/references/cli-commands.md
+# (in-season nflverse refresh, annual Retrosheet refresh).
+#
+# On-demand tool, not a CI job: workflow_dispatch only, no automatic trigger of
+# any kind (schedule-free CI policy, LS-8487). The in-season nflverse refresh is
+# a manual dispatch with force=true for the current season.
+#
+# Safety:
+#   - The job runs in the `corpus-ingest` environment, which requires the
+#     owner's approval before it starts. The OIDC role
+#     (terraform/main/github-actions-corpus-ingest.tf) trusts ONLY that
+#     environment and can only read/write (never delete) the corpus buckets.
+#   - dry_run defaults to true. A dry run still assumes the role and probes the
+#     target bucket (list + head one object) before the CLI parses everything
+#     without writing, so it proves access end to end.
+#   - The CLI exits non-zero when any season fails (LS-10224), so a partial
+#     ingest fails the run.
+# =============================================================================
+
+name: "Corpus Ingest"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Which corpus to ingest"
+        required: true
+        type: choice
+        options:
+          - nflverse
+          - retrosheet
+      from:
+        description: "First season (blank = CLI default: 1999 nflverse, 1897 retrosheet)"
+        required: false
+        type: string
+        default: ""
+      to:
+        description: "Last season (blank = CLI default: current NFL season / last year)"
+        required: false
+        type: string
+        default: ""
+      force:
+        description: "Re-upload objects that already exist (use for an in-progress NFL season)"
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: "Parse and report without writing to S3"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One ingest per corpus at a time; never cancel a run that is mid-write.
+concurrency:
+  group: corpus-ingest-${{ inputs.source }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  CORPUS_ROLE_ARN: arn:aws:iam::176661590736:role/legacy-sports-dev-corpus-ingest
+
+jobs:
+  ingest:
+    name: "Ingest ${{ inputs.source }}${{ inputs.dry_run && ' (dry run)' || '' }}"
+    runs-on: ubuntu-latest
+    environment: corpus-ingest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Resolve arguments
+        id: args
+        env:
+          SOURCE: ${{ inputs.source }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          FORCE: ${{ inputs.force }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          case "$SOURCE" in
+            nflverse)   command=ingest-nflverse-football; bucket=legacy-sports-dev-football-corpus ;;
+            retrosheet) command=ingest-retrosheet;        bucket=legacy-sports-dev-retrosheet-corpus ;;
+            *) echo "::error::Unknown source: $SOURCE"; exit 1 ;;
+          esac
+
+          args="--bucket $bucket"
+          for pair in "from:$FROM" "to:$TO"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            [ -z "$value" ] && continue
+            if ! [[ "$value" =~ ^[0-9]{4}$ ]]; then
+              echo "::error::Input '$name' must be a 4-digit year, got: $value"
+              exit 1
+            fi
+            args="$args --$name $value"
+          done
+          [ "$FORCE" = "true" ] && args="$args --force"
+          [ "$DRY_RUN" = "true" ] && args="$args --dry-run"
+
+          {
+            echo "command=$command"
+            echo "bucket=$bucket"
+            echo "args=$args"
+          } >> "$GITHUB_OUTPUT"
+          echo "Will run: ls-cli.sh $command $args"
+
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: ${{ env.CORPUS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The CLI's --dry-run never touches S3, so probe the bucket explicitly:
+      # a dry run then proves the role can list and read the target corpus too.
+      - name: Probe corpus bucket access
+        env:
+          BUCKET: ${{ steps.args.outputs.bucket }}
+        run: |
+          # JSON + jq rather than --output text: with --max-items the CLI also
+          # emits a NextToken, which text output can splice into the key.
+          listing=$(aws s3api list-objects-v2 --bucket "$BUCKET" --max-items 1 --output json)
+          echo "ListBucket on s3://$BUCKET: OK"
+          key=$(jq -r '.Contents[0].Key // empty' <<< "$listing")
+          if [ -n "$key" ]; then
+            aws s3api head-object --bucket "$BUCKET" --key "$key" > /dev/null
+            echo "GetObject (head) on s3://$BUCKET/$key: OK"
+          else
+            echo "Bucket is empty; skipped the object read probe"
+          fi
+
+      - name: Run ingest
+        env:
+          COMMAND: ${{ steps.args.outputs.command }}
+          ARGS: ${{ steps.args.outputs.args }}
+        run: |
+          set -o pipefail
+          read -r -a argv <<< "$ARGS"
+          bash ./ls-cli.sh "$COMMAND" "${argv[@]}" 2>&1 | tee "$RUNNER_TEMP/ingest.log"
+          # The CLI's global uncaughtException handler (lib/logging) only logs,
+          # so a crash outside the command (e.g. a module failing to load) exits
+          # 0. Require the command's own completion line so that cannot pass.
+          if ! grep -q 'Ingest complete:' "$RUNNER_TEMP/ingest.log"; then
+            echo "::error::The CLI exited without logging 'Ingest complete:'; treating the run as failed"
+            exit 1
+          fi
+
+      - name: Write job summary
+        if: always()
+        env:
+          SOURCE: ${{ inputs.source }}
+          COMMAND: ${{ steps.args.outputs.command }}
+          ARGS: ${{ steps.args.outputs.args }}
+        run: |
+          log="$RUNNER_TEMP/ingest.log"
+          {
+            echo "## Corpus ingest: $SOURCE"
+            echo
+            echo "\`ls-cli.sh $COMMAND $ARGS\`"
+            echo
+            if [ -f "$log" ]; then
+              echo '```'
+              grep -oE '(Season [0-9]{4}:.*|Ingest complete:.*)' "$log" || echo "(no per-season lines; see the Run ingest step log)"
+              echo '```'
+            else
+              echo "Ingest did not run; see the earlier step logs."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
