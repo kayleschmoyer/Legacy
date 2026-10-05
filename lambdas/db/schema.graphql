@@ -5757,6 +5757,7 @@ enum StatsLoadingStatus {
 type StripePriceInfo {
   annualPriceId: String!
   annualTotalCents: Int!
+  currency: String!
   monthlyPriceCents: Int!
   monthlyPriceId: String!
   trialPeriodDays: Int!

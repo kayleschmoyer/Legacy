@@ -103,7 +103,7 @@ export function useStripePrices(options?: UseStripePricesOptions) {
   }
 
   return {
-    ...derivePricing(monthly, annual),
+    ...derivePricing(monthly, annual, stripePrices?.currency),
     loading: false,
     pricesFailed: false,
     monthlyPriceId,

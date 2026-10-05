@@ -403,6 +403,7 @@ const StripePriceInfoRef = builder.objectRef<{
   annualTotalCents: number;
   monthlyPriceId: string;
   annualPriceId: string;
+  currency: string;
   trialPeriodDays: number;
 }>('StripePriceInfo');
 
@@ -412,6 +413,10 @@ StripePriceInfoRef.implement({
     annualTotalCents: t.exposeInt('annualTotalCents', { nullable: false }),
     monthlyPriceId: t.exposeString('monthlyPriceId', { nullable: false }),
     annualPriceId: t.exposeString('annualPriceId', { nullable: false }),
+    // Lowercase ISO 4217 code from the Stripe Price (e.g. "usd"). The *Cents
+    // fields are Stripe minor units, so zero-decimal currencies (jpy) carry
+    // whole units; clients format with Intl.NumberFormat using this code.
+    currency: t.exposeString('currency', { nullable: false }),
     // Number of free trial days offered on new subscriptions (0 = no trial).
     // Lets the client keep its trial messaging in sync with the actual Stripe
     // checkout config instead of hardcoding a trial that may not exist (LS-5200).
@@ -463,6 +468,7 @@ type StripePriceResult = {
   annualTotalCents: number;
   monthlyPriceId: string;
   annualPriceId: string;
+  currency: string;
 };
 
 /**
@@ -514,6 +520,12 @@ async function doFetchStripePrices(): Promise<StripePriceResult> {
     stripe.prices.retrieve(annualPriceId),
   ]);
 
+  if (monthlyPrice.currency !== annualPrice.currency) {
+    throw new Error(
+      `Stripe monthly and annual prices must share a currency (got ${monthlyPrice.currency} / ${annualPrice.currency})`,
+    );
+  }
+
   if (
     typeof monthlyPrice.unit_amount !== 'number' ||
     typeof annualPrice.unit_amount !== 'number'
@@ -528,6 +540,7 @@ async function doFetchStripePrices(): Promise<StripePriceResult> {
     annualTotalCents: annualPrice.unit_amount,
     monthlyPriceId,
     annualPriceId,
+    currency: monthlyPrice.currency,
   };
 }
 

@@ -1,13 +1,39 @@
 export const FALLBACK_MONTHLY_PRICE_CENTS = 499;
 export const FALLBACK_ANNUAL_TOTAL_CENTS = 3999;
 
+export const FALLBACK_CURRENCY = 'USD';
+
+/**
+ * Build a currency formatter for a Stripe currency code (case-insensitive).
+ * Falls back to USD when the code is not a valid ISO 4217 code so a bad value
+ * can never throw during render.
+ */
+function makeCurrencyFormatter(currency: string): Intl.NumberFormat {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    });
+  } catch {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: FALLBACK_CURRENCY,
+    });
+  }
+}
+
 export function derivePricing(
   monthlyPriceCents: number,
   annualTotalCents: number,
+  currency: string = FALLBACK_CURRENCY,
 ) {
-  const monthlyPrice = monthlyPriceCents / 100;
-  const annualTotal = annualTotalCents / 100;
-  const annualMonthlyPrice = annualTotalCents / 12 / 100;
+  const formatter = makeCurrencyFormatter(currency);
+  // Stripe amounts are minor units: 2 decimals for usd/eur/gbp, 0 for jpy.
+  const minorUnitDivisor =
+    10 ** (formatter.resolvedOptions().maximumFractionDigits ?? 2);
+  const monthlyPrice = monthlyPriceCents / minorUnitDivisor;
+  const annualTotal = annualTotalCents / minorUnitDivisor;
+  const annualMonthlyPrice = annualTotalCents / 12 / minorUnitDivisor;
   const hasValidSavingsInputs = monthlyPriceCents > 0 && annualTotalCents >= 0;
   const annualSavings = hasValidSavingsInputs
     ? 1 - annualTotalCents / (monthlyPriceCents * 12)
@@ -17,7 +43,7 @@ export function derivePricing(
     : 0;
   const annualSavingsPct = `${annualSavingsPctValue}%`;
 
-  const fmt = (v: number) => `$${v.toFixed(2)}`;
+  const fmt = (v: number) => formatter.format(v);
   return {
     monthlyPrice,
     annualTotal,

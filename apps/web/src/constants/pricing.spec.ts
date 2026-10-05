@@ -32,6 +32,28 @@ describe('derivePricing', () => {
     expect(result.annualSavingsPct).toBe('0%');
   });
 
+  it('formats non-USD currencies with the right symbol (LS-7195)', () => {
+    const eur = derivePricing(499, 3999, 'eur');
+    expect(eur.monthlyPriceDisplay).toContain('€');
+    expect(eur.monthlyPriceDisplay).not.toContain('$');
+    expect(eur.monthlyPrice).toBe(4.99);
+
+    expect(derivePricing(499, 3999, 'gbp').monthlyPriceDisplay).toContain('£');
+  });
+
+  it('treats zero-decimal currencies (JPY) as whole units (LS-7195)', () => {
+    const jpy = derivePricing(499, 3999, 'jpy');
+    expect(jpy.monthlyPrice).toBe(499);
+    expect(jpy.monthlyPriceDisplay).toMatch(/[¥￥]\s?499$/);
+    expect(jpy.monthlyPriceDisplay).not.toContain('.');
+  });
+
+  it('falls back to USD for an invalid currency code (LS-7195)', () => {
+    expect(derivePricing(499, 3999, 'not-a-currency').monthlyPriceDisplay).toBe(
+      '$4.99',
+    );
+  });
+
   it('clamps savings to 0% when annual is more expensive than monthly * 12', () => {
     // 1 - 6900 / (499 * 12) = -15%
     const result = derivePricing(499, 6900);

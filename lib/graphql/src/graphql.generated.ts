@@ -5265,6 +5265,7 @@ export type StripePriceInfo = {
   __typename?: 'StripePriceInfo';
   annualPriceId: Scalars['String']['output'];
   annualTotalCents: Scalars['Int']['output'];
+  currency: Scalars['String']['output'];
   monthlyPriceCents: Scalars['Int']['output'];
   monthlyPriceId: Scalars['String']['output'];
   trialPeriodDays: Scalars['Int']['output'];
@@ -9641,6 +9642,7 @@ export type GetStripePricesQuery = {
     annualTotalCents: number;
     monthlyPriceId: string;
     annualPriceId: string;
+    currency: string;
     trialPeriodDays: number;
   } | null;
 };
@@ -24152,6 +24154,7 @@ export const GetStripePrices = gql`
       annualTotalCents
       monthlyPriceId
       annualPriceId
+      currency
       trialPeriodDays
     }
   }

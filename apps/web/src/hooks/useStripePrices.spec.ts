@@ -30,6 +30,7 @@ describe('useStripePrices', () => {
           annualTotalCents: 4999,
           monthlyPriceId: 'price_monthly123',
           annualPriceId: 'price_annual456',
+          currency: 'usd',
           trialPeriodDays: 14,
         },
       },
@@ -48,6 +49,28 @@ describe('useStripePrices', () => {
     expect(result.current.monthlyPriceId).toBe('price_monthly123');
     expect(result.current.annualPriceId).toBe('price_annual456');
     expect(result.current.trialPeriodDays).toBe(14);
+  });
+
+  it('formats live prices in the Stripe currency (LS-7195)', () => {
+    useGetStripePricesQuery.mockReturnValue({
+      data: {
+        stripePrices: {
+          monthlyPriceCents: 599,
+          annualTotalCents: 4999,
+          monthlyPriceId: 'price_monthly123',
+          annualPriceId: 'price_annual456',
+          currency: 'eur',
+          trialPeriodDays: 0,
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+
+    const { result } = renderHook(() => useStripePrices());
+
+    expect(result.current.monthlyPriceDisplay).toContain('€');
+    expect(result.current.monthlyPriceDisplay).not.toContain('$');
   });
 
   it('returns hardcoded fallbacks when query returns null', () => {

@@ -80,5 +80,25 @@ describe('derivePricing', () => {
       expect(result.monthlyPriceDisplay).toBe('$1.00');
       expect(result.annualPriceDisplay).toBe('$10.00');
     });
+    it('formats non-USD currencies with the right symbol (LS-7195)', () => {
+      const eur = derivePricing(499, 3999, 'eur');
+      expect(eur.monthlyPriceDisplay).toContain('€');
+      expect(eur.monthlyPriceDisplay).not.toContain('$');
+      expect(derivePricing(499, 3999, 'gbp').monthlyPriceDisplay).toContain(
+        '£',
+      );
+    });
+
+    it('treats zero-decimal currencies (JPY) as whole units (LS-7195)', () => {
+      const jpy = derivePricing(499, 3999, 'jpy');
+      expect(jpy.monthlyPrice).toBe(499);
+      expect(jpy.monthlyPriceDisplay).toMatch(/[¥￥]\s?499$/);
+    });
+
+    it('falls back to USD for an invalid currency code (LS-7195)', () => {
+      expect(
+        derivePricing(499, 3999, 'not-a-currency').monthlyPriceDisplay,
+      ).toBe('$4.99');
+    });
   });
 });

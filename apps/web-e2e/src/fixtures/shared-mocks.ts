@@ -348,6 +348,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
         annualTotalCents: 3999,
         monthlyPriceId: 'price_monthly_test',
         annualPriceId: 'price_annual_test',
+        currency: 'usd',
         trialPeriodDays: 0,
       },
     },

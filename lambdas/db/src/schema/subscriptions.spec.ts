@@ -488,11 +488,15 @@ describe('getOrCreateStripeCustomer', () => {
 
 import { getStripeClient } from '../server/stripe';
 
-function makeStripeWithPrices(monthly: number, annual: number) {
+function makeStripeWithPrices(
+  monthly: number,
+  annual: number,
+  currency = 'usd',
+) {
   const retrieve = jest
     .fn()
-    .mockResolvedValueOnce({ unit_amount: monthly })
-    .mockResolvedValueOnce({ unit_amount: annual });
+    .mockResolvedValueOnce({ unit_amount: monthly, currency })
+    .mockResolvedValueOnce({ unit_amount: annual, currency });
   (getStripeClient as jest.Mock).mockResolvedValue({
     prices: { retrieve },
   });
@@ -531,8 +535,27 @@ describe('fetchStripePrices', () => {
         annualTotalCents: 8999,
         monthlyPriceId: 'price_monthly',
         annualPriceId: 'price_annual',
+        currency: 'usd',
       });
     }
+  });
+
+  it('exposes the Stripe Price currency (LS-7195)', async () => {
+    makeStripeWithPrices(499, 3999, 'jpy');
+
+    const result = await fetchStripePrices();
+
+    expect(result.currency).toBe('jpy');
+  });
+
+  it('rejects when monthly and annual prices use different currencies (LS-7195)', async () => {
+    const retrieve = jest
+      .fn()
+      .mockResolvedValueOnce({ unit_amount: 499, currency: 'usd' })
+      .mockResolvedValueOnce({ unit_amount: 3999, currency: 'eur' });
+    (getStripeClient as jest.Mock).mockResolvedValue({ prices: { retrieve } });
+
+    await expect(fetchStripePrices()).rejects.toThrow(/share a currency/);
   });
 
   it('returns cached promise on subsequent calls within TTL', async () => {

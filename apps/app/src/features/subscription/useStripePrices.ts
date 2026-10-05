@@ -92,7 +92,7 @@ export function useStripePrices() {
   // stripePrices is non-null here and the schema marks monthlyPriceId /
   // annualPriceId as non-nullable, so we read them directly.
   return {
-    ...derivePricing(monthly, annual),
+    ...derivePricing(monthly, annual, stripePrices.currency),
     loading: false,
     monthlyPriceId: stripePrices.monthlyPriceId,
     annualPriceId: stripePrices.annualPriceId,
