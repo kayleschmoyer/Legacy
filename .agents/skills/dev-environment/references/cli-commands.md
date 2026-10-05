@@ -69,11 +69,12 @@ Retrosheet publishes each season's processed CSVs the winter after the season en
 
 ## Data loading — football
 
-| Command                    | Purpose                                                                                                                                                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `load-football-career`     | PFR career stats → `career_football_*`. One of `--player-id <id>`, `--all`, `--batch <file>`, or `--limit N` (resumable); `--start-season <year>`                                                                                 |
-| `queue-players`            | Discover + batch-enqueue players to the stats SQS queue. `--sport baseball\|football` (required), `--letter <x>`, `--skip-queue`. Football scrapes the PFR A–Z index first                                                        |
-| `ingest-nflverse-football` | Stage the nflverse football corpus in S3, one object per player-season and per team-defense-season. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [in-season refresh](#in-season-nflverse-corpus-refresh) |
+| Command                    | Purpose                                                                                                                                                                                                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `load-football-career`     | PFR career stats → `career_football_*`. One of `--player-id <id>`, `--all`, `--batch <file>`, or `--limit N` (resumable); `--start-season <year>`                                                                                                                                                                        |
+| `queue-players`            | Discover + batch-enqueue players to the stats SQS queue. `--sport baseball\|football` (required), `--letter <x>`, `--skip-queue`. Football scrapes the PFR A–Z index first                                                                                                                                               |
+| `ingest-nflverse-football` | Stage the nflverse football corpus in S3, one object per player-season and per team-defense-season. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [in-season refresh](#in-season-nflverse-corpus-refresh)                                                                                        |
+| `seed-football-players`    | Insert football players PFR discovery missed (LS-9968 HOF gap) from nflverse `players.csv`, with authoritative `pfr_id`s and no PFR requests. Insert-only; dry run by default, `--apply` to write (shared dev DB, owner's call). See [ADR 0023](../../../../docs/decisions/0023-football-player-identity-without-pfr.md) |
 
 ### In-season nflverse corpus refresh
 

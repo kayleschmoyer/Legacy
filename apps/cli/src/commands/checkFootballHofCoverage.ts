@@ -44,20 +44,26 @@ export interface KnownFootballHofPlayer {
 }
 
 export const KNOWN_FOOTBALL_HOF_PLAYERS: readonly KnownFootballHofPlayer[] = [
-  { lastName: 'Montana' },
-  { lastName: 'Marino' },
-  { lastName: 'Elway' },
+  // pfr_ids below are as published in nflverse players.csv (LS-10585) —
+  // pinned so a same-surname namesake (Danieal Manning, Sidney Rice, Chad
+  // Simpson, ...) can no longer mask the HOF player being absent.
+  { lastName: 'Montana', pfrId: 'MontJo01' }, // Joe Montana
+  { lastName: 'Marino', pfrId: 'MariDa00' }, // Dan Marino
+  { lastName: 'Elway', pfrId: 'ElwaJo00' }, // John Elway
+  // Unitas retired in 1973, before nflverse's players.csv coverage starts, so
+  // there is no authoritative pfr_id to pin; his row comes from the PFA index
+  // (LS-10588, ADR 0023). Surname-only until then.
   { lastName: 'Unitas' },
-  { lastName: 'Namath' },
-  { lastName: 'Staubach' },
-  { lastName: 'Tarkenton' },
-  { lastName: 'Favre' },
-  { lastName: 'Aikman' },
+  { lastName: 'Namath', pfrId: 'NamaJo00' }, // Joe Namath
+  { lastName: 'Staubach', pfrId: 'StauRo00' }, // Roger Staubach
+  { lastName: 'Tarkenton', pfrId: 'TarkFr00' }, // Fran Tarkenton
+  { lastName: 'Favre', pfrId: 'FavrBr00' }, // Brett Favre
+  { lastName: 'Aikman', pfrId: 'AikmTr00' }, // Troy Aikman
   { lastName: 'Payton', pfrId: 'PaytWa00' }, // Walter Payton (LS-9765)
-  { lastName: 'Rice' },
-  { lastName: 'Simpson' },
-  { lastName: 'Manning' },
-  { lastName: 'Warner' },
+  { lastName: 'Rice', pfrId: 'RiceJe00' }, // Jerry Rice
+  { lastName: 'Simpson', pfrId: 'SimpO.00' }, // O.J. Simpson
+  { lastName: 'Manning', pfrId: 'MannPe00' }, // Peyton Manning
+  { lastName: 'Warner', pfrId: 'WarnKu00' }, // Kurt Warner
   { lastName: 'Smith', pfrId: 'SmitEm00' }, // Emmitt Smith (LS-9765)
 ];
 

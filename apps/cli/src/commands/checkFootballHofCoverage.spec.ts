@@ -25,7 +25,7 @@ describe('findMissingKnownPlayers', () => {
       pfrId: known.pfrId ?? `${known.lastName}Xx00`,
     }));
 
-    expect(findMissingKnownPlayers(rows)).toEqual(['Montana']);
+    expect(findMissingKnownPlayers(rows)).toEqual(['Montana (MontJo01)']);
   });
 
   it('treats a name match with a null pfr_id as not present', () => {

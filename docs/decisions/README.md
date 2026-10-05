@@ -32,3 +32,5 @@ for authoring guidance and the immutability rule.
 | [0019](0019-realtime-reliability-hardening.md)           | Realtime reliability: subsystem ownership, binding rules, no-mocked-neighbour testing | Accepted |
 | [0020](0020-native-websocket-fan-out-stays-manual.md)    | Native-emulator WebSocket fan-out coverage stays manual until mock server speaks WS   | Accepted |
 | [0021](0021-native-route-parity-seam.md)                 | Native route-parity seam: a driver-level translation table for tab-addressed routes   | Accepted |
+| [0022](0022-football-per-game-stats-source.md)           | Football per-game stats: nflverse 1999+, licensed PFA 1960-1998, no PFR scraping      | Accepted |
+| [0023](0023-football-player-identity-without-pfr.md)     | Football player identity without PFR: authoritative pfr_id only, pfa_id for the rest  | Accepted |

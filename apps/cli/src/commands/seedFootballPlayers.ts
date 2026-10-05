@@ -1,0 +1,367 @@
+import { LOGGER } from '@legacy-sports/logging';
+import { getDbOptions } from '@legacy-sports/utils/node';
+import {
+  PublicDb,
+  PublicSchema,
+  refreshFootballPlayerEligiblePositions,
+  runWithPublicClient,
+} from '@legacy-sports/db-client';
+import {
+  type NflverseRow,
+  parseNflverseCsv,
+} from '@legacy-sports/data-loaders';
+import { type IdpPosition, mapPfrPosition } from '@legacy-sports/pfr-client';
+import { eq, sql } from 'drizzle-orm';
+import {
+  currentNflSeason,
+  fetchWeeklyStatsCsv,
+  FIRST_SEASON,
+} from './ingestNflverseFootball';
+import { KNOWN_FOOTBALL_HOF_PLAYERS } from './checkFootballHofCoverage';
+import { toError } from '../utils/errors';
+
+/**
+ * Seeds football players that PFR discovery never inserted (LS-10585, slice 1
+ * of LS-9971) from nflverse's `players.csv`, without any PFR request.
+ *
+ * LS-9968's HOF "+" parsing bug silently dropped every Hall of Fame player
+ * from `queue-players --sport football`, and that command cannot be re-run:
+ * PFR is Cloudflare-walled and its terms forbid a derived database (LS-9908,
+ * ADR 0022). nflverse's players.csv (CC-BY 4.0, already the pfr_id -> gsis_id
+ * crosswalk for `ingest-nflverse-football`) publishes PFR's own ids for every
+ * player active from 1974 on, which covers the whole missing HOF cohort except
+ * players whose careers ended before 1974 (LS-10588).
+ *
+ * Identity rules (ADR 0023):
+ * - pfr_id is taken verbatim from players.csv — never synthesised from PFR's
+ *   `LastFi00` pattern.
+ * - Insert-only: `ON CONFLICT (pfr_id) DO NOTHING`. Rows PFR discovery already
+ *   created are never touched.
+ *
+ * Eligibility mirrors what PFR's per-letter index (the old discovery source)
+ * lists — players who appeared in a game at a position we track:
+ * - position maps through `mapPfrPosition` (QB/RB/WR/TE/K/DL/LB/DB), and
+ * - the career began before 1999 (pre-nflverse-stats era; players.csv only
+ *   carries those players because they played), OR the player has at least
+ *   one nflverse weekly stat row from 1999 on. Practice-squad and
+ *   roster-only players have no weekly row and are not seeded.
+ *
+ * Data source and attribution: nflverse-data, CC-BY 4.0
+ * (https://github.com/nflverse/nflverse-data/blob/master/LICENSE.md).
+ */
+
+const PLAYERS_URL =
+  'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv';
+const FETCH_TIMEOUT_MS = 120_000;
+
+// nflverse position codes that PFR's index spells differently. Everything
+// else (QB, RB, FB, WR, TE, K, DE, DT, NT, LB, ILB, OLB, MLB, CB, S, FS, SS,
+// DB) is already a POSITION_MAP key in pfr-client.
+const NFLVERSE_POSITION_ALIASES: Record<string, string> = {
+  SAF: 'S',
+  DL: 'DT',
+};
+
+// nflverse `latest_team` codes that differ from nfl_teams.abbreviation. Any
+// code not in `validTeams` after aliasing (relocated/defunct franchises —
+// OAK, SD, STL, ...) becomes null, matching queue-players' PFR_TEAM_MAP.
+const NFLVERSE_TEAM_ALIASES: Record<string, string> = {
+  LA: 'LAR',
+};
+
+export type SeedSkipReason =
+  | 'already_present'
+  | 'no_pfr_id'
+  | 'untracked_position'
+  | 'no_game_activity';
+
+export interface SeedCandidate {
+  pfrId: string;
+  gsisId: string | null;
+  firstName: string;
+  lastName: string;
+  position: Exclude<IdpPosition, null>;
+  nflTeam: string | null;
+  /** First season per players.csv (rookie_season, else draft_year). nflverse
+   * floors rookie_season at 1974 for older players, so this is an eligibility
+   * signal, not a true career start. */
+  firstSeason: number | null;
+}
+
+export interface SeedSelection {
+  candidates: SeedCandidate[];
+  skipped: Record<SeedSkipReason, number>;
+}
+
+export function mapNflversePosition(raw: string): IdpPosition {
+  const upper = raw.trim().toUpperCase();
+  return mapPfrPosition(NFLVERSE_POSITION_ALIASES[upper] ?? upper);
+}
+
+export function mapNflverseTeam(
+  raw: string | undefined,
+  validTeams: ReadonlySet<string>,
+): string | null {
+  const code = raw?.trim().toUpperCase();
+  if (!code) return null;
+  const mapped = NFLVERSE_TEAM_ALIASES[code] ?? code;
+  return validTeams.has(mapped) ? mapped : null;
+}
+
+function parseYear(value: string | undefined): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** First/last name from players.csv, falling back to splitting
+ * display_name on its first space (the same rule queue-players used for
+ * PFR's index names). */
+export function nflverseName(row: NflverseRow): {
+  firstName: string;
+  lastName: string;
+} {
+  const first = row.first_name?.trim();
+  const last = row.last_name?.trim();
+  if (first && last) return { firstName: first, lastName: last };
+
+  const display = (row.display_name ?? '').trim();
+  const spaceIdx = display.indexOf(' ');
+  if (spaceIdx === -1) return { firstName: display, lastName: display };
+  return {
+    firstName: display.slice(0, spaceIdx),
+    lastName: display.slice(spaceIdx + 1),
+  };
+}
+
+/**
+ * Pure selection: which players.csv rows to seed. No I/O, so it is unit
+ * tested directly. `existingPfrIds` must be every football pfr_id already in
+ * `players`; `activeGsisIds` every gsis id with an nflverse weekly stat row.
+ */
+export function selectSeedCandidates(
+  playersCsvRows: readonly NflverseRow[],
+  existingPfrIds: ReadonlySet<string>,
+  activeGsisIds: ReadonlySet<string>,
+  validTeams: ReadonlySet<string>,
+): SeedSelection {
+  const skipped: Record<SeedSkipReason, number> = {
+    already_present: 0,
+    no_pfr_id: 0,
+    untracked_position: 0,
+    no_game_activity: 0,
+  };
+  const candidates: SeedCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const row of playersCsvRows) {
+    const pfrId = row.pfr_id?.trim();
+    if (!pfrId) {
+      skipped.no_pfr_id++;
+      continue;
+    }
+    if (existingPfrIds.has(pfrId) || seen.has(pfrId)) {
+      skipped.already_present++;
+      continue;
+    }
+
+    const position = mapNflversePosition(row.position ?? '');
+    if (!position) {
+      skipped.untracked_position++;
+      continue;
+    }
+
+    const gsisId = row.gsis_id?.trim() || null;
+    const firstSeason =
+      parseYear(row.rookie_season) ?? parseYear(row.draft_year);
+    const preStatsEra = firstSeason !== null && firstSeason < FIRST_SEASON;
+    const hasActivity = gsisId !== null && activeGsisIds.has(gsisId);
+    if (!preStatsEra && !hasActivity) {
+      skipped.no_game_activity++;
+      continue;
+    }
+
+    seen.add(pfrId);
+    candidates.push({
+      pfrId,
+      gsisId,
+      ...nflverseName(row),
+      position,
+      nflTeam: mapNflverseTeam(row.latest_team, validTeams),
+      firstSeason,
+    });
+  }
+
+  return { candidates, skipped };
+}
+
+/** Every gsis id (`player_id`) with at least one row in a weekly stats CSV.
+ * nflverse only writes a weekly row for a player who recorded a stat. */
+export function collectActiveGsisIds(
+  weeklyCsv: string,
+  into: Set<string> = new Set(),
+): Set<string> {
+  for (const row of parseNflverseCsv(weeklyCsv)) {
+    if (row.player_id) into.add(row.player_id);
+  }
+  return into;
+}
+
+/** Known HOF players (check-football-hof-coverage) with a pinned pfr_id that
+ * would still be absent after this seed — surfaced in the dry-run report so
+ * an operator can see the seed closes the LS-9968 gap before applying it. */
+export function knownPlayersStillMissing(
+  existingPfrIds: ReadonlySet<string>,
+  candidates: readonly SeedCandidate[],
+): string[] {
+  const seeded = new Set(candidates.map((c) => c.pfrId));
+  return KNOWN_FOOTBALL_HOF_PLAYERS.filter(
+    (p) => p.pfrId && !existingPfrIds.has(p.pfrId) && !seeded.has(p.pfrId),
+  ).map((p) => `${p.lastName} (${p.pfrId})`);
+}
+
+async function fetchText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`GET ${url} failed: ${response.status}`);
+  return response.text();
+}
+
+async function fetchActiveGsisIds(): Promise<Set<string>> {
+  const active = new Set<string>();
+  const lastSeason = currentNflSeason(new Date());
+  for (let season = FIRST_SEASON; season <= lastSeason; season++) {
+    const csv = await fetchWeeklyStatsCsv(season);
+    if (csv === null) {
+      // Only the in-progress season can legitimately 404 (LS-10223); any
+      // other missing season would under-seed, so fail rather than guess.
+      if (season === lastSeason) {
+        LOGGER.warn(`nflverse weekly stats for ${season} not posted yet`);
+        continue;
+      }
+      throw new Error(`nflverse weekly stats for ${season} returned 404`);
+    }
+    collectActiveGsisIds(csv, active);
+    LOGGER.info(`Season ${season}: ${active.size} active players so far`);
+  }
+  return active;
+}
+
+async function loadExistingPfrIds(db: PublicDb): Promise<Set<string>> {
+  const rows = await db
+    .select({ pfrId: PublicSchema.players.pfrId })
+    .from(PublicSchema.players)
+    .where(eq(PublicSchema.players.sport, 'football'));
+  return new Set(rows.flatMap((r) => (r.pfrId ? [r.pfrId] : [])));
+}
+
+async function loadValidTeams(db: PublicDb): Promise<Set<string>> {
+  const rows = await db
+    .select({ abbreviation: PublicSchema.nflTeams.abbreviation })
+    .from(PublicSchema.nflTeams);
+  return new Set(rows.map((r) => r.abbreviation));
+}
+
+async function insertCandidate(
+  db: PublicDb,
+  c: SeedCandidate,
+): Promise<boolean> {
+  // bref_id is NOT NULL; football rows use pfr_id as bref_id (same as
+  // queue-players' upsertFootballPlayer). DO NOTHING, not DO UPDATE: this
+  // command only ever adds rows PFR discovery missed.
+  const result = await db.execute(sql`
+    INSERT INTO public.players
+      (first_name, last_name, bref_id, pfr_id, sport, is_dst, nfl_team, position)
+    VALUES
+      (${c.firstName}, ${c.lastName}, ${c.pfrId}, ${c.pfrId}, 'football', false, ${c.nflTeam}, ${c.position})
+    ON CONFLICT DO NOTHING
+  `);
+  return (result.rowCount ?? 0) > 0;
+}
+
+export interface SeedFootballPlayersArgs {
+  dryRun?: boolean;
+}
+
+export async function handleSeedFootballPlayers(
+  args: SeedFootballPlayersArgs,
+): Promise<void> {
+  const dryRun = args.dryRun ?? true;
+  LOGGER.info(
+    `seed-football-players: nflverse players.csv -> players (dryRun=${dryRun}). ` +
+      'Data source: nflverse-data (CC-BY 4.0, https://github.com/nflverse/nflverse-data)',
+  );
+
+  const playersCsv = parseNflverseCsv(await fetchText(PLAYERS_URL));
+  LOGGER.info(`players.csv: ${playersCsv.length} rows`);
+  const activeGsisIds = await fetchActiveGsisIds();
+
+  await runWithPublicClient(getDbOptions(), async (db: PublicDb) => {
+    const [existingPfrIds, validTeams] = await Promise.all([
+      loadExistingPfrIds(db),
+      loadValidTeams(db),
+    ]);
+
+    const { candidates, skipped } = selectSeedCandidates(
+      playersCsv,
+      existingPfrIds,
+      activeGsisIds,
+      validTeams,
+    );
+
+    const byPosition: Record<string, number> = {};
+    for (const c of candidates) {
+      byPosition[c.position] = (byPosition[c.position] ?? 0) + 1;
+    }
+    const preStatsEra = candidates.filter(
+      (c) => c.firstSeason !== null && c.firstSeason < FIRST_SEASON,
+    ).length;
+
+    LOGGER.info(
+      `Selected ${candidates.length} player(s) to seed ` +
+        `(${preStatsEra} with careers starting before ${FIRST_SEASON}); ` +
+        `by position ${JSON.stringify(byPosition)}; skipped ${JSON.stringify(skipped)}`,
+    );
+    LOGGER.info(
+      `Sample: ${candidates
+        .slice(0, 25)
+        .map((c) => `${c.firstName} ${c.lastName} (${c.pfrId}, ${c.position})`)
+        .join('; ')}`,
+    );
+
+    const stillMissing = knownPlayersStillMissing(existingPfrIds, candidates);
+    if (stillMissing.length > 0) {
+      LOGGER.warn(
+        `Known HOF players with a pinned pfr_id that this seed does NOT cover: ${stillMissing.join(', ')}`,
+      );
+    }
+
+    if (dryRun) {
+      LOGGER.info(
+        `[dry-run] would insert ${candidates.length} player(s); pass --apply to write`,
+      );
+      return;
+    }
+
+    let inserted = 0;
+    for (const candidate of candidates) {
+      if (await insertCandidate(db, candidate)) inserted++;
+    }
+    LOGGER.info(
+      `Inserted ${inserted} player(s) (${candidates.length - inserted} already present at insert time)`,
+    );
+
+    // players.position feeds the football_player_eligible_positions
+    // materialized view (LS-10553). Non-fatal, same as queue-players.
+    try {
+      await refreshFootballPlayerEligiblePositions(db);
+      LOGGER.info('football_player_eligible_positions refreshed.');
+    } catch (refreshError) {
+      LOGGER.error(
+        'Failed to refresh football_player_eligible_positions:',
+        toError(refreshError),
+      );
+    }
+  });
+}

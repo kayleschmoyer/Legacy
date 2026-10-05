@@ -33,6 +33,7 @@ import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
 import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball';
 import { handleIngestPfaFootball } from './commands/ingestPfaFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
+import { handleSeedFootballPlayers } from './commands/seedFootballPlayers';
 import {
   handleDeriveFootballSeasonStats,
   parsePlayerIds,
@@ -298,6 +299,19 @@ export function buildProgram(): Command {
     )
     .action((options: { apply?: boolean }) =>
       handleBackfillNflverseMultiTeamSeasons({ dryRun: !options.apply }),
+    );
+
+  program
+    .command('seed-football-players')
+    .description(
+      'Seed football players PFR discovery missed from nflverse players.csv (LS-10585, no PFR requests; insert-only)',
+    )
+    .option(
+      '--apply',
+      'Insert the selected players (default: dry-run report only)',
+    )
+    .action((options: { apply?: boolean }) =>
+      handleSeedFootballPlayers({ dryRun: !options.apply }),
     );
 
   program
