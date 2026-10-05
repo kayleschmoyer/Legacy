@@ -11,6 +11,7 @@
           "/baseball/league/*",
           "/join",
           "/join/*",
+          "/games/season-draft/join/*",
           "/baseball/mock-draft/join",
           "/baseball/mock-draft/join/*"
         ]

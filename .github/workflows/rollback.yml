@@ -185,11 +185,26 @@ jobs:
         if: "!inputs.dry_run"
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
+      # Hand-built Pages artifact instead of actions/upload-pages-artifact:
+      # that action drops dotfiles/dot-directories, which would silently remove
+      # /.well-known/ (apple-app-site-association, assetlinks.json) and break
+      # universal links / app links. Same layout the action produces.
+      - name: Archive Pages artifact
+        if: "!inputs.dry_run"
+        run: |
+          tar --dereference --hard-dereference --directory ./dist/apps/web \
+            -cf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude=.github .
+          tar -tf "$RUNNER_TEMP/artifact.tar" | grep -q 'well-known/apple-app-site-association' \
+            || { echo "::error::.well-known missing from Pages artifact"; exit 1; }
+
       - name: Upload to GitHub Pages
         if: "!inputs.dry_run"
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          path: ./dist/apps/web
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
       - name: "Rollbar Deploy Started (Rollback)"
         if: "!inputs.dry_run"

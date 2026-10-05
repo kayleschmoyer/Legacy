@@ -130,6 +130,9 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          # Invite/share link base. Must be an associated domain (apps/app/app.json
+          # associatedDomains) or shared links open in the browser, not the app.
+          EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
         run: |
           cd apps/app/ios
           xcodebuild \
@@ -146,6 +149,9 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           EXPO_PUBLIC_APP_VERSION: ${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          # Invite/share link base. Must be an associated domain (apps/app/app.json
+          # associatedDomains) or shared links open in the browser, not the app.
+          EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
         run: |
           cd apps/app/ios
 
