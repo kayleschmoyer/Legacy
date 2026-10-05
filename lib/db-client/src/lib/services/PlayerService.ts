@@ -79,6 +79,7 @@ interface ScoringResultRow {
   // Football identity columns (LS-246, LS-250)
   sport: 'baseball' | 'football';
   pfr_id: string | null;
+  pfa_id: string | null;
   is_dst: boolean;
   nfl_team: string | null;
   position: string | null;
@@ -1096,7 +1097,7 @@ export class PlayerService {
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
-            p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
+            p.sport, p.pfr_id, p.pfa_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
             p.news,
             p.projected_fantasy_points, p.adp_rank, p.mlb_team,
             ${battingScoreExpr} AS batting_score,
@@ -1144,6 +1145,7 @@ export class PlayerService {
           throwHand: row.throw_hand ?? null,
           sport: row.sport ?? 'baseball',
           pfrId: row.pfr_id ?? null,
+          pfaId: row.pfa_id ?? null,
           isDst: row.is_dst ?? false,
           nflTeam: row.nfl_team ?? null,
           position: toPlayerPosition(row.position),

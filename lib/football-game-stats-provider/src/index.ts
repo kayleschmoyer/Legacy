@@ -4,12 +4,15 @@ export { CareerStats, IDPStats, TeamDefense } from './lib/provider';
 export { PfaCareerStats } from './lib/pfa-provider';
 export {
   buildPfaObjectKey,
+  type FootballCorpusIdentity,
   isPfaSeason,
   PFA_FIRST_SEASON,
   PFA_LAST_SEASON,
   PFA_PAYLOAD_VERSION,
+  PFA_ONLY_KEY_PREFIX,
   PfaPayloadError,
   type PfaPlayerSeasonPayload,
+  resolveFootballCorpusKey,
 } from './lib/pfa-types';
 
 export {

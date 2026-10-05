@@ -167,6 +167,7 @@ async function queueFootballStatsLoadingForMatchup(
         matchupPlayerId: p.matchupPlayerId,
         playerId: p.playerId,
         pfrId: p.pfrId,
+        pfaId: p.pfaId,
         season: p.season,
         isDst: p.isDst,
         position: p.position,

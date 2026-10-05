@@ -1,7 +1,12 @@
 import { gzipSync } from 'node:zlib';
 
 import { PfaCareerStats } from './pfa-provider';
-import { buildPfaObjectKey, isPfaSeason, PfaPayloadError } from './pfa-types';
+import {
+  buildPfaObjectKey,
+  isPfaSeason,
+  PfaPayloadError,
+  resolveFootballCorpusKey,
+} from './pfa-types';
 import {
   __setS3ClientForTesting,
   clearFootballCorpusCache,
@@ -98,6 +103,22 @@ describe('PFA read path (LS-9997)', () => {
       );
       expect(buildPfaObjectKey('/corpus/', 'UnitJo00', 1960)).toBe(
         'corpus/pfa/v1/UnitJo00/1960.json.gz',
+      );
+    });
+
+    it('keys a player with no pfr_id as pfa-<pfaId> (ADR 0023, LS-10588)', () => {
+      expect(resolveFootballCorpusKey({ pfrId: 'UnitJo00', pfaId: 'x' })).toBe(
+        'UnitJo00',
+      );
+      expect(
+        resolveFootballCorpusKey({ pfrId: null, pfaId: 'unit00100' }),
+      ).toBe('pfa-unit00100');
+      expect(resolveFootballCorpusKey({ pfrId: '', pfaId: 'unit00100' })).toBe(
+        'pfa-unit00100',
+      );
+      expect(resolveFootballCorpusKey({ pfrId: null, pfaId: null })).toBeNull();
+      expect(buildPfaObjectKey('', 'pfa-unit00100', 1960)).toBe(
+        'pfa/v1/pfa-unit00100/1960.json.gz',
       );
     });
 
@@ -268,6 +289,57 @@ describe('PFA read path (LS-9997)', () => {
         getPfaPlayerSeasonPayload('UnitJo00', 1960),
       ).resolves.toEqual(PAYLOAD);
       expect(send).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('player with no pfr_id (ADR 0023, LS-10588)', () => {
+    const pfaOnlyPayload = { ...PAYLOAD, pfrId: null, pfaId: 'unit00100' };
+
+    it('reads pfa/v1/pfa-<pfaId>/ and accepts a payload with pfrId null', async () => {
+      const send = jest
+        .fn()
+        .mockImplementation((command: { input: unknown }) => {
+          expect(command.input).toEqual({
+            Bucket: 'test-football-corpus',
+            Key: 'pfa/v1/pfa-unit00100/1960.json.gz',
+          });
+          return Promise.resolve(respondWith(gz(pfaOnlyPayload)));
+        });
+      installClient(send);
+
+      const log = await PfaCareerStats.getGameLog(
+        { id: 42, pfrId: null, pfaId: 'unit00100' },
+        1960,
+      );
+
+      expect(log?.passing).toEqual([{ ...PAYLOAD.passing[0], playerId: 42 }]);
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a pfa-keyed object that holds another PFA player', async () => {
+      installClient(
+        jest
+          .fn()
+          .mockResolvedValue(
+            respondWith(gz({ ...pfaOnlyPayload, pfaId: 'star00100' })),
+          ),
+      );
+
+      await expect(
+        getPfaPlayerSeasonPayload('pfa-unit00100', 1960),
+      ).rejects.toThrow(
+        /holds pfa-star00100 1960, expected pfa-unit00100 1960/,
+      );
+    });
+
+    it('reads nothing for a player with neither id', async () => {
+      const send = jest.fn();
+      installClient(send);
+
+      await expect(
+        PfaCareerStats.getGameLog({ id: 42, pfrId: null, pfaId: null }, 1960),
+      ).resolves.toBeNull();
+      expect(send).not.toHaveBeenCalled();
     });
   });
 });

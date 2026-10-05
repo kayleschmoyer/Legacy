@@ -3,6 +3,7 @@ import {
   getPlayerSeasonPayload,
   getTeamDefenseSeasonPayload,
   isFootballCorpusConfigured,
+  resolveFootballCorpusKey,
   type StoredGameFootballDefense,
   type StoredGameFootballDefenseIdp,
   type StoredGameFootballKicking,
@@ -20,8 +21,12 @@ import {
  *   1999+      nflverse/v1/<pfrId>/<season>.json.gz, and
  *              nflverse/v1/team-defense/<nflTeam>/<season>.json.gz for DST
  *              (`@legacy-sports/football-game-stats-provider`, LS-9989)
- *   1960-1998  pfa/v1/<pfrId>/<season>.json.gz (PFA provider, LS-9997)
+ *   1960-1998  pfa/v1/<corpusKey>/<season>.json.gz (PFA provider, LS-9997)
  *              — offense and kicking only; see `pfaSource`
+ *
+ * Player objects are addressed by the corpus key, `pfr_id ?? 'pfa-' || pfa_id`
+ * (ADR 0023, LS-10588; see `resolvePlayerCorpusKey`). A player with no PFR id
+ * only has PFA objects, under `pfa-<pfaId>`.
  *
  * There is deliberately no Pro Football Reference fallback. PFR returns 403 to
  * every scripted request (LS-9908), so a scrape fallback could only ever fail.
@@ -48,11 +53,11 @@ export interface FootballCareerGameLog {
 export interface FootballGameStatsSource {
   readonly name: string;
   getCareerGameLog(
-    pfrId: string,
+    corpusKey: string,
     season: number,
   ): Promise<FootballCareerGameLog | null>;
   getIdpGameLog(
-    pfrId: string,
+    corpusKey: string,
     season: number,
   ): Promise<StoredGameFootballDefenseIdp[] | null>;
   getTeamDefenseGameLog(
@@ -82,15 +87,31 @@ function assertCorpusConfigured(): void {
 }
 
 /**
+ * The player's corpus key: `pfrId` when set, else `pfa-<pfaId>`. Throws when
+ * the player has neither — there is no object to read, and recording that as
+ * a corpus miss would hide a selection bug.
+ */
+export function resolvePlayerCorpusKey(player: {
+  pfrId: string | null;
+  pfaId?: string | null;
+}): string {
+  const corpusKey = resolveFootballCorpusKey(player);
+  if (corpusKey === null) {
+    throw new Error('Football player has neither pfr_id nor pfa_id');
+  }
+  return corpusKey;
+}
+
+/**
  * nflverse source for 1999+. Uses the provider package's S3 reads directly
  * rather than its `CareerStats`/`IDPStats`/`TeamDefense` wrappers, because
  * those wrappers fall back to the PFR scraper on a miss.
  */
 export const nflverseSource: FootballGameStatsSource = {
   name: 'nflverse',
-  async getCareerGameLog(pfrId, season) {
+  async getCareerGameLog(corpusKey, season) {
     assertCorpusConfigured();
-    const payload = await getPlayerSeasonPayload(pfrId, season);
+    const payload = await getPlayerSeasonPayload(corpusKey, season);
     if (payload === null) return null;
     return {
       passing: payload.passing,
@@ -99,9 +120,9 @@ export const nflverseSource: FootballGameStatsSource = {
       kicking: payload.kicking,
     };
   },
-  async getIdpGameLog(pfrId, season) {
+  async getIdpGameLog(corpusKey, season) {
     assertCorpusConfigured();
-    const payload = await getPlayerSeasonPayload(pfrId, season);
+    const payload = await getPlayerSeasonPayload(corpusKey, season);
     return payload === null ? null : payload.defenseIdp;
   },
   async getTeamDefenseGameLog(nflTeam, season) {
@@ -123,9 +144,9 @@ export const nflverseSource: FootballGameStatsSource = {
  */
 export const pfaSource: FootballGameStatsSource = {
   name: 'pfa',
-  async getCareerGameLog(pfrId, season) {
+  async getCareerGameLog(corpusKey, season) {
     assertCorpusConfigured();
-    const payload = await getPfaPlayerSeasonPayload(pfrId, season);
+    const payload = await getPfaPlayerSeasonPayload(corpusKey, season);
     if (payload === null) return null;
     return {
       passing: payload.passing,

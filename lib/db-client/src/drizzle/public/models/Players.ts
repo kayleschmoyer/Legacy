@@ -49,6 +49,10 @@ export const players = pgTable(
     // Football identity columns (LS-246 / LS-4150)
     sport: sportKind('sport').notNull().default('baseball'),
     pfrId: varchar('pfr_id', { length: 20 }),
+    // Pro Football Archives player id (LS-10588, ADR 0023). Set only on
+    // football rows with no obtainable pfr_id; those rows use
+    // bref_id = 'pfa-' || pfa_id.
+    pfaId: varchar('pfa_id', { length: 20 }),
     isDst: boolean('is_dst').notNull().default(false),
     nflTeam: varchar('nfl_team', { length: 10 }),
     // PFR canonical position for football players (LS-250). Nullable — baseball players
@@ -81,6 +85,10 @@ export const players = pgTable(
       playersPfrIdUnique: uniqueIndex('players_pfr_id_unique')
         .on(table.pfrId)
         .where(sql`pfr_id IS NOT NULL`),
+      // Partial unique index: one row per pfa_id when non-null (LS-10588)
+      playersPfaIdUnique: uniqueIndex('players_pfa_id_unique')
+        .on(table.pfaId)
+        .where(sql`pfa_id IS NOT NULL`),
       playersNflTeamFk: foreignKey({
         columns: [table.nflTeam],
         foreignColumns: [nflTeams.abbreviation],

@@ -34,6 +34,7 @@ import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball'
 import { handleIngestPfaFootball } from './commands/ingestPfaFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
 import { handleSeedFootballPlayers } from './commands/seedFootballPlayers';
+import { handleSeedPfaFootballPlayers } from './commands/seedPfaFootballPlayers';
 import {
   handleDeriveFootballSeasonStats,
   parsePlayerIds,
@@ -312,6 +313,34 @@ export function buildProgram(): Command {
     )
     .action((options: { apply?: boolean }) =>
       handleSeedFootballPlayers({ dryRun: !options.apply }),
+    );
+
+  program
+    .command('seed-pfa-football-players')
+    .description(
+      'Seed pre-1974 football players with no obtainable pfr_id from the PFA player index ' +
+        '(LS-10588, ADR 0023: pfr_id NULL, pfa_id set, insert-only). Needs profootballarchives.com — run from Actions.',
+    )
+    .option(
+      '--from <year>',
+      'First box-score season to crawl (default 1960)',
+      parseInt,
+    )
+    .option(
+      '--to <year>',
+      'Last box-score season to crawl (default 1998)',
+      parseInt,
+    )
+    .option(
+      '--apply',
+      'Insert the selected players (default: dry-run report only)',
+    )
+    .action((options: { apply?: boolean; from?: number; to?: number }) =>
+      handleSeedPfaFootballPlayers({
+        dryRun: !options.apply,
+        from: options.from,
+        to: options.to,
+      }),
     );
 
   program

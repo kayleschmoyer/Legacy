@@ -42,10 +42,13 @@ export function isPfaSeason(season: number): boolean {
  *
  * `rating`/`sacked`/`sackYds`/`lng` are era-limited in PFA's box scores and
  * are `null` wherever the source table did not render them.
+ *
+ * `pfrId` is `null` for a player with no obtainable PFR id (ADR 0023); that
+ * object lives under the `pfa-<pfaId>` corpus key instead.
  */
 export interface PfaPlayerSeasonPayload {
   v: number;
-  pfrId: string;
+  pfrId: string | null;
   /** PFA's own player id, kept for traceability back to the source page. */
   pfaId: string;
   season: number;
@@ -61,22 +64,51 @@ function normalizePrefix(prefix: string): string {
 }
 
 /**
- * S3 object key for a PFA player-season: `pfa/v1/<pfrId>/<season>.json.gz`,
- * the layout documented in `terraform/main/football-corpus.tf`. Keyed by
- * `pfrId` like the nflverse half, so the PFA-id crosswalk happens at ingest
- * and reads need no lookup.
+ * Prefix that turns a PFA id into a corpus key (and a `bref_id`) for a
+ * football player with no obtainable `pfr_id` (ADR 0023). PFR ids start with
+ * an uppercase letter and contain no hyphen, so the two namespaces are
+ * disjoint and one `pfa/v1/` prefix serves both.
+ */
+export const PFA_ONLY_KEY_PREFIX = 'pfa-';
+
+/** The identity columns a football corpus key is resolved from. */
+export interface FootballCorpusIdentity {
+  pfrId: string | null;
+  pfaId?: string | null;
+}
+
+/**
+ * Per-game corpus key for a football player: `pfr_id` when present, else
+ * `pfa-<pfa_id>` (ADR 0023 decision 4). `null` when the player has neither,
+ * which means there is no corpus object to read or write. Never synthesises
+ * a pfr_id.
+ */
+export function resolveFootballCorpusKey(
+  identity: FootballCorpusIdentity,
+): string | null {
+  if (identity.pfrId) return identity.pfrId;
+  if (identity.pfaId) return `${PFA_ONLY_KEY_PREFIX}${identity.pfaId}`;
+  return null;
+}
+
+/**
+ * S3 object key for a PFA player-season: `pfa/v1/<corpusKey>/<season>.json.gz`,
+ * the layout documented in `terraform/main/football-corpus.tf`. `corpusKey`
+ * comes from {@link resolveFootballCorpusKey}: the `pfrId` like the nflverse
+ * half, or `pfa-<pfaId>` for a player with none. The crosswalk happens at
+ * ingest, so reads need no lookup.
  */
 export function buildPfaObjectKey(
   prefix: string,
-  pfrId: string,
+  corpusKey: string,
   season: number,
 ): string {
-  return `${normalizePrefix(prefix)}pfa/v${PFA_PAYLOAD_VERSION}/${pfrId}/${season}.json.gz`;
+  return `${normalizePrefix(prefix)}pfa/v${PFA_PAYLOAD_VERSION}/${corpusKey}/${season}.json.gz`;
 }
 
 /**
  * Thrown when a PFA object exists but does not have the expected shape (wrong
- * version, missing stat arrays, or a pfrId/season that does not match its
+ * version, missing stat arrays, or an identity/season that does not match its
  * key). A corrupt object is a data problem to surface, not a corpus miss, so
  * it is never reported as "no data".
  */

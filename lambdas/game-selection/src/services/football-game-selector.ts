@@ -30,7 +30,10 @@ export interface FootballGameSelectionResult {
 export interface FootballPlayerNeedingStats {
   matchupPlayerId: number;
   playerId: number;
-  pfrId: string;
+  pfrId: string | null;
+  // Set for a player with no PFR id (ADR 0023); the stats Lambda reads that
+  // player's corpus as pfa-<pfaId>.
+  pfaId: string | null;
   season: number;
   isDst: boolean;
   position: string;
@@ -500,6 +503,7 @@ export async function selectGamesForMatchupFootball(
           .select({
             id: PublicSchema.players.id,
             pfrId: PublicSchema.players.pfrId,
+            pfaId: PublicSchema.players.pfaId,
             isDst: PublicSchema.players.isDst,
             position: PublicSchema.players.position,
             nflTeam: PublicSchema.players.nflTeam,
@@ -533,13 +537,17 @@ export async function selectGamesForMatchupFootball(
       const playerSeason = seasonMap.get(matchupPlayer.playerId);
       const playerInfo = playerInfoMap.get(matchupPlayer.playerId);
 
-      if (!playerSeason || !playerInfo || !playerInfo.pfrId) {
+      if (
+        !playerSeason ||
+        !playerInfo ||
+        (!playerInfo.pfrId && !playerInfo.pfaId)
+      ) {
         // Same graceful-degradation contract as baseball (LS-9534): a player
         // can legitimately have no season (waiver add, no eligible season)
-        // or, for football specifically, no pfr_id crosswalk — skip rather
-        // than failing the whole matchup.
+        // or, for football specifically, no corpus identity (neither pfr_id
+        // nor pfa_id, ADR 0023) — skip rather than failing the whole matchup.
         LOGGER.warn(
-          `No season or pfr_id for football player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
+          `No season or pfr_id/pfa_id for football player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
           { matchupId, matchupPlayerId: matchupPlayer.id },
         );
         continue;
@@ -567,6 +575,7 @@ export async function selectGamesForMatchupFootball(
           matchupPlayerId: matchupPlayer.id,
           playerId: matchupPlayer.playerId,
           pfrId: playerInfo.pfrId,
+          pfaId: playerInfo.pfaId,
           season: playerSeason,
           isDst: playerInfo.isDst,
           position,

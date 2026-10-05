@@ -27,6 +27,7 @@ import { gzipSync } from 'node:zlib';
 import {
   FootballCorpusUnavailableError,
   getFootballGameStatsSource,
+  resolvePlayerCorpusKey,
 } from './football-game-stats-source';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -222,6 +223,39 @@ describe('getFootballGameStatsSource', () => {
       ).rejects.toMatchObject({ name: 'PfaPayloadError' });
     });
 
+    it('reads a player with no pfr_id from pfa/v1/pfa-<pfaId>/ (ADR 0023)', async () => {
+      const unitasPassing = {
+        ...passingRow,
+        season: 1960,
+        gameIdentifier: '1960nfl001',
+      };
+      mockSend.mockResolvedValueOnce(
+        s3Body({
+          v: 1,
+          pfrId: null,
+          pfaId: 'unit00100',
+          season: 1960,
+          passing: [unitasPassing],
+          rushing: [],
+          receiving: [],
+          kicking: [],
+        }),
+      );
+
+      const corpusKey = resolvePlayerCorpusKey({
+        pfrId: null,
+        pfaId: 'unit00100',
+      });
+      const log = await getFootballGameStatsSource(1960).getCareerGameLog(
+        corpusKey,
+        1960,
+      );
+
+      expect(corpusKey).toBe('pfa-unit00100');
+      expect(requestedKey()).toBe('pfa/v1/pfa-unit00100/1960.json.gz');
+      expect(log?.passing).toEqual([unitasPassing]);
+    });
+
     it('resolves pre-1999 IDP and team defense as a miss without touching S3', async () => {
       const source = getFootballGameStatsSource(1985);
 
@@ -231,5 +265,23 @@ describe('getFootballGameStatsSource', () => {
       ).resolves.toBeNull();
       expect(mockSend).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('resolvePlayerCorpusKey', () => {
+  it('is pfr_id when set, else pfa-<pfa_id>', () => {
+    expect(resolvePlayerCorpusKey({ pfrId: 'MariDa00', pfaId: null })).toBe(
+      'MariDa00',
+    );
+    expect(resolvePlayerCorpusKey({ pfrId: 'MariDa00' })).toBe('MariDa00');
+    expect(resolvePlayerCorpusKey({ pfrId: null, pfaId: 'unit00100' })).toBe(
+      'pfa-unit00100',
+    );
+  });
+
+  it('throws for a player with neither id rather than reading nothing', () => {
+    expect(() => resolvePlayerCorpusKey({ pfrId: null, pfaId: null })).toThrow(
+      'neither pfr_id nor pfa_id',
+    );
   });
 });

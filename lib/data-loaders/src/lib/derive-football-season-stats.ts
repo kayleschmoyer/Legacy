@@ -474,7 +474,9 @@ export function buildCareerRows(
 
 export interface DerivationCandidate {
   playerId: number;
-  pfrId: string;
+  /** Null for a player with no PFR id (ADR 0023); `pfaId` is then set. */
+  pfrId: string | null;
+  pfaId: string | null;
   position: string | null;
 }
 
@@ -494,8 +496,9 @@ const EXISTING_STATS_UNION = sql`
 `;
 
 /**
- * Football players (non-DST, with a pfr_id — the corpus key) that have no
- * season or career stat rows at all, optionally limited to `playerIds`.
+ * Football players (non-DST, with a corpus key: a pfr_id, or a pfa_id for a
+ * player with no PFR id per ADR 0023) that have no season or career stat
+ * rows at all, optionally limited to `playerIds`.
  */
 export async function loadDerivationCandidates(
   db: PublicDb,
@@ -507,14 +510,15 @@ export async function loadDerivationCandidates(
       : sql``;
   const result = await db.execute<{
     id: number;
-    pfr_id: string;
+    pfr_id: string | null;
+    pfa_id: string | null;
     position: string | null;
   }>(sql`
-    SELECT p.id, p.pfr_id, p.position
+    SELECT p.id, NULLIF(p.pfr_id, '') AS pfr_id, p.pfa_id, p.position
     FROM players p
     WHERE p.sport = 'football'
       AND NOT p.is_dst
-      AND p.pfr_id IS NOT NULL AND p.pfr_id <> ''
+      AND (NULLIF(p.pfr_id, '') IS NOT NULL OR p.pfa_id IS NOT NULL)
       AND p.id NOT IN (${EXISTING_STATS_UNION})
       ${idFilter}
     ORDER BY p.id
@@ -522,6 +526,7 @@ export async function loadDerivationCandidates(
   return result.rows.map((r) => ({
     playerId: r.id,
     pfrId: r.pfr_id,
+    pfaId: r.pfa_id,
     position: r.position,
   }));
 }

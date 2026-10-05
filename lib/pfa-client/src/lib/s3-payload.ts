@@ -40,13 +40,16 @@ export type StoredGameFootballReceiving = Omit<
 export type StoredGameFootballKicking = Omit<GameFootballKicking, 'playerId'>;
 
 /**
- * One object per (pfrId, season) holding every PFA-sourced stat category for
- * that player-season — mirrors `NflversePlayerSeasonPayload`'s "one object
- * holds all stat families" shape (LS-9989).
+ * One object per (corpus key, season) holding every PFA-sourced stat category
+ * for that player-season — mirrors `NflversePlayerSeasonPayload`'s "one
+ * object holds all stat families" shape (LS-9989).
+ *
+ * `pfrId` is `null` for a player with no obtainable PFR id (ADR 0023,
+ * LS-10588); that object is keyed `pfa-<pfaId>` instead.
  */
 export interface PfaPlayerSeasonPayload {
   v: number;
-  pfrId: string;
+  pfrId: string | null;
   /** PFA's own player id, kept for traceability back to the source page. */
   pfaId: string;
   season: number;
@@ -62,18 +65,19 @@ function normalizePrefix(prefix: string): string {
 }
 
 /**
- * S3 object key for a player-season. Keyed by `pfrId` (this app's existing
- * football player identifier, shared with the nflverse sibling ingest) so
- * the PFA-id -> pfrId crosswalk is applied once at ingest instead of on
+ * S3 object key for a player-season. Keyed by the player's corpus key: the
+ * `pfrId` (this app's existing football player identifier, shared with the
+ * nflverse sibling ingest), or `pfa-<pfaId>` for a player with no PFR id
+ * (ADR 0023). The PFA-id crosswalk is applied once at ingest instead of on
  * every read. See `terraform/main/football-corpus.tf`'s documented layout:
  * `pfa/v1/<pfrId>/<season>.json.gz`, alongside `nflverse/v1/<pfrId>/<season>.json.gz`.
  */
 export function buildPfaObjectKey(
   prefix: string,
-  pfrId: string,
+  corpusKey: string,
   season: number,
 ): string {
-  return `${normalizePrefix(prefix)}pfa/v${PFA_PAYLOAD_VERSION}/${pfrId}/${season}.json.gz`;
+  return `${normalizePrefix(prefix)}pfa/v${PFA_PAYLOAD_VERSION}/${corpusKey}/${season}.json.gz`;
 }
 
 /**

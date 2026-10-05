@@ -1,7 +1,4 @@
-import type {
-  CareerStats as PfrCareerStats,
-  PfrPlayer,
-} from '@legacy-sports/pfr-client';
+import type { CareerStats as PfrCareerStats } from '@legacy-sports/pfr-client';
 import { LOGGER } from '@legacy-sports/logging';
 
 import type {
@@ -10,6 +7,10 @@ import type {
   StoredGameFootballReceiving,
   StoredGameFootballRushing,
 } from './types';
+import {
+  type FootballCorpusIdentity,
+  resolveFootballCorpusKey,
+} from './pfa-types';
 import { getPfaPlayerSeasonPayload } from './s3-store';
 
 /**
@@ -112,8 +113,11 @@ function kickingRow(row: StoredGameFootballKicking, playerId: number) {
  * Passing/rushing/receiving/kicking game log for a 1960-1998 player-season,
  * in the same `GameLog` shape `CareerStats.getGameLog` returns.
  *
- * Returns `null` ("no data") when the corpus has no object for the
- * player-season: a crosswalk miss, no games that season, a season outside
+ * The player is addressed by its corpus key, `pfrId ?? 'pfa-' + pfaId`
+ * (ADR 0023), so a player with no PFR id reads its `pfa-<pfaId>` objects.
+ *
+ * Returns `null` ("no data") when the player has neither id, or the corpus
+ * has no object for the player-season: a crosswalk miss, no games that season, a season outside
  * 1960-1998, or no `FOOTBALL_CORPUS_S3_BUCKET` configured. It never returns
  * an empty-but-truthy log for a miss.
  *
@@ -121,14 +125,16 @@ function kickingRow(row: StoredGameFootballKicking, playerId: number) {
  * exists but is malformed (`PfaPayloadError`).
  */
 async function getPfaCareerGameLog(
-  player: PfrPlayer,
+  player: { id: number } & FootballCorpusIdentity,
   season: number,
 ): Promise<PfrCareerStats.GameLog | null> {
-  const payload = await getPfaPlayerSeasonPayload(player.pfrId, season);
+  const corpusKey = resolveFootballCorpusKey(player);
+  if (corpusKey === null) return null;
+  const payload = await getPfaPlayerSeasonPayload(corpusKey, season);
   if (payload === null) return null;
 
   LOGGER.debug(
-    `PFA S3 HIT for ${player.pfrId} ${season} (passing=${payload.passing.length}, rushing=${payload.rushing.length}, receiving=${payload.receiving.length}, kicking=${payload.kicking.length})`,
+    `PFA S3 HIT for ${corpusKey} ${season} (passing=${payload.passing.length}, rushing=${payload.rushing.length}, receiving=${payload.receiving.length}, kicking=${payload.kicking.length})`,
   );
 
   return {

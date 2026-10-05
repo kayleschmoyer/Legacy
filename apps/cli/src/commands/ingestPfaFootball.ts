@@ -18,11 +18,16 @@ import {
   PFA_BASE_URL,
   PFA_PAYLOAD_VERSION,
   PFA_USER_AGENT,
+  type PfaCrosswalkRow,
   type PfaIngestAccumulator,
   type PfaPlayerSeasonPayload,
   PfaRateLimiter,
   resolvePfaCrosswalk,
 } from '@legacy-sports/pfa-client';
+import {
+  type FootballCorpusIdentity,
+  resolveFootballCorpusKey,
+} from '@legacy-sports/football-game-stats-provider';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
@@ -31,7 +36,8 @@ import { gzipSync } from 'node:zlib';
 
 /**
  * Stage the Pro Football Archives corpus (1960-1998) in S3, one object per
- * (pfrId, season) — the pre-nflverse sibling of
+ * (corpus key, season) — the corpus key is `pfr_id`, or `pfa-<pfa_id>` for a
+ * player with no PFR id (ADR 0023, LS-10588) — the pre-nflverse sibling of
  * `apps/cli/src/commands/ingestNflverseFootball.ts` (LS-9989), which itself
  * mirrors `ingestRetrosheet.ts` (LS-9817). Implements LS-9995. See
  * `terraform/main/football-corpus.tf` for the bucket this writes to
@@ -50,8 +56,8 @@ import { gzipSync } from 'node:zlib';
  * player eras when matching NFL-side appearances).
  */
 
-const FIRST_SEASON = 1960;
-const LAST_SEASON = 1998;
+export const FIRST_SEASON = 1960;
+export const LAST_SEASON = 1998;
 const FETCH_TIMEOUT_MS = 30_000;
 
 export interface IngestPfaFootballArgs {
@@ -65,7 +71,7 @@ export interface IngestPfaFootballArgs {
   dryRun?: boolean;
 }
 
-async function fetchPfaPage(
+export async function fetchPfaPage(
   url: string,
   rateLimiter: PfaRateLimiter,
 ): Promise<string | null> {
@@ -118,28 +124,87 @@ async function putGzippedJson(
   );
 }
 
-/** playerId -> pfrId, for football players that carry one (an unset pfrId
- * means the player can never be a write target here — the S3 key requires
- * it). Fetched separately from `fetchFootballPlayerCandidates` since the
- * crosswalk resolver's candidate shape (LS-9993) doesn't carry pfrId. */
-async function fetchPfrIdByPlayerId(
+/** playerId -> identity columns for every football player. The corpus key
+ * (`pfr_id ?? 'pfa-' || pfa_id`) is resolved from these; a player with
+ * neither can never be a write target here. Fetched separately from
+ * `fetchFootballPlayerCandidates` since the crosswalk resolver's candidate
+ * shape (LS-9993) doesn't carry them. */
+async function fetchFootballIdentities(
   db: Parameters<typeof fetchFootballPlayerCandidates>[0],
-): Promise<Map<number, string>> {
+): Promise<Map<number, FootballCorpusIdentity>> {
   const rows = await db
-    .select({ id: PublicSchema.players.id, pfrId: PublicSchema.players.pfrId })
+    .select({
+      id: PublicSchema.players.id,
+      pfrId: PublicSchema.players.pfrId,
+      pfaId: PublicSchema.players.pfaId,
+    })
     .from(PublicSchema.players)
     .where(eq(PublicSchema.players.sport, 'football'));
 
-  const map = new Map<number, string>();
-  for (const row of rows) {
-    if (row.pfrId) map.set(row.id, row.pfrId);
-  }
-  return map;
+  return new Map(
+    rows.map((row) => [row.id, { pfrId: row.pfrId, pfaId: row.pfaId }]),
+  );
 }
 
-interface ResolvedPfaIdentity {
+export interface ResolvedPfaIdentity {
   playerId: number;
-  pfrId: string;
+  /** Null for a PFA-only player (ADR 0023); the payload then carries no PFR id. */
+  pfrId: string | null;
+  corpusKey: string;
+}
+
+export interface PfaIngestResolution {
+  resolved: Map<string, ResolvedPfaIdentity>;
+  unresolved: number;
+  /** Name-matched a row that already belongs to a different PFA id. */
+  pfaIdConflict: number;
+  /** Matched a row with neither pfr_id nor pfa_id, so there is no corpus key. */
+  noCorpusKey: number;
+}
+
+/**
+ * Maps each PFA id to the `players` row whose corpus key the ingest writes
+ * under. A row that already carries this exact `pfa_id` (seeded by
+ * `seed-pfa-football-players`) wins outright, before any name matching. A
+ * name match onto a row that carries a *different* `pfa_id` is rejected:
+ * that row is another PFA player's identity. Pure, so it is unit tested.
+ */
+export function resolvePfaIngestIdentities(
+  crosswalkRows: readonly PfaCrosswalkRow[],
+  identities: ReadonlyMap<number, FootballCorpusIdentity>,
+): PfaIngestResolution {
+  const playerIdByPfaId = new Map<string, number>();
+  for (const [playerId, identity] of identities) {
+    if (identity.pfaId) playerIdByPfaId.set(identity.pfaId, playerId);
+  }
+
+  const resolved = new Map<string, ResolvedPfaIdentity>();
+  let unresolved = 0;
+  let pfaIdConflict = 0;
+  let noCorpusKey = 0;
+  for (const row of crosswalkRows) {
+    const playerId = playerIdByPfaId.get(row.pfaId) ?? row.playerId;
+    if (playerId === null) {
+      unresolved++;
+      continue;
+    }
+    const identity = identities.get(playerId);
+    if (identity?.pfaId && identity.pfaId !== row.pfaId) {
+      pfaIdConflict++;
+      continue;
+    }
+    const corpusKey = identity ? resolveFootballCorpusKey(identity) : null;
+    if (!identity || corpusKey === null) {
+      noCorpusKey++;
+      continue;
+    }
+    resolved.set(row.pfaId, {
+      playerId,
+      pfrId: identity.pfrId,
+      corpusKey,
+    });
+  }
+  return { resolved, unresolved, pfaIdConflict, noCorpusKey };
 }
 
 async function buildResolvedCrosswalk(
@@ -155,38 +220,25 @@ async function buildResolvedCrosswalk(
   }
 
   const resolved = await runWithPublicClient(getDbOptions(), async (db) => {
-    const [candidates, pfrIdByPlayerId] = await Promise.all([
+    const [candidates, identities] = await Promise.all([
       fetchFootballPlayerCandidates(db),
-      fetchPfrIdByPlayerId(db),
+      fetchFootballIdentities(db),
     ]);
     const crosswalkRows = resolvePfaCrosswalk(sourceTable.entries, candidates);
+    const resolution = resolvePfaIngestIdentities(crosswalkRows, identities);
 
-    const map = new Map<string, ResolvedPfaIdentity>();
-    let unresolved = 0;
-    let noPfrId = 0;
-    for (const row of crosswalkRows) {
-      if (row.playerId === null) {
-        unresolved++;
-        continue;
-      }
-      const pfrId = pfrIdByPlayerId.get(row.playerId);
-      if (!pfrId) {
-        noPfrId++;
-        continue;
-      }
-      map.set(row.pfaId, { playerId: row.playerId, pfrId });
-    }
     LOGGER.info(
-      `PFA ingest: crosswalk resolved ${map.size}/${crosswalkRows.length} PFA entries ` +
-        `(${unresolved} unmatched, ${noPfrId} matched but missing players.pfr_id)`,
+      `PFA ingest: crosswalk resolved ${resolution.resolved.size}/${crosswalkRows.length} PFA entries ` +
+        `(${resolution.unresolved} unmatched, ${resolution.pfaIdConflict} matched a row owned by another pfa_id, ` +
+        `${resolution.noCorpusKey} matched but missing both players.pfr_id and players.pfa_id)`,
     );
-    return map;
+    return resolution.resolved;
   });
 
   return resolved;
 }
 
-async function crawlSeasonBoxScores(
+export async function crawlSeasonBoxScores(
   season: number,
   rateLimiter: PfaRateLimiter,
   acc: PfaIngestAccumulator,
@@ -353,7 +405,7 @@ export async function handleIngestPfaFootball(
       kicking: acc.kicking.get(pfaId)?.get(season) ?? [],
     };
 
-    const key = buildPfaObjectKey(prefix, identity.pfrId, season);
+    const key = buildPfaObjectKey(prefix, identity.corpusKey, season);
     if (args.dryRun) {
       written++;
       continue;

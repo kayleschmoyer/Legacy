@@ -60,6 +60,7 @@ async function main() {
     throwHand: null,
     sport: 'baseball',
     pfrId: null,
+    pfaId: null,
     isDst: false,
     nflTeam: null,
     position: null,

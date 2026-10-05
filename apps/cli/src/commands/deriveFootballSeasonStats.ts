@@ -7,6 +7,7 @@ import {
   PFA_FIRST_SEASON,
   PFA_LAST_SEASON,
   PfaCareerStats,
+  resolveFootballCorpusKey,
 } from '@legacy-sports/football-game-stats-provider';
 import {
   aggregateNflverseSeasonStats,
@@ -36,7 +37,9 @@ import {
 /**
  * Derives football_season_* and career_football_* rows from per-game data for
  * football players that have no stat rows yet (LS-10586). 1999+ comes from
- * nflverse weekly stats, 1960-1998 from the PFA corpus in S3. See
+ * nflverse weekly stats, 1960-1998 from the PFA corpus in S3, read by corpus
+ * key (`pfr_id ?? 'pfa-' || pfa_id`, ADR 0023) so a player with no PFR id
+ * (LS-10588) derives from its pfa-<pfaId> objects. See
  * `derive-football-season-stats.ts` in `@legacy-sports/data-loaders` for the
  * aggregation and the never-overwrite guarantees.
  *
@@ -79,7 +82,11 @@ async function readPfaSeasons(
     const logs = await Promise.all(
       batch.map((season) =>
         PfaCareerStats.getGameLog(
-          { id: candidate.playerId, pfrId: candidate.pfrId },
+          {
+            id: candidate.playerId,
+            pfrId: candidate.pfrId,
+            pfaId: candidate.pfaId,
+          },
           season,
         ),
       ),
@@ -130,14 +137,14 @@ export async function handleDeriveFootballSeasonStats(
   await runWithPublicClient(getDbOptions(), async (db) => {
     const candidates = await loadDerivationCandidates(db, args.playerIds);
     LOGGER.info(
-      `Candidates (football, non-DST, pfr_id set, no season/career rows): ${candidates.length}`,
+      `Candidates (football, non-DST, pfr_id or pfa_id set, no season/career rows): ${candidates.length}`,
     );
     if (args.playerIds) {
       const found = new Set(candidates.map((c) => c.playerId));
       const skipped = args.playerIds.filter((id) => !found.has(id));
       if (skipped.length > 0) {
         LOGGER.info(
-          `Not candidates (unknown, not football, no pfr_id, or already have stat rows — left untouched): ${skipped.join(',')}`,
+          `Not candidates (unknown, not football, no pfr_id/pfa_id, or already have stat rows — left untouched): ${skipped.join(',')}`,
         );
       }
     }
@@ -156,7 +163,7 @@ export async function handleDeriveFootballSeasonStats(
 
     const gsisIds = new Set<string>();
     for (const c of candidates) {
-      const gsis = pfrToGsis.get(c.pfrId);
+      const gsis = c.pfrId ? pfrToGsis.get(c.pfrId) : undefined;
       if (gsis) gsisIds.add(gsis);
     }
     const offenseRows = parseNflverseCsv(offenseCsv);
@@ -182,26 +189,28 @@ export async function handleDeriveFootballSeasonStats(
     const samples: string[] = [];
 
     for (const candidate of candidates) {
-      const gsis = pfrToGsis.get(candidate.pfrId);
+      const { pfrId } = candidate;
+      const corpusKey = resolveFootballCorpusKey(candidate);
+      // A player with no PFR id (ADR 0023) is not in nflverse at all, so only
+      // the PFA corpus can hold their games.
+      const gsis = pfrId ? pfrToGsis.get(pfrId) : undefined;
       const playerAggs: NflversePlayerAggregates = {};
       if (gsis) {
         for (const category of Object.keys(aggs) as FootballStatCategory[]) {
           playerAggs[category] = aggs[category].get(gsis);
         }
       }
-      const nflverseRows = restrictToPositionGroup(
-        buildNflverseSeasonRows(
-          candidate.playerId,
-          candidate.pfrId,
-          playerAggs,
-        ),
-        candidate.position,
-      );
+      const nflverseRows = pfrId
+        ? restrictToPositionGroup(
+            buildNflverseSeasonRows(candidate.playerId, pfrId, playerAggs),
+            candidate.position,
+          )
+        : mergeDerivedSeasonRows();
       // PFA has no IDP data, so an IDP player never needs the S3 probe.
       const pfaRows =
         pfaEnabled &&
         !isIdpPosition(candidate.position) &&
-        mayHavePfaSeasons(rookieSeasons.get(candidate.pfrId))
+        mayHavePfaSeasons(pfrId ? rookieSeasons.get(pfrId) : undefined)
           ? await readPfaSeasons(candidate)
           : mergeDerivedSeasonRows();
 
@@ -218,7 +227,7 @@ export async function handleDeriveFootballSeasonStats(
       const careers = buildCareerRows(candidate.playerId, seasons);
       if (samples.length < 10) {
         samples.push(
-          `  ${candidate.pfrId} (id ${candidate.playerId}): ` +
+          `  ${corpusKey} (id ${candidate.playerId}): ` +
             `${countDerivedSeasonRows(nflverseRows)} nflverse + ${countDerivedSeasonRows(pfaRows)} pfa season rows; ` +
             `career passing yds=${careers.passing?.yds ?? '-'}, rushing yds=${careers.rushing?.yds ?? '-'}, ` +
             `receiving yds=${careers.receiving?.yds ?? '-'}, fgm=${careers.kicking?.fgm ?? '-'}, ` +

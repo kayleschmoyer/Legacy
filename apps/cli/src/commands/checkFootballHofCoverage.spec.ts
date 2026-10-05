@@ -38,6 +38,39 @@ describe('findMissingKnownPlayers', () => {
     ]);
   });
 
+  it('treats a pfa_id-only row as present for a player with no PFR id (Unitas, ADR 0023)', () => {
+    const rows: FootballPlayerRow[] = KNOWN_FOOTBALL_HOF_PLAYERS.map((known) =>
+      known.pfrId
+        ? { lastName: known.lastName, pfrId: known.pfrId }
+        : { lastName: known.lastName, pfrId: null, pfaId: 'unit00100' },
+    );
+
+    expect(
+      KNOWN_FOOTBALL_HOF_PLAYERS.find((p) => p.lastName === 'Unitas')?.pfrId,
+    ).toBeUndefined();
+    expect(findMissingKnownPlayers(rows)).toEqual([]);
+  });
+
+  it('still reports Unitas missing for a row with neither pfr_id nor pfa_id', () => {
+    const rows: FootballPlayerRow[] = [
+      { lastName: 'Unitas', pfrId: null, pfaId: null },
+    ];
+
+    expect(findMissingKnownPlayers(rows, [{ lastName: 'Unitas' }])).toEqual([
+      'Unitas',
+    ]);
+  });
+
+  it('does not let a pfa_id-only namesake satisfy a pinned pfrId', () => {
+    const rows: FootballPlayerRow[] = [
+      { lastName: 'Rice', pfrId: null, pfaId: 'rice00100' },
+    ];
+
+    expect(
+      findMissingKnownPlayers(rows, [{ lastName: 'Rice', pfrId: 'RiceJe00' }]),
+    ).toEqual(['Rice (RiceJe00)']);
+  });
+
   it('matches case-insensitively on last name when no pfrId is pinned', () => {
     const rows: FootballPlayerRow[] = [
       { lastName: 'favre', pfrId: 'FavrBr00' },

@@ -47,8 +47,12 @@ const mockGetTeamDefenseGameLog = jest.fn();
 
 jest.mock('./football-game-stats-source', () => {
   class FootballCorpusUnavailableError extends Error {}
+  const actual = jest.requireActual<
+    typeof import('./football-game-stats-source')
+  >('./football-game-stats-source');
   return {
     FootballCorpusUnavailableError,
+    resolvePlayerCorpusKey: actual.resolvePlayerCorpusKey,
     getFootballGameStatsSource: jest.fn(() => ({
       name: 'nflverse',
       getCareerGameLog: (...args: unknown[]): unknown =>
@@ -91,7 +95,7 @@ jest.mock('./handlers/calculate-football-matchup-scores', () => ({
 jest.mock('./constants', () => ({
   IDP_POSITIONS: [],
   validateNflTeam: jest.fn(),
-  validatePfrId: jest.fn(),
+  validateFootballCorpusKey: jest.fn(),
 }));
 
 const mockEmitSuccess = jest.fn();
@@ -361,6 +365,19 @@ describe('load-football-game per-player corpus loading', () => {
       false,
       'QB',
     );
+  });
+
+  it('reads a player with no pfr_id by pfa-<pfaId> (ADR 0023, LS-10588)', async () => {
+    mockGetCareerGameLog.mockResolvedValueOnce(null);
+
+    const result = await handler(
+      makeSqsEvent([
+        playerBody(1960, { pfrId: null, pfaId: 'unit00100', nflTeam: null }),
+      ]),
+    );
+
+    expect(result.batchItemFailures).toEqual([]);
+    expect(mockGetCareerGameLog).toHaveBeenCalledWith('pfa-unit00100', 1960);
   });
 
   it('reads DST games by nflTeam from the corpus', async () => {

@@ -52,7 +52,8 @@ export const KNOWN_FOOTBALL_HOF_PLAYERS: readonly KnownFootballHofPlayer[] = [
   { lastName: 'Elway', pfrId: 'ElwaJo00' }, // John Elway
   // Unitas retired in 1973, before nflverse's players.csv coverage starts, so
   // there is no authoritative pfr_id to pin; his row comes from the PFA index
-  // (LS-10588, ADR 0023). Surname-only until then.
+  // with pfr_id NULL and pfa_id set (seed-pfa-football-players, LS-10588,
+  // ADR 0023). Surname-only, and a pfa_id-only row counts as present.
   { lastName: 'Unitas' },
   { lastName: 'Namath', pfrId: 'NamaJo00' }, // Joe Namath
   { lastName: 'Staubach', pfrId: 'StauRo00' }, // Roger Staubach
@@ -74,28 +75,31 @@ export const KNOWN_FOOTBALL_HOF_LAST_NAMES: readonly string[] =
 export interface FootballPlayerRow {
   lastName: string;
   pfrId: string | null;
+  /** Pro Football Archives id, set on rows with no PFR id (ADR 0023). */
+  pfaId?: string | null;
 }
 
 /**
  * Pure comparison: given the football players currently in the DB, return
  * the display label (`lastName`, or `lastName (pfrId)` when the known entry
- * pins one) for each known player with no matching row. A name match with a
- * null pfr_id is not "present" — it would not be reachable by the stats
- * loader either. When a known entry pins a `pfrId`, presence requires that
+ * pins one) for each known player with no matching row. A name match with
+ * neither a pfr_id nor a pfa_id is not "present" — it has no corpus key, so
+ * the stats loader could not reach it either. A pfa_id-only row is present
+ * (ADR 0023): it is how players nflverse publishes no PFR id for (Unitas)
+ * exist at all. When a known entry pins a `pfrId`, presence requires that
  * exact id — a same-surname row is not enough (LS-9765).
  */
 export function findMissingKnownPlayers(
   dbRows: FootballPlayerRow[],
   knownPlayers: readonly KnownFootballHofPlayer[] = KNOWN_FOOTBALL_HOF_PLAYERS,
 ): string[] {
-  const rowsWithPfrId = dbRows.filter(
-    (r): r is FootballPlayerRow & { pfrId: string } => r.pfrId !== null,
-  );
   const presentPfrIds = new Set(
-    rowsWithPfrId.map((r) => r.pfrId.toLowerCase()),
+    dbRows.flatMap((r) => (r.pfrId ? [r.pfrId.toLowerCase()] : [])),
   );
   const presentLastNames = new Set(
-    rowsWithPfrId.map((r) => r.lastName.toLowerCase()),
+    dbRows
+      .filter((r) => r.pfrId || r.pfaId)
+      .map((r) => r.lastName.toLowerCase()),
   );
 
   return knownPlayers
@@ -119,6 +123,7 @@ async function fetchFootballPlayersByLastName(
     .select({
       lastName: PublicSchema.players.lastName,
       pfrId: PublicSchema.players.pfrId,
+      pfaId: PublicSchema.players.pfaId,
     })
     .from(PublicSchema.players)
     .where(
@@ -154,7 +159,7 @@ export async function handleCheckFootballHofCoverage(): Promise<void> {
   }
 
   LOGGER.error(
-    `❌ football HOF coverage check FAILED: missing players table rows (with pfr_id) for: ${missing.join(', ')}. ` +
+    `❌ football HOF coverage check FAILED: missing players table rows (with pfr_id or pfa_id) for: ${missing.join(', ')}. ` +
       'This is the LS-9968 regression signal — re-check football-player discovery (lib/pfr-client/src/lib/Players.ts) ' +
       'for a cohort being silently dropped.',
   );

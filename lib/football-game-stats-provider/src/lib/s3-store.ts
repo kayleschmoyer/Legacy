@@ -8,6 +8,7 @@ import {
   PFA_PAYLOAD_VERSION,
   PfaPayloadError,
   type PfaPlayerSeasonPayload,
+  resolveFootballCorpusKey,
 } from './pfa-types';
 import {
   buildPlayerObjectKey,
@@ -182,7 +183,7 @@ export function getTeamDefenseSeasonPayload(
 function decodePfaPayload(
   key: string,
   compressed: Buffer,
-  pfrId: string,
+  corpusKey: string,
   season: number,
 ): PfaPlayerSeasonPayload {
   let parsed: unknown;
@@ -204,10 +205,14 @@ function decodePfaPayload(
   if (payload.v !== PFA_PAYLOAD_VERSION) {
     throw new PfaPayloadError(key, `unsupported version ${String(payload.v)}`);
   }
-  if (payload.pfrId !== pfrId || payload.season !== season) {
+  const heldKey = resolveFootballCorpusKey({
+    pfrId: typeof payload.pfrId === 'string' ? payload.pfrId : null,
+    pfaId: typeof payload.pfaId === 'string' ? payload.pfaId : null,
+  });
+  if (heldKey !== corpusKey || payload.season !== season) {
     throw new PfaPayloadError(
       key,
-      `holds ${String(payload.pfrId)} ${String(payload.season)}, expected ${pfrId} ${season}`,
+      `holds ${String(heldKey)} ${String(payload.season)}, expected ${corpusKey} ${season}`,
     );
   }
   for (const family of [
@@ -236,25 +241,30 @@ function decodePfaPayload(
 }
 
 /**
- * Load the PFA payload for a 1960-1998 player-season, or `null` when the
+ * Load the PFA payload for a 1960-1998 player-season, addressed by the
+ * player's corpus key (`resolveFootballCorpusKey`), or `null` when the
  * corpus has no object for it (crosswalk miss, no games that season, a
  * season outside 1960-1998, or no bucket configured). A non-404 S3 error or
  * a malformed object throws.
  */
 export function getPfaPlayerSeasonPayload(
-  pfrId: string,
+  corpusKey: string,
   season: number,
 ): Promise<PfaPlayerSeasonPayload | null> {
   if (!isFootballCorpusConfigured() || !isPfaSeason(season)) {
     return Promise.resolve(null);
   }
 
-  const key = buildPfaObjectKey(process.env[PREFIX_ENV] ?? '', pfrId, season);
-  return memoize(pfaCache, `${pfrId}:${season}`, async () => {
+  const key = buildPfaObjectKey(
+    process.env[PREFIX_ENV] ?? '',
+    corpusKey,
+    season,
+  );
+  return memoize(pfaCache, `${corpusKey}:${season}`, async () => {
     const compressed = await getObjectBytes(key);
     return compressed === null
       ? null
-      : decodePfaPayload(key, compressed, pfrId, season);
+      : decodePfaPayload(key, compressed, corpusKey, season);
   });
 }
 

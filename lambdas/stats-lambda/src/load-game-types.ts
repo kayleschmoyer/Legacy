@@ -40,7 +40,10 @@ export interface LoadFootballMatchupStatsMessage {
   players: Array<{
     matchupPlayerId: number;
     playerId: number;
-    pfrId: string;
+    /** Null for a player with no PFR id; the corpus key is then pfa-<pfaId>. */
+    pfrId: string | null;
+    /** Set for a player with no PFR id (ADR 0023). Optional: older producers omit it. */
+    pfaId?: string | null;
     season: number;
     isDst: boolean;
     position: string;

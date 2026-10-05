@@ -55,6 +55,7 @@ export async function loadPlayerGameStats(
     throwHand: string | null;
     sport: 'baseball' | 'football';
     pfrId: string | null;
+    pfaId: string | null;
     isDst: boolean;
     nflTeam: string | null;
     position: Player['position'];
@@ -83,6 +84,7 @@ export async function loadPlayerGameStats(
     throwHand: null,
     sport: 'baseball',
     pfrId: null,
+    pfaId: null,
     isDst: false,
     nflTeam: null,
     position: null,
