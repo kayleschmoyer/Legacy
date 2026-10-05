@@ -2352,7 +2352,7 @@ export type Mutation = {
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   /** Host-only: delete a mock draft. Its seats, picks and chat cascade with it. */
   deleteMockDraft?: Maybe<Scalars['Boolean']['output']>;
-  /** Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Replaces deleteMyMockDraftLeagues, which reset the weekly cap by deleting the throwaway leagues the old path created (LS-8238). */
+  /** Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Test cleanup only: it does not reset the weekly mock-draft cap, which counts drafts at creation (LS-10483). */
   deleteMyMockDrafts?: Maybe<Scalars['Int']['output']>;
   /** Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673) */
   designateKeeper?: Maybe<KeeperDesignation>;

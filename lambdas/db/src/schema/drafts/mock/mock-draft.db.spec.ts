@@ -11,7 +11,8 @@
  *   1. A full OFFLINE draft completes with zero league rows.
  *   2. A full ONLINE draft (created, joined, started) completes the same way.
  *   3. Two joiners racing for the last seat: exactly one wins.
- *   4. The weekly quota counts `drafts`, not leagues.
+ *   4. The weekly quota counts drafts at creation — not leagues, and deleting
+ *      a draft never refunds it (LS-10483).
  *   5. The lobby-expiry and stale-offline jobs.
  */
 
@@ -424,6 +425,87 @@ describe('Mock drafts v2 — DB integration (LS-10076)', () => {
         .where(eq(drafts.kind, 'mock'));
       expect(remaining).toHaveLength(1);
       expect(remaining[0].id).toBe(theirs.draftId);
+    });
+
+    // LS-10483: every mock draft counts at creation (LS-10455), so neither
+    // delete mutation may refund quota.
+    it('deleteMyMockDrafts does not change getMyMockDraftUsage', async () => {
+      const host = getUser(0);
+      const { MOCK_DRAFT_FREE_WEEKLY_LIMIT } = await import('../helpers');
+
+      testEntitlements.unlimitedMockDrafts = false;
+
+      for (let i = 0; i < MOCK_DRAFT_FREE_WEEKLY_LIMIT; i++) {
+        await resolvers.createMockDraft(
+          {},
+          { sport: 'baseball', numTeams: 2, pickPosition: 1, mode: 'offline' },
+          contextFor(host.id),
+        );
+      }
+
+      const before = await resolvers.getMyMockDraftUsage(
+        {},
+        {},
+        contextFor(host.id),
+      );
+      expect(before).toMatchObject({
+        used: MOCK_DRAFT_FREE_WEEKLY_LIMIT,
+        remaining: 0,
+      });
+
+      const deleted = await resolvers.deleteMyMockDrafts(
+        {},
+        {},
+        contextFor(host.id),
+      );
+      expect(deleted).toBe(MOCK_DRAFT_FREE_WEEKLY_LIMIT);
+
+      expect(
+        await resolvers.getMyMockDraftUsage({}, {}, contextFor(host.id)),
+      ).toEqual(before);
+
+      await expect(
+        resolvers.createMockDraft(
+          {},
+          { sport: 'baseball', numTeams: 2, pickPosition: 1, mode: 'offline' },
+          contextFor(host.id),
+        ),
+      ).rejects.toThrow(/mock drafts per week/i);
+    });
+
+    it('deleteMockDraft does not change getMyMockDraftUsage', async () => {
+      const host = getUser(0);
+
+      testEntitlements.unlimitedMockDrafts = false;
+
+      const created = await resolvers.createMockDraft(
+        {},
+        { sport: 'baseball', numTeams: 2, pickPosition: 1, mode: 'online' },
+        contextFor(host.id),
+      );
+
+      const before = await resolvers.getMyMockDraftUsage(
+        {},
+        {},
+        contextFor(host.id),
+      );
+      expect(before).toMatchObject({ used: 1 });
+
+      await resolvers.deleteMockDraft(
+        {},
+        { draftId: created.draftId },
+        contextFor(host.id),
+      );
+
+      const [{ n: left }] = await db
+        .select({ n: count() })
+        .from(drafts)
+        .where(eq(drafts.id, created.draftId as number));
+      expect(Number(left)).toBe(0);
+
+      expect(
+        await resolvers.getMyMockDraftUsage({}, {}, contextFor(host.id)),
+      ).toEqual(before);
     });
   });
 

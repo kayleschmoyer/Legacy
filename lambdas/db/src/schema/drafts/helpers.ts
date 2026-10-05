@@ -40,12 +40,11 @@ export const MOCK_DRAFT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * {@link MOCK_DRAFT_WINDOW_MS}. Used both to enforce the free-tier weekly
  * mock-draft cap and to surface remaining usage in the UI.
  *
- * Counts `drafts WHERE kind = 'mock' AND created_by = user` (LS-10076) —
- * joining someone else's lobby is free, and an expired lobby still counts (the
- * lobby-expiry job keeps its row until it has aged out of this window). The
- * legacy league-backed mock
- * drafts are gone (deleted by the LS-10076 migration), so there is no second
- * leg to count.
+ * Counts the append-only `mock_draft_usage` ledger (LS-10483), which gets one
+ * row per mock draft the user creates (joining someone else's lobby is free).
+ * It deliberately does not count live `drafts` rows: a deleted or expired
+ * draft still counts, because every mock draft counts against the cap at
+ * creation (LS-10455) and deleting drafts must never refund quota.
  */
 export async function countRecentMockDrafts(
   db: PublicDb,
@@ -54,12 +53,11 @@ export async function countRecentMockDrafts(
   const windowStart = new Date(Date.now() - MOCK_DRAFT_WINDOW_MS);
   const [{ mockDraftCount }] = await db
     .select({ mockDraftCount: count() })
-    .from(PublicSchema.drafts)
+    .from(PublicSchema.mockDraftUsage)
     .where(
       and(
-        eq(PublicSchema.drafts.kind, 'mock'),
-        eq(PublicSchema.drafts.createdBy, userId),
-        gte(PublicSchema.drafts.createdAt, windowStart),
+        eq(PublicSchema.mockDraftUsage.userId, userId),
+        gte(PublicSchema.mockDraftUsage.createdAt, windowStart),
       ),
     );
   // Drizzle's count() can surface as a string/bigint depending on the driver;

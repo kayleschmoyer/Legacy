@@ -62,6 +62,38 @@ export const mockDraftSettings = pgTable(
 );
 
 /**
+ * Append-only ledger of mock drafts created, one row per draft (LS-10483).
+ * The free-tier weekly cap counts these rows, not live `drafts`, so deleting a
+ * mock draft never refunds quota. Written by the drafts_record_mock_usage
+ * AFTER INSERT trigger on `drafts`; draft_id is intentionally not a foreign
+ * key so the row outlives its draft.
+ */
+export const mockDraftUsage = pgTable(
+  'mock_draft_usage',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id').notNull(),
+    draftId: integer('draft_id'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      mockDraftUsageUserIdFk: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+        name: 'mock_draft_usage_user_id_fkey',
+      }).onDelete('cascade'),
+      userIdCreatedAtIdx: index('mock_draft_usage_user_id_created_at_idx').on(
+        table.userId,
+        table.createdAt,
+      ),
+    };
+  },
+);
+
+/**
  * Direct per-user invite to a mock draft or a league (exactly one target —
  * CHECK invitations_target_ck). Shareable codes stay on their targets
  * (drafts.invite_code / leagues.invite_code). reservedSlot holds a mock-draft

@@ -3142,7 +3142,7 @@ type Mutation {
   deleteMockDraft(draftId: Int!): Boolean
 
   """
-  Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Replaces deleteMyMockDraftLeagues, which reset the weekly cap by deleting the throwaway leagues the old path created (LS-8238).
+  Delete every mock draft the caller created, and return how many. Scoped to the caller, so it can never touch anyone else’s draft. Test cleanup only: it does not reset the weekly mock-draft cap, which counts drafts at creation (LS-10483).
   """
   deleteMyMockDrafts: Int
 

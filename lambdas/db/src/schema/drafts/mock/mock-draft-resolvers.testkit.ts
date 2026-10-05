@@ -42,6 +42,8 @@ export interface CapturedMockDraftResolvers {
   revokeInvite: CapturedResolver<ResolverPayload>;
   myInvites: CapturedResolver<ResolverPayload>;
   pendingInvites: CapturedResolver<ResolverPayload[]>;
+  // Weekly quota read (LS-10483) — lives with the other draft queries.
+  getMyMockDraftUsage: CapturedResolver<ResolverPayload>;
 }
 
 /** The shape a `t.field({...})` definition has, as far as this kit cares. */
@@ -53,7 +55,7 @@ interface FieldDefinition {
  * Entitlement answers for the captured resolvers. Real entitlement resolution
  * reads Stripe-backed state the DB specs do not seed, so the gate itself is
  * stubbed here and tested separately; set `unlimitedMockDrafts = false` to
- * exercise the free-tier weekly cap against real `drafts` rows.
+ * exercise the free-tier weekly cap against real rows.
  */
 export const testEntitlements = {
   unlimitedMockDrafts: true,
@@ -145,6 +147,7 @@ export async function captureMockDraftResolvers(): Promise<CapturedMockDraftReso
   await import('./active');
   await import('../../invites/resolve-invite-code');
   await import('../../invites/direct-invites');
+  await import('../queries');
 
   return captured as unknown as CapturedMockDraftResolvers;
 }

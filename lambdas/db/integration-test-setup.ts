@@ -197,6 +197,12 @@ export async function cleanupTestData(): Promise<void> {
     WHERE kind = 'mock'
       AND (created_by IN (1, 2, 3) OR created_by BETWEEN 100 AND 119)
   `);
+  // The weekly mock-draft quota ledger (LS-10483) is append-only and outlives
+  // its drafts by design, so it has to be cleared separately too.
+  await db.execute(sql`
+    DELETE FROM mock_draft_usage
+    WHERE user_id IN (1, 2, 3) OR user_id BETWEEN 100 AND 119
+  `);
   // Remove bulk test users themselves (created by leagues.db.spec bulk test)
   await db.execute(sql`
     DELETE FROM app_internal.users WHERE id BETWEEN 100 AND 119

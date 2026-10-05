@@ -5,7 +5,10 @@
  *   kickMockDraftSeat   — host removes a seat holder before the start
  *   updateMockDraftLobby— host changes settings or visibility before the start
  *   deleteMockDraft     — host deletes the draft outright
- *   deleteMyMockDrafts  — delete all of the caller's mock drafts (test reset)
+ *   deleteMyMockDrafts  — delete all of the caller's mock drafts (test cleanup)
+ *
+ * Deleting never refunds weekly mock-draft quota: the cap counts the
+ * append-only mock_draft_usage ledger, not live drafts rows (LS-10483).
  *
  * Every write locks the draft row FOR UPDATE and re-reads its status inside
  * the transaction (LS-10147), because host transfer and seat release both
@@ -381,9 +384,9 @@ builder.mutationField('deleteMyMockDrafts', (t) =>
     type: 'Int',
     description:
       'Delete every mock draft the caller created, and return how many. Scoped ' +
-      'to the caller, so it can never touch anyone else’s draft. Replaces ' +
-      'deleteMyMockDraftLeagues, which reset the weekly cap by deleting the ' +
-      'throwaway leagues the old path created (LS-8238).',
+      'to the caller, so it can never touch anyone else’s draft. Test ' +
+      'cleanup only: it does not reset the weekly mock-draft cap, which ' +
+      'counts drafts at creation (LS-10483).',
     resolve: async (_parent, _args, context) => {
       if (!context.user) {
         throw AuthenticationError(

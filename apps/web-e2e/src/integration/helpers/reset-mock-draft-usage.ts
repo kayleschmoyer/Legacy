@@ -3,7 +3,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { graphql } from './graphql';
 
 /**
- * Reset the authenticated user's free-tier weekly mock-draft usage (LS-7872).
+ * Delete the authenticated user's own mock drafts (LS-7872).
  *
  * The free tier caps mock drafts at `MOCK_DRAFT_FREE_WEEKLY_LIMIT` per rolling
  * 7-day window (`countRecentMockDrafts`, gated on
@@ -14,7 +14,13 @@ import { graphql } from './graphql';
  * the window and the spec stays red for up to a week.
  *
  * Uses the `deleteMyMockDrafts` mutation (LS-8238), which deletes ONLY the
- * caller's own mock leagues (`owner = caller AND is_mock_draft = true`).
+ * caller's own mock drafts (`kind = 'mock' AND created_by = caller`).
+ *
+ * Since LS-10483 this is cleanup only — it no longer refunds weekly quota,
+ * because the cap counts the append-only `mock_draft_usage` ledger, not live
+ * drafts. That is safe for its callers: the shared commissioner is
+ * `access_level = 'admin'`, and admins hold `unlimited_mock_drafts`, so
+ * `MockDraftPage` never shows `LimitReachedScreen` for them.
  *
  * It deliberately does NOT use `deleteAllLeagues`. The integration specs all run
  * as the same shared commissioner test user, which is provisioned

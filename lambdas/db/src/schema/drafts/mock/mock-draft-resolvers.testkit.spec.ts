@@ -28,6 +28,7 @@ describe('captureMockDraftResolvers', () => {
       'sendDraftMessage',
       'expireMockDraftLobbies',
       'purgeStaleOfflineMockDrafts',
+      'getMyMockDraftUsage',
       'myActiveMockDrafts',
     ] as const;
 
