@@ -71,8 +71,9 @@ export async function countRecentMockDrafts(
  * enough counted drafts have aged out of {@link MOCK_DRAFT_WINDOW_MS} for
  * `remaining` to rise by one. Below the cap that is the oldest counted draft's
  * `createdAt` + window; at (or over) the cap it is the
- * `(used - limit + 1)`-th oldest. Reads the same rows
- * {@link countRecentMockDrafts} counts — it does not change the accounting.
+ * `(used - limit + 1)`-th oldest. Reads the same `mock_draft_usage` ledger
+ * rows {@link countRecentMockDrafts} counts (LS-10483), so deleting a draft
+ * moves neither the count nor the reset time.
  *
  * Returns `null` when nothing is counted (`used <= 0`).
  */
@@ -85,16 +86,15 @@ export async function getNextMockDraftSlotAt(
   if (used <= 0) return null;
   const windowStart = new Date(Date.now() - MOCK_DRAFT_WINDOW_MS);
   const [row] = await db
-    .select({ createdAt: PublicSchema.drafts.createdAt })
-    .from(PublicSchema.drafts)
+    .select({ createdAt: PublicSchema.mockDraftUsage.createdAt })
+    .from(PublicSchema.mockDraftUsage)
     .where(
       and(
-        eq(PublicSchema.drafts.kind, 'mock'),
-        eq(PublicSchema.drafts.createdBy, userId),
-        gte(PublicSchema.drafts.createdAt, windowStart),
+        eq(PublicSchema.mockDraftUsage.userId, userId),
+        gte(PublicSchema.mockDraftUsage.createdAt, windowStart),
       ),
     )
-    .orderBy(asc(PublicSchema.drafts.createdAt))
+    .orderBy(asc(PublicSchema.mockDraftUsage.createdAt))
     .offset(Math.max(0, used - limit))
     .limit(1);
   return row
