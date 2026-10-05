@@ -300,6 +300,7 @@ describe('WebSocketClient', () => {
       const notification: NotificationData = {
         type: 'draft-completed' as const,
         leagueId: 123,
+        draftId: 7,
         selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
       };
@@ -452,6 +453,7 @@ describe('WebSocketClient', () => {
       const notification: NotificationData = {
         type: 'draft-completed' as const,
         leagueId: 123,
+        draftId: 7,
         selectionMethod: 'standard',
         completedAt: '2024-01-01T00:00:00Z',
       };

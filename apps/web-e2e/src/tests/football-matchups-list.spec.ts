@@ -63,7 +63,6 @@ const MOCK_LEAGUE = {
   playoffFormat: '4-team',
   playoffMultiWeek: false,
   lmNotes: null,
-  isMockDraft: false,
   previousLeagueId: null,
   frozenAt: null,
   seasonNumber: 1,

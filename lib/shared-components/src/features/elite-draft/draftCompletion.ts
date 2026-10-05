@@ -37,20 +37,20 @@ export interface DraftCompletionAction {
  */
 export function getDraftCompletionActions({
   sport,
-  isMockDraft,
+  isMock,
   leagueId,
 }: {
   sport: SportKind;
-  isMockDraft: boolean;
+  isMock: boolean;
   leagueId: number | null;
 }): DraftCompletionAction[] {
   const myLeagues: DraftCompletionAction = {
     key: 'my-leagues',
     label: 'Go to My Leagues',
     path: `/${sport}`,
-    primary: !isMockDraft,
+    primary: !isMock,
   };
-  if (isMockDraft) {
+  if (isMock) {
     return [
       {
         key: 'practice-again',

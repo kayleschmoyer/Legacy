@@ -834,13 +834,11 @@ export type DraftQueueEntry = {
   __typename?: 'DraftQueueEntry';
   draftId?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  /** The queue owner's seat. Null only for a league queue row written before LS-10073. */
+  /** The queue owner's seat. */
   participantId?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   priority?: Maybe<Scalars['Int']['output']>;
-  /** Null for a mock draft, whose queue belongs to a seat (LS-10076). */
-  teamId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A draft pick recommendation produced by the Draft Intelligence algorithm */
@@ -1725,7 +1723,6 @@ export type League = {
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   baseballHofOnly?: Maybe<Scalars['Boolean']['output']>;
-  controlAllTeams?: Maybe<Scalars['Boolean']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
@@ -1742,8 +1739,6 @@ export type League = {
   id?: Maybe<Scalars['Int']['output']>;
   /** League invite code. Null for non-members — only league members and the owner receive this value. */
   inviteCode?: Maybe<Scalars['String']['output']>;
-  isMockDraft?: Maybe<Scalars['Boolean']['output']>;
-  isOfflineDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   /** Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671) */
   keeperSettings?: Maybe<KeeperSettings>;
@@ -7274,9 +7269,6 @@ export type CreateLeagueAndTeamsMutation = {
       playoffMultiWeek?: boolean | null;
       medianGameEnabled?: boolean | null;
       lmNotes?: string | null;
-      isMockDraft?: boolean | null;
-      isOfflineDraft?: boolean | null;
-      controlAllTeams?: boolean | null;
       isPublic?: boolean | null;
       logoUrl?: string | null;
       bannerUrl?: string | null;
@@ -7360,9 +7352,6 @@ export type GetUserLeaguesQuery = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -7445,9 +7434,6 @@ export type GetMyLeaguesQuery = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -7548,9 +7534,6 @@ export type StartDraftMutation = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -7734,9 +7717,6 @@ export type StartSeasonMutation = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -10963,9 +10943,6 @@ export type UpdateLeagueSettingsMutation = {
     faabBudgetDefault?: number | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -12149,9 +12126,6 @@ export type GetLeagueByIdQuery = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -13371,9 +13345,6 @@ export type LeagueFragment = {
   playoffMultiWeek?: boolean | null;
   medianGameEnabled?: boolean | null;
   lmNotes?: string | null;
-  isMockDraft?: boolean | null;
-  isOfflineDraft?: boolean | null;
-  controlAllTeams?: boolean | null;
   isPublic?: boolean | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -13659,7 +13630,6 @@ export type GetMyDraftQueueQuery = {
     __typename?: 'DraftQueueEntry';
     id?: number | null;
     draftId?: number | null;
-    teamId?: number | null;
     playerId?: number | null;
     priority?: number | null;
     player?: {
@@ -13682,7 +13652,6 @@ export type SetDraftQueueMutation = {
     __typename?: 'DraftQueueEntry';
     id?: number | null;
     draftId?: number | null;
-    teamId?: number | null;
     playerId?: number | null;
     priority?: number | null;
     player?: {
@@ -13705,7 +13674,6 @@ export type AddToDraftQueueMutation = {
     __typename?: 'DraftQueueEntry';
     id?: number | null;
     draftId?: number | null;
-    teamId?: number | null;
     playerId?: number | null;
     priority?: number | null;
     player?: {
@@ -13728,7 +13696,6 @@ export type RemoveFromDraftQueueMutation = {
     __typename?: 'DraftQueueEntry';
     id?: number | null;
     draftId?: number | null;
-    teamId?: number | null;
     playerId?: number | null;
     priority?: number | null;
     player?: {
@@ -13751,7 +13718,6 @@ export type ReorderDraftQueueMutation = {
     __typename?: 'DraftQueueEntry';
     id?: number | null;
     draftId?: number | null;
-    teamId?: number | null;
     playerId?: number | null;
     priority?: number | null;
     player?: {
@@ -15170,9 +15136,6 @@ export type RenewLeagueMutation = {
     playoffMultiWeek?: boolean | null;
     medianGameEnabled?: boolean | null;
     lmNotes?: string | null;
-    isMockDraft?: boolean | null;
-    isOfflineDraft?: boolean | null;
-    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -17900,9 +17863,6 @@ export const LeagueFragmentDoc = gql`
     playoffMultiWeek
     medianGameEnabled
     lmNotes
-    isMockDraft
-    isOfflineDraft
-    controlAllTeams
     isPublic
     logoUrl
     bannerUrl
@@ -33750,7 +33710,6 @@ export const GetMyDraftQueue = gql`
     getMyDraftQueue(draftId: $draftId) {
       id
       draftId
-      teamId
       playerId
       priority
       player {
@@ -33849,7 +33808,6 @@ export const SetDraftQueue = gql`
     setDraftQueue(draftId: $draftId, playerIds: $playerIds) {
       id
       draftId
-      teamId
       playerId
       priority
       player {
@@ -33909,7 +33867,6 @@ export const AddToDraftQueue = gql`
     addToDraftQueue(draftId: $draftId, playerId: $playerId) {
       id
       draftId
-      teamId
       playerId
       priority
       player {
@@ -33969,7 +33926,6 @@ export const RemoveFromDraftQueue = gql`
     removeFromDraftQueue(draftId: $draftId, playerId: $playerId) {
       id
       draftId
-      teamId
       playerId
       priority
       player {
@@ -34029,7 +33985,6 @@ export const ReorderDraftQueue = gql`
     reorderDraftQueue(draftId: $draftId, playerIds: $playerIds) {
       id
       draftId
-      teamId
       playerId
       priority
       player {

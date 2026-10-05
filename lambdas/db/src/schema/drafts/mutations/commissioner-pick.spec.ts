@@ -253,7 +253,6 @@ describe('commissionerPick resolver', () => {
       minCareerGames: 0,
       minCareerSeasons: 0,
       maxRosterSize: 25,
-      isMockDraft: false,
     };
     const draftRow = {
       id: 1,
@@ -316,7 +315,6 @@ describe('commissionerPick resolver', () => {
       minCareerGames: 0,
       minCareerSeasons: 0,
       maxRosterSize: 25,
-      isMockDraft: false,
     };
     const draftRow = {
       id: 1,
@@ -383,7 +381,6 @@ describe('commissionerPick — draft row lock-wait retry (LS-8480)', () => {
     minCareerGames: 0,
     minCareerSeasons: 0,
     maxRosterSize: 25,
-    isMockDraft: false,
   };
   const draftRow = {
     id: 1,

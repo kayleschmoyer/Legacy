@@ -32,7 +32,7 @@ import {
   integrationTestSchema,
 } from '../../../integration-test-setup';
 
-const { drafts, draftTeams, draftPicks, leagues, teams, leagueMembers } =
+const { drafts, draftParticipants, draftPicks, leagues, teams, leagueMembers } =
   integrationTestSchema;
 
 describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9319)', () => {
@@ -104,12 +104,14 @@ describe('autoProcessDraftPicks Phase 1 / Phase 2 split — DB Integration (LS-9
       })
       .returning();
 
-    await db.insert(draftTeams).values(
+    await db.insert(draftParticipants).values(
       teamFixtures.map((t, i) => ({
         draftId: draft.id,
+        slot: i + 1,
         teamId: t.id,
         leagueId: league.id,
-        draftOrder: i + 1,
+        controller: 'user' as const,
+        seatName: t.name,
       })),
     );
 

@@ -217,9 +217,9 @@ builder.queryField('getCurrentDraftPick', (t) =>
         if (error instanceof GraphQLError) {
           throw error;
         }
-        // draft_teams is empty between league creation (which creates the
-        // drafts row) and initializeDraft running (which populates
-        // draft_teams) — an expected transient state while the commissioner
+        // draft_participants is empty between league creation (which creates
+        // the drafts row) and initializeDraft running (which seats the
+        // draft) — an expected transient state while the commissioner
         // hasn't started the draft yet, not a system failure. The client
         // already renders a friendly "draft order not generated yet" message
         // for this exact case (useDraftEffects), but only if it can read the
@@ -985,7 +985,7 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
 
       try {
         // This query refetches after every pick/auto-pick event on the live
-        // draft board, so it races concurrent writes to draft_teams (e.g. a
+        // draft board, so it races concurrent writes to draft_participants (e.g. a
         // makeDraftPick / toggleAutoPick mutation firing off the same event).
         // Wrap the two reads in a bounded retry so a transient Postgres failure
         // (deadlock / serialization / lock-timeout) recovers silently instead
@@ -1798,18 +1798,19 @@ builder.queryField('getMyDraftQueue', (t) =>
         );
       }
 
-      const rows = await context.db
+      const seat = await getSeatForTeam(context.db, draftId, membership.teamId);
+      if (!seat) return [];
+
+      return context.db
         .select()
         .from(PublicSchema.draftQueue)
         .where(
           and(
             eq(PublicSchema.draftQueue.draftId, draftId),
-            eq(PublicSchema.draftQueue.teamId, membership.teamId),
+            eq(PublicSchema.draftQueue.participantId, seat.id),
           ),
         )
         .orderBy(asc(PublicSchema.draftQueue.priority));
-
-      return rows;
     },
   }),
 );

@@ -338,38 +338,6 @@ describe('SpectatorScreen (native) — full-page states', () => {
     expect(onNavigate).toHaveBeenCalledWith('/baseball/league/1');
   });
 
-  it('sends mock drafts to My Leagues instead of the ephemeral practice league (LS-9239)', () => {
-    mockUseSpectatorDraftData.mockReturnValue(
-      makeData({
-        league: {
-          id: 1,
-          name: 'Mock Draft Practice',
-          draftStatus: 'in-progress',
-          isMockDraft: true,
-        },
-        currentPickInfo: {
-          draftId: 42,
-          teamId: 11,
-          round: 20,
-          pickNumber: 2,
-          overallPick: 40,
-          isComplete: true,
-        },
-      }),
-    );
-    const onNavigate = jest.fn();
-    const { getByText, container } = render(
-      <SpectatorScreen {...defaultProps} onNavigate={onNavigate} />,
-    );
-    expect(getByText('DRAFT COMPLETE')).toBeTruthy();
-    const backButton = container.querySelector(
-      '[data-accessibility-label="Go to My Leagues"]',
-    );
-    expect(backButton).toBeTruthy();
-    fireEvent.click(backButton as Element);
-    expect(onNavigate).toHaveBeenCalledWith('/baseball');
-  });
-
   it('shows the paused overlay without a resume affordance', () => {
     const { getByText, queryByText } = render(
       <SpectatorScreen {...defaultProps} />,

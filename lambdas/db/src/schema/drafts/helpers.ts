@@ -26,7 +26,7 @@ import { addPlayerToRoster } from '../../services/roster-service';
  * Free-tier users may start at most this many mock drafts per rolling 7-day
  * window. Users with the `unlimited_mock_drafts` entitlement are exempt.
  *
- * Single source of truth shared by the `initializeMockDraft` mutation (which
+ * Single source of truth shared by the `createMockDraft` mutation (which
  * enforces the cap) and the `getMyMockDraftUsage` query (which surfaces the
  * usage to the web UI so the limit is reflected *before* submit — LS-5178).
  */

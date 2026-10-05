@@ -319,7 +319,7 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
     );
   });
 
-  it('LS-8742: preserves a draft_teams order already seeded by an approved slot trade instead of reshuffling', async () => {
+  it('LS-8742: preserves a seat order already seeded by an approved slot trade instead of reshuffling', async () => {
     resolveDraftTeamsOrder.mockResolvedValueOnce({
       orderedTeamIds: [501, 500],
       needsInsert: false,

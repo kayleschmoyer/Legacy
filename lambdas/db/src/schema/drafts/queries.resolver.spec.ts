@@ -79,7 +79,6 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
           },
           draftQueue: {
             draftId: 'draftId',
-            teamId: 'draftQueue.teamId',
             participantId: 'draftQueue.participantId',
             priority: 'priority',
           },
@@ -267,7 +266,6 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
       expect(result).toEqual(queueRows);
       const queueFilter = JSON.stringify(mockDb.where.mock.lastCall?.[0]);
       expect(queueFilter).toContain('draftQueue.participantId');
-      expect(queueFilter).not.toContain('draftQueue.teamId');
     });
 
     it('rejects with FORBIDDEN when the caller holds no seat', async () => {
@@ -292,7 +290,7 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
  * Resolver-level tests for `getDraftTeamAutoPickStatuses` resilience (LS-8287).
  *
  * This query refetches after every pick event on the live draft board, so it
- * races concurrent writes to draft_teams. A single production occurrence
+ * races concurrent writes to draft_participants. A single production occurrence
  * (Rollbar #171) surfaced as a masked "Internal server error". These tests
  * assert the two-part fix:
  *   1. A transient Postgres failure (deadlock / serialization / lock-timeout)
@@ -559,7 +557,7 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
  * `getCurrentDraftPickInfo` throws a plain `Error('No teams configured for
  * this draft')` while a draft exists but hasn't been initialized yet (the
  * window between league creation and `initializeDraft` populating
- * `draft_teams`) — an expected, client-visible state, not a system failure.
+ * `draft_participants`) — an expected, client-visible state, not a system failure.
  * Because a plain `Error` carries no client-facing `extensions.code`, Apollo's
  * `formatError` was scrubbing the message to a generic "Internal server
  * error" and reporting it to Rollbar. These tests assert the resolver
@@ -1267,7 +1265,7 @@ describe('spectator read access — LS-8939 access matrix', () => {
           },
           draftQueue: {
             draftId: 'draftId',
-            teamId: 'teamId',
+            participantId: 'participantId',
             priority: 'priority',
           },
         },

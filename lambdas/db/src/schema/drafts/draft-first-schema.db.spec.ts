@@ -1,14 +1,12 @@
 /**
- * Draft-first schema (LS-10073) — real-Postgres guard for the slice-1 schema.
+ * Draft-first schema (LS-10073, contracted in LS-10080) — real-Postgres guard.
  *
  * 1. Conformance: every column the new/changed Drizzle models map exists
  *    (same technique as football-stats-schema.db.spec.ts, LS-8553).
- * 2. The CHECK constraints the migration promises are present and enforced.
- * 3. Bridge triggers: the draft writers deployed today (initializeDraft,
- *    setDraftOrder, makeDraftPick, league status transitions) know nothing
- *    about the new columns, yet drafts.status/created_by/sport and
- *    draft_picks.participant_id are NOT NULL. These tests replay those
- *    writers' insert/update shapes and assert the triggers fill the gaps.
+ * 2. The CHECK constraints the migrations promise are present and enforced.
+ * 3. The fill triggers that outlived the draft_teams bridge (dropped in
+ *    LS-10080): drafts.status/created_by/sport from the league, the
+ *    leagues.draft_status mirror, and draft_picks.participant_id from team_id.
  */
 
 import { eq, sql } from 'drizzle-orm';
@@ -27,7 +25,6 @@ const {
   draftParticipants,
   draftPicks,
   draftQueue,
-  draftTeams,
   drafts,
   invitations,
   leagueMembers,
@@ -51,7 +48,7 @@ describe('Draft-first schema (LS-10073)', () => {
     await cleanupTestData();
   });
 
-  /** initializeDraft-shaped seed: drafts + draft_teams without any new column. */
+  /** League-draft seed: a drafts row without the trigger-filled columns, plus one seat per team. */
   async function seedLeagueDraft(teamCount = 3) {
     const owner = getUser(1);
     const leagueFixture = getLeague(0);
@@ -91,12 +88,14 @@ describe('Draft-first schema (LS-10073)', () => {
       })
       .returning();
 
-    await db.insert(draftTeams).values(
+    await db.insert(draftParticipants).values(
       teamFixtures.map((t, i) => ({
         draftId: draft.id,
+        slot: i + 1,
         teamId: t.id,
         leagueId: league.id,
-        draftOrder: i + 1,
+        controller: i > 0 ? ('ai' as const) : ('user' as const),
+        seatName: t.name,
         autoPick: i > 0,
       })),
     );
@@ -232,23 +231,13 @@ describe('Draft-first schema (LS-10073)', () => {
     });
   });
 
-  describe('bridge triggers for the deployed writers', () => {
+  describe('fill triggers', () => {
     it('fills drafts.status/created_by/sport from the league', async () => {
       const { draft, owner } = await seedLeagueDraft();
       expect(draft.kind).toBe('league');
       expect(draft.status).toBe('in-progress');
       expect(draft.createdBy).toBe(owner.id);
       expect(draft.sport).toBe('football');
-    });
-
-    it('seats one participant per draft_teams row at its draft order', async () => {
-      const { draft, teams: teamFix } = await seedLeagueDraft();
-      const seats = await seatsOf(draft.id);
-      expect(seats.map((s) => [s.teamId, s.slot, s.controller])).toEqual([
-        [teamFix[0].id, 1, 'user'],
-        [teamFix[1].id, 2, 'ai'],
-        [teamFix[2].id, 3, 'ai'],
-      ]);
     });
 
     it('resolves participant_id on a pick inserted without one', async () => {
@@ -268,47 +257,6 @@ describe('Draft-first schema (LS-10073)', () => {
         (s) => s.teamId === teamFix[1].id,
       );
       expect(pick.participantId).toBe(seat?.id);
-    });
-
-    it('keeps seat ids (and queue rows) across a delete + reinsert reorder', async () => {
-      const { draft, league, teams: teamFix } = await seedLeagueDraft();
-      await db.insert(draftQueue).values({
-        draftId: draft.id,
-        teamId: teamFix[2].id,
-        playerId: getTestPlayers()[1].id,
-        priority: 1,
-      });
-      const before = await seatsOf(draft.id);
-
-      await db.transaction(async (tx) => {
-        await tx.delete(draftTeams).where(eq(draftTeams.draftId, draft.id));
-        await tx.insert(draftTeams).values(
-          [teamFix[2], teamFix[0], teamFix[1]].map((t, i) => ({
-            draftId: draft.id,
-            teamId: t.id,
-            leagueId: league.id,
-            draftOrder: i + 1,
-          })),
-        );
-      });
-
-      const after = await seatsOf(draft.id);
-      expect(after.map((s) => s.teamId)).toEqual([
-        teamFix[2].id,
-        teamFix[0].id,
-        teamFix[1].id,
-      ]);
-      const idByTeam = (rows: typeof before) =>
-        Object.fromEntries(rows.map((r) => [r.teamId, r.id]));
-      expect(idByTeam(after)).toEqual(idByTeam(before));
-
-      const queue = await db
-        .select({ participantId: draftQueue.participantId })
-        .from(draftQueue)
-        .where(eq(draftQueue.draftId, draft.id));
-      expect(queue).toEqual([
-        { participantId: idByTeam(before)[teamFix[2].id] },
-      ]);
     });
 
     it('mirrors leagues.draft_status onto drafts.status', async () => {

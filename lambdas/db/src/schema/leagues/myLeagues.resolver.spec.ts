@@ -56,7 +56,6 @@ describe('myLeagues query (LS-255 AC12)', () => {
             waiverEnabled: 'waiverEnabled',
             faabBudgetDefault: 'faabBudgetDefault',
             isPublic: 'isPublic',
-            isMockDraft: 'isMockDraft',
             gamesPerMatchup: 'gamesPerMatchup',
             tierFrozenAt: 'tierFrozenAt',
           },
@@ -248,9 +247,8 @@ describe('myLeagues query (LS-255 AC12)', () => {
       undefined as never,
     );
 
-    // With sport=football, the where() call should receive three conditions
-    // (userId match, isMockDraft=false, sport=football). Without sport, only
-    // the first two. We assert that where() was invoked at least once on the
+    // With sport=football, the where() call should receive two conditions
+    // (userId match, sport=football). Without sport, only the first. We assert that where() was invoked at least once on the
     // join chain — finer-grained assertions would couple the test to drizzle
     // expression objects, which are opaque.
     expect(mockDb.where).toHaveBeenCalled();

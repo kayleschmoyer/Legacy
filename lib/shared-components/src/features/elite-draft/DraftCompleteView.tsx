@@ -19,7 +19,7 @@ interface DraftCompleteViewProps {
    * What this draft was, for the copy and CTAs. A mock draft has no league
    * (LS-10076), so this is the draft's own summary rather than a league row.
    */
-  draftSummary: { isMockDraft?: boolean; name?: string } | null | undefined;
+  draftSummary: { isMock?: boolean; name?: string } | null | undefined;
   leagueId: number | null;
   /** Routes the CTAs to this sport's pages (LS-10528). */
   sport: SportKind;
@@ -123,7 +123,7 @@ export function DraftCompleteView({
 
   const actions = getDraftCompletionActions({
     sport,
-    isMockDraft: draftSummary?.isMockDraft === true,
+    isMock: draftSummary?.isMock === true,
     leagueId,
   });
 
@@ -195,7 +195,7 @@ export function DraftCompleteView({
           lineHeight={21}
           textAlign="center"
         >
-          {draftSummary?.isMockDraft
+          {draftSummary?.isMock
             ? `All ${pickHistory.length} picks have been made. No rosters were saved — this was a practice draft.`
             : `All ${pickHistory.length} picks have been made. Your roster is set!`}
         </Text>

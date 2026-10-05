@@ -67,19 +67,16 @@ export function BaseballScreen() {
 
   const leagues = React.useMemo(
     () =>
-      (data?.userLeagues ?? [])
-        .filter(Boolean)
-        .filter((l) => !l.isMockDraft)
-        .map((l) => ({
-          id: l?.id ?? 0,
-          name: l?.name,
-          draftStatus: l?.draftStatus,
-          currentWeekNumber: l?.currentWeekNumber,
-          weekAdvanceStatus: l?.weekAdvanceStatus,
-          maxRosterSize: l?.maxRosterSize,
-          frozenAt: l?.frozenAt,
-          permissionLevel: l?.userMembership?.permissionLevel,
-        })),
+      (data?.userLeagues ?? []).filter(Boolean).map((l) => ({
+        id: l?.id ?? 0,
+        name: l?.name,
+        draftStatus: l?.draftStatus,
+        currentWeekNumber: l?.currentWeekNumber,
+        weekAdvanceStatus: l?.weekAdvanceStatus,
+        maxRosterSize: l?.maxRosterSize,
+        frozenAt: l?.frozenAt,
+        permissionLevel: l?.userMembership?.permissionLevel,
+      })),
     [data?.userLeagues],
   );
 

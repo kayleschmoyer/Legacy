@@ -149,20 +149,20 @@ jest.mock('./DraftPlayerBoard', () => ({
 }));
 jest.mock('./DraftTopBand', () => ({
   DraftTopBand: ({
-    isMockDraft,
+    isMock,
     onExitDraft,
     connectionStale,
   }: {
-    isMockDraft?: boolean;
+    isMock?: boolean;
     onExitDraft?: () => void;
     connectionStale?: boolean;
   }) => (
     <div
       data-testid="draft-top-band"
-      data-is-mock-draft={String(!!isMockDraft)}
+      data-is-mock-draft={String(!!isMock)}
       data-connection-stale={String(!!connectionStale)}
     >
-      {isMockDraft && onExitDraft && (
+      {isMock && onExitDraft && (
         <button onClick={onExitDraft}>Exit Draft</button>
       )}
     </div>
@@ -435,14 +435,14 @@ jest.mock('./DraftMyPickAnnouncement', () => ({
 }));
 jest.mock('./DraftRoomRecap', () => ({
   DraftRoomRecap: ({
-    isMockDraft,
+    isMock,
     leagueId,
     myTeamId,
     leagueTeams,
     sport,
     onNavigate,
   }: {
-    isMockDraft: boolean;
+    isMock: boolean;
     leagueId: number | null;
     myTeamId: number | null;
     leagueTeams: unknown[];
@@ -451,7 +451,7 @@ jest.mock('./DraftRoomRecap', () => ({
   }) => (
     <div
       data-testid="draft-room-recap"
-      data-is-mock-draft={String(isMockDraft)}
+      data-is-mock-draft={String(isMock)}
       data-league-id={String(leagueId)}
       data-my-team-id={String(myTeamId)}
       data-team-count={String(leagueTeams.length)}
@@ -624,9 +624,6 @@ function makeBaseUI(
 /** Shape of the `league` fixture the derived values below are read from. */
 type LeagueFixture = {
   draftStatus?: string | null;
-  isMockDraft?: boolean | null;
-  isOfflineDraft?: boolean | null;
-  controlAllTeams?: boolean | null;
   maxRosterSize?: number | null;
   sport?: string | null;
   name?: string | null;
@@ -637,15 +634,16 @@ function makeBaseQueries(
 ) {
   // LS-10076: the board no longer reads status/roster size/mock-ness off
   // `league` — `useDraftQueries` derives them from whichever source it loaded
-  // (the league, or `draftRoom` in draft-room mode). In league mode they
-  // mirror the league, so derive them from the fixture here and let a test
-  // still override any of them explicitly.
+  // (the league, or `draftRoom` in draft-room mode). In league mode status,
+  // roster size, sport and title mirror the league, so derive them from the
+  // fixture here; mock-ness only ever comes from the draft room (LS-10080), so
+  // a test that needs a mock draft overrides `isMock` (and
+  // `controlAllTeams` / `isOfflineDraft`) directly.
   const league =
     'league' in overrides
       ? (overrides.league as LeagueFixture)
       : {
           draftStatus: 'in-progress',
-          isMockDraft: false,
           sport: null,
           name: 'Test League',
         };
@@ -663,7 +661,6 @@ function makeBaseQueries(
       id: 1,
       name: 'Test League',
       draftStatus: 'in-progress',
-      isMockDraft: false,
       userMembership: { permissionLevel: 'member', teamId: 1 },
     },
     leagueTeams: [],
@@ -709,9 +706,9 @@ function makeBaseQueries(
     // Derived board values (LS-10076).
     draftStatus: league?.draftStatus ?? null,
     maxRosterSize: league?.maxRosterSize ?? null,
-    isMockDraft: league?.isMockDraft === true,
-    isOfflineDraft: league?.isOfflineDraft === true,
-    controlAllTeams: league?.controlAllTeams === true,
+    isMock: false,
+    isOfflineDraft: false,
+    controlAllTeams: false,
     draftSport: league?.sport ?? null,
     draftTitle: league?.name ?? null,
     ...overrides,
@@ -824,7 +821,6 @@ describe('EliteDraftBoardScreen — sport prop (LS-4662)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'pre_draft',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: null,
@@ -847,10 +843,9 @@ describe('EliteDraftBoardScreen — sport prop (LS-4662)', () => {
       makeBaseQueries({
         league: {
           id: 1,
-          name: 'Mock Draft Practice',
+          name: 'Football League',
           sport: 'football',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'commissioner', teamId: 1 },
         },
       }),
@@ -874,7 +869,6 @@ describe('EliteDraftBoardScreen — sport prop (LS-4662)', () => {
           name: 'Test League',
           sport: 'football',
           draftStatus: 'in-progress',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
       }),
@@ -994,7 +988,6 @@ describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression g
           id: 1,
           name: 'Test League',
           draftStatus: 'completed',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: null,
@@ -1035,7 +1028,7 @@ describe('EliteDraftBoardScreen — draft-complete recap viewport swap (LS-9402)
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({
-        isMockDraft: true,
+        isMock: true,
         leagueTeams: [
           { id: '1', name: 'Mine', leagueId: 1 },
           { id: '2', name: 'CPU', leagueId: 1, isCpu: true },
@@ -1081,7 +1074,6 @@ describe('EliteDraftBoardScreen — pre-draft lobby guard (LS-4085)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'queued',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: null,
@@ -1104,7 +1096,6 @@ describe('EliteDraftBoardScreen — pre-draft lobby guard (LS-4085)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'paused',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         draftId: 42,
@@ -1394,7 +1385,6 @@ describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: {
@@ -1423,7 +1413,6 @@ describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'paused',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: {
@@ -1452,7 +1441,6 @@ describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'pre_draft',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
         leagueDraft: null,
@@ -1479,7 +1467,6 @@ describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: false,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
       }),
@@ -1655,7 +1642,7 @@ function setupCompactLiveDraft({
   mockUseDraftUIState.mockReturnValue({ ...makeBaseUI(), ...ui });
   mockUseDraftQueries.mockReturnValue({
     // Passed through makeBaseQueries so a `league` override still drives the
-    // derived board values (draftStatus, isMockDraft, …) (LS-10076).
+    // derived board values (draftStatus, draftSport, …) (LS-10076).
     ...makeBaseQueries(queries),
     leagueTeams: TEAMS,
     boardOrderedTeams: TEAMS,
@@ -1881,12 +1868,12 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
       players: [makeDraftPlayer()],
       queries: {
         isCommissioner: true,
+        isMock: true,
+        controlAllTeams: true,
         league: {
           id: 1,
           name: 'Mock Draft Practice',
           draftStatus: 'in-progress',
-          isMockDraft: true,
-          controlAllTeams: true,
           userMembership: { permissionLevel: 'commissioner', teamId: 1 },
         },
       },
@@ -2005,7 +1992,6 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
               id: 1,
               name: 'Test League',
               draftStatus: 'in-progress',
-              isMockDraft: false,
               userMembership: { permissionLevel, teamId: 1 },
             },
           },
@@ -2024,19 +2010,19 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     );
   });
 
-  // LS-9242: initialize-mock-draft.ts registers the human as
-  // permissionLevel="commissioner" so the pick/queue flow works, but a solo
-  // mock draft has no real commissioner role to manage — the commissioner
-  // controls must stay hidden even though isCommissioner is true.
+  // LS-9242: a mock draft's host can surface as isCommissioner so the
+  // pick/queue flow works, but a mock draft has no real commissioner role to
+  // manage — the commissioner controls must stay hidden even though
+  // isCommissioner is true.
   it('hides commissioner controls in a mock draft even though the user is registered as commissioner', () => {
     setupCompactLiveDraft({
       queries: {
         isCommissioner: true,
+        isMock: true,
         league: {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'commissioner', teamId: 1 },
         },
       },
@@ -2415,11 +2401,11 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
     const onNavigate = jest.fn();
     setupCompactLiveDraft({
       queries: {
+        isMock: true,
         league: {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
       },
@@ -2440,11 +2426,11 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
     const onExitDraft = jest.fn();
     setupCompactLiveDraft({
       queries: {
+        isMock: true,
         league: {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
       },
@@ -2478,11 +2464,11 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
       makeBaseQueries({
         leagueTeams: TEAMS,
         boardOrderedTeams: TEAMS,
+        isMock: true,
         league: {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
       }),
@@ -2723,7 +2709,6 @@ describe('EliteDraftBoardScreen — header chrome (LS-10204)', () => {
           id: 1,
           name: 'Test League',
           draftStatus: 'in-progress',
-          isMockDraft: false,
           maxRosterSize: 23,
           userMembership: { permissionLevel: 'member', teamId: 1 },
         },
@@ -2784,11 +2769,11 @@ describe('EliteDraftBoardScreen — header chrome (LS-10204)', () => {
   it('drops the hero back link for mock drafts', () => {
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({
+        isMock: true,
         league: {
           id: 1,
           name: 'Mock Draft Practice',
           draftStatus: 'in-progress',
-          isMockDraft: true,
           userMembership: { permissionLevel: 'commissioner', teamId: 1 },
         },
       }),

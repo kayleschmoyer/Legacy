@@ -140,16 +140,6 @@ builder.queryField('league', (t) =>
             secondaryColor: PublicSchema.leagues.secondaryColor,
             // Season info
             lmNotes: PublicSchema.leagues.lmNotes,
-            isMockDraft: PublicSchema.leagues.isMockDraft,
-            // LS-9253: isOfflineDraft (LS-9144) was exposed on the League type
-            // and fragment but never selected/returned here — the live draft
-            // board's `untimed` detection (queries.league?.isOfflineDraft)
-            // silently always read undefined via this query path. Picked up
-            // while adding controlAllTeams (which needs the same treatment)
-            // since Control All Teams forces isOffline and depends on the
-            // untimed UI actually engaging.
-            isOfflineDraft: PublicSchema.leagues.isOfflineDraft,
-            controlAllTeams: PublicSchema.leagues.controlAllTeams,
             previousLeagueId: PublicSchema.leagues.previousLeagueId,
             frozenAt: PublicSchema.leagues.frozenAt,
             seasonNumber: PublicSchema.leagues.seasonNumber,
@@ -263,9 +253,6 @@ builder.queryField('league', (t) =>
           secondaryColor: league.secondaryColor,
           // Season info
           lmNotes: league.lmNotes,
-          isMockDraft: league.isMockDraft,
-          isOfflineDraft: league.isOfflineDraft,
-          controlAllTeams: league.controlAllTeams,
           previousLeagueId: league.previousLeagueId,
           frozenAt: league.frozenAt ? league.frozenAt.toISOString() : null,
           seasonNumber: league.seasonNumber,

@@ -18,6 +18,7 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray } from 'drizzle-orm';
 
+import { getParticipantIdForTeam } from './participants';
 import { UserInputError } from '../graphql-errors';
 
 export interface ApplyKeeperDesignationsParams {
@@ -219,15 +220,21 @@ export async function applyKeeperDesignationsForDraft(
   // normal draft-start budget initialization to seed at full auctionBudget.
   if (costModel === 'auction-budget' && auctionCostByTeam.size > 0) {
     for (const [teamId, totalCost] of auctionCostByTeam) {
+      const participantId = await getParticipantIdForTeam(tx, draftId, teamId);
+      if (participantId === null) {
+        throw new Error(
+          `Team ${teamId} has no seat in draft ${draftId}; seat the draft before applying keepers`,
+        );
+      }
       const playersWon = keptPlayerIdsByTeam.get(teamId)?.length ?? 0;
       const remainingBudget = Math.max(0, auctionBudget - totalCost);
       await tx
         .insert(PublicSchema.auctionBudgets)
-        .values({ draftId, teamId, remainingBudget, playersWon })
+        .values({ draftId, participantId, remainingBudget, playersWon })
         .onConflictDoUpdate({
           target: [
             PublicSchema.auctionBudgets.draftId,
-            PublicSchema.auctionBudgets.teamId,
+            PublicSchema.auctionBudgets.participantId,
           ],
           set: { remainingBudget, playersWon },
         });

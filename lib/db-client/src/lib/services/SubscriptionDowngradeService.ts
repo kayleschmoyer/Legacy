@@ -64,12 +64,7 @@ export async function handleSubscriptionDowngrade(
         frozenAt: PublicSchema.leagues.frozenAt,
       })
       .from(PublicSchema.leagues)
-      .where(
-        and(
-          eq(PublicSchema.leagues.owner, userId),
-          eq(PublicSchema.leagues.isMockDraft, false),
-        ),
-      )
+      .where(eq(PublicSchema.leagues.owner, userId))
       .orderBy(asc(PublicSchema.leagues.id));
 
     if (ownedLeagues.length === 0) return;
@@ -185,12 +180,7 @@ export async function reapplyLeagueRestrictions(
         frozenAt: PublicSchema.leagues.frozenAt,
       })
       .from(PublicSchema.leagues)
-      .where(
-        and(
-          eq(PublicSchema.leagues.owner, userId),
-          eq(PublicSchema.leagues.isMockDraft, false),
-        ),
-      );
+      .where(eq(PublicSchema.leagues.owner, userId));
 
     const ownedIds = new Set(ownedLeagues.map((l) => l.id));
     const requestedActive = new Set(

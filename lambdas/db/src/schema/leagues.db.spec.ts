@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, inArray } from 'drizzle-orm';
+import { count, countDistinct, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import {
   cleanupTestData,
@@ -552,7 +552,7 @@ describe('Leagues - DB Integration Tests', () => {
   // real database and contrast them with the buggy owner-only count.
   describe('free-tier league cap counts membership (LS-5181)', () => {
     // Mirrors the production count query in LeagueService.createLeague and the
-    // renewLeague resolver: count distinct active (non-mock) leagues the user
+    // renewLeague resolver: count distinct leagues the user
     // is a member of.
     function countActiveLeaguesForUser(userId: number) {
       return db
@@ -567,12 +567,7 @@ describe('Leagues - DB Integration Tests', () => {
             integrationTestSchema.leagues.id,
           ),
         )
-        .where(
-          and(
-            eq(integrationTestSchema.leagueMembers.userId, userId),
-            eq(integrationTestSchema.leagues.isMockDraft, false),
-          ),
-        );
+        .where(eq(integrationTestSchema.leagueMembers.userId, userId));
     }
 
     // The original (buggy) count keyed solely on ownership.
@@ -580,19 +575,14 @@ describe('Leagues - DB Integration Tests', () => {
       return db
         .select({ leagueCount: count() })
         .from(integrationTestSchema.leagues)
-        .where(
-          and(
-            eq(integrationTestSchema.leagues.owner, userId),
-            eq(integrationTestSchema.leagues.isMockDraft, false),
-          ),
-        );
+        .where(eq(integrationTestSchema.leagues.owner, userId));
     }
 
     it('counts joined leagues that the user does not own', async () => {
       const owner = getUser(2);
       const member = getUser(1);
 
-      // owner creates 3 non-mock leagues; member joins all 3 but owns none.
+      // owner creates 3 leagues; member joins all 3 but owns none.
       const leagues = await db
         .insert(integrationTestSchema.leagues)
         .values([
@@ -665,45 +655,6 @@ describe('Leagues - DB Integration Tests', () => {
       // 2 owned + 1 joined = 3 distinct leagues; the (leagueId, userId) PK
       // guarantees a single membership row per league, so no double counting.
       expect(leagueCount).toBe(3);
-    });
-
-    it('excludes mock-draft leagues from the cap count', async () => {
-      const owner = getUser(2);
-      const member = getUser(1);
-
-      const [realLeague, mockLeague] = await db
-        .insert(integrationTestSchema.leagues)
-        .values([
-          {
-            name: 'Real League',
-            owner: owner.id,
-            inviteCode: 'MOCK518A',
-            isMockDraft: false,
-          },
-          {
-            name: 'Mock League',
-            owner: owner.id,
-            inviteCode: 'MOCK518B',
-            isMockDraft: true,
-          },
-        ])
-        .returning();
-
-      await db.insert(integrationTestSchema.leagueMembers).values([
-        {
-          leagueId: realLeague.id,
-          userId: member.id,
-          permissionLevel: 'general_manager' as const,
-        },
-        {
-          leagueId: mockLeague.id,
-          userId: member.id,
-          permissionLevel: 'general_manager' as const,
-        },
-      ]);
-
-      const [{ leagueCount }] = await countActiveLeaguesForUser(member.id);
-      expect(leagueCount).toBe(1);
     });
   });
 

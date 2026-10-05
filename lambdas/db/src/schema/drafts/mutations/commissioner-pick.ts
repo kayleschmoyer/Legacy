@@ -288,7 +288,7 @@ builder.mutationField('commissionerPick', (t) =>
               draftPick,
               isDraftComplete,
               leagueId: txLeagueId,
-              isMockDraft: false,
+              isMock: false,
               selectionMethod: draft.selection_method,
               currentPickInfo,
               nextPickInfo,
@@ -366,9 +366,9 @@ builder.mutationField('commissionerPick', (t) =>
         }
 
         // Auto-create all matchups when draft completes.
-        // Skipped for mock drafts — the league is ephemeral and rosters are not
+        // Skipped for mock drafts — they have no league and rosters are not
         // persisted, so matchups and badge evaluation would be meaningless.
-        if (result.isDraftComplete && !result.isMockDraft) {
+        if (result.isDraftComplete && !result.isMock) {
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,

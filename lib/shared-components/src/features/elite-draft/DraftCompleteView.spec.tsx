@@ -46,7 +46,7 @@ function buildLargeRoster(count: number): {
 }
 
 const defaultProps = {
-  league: { isMockDraft: false, name: 'Test League' },
+  draftSummary: { isMock: false, name: 'Test League' },
   leagueId: 1,
   sport: 'baseball' as const,
   pickHistory: [],
@@ -64,18 +64,18 @@ describe('DraftCompleteView', () => {
     expect(getByText('Draft Complete!')).toBeTruthy();
   });
 
-  it('shows real-draft completion message when isMockDraft is false', () => {
+  it('shows real-draft completion message when isMock is false', () => {
     const { getByText } = render(<DraftCompleteView {...defaultProps} />);
     expect(
       getByText(/all 0 picks have been made\. your roster is set!/i),
     ).toBeTruthy();
   });
 
-  it('shows mock-draft completion message when isMockDraft is true', () => {
+  it('shows mock-draft completion message when isMock is true', () => {
     const { getByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        draftSummary={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMock: true, name: 'Test League' }}
       />,
     );
     expect(
@@ -93,7 +93,7 @@ describe('DraftCompleteView', () => {
     const { getByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        draftSummary={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMock: true, name: 'Test League' }}
       />,
     );
     expect(getByText('Practice Again')).toBeTruthy();
@@ -121,7 +121,7 @@ describe('DraftCompleteView', () => {
     const { getByText, getAllByText } = render(
       <DraftCompleteView
         {...defaultProps}
-        draftSummary={{ isMockDraft: true, name: 'Test League' }}
+        draftSummary={{ isMock: true, name: 'Test League' }}
         pickHistory={picks}
         myTeam={players}
         myTeamPicks={picks}
@@ -155,7 +155,7 @@ describe('DraftCompleteView', () => {
       <DraftCompleteView
         {...defaultProps}
         sport="football"
-        draftSummary={{ isMockDraft: true, name: 'Mock' }}
+        draftSummary={{ isMock: true, name: 'Mock' }}
         onNavigate={onNavigate}
       />,
     );

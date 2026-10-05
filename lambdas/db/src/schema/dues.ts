@@ -487,12 +487,11 @@ builder.mutationField('sendDuesReminders', (t) =>
       const errors: string[] = [];
       let remindersSent = 0;
 
-      // 1. Find active leagues (excluding mock drafts) with dues reminders enabled for today
+      // 1. Find active leagues with dues reminders enabled for today
       const conditions = [
         eq(PublicSchema.leagueDuesSettings.enabled, true),
         eq(PublicSchema.leagueDuesSettings.reminderEnabled, true),
         eq(PublicSchema.leagueDuesSettings.reminderDayOfWeek, currentDayOfWeek),
-        eq(PublicSchema.leagues.isMockDraft, false),
       ];
 
       if (args.leagueId) {

@@ -1056,17 +1056,12 @@ type DraftQueueEntry {
   id: Int
 
   """
-  The queue owner's seat. Null only for a league queue row written before LS-10073.
+  The queue owner's seat.
   """
   participantId: Int
   player: Player
   playerId: Int
   priority: Int
-
-  """
-  Null for a mock draft, whose queue belongs to a seat (LS-10076).
-  """
-  teamId: Int
 }
 
 """
@@ -2141,7 +2136,6 @@ type League {
   auctionMinBid: Int
   bannerUrl: String
   baseballHofOnly: Boolean
-  controlAllTeams: Boolean
   currentMatchup: Int
   currentWeek: Int
 
@@ -2167,8 +2161,6 @@ type League {
   League invite code. Null for non-members — only league members and the owner receive this value.
   """
   inviteCode: String
-  isMockDraft: Boolean
-  isOfflineDraft: Boolean
   isPublic: Boolean
 
   """

@@ -264,13 +264,13 @@ export function useDraftQueries({
   // league row carries them any more (LS-10076 deleted every one and no writer
   // sets them), so in league mode they are simply false — the room is the only
   // place a mock draft can come from now.
-  const isMockDraft = isRoomMode && room?.kind === DraftKind.Mock;
+  const isMock = isRoomMode && room?.kind === DraftKind.Mock;
   const isOfflineDraft =
     isRoomMode && room?.draft?.mockMode === MockDraftMode.Offline;
   const controlAllTeams = isRoomMode && (room?.draft?.controlAllTeams ?? false);
   const draftSport = isRoomMode ? room?.sport : league?.sport;
   const draftTitle = isRoomMode
-    ? isMockDraft
+    ? isMock
       ? 'Mock Draft'
       : room?.draft?.id != null
         ? `Draft #${String(room.draft.id)}`
@@ -752,7 +752,7 @@ export function useDraftQueries({
     // Values the board renders from, whichever mode produced them
     draftStatus,
     maxRosterSize,
-    isMockDraft,
+    isMock,
     isOfflineDraft,
     controlAllTeams,
     draftSport,

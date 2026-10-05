@@ -14,7 +14,7 @@ describe('getDraftCompletionActions (LS-10528)', () => {
     (sport) => {
       expect(
         pathsOf(
-          getDraftCompletionActions({ sport, isMockDraft: true, leagueId: 9 }),
+          getDraftCompletionActions({ sport, isMock: true, leagueId: 9 }),
         ),
       ).toEqual([
         ['practice-again', MOCK_DRAFT_SETUP_PATH, true],
@@ -28,7 +28,7 @@ describe('getDraftCompletionActions (LS-10528)', () => {
     (sport) => {
       expect(
         pathsOf(
-          getDraftCompletionActions({ sport, isMockDraft: false, leagueId: 9 }),
+          getDraftCompletionActions({ sport, isMock: false, leagueId: 9 }),
         ),
       ).toEqual([
         ['set-lineup', `/${sport}/league/9/roster`, true],
@@ -42,7 +42,7 @@ describe('getDraftCompletionActions (LS-10528)', () => {
       pathsOf(
         getDraftCompletionActions({
           sport: 'football',
-          isMockDraft: false,
+          isMock: false,
           leagueId: null,
         }),
       ),

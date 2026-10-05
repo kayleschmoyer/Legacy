@@ -4,9 +4,10 @@
  * Covers live auction state, per-team budgets, and the two user-facing
  * mutations: nominatePlayer and placeBid.
  */
+import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Team } from './types';
 import {
   AuthenticationError,
@@ -15,12 +16,55 @@ import {
 } from '../graphql-errors';
 import { builder } from '../builder';
 import { requireLeagueId } from '../drafts/league-draft';
+import { getParticipantIdForTeam } from '../drafts/participants';
+
+type AuctionStateRow = typeof PublicSchema.auctionState.$inferSelect;
+
+/**
+ * League team ids for a set of seats. Auction rows reference the seat
+ * (`participant_id`, LS-10073); the GraphQL types still expose the team.
+ */
+async function teamIdsBySeat(
+  db: PublicDb,
+  participantIds: number[],
+): Promise<Map<number, number | null>> {
+  if (participantIds.length === 0) return new Map();
+  const seats = await db
+    .select({
+      id: PublicSchema.draftParticipants.id,
+      teamId: PublicSchema.draftParticipants.teamId,
+    })
+    .from(PublicSchema.draftParticipants)
+    .where(inArray(PublicSchema.draftParticipants.id, participantIds));
+  return new Map(seats.map((seat) => [seat.id, seat.teamId]));
+}
+
+/** Shape an auction_state row for the AuctionState GraphQL type. */
+async function toAuctionState(db: PublicDb, row: AuctionStateRow) {
+  const seatIds = [
+    row.nominatorParticipantId,
+    row.currentBidderParticipantId,
+  ].filter((id): id is number => id !== null);
+  const teamIds = await teamIdsBySeat(db, seatIds);
+  const teamOf = (participantId: number | null) =>
+    participantId === null ? null : (teamIds.get(participantId) ?? null);
+  return {
+    draftId: row.draftId,
+    nominatorTeamId: teamOf(row.nominatorParticipantId),
+    nominatedPlayerId: row.nominatedPlayerId,
+    currentBid: row.currentBid,
+    currentBidderTeamId: teamOf(row.currentBidderParticipantId),
+    nominationDeadline: row.nominationDeadline,
+    bidDeadline: row.bidDeadline,
+    nominationOrder: row.nominationOrder,
+  };
+}
 
 // ── AuctionState type ─────────────────────────────────────────────────────
 
 const AuctionState = builder.objectRef<{
   draftId: number;
-  nominatorTeamId: number;
+  nominatorTeamId: number | null;
   nominatedPlayerId: number | null;
   currentBid: number | null;
   currentBidderTeamId: number | null;
@@ -36,6 +80,9 @@ AuctionState.implement({
     nominatorTeam: t.field({
       type: Team,
       resolve: async (parent, _args, context) => {
+        if (parent.nominatorTeamId === null) {
+          throw NotFoundError('Nominator team not found');
+        }
         const team = await context.loaders.teams.load(parent.nominatorTeamId);
         if (!team) throw NotFoundError('Nominator team not found');
         return team;
@@ -114,16 +161,7 @@ builder.queryField('auctionState', (t) =>
         .where(eq(PublicSchema.auctionState.draftId, args.draftId))
         .limit(1);
       if (!row) return null;
-      return {
-        draftId: row.draftId,
-        nominatorTeamId: row.nominatorTeamId,
-        nominatedPlayerId: row.nominatedPlayerId,
-        currentBid: row.currentBid,
-        currentBidderTeamId: row.currentBidderTeamId,
-        nominationDeadline: row.nominationDeadline,
-        bidDeadline: row.bidDeadline,
-        nominationOrder: row.nominationOrder,
-      };
+      return toAuctionState(context.db, row);
     },
   }),
 );
@@ -160,23 +198,39 @@ builder.queryField('auctionBudgets', (t) =>
       const minBid = leagueRow?.auctionMinBid ?? 1;
 
       const budgets = await context.db
-        .select()
+        .select({
+          draftId: PublicSchema.auctionBudgets.draftId,
+          teamId: PublicSchema.draftParticipants.teamId,
+          remainingBudget: PublicSchema.auctionBudgets.remainingBudget,
+          playersWon: PublicSchema.auctionBudgets.playersWon,
+        })
         .from(PublicSchema.auctionBudgets)
+        .innerJoin(
+          PublicSchema.draftParticipants,
+          eq(
+            PublicSchema.draftParticipants.id,
+            PublicSchema.auctionBudgets.participantId,
+          ),
+        )
         .where(eq(PublicSchema.auctionBudgets.draftId, draftId));
 
-      return budgets.map((b) => {
+      return budgets.flatMap((b) => {
+        // A league auction seat always holds a team.
+        if (b.teamId === null) return [];
         const unfilledSlots = Math.max(0, maxRosterSize - b.playersWon);
         const maxBid = Math.max(
           minBid,
           b.remainingBudget - Math.max(0, unfilledSlots - 1) * minBid,
         );
-        return {
-          draftId: b.draftId,
-          teamId: b.teamId,
-          remainingBudget: b.remainingBudget,
-          playersWon: b.playersWon,
-          maxBid,
-        };
+        return [
+          {
+            draftId: b.draftId,
+            teamId: b.teamId,
+            remainingBudget: b.remainingBudget,
+            playersWon: b.playersWon,
+            maxBid,
+          },
+        ];
       });
     },
   }),
@@ -219,7 +273,13 @@ builder.mutationField('nominatePlayer', (t) =>
         )
         .limit(1);
 
-      if (membership?.teamId !== state.nominatorTeamId) {
+      const callerParticipantId = membership?.teamId
+        ? await getParticipantIdForTeam(context.db, draftId, membership.teamId)
+        : null;
+      if (
+        callerParticipantId === null ||
+        callerParticipantId !== state.nominatorParticipantId
+      ) {
         throw ForbiddenError('It is not your turn to nominate');
       }
 
@@ -255,7 +315,7 @@ builder.mutationField('nominatePlayer', (t) =>
         .set({
           nominatedPlayerId: playerId,
           currentBid: minBid,
-          currentBidderTeamId: null,
+          currentBidderParticipantId: null,
           bidDeadline,
           nominationDeadline: null,
         })
@@ -267,19 +327,10 @@ builder.mutationField('nominatePlayer', (t) =>
       LOGGER.info('Player nominated in auction draft', {
         draftId,
         playerId,
-        nominatorTeamId: state.nominatorTeamId,
+        nominatorParticipantId: state.nominatorParticipantId,
       });
 
-      return {
-        draftId: updated.draftId,
-        nominatorTeamId: updated.nominatorTeamId,
-        nominatedPlayerId: updated.nominatedPlayerId,
-        currentBid: updated.currentBid,
-        currentBidderTeamId: updated.currentBidderTeamId,
-        nominationDeadline: updated.nominationDeadline,
-        bidDeadline: updated.bidDeadline,
-        nominationOrder: updated.nominationOrder,
-      };
+      return toAuctionState(context.db, updated);
     },
   }),
 );
@@ -336,7 +387,10 @@ builder.mutationField('placeBid', (t) =>
         )
         .limit(1);
 
-      if (!membership?.teamId) {
+      const participantId = membership?.teamId
+        ? await getParticipantIdForTeam(context.db, draftId, membership.teamId)
+        : null;
+      if (participantId === null) {
         throw ForbiddenError('You are not a participant in this draft');
       }
 
@@ -346,7 +400,7 @@ builder.mutationField('placeBid', (t) =>
         .where(
           and(
             eq(PublicSchema.auctionBudgets.draftId, draftId),
-            eq(PublicSchema.auctionBudgets.teamId, membership.teamId),
+            eq(PublicSchema.auctionBudgets.participantId, participantId),
           ),
         )
         .limit(1);
@@ -384,7 +438,7 @@ builder.mutationField('placeBid', (t) =>
         .update(PublicSchema.auctionState)
         .set({
           currentBid: amount,
-          currentBidderTeamId: membership.teamId,
+          currentBidderParticipantId: participantId,
           bidDeadline,
         })
         .where(eq(PublicSchema.auctionState.draftId, draftId))
@@ -395,19 +449,10 @@ builder.mutationField('placeBid', (t) =>
       LOGGER.info('Bid placed in auction draft', {
         draftId,
         amount,
-        teamId: membership.teamId,
+        participantId,
       });
 
-      return {
-        draftId: updated.draftId,
-        nominatorTeamId: updated.nominatorTeamId,
-        nominatedPlayerId: updated.nominatedPlayerId,
-        currentBid: updated.currentBid,
-        currentBidderTeamId: updated.currentBidderTeamId,
-        nominationDeadline: updated.nominationDeadline,
-        bidDeadline: updated.bidDeadline,
-        nominationOrder: updated.nominationOrder,
-      };
+      return toAuctionState(context.db, updated);
     },
   }),
 );

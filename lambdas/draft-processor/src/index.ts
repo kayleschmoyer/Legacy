@@ -74,7 +74,8 @@ const SqsDraftMessageSchema = z.object({
   messageType: z.literal('START_DRAFT'),
   payload: z.object({
     leagueId: z.number().int().positive(),
-    // Optional: messages queued before LS-10075 carry only leagueId.
+    // Optional so a message without one still completes the draft; its
+    // DRAFT_COMPLETED then reaches the league channel only.
     draftId: z.number().int().positive().optional(),
     draftMode: z.enum(['live', 'automated']),
     selectionMethod: z.enum(['standard', 'auction', 'random']),
@@ -992,7 +993,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
  * slots across every team in the league.
  *
  * Simulation strategy per position slot:
- *   1. Nomination rotates round-robin through draftTeams ordered by draftOrder.
+ *   1. Nomination rotates round-robin through the draft's seats in slot order.
  *   2. Best available player eligible for the current position slot is
  *      auto-nominated.
  *   3. Every team that still needs THIS position slot bids proportionally to
@@ -1070,15 +1071,16 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
       });
 
       // ── 2. Load draft teams + league positions ────────────────────────────
-      const [draftTeamRows, leaguePositions] = await Promise.all([
+      const [seatRows, leaguePositions] = await Promise.all([
         tx
           .select({
-            teamId: PublicSchema.draftTeams.teamId,
-            draftOrder: PublicSchema.draftTeams.draftOrder,
+            participantId: PublicSchema.draftParticipants.id,
+            teamId: PublicSchema.draftParticipants.teamId,
+            draftOrder: PublicSchema.draftParticipants.slot,
           })
-          .from(PublicSchema.draftTeams)
-          .where(eq(PublicSchema.draftTeams.draftId, draftId))
-          .orderBy(PublicSchema.draftTeams.draftOrder),
+          .from(PublicSchema.draftParticipants)
+          .where(eq(PublicSchema.draftParticipants.draftId, draftId))
+          .orderBy(PublicSchema.draftParticipants.slot),
         tx
           .select({
             id: PublicSchema.leaguePosition.id,
@@ -1088,6 +1090,15 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
           .orderBy(PublicSchema.leaguePosition.id),
       ]);
+
+      // A league draft's seats all point at a team; narrow away the nullable
+      // team_id that only mock-draft seats use.
+      const draftTeamRows = seatRows.flatMap((seat) =>
+        seat.teamId === null ? [] : [{ ...seat, teamId: seat.teamId }],
+      );
+      const participantIdByTeam = new Map(
+        draftTeamRows.map((t) => [t.teamId, t.participantId]),
+      );
 
       const numTeams = draftTeamRows.length;
       if (numTeams === 0) {
@@ -1117,7 +1128,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
         .values(
           draftTeamRows.map((t) => ({
             draftId,
-            teamId: t.teamId,
+            participantId: t.participantId,
             remainingBudget: auctionBudget,
             playersWon: 0,
           })),
@@ -1347,6 +1358,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
         auctionResults.map((r) => ({
           draftId,
           teamId: r.teamId,
+          participantId: participantIdByTeam.get(r.teamId),
           playerId: r.playerId,
           round: r.round,
           pickNumber: r.pickNumber,
@@ -1416,7 +1428,7 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
           .where(
             and(
               eq(PublicSchema.auctionBudgets.draftId, draftId),
-              eq(PublicSchema.auctionBudgets.teamId, team.teamId),
+              eq(PublicSchema.auctionBudgets.participantId, team.participantId),
             ),
           );
       }

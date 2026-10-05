@@ -1,10 +1,10 @@
 import {
   pgTable,
   unique,
+  uniqueIndex,
   serial,
   varchar,
   foreignKey,
-  uniqueIndex,
   integer,
   date,
   index,
@@ -145,18 +145,6 @@ export const leagues = pgTable(
     medianGameEnabled: boolean('median_game_enabled').notNull().default(false),
     /** Persistent commissioner notes visible to all league members */
     lmNotes: text('lm_notes'),
-    /** Legacy flag for the league-backed mock drafts retired by LS-10076 — no
-     *  row carries it any more (the migration deleted every one) and no writer
-     *  sets it. A mock draft is now a league-less `drafts` row with
-     *  `kind = 'mock'`. The column itself is dropped by LS-10080. */
-    isMockDraft: boolean('is_mock_draft').notNull().default(false),
-    /** Legacy companion to `isMockDraft`, retired the same way (LS-10076): the
-     *  offline mode now lives on `drafts.mock_mode`. Dropped by LS-10080. */
-    isOfflineDraft: boolean('is_offline_draft').notNull().default(false),
-    /** Legacy companion to `isMockDraft`, retired the same way (LS-10076):
-     *  Control All Teams now lives on `drafts.control_all_teams`, still paired
-     *  with `drafts.auto_pick_disabled`. Dropped by LS-10080. */
-    controlAllTeams: boolean('control_all_teams').notNull().default(false),
     /** Client-generated key from a single create-league form submission attempt
      *  (LS-6063). Lets createLeague dedupe a resubmission (double-click, retry,
      *  parallel tab) against an already-created league instead of inserting a
@@ -221,11 +209,6 @@ export const leagues = pgTable(
       previousLeagueIdIdx: index('leagues_previous_league_id_idx').on(
         table.previousLeagueId,
       ),
-      // Partial index for mock draft weekly count query (LS-5138).
-      // Covers: WHERE owner = $1 AND is_mock_draft = true AND created_at >= $2
-      mockDraftOwnerCreatedAtIdx: index('idx_leagues_owner_created_at_mock')
-        .on(table.owner, table.createdAt)
-        .where(sql`is_mock_draft = true`),
       leaguesPreviousLeagueIdFk: foreignKey({
         columns: [table.previousLeagueId],
         foreignColumns: [table.id],
@@ -377,8 +360,6 @@ export const drafts = pgTable(
  * user, or at nobody when it is open or AI-controlled. CHECKs keep teamId and
  * leagueId both-null-or-both-set and forbid a seat with both a team and a user.
  *
- * Until the draft writers move over (LS-10074), a deferred trigger on
- * draft_teams keeps league seats in step with draft_teams.
  */
 export const draftParticipants = pgTable(
   'draft_participants',
@@ -393,7 +374,7 @@ export const draftParticipants = pgTable(
     userId: integer('user_id'),
     controller: draftParticipantController('controller').notNull(),
     seatName: varchar('seat_name', { length: 40 }).notNull(),
-    /** Same meaning as draft_teams.auto_pick. */
+    /** Seat auto-picks when its clock expires. */
     autoPick: boolean('auto_pick').notNull().default(false),
     joinedAt: timestamp('joined_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -556,44 +537,6 @@ export const leagueMembers = pgTable(
   },
 );
 
-export const draftTeams = pgTable(
-  'draft_teams',
-  {
-    draftId: integer('draft_id').notNull(),
-    teamId: integer('team_id').notNull(),
-    leagueId: integer('league_id').notNull(),
-    draftOrder: integer('draft_order').notNull(),
-    autoPick: boolean('auto_pick').notNull().default(false),
-  },
-  (table) => {
-    return {
-      draftTeamsDraftsIdFk: foreignKey({
-        columns: [table.draftId],
-        foreignColumns: [drafts.id],
-        name: 'draft_teams_drafts_id_fk',
-      }).onDelete('cascade'),
-      draftTeamsTeamsIdLeagueIdFk: foreignKey({
-        columns: [table.teamId, table.leagueId],
-        foreignColumns: [teams.id, teams.leagueId],
-        name: 'draft_teams_teams_id_league_id_fk',
-      }),
-      draftTeamsPk: primaryKey({
-        columns: [table.draftId, table.teamId, table.leagueId],
-        name: 'draft_teams_pk',
-      }),
-      draftTeamsUkOrder: unique('draft_teams_uk_order').on(
-        table.draftId,
-        table.draftOrder,
-      ),
-      draftIdIdx: index('draft_teams_draft_id_idx').on(table.draftId),
-      teamIdLeagueIdIdx: index('draft_teams_team_id_league_id_idx').on(
-        table.teamId,
-        table.leagueId,
-      ),
-    };
-  },
-);
-
 export const draftPicks = pgTable(
   'draft_picks',
   {
@@ -674,11 +617,10 @@ export const draftQueue = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    /** NULL for a mock-draft queue, which belongs to a seat alone (LS-10076). */
-    teamId: integer('team_id'),
-    /** The queue owner's seat (LS-10073). Filled from (draft_id, team_id) by
-     *  trigger when omitted. */
-    participantId: integer('participant_id'),
+    /** The queue owner's seat (LS-10073). Every writer sets it since LS-10080,
+     *  which also stopped writing team_id; the follow-up contract migration
+     *  drops team_id and makes this column NOT NULL. */
+    participantId: integer('participant_id').notNull(),
     playerId: integer('player_id').notNull(),
     priority: integer('priority').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -708,14 +650,9 @@ export const draftQueue = pgTable(
       participantIdIdx: index('draft_queue_participant_id_idx').on(
         table.participantId,
       ),
-      draftQueueUkDraftTeamPlayer: unique(
-        'draft_queue_uk_draft_team_player',
-      ).on(table.draftId, table.teamId, table.playerId),
-      draftQueueUkDraftTeamPriority: unique(
-        'draft_queue_uk_draft_team_priority',
-      ).on(table.draftId, table.teamId, table.priority),
-      // The team-keyed uniques above never match a NULL team_id, so seat-keyed
-      // mock-draft queues get their own (LS-10076).
+      // Seat-keyed uniques for rows written without a team_id (LS-10076):
+      // every row since LS-10080. The follow-up contract migration replaces
+      // them with plain constraints when it drops team_id.
       draftQueueUkDraftParticipantPlayer: uniqueIndex(
         'draft_queue_uk_draft_participant_player',
       )
@@ -726,10 +663,6 @@ export const draftQueue = pgTable(
       )
         .on(table.draftId, table.participantId, table.priority)
         .where(sql`team_id IS NULL`),
-      draftQueueDraftTeamIdx: index('draft_queue_draft_team_idx').on(
-        table.draftId,
-        table.teamId,
-      ),
       draftQueuePlayerIdx: index('draft_queue_player_idx').on(table.playerId),
     };
   },

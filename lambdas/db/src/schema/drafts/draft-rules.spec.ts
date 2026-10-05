@@ -48,7 +48,6 @@ function joinedRow(overrides: Record<string, unknown> = {}) {
       minCareerSeasons: 4,
       gamesPerMatchup: 6,
       pitcherStartsPerMatchup: 2,
-      isMockDraft: false,
     },
     ...overrides,
   };
@@ -125,23 +124,6 @@ describe('loadDraftRules — league branch (LS-10074)', () => {
     expect(rules.rosterPositions).toEqual(['C', 'OF', 'OF', 'SP']);
     // Ordered by league_positions.id so the slot list is stable across calls.
     expect(db.orderBy).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports isMock off drafts.kind, not the legacy leagues column (LS-10076)', async () => {
-    const row = joinedRow();
-    const db = makeDb({
-      joined: [{ ...row, league: { ...row.league, isMockDraft: true } }],
-    });
-
-    const rules = await loadDraftRules(db, DRAFT_ID);
-
-    // `leagues.is_mock_draft` used to be what made a draft a mock draft
-    // (LS-9181). A mock draft is now its own league-less `drafts` row
-    // (`kind = 'mock'`), and nothing creates a league-backed mock lobby any
-    // more — so a kind='league' draft is a real draft whatever the retired
-    // league column still says, and commitDraftPick rosters its picks.
-    expect(rules.kind).toBe('league');
-    expect(rules.isMock).toBe(false);
   });
 
   it('passes a football league its defensive format through unchanged', async () => {

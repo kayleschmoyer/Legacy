@@ -267,7 +267,7 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
     });
   });
 
-  describe('draft events — dual broadcast on the draft and league channels (LS-10075)', () => {
+  describe('draft events — draft channel, plus the league channel for lifecycle events only (LS-10080)', () => {
     /** Answer each Query by index name, so call order doesn't matter. */
     const answerQueriesByIndex = (byIndex: Record<string, () => unknown>) => {
       mockDynamoSend.mockImplementation((command: QueryCall) => {
@@ -282,17 +282,106 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
           (command as { input: { ConnectionId: string } }).input.ConnectionId,
       );
 
-    it('delivers a pick to league-channel and draft-channel connections, once each', async () => {
+    const queriedIndexes = (): (string | undefined)[] =>
+      getDynamoCalls().map((c) => c.input.IndexName);
+
+    const bothChannels = () =>
       answerQueriesByIndex({
         LeagueIdIndex: () =>
-          Promise.resolve({ Items: makeConnectionItems(['old-app', 'both']) }),
+          Promise.resolve({
+            Items: makeConnectionItems(['league-page', 'both']),
+          }),
         DraftIdIndex: () =>
-          Promise.resolve({ Items: makeConnectionItems(['new-app', 'both']) }),
+          Promise.resolve({
+            Items: makeConnectionItems(['draft-room', 'both']),
+          }),
       });
 
-      await service.notifyDraftPickMade(42, 7, 1, 3, 99, 1, 1, 1);
+    it.each([
+      [
+        'pick made',
+        (svc: WebSocketNotificationService) =>
+          svc.notifyDraftPickMade(42, 7, 1, 3, 99, 1, 1, 1, 1),
+      ],
+      [
+        'pick undone',
+        (svc: WebSocketNotificationService) =>
+          svc.notifyDraftPickUndone(
+            42,
+            7,
+            1,
+            99,
+            3,
+            1,
+            1,
+            '2026-09-13T00:00:00.000Z',
+          ),
+      ],
+      [
+        'paused',
+        (svc: WebSocketNotificationService) => svc.notifyDraftPaused(42, 7),
+      ],
+      [
+        'resumed',
+        (svc: WebSocketNotificationService) =>
+          svc.notifyDraftResumed(42, 7, '2026-09-13T00:00:00.000Z'),
+      ],
+    ])(
+      'delivers a %s event on the draft channel only',
+      async (_label, send) => {
+        bothChannels();
 
-      expect(deliveredTo().sort()).toEqual(['both', 'new-app', 'old-app']);
+        await send(service);
+
+        expect(queriedIndexes()).toEqual(['DraftIdIndex']);
+        expect(deliveredTo().sort()).toEqual(['both', 'draft-room']);
+      },
+    );
+
+    it.each([
+      [
+        'started',
+        (svc: WebSocketNotificationService) =>
+          svc.notifyDraftStarted(
+            42,
+            7,
+            'snake',
+            8,
+            90,
+            '2026-09-13T00:00:00.000Z',
+          ),
+      ],
+      [
+        'completed',
+        (svc: WebSocketNotificationService) =>
+          svc.notifyDraftCompleted(42, 7, 'random'),
+      ],
+    ])(
+      'delivers a %s event on the draft and league channels, once per connection',
+      async (_label, send) => {
+        bothChannels();
+
+        await send(service);
+
+        expect(queriedIndexes().sort()).toEqual([
+          'DraftIdIndex',
+          'LeagueIdIndex',
+        ]);
+        expect(deliveredTo().sort()).toEqual([
+          'both',
+          'draft-room',
+          'league-page',
+        ]);
+      },
+    );
+
+    it('delivers a mock draft lifecycle event on the draft channel only', async () => {
+      bothChannels();
+
+      await service.notifyDraftCompleted(null, 7, 'standard');
+
+      expect(queriedIndexes()).toEqual(['DraftIdIndex']);
+      expect(deliveredTo().sort()).toEqual(['both', 'draft-room']);
     });
 
     it('queries DraftIdIndex by draftId, excluding lobby-preview connections', async () => {
@@ -315,38 +404,38 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
       });
     });
 
-    it('still delivers on the league channel when the DraftIdIndex GSI does not exist yet', async () => {
+    it('propagates a draft-channel lookup failure instead of silently dropping the event', async () => {
       answerQueriesByIndex({
-        LeagueIdIndex: () =>
-          Promise.resolve({ Items: makeConnectionItems(['old-app']) }),
         DraftIdIndex: () =>
           Promise.reject(
-            Object.assign(
-              new Error(
-                'The table does not have the specified index: DraftIdIndex',
-              ),
-              { name: 'ValidationException' },
-            ),
+            Object.assign(new Error('Query failed'), {
+              name: 'ValidationException',
+            }),
           ),
       });
 
-      await service.notifyDraftResumed(42, 7, '2026-09-13T00:00:00.000Z');
-
-      expect(deliveredTo()).toEqual(['old-app']);
+      await expect(
+        service.notifyDraftResumed(42, 7, '2026-09-13T00:00:00.000Z'),
+      ).rejects.toThrow('Query failed');
+      expect(deliveredTo()).toEqual([]);
     });
 
-    it('skips the draft-channel lookup when the draftId is unknown', async () => {
-      answerQueriesByIndex({
-        LeagueIdIndex: () =>
-          Promise.resolve({ Items: makeConnectionItems(['old-app']) }),
-      });
+    it('sends nothing for a pause with no draft row', async () => {
+      bothChannels();
+
+      await service.notifyDraftPaused(42, null);
+
+      expect(getDynamoCalls()).toEqual([]);
+      expect(deliveredTo()).toEqual([]);
+    });
+
+    it('delivers DRAFT_COMPLETED on the league channel alone when the draftId is unknown', async () => {
+      bothChannels();
 
       await service.notifyDraftCompleted(42, null, 'random');
 
-      expect(getDynamoCalls().map((c) => c.input.IndexName)).toEqual([
-        'LeagueIdIndex',
-      ]);
-      expect(deliveredTo()).toEqual(['old-app']);
+      expect(queriedIndexes()).toEqual(['LeagueIdIndex']);
+      expect(deliveredTo().sort()).toEqual(['both', 'league-page']);
     });
   });
 

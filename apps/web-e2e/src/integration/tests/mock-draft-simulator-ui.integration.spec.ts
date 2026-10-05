@@ -591,10 +591,10 @@ test.describe
     });
 
     await test.step('Verify "Practice Again" CTA button is shown (mock-draft exclusive)', async () => {
-      // "Practice Again" only renders when isMockDraft is true — it may
-      // take a moment for the league query to resolve on a cold load.
-      // The Apollo cache may not have isMockDraft on the first load, so
-      // retry with reloads up to 3 times.
+      // "Practice Again" only renders once the board knows this is a mock
+      // draft (the draft room's kind is 'mock') — it may take a moment for
+      // the draft-room query to resolve on a cold load, so retry with
+      // reloads up to 3 times.
       const practiceBtn = page.getByRole('button', { name: /Practice Again/i });
       await reloadUntilVisible(page, practiceBtn, {
         attempts: 3,
@@ -610,7 +610,7 @@ test.describe
     });
 
     await test.step('Verify mock-draft-specific message', async () => {
-      // Now that isMockDraft is loaded, check the descriptive text
+      // Now that the draft room has loaded, check the descriptive text
       await expect(
         page.getByText(/No rosters were saved|practice draft/i).first(),
       ).toBeVisible({ timeout: 10_000 });

@@ -1,19 +1,16 @@
 /**
  * Draft domain — draft seats (`draft_participants`), LS-10074.
  *
- * `draft_teams` mapped a draft slot to a league team, which is exactly the
- * assumption a draft-first mock draft (epic LS-9252) cannot satisfy: it has no
- * league and no teams. `draft_participants` (LS-10073) replaces it with a seat
- * that may be held by a team, a user, or nobody.
+ * The former `draft_teams` table mapped a draft slot to a league team, which
+ * is exactly the assumption a draft-first mock draft (epic LS-9252) cannot
+ * satisfy: it has no league and no teams. `draft_participants` (LS-10073)
+ * replaced it with a seat that may be held by a team, a user, or nobody;
+ * `draft_teams` was dropped in LS-10080.
  *
  * This module is the only place the draft domain reads or writes seats. League
  * drafts keep one seat per league team, so every function here is a
- * like-for-like replacement for the `draft_teams` statement it supersedes —
- * this slice is behavior-neutral.
- *
- * `draft_teams` is no longer written by any of these paths. The table stays
- * (and its commit-time reconcile trigger with it) until slice 8 drops it, so
- * an in-flight draft written by the previously deployed lambdas keeps working.
+ * like-for-like replacement for the `draft_teams` statement it superseded
+ * (LS-10074).
  */
 
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
@@ -29,7 +26,7 @@ export interface DraftSeat {
   /** `draft_participants.id` — the `participant_id` written onto picks/queue/auction rows. */
   id: number;
   draftId: number;
-  /** 1-based draft position (the old `draft_teams.draft_order`). */
+  /** 1-based draft position (formerly `draft_teams.draft_order`). */
   slot: number;
   teamId: number | null;
   leagueId: number | null;
@@ -62,8 +59,8 @@ const seatColumns = () =>
 const SEAT_NAME_MAX_LENGTH = 40;
 
 /**
- * Every seat in a draft, ordered by slot — the replacement for
- * `SELECT ... FROM draft_teams ORDER BY draft_order`.
+ * Every seat in a draft, ordered by slot (replaced the former
+ * `SELECT ... FROM draft_teams ORDER BY draft_order`, LS-10074).
  */
 export async function getDraftSeats(
   db: PublicDb,
@@ -140,10 +137,9 @@ export async function getSeatForTeam(
 /**
  * The `participant_id` for a league team's seat, or `null` when it has none.
  *
- * Pick / queue / auction writers pass this explicitly instead of relying on
- * the LS-10073 bridge trigger to resolve it from `team_id` — the trigger stays
- * in place for the previously deployed lambdas, but a writer that knows its
- * own seat should say so.
+ * Pick / queue / auction writers pass this explicitly: queue and auction rows
+ * are keyed by seat alone, and a pick writer that knows its own seat should
+ * say so rather than lean on the `draft_picks` fill trigger.
  */
 export async function getParticipantIdForTeam(
   db: PublicDb,
@@ -155,11 +151,10 @@ export async function getParticipantIdForTeam(
 }
 
 /**
- * Controller for a league seat, mirroring the `draft_seat_controller` SQL
- * function the LS-10073 backfill and its bridge trigger use: a seat is driven
- * by `ai` only when it auto-picks *and* no league member manages the team.
- * A managed team that turned auto-pick on is still `user`-controlled — a human
- * is there, they just stepped away from the board.
+ * Controller for a league seat: a seat is driven by `ai` only when it
+ * auto-picks *and* no league member manages the team. A managed team that
+ * turned auto-pick on is still `user`-controlled — a human is there, they
+ * just stepped away from the board.
  */
 function seatController(autoPick: boolean, hasMember: boolean): SeatController {
   return autoPick && !hasMember ? 'ai' : 'user';
@@ -191,7 +186,7 @@ async function teamIdsWithMember(
 /**
  * Replace a league draft's seats with one seat per team, in the given order.
  *
- * Supersedes the `DELETE FROM draft_teams` + `INSERT INTO draft_teams`
+ * Superseded the former `DELETE FROM draft_teams` + `INSERT INTO draft_teams`
  * pair that `initializeDraft` and `autoStartScheduledDrafts` ran at draft
  * start. Callers delete `draft_picks` first: `draft_picks.participant_id`
  * cascades, so dropping a seat that still has picks would take the picks with
@@ -254,8 +249,8 @@ export async function reseatLeagueDraft(
  * auto-pick flag and controller — so picks, queue entries and auction rows
  * that reference a seat follow their team to its new slot.
  *
- * Supersedes `setDraftOrder`/`randomizeDraftOrder`'s delete-and-reinsert of
- * `draft_teams`, which existed only to dodge that table's NOT DEFERRABLE
+ * Superseded `setDraftOrder`/`randomizeDraftOrder`'s delete-and-reinsert of
+ * the former `draft_teams`, which existed only to dodge that table's NOT DEFERRABLE
  * unique constraint. `draft_participants_uk_draft_slot` is DEFERRABLE
  * INITIALLY IMMEDIATE — checked at end of statement — so one `UPDATE ... FROM
  * (VALUES ...)` may permute every slot at once without a transient collision.
@@ -341,7 +336,7 @@ export async function swapLeagueDraftSeats(
  * Turn auto-pick on or off for a set of league teams' seats, keeping
  * `controller` consistent with {@link seatController}.
  *
- * Supersedes every `UPDATE draft_teams SET auto_pick = ...`.
+ * Superseded every former `UPDATE draft_teams SET auto_pick = ...` (LS-10074).
  */
 export async function setSeatAutoPick(
   tx: PublicDb,

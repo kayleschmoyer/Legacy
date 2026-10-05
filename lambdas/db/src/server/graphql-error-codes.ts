@@ -75,7 +75,7 @@ export const CLIENT_FACING_CODES = new Set([
   // getCurrentDraftPick surfaces "no teams configured" with this stable code
   // instead of letting the formatter mask it as "Internal server error". This
   // is the expected state between league creation and initializeDraft running
-  // (which populates draft_teams) — the client already renders a friendly
+  // (which populates draft_participants) — the client already renders a friendly
   // "draft order not generated yet" message for it, but only works off the
   // real error message, so it must reach the client unscrubbed (LS-4853).
   'DRAFT_TEAMS_NOT_CONFIGURED',

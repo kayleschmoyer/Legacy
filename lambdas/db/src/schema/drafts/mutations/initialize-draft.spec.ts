@@ -61,7 +61,6 @@ function captureInitializeDraftResolver(): Resolver {
           permissionLevel: 'permissionLevel',
         },
         teams: { id: 'id', leagueId: 'leagueId' },
-        draftTeams: { draftId: 'draftId' },
         draftPicks: { draftId: 'draftId' },
       },
     }),

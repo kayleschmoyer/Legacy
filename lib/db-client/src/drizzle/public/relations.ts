@@ -7,7 +7,6 @@ import {
   draftParticipants,
   leagueMessages,
   leagueMembers,
-  draftTeams,
   players,
   seasonFielding,
   seasonBatting,
@@ -30,7 +29,6 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
     fields: [teams.leagueId],
     references: [leagues.id],
   }),
-  draftTeams: many(draftTeams),
   draftPicks: many(draftPicks),
   matchupsAsTeam1: many(matchups, { relationName: 'team1' }),
   matchupsAsTeam2: many(matchups, { relationName: 'team2' }),
@@ -50,7 +48,6 @@ export const draftsRelations = relations(drafts, ({ one, many }) => ({
     fields: [drafts.leagueId],
     references: [leagues.id],
   }),
-  draftTeams: many(draftTeams),
   draftPicks: many(draftPicks),
   participants: many(draftParticipants),
 }));
@@ -167,17 +164,6 @@ export const leagueScoringChangeLogRelations = relations(
     }),
   }),
 );
-
-export const draftTeamsRelations = relations(draftTeams, ({ one }) => ({
-  draft: one(drafts, {
-    fields: [draftTeams.draftId],
-    references: [drafts.id],
-  }),
-  team: one(teams, {
-    fields: [draftTeams.teamId],
-    references: [teams.id],
-  }),
-}));
 
 export const seasonFieldingRelations = relations(seasonFielding, ({ one }) => ({
   player: one(players, {

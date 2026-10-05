@@ -102,10 +102,6 @@ export default function FootballHomeScreen({
         // them as football rather than silently dropping them, since the
         // alternative is the user losing access to the league entirely.
         .filter((l) => l.sport === Sport.Football || l.sport == null)
-        // Defence in depth: the server already excludes mock drafts from
-        // userLeagues, but a different query alias or future regression
-        // should not be able to leak one into this list (FBH-007).
-        .filter((l) => !l.isMockDraft)
         .filter((l): l is LeagueWithId => l.id != null)
         .map((l) => ({
           id: l.id,

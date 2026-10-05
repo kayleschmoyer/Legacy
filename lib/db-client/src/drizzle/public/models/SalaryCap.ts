@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { leagues } from './Leagues';
 import { players } from './Players';
-import { draftParticipants, drafts, teams } from './Leagues';
+import { draftParticipants, drafts } from './Leagues';
 
 /**
  * player_salaries — authoritative salary for every player in a salary-cap league.
@@ -79,12 +79,10 @@ export const auctionState = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    nominatorTeamId: integer('nominator_team_id').notNull(),
     nominatedPlayerId: integer('nominated_player_id'),
     currentBid: integer('current_bid'),
-    currentBidderTeamId: integer('current_bidder_team_id'),
-    /** Seat ids for the nominator / current bidder (LS-10073). Filled from the
-     *  matching *_team_id columns by trigger when omitted. */
+    /** Seat ids for the nominator / current bidder (LS-10073). Writers set
+     *  these instead of the *_team_id columns since LS-10080. */
     nominatorParticipantId: integer('nominator_participant_id'),
     currentBidderParticipantId: integer('current_bidder_participant_id'),
     nominationDeadline: timestamp('nomination_deadline', {
@@ -116,9 +114,9 @@ export const auctionState = pgTable(
 );
 
 /**
- * auction_budgets — per-team budget tracking during an auction draft.
+ * auction_budgets — per-seat budget tracking during an auction draft.
  *
- * One row per (draft, team). remainingBudget is decremented on each winning bid.
+ * One row per (draft, seat). remainingBudget is decremented on each winning bid.
  *
  * Added in LS-634 (salary cap schema foundations).
  */
@@ -127,10 +125,10 @@ export const auctionBudgets = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    teamId: integer('team_id').notNull(),
-    /** The budget owner's seat (LS-10073). Filled from (draft_id, team_id) by
-     *  trigger when omitted. */
-    participantId: integer('participant_id'),
+    /** The budget owner's seat (LS-10073). Every writer sets it since
+     *  LS-10080, which also stopped writing team_id; the follow-up contract
+     *  migration drops team_id and makes this column NOT NULL. */
+    participantId: integer('participant_id').notNull(),
     remainingBudget: integer('remaining_budget').notNull(),
     playersWon: integer('players_won').notNull().default(0),
   },
@@ -141,16 +139,10 @@ export const auctionBudgets = pgTable(
         foreignColumns: [drafts.id],
         name: 'auction_budgets_draft_fk',
       }).onDelete('cascade'),
-      auctionBudgetsTeamFk: foreignKey({
-        columns: [table.teamId],
-        foreignColumns: [teams.id],
-        name: 'auction_budgets_team_fk',
-      }).onDelete('cascade'),
-      auctionBudgetsUk: unique('auction_budgets_uk_draft_team').on(
+      auctionBudgetsUk: unique('auction_budgets_uk_draft_participant').on(
         table.draftId,
-        table.teamId,
+        table.participantId,
       ),
-      teamIdIdx: index('auction_budgets_team_id_idx').on(table.teamId),
       auctionBudgetsParticipantIdFk: foreignKey({
         columns: [table.participantId],
         foreignColumns: [draftParticipants.id],

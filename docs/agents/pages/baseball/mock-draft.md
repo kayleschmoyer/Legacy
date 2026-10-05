@@ -54,8 +54,9 @@ Examples: "Snake draft — you pick first every odd round" · "at position 5 eve
 
 ## GraphQL
 
-**Mutation**: `useCreateMockDraftMutation` (LS-10076 — replaces
-`initializeMockDraft`, which created a throwaway league)  
+**Mutation**: `useCreateMockDraftMutation` (LS-10076 — a mock draft is a
+league-less `drafts` row with `kind = 'mock'`; the old league-based mock-draft
+mutation and the league-level mock-draft flags are gone, LS-10080)  
 Input variables:
 
 - `sport: Sport` (BASEBALL | FOOTBALL)
@@ -86,6 +87,22 @@ automatically using ADP-based strategy; all draft board features apply (see
 
 An ONLINE draft lands on its lobby (`MockDraftLobby`) until the host starts it;
 joiners reach the same route via `joinMockDraft`, which returns the draft id.
+
+### Routes (draftId-based)
+
+| Surface | Setup                  | Draft room                                                                                 |
+| ------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| Web     | `/baseball/mock-draft` | `/baseball/mock-draft/:draftId` · `/football/mock-draft/:draftId` (`MockDraftBoardScreen`) |
+| Native  | `/baseball/mock-draft` | `/mock-draft/[draftId]` (`apps/app/src/app/(app)/mock-draft/[draftId].tsx`)                |
+
+The hub at `/mock-drafts` lists public lobbies, the user's own mock drafts and
+invites. Legacy `/baseball/mock-draft/join[/:inviteCode]` links redirect to
+`/join[/:inviteCode]`. A mock draft is never reached through
+`/baseball/league/{id}/draft` — that route is for real league drafts only.
+
+The board tells a mock draft apart from a league draft by the draft room
+(`draftRoom(draftId).kind === 'mock'`, with `draft.mockMode` and
+`draft.controlAllTeams` for solo/host-picks-all), never by a league field.
 
 ---
 

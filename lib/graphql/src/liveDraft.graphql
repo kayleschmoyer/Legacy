@@ -149,7 +149,6 @@ query GetMyDraftQueue($draftId: Int!) {
   getMyDraftQueue(draftId: $draftId) {
     id
     draftId
-    teamId
     playerId
     priority
     player {
@@ -164,7 +163,6 @@ mutation SetDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
   setDraftQueue(draftId: $draftId, playerIds: $playerIds) {
     id
     draftId
-    teamId
     playerId
     priority
     player {
@@ -179,7 +177,6 @@ mutation AddToDraftQueue($draftId: Int!, $playerId: Int!) {
   addToDraftQueue(draftId: $draftId, playerId: $playerId) {
     id
     draftId
-    teamId
     playerId
     priority
     player {
@@ -194,7 +191,6 @@ mutation RemoveFromDraftQueue($draftId: Int!, $playerId: Int!) {
   removeFromDraftQueue(draftId: $draftId, playerId: $playerId) {
     id
     draftId
-    teamId
     playerId
     priority
     player {
@@ -209,7 +205,6 @@ mutation ReorderDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
   reorderDraftQueue(draftId: $draftId, playerIds: $playerIds) {
     id
     draftId
-    teamId
     playerId
     priority
     player {

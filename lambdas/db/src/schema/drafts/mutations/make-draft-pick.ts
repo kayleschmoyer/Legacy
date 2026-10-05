@@ -301,7 +301,7 @@ builder.mutationField('makeDraftPick', (t) =>
                 draftPick: existingOwnPick,
                 isDraftComplete: false,
                 leagueId: draft.league_id,
-                isMockDraft: rules.isMock,
+                isMock: rules.isMock,
                 selectionMethod: draft.selection_method,
                 currentPickInfo,
                 nextPickInfo: idempotentNextPickInfo,
@@ -372,7 +372,7 @@ builder.mutationField('makeDraftPick', (t) =>
               draftPick,
               isDraftComplete,
               leagueId: draft.league_id,
-              isMockDraft: rules.isMock,
+              isMock: rules.isMock,
               selectionMethod: draft.selection_method,
               currentPickInfo,
               nextPickInfo,
@@ -515,11 +515,11 @@ builder.mutationField('makeDraftPick', (t) =>
         // draft (the final pick, with no auto-pick teams after it). When an
         // auto-pick completes the draft, autoProcessDraftPicks → executePickEffects
         // handles matchup creation and the completion notification instead.
-        // Skipped for mock drafts — the league is ephemeral and rosters are not
+        // Skipped for mock drafts — they have no league and rosters are not
         // persisted, so matchups and badge evaluation would be meaningless.
         if (
           result.isDraftComplete &&
-          !result.isMockDraft &&
+          !result.isMock &&
           result.leagueId !== null
         ) {
           const completedLeagueId = result.leagueId;

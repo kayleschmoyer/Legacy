@@ -24,7 +24,7 @@ const {
   teamMembers,
   keeperDesignations,
   drafts,
-  draftTeams,
+  draftParticipants,
   draftForfeitedPicks,
   auctionBudgets,
 } = integrationTestSchema;
@@ -103,20 +103,19 @@ describe('applyKeeperDesignationsForDraft - DB Integration Tests (LS-8674)', () 
         currentPick: 0,
       })
       .returning();
-    await db.insert(draftTeams).values([
-      {
-        draftId: draft.id,
-        teamId: teamA.id,
-        leagueId: league.id,
-        draftOrder: 1,
-      },
-      {
-        draftId: draft.id,
-        teamId: teamB.id,
-        leagueId: league.id,
-        draftOrder: 2,
-      },
-    ]);
+    const [seatA] = await db
+      .insert(draftParticipants)
+      .values(
+        [teamA, teamB].map((t, i) => ({
+          draftId: draft.id,
+          slot: i + 1,
+          teamId: t.id,
+          leagueId: league.id,
+          controller: 'user' as const,
+          seatName: t.name,
+        })),
+      )
+      .returning({ id: draftParticipants.id });
 
     const rosterSize = options.rosterSize ?? 2;
     const players = getTestPlayers().slice(0, rosterSize);
@@ -130,7 +129,7 @@ describe('applyKeeperDesignationsForDraft - DB Integration Tests (LS-8674)', () 
       });
     }
 
-    return { owner, league, teamA, teamB, draft, players };
+    return { owner, league, teamA, teamB, draft, players, seatA };
   }
 
   it('round-penalty: applies cost from the carried-forward draftRound and records the forfeited pick', async () => {
@@ -298,7 +297,7 @@ describe('applyKeeperDesignationsForDraft - DB Integration Tests (LS-8674)', () 
   });
 
   it('auction-budget: deducts the carried-forward salary and seeds auction_budgets before bidding opens', async () => {
-    const { league, teamA, draft, players } = await seedKeeperDraft({
+    const { league, teamA, draft, players, seatA } = await seedKeeperDraft({
       costModel: 'auction-budget',
       rosterSize: 1,
       auctionBudget: 260,
@@ -332,7 +331,7 @@ describe('applyKeeperDesignationsForDraft - DB Integration Tests (LS-8674)', () 
       .from(auctionBudgets)
       .where(eq(auctionBudgets.draftId, draft.id));
     expect(budget).toMatchObject({
-      teamId: teamA.id,
+      participantId: seatA.id,
       remainingBudget: 250,
       playersWon: 1,
     });

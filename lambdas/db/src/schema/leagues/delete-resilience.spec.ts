@@ -28,15 +28,15 @@ describe('describeDbError', () => {
   it('recovers code/constraint/table/detail from a Drizzle-wrapped cause', () => {
     const err = drizzleError({
       code: '23503',
-      constraint_name: 'draft_teams_teams_id_league_id_fk',
-      table_name: 'draft_teams',
+      constraint_name: 'draft_participants_teams_id_league_id_fk',
+      table_name: 'draft_participants',
       detail: 'Key (team_id)=(1) is still referenced.',
     });
     expect(describeDbError(err)).toEqual({
       message: expect.stringContaining('Failed query'),
       code: '23503',
-      constraint: 'draft_teams_teams_id_league_id_fk',
-      table: 'draft_teams',
+      constraint: 'draft_participants_teams_id_league_id_fk',
+      table: 'draft_participants',
       detail: 'Key (team_id)=(1) is still referenced.',
     });
   });

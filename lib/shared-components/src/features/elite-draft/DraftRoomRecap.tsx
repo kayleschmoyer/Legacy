@@ -43,7 +43,7 @@ export interface DraftRoomRecapProps {
   leagueName?: string | null;
   onDownloadPacket?: (contents: string, filename: string) => void;
   /** Mock drafts offer Practice Again; league drafts offer the league. */
-  isMockDraft: boolean;
+  isMock: boolean;
   leagueId: number | null;
   myTeamId: number | null;
   /** Every team in the draft — drives the roster team selector. */
@@ -142,7 +142,7 @@ export function DraftRoomRecap({
   teamNameById,
   leagueName,
   onDownloadPacket,
-  isMockDraft,
+  isMock,
   leagueId,
   myTeamId,
   leagueTeams,
@@ -216,7 +216,7 @@ export function DraftRoomRecap({
     [leaguePositions, rosterPlayers, sport, maxRosterSize],
   );
 
-  const actions = getDraftCompletionActions({ sport, isMockDraft, leagueId });
+  const actions = getDraftCompletionActions({ sport, isMock, leagueId });
 
   const slotRows = useMemo(
     () =>

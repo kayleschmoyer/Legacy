@@ -1,9 +1,9 @@
 /**
  * Mock draft mutation: createMockDraft (LS-10076)
  *
- * Creates a mock draft as a league-less `drafts` row — the replacement for
+ * Creates a mock draft as a league-less `drafts` row. (It replaced the removed
  * `initializeMockDraft`, which built a throwaway league, teams and a
- * league_members row for every practice session.
+ * league_members row for every practice session.)
  *
  * Two modes:
  *

@@ -35,7 +35,7 @@ export interface DraftCompletedNotification {
   type: typeof WireNotificationType.DRAFT_COMPLETED;
   /** `null` for a mock draft, which has no league (LS-10076). */
   leagueId: number | null;
-  /** `null` only for automated-draft SQS messages queued before LS-10075. */
+  /** `null` only for an automated-draft SQS message without a draftId. */
   draftId: number | null;
   selectionMethod: string;
   completedAt: string;
@@ -83,8 +83,7 @@ export interface DraftPickNotification {
 export interface DraftPausedNotification {
   type: typeof WireNotificationType.DRAFT_PAUSED;
   leagueId: number | null;
-  /** `null` when the league has no draft row to pause (LS-10075). */
-  draftId: number | null;
+  draftId: number;
   pausedAt: string;
 }
 
@@ -636,45 +635,36 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Broadcast a draft event on both of the draft's channels (LS-10075): the
-   * draft channel (`draftId`) and, for a league draft, the league channel.
+   * Broadcast a draft event on the draft's own channel (`draftId`, LS-10075).
    *
-   * The league channel stays because installed mobile builds only know how to
-   * connect by leagueId and there is no force-update gate. Recipients are
-   * unioned by connectionId, so a connection that matches both channels gets
-   * the event once.
+   * Draft-room events (picks, undo, pause/resume, draft chat) go to the draft
+   * channel only (LS-10080): every draft-room client joins by draftId.
    *
-   * The draft-channel lookup is best-effort: the `DraftIdIndex` GSI is created
-   * by a terraform apply that can land hours after this code deploys, and a
-   * Query against a missing index throws. Until it exists, league-channel
-   * delivery must carry on exactly as before.
+   * Pass `leagueId` only for the draft lifecycle events that league pages
+   * also react to — DRAFT_STARTED and DRAFT_COMPLETED. League pages (web
+   * LeagueDetailPage/V2, the app league screens, the CLI test workflow)
+   * listen on the league channel to refetch league state when a draft starts
+   * or an automated draft finishes, so those two are deliberately sent on
+   * both channels. Recipients are unioned by connectionId, so a connection
+   * that matches both channels gets the event once.
    */
   private async broadcastToDraft(
     message: NotificationMessage,
-    leagueId: number | null,
     draftId: number | null,
+    leagueId: number | null = null,
   ): Promise<{ sent: number; failed: number }> {
     if (!this.websocketEndpoint) {
       LOGGER.warn('WebSocket endpoint not configured, skipping broadcast');
       return { sent: 0, failed: 0 };
     }
 
-    // A mock draft has no league channel to dual-broadcast on (LS-10076) —
-    // its clients only ever connect by draftId.
     const connectionIds = new Set(
-      leagueId === null ? [] : await this.getConnections(leagueId),
+      draftId === null ? [] : await this.getDraftConnections(draftId),
     );
 
-    if (draftId !== null) {
-      try {
-        for (const id of await this.getDraftConnections(draftId)) {
-          connectionIds.add(id);
-        }
-      } catch (error) {
-        LOGGER.warn(
-          'Draft-channel lookup failed; delivering on the league channel only',
-          { draftId, leagueId, error },
-        );
+    if (leagueId !== null) {
+      for (const id of await this.getConnections(leagueId)) {
+        connectionIds.add(id);
       }
     }
 
@@ -751,10 +741,13 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Send draft completed notification on the draft's channels.
+   * Send draft completed notification on the draft channel and, for a league
+   * draft, the league channel — league pages refetch rosters/matchups on it
+   * (see `broadcastToDraft`).
    *
    * @param draftId - `null` only when the caller cannot know it (an automated
-   *   draft queued before LS-10075); the event then reaches the league only.
+   *   draft SQS message without a draftId); the event then reaches the league
+   *   channel only.
    */
   async notifyDraftCompleted(
     leagueId: number | null,
@@ -780,13 +773,15 @@ export class WebSocketNotificationService {
         type: 'notification',
         data: notification,
       },
-      leagueId,
       draftId,
+      leagueId,
     );
   }
 
   /**
-   * Send draft started notification on the draft's channels
+   * Send draft started notification on the draft channel and, for a league
+   * draft, the league channel — league pages refetch on it (see
+   * `broadcastToDraft`).
    */
   async notifyDraftStarted(
     leagueId: number | null,
@@ -820,13 +815,13 @@ export class WebSocketNotificationService {
         type: 'notification',
         data: notification,
       },
-      leagueId,
       draftId,
+      leagueId,
     );
   }
 
   /**
-   * Send draft pick notification on the draft's channels
+   * Send draft pick notification on the draft channel
    */
   async notifyDraftPickMade(
     leagueId: number | null,
@@ -884,18 +879,27 @@ export class WebSocketNotificationService {
         type: 'notification',
         data: notification,
       },
-      leagueId,
       draftId,
     );
   }
 
   /**
-   * Send draft paused notification on the draft's channels
+   * Send draft paused notification on the draft channel.
+   *
+   * @param draftId - `null` when the league has no draft row; there is then
+   *   no draft room to notify and nothing is sent.
    */
   async notifyDraftPaused(
     leagueId: number | null,
     draftId: number | null,
   ): Promise<void> {
+    if (draftId === null) {
+      LOGGER.info('Draft paused without a draft row; no draft room to notify', {
+        leagueId,
+      });
+      return;
+    }
+
     const notification: DraftPausedNotification = {
       type: WireNotificationType.DRAFT_PAUSED,
       leagueId,
@@ -907,13 +911,12 @@ export class WebSocketNotificationService {
 
     await this.broadcastToDraft(
       { type: 'notification', data: notification },
-      leagueId,
       draftId,
     );
   }
 
   /**
-   * Send draft pick undone notification on the draft's channels.
+   * Send draft pick undone notification on the draft channel.
    * Informs all clients that the last pick has been rolled back.
    */
   async notifyDraftPickUndone(
@@ -950,13 +953,12 @@ export class WebSocketNotificationService {
 
     await this.broadcastToDraft(
       { type: 'notification', data: notification },
-      leagueId,
       draftId,
     );
   }
 
   /**
-   * Send draft resumed notification on the draft's channels
+   * Send draft resumed notification on the draft channel
    */
   async notifyDraftResumed(
     leagueId: number | null,
@@ -979,7 +981,6 @@ export class WebSocketNotificationService {
 
     await this.broadcastToDraft(
       { type: 'notification', data: notification },
-      leagueId,
       draftId,
     );
   }
@@ -1238,7 +1239,6 @@ export class WebSocketNotificationService {
 
     await this.broadcastToDraft(
       { type: 'notification', data: notification },
-      null,
       payload.draftId,
     );
   }

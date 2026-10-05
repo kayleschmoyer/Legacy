@@ -1,4 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm';
+import { setLeagueDraftSeatOrder } from './drafts/participants';
 import {
   cleanupTestData,
   getTestDatabase,
@@ -6,7 +7,22 @@ import {
 } from '../../integration-test-setup';
 import { getLeague, getTeam, getUser } from '../__fixtures__';
 
-const { drafts, draftTeams, leagues, teams } = integrationTestSchema;
+const { drafts, draftParticipants, leagues, teams } = integrationTestSchema;
+
+/** A league draft seat for `team` at `slot` (seats replaced draft_teams, LS-10074). */
+const leagueSeat = (
+  draftId: number,
+  leagueId: number,
+  team: { id: number; name: string },
+  slot: number,
+) => ({
+  draftId,
+  slot,
+  teamId: team.id,
+  leagueId,
+  controller: 'user' as const,
+  seatName: team.name,
+});
 
 describe('Drafts - DB Integration Tests', () => {
   let db: Awaited<ReturnType<typeof getTestDatabase>>;
@@ -247,7 +263,7 @@ describe('Drafts - DB Integration Tests', () => {
       expect(result[0].leagueName).toBe(league.name);
     });
 
-    it('should cascade delete to draft_teams', async () => {
+    it('should cascade delete to draft_participants', async () => {
       const { league } = await seedUserAndLeague();
       const team = getTeam(0);
 
@@ -266,26 +282,23 @@ describe('Drafts - DB Integration Tests', () => {
         })
         .returning();
 
-      await db.insert(draftTeams).values({
-        draftId: draft.id,
-        teamId: team.id,
-        leagueId: league.id,
-        draftOrder: 1,
-      });
+      await db
+        .insert(draftParticipants)
+        .values(leagueSeat(draft.id, league.id, team, 1));
 
-      let draftTeamEntries = await db
+      let seats = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id));
-      expect(draftTeamEntries).toHaveLength(1);
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id));
+      expect(seats).toHaveLength(1);
 
       await db.delete(drafts).where(eq(drafts.id, draft.id));
 
-      draftTeamEntries = await db
+      seats = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id));
-      expect(draftTeamEntries).toHaveLength(0);
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id));
+      expect(seats).toHaveLength(0);
     });
   });
 
@@ -388,7 +401,7 @@ describe('Drafts - DB Integration Tests', () => {
   });
 
   describe('Draft Order Reordering (LS-1094)', () => {
-    it('should reorder draft_teams via delete-and-reinsert without violating unique constraint', async () => {
+    it('should permute seat slots in place without violating the unique slot constraint', async () => {
       const { league } = await seedUserAndLeague();
       const team1 = getTeam(0);
       const team2 = getTeam(1);
@@ -410,66 +423,39 @@ describe('Drafts - DB Integration Tests', () => {
         })
         .returning();
 
-      await db.insert(draftTeams).values([
-        {
-          draftId: draft.id,
-          teamId: team1.id,
-          leagueId: league.id,
-          draftOrder: 1,
-        },
-        {
-          draftId: draft.id,
-          teamId: team2.id,
-          leagueId: league.id,
-          draftOrder: 2,
-        },
-        {
-          draftId: draft.id,
-          teamId: team3.id,
-          leagueId: league.id,
-          draftOrder: 3,
-        },
-      ]);
+      await db
+        .insert(draftParticipants)
+        .values([
+          leagueSeat(draft.id, league.id, team1, 1),
+          leagueSeat(draft.id, league.id, team2, 2),
+          leagueSeat(draft.id, league.id, team3, 3),
+        ]);
 
-      // Reorder: reverse to team3=1, team2=2, team1=3
-      await db.delete(draftTeams).where(eq(draftTeams.draftId, draft.id));
-      await db.insert(draftTeams).values([
-        {
-          draftId: draft.id,
-          teamId: team3.id,
-          leagueId: league.id,
-          draftOrder: 1,
-        },
-        {
-          draftId: draft.id,
-          teamId: team2.id,
-          leagueId: league.id,
-          draftOrder: 2,
-        },
-        {
-          draftId: draft.id,
-          teamId: team1.id,
-          leagueId: league.id,
-          draftOrder: 3,
-        },
+      // Reorder: reverse to team3=1, team2=2, team1=3 — one UPDATE permutes
+      // every slot; draft_participants_uk_draft_slot is checked at end of
+      // statement, so no transient collision.
+      await setLeagueDraftSeatOrder(db, draft.id, [
+        team3.id,
+        team2.id,
+        team1.id,
       ]);
 
       const result = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id))
-        .orderBy(asc(draftTeams.draftOrder));
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id))
+        .orderBy(asc(draftParticipants.slot));
 
       expect(result).toHaveLength(3);
       expect(result[0].teamId).toBe(team3.id);
-      expect(result[0].draftOrder).toBe(1);
+      expect(result[0].slot).toBe(1);
       expect(result[1].teamId).toBe(team2.id);
-      expect(result[1].draftOrder).toBe(2);
+      expect(result[1].slot).toBe(2);
       expect(result[2].teamId).toBe(team1.id);
-      expect(result[2].draftOrder).toBe(3);
+      expect(result[2].slot).toBe(3);
     });
 
-    it('should allow same draft_order across different drafts', async () => {
+    it('should allow the same slot across different drafts', async () => {
       const { league } = await seedUserAndLeague();
       const team1 = getTeam(0);
       const team2 = getTeam(1);
@@ -499,37 +485,29 @@ describe('Drafts - DB Integration Tests', () => {
         })
         .returning();
 
-      await db.insert(draftTeams).values([
-        {
-          draftId: draft1.id,
-          teamId: team1.id,
-          leagueId: league.id,
-          draftOrder: 1,
-        },
-        {
-          draftId: draft2.id,
-          teamId: team2.id,
-          leagueId: league.id,
-          draftOrder: 1,
-        },
-      ]);
+      await db
+        .insert(draftParticipants)
+        .values([
+          leagueSeat(draft1.id, league.id, team1, 1),
+          leagueSeat(draft2.id, league.id, team2, 1),
+        ]);
 
-      const d1Teams = await db
+      const d1Seats = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft1.id));
-      const d2Teams = await db
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft1.id));
+      const d2Seats = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft2.id));
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft2.id));
 
-      expect(d1Teams).toHaveLength(1);
-      expect(d2Teams).toHaveLength(1);
-      expect(d1Teams[0].draftOrder).toBe(1);
-      expect(d2Teams[0].draftOrder).toBe(1);
+      expect(d1Seats).toHaveLength(1);
+      expect(d2Seats).toHaveLength(1);
+      expect(d1Seats[0].slot).toBe(1);
+      expect(d2Seats[0].slot).toBe(1);
     });
 
-    it('should reject duplicate draft_order within the same draft', async () => {
+    it('should reject a duplicate slot within the same draft', async () => {
       const { league } = await seedUserAndLeague();
       const team1 = getTeam(0);
       const team2 = getTeam(1);
@@ -549,20 +527,14 @@ describe('Drafts - DB Integration Tests', () => {
         })
         .returning();
 
-      await db.insert(draftTeams).values({
-        draftId: draft.id,
-        teamId: team1.id,
-        leagueId: league.id,
-        draftOrder: 1,
-      });
+      await db
+        .insert(draftParticipants)
+        .values(leagueSeat(draft.id, league.id, team1, 1));
 
       await expect(
-        db.insert(draftTeams).values({
-          draftId: draft.id,
-          teamId: team2.id,
-          leagueId: league.id,
-          draftOrder: 1,
-        }),
+        db
+          .insert(draftParticipants)
+          .values(leagueSeat(draft.id, league.id, team2, 1)),
       ).rejects.toThrow();
     });
   });

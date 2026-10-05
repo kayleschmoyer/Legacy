@@ -3747,7 +3747,6 @@ builder.mutationField('renewLeague', (t) =>
             previousLeagueId: leagueId,
             seasonNumber: (oldLeague.seasonNumber ?? 1) + 1,
             weekAdvanceStatus: 'idle',
-            isMockDraft: false,
             // Salary cap settings carried forward (LS-645)
             salaryCapEnabled: oldLeague.salaryCapEnabled,
             salaryCap: oldLeague.salaryCap,

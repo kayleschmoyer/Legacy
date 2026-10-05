@@ -17,7 +17,11 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
-/** League owned by user id=1, with mock-draft settings. */
+/**
+ * League owned by user id=1, served to the league-scoped queries the app
+ * shell may issue. A mock draft itself is a league-less `drafts` row (LS-10076)
+ * — nothing about this league marks it as a mock draft.
+ */
 const MOCK_LEAGUE = {
   __typename: 'League',
   id: 99,
@@ -47,7 +51,6 @@ const MOCK_LEAGUE = {
   minCareerGames: 50,
   minCareerSeasons: 3,
   waiverType: 'standard',
-  isMockDraft: true,
 };
 
 const MOCK_TEAMS = Array.from({ length: 4 }, (_, i) => ({

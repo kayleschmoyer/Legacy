@@ -47,7 +47,6 @@ function mockLeague(overrides: Record<string, unknown> = {}) {
     playoffFormat: '4-team',
     playoffMultiWeek: false,
     lmNotes: null,
-    isMockDraft: false,
     isPublic: false,
     logoUrl: null,
     bannerUrl: null,

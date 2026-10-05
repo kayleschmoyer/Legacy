@@ -1064,7 +1064,7 @@ describe('FootballPlayers', () => {
   describe('availability filter (LS-7042)', () => {
     const footballLeaguesData = {
       data: {
-        userLeagues: [{ id: 1, sport: 'football', isMockDraft: false }],
+        userLeagues: [{ id: 1, sport: 'football' }],
       },
       loading: false,
     };

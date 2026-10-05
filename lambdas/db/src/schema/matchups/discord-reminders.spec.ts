@@ -81,7 +81,6 @@ jest.mock('@legacy-sports/db-client', () =>
         currentWeek: 'leagues.current_week',
         rosterLockTiming: 'leagues.roster_lock_timing',
         leaguePhase: 'leagues.league_phase',
-        isMockDraft: 'leagues.is_mock_draft',
         draftStatus: 'leagues.draft_status',
         gamesPerMatchup: 'leagues.games_per_matchup',
         weekAdvanceStatus: 'leagues.week_advance_status',

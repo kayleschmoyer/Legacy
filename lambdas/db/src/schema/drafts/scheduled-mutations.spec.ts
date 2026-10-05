@@ -408,7 +408,7 @@ describe('isBenignAutoPickRace (LS-9691)', () => {
 });
 
 describe('isDraftNotYetInitialized (LS-4853)', () => {
-  it('treats "No teams configured for this draft" as expected — draft_teams not populated yet', () => {
+  it('treats "No teams configured for this draft" as expected — draft seats not populated yet', () => {
     expect(
       isDraftNotYetInitialized(new Error('No teams configured for this draft')),
     ).toBe(true);

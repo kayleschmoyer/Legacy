@@ -88,7 +88,6 @@ function captureDraftQueueResolvers(): Record<string, Resolver> {
         draftQueue: {
           id: 'draftQueue.id',
           draftId: 'draftQueue.draftId',
-          teamId: 'draftQueue.teamId',
           participantId: 'draftQueue.participantId',
           playerId: 'draftQueue.playerId',
           priority: 'draftQueue.priority',

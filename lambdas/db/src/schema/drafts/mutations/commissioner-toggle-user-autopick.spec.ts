@@ -140,7 +140,7 @@ function captureResolver(): Resolver {
 
 // Default happy-path DB result sequence. Since LS-10074 the draft row carries
 // the status the resolver gates on (no separate leagues read) and the seat
-// lookup goes through the mocked participants module (no draft_teams read).
+// lookup goes through the mocked participants module.
 //   1st limit → draft row (incl. status)
 //   2nd limit → commissioner membership
 //   3rd limit → team name

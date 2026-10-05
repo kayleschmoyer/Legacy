@@ -536,7 +536,6 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
         salaryDecayPct: 0,
         auctionBudget: null,
         auctionMinBid: null,
-        isMockDraft: false,
         ...leagueOverrides,
       };
 

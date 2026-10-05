@@ -129,7 +129,6 @@ const baseballLeaguesData = {
       {
         id: 1,
         sport: 'Baseball',
-        isMockDraft: false,
         userMembership: { teamId: 100 },
       },
     ],

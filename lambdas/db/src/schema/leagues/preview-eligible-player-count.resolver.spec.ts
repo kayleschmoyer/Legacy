@@ -73,7 +73,6 @@ describe('previewEligiblePlayerCount (LS-6089)', () => {
             waiverEnabled: 'waiverEnabled',
             faabBudgetDefault: 'faabBudgetDefault',
             isPublic: 'isPublic',
-            isMockDraft: 'isMockDraft',
             tierFrozenAt: 'tierFrozenAt',
           },
           leagueMembers: {

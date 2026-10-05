@@ -842,10 +842,10 @@ describe('useDraftWebSocket — presence re-sync on reconnect (LDB-028)', () => 
 // ── Draft-keyed realtime channel (LS-10160) ────────────────────────────────
 
 /**
- * LS-10075 shipped the server-side draft channel (DraftIdIndex GSI, per-draft
- * presence, dual broadcast). The draft room must now join it by draftId rather
- * than riding the league channel, while callers with no draftId yet keep the
- * league channel and auction drafts stay socket-less.
+ * The draft room joins the draft-keyed channel by draftId. Draft-room events
+ * are delivered on that channel only (LS-10080), so the hook never falls back
+ * to the league channel: with no draftId yet it stays socket-less until one
+ * resolves, and auction drafts stay socket-less.
  */
 describe('useDraftWebSocket — draft-keyed channel (LS-10160)', () => {
   function getConstructor(): jest.Mock {
@@ -889,16 +889,29 @@ describe('useDraftWebSocket — draft-keyed channel (LS-10160)', () => {
     expect(mockInstance.connect).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the league channel for a caller without a draftId', async () => {
-    const params = { ...makeDefaultParams(), draftId: null };
-    renderHook(() => useDraftWebSocket(params));
+  it('never joins the league channel, and waits for a draftId before connecting (LS-10080)', async () => {
+    const params: Parameters<typeof useDraftWebSocket>[0] = {
+      ...makeDefaultParams(),
+      draftId: null,
+    };
+    const { rerender } = renderHook(
+      (p: Parameters<typeof useDraftWebSocket>[0]) => useDraftWebSocket(p),
+      { initialProps: params },
+    );
     await flushDeferredConnect();
 
-    const options = (
-      getConstructor().mock.calls as unknown[][]
-    )[0][0] as Record<string, unknown>;
-    expect(options).toMatchObject({ leagueId: 1, viewContext: 'league' });
-    expect(options.draftId).toBeUndefined();
+    for (const [options] of getConstructor().mock.calls as unknown[][]) {
+      expect(options).not.toHaveProperty('leagueId', 1);
+      expect(options).not.toMatchObject({ viewContext: 'league' });
+    }
+    expect(mockInstance.connect).not.toHaveBeenCalled();
+
+    rerender({ ...params, draftId: 42 });
+    await flushDeferredConnect();
+
+    expect(getConstructor()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ draftId: 42, viewContext: 'draft' }),
+    );
     expect(mockInstance.connect).toHaveBeenCalledTimes(1);
   });
 

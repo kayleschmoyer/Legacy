@@ -999,7 +999,7 @@ test.describe
             // causing the draft to abort incomplete (LS-3833).
             //
             // Why reload instead of just waiting for the poll?
-            // initializeDraft briefly clears draft_teams before recreating them.
+            // initializeDraft briefly clears the draft's seats before recreating them.
             // If the Apollo poll fires during that window it receives "No teams
             // configured for this draft", which sets draftOrderMissing=true and
             // stops the poll (pollInterval→0).  The poll never recovers without

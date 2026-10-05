@@ -410,12 +410,7 @@ export class LeagueService {
               PublicSchema.leagueMembers,
               eq(PublicSchema.leagueMembers.leagueId, PublicSchema.leagues.id),
             )
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.userId, ownerId),
-                eq(PublicSchema.leagues.isMockDraft, false),
-              ),
-            );
+            .where(eq(PublicSchema.leagueMembers.userId, ownerId));
           if (existingCount >= leagueLimit) {
             throw new Error('LEAGUE_LIMIT_EXCEEDED');
           }

@@ -226,7 +226,7 @@ interface CompactLiveDraftBoardProps {
    *  position chips the pick sheet's browser offers (LS-9475). */
   defensiveFormat: 'dst' | 'idp' | null;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
-  isMockDraft: boolean;
+  isMock: boolean;
   /** Premium (LS-9253): every team's turn is pickable, routed through the
    *  commissionerPick mutation under the hood — no CPU auto-picker exists
    *  in this mode. */
@@ -270,7 +270,7 @@ function CompactLiveDraftBoard({
   currentPick,
   sport,
   defensiveFormat,
-  isMockDraft,
+  isMock,
   controlAllTeams,
   bottomInset,
   draftDetails,
@@ -371,7 +371,7 @@ function CompactLiveDraftBoard({
   // Mock drafts auto-register the human as "commissioner" (initialize-mock-draft.ts)
   // so the queue/pick flow works, but there's no real commissioner role to manage
   // in a solo practice draft — the controls should never surface there (LS-9242).
-  const showCommissionerBar = queries.isCommissioner && !isMockDraft;
+  const showCommissionerBar = queries.isCommissioner && !isMock;
 
   // ---- Phone shell: slim nav + clock bar (LS-10204) + last-pick ticker ----
   const lastPick = useMemo(
@@ -481,7 +481,7 @@ function CompactLiveDraftBoard({
           )}
 
           {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
-          {isMockDraft && (
+          {isMock && (
             <XStack
               gap="$2"
               paddingHorizontal="$3"
@@ -1061,12 +1061,12 @@ export function EliteDraftBoardScreen({
   // LS-9238: the live board otherwise has no way to leave a mock draft in
   // progress — real leagues intentionally omit this (other drafters are
   // waiting on you), but a mock draft has no one to leave hanging.
-  const isMockDraft = queries.isMockDraft === true;
+  const isMock = queries.isMock === true;
   // LS-9859: same gate the compact shell's commissioner bar uses
   // (`showCommissionerBar` in CompactLiveDraftBoard) — commissioner, but not a
   // mock draft, where the solo human is auto-registered as "commissioner"
   // (LS-9242). Drives the rail's Draft Pick Order panel.
-  const showCommissionerControls = queries.isCommissioner && !isMockDraft;
+  const showCommissionerControls = queries.isCommissioner && !isMock;
   // Premium Control All Teams mode (LS-9253): the human picks for every
   // team, so every turn should be pickable regardless of whose seat it is.
   const controlAllTeams = queries.controlAllTeams === true;
@@ -1207,13 +1207,13 @@ export function EliteDraftBoardScreen({
   // board) inherits it unchanged.
   const handleCommissionerPick = useCallback(
     (id: number) => {
-      if (isMockDraft) {
+      if (isMock) {
         void handleMockHostPick(id);
         return;
       }
       void commissionerPick(id);
     },
-    [isMockDraft, handleMockHostPick, commissionerPick],
+    [isMock, handleMockHostPick, commissionerPick],
   );
   const handleToggleQueuePlayer = useCallback(
     (id: number) => {
@@ -1323,7 +1323,7 @@ export function EliteDraftBoardScreen({
           teamNameById={queries.teamNameById}
           leagueName={queries.draftTitle ?? undefined}
           onDownloadPacket={onDownloadDraftPacket}
-          isMockDraft={isMockDraft}
+          isMock={isMock}
           leagueId={leagueId}
           myTeamId={queries.myTeamId}
           leagueTeams={queries.leagueTeams}
@@ -1339,7 +1339,7 @@ export function EliteDraftBoardScreen({
           // needs to know which copy and CTAs to render.
           queries.league || queries.isRoomMode
             ? {
-                isMockDraft,
+                isMock,
                 name: queries.draftTitle ?? undefined,
               }
             : null
@@ -1384,7 +1384,7 @@ export function EliteDraftBoardScreen({
     queries.draftStatus !== 'in-progress' &&
     queries.draftStatus !== 'paused'
   ) {
-    if (isMockDraft) {
+    if (isMock) {
       return (
         <MockDraftLobby
           draftId={queries.draftId ?? null}
@@ -1498,8 +1498,8 @@ export function EliteDraftBoardScreen({
         currentPick={currentPick}
         sport={sport}
         defensiveFormat={defensiveFormat}
-        isMockDraft={isMockDraft}
-        chatDraftId={isMockDraft ? queries.draftId : null}
+        isMock={isMock}
+        chatDraftId={isMock ? queries.draftId : null}
         controlAllTeams={controlAllTeams}
         bottomInset={bottomInset}
         draftDetails={draftDetails}
@@ -1566,7 +1566,7 @@ export function EliteDraftBoardScreen({
       ? maxRosterSize * queries.leagueTeams.length
       : null;
   const heroBackHref =
-    isMockDraft || leagueId == null ? null : `/${sport}/league/${leagueId}`;
+    isMock || leagueId == null ? null : `/${sport}/league/${leagueId}`;
 
   return (
     <div className="d-root" data-sport={sport}>
@@ -1607,7 +1607,7 @@ export function EliteDraftBoardScreen({
           timeRemaining={timeRemaining}
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
           untimed={untimed}
-          isMockDraft={isMockDraft}
+          isMock={isMock}
           onExitDraft={handleExitDraft}
           isMyPick={isMyPick}
           currentPickInfo={queries.currentPickInfo}

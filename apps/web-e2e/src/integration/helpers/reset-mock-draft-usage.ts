@@ -6,12 +6,10 @@ import { graphql } from './graphql';
  * Delete the authenticated user's own mock drafts (LS-7872).
  *
  * The free tier caps mock drafts at `MOCK_DRAFT_FREE_WEEKLY_LIMIT` per rolling
- * 7-day window (`countRecentMockDrafts`, gated on
- * `owner = userId AND isMockDraft = true`). Once a commissioner exhausts that
- * cap, `MockDraftPage` renders `LimitReachedScreen` instead of the setup form —
- * and because mock-draft leagues are excluded from `userLeagues`/`myLeagues`,
- * the standard cleanup sweeps never reap them, so the count never resets within
- * the window and the spec stays red for up to a week.
+ * 7-day window. Once a user exhausts that cap, `MockDraftPage` renders
+ * `LimitReachedScreen` instead of the setup form. Mock drafts are league-less
+ * `drafts` rows (LS-10076), so the league cleanup sweeps never reap them —
+ * this helper is how a spec removes the ones it created.
  *
  * Uses the `deleteMyMockDrafts` mutation (LS-8238), which deletes ONLY the
  * caller's own mock drafts (`kind = 'mock' AND created_by = caller`).

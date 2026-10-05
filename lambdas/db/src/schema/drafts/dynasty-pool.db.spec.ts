@@ -25,8 +25,14 @@ import {
   integrationTestSchema,
 } from '../../../integration-test-setup';
 
-const { leagues, teams, leagueMembers, teamMembers, drafts, draftTeams } =
-  integrationTestSchema;
+const {
+  leagues,
+  teams,
+  leagueMembers,
+  teamMembers,
+  drafts,
+  draftParticipants,
+} = integrationTestSchema;
 
 describe('Dynasty draft pool + roster carryover — DB Integration Tests (LS-8386)', () => {
   let db: Awaited<ReturnType<typeof getTestDatabase>>;
@@ -90,20 +96,16 @@ describe('Dynasty draft pool + roster carryover — DB Integration Tests (LS-838
       })
       .returning();
 
-    await db.insert(draftTeams).values([
-      {
+    await db.insert(draftParticipants).values(
+      [teamA, teamB].map((t, i) => ({
         draftId: draft.id,
-        teamId: teamA.id,
+        slot: i + 1,
+        teamId: t.id,
         leagueId: league.id,
-        draftOrder: 1,
-      },
-      {
-        draftId: draft.id,
-        teamId: teamB.id,
-        leagueId: league.id,
-        draftOrder: 2,
-      },
-    ]);
+        controller: 'user' as const,
+        seatName: t.name,
+      })),
+    );
 
     const allPlayers = getTestPlayers();
     const rostered = allPlayers.slice(0, rosteredCount);

@@ -58,7 +58,6 @@ export interface MockLeague {
   playoffFormat: string | null;
   playoffMultiWeek: boolean;
   lmNotes: string | null;
-  isMockDraft: boolean;
   previousLeagueId: number | null;
   frozenAt: string | null;
   seasonNumber: number;
@@ -119,7 +118,6 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     playoffFormat: null,
     playoffMultiWeek: false,
     lmNotes: null,
-    isMockDraft: false,
     previousLeagueId: null,
     frozenAt: null,
     seasonNumber: 1,

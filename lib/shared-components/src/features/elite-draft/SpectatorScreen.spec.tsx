@@ -87,7 +87,6 @@ function makeData(
       name: 'History League',
       draftStatus: 'in-progress',
       isPublic: true,
-      isMockDraft: false,
       maxRosterSize: 20,
     },
     leagueData: {},

@@ -40,7 +40,6 @@ jest.mock('../client/PublicDbClient', () => ({
     leagues: {
       id: 'leagues.id',
       owner: 'leagues.owner',
-      isMockDraft: 'leagues.is_mock_draft',
       salaryCapEnabled: 'leagues.salary_cap_enabled',
       playoffFormat: 'leagues.playoff_format',
       waiverType: 'leagues.waiver_type',

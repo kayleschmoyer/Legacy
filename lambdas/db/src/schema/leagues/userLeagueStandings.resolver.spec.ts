@@ -72,7 +72,6 @@ describe('getUserLeagueStandings query (LS-9528)', () => {
             waiverEnabled: 'waiverEnabled',
             faabBudgetDefault: 'faabBudgetDefault',
             isPublic: 'isPublic',
-            isMockDraft: 'isMockDraft',
             createdAt: 'createdAt',
             tierFrozenAt: 'tierFrozenAt',
           },

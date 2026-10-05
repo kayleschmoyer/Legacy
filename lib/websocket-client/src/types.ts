@@ -12,8 +12,11 @@ export interface DraftCompletedNotification {
   type: typeof ClientNotificationType.DRAFT_COMPLETED;
   /** `null` for a mock draft, which has no league (LS-10076). */
   leagueId: number | null;
-  /** Absent from servers before LS-10075; `null` for a legacy queued draft. */
-  draftId?: number | null;
+  /**
+   * `null` only for an automated-draft SQS message without a draftId; that
+   * event is delivered on the league channel alone.
+   */
+  draftId: number | null;
   selectionMethod: string;
   completedAt: string;
 }
@@ -61,8 +64,7 @@ export interface DraftPausedNotification {
   type: typeof ClientNotificationType.DRAFT_PAUSED;
   /** `null` for a mock draft, which has no league (LS-10076). */
   leagueId: number | null;
-  /** Absent from servers before LS-10075. */
-  draftId?: number | null;
+  draftId: number;
   pausedAt: string;
 }
 
@@ -84,8 +86,7 @@ export interface DraftResumedNotification {
   type: typeof ClientNotificationType.DRAFT_RESUMED;
   /** `null` for a mock draft, which has no league (LS-10076). */
   leagueId: number | null;
-  /** Absent from servers before LS-10075. */
-  draftId?: number;
+  draftId: number;
   currentPickDeadline: string;
   resumedAt: string;
 }
@@ -364,7 +365,9 @@ export type ConnectionState =
 /**
  * What a connection is looking at. `'draft'` / `'draft-preview'` put the
  * connection on a draft's own channel (keyed by `draftId`, LS-10075); a
- * preview connection receives lobby events only.
+ * preview connection receives lobby events only. Draft-room events (picks,
+ * undo, pause/resume, draft chat) are sent on the draft channel only; a league
+ * connection receives just DRAFT_STARTED and DRAFT_COMPLETED (LS-10080).
  */
 export type WebSocketViewContext =
   | 'general'

@@ -110,7 +110,7 @@ function baseProps(
     teamNameById: () => 'Some Team',
     leagueName: 'Test League',
     onDownloadPacket: jest.fn(),
-    isMockDraft: true,
+    isMock: true,
     leagueId: null,
     myTeamId: 1,
     leagueTeams: LEAGUE_TEAMS,
@@ -170,7 +170,7 @@ describe('DraftRoomRecap', () => {
       const onNavigate = jest.fn();
       const { getByTestId, queryByTestId } = render(
         <DraftRoomRecap
-          {...baseProps({ isMockDraft: false, leagueId: 7, onNavigate })}
+          {...baseProps({ isMock: false, leagueId: 7, onNavigate })}
         />,
       );
 

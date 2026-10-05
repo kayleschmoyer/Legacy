@@ -190,9 +190,10 @@ test.describe('subscription gating — mock draft limit @critical', () => {
     //
     // `createMockDraft` is NOT a no-op probe: below the weekly limit it creates
     // a real mock draft. It is safe to run here in a way its predecessor was
-    // not — `initializeMockDraft` created a whole "Mock Draft Practice" *league*
-    // commissioned by MANAGER_1, which the manager-membership sweep in
-    // global-setup.ts never reaped (it only reaps leagues a manager *joins*),
+    // not — the removed league-based mock-draft mutation created a whole
+    // "Mock Draft Practice" *league* commissioned by MANAGER_1, which the
+    // manager-membership sweep in global-setup.ts never reaped (it only reaps
+    // leagues a manager *joins*),
     // so every run leaked one and eventually pinned the free-tier persona over
     // the 3-league cap (LS-10134). A mock draft now writes no league, team or
     // membership row at all (LS-10076), and whatever this creates is deleted

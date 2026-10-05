@@ -2,9 +2,9 @@
  * Unit tests for resolveDraftTeamsOrder (LS-8742).
  *
  * initializeDraft and autoStartScheduledDrafts previously always deleted and
- * reshuffled draft_teams at draft start, silently discarding any
- * commissioner-approved draft slot trade (LS-8676) seeded before the draft
- * began. This helper decides whether to preserve an existing seeded order or
+ * reshuffled the draft order (then draft_teams, now draft_participants) at
+ * draft start, silently discarding any commissioner-approved draft slot
+ * trade (LS-8676) seeded before the draft began. This helper decides whether to preserve an existing seeded order or
  * fall back to a fresh shuffle.
  */
 
@@ -47,11 +47,11 @@ describe('resolveDraftTeamsOrder (LS-8742)', () => {
 
     expect(result.needsInsert).toBe(true);
     expect([...result.orderedTeamIds].sort()).toEqual([1, 2, 3]);
-    // No draftId ⇒ no draft_teams rows can exist yet ⇒ skip the lookup query.
+    // No draftId ⇒ no seats can exist yet ⇒ skip the lookup query.
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('shuffles and requires insert when no draft_teams rows exist yet', async () => {
+  it('shuffles and requires insert when no seats exist yet', async () => {
     const db = makeDb([]);
     const result = await resolveDraftTeamsOrder(asPublicDb(db), 5, [
       { id: 10 },

@@ -65,7 +65,6 @@ describe('publicLeagues query — sport scoping (LS-7634)', () => {
             waiverEnabled: 'waiverEnabled',
             faabBudgetDefault: 'faabBudgetDefault',
             isPublic: 'isPublic',
-            isMockDraft: 'isMockDraft',
             tierFrozenAt: 'tierFrozenAt',
             baseballEraFilter: 'baseballEraFilter',
             createdAt: 'createdAt',

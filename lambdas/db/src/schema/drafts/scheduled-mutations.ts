@@ -74,8 +74,8 @@ export function isBenignAutoPickRace(error: unknown): boolean {
 
 /**
  * True when `error` is the "No teams configured for this draft" thrown by
- * `getCurrentDraftPickInfo` (helpers.ts) for a draft whose `draft_teams`
- * hasn't been populated yet — the same expected, transient window between
+ * `getCurrentDraftPickInfo` (helpers.ts) for a draft whose seats
+ * (`draft_participants`) haven't been populated yet — the same expected, transient window between
  * league creation and `initializeDraft`'s transaction completing that the
  * `getCurrentDraftPick` query resolver already classifies as client-visible
  * rather than a server defect (LS-4853, graphql-error-codes.ts). The
@@ -795,7 +795,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 draftLeagueId,
                 draftId,
                 selectionMethod: (row.selection_method as string) ?? 'standard',
-                isMockDraft: candidatePool.rules.isMock,
+                isMock: candidatePool.rules.isMock,
                 pickResult,
               });
               result.draftsCompleted += effects.draftsCompleted;
@@ -851,7 +851,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
 
             if (isDraftNotYetInitialized(draftError)) {
               LOGGER.warn(
-                `[autoProcessDraftPicks] Draft ${draftId} has an expired deadline but draft_teams isn't populated yet — skipping until initializeDraft completes (will retry next cycle)`,
+                `[autoProcessDraftPicks] Draft ${draftId} has an expired deadline but draft_participants isn't populated yet — skipping until initializeDraft completes (will retry next cycle)`,
                 { draftId, leagueId: draftLeagueId },
               );
               continue;

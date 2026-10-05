@@ -335,41 +335,42 @@ async function processExpiredPicks(
             return null;
           }
 
-          // Get current pick info via draft_order
-          const draftTeams = await tx
-            .select()
-            .from(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, draftId));
+          // Get current pick info from the draft's seats
+          const seats = await tx
+            .select({
+              participantId: PublicSchema.draftParticipants.id,
+              teamId: PublicSchema.draftParticipants.teamId,
+            })
+            .from(PublicSchema.draftParticipants)
+            .where(eq(PublicSchema.draftParticipants.draftId, draftId))
+            .orderBy(PublicSchema.draftParticipants.slot);
 
-          if (draftTeams.length === 0) {
+          if (seats.length === 0) {
             throw new Error(
-              `Draft ${draftId} has no draft_teams — the draft was not properly initialized via initializeDraft`,
+              `Draft ${draftId} has no draft_participants — the draft was not properly initialized via initializeDraft`,
             );
           }
 
-          const numTeams = draftTeams.length;
+          const numTeams = seats.length;
           // current_pick tracks the LAST completed pick (0 = no picks yet)
           // The next pick to make is current_pick + 1
           const nextOverall = draft.current_pick + 1;
           const round = Math.floor((nextOverall - 1) / numTeams) + 1;
           const pickInRound = ((nextOverall - 1) % numTeams) + 1;
 
-          // Build team order from draft_teams table (sorted by draft_order position)
-          // The drafts.draft_order column stores the style ('snake'/'linear'), not team IDs
+          // Seats are already in slot order. The drafts.draft_order column
+          // stores the style ('snake'/'linear'), not team IDs.
           const draftStyle = row.draft_order as string;
-          const sortedTeams = [...draftTeams].sort(
-            (a, b) => (a.draftOrder ?? 0) - (b.draftOrder ?? 0),
-          );
-          const teamOrder = sortedTeams.map((dt) => dt.teamId);
 
           // Snake draft: reverse every other round
           let orderIndex = pickInRound - 1;
           if (draftStyle === 'snake' && round % 2 === 0) {
             orderIndex = numTeams - pickInRound;
           }
-          const currentTeamId = teamOrder[orderIndex];
+          const currentSeat = seats[orderIndex];
+          const currentTeamId = currentSeat?.teamId;
 
-          if (!currentTeamId) {
+          if (!currentSeat || !currentTeamId) {
             throw new Error(
               `Could not determine team for pick ${nextOverall} (round ${round}, pick ${pickInRound})`,
             );
@@ -424,6 +425,7 @@ async function processExpiredPicks(
           await tx.insert(PublicSchema.draftPicks).values({
             draftId,
             teamId: currentTeamId,
+            participantId: currentSeat.participantId,
             playerId: autoPlayerId,
             round,
             pickNumber: pickInRound,

@@ -33,7 +33,7 @@ async function resolveSeatForDraft(
   db: PublicDb,
   draftId: number,
   userId: number,
-): Promise<{ participantId: number; teamId: number | null }> {
+): Promise<{ participantId: number }> {
   const [draft] = await db
     .select({
       kind: PublicSchema.drafts.kind,
@@ -49,7 +49,7 @@ async function resolveSeatForDraft(
   if (draft.kind === 'mock') {
     const seat = await getSeatForUser(db, draftId, userId);
     if (!seat) throw ForbiddenError('You do not have a seat in this draft');
-    return { participantId: seat.id, teamId: null };
+    return { participantId: seat.id };
   }
 
   const leagueId = requireLeagueId(draft);
@@ -82,7 +82,7 @@ async function resolveSeatForDraft(
     );
   }
 
-  return { participantId: seat.id, teamId: membership.teamId };
+  return { participantId: seat.id };
 }
 
 // ── setDraftQueue ─────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ builder.mutationField('setDraftQueue', (t) =>
       const { draftId, playerIds } = args;
       const userId = context.user.id;
 
-      const { participantId, teamId } = await resolveSeatForDraft(
+      const { participantId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -155,7 +155,6 @@ builder.mutationField('setDraftQueue', (t) =>
         // Insert new entries with 1-based priority
         const insertValues = deduped.map((playerId, idx) => ({
           draftId,
-          teamId,
           participantId,
           playerId,
           priority: idx + 1,
@@ -171,7 +170,7 @@ builder.mutationField('setDraftQueue', (t) =>
 
       LOGGER.info('[LS-473] Draft queue set', {
         draftId,
-        teamId,
+        participantId,
         count: rows.length,
       });
 
@@ -203,7 +202,7 @@ builder.mutationField('addToDraftQueue', (t) =>
       const { draftId, playerId } = args;
       const userId = context.user.id;
 
-      const { participantId, teamId } = await resolveSeatForDraft(
+      const { participantId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -255,7 +254,6 @@ builder.mutationField('addToDraftQueue', (t) =>
 
           await tx.insert(PublicSchema.draftQueue).values({
             draftId,
-            teamId,
             participantId,
             playerId,
             priority: maxPriority + 1,
@@ -276,7 +274,7 @@ builder.mutationField('addToDraftQueue', (t) =>
 
       LOGGER.info('[LS-473] Player added to draft queue', {
         draftId,
-        teamId,
+        participantId,
         playerId,
       });
 
@@ -307,7 +305,7 @@ builder.mutationField('removeFromDraftQueue', (t) =>
       const { draftId, playerId } = args;
       const userId = context.user.id;
 
-      const { participantId, teamId } = await resolveSeatForDraft(
+      const { participantId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -354,7 +352,7 @@ builder.mutationField('removeFromDraftQueue', (t) =>
 
       LOGGER.info('[LS-473] Player removed from draft queue', {
         draftId,
-        teamId,
+        participantId,
         playerId,
       });
 
@@ -387,7 +385,7 @@ builder.mutationField('reorderDraftQueue', (t) =>
       const { draftId, playerIds } = args;
       const userId = context.user.id;
 
-      const { participantId, teamId } = await resolveSeatForDraft(
+      const { participantId } = await resolveSeatForDraft(
         context.db,
         draftId,
         userId,
@@ -461,7 +459,7 @@ builder.mutationField('reorderDraftQueue', (t) =>
 
       LOGGER.info('[LS-473] Draft queue reordered', {
         draftId,
-        teamId,
+        participantId,
         count: rows.length,
       });
 

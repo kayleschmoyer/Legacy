@@ -526,13 +526,23 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
   it('delivers a draft pick notification to a second connected client (AC1, regression: LS-7977)', async () => {
     const leagueId = 100;
+    const draftId = 5;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
     const teamA = registerUser('alice');
     const teamB = registerUser('bob');
     grantLeagueMembership(teamA.userId, leagueId);
     grantLeagueMembership(teamB.userId, leagueId);
 
-    const clientA = client({ token: teamA.token, leagueId });
-    const clientB = client({ token: teamB.token, leagueId });
+    const clientA = client({
+      token: teamA.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    const clientB = client({
+      token: teamB.token,
+      draftId,
+      viewContext: 'draft',
+    });
     await Promise.all([
       waitForEvent(clientA, 'connected'),
       waitForEvent(clientB, 'connected'),
@@ -549,7 +559,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     // DB (out of this ticket's scope; see the docblock above).
     await notificationService().notifyDraftPickMade(
       leagueId,
-      /* draftId */ 5,
+      draftId,
       /* pickId */ 9,
       teamA.userId,
       /* participantId */ 5151,
@@ -571,6 +581,8 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
   it('delivers the same pick to every subscribed client, not just one (regression: LS-8067)', async () => {
     const leagueId = 200;
+    const draftId = 1;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
     const commissioner = registerUser('commissioner');
     const webViewer = registerUser('web-viewer');
     const nativeViewer = registerUser('native-viewer');
@@ -578,8 +590,16 @@ describe('WebSocket fan-out (LS-8856)', () => {
       grantLeagueMembership(u.userId, leagueId);
     }
 
-    const webClient = client({ token: webViewer.token, leagueId });
-    const nativeClient = client({ token: nativeViewer.token, leagueId });
+    const webClient = client({
+      token: webViewer.token,
+      draftId,
+      viewContext: 'draft',
+    });
+    const nativeClient = client({
+      token: nativeViewer.token,
+      draftId,
+      viewContext: 'draft',
+    });
     await Promise.all([
       waitForEvent(webClient, 'connected'),
       waitForEvent(nativeClient, 'connected'),
@@ -590,7 +610,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
     await notificationService().notifyDraftPickMade(
       leagueId,
-      1,
+      draftId,
       1,
       commissioner.userId,
       /* participantId */ 5151,
@@ -659,18 +679,8 @@ describe('WebSocket fan-out (LS-8856)', () => {
     await waitForEvent(viewerClient, 'connected');
 
     // Subscribed: a broadcast arrives.
-    const firstReceived = waitForEvent(viewerClient, 'draft-pick-made');
-    await notificationService().notifyDraftPickMade(
-      leagueId,
-      1,
-      1,
-      sender.userId,
-      /* participantId */ 5151,
-      1,
-      1,
-      1,
-      1,
-    );
+    const firstReceived = waitForEvent(viewerClient, 'roster-update');
+    await notificationService().notifyRosterUpdate(leagueId);
     await firstReceived;
 
     // Unsubscribe by explicitly clearing leagueId (the real client contract
@@ -678,21 +688,11 @@ describe('WebSocket fan-out (LS-8856)', () => {
     // sets, so a genuine clear goes over the wire as the server's own null
     // convention, exactly as a real "navigate away" would).
     const messagesAfterUnsubscribe: unknown[] = [];
-    viewerClient.on('draft-pick-made', (n) => messagesAfterUnsubscribe.push(n));
+    viewerClient.on('roster-update', (n) => messagesAfterUnsubscribe.push(n));
     viewerClient.send({ action: 'updateContext', data: { leagueId: null } });
     await sleep(200); // let the server apply the update
 
-    await notificationService().notifyDraftPickMade(
-      leagueId,
-      1,
-      2,
-      sender.userId,
-      /* participantId */ 5151,
-      2,
-      1,
-      2,
-      2,
-    );
+    await notificationService().notifyRosterUpdate(leagueId);
     await sleep(300); // bounded wait for a negative assertion — see PR body
 
     expect(messagesAfterUnsubscribe).toHaveLength(0);
@@ -828,20 +828,10 @@ describe('WebSocket fan-out (LS-8856)', () => {
     ]);
 
     const leagueBMessages: unknown[] = [];
-    clientB.on('draft-pick-made', (n) => leagueBMessages.push(n));
+    clientB.on('roster-update', (n) => leagueBMessages.push(n));
 
-    const receivedByA = waitForEvent(clientA, 'draft-pick-made');
-    await notificationService().notifyDraftPickMade(
-      leagueA,
-      1,
-      1,
-      senderA.userId,
-      /* participantId */ 5151,
-      1,
-      1,
-      1,
-      1,
-    );
+    const receivedByA = waitForEvent(clientA, 'roster-update');
+    await notificationService().notifyRosterUpdate(leagueA);
     await receivedByA;
     await sleep(300); // bounded wait for a negative assertion — see PR body
 
@@ -869,44 +859,22 @@ describe('WebSocket fan-out (LS-8856)', () => {
     viewerClient.on('disconnected', disconnectedHandler);
 
     // Still scoped to league A: a league A broadcast is delivered.
-    const firstReceived = waitForEvent(viewerClient, 'draft-pick-made');
-    await notificationService().notifyDraftPickMade(
-      leagueA,
-      1,
-      1,
-      senderA.userId,
-      /* participantId */ 5151,
-      1,
-      1,
-      1,
-      1,
-    );
+    const firstReceived = waitForEvent(viewerClient, 'roster-update');
+    await notificationService().notifyRosterUpdate(leagueA);
     await firstReceived;
 
     // Real client API — the exact call `useWebSocket`'s `updateContext`
     // forwards to. Must reach the server over the SAME connection: a
     // disconnect/reconnect here would be the LS-8879 regression.
     const leagueAMessagesAfterSwitch: unknown[] = [];
-    viewerClient.on('draft-pick-made', (n) =>
-      leagueAMessagesAfterSwitch.push(n),
-    );
+    viewerClient.on('roster-update', (n) => leagueAMessagesAfterSwitch.push(n));
     viewerClient.updateContext({ leagueId: leagueB });
     await sleep(200); // let the server apply the update
 
     expect(disconnectedHandler).not.toHaveBeenCalled();
 
     // No longer scoped to league A: a league A broadcast is not delivered.
-    await notificationService().notifyDraftPickMade(
-      leagueA,
-      1,
-      2,
-      senderA.userId,
-      /* participantId */ 5151,
-      2,
-      1,
-      2,
-      2,
-    );
+    await notificationService().notifyRosterUpdate(leagueA);
     await sleep(300); // bounded wait for a negative assertion — see PR body
     expect(leagueAMessagesAfterSwitch).toHaveLength(0);
 
@@ -914,19 +882,9 @@ describe('WebSocket fan-out (LS-8856)', () => {
     // same, still-open connection.
     const receivedAfterSwitch = waitForEvent<{ leagueId: number }>(
       viewerClient,
-      'draft-pick-made',
+      'roster-update',
     );
-    await notificationService().notifyDraftPickMade(
-      leagueB,
-      1,
-      1,
-      senderB.userId,
-      /* participantId */ 5151,
-      3,
-      1,
-      1,
-      1,
-    );
+    await notificationService().notifyRosterUpdate(leagueB);
     await expect(receivedAfterSwitch).resolves.toMatchObject({
       leagueId: leagueB,
     });
@@ -953,24 +911,14 @@ describe('WebSocket fan-out (LS-8856)', () => {
       await waitForEvent(viewerClient, 'connected');
 
       const messages: unknown[] = [];
-      viewerClient.on('draft-pick-made', (n) => messages.push(n));
+      viewerClient.on('roster-update', (n) => messages.push(n));
 
       // Outlast the TTL with the socket still open — DynamoDB TTL eviction is
       // lazy, so the row disappears from reads while the client believes it's
       // still subscribed.
       await sleep(2500);
 
-      await notificationService().notifyDraftPickMade(
-        leagueId,
-        1,
-        1,
-        sender.userId,
-        /* participantId */ 5151,
-        1,
-        1,
-        1,
-        1,
-      );
+      await notificationService().notifyRosterUpdate(leagueId);
       await sleep(300); // bounded wait for a negative assertion
 
       expect(messages).toHaveLength(0);
@@ -999,23 +947,13 @@ describe('WebSocket fan-out (LS-8856)', () => {
       // survive because the heartbeat kept refreshing it.
       await sleep(2500);
 
-      const received = waitForEvent<{ playerId: number }>(
+      const received = waitForEvent<{ leagueId: number }>(
         viewerClient,
-        'draft-pick-made',
+        'roster-update',
       );
-      await notificationService().notifyDraftPickMade(
-        leagueId,
-        1,
-        1,
-        sender.userId,
-        /* participantId */ 5151,
-        999,
-        1,
-        1,
-        1,
-      );
+      await notificationService().notifyRosterUpdate(leagueId);
 
-      await expect(received).resolves.toMatchObject({ playerId: 999 });
+      await expect(received).resolves.toMatchObject({ leagueId });
     },
   );
 
@@ -1023,6 +961,8 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
   it('delivers a pick broadcast after a client drops and reconnects mid-draft', async () => {
     const leagueId = 550;
+    const draftId = 6;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
     const stableViewer = registerUser('noah'); // stays connected throughout
     const droppedViewer = registerUser('olivia'); // disconnects and reconnects
     grantLeagueMembership(stableViewer.userId, leagueId);
@@ -1031,10 +971,15 @@ describe('WebSocket fan-out (LS-8856)', () => {
     // `reconnect: false` — this test drives the connect/disconnect cycle
     // itself rather than relying on the client's own backoff timer, per the
     // ticket's Technical Approach.
-    const stableClient = client({ token: stableViewer.token, leagueId });
+    const stableClient = client({
+      token: stableViewer.token,
+      draftId,
+      viewContext: 'draft',
+    });
     const droppedClient = client({
       token: droppedViewer.token,
-      leagueId,
+      draftId,
+      viewContext: 'draft',
       reconnect: false,
     });
     await Promise.all([
@@ -1063,7 +1008,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     await expect(
       notificationService().notifyDraftPickMade(
         leagueId,
-        6,
+        draftId,
         10,
         stableViewer.userId,
         /* participantId */ 5151,
@@ -1077,7 +1022,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       overallPick: 3,
     });
 
-    // Reconnect with the same league context and re-assert delivery.
+    // Reconnect with the same draft context and re-assert delivery.
     const droppedReconnected = waitForEvent(droppedClient, 'connected');
     droppedClient.connect();
     await droppedReconnected;
@@ -1087,7 +1032,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     }>(droppedClient, 'draft-pick-made');
     await notificationService().notifyDraftPickMade(
       leagueId,
-      6,
+      draftId,
       11,
       stableViewer.userId,
       /* participantId */ 5151,
@@ -1106,12 +1051,18 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
   it('delivers every pick in a burst of chained auto-picks exactly once', async () => {
     const leagueId = 600;
+    const draftId = 7;
+    mockDrafts.set(draftId, { leagueId, kind: 'league' });
     const commissioner = registerUser('karl');
     const viewer = registerUser('maria');
     grantLeagueMembership(commissioner.userId, leagueId);
     grantLeagueMembership(viewer.userId, leagueId);
 
-    const viewerClient = client({ token: viewer.token, leagueId });
+    const viewerClient = client({
+      token: viewer.token,
+      draftId,
+      viewContext: 'draft',
+    });
     await waitForEvent(viewerClient, 'connected');
 
     const BURST_SIZE = 6;
@@ -1129,7 +1080,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     const sends = Array.from({ length: BURST_SIZE }, (_, i) =>
       notificationService().notifyDraftPickMade(
         leagueId,
-        7,
+        draftId,
         20 + i,
         commissioner.userId,
         /* participantId */ 5151,
@@ -1167,7 +1118,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
   // with a 403. Real handler + real clients per ADR-0019 — mock-only
   // evidence is explicitly insufficient for this ticket. ──
 
-  it('delivers a draft pick to both a member and a non-member spectator of a public league (LS-8940)', async () => {
+  it('delivers a league broadcast to both a member and a non-member spectator of a public league (LS-8940)', async () => {
     const leagueId = 700;
     const member = registerUser('member-mallory');
     const spectator = registerUser('spectator-sam');
@@ -1182,35 +1133,19 @@ describe('WebSocket fan-out (LS-8856)', () => {
       waitForEvent(spectatorClient, 'connected'),
     ]);
 
-    const memberReceived = waitForEvent<{
-      leagueId: number;
-      playerId: number;
-    }>(memberClient, 'draft-pick-made');
-    const spectatorReceived = waitForEvent<{
-      leagueId: number;
-      playerId: number;
-    }>(spectatorClient, 'draft-pick-made');
-
-    await notificationService().notifyDraftPickMade(
-      leagueId,
-      /* draftId */ 8,
-      /* pickId */ 30,
-      member.userId,
-      /* participantId */ 5151,
-      /* playerId */ 8888,
-      /* round */ 1,
-      /* pickNumber */ 5,
-      /* overallPick */ 5,
+    const memberReceived = waitForEvent<{ leagueId: number }>(
+      memberClient,
+      'roster-update',
+    );
+    const spectatorReceived = waitForEvent<{ leagueId: number }>(
+      spectatorClient,
+      'roster-update',
     );
 
-    await expect(memberReceived).resolves.toMatchObject({
-      leagueId,
-      playerId: 8888,
-    });
-    await expect(spectatorReceived).resolves.toMatchObject({
-      leagueId,
-      playerId: 8888,
-    });
+    await notificationService().notifyRosterUpdate(leagueId);
+
+    await expect(memberReceived).resolves.toMatchObject({ leagueId });
+    await expect(spectatorReceived).resolves.toMatchObject({ leagueId });
   });
 
   it('refuses a non-member connecting to a private league at $connect with 403 (LS-8940)', async () => {
@@ -1271,38 +1206,54 @@ describe('WebSocket fan-out (LS-8856)', () => {
     return result.statusCode;
   }
 
-  it('delivers every draft event to both an old league-channel client and a new draft-channel client (LS-10075 AC1)', async () => {
+  it('delivers every draft event on the draft channel, and only the start/complete lifecycle events on the league channel (LS-10080)', async () => {
     const leagueId = 900;
     const draftId = 90;
     mockDrafts.set(draftId, { leagueId, kind: 'league' });
-    const oldApp = registerUser('old-app-olive');
-    const newApp = registerUser('new-app-nate');
-    grantLeagueMembership(oldApp.userId, leagueId);
-    grantLeagueMembership(newApp.userId, leagueId);
+    const leagueViewer = registerUser('league-page-lena');
+    const drafter = registerUser('draft-room-nate');
+    grantLeagueMembership(leagueViewer.userId, leagueId);
+    grantLeagueMembership(drafter.userId, leagueId);
 
-    // The installed mobile build only knows the league channel.
-    const oldClient = client({ token: oldApp.token, leagueId });
-    const newClient = client({
-      token: newApp.token,
+    // A league page (not the draft room) — it refetches league state when a
+    // draft starts or completes, and needs nothing else from the draft.
+    const leagueClient = client({ token: leagueViewer.token, leagueId });
+    const draftClient = client({
+      token: drafter.token,
       draftId,
       viewContext: 'draft',
     });
     await Promise.all([
-      waitForEvent(oldClient, 'connected'),
-      waitForEvent(newClient, 'connected'),
+      waitForEvent(leagueClient, 'connected'),
+      waitForEvent(draftClient, 'connected'),
     ]);
 
-    const draftEvents = [
-      'draft-started',
+    const draftRoomEvents = [
       'draft-pick-made',
       'draft-pick-undone',
       'draft-paused',
       'draft-resumed',
-      'draft-completed',
     ];
-    const received = [oldClient, newClient].flatMap((c) =>
-      draftEvents.map((event) =>
-        waitForEvent<{ leagueId: number; draftId?: number | null }>(c, event),
+    const lifecycleEvents = ['draft-started', 'draft-completed'];
+
+    const leagueReceived: string[] = [];
+    for (const event of [...draftRoomEvents, ...lifecycleEvents]) {
+      leagueClient.on(event as never, () => {
+        leagueReceived.push(event);
+      });
+    }
+
+    const draftReceived = [...draftRoomEvents, ...lifecycleEvents].map(
+      (event) =>
+        waitForEvent<{ leagueId: number; draftId?: number | null }>(
+          draftClient,
+          event,
+        ),
+    );
+    const leagueLifecycleReceived = lifecycleEvents.map((event) =>
+      waitForEvent<{ leagueId: number; draftId?: number | null }>(
+        leagueClient,
+        event,
       ),
     );
 
@@ -1319,7 +1270,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       leagueId,
       draftId,
       /* pickId */ 1,
-      oldApp.userId,
+      drafter.userId,
       /* participantId */ 5151,
       /* playerId */ 4242,
       1,
@@ -1331,7 +1282,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
       draftId,
       /* undonePickId */ 1,
       /* playerId */ 4242,
-      oldApp.userId,
+      drafter.userId,
       /* overallPick */ 1,
       /* newCurrentPick */ 1,
       '2026-09-13T00:02:00.000Z',
@@ -1344,9 +1295,15 @@ describe('WebSocket fan-out (LS-8856)', () => {
     );
     await service.notifyDraftCompleted(leagueId, draftId, 'standard');
 
-    for (const notification of await Promise.all(received)) {
+    for (const notification of await Promise.all([
+      ...draftReceived,
+      ...leagueLifecycleReceived,
+    ])) {
       expect(notification).toMatchObject({ leagueId, draftId });
     }
+    await sleep(100);
+
+    expect(leagueReceived.sort()).toEqual([...lifecycleEvents].sort());
   });
 
   it('lets a public-league non-member open the draft channel as a spectator (LS-10075 AC2)', async () => {

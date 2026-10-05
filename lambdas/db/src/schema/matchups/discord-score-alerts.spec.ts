@@ -49,7 +49,6 @@ jest.mock('@legacy-sports/db-client', () =>
         name: 'leagues.name',
         discordWebhookUrl: 'leagues.discord_webhook_url',
         leaguePhase: 'leagues.league_phase',
-        isMockDraft: 'leagues.is_mock_draft',
         currentWeek: 'leagues.current_week',
         draftStatus: 'leagues.draft_status',
         gamesPerMatchup: 'leagues.games_per_matchup',

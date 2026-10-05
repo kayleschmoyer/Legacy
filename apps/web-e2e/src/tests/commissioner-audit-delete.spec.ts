@@ -68,7 +68,6 @@ function makeLeague(overrides: Record<string, unknown> = {}) {
     leaguePhase: null,
     weekAdvanceStatus: null,
     faabBudgetDefault: null,
-    isMockDraft: false,
     previousLeagueId: null,
     seasonNumber: 1,
     salaryCapEnabled: false,

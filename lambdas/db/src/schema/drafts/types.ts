@@ -591,8 +591,7 @@ UpdateDraftSettingsPayload.implement({
 export const DraftQueueEntry = builder.objectRef<{
   id: number;
   draftId: number;
-  teamId: number | null;
-  participantId: number | null;
+  participantId: number;
   playerId: number;
   priority: number;
 }>('DraftQueueEntry');
@@ -603,15 +602,8 @@ DraftQueueEntry.implement({
   fields: (t) => ({
     id: t.exposeInt('id'),
     draftId: t.exposeInt('draftId'),
-    teamId: t.exposeInt('teamId', {
-      nullable: true,
-      description:
-        'Null for a mock draft, whose queue belongs to a seat (LS-10076).',
-    }),
     participantId: t.exposeInt('participantId', {
-      nullable: true,
-      description:
-        "The queue owner's seat. Null only for a league queue row written before LS-10073.",
+      description: "The queue owner's seat.",
     }),
     playerId: t.exposeInt('playerId'),
     priority: t.exposeInt('priority'),

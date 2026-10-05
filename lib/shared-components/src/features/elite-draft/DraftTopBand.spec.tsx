@@ -128,7 +128,7 @@ describe('DraftTopBand autopick visibility (LS-7980)', () => {
         {...baseProps}
         isCommissioner={true}
         isOwner={true}
-        isMockDraft={true}
+        isMock={true}
       />,
     );
     expect(queryByRole('button', { name: /pause/i })).toBeNull();
@@ -216,26 +216,26 @@ describe('DraftTopBand global Disable Auto-Pick control (LS-8783)', () => {
 });
 
 describe('DraftTopBand Exit Draft control (LS-9238)', () => {
-  it('is hidden when isMockDraft is false', () => {
+  it('is hidden when isMock is false', () => {
     const { queryByRole } = render(
       <DraftTopBand
         {...baseProps}
         isCommissioner={false}
         isOwner={false}
-        isMockDraft={false}
+        isMock={false}
         onExitDraft={jest.fn()}
       />,
     );
     expect(queryByRole('button', { name: /exit draft/i })).toBeNull();
   });
 
-  it('is hidden when no onExitDraft handler is supplied, even if isMockDraft is true', () => {
+  it('is hidden when no onExitDraft handler is supplied, even if isMock is true', () => {
     const { queryByRole } = render(
       <DraftTopBand
         {...baseProps}
         isCommissioner={false}
         isOwner={false}
-        isMockDraft={true}
+        isMock={true}
       />,
     );
     expect(queryByRole('button', { name: /exit draft/i })).toBeNull();
@@ -248,7 +248,7 @@ describe('DraftTopBand Exit Draft control (LS-9238)', () => {
         {...baseProps}
         isCommissioner={false}
         isOwner={false}
-        isMockDraft={true}
+        isMock={true}
         onExitDraft={onExitDraft}
       />,
     );

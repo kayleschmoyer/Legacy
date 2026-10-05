@@ -32,7 +32,6 @@ jest.mock('../services/activity-log', () => ({
 
 const {
   drafts,
-  draftTeams,
   draftParticipants,
   draftPicks,
   leagues,
@@ -101,12 +100,14 @@ describe('Draft Picks - DB Integration Tests', () => {
       })
       .returning();
 
-    await db.insert(draftTeams).values(
+    await db.insert(draftParticipants).values(
       teamFixtures.map((t, i) => ({
         draftId: draft.id,
+        slot: i + 1,
         teamId: t.id,
         leagueId: league.id,
-        draftOrder: i + 1,
+        controller: 'user' as const,
+        seatName: t.name,
       })),
     );
 
@@ -123,9 +124,9 @@ describe('Draft Picks - DB Integration Tests', () => {
   }
 
   /**
-   * The seat (`draft_participants.id`) a team drafts from. The draft_teams
-   * bridge trigger (LS-10073) creates one per draft_teams row; a hand-built
-   * pickInfo must name it since picks are seat-keyed (LS-10076).
+   * The seat (`draft_participants.id`) a team drafts from. The seed helpers
+   * insert one seat per team; a hand-built pickInfo must name it since picks
+   * are seat-keyed (LS-10076).
    */
   async function seatIdFor(draftId: number, teamId: number): Promise<number> {
     const [seat] = await db
@@ -447,24 +448,24 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(found.draftStatus).toBe('in-progress');
     });
 
-    it('should have correctly ordered draft_teams after seeding', async () => {
+    it('should have correctly ordered draft seats after seeding', async () => {
       const { draft } = await seedDraftFixture(3);
 
       const entries = await db
         .select()
-        .from(draftTeams)
-        .where(eq(draftTeams.draftId, draft.id))
-        .orderBy(draftTeams.draftOrder);
+        .from(draftParticipants)
+        .where(eq(draftParticipants.draftId, draft.id))
+        .orderBy(draftParticipants.slot);
 
       expect(entries).toHaveLength(3);
-      expect(entries[0].draftOrder).toBe(1);
-      expect(entries[1].draftOrder).toBe(2);
-      expect(entries[2].draftOrder).toBe(3);
+      expect(entries[0].slot).toBe(1);
+      expect(entries[1].slot).toBe(2);
+      expect(entries[2].slot).toBe(3);
     });
   });
 
   // ---------------------------------------------------------------------------
-  describe('isMockDraft guards', () => {
+  describe('mock draft guards', () => {
     beforeEach(() => {
       jest.clearAllMocks();
     });
@@ -478,7 +479,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       } = await seedDraftFixture(2);
 
       // A mock draft has no league (LS-10076): leagueId null is what skips
-      // the roster write now that the isMockDraft flag is gone.
+      // the roster write.
       await commitDraftPick({
         tx: db,
         draftId: draft.id,
@@ -523,7 +524,7 @@ describe('Draft Picks - DB Integration Tests', () => {
         draftLeagueId: league.id,
         draftId: draft.id,
         selectionMethod: 'standard',
-        isMockDraft: true,
+        isMock: true,
         pickResult: {
           draftPick: { id: 99 },
           autoPlayerId: playerFix[0].id,
@@ -1016,12 +1017,14 @@ describe('Draft Picks - DB Integration Tests', () => {
         })
         .returning();
 
-      await db.insert(draftTeams).values(
+      await db.insert(draftParticipants).values(
         teamFixtures.map((t, i) => ({
           draftId: draft.id,
+          slot: i + 1,
           teamId: t.id,
           leagueId: league.id,
-          draftOrder: i + 1,
+          controller: 'user' as const,
+          seatName: t.name,
           autoPick: false,
         })),
       );
@@ -1056,8 +1059,6 @@ describe('Draft Picks - DB Integration Tests', () => {
       // Commissioner's team must NOT be marked
       expect(markedIds).not.toContain(teamFix[0].id);
 
-      // enableAutoPickForUnmanagedTeams writes draft_participants since
-      // LS-10074 — draft_teams is no longer touched by any writer.
       const rows = await db
         .select({
           teamId: draftParticipants.teamId,
@@ -1110,8 +1111,6 @@ describe('Draft Picks - DB Integration Tests', () => {
       expect(markedIds).not.toContain(teamFix[1].id);
       expect(markedIds).toContain(teamFix[2].id); // no member → auto-pick
 
-      // enableAutoPickForUnmanagedTeams writes draft_participants since
-      // LS-10074 — draft_teams is no longer touched by any writer.
       const rows = await db
         .select({
           teamId: draftParticipants.teamId,

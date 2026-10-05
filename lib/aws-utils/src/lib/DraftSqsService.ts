@@ -6,8 +6,9 @@ export interface StartDraftMessage {
   leagueId: number;
   /**
    * The draft being processed, so its completion broadcast can reach the
-   * draft channel (LS-10075). Optional: messages already in flight when this
-   * shipped carry only leagueId, and those still broadcast to the league.
+   * draft channel (LS-10075). Every producer sets it; it stays optional only
+   * so a message without one is still processed — its DRAFT_COMPLETED then
+   * reaches the league channel alone (LS-10080).
    */
   draftId?: number;
   draftMode: 'live' | 'automated';

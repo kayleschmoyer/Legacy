@@ -828,13 +828,11 @@ export type DraftQueueEntry = {
   __typename?: 'DraftQueueEntry';
   draftId?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  /** The queue owner's seat. Null only for a league queue row written before LS-10073. */
+  /** The queue owner's seat. */
   participantId?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   priority?: Maybe<Scalars['Int']['output']>;
-  /** Null for a mock draft, whose queue belongs to a seat (LS-10076). */
-  teamId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A draft pick recommendation produced by the Draft Intelligence algorithm */
@@ -1719,7 +1717,6 @@ export type League = {
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   baseballHofOnly?: Maybe<Scalars['Boolean']['output']>;
-  controlAllTeams?: Maybe<Scalars['Boolean']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
@@ -1736,8 +1733,6 @@ export type League = {
   id?: Maybe<Scalars['Int']['output']>;
   /** League invite code. Null for non-members — only league members and the owner receive this value. */
   inviteCode?: Maybe<Scalars['String']['output']>;
-  isMockDraft?: Maybe<Scalars['Boolean']['output']>;
-  isOfflineDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   /** Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671) */
   keeperSettings?: Maybe<KeeperSettings>;

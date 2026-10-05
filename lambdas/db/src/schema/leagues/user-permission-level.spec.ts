@@ -104,7 +104,6 @@ describe('viewerMembership resolver (LS-6036)', () => {
             waiverEnabled: 'waiverEnabled',
             faabBudgetDefault: 'faabBudgetDefault',
             isPublic: 'isPublic',
-            isMockDraft: 'isMockDraft',
             tierFrozenAt: 'tierFrozenAt',
           },
           leagueMembers: {

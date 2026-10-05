@@ -36,7 +36,7 @@ interface DraftTopBandProps {
    * Also gates the Exit Draft control — mock drafts have no real teammates
    * to leave hanging (LS-9238).
    */
-  isMockDraft?: boolean;
+  isMock?: boolean;
   onExitDraft?: () => void;
   isMyPick: boolean;
   currentPickInfo: CurrentDraftPickInfo | null;
@@ -381,7 +381,7 @@ export function DraftTopBand({
   pickTimeLimitSeconds,
   connectionStale = false,
   untimed = false,
-  isMockDraft = false,
+  isMock = false,
   onExitDraft,
   isMyPick,
   currentPickInfo,
@@ -440,7 +440,7 @@ export function DraftTopBand({
   // ClockSlab above.
   const stacked = useDraftViewportTier() !== 'desktop';
 
-  const showCommish = isCommissioner && !!draftId && !isMockDraft;
+  const showCommish = isCommissioner && !!draftId && !isMock;
   const showAutopick = draftId !== null && myTeamId !== null;
 
   return (
@@ -739,7 +739,7 @@ export function DraftTopBand({
       )}
 
       {/* Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) */}
-      {isMockDraft && onExitDraft && (
+      {isMock && onExitDraft && (
         <GhostBtn
           {...BUTTON_A11Y}
           onPress={onExitDraft}

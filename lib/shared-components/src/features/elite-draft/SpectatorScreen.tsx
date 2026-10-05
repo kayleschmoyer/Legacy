@@ -164,12 +164,7 @@ export function SpectatorScreen({
     return (
       <DraftCompleteView
         draftSummary={
-          data.league
-            ? {
-                isMockDraft: data.league.isMockDraft ?? undefined,
-                name: data.league.name ?? undefined,
-              }
-            : null
+          data.league ? { name: data.league.name ?? undefined } : null
         }
         leagueId={leagueId}
         sport={sport}

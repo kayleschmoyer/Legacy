@@ -130,7 +130,6 @@ builder.mutationField('sendDiscordWeeklyRecaps', (t) =>
       const leagueConditions = [
         isNotNull(PublicSchema.leagues.discordWebhookUrl),
         eq(PublicSchema.leagues.leaguePhase, 'active'),
-        eq(PublicSchema.leagues.isMockDraft, false),
       ];
 
       if (args.leagueId) {
