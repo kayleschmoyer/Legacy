@@ -3627,7 +3627,7 @@ type Mutation {
   ): [TeamMember!]
 
   """
-  Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick.
+  Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. A missed pick is auto-picked for that pick only (auto-pick stays on permanently only for teams with no manager), and making a pick manually turns auto-pick off.
   """
   toggleDraftAutoPick(draftId: Int!, enable: Boolean!): Boolean
 
@@ -4607,6 +4607,11 @@ type Query {
     draftId: Int!
     limit: Int
     offset: Int
+
+    """
+    When true (the default), list only players who can fill one of the caller's still-open roster slots (LS-8065). Pass false to list every eligible player; getDraftOpenSlotPositions reports which slots the default filter applies (LS-10593).
+    """
+    openSlotsOnly: Boolean = true
     orderBy: String
     position: String
     search: String
@@ -4621,6 +4626,11 @@ type Query {
   Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478).
   """
   getDraftFootballPlayerStats: [DraftFootballPlayerStats!]
+
+  """
+  Roster slot types (e.g. C, SS, SP) the caller's seat still has open — the positions getAvailableDraftPlayers filters to by default (openSlotsOnly). Empty when no filter applies (LS-10593).
+  """
+  getDraftOpenSlotPositions(draftId: Int!): [String!]
   getDraftPicks(draftId: Int!): [DraftPick!]
 
   """

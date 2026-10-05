@@ -1294,4 +1294,153 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
   });
+
+  describe('stale socket events (LS-10593)', () => {
+    /**
+     * Minimal controllable WebSocket stand-in: unlike mock-socket, the test
+     * decides exactly when each socket's open/close events fire, so it can
+     * reproduce a superseded socket's `onclose` landing late.
+     */
+    class FakeWebSocket {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+      static instances: FakeWebSocket[] = [];
+
+      readyState = FakeWebSocket.CONNECTING;
+      onopen: ((ev: Event) => void) | null = null;
+      onmessage: ((ev: MessageEvent) => void) | null = null;
+      onerror: ((ev: Event) => void) | null = null;
+      onclose: ((ev: CloseEvent) => void) | null = null;
+      sent: string[] = [];
+      /** Captured at construction so a test can fire it after detachment. */
+      capturedOnclose: (() => void) | null = null;
+
+      constructor(public url: string) {
+        FakeWebSocket.instances.push(this);
+      }
+
+      open(): void {
+        this.capturedOnclose = this.onclose as (() => void) | null;
+        this.readyState = FakeWebSocket.OPEN;
+        this.onopen?.(new Event('open'));
+      }
+
+      send(data: string): void {
+        this.sent.push(data);
+      }
+
+      close(): void {
+        this.readyState = FakeWebSocket.CLOSED;
+      }
+
+      /** Simulate the browser delivering the close event (possibly late). */
+      fireClose(): void {
+        this.readyState = FakeWebSocket.CLOSED;
+        (this.onclose as (() => void) | null)?.();
+      }
+    }
+
+    const originalWebSocket = global.WebSocket;
+
+    beforeEach(() => {
+      FakeWebSocket.instances = [];
+      (global as unknown as { WebSocket: unknown }).WebSocket = FakeWebSocket;
+    });
+
+    afterEach(() => {
+      (global as unknown as { WebSocket: unknown }).WebSocket =
+        originalWebSocket;
+    });
+
+    it("ignores a superseded socket's late close after disconnect(); connect()", () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        draftId: 7,
+        viewContext: 'draft',
+        reconnectDelay: 100,
+        autoConnect: false,
+      });
+      client.setHeartbeatInterval(1000);
+      const disconnected = jest.fn();
+      client.on('disconnected', disconnected);
+
+      client.connect();
+      const first = FakeWebSocket.instances[0];
+      first.open();
+      const staleOnclose = first.capturedOnclose;
+
+      // Forced fresh socket (e.g. app returned from a long background).
+      client.disconnect();
+      client.connect();
+      const second = FakeWebSocket.instances[1];
+      second.open();
+      expect(disconnected).toHaveBeenCalledTimes(1);
+
+      // The old socket's close event arrives after the new socket is live.
+      // Even if a platform invokes the handler it captured earlier, it must
+      // not affect the new socket.
+      staleOnclose?.();
+      first.fireClose();
+
+      expect(disconnected).toHaveBeenCalledTimes(1);
+      expect(client.getState()).toBe('connected');
+
+      // The new socket's heartbeat is still running, and no duplicate
+      // reconnect (100ms backoff) was scheduled by the stale close.
+      jest.advanceTimersByTime(1000);
+      expect(second.sent.some((m) => m.includes('ping'))).toBe(true);
+      expect(FakeWebSocket.instances).toHaveLength(2);
+
+      client.dispose();
+    });
+
+    it('detaches handlers from a socket retired by disconnect()', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        autoConnect: false,
+      });
+
+      client.connect();
+      const ws = FakeWebSocket.instances[0];
+      ws.open();
+      client.disconnect();
+
+      expect(ws.onopen).toBeNull();
+      expect(ws.onmessage).toBeNull();
+      expect(ws.onerror).toBeNull();
+      expect(ws.onclose).toBeNull();
+      client.dispose();
+    });
+
+    it('reconnects (instead of giving up) when the heartbeat detects a dead socket', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        reconnectDelay: 100,
+        autoConnect: false,
+      });
+      client.setHeartbeatInterval(1000);
+      const disconnected = jest.fn();
+      client.on('disconnected', disconnected);
+
+      client.connect();
+      FakeWebSocket.instances[0].open();
+
+      // Three unanswered heartbeat cycles — the zombie-socket branch.
+      jest.advanceTimersByTime(3000);
+      expect(disconnected).toHaveBeenCalledTimes(1);
+
+      // A reconnect is scheduled with backoff and opens a fresh socket.
+      jest.advanceTimersByTime(100);
+      expect(FakeWebSocket.instances).toHaveLength(2);
+      FakeWebSocket.instances[1].open();
+      expect(client.getState()).toBe('connected');
+
+      client.dispose();
+    });
+  });
 });

@@ -165,7 +165,11 @@ resource "aws_iam_policy" "graphql_lambda_sqs" {
         Resource = [
           aws_sqs_queue.automatic_drafts.arn,
           aws_sqs_queue.load_season_stats.arn,
-          aws_sqs_queue.select_game.arn
+          aws_sqs_queue.select_game.arn,
+          # Push notifications (NotificationPublisher) — without this the
+          # lambda could publish no push at all, e.g. the draft
+          # "you're on the clock" alert (LS-10593).
+          aws_sqs_queue.notifications_queue.arn
         ]
       }
     ]
@@ -291,6 +295,12 @@ resource "aws_lambda_function" "graphql" {
       SQS_LOAD_SEASON_STATS_URL = aws_sqs_queue.load_season_stats.url
       SQS_AUTOMATIC_DRAFTS_URL  = aws_sqs_queue.automatic_drafts.url
       SQS_SELECT_GAME_URL       = aws_sqs_queue.select_game.url
+
+      # Push notifications queue, read by lib/aws-utils's
+      # createNotificationPublisher(). Unset, it returns null and every push
+      # this lambda tries to send (trade offers, chat mentions, draft
+      # on-the-clock alerts, ...) is silently dropped (LS-10593).
+      NOTIFICATION_QUEUE_URL = aws_sqs_queue.notifications_queue.url
 
       # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name

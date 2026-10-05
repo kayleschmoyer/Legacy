@@ -207,14 +207,33 @@ export function useDraftActions({
   // the click and leave the draft stuck on that pick (LS-10433).
   const submitPick = useCallback(
     async (playerId: number, isAutoPick: boolean, requireOwnTurn: boolean) => {
-      if (
-        !draftId ||
-        (requireOwnTurn && !isMyPick) ||
-        isPickingRef.current ||
-        draftPaused
-      )
+      if (!draftId || isPickingRef.current || draftPaused) return;
+      if (requireOwnTurn && !isMyPick) {
+        // The board offered a pick it no longer believes is ours — usually
+        // because the commissioner (or auto-pick) already picked for this
+        // team while this client was out of sync. Dropping the click
+        // silently left the user tapping a dead button with no idea why;
+        // tell them and resync the turn instead (LS-10593).
+        if (!isAutoPick) {
+          showToast('Not your turn to pick — refreshing board', 'warning');
+        }
+        void refetchCurrentPick({ draftId });
         return;
+      }
       isPickingRef.current = true;
+      // A pick rejected because the board was stale means picks (possibly
+      // our own, made by the commissioner on our behalf) landed that this
+      // client missed — refresh everything the pick touches, not just the
+      // one list (LS-10593).
+      const refreshBoard = () => {
+        void refetchCurrentPick({ draftId });
+        void refetchPickHistory();
+        void refetchAvailablePlayers();
+        void refetchQueue().catch((e: unknown) =>
+          LOGGER.warn('[Draft] Queue refetch failed:', String(e)),
+        );
+        void refetchDraft();
+      };
       try {
         setUrgentMessage('');
         await makeDraftPick({
@@ -226,15 +245,19 @@ export function useDraftActions({
         void refetchAvailablePlayers();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to make pick';
-        if (msg.includes('Player has already been drafted')) {
-          showToast('Player already drafted — refreshing list', 'warning');
-          void refetchAvailablePlayers();
+        if (msg.includes('already been drafted')) {
+          showToast('Player already drafted — refreshing', 'warning');
+          refreshBoard();
         } else if (
+          // LS-10593: the turn moved on server-side before this pick landed
+          // — most often the commissioner picked for this team while the
+          // client was backgrounded or out of sync.
+          msg.includes('Draft state changed') ||
           msg.includes('not your turn') ||
           msg.includes('Not authorized')
         ) {
-          showToast('Not your turn to pick', 'warning');
-          void refetchCurrentPick({ draftId });
+          showToast('Pick was made for you — refreshing board', 'warning');
+          refreshBoard();
         } else if (msg.includes('paused')) {
           showToast('Draft is currently paused', 'warning');
           _setDraftPaused(true);
@@ -281,6 +304,8 @@ export function useDraftActions({
       refetchCurrentPick,
       refetchPickHistory,
       refetchAvailablePlayers,
+      refetchQueue,
+      refetchDraft,
       refetchLeague,
       showToast,
       setUrgentMessage,

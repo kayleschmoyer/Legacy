@@ -17,6 +17,8 @@ import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { requireLeagueId } from '../league-draft';
+import { offloadNextPickIfAutoPick } from '../offload-auto-pick';
+import { notifyOnTheClock } from '../on-the-clock-push';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
 import {
@@ -273,18 +275,38 @@ builder.mutationField('commissionerPick', (t) =>
 
             // Commit the pick: insert pick row, advance draft state, and add player to roster.
             // commitDraftPick is the single source of truth for all draft-pick DB writes.
-            const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
-              await commitDraftPick({
-                tx,
-                draftId,
-                leagueId: txLeagueId,
-                pickInfo: currentPickInfo,
-                playerId,
-                maxRosterSize: league.maxRosterSize,
-                pickTimeLimitSeconds: draft.pick_time_limit_seconds,
-              });
+            const {
+              draftPick,
+              isDraftComplete,
+              nextDeadline: committedDeadline,
+              nextPickInfo,
+            } = await commitDraftPick({
+              tx,
+              draftId,
+              leagueId: txLeagueId,
+              pickInfo: currentPickInfo,
+              playerId,
+              maxRosterSize: league.maxRosterSize,
+              pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+            });
+
+            // LS-10593: a commissioner may pick while the draft is paused,
+            // but commitDraftPick always arms a fresh timer. Keep the paused
+            // draft's deadline cleared (pauseDraft's invariant) — resumeDraft
+            // grants the on-clock seat a full timer — so the timer is neither
+            // broadcast nor picked up by autoProcessDraftPicks while paused.
+            const isPaused = league.draftStatus === 'paused';
+            let nextDeadline = committedDeadline;
+            if (isPaused && nextDeadline !== null) {
+              await tx
+                .update(PublicSchema.drafts)
+                .set({ currentPickDeadline: null })
+                .where(eq(PublicSchema.drafts.id, draftId));
+              nextDeadline = null;
+            }
 
             return {
+              isPaused,
               draftPick,
               isDraftComplete,
               leagueId: txLeagueId,
@@ -363,6 +385,30 @@ builder.mutationField('commissionerPick', (t) =>
               result.selectionMethod,
             );
           }
+        }
+
+        // LS-10593: mirror makeDraftPick's post-pick handling for the seat
+        // now on the clock. Without the LS-8107 offload an auto-pick seat
+        // after a commissioner pick sat on the clock for its full timer.
+        // The offload is skipped while paused (the deadline stays cleared
+        // until resumeDraft); the on-the-clock push is still sent so the
+        // manager knows they are up when the draft resumes.
+        if (!result.isDraftComplete && result.nextPickInfo) {
+          if (!result.isPaused) {
+            await offloadNextPickIfAutoPick(context.db, {
+              draftId,
+              leagueId: result.leagueId,
+              nextParticipantId: result.nextPickInfo.participantId,
+            });
+          }
+
+          await notifyOnTheClock(context.db, context.notificationPublisher, {
+            draftId,
+            leagueId: result.leagueId,
+            participantId: result.nextPickInfo.participantId,
+            round: result.nextPickInfo.round,
+            pickNumber: result.nextPickInfo.pickNumber,
+          });
         }
 
         // Auto-create all matchups when draft completes.

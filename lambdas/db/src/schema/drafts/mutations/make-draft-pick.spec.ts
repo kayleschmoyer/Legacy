@@ -93,6 +93,8 @@ function setupResolver(options: {
    * the LS-8107 offload path (deadline expiry + autoProcessDraftPicks nudge).
    */
   nextTeamAutoPick?: boolean;
+  /** Whether the seat making this pick has auto-pick on (LS-10593). */
+  pickingSeatAutoPick?: boolean;
   /**
    * Number of leading `context.db.transaction` invocations that should reject
    * with `transactionError` (default: a 57014 lock-wait timeout) before the
@@ -110,6 +112,9 @@ function setupResolver(options: {
 
   const mockNotifyDraftPickMade = jest.fn().mockResolvedValue(undefined);
   const mockTriggerAutoProcessDraftPicks = jest.fn();
+  const mockNotifyOnTheClock = jest.fn().mockResolvedValue([]);
+  const mockSetSeatAutoPickById = jest.fn().mockResolvedValue(undefined);
+  const mockNotificationPublisher = { publishToMany: jest.fn() };
 
   // The raw `drafts` row both phases read. Since LS-10074 it carries the
   // draft's own lifecycle status and kind — `leagues.draft_status` is no
@@ -287,9 +292,20 @@ function setupResolver(options: {
   // (LS-10076). Seats live in draft_participants and are read through this
   // module, which has its own coverage.
   jest.doMock('../participants', () => ({
-    getSeatById: jest
-      .fn()
-      .mockResolvedValue({ autoPick: options.nextTeamAutoPick ?? false }),
+    // Seat 55 is the one picking (LS-10593 auto-pick-off rule); any other
+    // seat is the one up next (LS-8107 offload).
+    getSeatById: jest.fn((_db: unknown, participantId: number) =>
+      Promise.resolve(
+        participantId === 55
+          ? {
+              id: 55,
+              userId: null,
+              autoPick: options.pickingSeatAutoPick ?? false,
+            }
+          : { id: participantId, autoPick: options.nextTeamAutoPick ?? false },
+      ),
+    ),
+    setSeatAutoPickById: mockSetSeatAutoPickById,
   }));
 
   // Settings come from the rules loader rather than a leagues SELECT
@@ -328,6 +344,11 @@ function setupResolver(options: {
 
   jest.doMock('../../../services/activity-log', () => ({
     logDraftPickActivity: jest.fn().mockResolvedValue(undefined),
+  }));
+
+  // LS-10593: the on-the-clock push helper has its own coverage.
+  jest.doMock('../on-the-clock-push', () => ({
+    notifyOnTheClock: mockNotifyOnTheClock,
   }));
 
   jest.doMock('../trigger-auto-process', () => ({
@@ -459,6 +480,7 @@ function setupResolver(options: {
       notifyDraftPickMade: mockNotifyDraftPickMade,
       notifyDraftCompleted: jest.fn().mockResolvedValue(undefined),
     },
+    notificationPublisher: mockNotificationPublisher,
   };
 
   require('./make-draft-pick');
@@ -475,6 +497,9 @@ function setupResolver(options: {
     mockCommitDraftPick,
     mockDb,
     idempotentPick,
+    mockNotifyOnTheClock,
+    mockNotificationPublisher,
+    mockSetSeatAutoPickById,
   };
 }
 
@@ -691,6 +716,66 @@ describe('makeDraftPick — keeper roster guard (LS-8674)', () => {
       extensions: { code: 'BAD_USER_INPUT' },
     });
     expect(mockCommitDraftPick).not.toHaveBeenCalled();
+  });
+});
+
+describe('makeDraftPick — on-the-clock push (LS-10593)', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('pushes the seat now on the clock after a new pick', async () => {
+    const { resolve, ctx, mockNotifyOnTheClock, mockNotificationPublisher } =
+      setupResolver({ existingOwnPick: null });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockNotifyOnTheClock).toHaveBeenCalledWith(
+      ctx.db,
+      mockNotificationPublisher,
+      { draftId: 1, leagueId: 10, participantId: 66, round: 1, pickNumber: 2 },
+    );
+  });
+
+  it('does not re-push for an idempotent re-submit', async () => {
+    const { resolve, ctx, mockNotifyOnTheClock } = setupResolver({});
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockNotifyOnTheClock).not.toHaveBeenCalled();
+  });
+});
+
+describe("makeDraftPick — a manager's own pick turns their auto-pick off (LS-10593)", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('turns off auto-pick when the seat owner picks manually', async () => {
+    const { resolve, ctx, mockSetSeatAutoPickById } = setupResolver({
+      existingOwnPick: null,
+      pickingSeatAutoPick: true,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockSetSeatAutoPickById).toHaveBeenCalledTimes(1);
+    expect(mockSetSeatAutoPickById).toHaveBeenCalledWith(
+      expect.anything(),
+      55,
+      false,
+    );
+  });
+
+  it('leaves auto-pick alone when it was already off', async () => {
+    const { resolve, ctx, mockSetSeatAutoPickById } = setupResolver({
+      existingOwnPick: null,
+      pickingSeatAutoPick: false,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockSetSeatAutoPickById).not.toHaveBeenCalled();
   });
 });
 

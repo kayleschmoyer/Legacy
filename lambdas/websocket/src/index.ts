@@ -13,6 +13,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import {
   ApiGatewayManagementApiClient,
+  DeleteConnectionCommand,
   PostToConnectionCommand,
 } from '@aws-sdk/client-apigatewaymanagementapi';
 import { verify } from 'jsonwebtoken';
@@ -80,18 +81,38 @@ function computeConnectionTtl(): number {
  * clients never call the server `updateContext` action (they disconnect and
  * reconnect instead), so ping is the only refresh signal the server
  * reliably receives from a client that never changes context.
+ *
+ * Conditional on the row still existing (LS-10593): an unconditional
+ * UpdateItem is an upsert, so a ping on a socket whose row was already
+ * deleted (stale-connection cleanup, TTL eviction) recreated a bare
+ * `{connectionId, ttl}` row with no draftId/leagueId. The client kept getting
+ * pongs — so it never reconnected — but matched no broadcast query, and
+ * silently stopped receiving draft updates.
+ *
+ * @returns `false` when the row no longer exists (nothing was written).
  */
-async function refreshConnectionTtl(connectionId: string): Promise<void> {
+async function refreshConnectionTtl(connectionId: string): Promise<boolean> {
   const ttl = computeConnectionTtl();
-  await dynamoClient.send(
-    new UpdateItemCommand({
-      TableName: connectionsTable,
-      Key: { connectionId: { S: connectionId } },
-      UpdateExpression: 'SET #ttl = :ttl',
-      ExpressionAttributeNames: { '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':ttl': { N: ttl.toString() } },
-    }),
-  );
+  try {
+    await dynamoClient.send(
+      new UpdateItemCommand({
+        TableName: connectionsTable,
+        Key: { connectionId: { S: connectionId } },
+        UpdateExpression: 'SET #ttl = :ttl',
+        ConditionExpression: 'attribute_exists(connectionId)',
+        ExpressionAttributeNames: { '#ttl': 'ttl' },
+        ExpressionAttributeValues: { ':ttl': { N: ttl.toString() } },
+      }),
+    );
+    return true;
+  } catch (error) {
+    if (
+      (error as { name?: string }).name === 'ConditionalCheckFailedException'
+    ) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -1345,14 +1366,37 @@ async function handleDefault(
       // Refresh the connections-table row TTL on every heartbeat so a long-lived
       // socket (e.g. a multi-hour draft) never gets TTL-evicted while still
       // open. Non-fatal: a refresh failure shouldn't block the pong ack.
+      let connectionRowExists = true;
       try {
-        await refreshConnectionTtl(connectionId);
+        connectionRowExists = await refreshConnectionTtl(connectionId);
       } catch (error) {
         LOGGER.warn(
           'Failed to refresh connection TTL on ping',
           toError(error),
           { connectionId },
         );
+      }
+
+      // LS-10593: the connection's row is gone, so no broadcast can reach
+      // this socket. Answering the ping would keep the client believing it
+      // is connected; close the socket server-side instead so the client's
+      // reconnect logic re-runs $connect and re-registers its draft/league.
+      if (!connectionRowExists) {
+        const endpoint = buildApiGatewayEndpoint(event);
+        try {
+          await new ApiGatewayManagementApiClient({ endpoint }).send(
+            new DeleteConnectionCommand({ ConnectionId: connectionId }),
+          );
+          LOGGER.info(
+            'Closed orphaned connection with no connections-table row',
+            { connectionId },
+          );
+        } catch (error) {
+          LOGGER.warn('Failed to close orphaned connection', toError(error), {
+            connectionId,
+          });
+        }
+        return { statusCode: 200, body: 'Connection reset' };
       }
 
       // Send pong response back to the client

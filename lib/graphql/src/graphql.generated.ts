@@ -2520,7 +2520,7 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
-  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. A missed pick is auto-picked for that pick only (auto-pick stays on permanently only for teams with no manager), and making a pick manually turns auto-pick off. */
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
@@ -3873,6 +3873,8 @@ export type Query = {
   getDraft?: Maybe<Draft>;
   /** Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478). */
   getDraftFootballPlayerStats?: Maybe<Array<DraftFootballPlayerStats>>;
+  /** Roster slot types (e.g. C, SS, SP) the caller's seat still has open — the positions getAvailableDraftPlayers filters to by default (openSlotsOnly). Empty when no filter applies (LS-10593). */
+  getDraftOpenSlotPositions?: Maybe<Array<Scalars['String']['output']>>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
   getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
@@ -4202,6 +4204,7 @@ export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  openSlotsOnly?: InputMaybe<Scalars['Boolean']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -4225,6 +4228,10 @@ export type QueryGetDirectMessagesArgs = {
 };
 
 export type QueryGetDraftArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftOpenSlotPositionsArgs = {
   draftId: Scalars['Int']['input'];
 };
 
@@ -13889,6 +13896,7 @@ export type GetAvailableDraftPlayersQueryVariables = Exact<{
   orderBy?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  openSlotsOnly?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetAvailableDraftPlayersQuery = {
@@ -14244,6 +14252,15 @@ export type SendDraftMessageMutation = {
     containsProfanity?: boolean | null;
     createdAt?: string | null;
   } | null;
+};
+
+export type GetDraftOpenSlotPositionsQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftOpenSlotPositionsQuery = {
+  __typename?: 'Query';
+  getDraftOpenSlotPositions?: Array<string> | null;
 };
 
 export type MakeSeasonDraftPickMutationVariables = Exact<{
@@ -34811,6 +34828,7 @@ export const GetAvailableDraftPlayers = gql`
     $orderBy: String
     $limit: Int
     $offset: Int
+    $openSlotsOnly: Boolean
   ) {
     getAvailableDraftPlayers(
       draftId: $draftId
@@ -34819,6 +34837,7 @@ export const GetAvailableDraftPlayers = gql`
       orderBy: $orderBy
       limit: $limit
       offset: $offset
+      openSlotsOnly: $openSlotsOnly
     ) {
       id
       firstName
@@ -34852,6 +34871,7 @@ export const GetAvailableDraftPlayers = gql`
  *      orderBy: // value for 'orderBy'
  *      limit: // value for 'limit'
  *      offset: // value for 'offset'
+ *      openSlotsOnly: // value for 'openSlotsOnly'
  *   },
  * });
  */
@@ -36134,6 +36154,94 @@ export type SendDraftMessageMutationResult =
 export type SendDraftMessageMutationOptions = BaseMutationOptions<
   SendDraftMessageMutation,
   SendDraftMessageMutationVariables
+>;
+export const GetDraftOpenSlotPositions = gql`
+  query GetDraftOpenSlotPositions($draftId: Int!) {
+    getDraftOpenSlotPositions(draftId: $draftId)
+  }
+`;
+
+/**
+ * __useGetDraftOpenSlotPositionsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftOpenSlotPositionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftOpenSlotPositionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftOpenSlotPositionsQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetDraftOpenSlotPositionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftOpenSlotPositionsQuery,
+    GetDraftOpenSlotPositionsQueryVariables
+  > &
+    (
+      | { variables: GetDraftOpenSlotPositionsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftOpenSlotPositionsQuery,
+    GetDraftOpenSlotPositionsQueryVariables
+  >(GetDraftOpenSlotPositions, options);
+}
+export function useGetDraftOpenSlotPositionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftOpenSlotPositionsQuery,
+    GetDraftOpenSlotPositionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftOpenSlotPositionsQuery,
+    GetDraftOpenSlotPositionsQueryVariables
+  >(GetDraftOpenSlotPositions, options);
+}
+export function useGetDraftOpenSlotPositionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftOpenSlotPositionsQuery,
+        GetDraftOpenSlotPositionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftOpenSlotPositionsQuery,
+    GetDraftOpenSlotPositionsQueryVariables
+  >(
+    GetDraftOpenSlotPositions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftOpenSlotPositionsQuery,
+          GetDraftOpenSlotPositionsQueryVariables
+        >,
+  );
+}
+export type GetDraftOpenSlotPositionsQueryHookResult = ReturnType<
+  typeof useGetDraftOpenSlotPositionsQuery
+>;
+export type GetDraftOpenSlotPositionsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftOpenSlotPositionsLazyQuery
+>;
+export type GetDraftOpenSlotPositionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftOpenSlotPositionsSuspenseQuery
+>;
+export type GetDraftOpenSlotPositionsQueryResult = Apollo.QueryResult<
+  GetDraftOpenSlotPositionsQuery,
+  GetDraftOpenSlotPositionsQueryVariables
 >;
 export const MakeSeasonDraftPick = gql`
   mutation MakeSeasonDraftPick(

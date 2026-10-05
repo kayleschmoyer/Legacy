@@ -377,20 +377,17 @@ export function SpectatorScreen({
   return (
     <YStack flex={1} backgroundColor="$background">
       {/* ---- Slim top band ---- */}
+      {/* Only the one-line clock row stays pinned; the board, depth chart and
+          recent picks scroll together below it. A pinned board made the header
+          eat ~half the screen and cut off the depth chart (LS-10593). */}
       <YStack
         paddingHorizontal="$3"
-        paddingTop={10}
-        paddingBottom={11}
+        paddingVertical={6}
         borderBottomWidth={1}
         backgroundColor="$surfacePanel"
         borderBottomColor="$outlineSubtle"
       >
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          gap="$3"
-          marginBottom={8}
-        >
+        <XStack justifyContent="space-between" alignItems="center" gap="$3">
           <YStack flex={1} minWidth={0}>
             <Eyebrow color={draftPaused ? '$fg4' : '$brandGoldLight'}>
               {draftPaused
@@ -413,25 +410,35 @@ export function SpectatorScreen({
             </Text>
           </YStack>
           <DraftClockRing
+            size={44}
             secondsRemaining={timeRemaining}
             totalSeconds={pickTimeLimitSeconds}
             emphasize={false}
             paused={draftPaused}
           />
         </XStack>
-
-        <DraftMiniBoard
-          teams={boardTeams}
-          picks={data.pickHistory}
-          currentPickInfo={data.currentPickInfo}
-          myTeamId={null}
-          statsLookup={data.statsLookup}
-          rounds={boardRounds}
-        />
       </YStack>
 
       <ScrollView flex={1}>
         <YStack padding="$3" gap="$3">
+          {/* ---- Draft board ---- */}
+          <YStack
+            backgroundColor="$surfacePanel"
+            borderWidth={1}
+            borderColor="$surfacePanelBorder"
+            borderRadius={12}
+            padding="$2"
+          >
+            <DraftMiniBoard
+              teams={boardTeams}
+              picks={data.pickHistory}
+              currentPickInfo={data.currentPickInfo}
+              myTeamId={null}
+              statsLookup={data.statsLookup}
+              rounds={boardRounds}
+            />
+          </YStack>
+
           {/* ---- On-the-clock depth chart ---- */}
           <YStack
             backgroundColor="$surfacePanel"

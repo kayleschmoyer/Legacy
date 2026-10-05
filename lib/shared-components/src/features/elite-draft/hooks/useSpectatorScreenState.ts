@@ -34,7 +34,11 @@ export function useSpectatorScreenState({
   const { user, token: authToken } = useAuth();
   const isAuthenticated = !!user;
 
-  const data = useSpectatorDraftData({ leagueId });
+  // Players drafted over the live socket, fed straight into the highlight
+  // video lookup so a splash isn't waiting on the debounced pick-history
+  // refetch before its video query can even start (LS-10593).
+  const [livePlayerIds, setLivePlayerIds] = useState<number[]>([]);
+  const data = useSpectatorDraftData({ leagueId, livePlayerIds });
 
   const [draftComplete, setDraftComplete] = useState(false);
   const [draftPaused, setDraftPaused] = useState(false);
@@ -59,6 +63,9 @@ export function useSpectatorScreenState({
       auto: boolean,
       teamName: string,
     ) => {
+      setLivePlayerIds((prev) =>
+        prev.includes(player.id) ? prev : [...prev, player.id],
+      );
       enqueue({
         player,
         overallPick: pickNumber,

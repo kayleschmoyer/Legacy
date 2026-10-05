@@ -8,7 +8,7 @@
  * from the draft's own `draft_messages` rather than league chat.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useMatch, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client/react';
 import {
@@ -26,6 +26,7 @@ import {
 import type { DraftChatTabRenderProps } from '@legacy-sports/shared-components/elite-draft';
 
 import { env } from '../config/environment';
+import { useDraftChatUnread } from '../hooks/useDraftChatUnread';
 import { downloadCsvFile } from '../utils/draftPacketDownload';
 
 /** The draft's own chat, in the shape `DraftChatTab` renders. */
@@ -33,6 +34,7 @@ function DraftChatConnector({
   draftId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps & { draftId: number }): React.JSX.Element {
   const { data, loading, refetch } = useQuery<
     GetDraftMessagesQuery,
@@ -47,18 +49,23 @@ function DraftChatConnector({
   >(SEND_DRAFT_MESSAGE);
 
   const messages = data?.draftMessages ?? [];
-  // null until the first sync, so loading history never counts as "new".
-  const prevCountRef = useRef<number | null>(null);
+  const chatMessages = messages.map((m) => ({
+    id: m.id ?? 0,
+    userId: m.userId ?? 0,
+    username: m.user?.username ?? 'Manager',
+    messageText: m.messageText ?? '',
+  }));
 
-  useEffect(() => {
-    if (
-      prevCountRef.current !== null &&
-      messages.length > prevCountRef.current
-    ) {
-      onNewMessage();
-    }
-    prevCountRef.current = messages.length;
-  }, [messages.length, onNewMessage]);
+  // Persisted last-read id per mock draft instead of a per-mount message
+  // count, so the history load never re-raises the unread dot on re-entry
+  // (LS-10593).
+  useDraftChatUnread({
+    storageKey: `draft-${draftId}`,
+    messages: chatMessages,
+    currentUserId: userId,
+    chatOpen,
+    onNewMessage,
+  });
 
   const handleSend = useCallback(
     async (messageText: string) => {
@@ -73,12 +80,7 @@ function DraftChatConnector({
       currentUserId={userId}
       loading={loading}
       sending={sending}
-      messages={messages.map((m) => ({
-        id: m.id ?? 0,
-        userId: m.userId ?? 0,
-        username: m.user?.username ?? 'Manager',
-        messageText: m.messageText ?? '',
-      }))}
+      messages={chatMessages}
       onSend={(text) => void handleSend(text)}
     />
   );

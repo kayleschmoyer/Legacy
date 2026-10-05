@@ -369,6 +369,68 @@ builder.queryField('getDraftPicks', (t) =>
  * Returns all players not yet picked in this draft, optionally
  * filtered by a name search term. Respects the league's player pool setting.
  */
+/**
+ * The caller's open-roster-slot board filter (LS-8065): the slot types their
+ * seat still has to fill, and the stat positions that can fill them. An empty
+ * `eligibleStatPositions` means no filter applies (all slots filled, no slot
+ * requirements, or only unrecognized slot types — the safe failure mode).
+ */
+async function resolveOpenSlotFilter(
+  db: PublicDb,
+  draftId: number,
+  participantId: number,
+  rules: Awaited<ReturnType<typeof loadDraftRules>>,
+): Promise<{
+  unfilledPositionTypes: string[];
+  eligibleStatPositions: string[];
+}> {
+  const unfilledPositionTypes = await getUnfilledPositionTypes(
+    db,
+    draftId,
+    participantId,
+    rules,
+  );
+  const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
+    unfilledPositionTypes,
+    rules.sport,
+  );
+  return { unfilledPositionTypes, eligibleStatPositions };
+}
+
+/**
+ * The roster slot types getAvailableDraftPlayers' default open-slots filter
+ * is currently narrowing the caller's board to (LS-10593), so the client can
+ * explain the filter ("Showing players for: C, SS, SP") and offer a toggle.
+ * Empty when no filter applies — the caller holds no seat, every slot is
+ * filled, or the draft defines no slot requirements.
+ */
+builder.queryField('getDraftOpenSlotPositions', (t) =>
+  t.field({
+    type: ['String'],
+    args: {
+      draftId: t.arg.int({ required: true }),
+    },
+    description:
+      "Roster slot types (e.g. C, SS, SP) the caller's seat still has open — the positions getAvailableDraftPlayers filters to by default (openSlotsOnly). Empty when no filter applies (LS-10593).",
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+      const { seat } = await authorizeDraft(
+        context,
+        args.draftId,
+        'participate',
+      );
+      if (!seat) return [];
+
+      const rules = await loadDraftRules(context.db, args.draftId);
+      const { unfilledPositionTypes, eligibleStatPositions } =
+        await resolveOpenSlotFilter(context.db, args.draftId, seat.id, rules);
+      return eligibleStatPositions.length > 0 ? unfilledPositionTypes : [];
+    },
+  }),
+);
+
 builder.queryField('getAvailableDraftPlayers', (t) =>
   t.field({
     type: [DraftPlayer],
@@ -379,6 +441,12 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       orderBy: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
       offset: t.arg.int({ required: false }),
+      openSlotsOnly: t.arg.boolean({
+        required: false,
+        defaultValue: true,
+        description:
+          "When true (the default), list only players who can fill one of the caller's still-open roster slots (LS-8065). Pass false to list every eligible player; getDraftOpenSlotPositions reports which slots the default filter applies (LS-10593).",
+      }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -392,6 +460,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         orderBy,
         limit: resultLimit,
         offset: resultOffset,
+        openSlotsOnly,
       } = args;
 
       // Verify the caller may draft here, and capture their seat/team so the
@@ -515,16 +584,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Both helpers are sport-aware (LS-9479) — football reads
       // football_player_eligible_positions and ALLOWED_POSITIONS_BY_SPORT.football
       // instead of the baseball-only equivalents, matching the EXISTS clause below.
-      if (seat) {
-        const unfilledPositionTypes = await getUnfilledPositionTypes(
+      //
+      // The filter is opt-out via `openSlotsOnly: false` (LS-10593) — it used
+      // to be invisible and unconditional, so a manager could not tell why
+      // players were missing from the board.
+      if (seat && openSlotsOnly !== false) {
+        const { eligibleStatPositions } = await resolveOpenSlotFilter(
           context.db,
           draftId,
           seat.id,
           rules,
-        );
-        const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
-          unfilledPositionTypes,
-          leagueSport,
         );
         if (eligibleStatPositions.length > 0) {
           const positionValues = sql.join(

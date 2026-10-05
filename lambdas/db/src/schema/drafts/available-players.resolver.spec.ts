@@ -33,9 +33,9 @@ const SEAT_ID = 900;
  */
 let currentLeague: Record<string, unknown> = {};
 
-async function captureResolver(): Promise<
-  (...args: unknown[]) => Promise<unknown>
-> {
+async function captureResolver(
+  fieldName = 'getAvailableDraftPlayers',
+): Promise<(...args: unknown[]) => Promise<unknown>> {
   jest.resetModules();
   const captured: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
 
@@ -170,9 +170,8 @@ async function captureResolver(): Promise<
   }));
 
   await import('./queries');
-  const resolve = captured.getAvailableDraftPlayers;
-  if (!resolve)
-    throw new Error('getAvailableDraftPlayers resolver was not captured');
+  const resolve = captured[fieldName];
+  if (!resolve) throw new Error(`${fieldName} resolver was not captured`);
   return resolve;
 }
 
@@ -347,6 +346,90 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
  * of its own, so the board query itself has to scope the pool to the league's
  * sport or a football draft lists every MLB player as draftable.
  */
+describe('open-slots filter is optional and explainable (LS-10593)', () => {
+  beforeEach(() => {
+    getUnfilledPositionTypes.mockReset();
+    eligibleStatPositionsForUnfilledSlots.mockReset();
+    verifyLeagueMembership.mockReset();
+  });
+
+  it('skips the open-slot filter when openSlotsOnly is false', async () => {
+    const resolve = await captureResolver();
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue(['SP']);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue(['SP', 'P']);
+    const db = makeDb();
+
+    await resolve(
+      {},
+      { draftId: 100, openSlotsOnly: false },
+      { user: { id: 7 }, db },
+    );
+
+    expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
+    const { sql: text } = serializeExecutedQuery(db);
+    expect(text).not.toContain('player_eligible_positions');
+  });
+
+  it('still applies the filter when openSlotsOnly is true', async () => {
+    const resolve = await captureResolver();
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue(['SP']);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue(['SP', 'P']);
+    const db = makeDb();
+
+    await resolve(
+      {},
+      { draftId: 100, openSlotsOnly: true },
+      { user: { id: 7 }, db },
+    );
+
+    const { sql: text } = serializeExecutedQuery(db);
+    expect(text).toContain('player_eligible_positions');
+  });
+
+  it("getDraftOpenSlotPositions reports the caller's open slot types", async () => {
+    const resolve = await captureResolver('getDraftOpenSlotPositions');
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue(['C', 'SP']);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue(['C', 'SP', 'P']);
+    const db = makeDb();
+
+    await expect(
+      resolve({}, { draftId: 100 }, { user: { id: 7 }, db }),
+    ).resolves.toEqual(['C', 'SP']);
+    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+      db,
+      100,
+      SEAT_ID,
+      expect.objectContaining({ sport: 'baseball' }),
+    );
+  });
+
+  it('getDraftOpenSlotPositions is empty when no filter applies', async () => {
+    const resolve = await captureResolver('getDraftOpenSlotPositions');
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue(['XX']);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
+    const db = makeDb();
+
+    await expect(
+      resolve({}, { draftId: 100 }, { user: { id: 7 }, db }),
+    ).resolves.toEqual([]);
+  });
+
+  it('getDraftOpenSlotPositions is empty for a caller with no seat', async () => {
+    const resolve = await captureResolver('getDraftOpenSlotPositions');
+    verifyLeagueMembership.mockResolvedValue({ teamId: null });
+    const db = makeDb();
+
+    await expect(
+      resolve({}, { draftId: 100 }, { user: { id: 7 }, db }),
+    ).resolves.toEqual([]);
+    expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
+  });
+});
+
 describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () => {
   const FOOTBALL_LEAGUE = { ...LEAGUE_ROW, sport: 'football' };
 

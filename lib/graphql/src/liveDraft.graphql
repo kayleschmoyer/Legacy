@@ -325,6 +325,7 @@ query GetAvailableDraftPlayers(
   $orderBy: String
   $limit: Int
   $offset: Int
+  $openSlotsOnly: Boolean
 ) {
   getAvailableDraftPlayers(
     draftId: $draftId
@@ -333,6 +334,7 @@ query GetAvailableDraftPlayers(
     orderBy: $orderBy
     limit: $limit
     offset: $offset
+    openSlotsOnly: $openSlotsOnly
   ) {
     id
     firstName
@@ -625,4 +627,10 @@ mutation SendDraftMessage(
     containsProfanity
     createdAt
   }
+}
+
+# LS-10593: the roster slot types getAvailableDraftPlayers' default
+# open-slots filter narrows the caller's board to (empty when none applies).
+query GetDraftOpenSlotPositions($draftId: Int!) {
+  getDraftOpenSlotPositions(draftId: $draftId)
 }

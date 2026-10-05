@@ -70,6 +70,7 @@ import {
   WHITE,
   withAlpha,
 } from '../../utils/colors';
+import { isDraftPaused, isDraftRoomReachable } from '../../utils/draftStatus';
 
 // Re-export the shared display-name formatter so app wrappers can reuse it.
 export { formatDisplayName } from './homeSummaryFormatters';
@@ -125,6 +126,12 @@ export interface HomeScreenProps {
   onViewLeague: (summary: HomeLeagueSummary) => void;
   onSetLineup?: (summary: HomeLeagueSummary) => void;
   onMockDraft?: (summary: HomeLeagueSummary) => void;
+  /**
+   * Opens the league's live draft room. When supplied, the hero league card
+   * shows a "Join Draft" CTA (or "Return to Draft" while paused) whenever the
+   * league's draft room is reachable (LS-10593).
+   */
+  onJoinDraft?: (summary: HomeLeagueSummary) => void;
   onCreateLeague: (sportKey: 'baseball' | 'football') => void;
   onJoinLeague: () => void;
   onBrowseStats: () => void;
@@ -337,7 +344,21 @@ function TicketButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      // The ticket card is itself pressable (opens the league) — stop the
+      // event here so an action button never also fires the card's handler
+      // (LS-10593), same as `PlayboardButton`.
+      onPress={(e: GestureResponderEvent) => {
+        e.stopPropagation?.();
+        onPress?.();
+      }}
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onPress?.();
+        }
+      }}
       cursor="pointer"
       minHeight={44}
       paddingVertical={12}
@@ -770,15 +791,26 @@ function TicketHeroScoreZone({
 
 /* ─── Hero league card ─── */
 
+/** Hero "join draft" CTA copy — paused drafts read as a return, matching the
+ *  league Overview's join-draft banner (LS-8843). */
+function joinDraftLabel(summary: HomeLeagueSummary): string {
+  return isDraftPaused(summary.draftStatus) ? 'Return to Draft' : 'Join Draft';
+}
+
 function LeagueHeroCard({
   summary,
   onPress,
   onSetLineup,
+  onJoinDraft,
 }: {
   summary: HomeLeagueSummary;
   onPress: () => void;
   onSetLineup?: () => void;
+  /** Opens the league's live draft room; the CTA renders only while the draft room is reachable. */
+  onJoinDraft?: () => void;
 }) {
+  const showJoinDraft =
+    onJoinDraft != null && isDraftRoomReachable(summary.draftStatus);
   const eraDesc = formatEraDescriptor(summary);
   const stubLabel =
     summary.currentWeekNumber != null
@@ -908,13 +940,22 @@ function LeagueHeroCard({
                 flexWrap="wrap"
                 $sm={{ marginTop: 14 }}
               >
+                {showJoinDraft ? (
+                  <TicketButton
+                    label={joinDraftLabel(summary)}
+                    variant="solid"
+                    onPress={onJoinDraft}
+                    testID="home-hero-join-draft"
+                  />
+                ) : null}
                 <TicketButton
                   label="View League"
-                  variant="solid"
+                  variant={showJoinDraft ? 'outline' : 'solid'}
                   onPress={onPress}
                   testID="home-hero-view-league"
                 />
-                {onSetLineup ? (
+                {/* No lineup to set mid-draft — the draft CTA takes its slot. */}
+                {onSetLineup && !showJoinDraft ? (
                   <TicketButton
                     label="Set Lineup"
                     variant="outline"
@@ -1419,11 +1460,16 @@ function PlayboardHeroCard({
   summary,
   onPress,
   onSetLineup,
+  onJoinDraft,
 }: {
   summary: HomeLeagueSummary;
   onPress: () => void;
   onSetLineup?: () => void;
+  /** Opens the league's live draft room; the CTA renders only while the draft room is reachable. */
+  onJoinDraft?: () => void;
 }) {
+  const showJoinDraft =
+    onJoinDraft != null && isDraftRoomReachable(summary.draftStatus);
   const isDraftLive = summary.draftStatus === 'in-progress';
   const hasMatchup =
     summary.matchupId != null && summary.matchupStatus === 'in_progress';
@@ -1639,13 +1685,23 @@ function PlayboardHeroCard({
               flexDirection={compactActions ? 'column' : 'row'}
               flexWrap="wrap"
             >
-              <PlayboardButton
-                label="Set Lineup"
-                variant="solid"
-                onPress={onSetLineup}
-                testID="home-playboard-set-lineup"
-                fullWidth={compactActions}
-              />
+              {showJoinDraft ? (
+                <PlayboardButton
+                  label={joinDraftLabel(summary)}
+                  variant="solid"
+                  onPress={onJoinDraft}
+                  testID="home-playboard-join-draft"
+                  fullWidth={compactActions}
+                />
+              ) : (
+                <PlayboardButton
+                  label="Set Lineup"
+                  variant="solid"
+                  onPress={onSetLineup}
+                  testID="home-playboard-set-lineup"
+                  fullWidth={compactActions}
+                />
+              )}
               <PlayboardButton
                 label="View League"
                 variant="outline"
@@ -2870,6 +2926,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onViewLeague,
     onSetLineup,
     onMockDraft,
+    onJoinDraft,
     onCreateLeague,
     onJoinLeague,
     onBrowseStats,
@@ -3073,6 +3130,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   onSetLineup={
                     onSetLineup ? () => onSetLineup(heroLeague) : undefined
                   }
+                  onJoinDraft={
+                    onJoinDraft ? () => onJoinDraft(heroLeague) : undefined
+                  }
                 />
               ) : (
                 <LeagueHeroCard
@@ -3080,6 +3140,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   onPress={() => onViewLeague(heroLeague)}
                   onSetLineup={
                     onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                  }
+                  onJoinDraft={
+                    onJoinDraft ? () => onJoinDraft(heroLeague) : undefined
                   }
                 />
               )}
@@ -3221,6 +3284,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     onSetLineup={
                       onSetLineup ? () => onSetLineup(heroLeague) : undefined
                     }
+                    onJoinDraft={
+                      onJoinDraft ? () => onJoinDraft(heroLeague) : undefined
+                    }
                   />
                 ) : (
                   <LeagueHeroCard
@@ -3228,6 +3294,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     onPress={() => onViewLeague(heroLeague)}
                     onSetLineup={
                       onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                    }
+                    onJoinDraft={
+                      onJoinDraft ? () => onJoinDraft(heroLeague) : undefined
                     }
                   />
                 )}

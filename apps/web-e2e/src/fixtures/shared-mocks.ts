@@ -453,6 +453,14 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   getleaguehistory: { data: { getLeagueHistory: [] } },
   getalltimerecords: { data: { getAllTimeRecords: [] } },
 
+  // ── Live draft room / spectator (LS-10593) ─────────────────────────
+  // The draft room reads which open roster-slot positions the server is
+  // narrowing the player list to; empty = no filter banner (the pre-LS-10593
+  // UI). The spectator splash now looks up highlight videos for live socket
+  // picks immediately; empty falls back to the stat graphic.
+  getdraftopenslotpositions: { data: { getDraftOpenSlotPositions: [] } },
+  gethighlightvideos: { data: { highlightVideosByPlayerIds: [] } },
+
   // ── Minigames hub (MinigamesHub, mounts on /games) ─────────────────
   // GetSeasonDraftGames, GetDisclosureGameBestScore and GetMinigamesStats
   // fire from MinigamesHub (lib/shared-components/src/features/minigames-hub/

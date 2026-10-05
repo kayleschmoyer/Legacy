@@ -88,6 +88,14 @@ function loadYouTubeIframeApi(): Promise<YTNamespace> {
   return iframeApiPromise;
 }
 
+/**
+ * Warm the IFrame Player API ahead of the first pick splash so its cold
+ * script load doesn't eat the first-frame timeout (LS-10593).
+ */
+export function preloadYouTubeIframeApi(): void {
+  void loadYouTubeIframeApi();
+}
+
 export interface PickSplashHighlightVideoProps {
   /** Validated cached video for the drafted player — null uses the fallback tier. */
   video: HighlightVideoSummary | null;

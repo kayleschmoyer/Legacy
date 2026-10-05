@@ -30,6 +30,7 @@ async function captureGetDraftRecommendationsResolver(): Promise<
           arg: {
             int: () => ({}),
             string: () => ({}),
+            boolean: () => ({}),
           },
         });
       }),

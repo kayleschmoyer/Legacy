@@ -7,6 +7,7 @@ import {
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
   GetDraftFootballPlayerStats as GET_DRAFT_FOOTBALL_PLAYER_STATS,
+  GetDraftOpenSlotPositions as GET_DRAFT_OPEN_SLOT_POSITIONS,
   GetDraftPicks as GET_DRAFT_PICKS,
   GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
@@ -23,6 +24,8 @@ import {
   type GetCurrentDraftPickQuery,
   type GetCurrentDraftPickQueryVariables,
   type GetDraftFootballPlayerStatsQuery,
+  type GetDraftOpenSlotPositionsQuery,
+  type GetDraftOpenSlotPositionsQueryVariables,
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
   type GetDraftPitchingStatsQuery,
@@ -67,6 +70,8 @@ interface UseDraftQueriesParams {
   draftId?: number | null;
   playerSearch: string;
   selectedPosition: string;
+  /** Lift the server's default open-roster-slot filter (LS-10593). */
+  showAllPositions?: boolean;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
   /** True on the compact/native draft board, which always renders the Board
    * tab (DraftRoundBoard, LS-10000; previously DraftBoardGrid) regardless of
@@ -79,6 +84,7 @@ export function useDraftQueries({
   draftId: roomDraftId = null,
   playerSearch,
   selectedPosition,
+  showAllPositions = false,
   viewMode,
   isCompact = false,
 }: UseDraftQueriesParams) {
@@ -416,6 +422,7 @@ export function useDraftQueries({
       position: selectedPosition !== 'ALL' ? selectedPosition : null,
       orderBy: playerSortOrderBy,
       limit: PLAYER_PAGE_SIZE,
+      openSlotsOnly: !showAllPositions,
     },
     skip: !draftId || isAuctionDraft,
     errorPolicy: 'all',
@@ -427,6 +434,8 @@ export function useDraftQueries({
   >([]);
   const [hasMorePlayers, setHasMorePlayers] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Bumped to invalidate an in-flight load-more (see the effect below).
+  const loadMoreRequestKeyRef = useRef(0);
 
   useEffect(() => {
     // While a filter/search-driven refetch is in flight, Apollo clears `data`
@@ -434,6 +443,12 @@ export function useDraftQueries({
     // the prior player list instead of collapsing to an empty grid.
     const source = availablePlayersData ?? previousAvailablePlayersData;
     const items = source?.getAvailableDraftPlayers ?? [];
+    // A fresh first page (e.g. the post-pick refetch) invalidates any
+    // load-more still in flight: its offset was computed against the old
+    // list, and appending it produced duplicate rows/keys and a jumping list
+    // while searching mid-pick (LS-10593).
+    loadMoreRequestKeyRef.current++;
+    setLoadingMore(false);
     setAllRawPlayers(items);
     setHasMorePlayers(items.length === PLAYER_PAGE_SIZE);
   }, [availablePlayersData, previousAvailablePlayersData]);
@@ -698,7 +713,6 @@ export function useDraftQueries({
   );
 
   // ---- Load More Players ----
-  const loadMoreRequestKeyRef = useRef(0);
 
   const handleLoadMorePlayers = useCallback(async () => {
     if (loadingMore || !draftId) return;
@@ -717,12 +731,16 @@ export function useDraftQueries({
           orderBy: playerSortOrderBy,
           limit: PLAYER_PAGE_SIZE,
           offset: allRawPlayers.length,
+          openSlotsOnly: !showAllPositions,
         },
         fetchPolicy: 'network-only',
       });
       if (requestKey !== loadMoreRequestKeyRef.current) return;
       const newItems = result.data?.getAvailableDraftPlayers ?? [];
-      setAllRawPlayers((prev) => [...prev, ...newItems]);
+      setAllRawPlayers((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...newItems.filter((p) => !seen.has(p.id))];
+      });
       setHasMorePlayers(newItems.length === PLAYER_PAGE_SIZE);
     } catch (err) {
       if (requestKey !== loadMoreRequestKeyRef.current) return;
@@ -741,9 +759,32 @@ export function useDraftQueries({
     client,
     playerSearch,
     selectedPosition,
+    showAllPositions,
     playerSortOrderBy,
     allRawPlayers.length,
   ]);
+
+  // Which open roster-slot positions the server is narrowing the board to,
+  // so the UI can say so (LS-10593). Empty = no filter applied.
+  const { data: openSlotPositionsData, refetch: refetchOpenSlotPositions } =
+    useQuery<
+      GetDraftOpenSlotPositionsQuery,
+      GetDraftOpenSlotPositionsQueryVariables
+    >(GET_DRAFT_OPEN_SLOT_POSITIONS, {
+      variables: { draftId: draftId ?? 0 },
+      skip: !draftId || isAuctionDraft,
+      errorPolicy: 'all',
+    });
+  const openSlotPositions = useMemo(
+    () => openSlotPositionsData?.getDraftOpenSlotPositions ?? [],
+    [openSlotPositionsData],
+  );
+  // A pick (ours) can fill a slot — refresh the applied filter with history.
+  const pickCount = pickHistory.length;
+  useEffect(() => {
+    if (!draftId || isAuctionDraft || pickCount === 0) return;
+    void refetchOpenSlotPositions();
+  }, [pickCount, draftId, isAuctionDraft, refetchOpenSlotPositions]);
 
   return {
     // Room (LS-10076) — present only in draft-room mode.
@@ -793,6 +834,8 @@ export function useDraftQueries({
     availablePlayers,
     availablePlayersData,
     availablePlayersLoading,
+    openSlotPositions,
+    refetchOpenSlotPositions,
     availablePlayersError,
     refetchAvailablePlayers,
     hasMorePlayers,

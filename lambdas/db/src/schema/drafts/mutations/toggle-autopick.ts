@@ -62,9 +62,11 @@ async function resolveLeagueSeat(
  *   - If the draft is in-progress and it is currently this team's turn, the
  *     deadline is immediately expired so autoProcessDraftPicks fires ASAP.
  *
- * When a team misses a pick (deadline expires), auto-pick is automatically
- * enabled for them — this mutation also allows manually re-enabling it or
- * turning it back off before the next pick.
+ * A missed pick (deadline expires) is auto-picked for that one pick only;
+ * auto-pick is switched on permanently just for teams with no manager
+ * (autoProcessDraftPicks → enableAutoPickForUnmanagedTeams). A managed team
+ * keeps its setting, and a manual pick by the seat's own manager turns
+ * auto-pick back off (LS-10593).
  *
  * Auth: authenticated user who owns the relevant team in this draft.
  */
@@ -76,7 +78,7 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
       enable: t.arg.boolean({ required: true }),
     },
     description:
-      "Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick.",
+      "Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. A missed pick is auto-picked for that pick only (auto-pick stays on permanently only for teams with no manager), and making a pick manually turns auto-pick off.",
     resolve: async (_parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required to toggle auto-pick');

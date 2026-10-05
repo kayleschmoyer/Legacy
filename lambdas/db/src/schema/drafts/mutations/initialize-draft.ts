@@ -18,6 +18,7 @@ import {
 } from '../helpers';
 import { setLeagueDraftStatus } from '../draft-status';
 import { reseatLeagueDraft } from '../participants';
+import { notifyDraftStartPushes } from '../on-the-clock-push';
 import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
 import { applyKeeperDesignationsForDraft } from '../keeper-application';
 import {
@@ -390,6 +391,14 @@ builder.mutationField('initializeDraft', (t) =>
               initialDeadline.toISOString(),
             );
           }
+
+          // LS-10593: push the first-pick holder (on the clock) and every other
+          // league member (draft started). Never throws.
+          await notifyDraftStartPushes(
+            context.db,
+            context.notificationPublisher,
+            { draftId: draft.id, leagueId },
+          );
         } else {
           // Automated draft: send the SQS message FIRST, then mark draftStatus
           // as 'queued'. Previously the status was set inside the transaction

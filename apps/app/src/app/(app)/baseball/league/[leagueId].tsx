@@ -88,12 +88,19 @@ function LeagueWSPageHandler({
   onRosterUpdate,
   onTradeOffer,
   onDraftCompleted,
+  onDraftStatusChanged,
 }: {
   onRosterUpdate: () => void;
   onTradeOffer: () => void;
   onDraftCompleted: () => void;
+  onDraftStatusChanged: () => void;
 }) {
-  useLeagueWebSocket({ onRosterUpdate, onTradeOffer, onDraftCompleted });
+  useLeagueWebSocket({
+    onRosterUpdate,
+    onTradeOffer,
+    onDraftCompleted,
+    onDraftStatusChanged,
+  });
   return null;
 }
 
@@ -661,7 +668,14 @@ export default function LeagueId(): React.JSX.Element {
           tradeRefetchRef.current?.();
         }}
         onDraftCompleted={() => {
+          // LS-10593: refetch so the draft banner / status reflect completion.
+          void refetchLeague();
           Alert.alert('Draft Complete', 'The draft has finished!');
+        }}
+        onDraftStatusChanged={() => {
+          // LS-10593: draft started / paused / resumed — refetch draftStatus
+          // so the "Join draft" banner appears without a manual refresh.
+          void refetchLeague();
         }}
       />
       <LeagueDetailShell

@@ -21,6 +21,10 @@
  */
 import React, { useId, useState } from 'react';
 
+import {
+  OPEN_SLOTS_EMPTY_MESSAGE,
+  OPEN_SLOTS_EMPTY_SEARCH_MESSAGE,
+} from './openSlotsCopy';
 import type { DraftPlayer } from './types';
 import type { DockRowColumns } from './draftDock';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
@@ -178,8 +182,8 @@ export function DraftPlayerDock({
             {players.length === 0 && !loading && (
               <div className="d-dock-empty">
                 {searchTerm
-                  ? 'No players match your search'
-                  : 'All available players have been drafted'}
+                  ? OPEN_SLOTS_EMPTY_SEARCH_MESSAGE
+                  : OPEN_SLOTS_EMPTY_MESSAGE}
               </div>
             )}
             {hasMore && !loading && players.length > 0 && (

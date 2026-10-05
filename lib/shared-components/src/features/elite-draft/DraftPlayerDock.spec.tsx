@@ -221,6 +221,8 @@ describe('DraftPlayerDock — rows (LS-10005 AC3)', () => {
     const { getByText } = render(
       <DraftPlayerDock {...makeProps({ players: [], searchTerm: 'zzz' })} />,
     );
-    expect(getByText('No players match your search')).toBeTruthy();
+    expect(
+      getByText('No players match your search in your open roster spots'),
+    ).toBeTruthy();
   });
 });

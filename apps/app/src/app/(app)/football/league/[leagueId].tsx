@@ -83,17 +83,20 @@ function LeagueWSPageHandler({
   onRosterUpdate,
   onTradeOffer,
   onDraftCompleted,
+  onDraftStatusChanged,
   onMatchupScoreUpdate,
 }: {
   onRosterUpdate: () => void;
   onTradeOffer: () => void;
   onDraftCompleted: () => void;
+  onDraftStatusChanged: () => void;
   onMatchupScoreUpdate: () => void;
 }) {
   useLeagueWebSocket({
     onRosterUpdate,
     onTradeOffer,
     onDraftCompleted,
+    onDraftStatusChanged,
     onMatchupScoreUpdated: onMatchupScoreUpdate,
   });
   return null;
@@ -649,7 +652,14 @@ export default function FootballLeagueId(): React.JSX.Element {
           tradeRefetchRef.current?.();
         }}
         onDraftCompleted={() => {
+          // LS-10593: refetch so the draft banner / status reflect completion.
+          void refetchLeague();
           Alert.alert('Draft Complete', 'The draft has finished!');
+        }}
+        onDraftStatusChanged={() => {
+          // LS-10593: draft started / paused / resumed — refetch draftStatus
+          // so the "Join draft" banner appears without a manual refresh.
+          void refetchLeague();
         }}
         onMatchupScoreUpdate={() => {
           if (isPremium) void refetchMatchups();

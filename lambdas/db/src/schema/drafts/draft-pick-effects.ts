@@ -10,8 +10,12 @@
 import { createBadgeService, type PublicDb } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
+import type {
+  NotificationPublisher,
+  WebSocketNotificationService,
+} from '@legacy-sports/aws-utils';
 
+import { notifyOnTheClock } from './on-the-clock-push';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
 import { logDraftPickActivity } from '../../services/activity-log';
 
@@ -22,6 +26,8 @@ const badgeService = createBadgeService(getDbOptions());
 export interface PickEffectsParams {
   db: PublicDb;
   notificationService: WebSocketNotificationService | null | undefined;
+  /** Push publisher (SQS) for the on-the-clock alert (LS-10593). */
+  notificationPublisher?: NotificationPublisher | null;
   /** `null` for a mock draft, which has no league (LS-10076). */
   draftLeagueId: number | null;
   draftId: number;
@@ -66,6 +72,7 @@ export async function executePickEffects(
   const {
     db,
     notificationService,
+    notificationPublisher,
     draftLeagueId,
     draftId,
     selectionMethod,
@@ -90,6 +97,24 @@ export async function executePickEffects(
         err,
       });
     }
+  }
+
+  // LS-10593: push the manager now on the clock. Skipped when the chained
+  // deadline has already expired — autoProcessDraftPicks auto-picks that
+  // seat immediately, so "you're on the clock" would be stale on arrival.
+  if (
+    !pickResult.isDraftComplete &&
+    pickResult.nextPickInfo &&
+    !isMock &&
+    !(pickResult.nextDeadline && pickResult.nextDeadline <= new Date())
+  ) {
+    await notifyOnTheClock(db, notificationPublisher, {
+      draftId,
+      leagueId: draftLeagueId,
+      participantId: pickResult.nextPickInfo.participantId,
+      round: pickResult.nextPickInfo.round,
+      pickNumber: pickResult.nextPickInfo.pickNumber,
+    });
   }
 
   // Auto-create matchups + badges when draft completes

@@ -7,6 +7,11 @@ import {
 } from './DraftPlayerBoard';
 import { computeMyUpcomingPicks } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
+import { useLocalInputText } from './hooks/useLocalInputText';
+import {
+  OPEN_SLOTS_EMPTY_MESSAGE,
+  OPEN_SLOTS_EMPTY_SEARCH_MESSAGE,
+} from './openSlotsCopy';
 import { formatEligiblePositions, getPositionColor } from './utils';
 import type { CurrentDraftPickInfo, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
@@ -108,6 +113,10 @@ export function DraftPlayersTab({
   loadingMore = false,
   onLoadMore,
 }: DraftPlayersTabProps): React.JSX.Element {
+  const [searchText, handleSearchChange] = useLocalInputText(
+    searchTerm,
+    onSetSearchTerm,
+  );
   const palette = useDraftPalette();
   const [sortKey, setSortKey] = useState<SortKey>('adp');
   const positionChips = useMemo(
@@ -231,8 +240,8 @@ export function DraftPlayersTab({
           color="$color"
           placeholder="Search players…"
           placeholderTextColor={palette.text.fg4}
-          value={searchTerm}
-          onChangeText={onSetSearchTerm}
+          value={searchText}
+          onChangeText={handleSearchChange}
         />
         <XStack
           borderWidth={1}
@@ -371,7 +380,11 @@ export function DraftPlayersTab({
         }
         ListEmptyComponent={
           <YStack padding="$6" alignItems="center">
-            <Text color="$textMuted">No players match that filter</Text>
+            <Text color="$textMuted" textAlign="center">
+              {searchText
+                ? OPEN_SLOTS_EMPTY_SEARCH_MESSAGE
+                : OPEN_SLOTS_EMPTY_MESSAGE}
+            </Text>
           </YStack>
         }
       />

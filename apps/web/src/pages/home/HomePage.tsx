@@ -58,6 +58,13 @@ function leagueDetailRoute(
   return `/${sportPrefix}/league/${summary.leagueId}`;
 }
 
+/** Live draft room for a league (`/:sport/league/:id/draft`, app.tsx). */
+function leagueDraftRoomRoute(
+  summary: Pick<UserLeagueSummaryFragment, 'leagueId' | 'sport'>,
+): string {
+  return `${leagueDetailRoute(summary)}/draft`;
+}
+
 function leagueMockDraftRoute(
   summary: Pick<
     UserLeagueSummaryFragment,
@@ -330,6 +337,7 @@ export function HomePage(): React.JSX.Element {
           onViewLeague={(s) => navigate(leagueDetailRoute(s))}
           onSetLineup={(s) => navigate(leagueDetailRoute(s))}
           onMockDraft={(s) => navigate(leagueMockDraftRoute(s))}
+          onJoinDraft={(s) => navigate(leagueDraftRoomRoute(s))}
           onCreateLeague={(sportKey) => navigate(`/${sportKey}/league/create`)}
           onJoinLeague={() =>
             navigate(JOIN_BASEBALL_LEAGUE_ROUTE, { state: { from: '/' } })

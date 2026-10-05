@@ -34,6 +34,8 @@ const CELL_HEIGHT = 23;
 const CELL_GAP = 3;
 /** Roughly five rounds of cells — deeper boards scroll inside the header. */
 const BOARD_MAX_HEIGHT = 5 * (CELL_HEIGHT + CELL_GAP) + 4;
+/** Rounds kept visible above the one on the clock when auto-scrolling. */
+const ROUNDS_ABOVE_CURRENT = 2;
 
 export interface DraftMiniBoardProps {
   teams: LeagueTeam[];
@@ -100,6 +102,19 @@ export function DraftMiniBoard({
 }: DraftMiniBoardProps): React.JSX.Element | null {
   const palette = useDraftPalette();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  // Follow the round on the clock — the board used to sit at round 1 forever,
+  // so later rounds were effectively unreachable mid-draft (LS-10593).
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const currentRound = currentPickInfo?.round ?? null;
+  useEffect(() => {
+    if (currentRound == null) return;
+    const y = Math.max(
+      0,
+      (currentRound - 1 - ROUNDS_ABOVE_CURRENT) * (CELL_HEIGHT + CELL_GAP),
+    );
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }, [currentRound]);
 
   const nameByTeamId = useMemo(() => {
     const map = new Map<string, string>();
@@ -168,8 +183,10 @@ export function DraftMiniBoard({
       </XStack>
 
       <ScrollView
+        ref={scrollRef}
         maxHeight={BOARD_MAX_HEIGHT}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator
+        nestedScrollEnabled
       >
         <YStack gap={CELL_GAP}>
           {rows.map((row, rowIndex) => (

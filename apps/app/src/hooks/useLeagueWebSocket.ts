@@ -28,6 +28,13 @@ export interface UseLeagueWebSocketOptions {
   /** Fired when a draft finishes for this league. */
   onDraftCompleted?: () => void;
   /**
+   * Fired when this league's draft starts, pauses, or resumes, so the screen
+   * can refetch the league's draftStatus. Without it an open league screen
+   * kept showing "draft not started" after the commissioner started the
+   * draft — DRAFT_STARTED reached the socket but nothing listened (LS-10593).
+   */
+  onDraftStatusChanged?: () => void;
+  /**
    * Fired whenever the scoring system writes a matchup's score, including a
    * single-player stat correction outside of batch completion (LS-6316).
    * Mirrors apps/web/src/hooks/useLeagueWebSocket.ts's onMatchupScoreUpdated.
@@ -60,6 +67,9 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
   const onDraftCompletedRef = useRef(options.onDraftCompleted);
   onDraftCompletedRef.current = options.onDraftCompleted;
 
+  const onDraftStatusChangedRef = useRef(options.onDraftStatusChanged);
+  onDraftStatusChangedRef.current = options.onDraftStatusChanged;
+
   const onMatchupScoreUpdatedRef = useRef(options.onMatchupScoreUpdated);
   onMatchupScoreUpdatedRef.current = options.onMatchupScoreUpdated;
 
@@ -91,6 +101,18 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
         onDraftCompletedRef.current?.();
       }),
     );
+
+    for (const eventName of [
+      ClientNotificationType.DRAFT_STARTED,
+      ClientNotificationType.DRAFT_PAUSED,
+      ClientNotificationType.DRAFT_RESUMED,
+    ]) {
+      unsubs.push(
+        client.on(eventName, () => {
+          onDraftStatusChangedRef.current?.();
+        }),
+      );
+    }
 
     unsubs.push(
       client.on(ClientNotificationType.MATCHUP_SCORE_UPDATED, (n) => {

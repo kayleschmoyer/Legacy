@@ -16,7 +16,6 @@ import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { loadDraftRules } from '../draft-rules';
 import { assertCallerIsOnTheClock } from '../pick-authorization';
-import { getSeatById } from '../participants';
 import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
@@ -25,7 +24,9 @@ import {
   checkRosterCapacity,
   isPlayerOnRoster,
 } from '../../../services/roster-service';
-import { triggerAutoProcessDraftPicks } from '../trigger-auto-process';
+import { offloadNextPickIfAutoPick } from '../offload-auto-pick';
+import { notifyOnTheClock } from '../on-the-clock-push';
+import { getSeatById, setSeatAutoPickById } from '../participants';
 import { AuthenticationError, UserInputError } from '../../graphql-errors';
 import {
   describeDbError,
@@ -368,6 +369,27 @@ builder.mutationField('makeDraftPick', (t) =>
                 setStartedAt: draft.current_pick === 0,
               });
 
+            // LS-10593: a manual pick by the seat's own manager means "I'm
+            // back" — turn their auto-pick off so the next pick isn't made
+            // for them. Not when a Control All Teams mock host picks for
+            // someone else's seat. League seats were authorized through the
+            // caller's team, so a league pick is always the owner's own.
+            // Clients learn of it from the DRAFT_PICK_MADE broadcast below,
+            // which already refetches every seat's auto-pick status.
+            const pickingSeat = await getSeatById(
+              tx,
+              currentPickInfo.participantId,
+            );
+            const isOwnSeat =
+              draft.kind === 'league' || pickingSeat?.userId === userId;
+            if (pickingSeat?.autoPick && isOwnSeat) {
+              await setSeatAutoPickById(tx, pickingSeat.id, false);
+              LOGGER.info(
+                '[LS-10593] Manual pick by the seat owner — auto-pick turned off',
+                { draftId, participantId: pickingSeat.id, userId },
+              );
+            }
+
             return {
               draftPick,
               isDraftComplete,
@@ -469,46 +491,22 @@ builder.mutationField('makeDraftPick', (t) =>
           !result.isDraftComplete &&
           result.nextPickInfo
         ) {
-          try {
-            const upcomingSeat = await getSeatById(
-              context.db,
-              result.nextPickInfo.participantId,
-            );
+          await offloadNextPickIfAutoPick(context.db, {
+            draftId,
+            leagueId: result.leagueId,
+            nextParticipantId: result.nextPickInfo.participantId,
+          });
 
-            if (upcomingSeat?.autoPick) {
-              // Expire the next team's deadline so autoProcessDraftPicks treats
-              // it as due immediately (mirrors LS-3643 / LS-427).
-              await context.db
-                .update(PublicSchema.drafts)
-                .set({ currentPickDeadline: new Date(Date.now() - 1) })
-                .where(eq(PublicSchema.drafts.id, draftId));
-
-              // Set-and-forget: dispatch the nudge without awaiting it.
-              // Nudged by draft id so a league-less mock draft is reachable
-              // too (LS-10076).
-              triggerAutoProcessDraftPicks({
-                leagueId: result.leagueId,
-                draftId,
-              });
-
-              LOGGER.info(
-                '[LS-8107] Offloaded chained auto-picks to autoProcessDraftPicks',
-                {
-                  draftId,
-                  leagueId: result.leagueId,
-                  nextParticipantId: result.nextPickInfo.participantId,
-                },
-              );
-            }
-          } catch (offloadError) {
-            LOGGER.warn(
-              '[LS-8107] Failed to offload auto-picks (non-fatal)',
-              offloadError instanceof Error
-                ? offloadError
-                : new Error(String(offloadError)),
-              { draftId, leagueId: result.leagueId },
-            );
-          }
+          // LS-10593: push the manager now on the clock. Skipped for
+          // idempotent re-submits (the original pick already pushed) and,
+          // inside the helper, for auto-pick seats and mock drafts.
+          await notifyOnTheClock(context.db, context.notificationPublisher, {
+            draftId,
+            leagueId: result.leagueId,
+            participantId: result.nextPickInfo.participantId,
+            round: result.nextPickInfo.round,
+            pickNumber: result.nextPickInfo.pickNumber,
+          });
         }
 
         // Auto-create all matchups when the manual pick itself completes the

@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   DraftChatTab,
   EliteDraftBoardScreen,
@@ -16,7 +17,10 @@ import type {
   DraftChatTabRenderProps,
 } from '@legacy-sports/shared-components/elite-draft';
 import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
+import { LeagueWebSocketContext } from '../context/LeagueWebSocketContext';
+import { useDraftChatUnread } from '../hooks/useDraftChatUnread';
 import { useLeagueChat } from '../hooks/useLeagueChat';
+import { useLeagueWebSocketLifecycle } from '../hooks/useLeagueWebSocketLifecycle';
 import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';
 import { downloadCsvFile } from '../utils/draftPacketDownload';
@@ -49,12 +53,14 @@ function renderChatTab({
   leagueId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps) {
   return (
     <ChatTabConnector
       leagueId={leagueId}
       userId={userId}
       onNewMessage={onNewMessage}
+      chatOpen={chatOpen}
     />
   );
 }
@@ -63,25 +69,24 @@ function ChatTabConnector({
   leagueId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps): React.JSX.Element {
   // League drafts always carry a league id; the mock-draft room has its own
   // chat connector (MockDraftBoard.tsx) and never mounts this one (LS-10076).
   const { messages, loading, sending, sendError, sendMessage } = useLeagueChat(
     leagueId ?? 0,
   );
-  // null until the first sync so loading the existing message history never
-  // counts as a "new" message for the unread dot — only counts up from there.
-  const prevCountRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (
-      prevCountRef.current !== null &&
-      messages.length > prevCountRef.current
-    ) {
-      onNewMessage();
-    }
-    prevCountRef.current = messages.length;
-  }, [messages.length, onNewMessage]);
+  // Unread dot keyed on a persisted last-read id rather than a per-mount
+  // message count, so loading history on re-entry never re-raises it
+  // (LS-10593). Only the compact layout mounts this connector; the wide
+  // layout's `renderChat` overlay has no unread dot.
+  useDraftChatUnread({
+    storageKey: leagueId ?? 0,
+    messages,
+    currentUserId: userId,
+    chatOpen,
+    onNewMessage,
+  });
 
   return (
     <DraftChatTab
@@ -106,6 +111,20 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
   const leagueId = leagueIdParam ? parseInt(leagueIdParam, 10) : null;
   const [isDraftActive, setIsDraftActive] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user, isLoading: authLoading, token: authToken } = useAuth();
+
+  // League chat broadcasts only reach sockets registered under the league id
+  // (LeagueIdIndex); the board's own draft socket registers the draft id, so
+  // without a league socket here `useLeagueChat` (both the compact Chat tab
+  // and the wide `renderChat` overlay) never received anyone else's
+  // messages live. Give the draft room its own league socket, the same way
+  // LeagueDetailPageV2 does (LS-10593).
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({
+      leagueId: leagueId ?? NaN,
+      isAuthenticated: !authLoading && !!user,
+      authToken,
+    });
 
   // Warn before leaving an active draft (LS-4986).
   //
@@ -202,20 +221,24 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
   // draft board's layout is unchanged; DOM containment (containerRef) still
   // works regardless of the display value.
   return (
-    <div ref={containerRef} style={{ display: 'contents' }}>
-      <EliteDraftBoardScreen
-        leagueId={leagueId}
-        onNavigate={(path) => navigate(path)}
-        websocketUrl={env.websocketUrl}
-        renderChat={renderChat}
-        renderChatTab={renderChatTab}
-        onPlayerDrafted={trackPlayerSelected}
-        onActiveDraftChange={setIsDraftActive}
-        onDownloadDraftPacket={(contents, filename) =>
-          downloadCsvFile(filename, contents)
-        }
-      />
-    </div>
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <div ref={containerRef} style={{ display: 'contents' }}>
+        <EliteDraftBoardScreen
+          leagueId={leagueId}
+          onNavigate={(path) => navigate(path)}
+          websocketUrl={env.websocketUrl}
+          renderChat={renderChat}
+          renderChatTab={renderChatTab}
+          onPlayerDrafted={trackPlayerSelected}
+          onActiveDraftChange={setIsDraftActive}
+          onDownloadDraftPacket={(contents, filename) =>
+            downloadCsvFile(filename, contents)
+          }
+        />
+      </div>
+    </LeagueWebSocketContext.Provider>
   );
 }
 

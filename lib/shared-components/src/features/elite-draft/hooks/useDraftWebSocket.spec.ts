@@ -23,6 +23,8 @@ interface MockWSClient {
   send: jest.Mock;
   updateContext: jest.Mock;
   setHeartbeatInterval: jest.Mock;
+  reconnectNow: jest.Mock;
+  updateToken: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
   _emit: (event: string, ...args: unknown[]) => void;
@@ -50,6 +52,8 @@ function mockMakeWSClient(): MockWSClient {
     send: jest.fn(),
     updateContext: jest.fn(),
     setHeartbeatInterval: jest.fn(),
+    reconnectNow: jest.fn(),
+    updateToken: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
     _emit(event: string, ...args: unknown[]) {
@@ -63,6 +67,15 @@ jest.mock('@legacy-sports/websocket-client', () => ({
     mockInstance = mockMakeWSClient();
     return mockInstance;
   }),
+}));
+
+// Capture the foreground callback so tests can simulate the app returning
+// from the background without depending on the platform variant (LS-10593).
+let mockForegroundCallback: ((backgroundMs: number) => void) | null = null;
+jest.mock('../../../hooks/useAppForeground', () => ({
+  useAppForeground: (cb: (backgroundMs: number) => void) => {
+    mockForegroundCallback = cb;
+  },
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -621,7 +634,7 @@ describe('useDraftWebSocket — WS auth token rotation (LS-6788)', () => {
     ).WebSocketClient;
   }
 
-  it('tears down the stale socket and opens a new one when the auth token rotates', async () => {
+  it('keeps the live draft socket and hands it the rotated token (LS-10593)', async () => {
     const params = makeDefaultParams();
     const { rerender } = renderHook((p) => useDraftWebSocket(p), {
       initialProps: params,
@@ -631,26 +644,25 @@ describe('useDraftWebSocket — WS auth token rotation (LS-6788)', () => {
       await Promise.resolve();
     });
 
-    const staleInstance = mockInstance;
+    const instance = mockInstance;
     expect(getConstructor()).toHaveBeenCalledTimes(1);
     expect(getConstructor()).toHaveBeenLastCalledWith(
       expect.objectContaining({ token: 'test-token' }),
     );
 
     // A long-running draft's access token is rotated in the background well
-    // before the WS is ever forced to reconnect by a network drop.
+    // before the WS is ever forced to reconnect by a network drop. Tearing
+    // the socket down for it used to drop the draft connection mid-pick;
+    // the client now just uses the new token on its next (re)connect.
     rerender({ ...params, token: 'rotated-token' });
 
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(staleInstance.dispose).toHaveBeenCalledTimes(1);
-    expect(getConstructor()).toHaveBeenCalledTimes(2);
-    expect(getConstructor()).toHaveBeenLastCalledWith(
-      expect.objectContaining({ token: 'rotated-token' }),
-    );
-    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+    expect(instance.dispose).not.toHaveBeenCalled();
+    expect(getConstructor()).toHaveBeenCalledTimes(1);
+    expect(instance.updateToken).toHaveBeenCalledWith('rotated-token');
   });
 });
 
@@ -921,5 +933,199 @@ describe('useDraftWebSocket — draft-keyed channel (LS-10160)', () => {
     await flushDeferredConnect();
 
     expect(mockInstance.connect).not.toHaveBeenCalled();
+  });
+});
+
+// ── App foreground resync (LS-10593) ───────────────────────────────────────
+
+describe('useDraftWebSocket — app foreground resync (LS-10593)', () => {
+  async function flushRefetches() {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockForegroundCallback = null;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function foreground(backgroundMs: number) {
+    act(() => {
+      mockForegroundCallback?.(backgroundMs);
+    });
+  }
+
+  it('resyncs the full board, including the league, when the app returns to the foreground', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    act(() => mockInstance._emit('connected'));
+
+    foreground(1_000);
+    await flushRefetches();
+
+    expect(params.refetchCurrentPick).toHaveBeenCalledWith({ draftId: 42 });
+    expect(params.refetchPickHistory).toHaveBeenCalledTimes(1);
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(params.refetchAutoPickStatuses).toHaveBeenCalledTimes(1);
+    expect(params.refetchQueue).toHaveBeenCalledTimes(1);
+    expect(params.refetchDraft).toHaveBeenCalledTimes(1);
+    // Paused/resumed state lives on the league — a DRAFT_PAUSED/RESUMED
+    // missed while backgrounded is only recovered by refetching it.
+    expect(params.refetchLeague).toHaveBeenCalledTimes(1);
+    expect(mockInstance.send).toHaveBeenCalledWith({
+      type: 'requestUserList',
+      draftId: 42,
+    });
+  });
+
+  it('revives a given-up client after a short background without tearing down the socket', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    mockInstance.disconnect.mockClear();
+    mockInstance.connect.mockClear();
+
+    foreground(2_000);
+
+    expect(mockInstance.reconnectNow).toHaveBeenCalledTimes(1);
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('forces a fresh socket after a long background', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    mockInstance.disconnect.mockClear();
+    mockInstance.connect.mockClear();
+
+    foreground(60_000);
+
+    expect(mockInstance.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+    expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('does not resync a second time on the reconnect edge right after a foreground resync', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    act(() => mockInstance._emit('connected'));
+
+    foreground(60_000);
+    // The forced fresh socket closes and reopens moments later.
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+    await flushRefetches();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(params.refetchLeague).toHaveBeenCalledTimes(1);
+    // Presence is WS-only, so the new socket is still asked for it.
+    expect(
+      mockInstance.send.mock.calls.filter(
+        ([msg]) => (msg as { type?: string }).type === 'requestUserList',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('still resyncs on a reconnect edge well after the last resync', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    act(() => mockInstance._emit('connected'));
+
+    foreground(1_000);
+    await flushRefetches();
+
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+    await flushRefetches();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(2);
+  });
+
+  it('does nothing on foreground for a socket-less (auction) draft', () => {
+    const params = { ...makeDefaultParams(), isAuctionDraft: true };
+    renderHook(() => useDraftWebSocket(params));
+
+    foreground(60_000);
+
+    expect(params.refetchAvailablePlayers).not.toHaveBeenCalled();
+    expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+});
+
+// ── Undo clears announced picks (LS-10593) ─────────────────────────────────
+
+describe('useDraftWebSocket — pick undo re-arms announcements (LS-10593)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const pick = (overallPick: number, playerId: number) => ({
+    draftId: 42,
+    pickId: 100 + overallPick,
+    teamId: 20,
+    playerId,
+    round: 1,
+    pickNumber: overallPick,
+    overallPick,
+    nextPick: { teamId: 10 },
+    wasAutoPick: false,
+    currentPickDeadline: null,
+  });
+
+  it("announces a re-pick of an undone slot (e.g. the commissioner picking on the team's behalf)", () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pick(4, 1));
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pick(5, 2));
+    });
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_UNDONE, {
+        draftId: 42,
+        overallPick: 5,
+      });
+    });
+
+    // Earlier picks stay announced; the undone slot is forgotten.
+    expect(params.notifiedPicksRef.current.has(4)).toBe(true);
+    expect(params.notifiedPicksRef.current.has(5)).toBe(false);
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pick(5, 3));
+    });
+
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(3);
+    expect(params.showAnnouncement).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 3 }),
+      5,
+      1,
+      5,
+      false,
+      false,
+      'Team A',
+    );
+  });
+
+  it('refetches the queue and auto-pick statuses after an undo', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_UNDONE, {
+        draftId: 42,
+        overallPick: 5,
+      });
+    });
+
+    expect(params.refetchQueue).toHaveBeenCalledTimes(1);
+    expect(params.refetchAutoPickStatuses).toHaveBeenCalledTimes(1);
   });
 });

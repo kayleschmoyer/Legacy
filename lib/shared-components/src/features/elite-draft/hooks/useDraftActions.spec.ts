@@ -594,3 +594,78 @@ describe('useDraftActions Control All Teams mock host picks (LS-10433)', () => {
     expect(mockMakeDraftPick).not.toHaveBeenCalled();
   });
 });
+
+describe('useDraftActions stale-board pick recovery (LS-10593)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockMakeDraftPick.mockReset();
+    mockNoop.mockReset();
+  });
+
+  function expectFullBoardRefresh(params: ReturnType<typeof makeParams>) {
+    expect(params.refetchCurrentPick).toHaveBeenCalledWith({ draftId: 42 });
+    expect(params.refetchPickHistory).toHaveBeenCalled();
+    expect(params.refetchAvailablePlayers).toHaveBeenCalled();
+    expect(params.refetchQueue).toHaveBeenCalled();
+    expect(params.refetchDraft).toHaveBeenCalled();
+  }
+
+  it.each([
+    'Draft state changed during pick submission — please refresh and retry',
+    'Not authorized: It is not your turn to pick or you do not own this team',
+  ])(
+    'tells the user their pick was made for them and refreshes the board on "%s"',
+    async (serverMessage) => {
+      mockMakeDraftPick.mockRejectedValue(new Error(serverMessage));
+      const params = makeParams();
+      const { result } = renderHook(() => useDraftActions(params));
+
+      await act(async () => {
+        await result.current.handleMakePick(101);
+      });
+
+      expect(params.showToast).toHaveBeenCalledWith(
+        'Pick was made for you — refreshing board',
+        'warning',
+      );
+      expectFullBoardRefresh(params);
+      expect(params.setUrgentMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('Draft pick failed'),
+      );
+    },
+  );
+
+  it('refreshes the whole board when the player was already drafted', async () => {
+    mockMakeDraftPick.mockRejectedValue(
+      new Error('Player has already been drafted'),
+    );
+    const params = makeParams();
+    const { result } = renderHook(() => useDraftActions(params));
+
+    await act(async () => {
+      await result.current.handleMakePick(101);
+    });
+
+    expect(params.showToast).toHaveBeenCalledWith(
+      'Player already drafted — refreshing',
+      'warning',
+    );
+    expectFullBoardRefresh(params);
+  });
+
+  it('warns and refetches the current pick instead of silently dropping an off-turn click', async () => {
+    const params = makeParams({ isMyPick: false });
+    const { result } = renderHook(() => useDraftActions(params));
+
+    await act(async () => {
+      await result.current.handleMakePick(101);
+    });
+
+    expect(mockMakeDraftPick).not.toHaveBeenCalled();
+    expect(params.showToast).toHaveBeenCalledWith(
+      'Not your turn to pick — refreshing board',
+      'warning',
+    );
+    expect(params.refetchCurrentPick).toHaveBeenCalledWith({ draftId: 42 });
+  });
+});

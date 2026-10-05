@@ -155,13 +155,36 @@ export class WebSocketClient {
     LOGGER.debug('Connecting to WebSocket', { url: this.redactToken(url) });
 
     try {
-      // Create WebSocket instance (works in browser, React Native, and Node.js with 'ws' package)
-      this.ws = new WebSocket(url);
+      // A previous socket that never opened (or already closed) would
+      // otherwise be orphaned with live handlers — retire it first.
+      if (this.ws) {
+        this.closeDetached(this.ws);
+        this.ws = null;
+      }
 
-      this.ws.onopen = () => this.handleOpen();
-      this.ws.onmessage = (event) => this.handleMessage(event);
-      this.ws.onerror = (error) => this.handleError(error);
-      this.ws.onclose = () => this.handleClose();
+      // Create WebSocket instance (works in browser, React Native, and Node.js with 'ws' package)
+      const ws = new WebSocket(url);
+      this.ws = ws;
+
+      // Bind every handler to *this* socket instance, not to whatever
+      // `this.ws` happens to be when the event fires (LS-10593). Closing a
+      // socket is asynchronous, so after `disconnect(); connect()` (e.g. a
+      // forced reconnect on app foreground) the old socket's late `onclose`
+      // used to land after the new socket was created — stopping the new
+      // socket's heartbeat, emitting a spurious 'disconnected' and scheduling
+      // a duplicate reconnect. Events from a superseded socket are ignored.
+      ws.onopen = () => {
+        if (this.ws === ws) this.handleOpen();
+      };
+      ws.onmessage = (event) => {
+        if (this.ws === ws) this.handleMessage(event);
+      };
+      ws.onerror = (error) => {
+        if (this.ws === ws) this.handleError(error);
+      };
+      ws.onclose = () => {
+        if (this.ws === ws) this.handleClose();
+      };
     } catch (error) {
       LOGGER.error('Failed to create WebSocket', { error });
       this.emitConnectionState('error');
@@ -177,11 +200,28 @@ export class WebSocketClient {
     this.cancelReconnect();
 
     if (this.ws) {
-      this.ws.close();
+      this.closeDetached(this.ws);
       this.ws = null;
     }
 
     this.emitConnectionState('disconnected');
+  }
+
+  /**
+   * Close a socket without letting any of its (late, asynchronous) events
+   * reach the client — see the per-socket handler guard in `connect()`
+   * (LS-10593).
+   */
+  private closeDetached(ws: WebSocket): void {
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onerror = null;
+    ws.onclose = null;
+    try {
+      ws.close();
+    } catch (error) {
+      LOGGER.debug('Error closing superseded WebSocket', { error });
+    }
   }
 
   /**
@@ -573,8 +613,21 @@ export class WebSocketClient {
 
         // Disconnect if no response after 3 consecutive pings
         if (this.consecutivePings >= MAX_CONSECUTIVE_PINGS) {
-          LOGGER.warn('No pong response after 3 pings, disconnecting');
-          this.disconnect();
+          // A zombie socket is a dropped connection, not a deliberate
+          // disconnect — `disconnect()` would cancel reconnection and leave
+          // the client dead (LS-10593). Retire the socket without waiting
+          // for its (possibly never-arriving) close event, then recover
+          // through the normal reconnect path.
+          LOGGER.warn('No pong response after 3 pings, reconnecting');
+          this.stopHeartbeat();
+          if (this.ws) {
+            this.closeDetached(this.ws);
+            this.ws = null;
+          }
+          this.emitConnectionState('disconnected');
+          if (this.options.reconnect && !this.disposed) {
+            this.scheduleReconnect();
+          }
           return;
         }
 

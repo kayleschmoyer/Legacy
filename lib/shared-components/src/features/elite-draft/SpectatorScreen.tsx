@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Sport } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
@@ -9,11 +9,13 @@ import {
   LoadingScreen,
   NoLeagueScreen,
 } from './DraftStateScreens';
+import { preloadYouTubeIframeApi } from './PickSplashHighlightVideo';
 import { SpectatorDepthChart } from './SpectatorDepthChart';
 import { type SplashPick, SplashQueue } from './SplashQueue';
 import { getDraftCommentary } from './draftUtils';
 import { getPositionColor } from './utils';
 import { useSpectatorScreenState } from './hooks';
+import { useScreenWakeLock } from '../../hooks/useScreenWakeLock';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
@@ -115,6 +117,12 @@ export function SpectatorScreen({
     recentPicks,
     pickTimeLimitSeconds,
   } = useSpectatorScreenState({ leagueId, websocketUrl, token, minSplashMs });
+
+  useEffect(() => {
+    preloadYouTubeIframeApi();
+  }, []);
+  // The watch screen is meant to sit on a TV/monitor — never let it sleep.
+  useScreenWakeLock(true);
 
   // The league itself is the source of truth for the spectator's sport, same
   // as EliteDraftBoardScreen — neither web nor native route passes a `sport`

@@ -27,7 +27,8 @@
  * portals to the root and snaps to a fixed share of the viewport, so the frame
  * never grows with the list — the list scrolls inside it instead.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
+import { BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { Sheet, Text, XStack, YStack } from 'tamagui';
 
 import { useDraftPalette } from './nativeDraftPalette';
@@ -47,6 +48,28 @@ export const SQUAD_SHEET_HEIGHT_PERCENT = 74;
 
 /** Touch-target floor shared by the CTA and the close control. */
 const MIN_TOUCH = 44;
+
+/** Breathing room kept between the status bar and the sheet's top edge. */
+const TOP_GAP = 8;
+
+/**
+ * Clamp the snap point so the frame's top edge (grab bar + close control)
+ * never rises under the status bar. The modal sheet portals to the app root,
+ * outside the Stack's safe-area padding, so it has to reserve the inset itself
+ * (LS-10593 — on short/landscape Android windows the close control landed
+ * under the status bar and the sheet couldn't be dismissed).
+ */
+export function clampSheetHeightPercent(
+  heightPercent: number,
+  windowHeight: number,
+  topInset: number,
+): number {
+  if (windowHeight <= 0 || topInset <= 0) return heightPercent;
+  const maxPercent = Math.floor(
+    ((windowHeight - topInset - TOP_GAP) / windowHeight) * 100,
+  );
+  return Math.max(1, Math.min(heightPercent, maxPercent));
+}
 
 // ---------------------------------------------------------------------------
 // CTA
@@ -140,6 +163,9 @@ export interface DraftPickSheetProps {
   /** Bottom safe-area inset (LS-9444) — the sheet covers the bottom nav, so it
    *  reserves the system navigation bar itself. */
   bottomInset?: number;
+  /** Top safe-area inset (status bar) — the sheet's top edge is clamped below
+   *  it so the close control is always reachable (LS-10593). */
+  topInset?: number;
   /** Overrides the root `testID`, so the two sheets are separately targetable. */
   testID?: string;
   children: React.ReactNode;
@@ -152,6 +178,7 @@ export function DraftPickSheet({
   subtitle,
   heightPercent = PICK_SHEET_HEIGHT_PERCENT,
   bottomInset = 0,
+  topInset = 0,
   testID = 'draft-pick-sheet',
   children,
 }: DraftPickSheetProps): React.JSX.Element {
@@ -159,6 +186,23 @@ export function DraftPickSheet({
   const reducedMotion = useReducedMotion();
   const animation = reducedMotion ? '100ms' : 'medium';
   const close = (): void => onOpenChange(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const snapPercent = clampSheetHeightPercent(
+    heightPercent,
+    windowHeight,
+    topInset,
+  );
+
+  // Android's hardware back should close the sheet, not pop the whole draft
+  // route out from under it (LS-10593). No-op on web/iOS.
+  useEffect(() => {
+    if (!open || Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onOpenChange(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [open, onOpenChange]);
 
   return (
     <Sheet
@@ -166,14 +210,18 @@ export function DraftPickSheet({
       open={open}
       onOpenChange={onOpenChange}
       snapPointsMode="percent"
-      snapPoints={[heightPercent]}
+      snapPoints={[snapPercent]}
       dismissOnSnapToBottom
       dismissOnOverlayPress
       // The body is a FlatList: letting the frame's pan gesture compete with
       // the list's own scroll makes the list feel stuck on native. Scrim and
       // close control are the dismissal paths, as in the design.
       disableDrag
-      moveOnKeyboardChange
+      // Android edge-to-edge doesn't resize for the keyboard, so Tamagui lifts
+      // the sheet by the full keyboard height and clamps it to y=0 — under the
+      // status bar, with the close control unreachable (LS-10593). The search
+      // field sits at the top of the sheet, so only iOS needs the lift.
+      moveOnKeyboardChange={Platform.OS === 'ios'}
       // Nothing of the browser stays mounted (or re-renders on every pick)
       // while the sheet is down; search/position state lives in
       // useDraftUIState, so it survives a close/re-open.

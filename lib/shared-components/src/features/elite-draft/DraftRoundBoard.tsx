@@ -21,7 +21,14 @@
  * All view-independent logic lives in `roundBoard.ts` so it is unit-testable
  * without a renderer.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { LayoutChangeEvent } from 'react-native';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 
 import { buildBoardCells } from './nativeDraftBoard';
@@ -106,11 +113,40 @@ function RoundTabs({
 }): React.JSX.Element {
   const palette = useDraftPalette();
 
+  // Keep the active round's tab scrolled into view — in a long draft the
+  // current round's tab sat off-screen to the right (LS-10593).
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const tabLayoutsRef = useRef(new Map<number, { x: number; width: number }>());
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [layoutVersion, setLayoutVersion] = useState(0);
+
+  const handleTabLayout = useCallback(
+    (round: number, event: LayoutChangeEvent) => {
+      const { x, width } = event.nativeEvent.layout;
+      tabLayoutsRef.current.set(round, { x, width });
+      setLayoutVersion((v) => v + 1);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const tab = tabLayoutsRef.current.get(activeRound);
+    if (!tab || viewportWidth <= 0) return;
+    scrollRef.current?.scrollTo({
+      x: Math.max(0, tab.x + tab.width / 2 - viewportWidth / 2),
+      animated: true,
+    });
+  }, [activeRound, viewportWidth, layoutVersion]);
+
   return (
     <ScrollView
+      ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
       testID="draft-round-board-tabs"
+      onLayout={(event: LayoutChangeEvent) =>
+        setViewportWidth(event.nativeEvent.layout.width)
+      }
     >
       <XStack
         role="tablist"
@@ -139,6 +175,9 @@ function RoundTabs({
             <YStack
               key={round}
               testID={`draft-round-board-tab-${round}`}
+              onLayout={(event: LayoutChangeEvent) =>
+                handleTabLayout(round, event)
+              }
               minWidth={TAB_MIN_WIDTH}
               minHeight={TAB_MIN_HEIGHT}
               alignItems="center"

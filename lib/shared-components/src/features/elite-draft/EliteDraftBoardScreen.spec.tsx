@@ -683,6 +683,8 @@ function makeBaseQueries(
     pickHistory: [],
     availablePlayers: [],
     hasMorePlayers: false,
+    openSlotPositions: [],
+    refetchOpenSlotPositions: jest.fn(),
     loadingMore: false,
     boardOrderedTeams: [],
     queueEntries: [],

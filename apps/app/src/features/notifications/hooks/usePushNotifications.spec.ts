@@ -166,28 +166,35 @@ describe('usePushNotifications — navigateFromNotification', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/notifications');
   });
 
-  it('navigates to baseball league on DRAFT_STARTED tap with sport=baseball', () => {
+  // LS-10593: draft call-to-action pushes open the live draft room, which
+  // serves both sports, rather than the sport-prefixed league screen.
+  it.each([['baseball'], ['football'], [undefined]])(
+    'navigates to the draft board on DRAFT_STARTED tap (sport=%s)',
+    (sport) => {
+      const { tap } = setupListeners();
+
+      tap({
+        notificationType: 'DRAFT_STARTED',
+        leagueId: 3,
+        ...(sport ? { sport } : {}),
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: '3' },
+      });
+    },
+  );
+
+  it('navigates to the draft board on DRAFT_ON_THE_CLOCK tap', () => {
     const { tap } = setupListeners();
 
-    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3, sport: 'baseball' });
+    tap({ notificationType: 'DRAFT_ON_THE_CLOCK', leagueId: 9 });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/3');
-  });
-
-  it('navigates to football league on DRAFT_STARTED tap with sport=football', () => {
-    const { tap } = setupListeners();
-
-    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3, sport: 'football' });
-
-    expect(mockNavigate).toHaveBeenCalledWith('/football/league/3');
-  });
-
-  it('defaults to baseball league on DRAFT_STARTED tap when sport is absent', () => {
-    const { tap } = setupListeners();
-
-    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3 });
-
-    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/3');
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/DraftBoardPage',
+      params: { leagueId: '9' },
+    });
   });
 
   it('navigates to baseball matchup on matchupId+leagueId tap with sport=baseball', () => {
@@ -265,7 +272,13 @@ describe('usePushNotifications — tap deduplication', () => {
     tap({ notificationType: 'DRAFT_STARTED', leagueId: 4 }, 'id-2');
 
     expect(mockNavigate).toHaveBeenCalledTimes(2);
-    expect(mockNavigate).toHaveBeenNthCalledWith(1, '/baseball/league/3');
-    expect(mockNavigate).toHaveBeenNthCalledWith(2, '/baseball/league/4');
+    expect(mockNavigate).toHaveBeenNthCalledWith(1, {
+      pathname: '/DraftBoardPage',
+      params: { leagueId: '3' },
+    });
+    expect(mockNavigate).toHaveBeenNthCalledWith(2, {
+      pathname: '/DraftBoardPage',
+      params: { leagueId: '4' },
+    });
   });
 });

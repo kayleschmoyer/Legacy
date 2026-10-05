@@ -33,6 +33,7 @@ async function captureGetMyMockDraftUsageResolver(): Promise<
           arg: {
             int: () => ({}),
             string: () => ({}),
+            boolean: () => ({}),
           },
         });
       }),

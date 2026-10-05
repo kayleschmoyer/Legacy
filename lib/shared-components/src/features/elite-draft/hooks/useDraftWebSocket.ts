@@ -24,6 +24,7 @@ import {
   type UserListNotification,
   useWebSocket,
 } from '../../../hooks/useWebSocket';
+import { useAppForeground } from '../../../hooks/useAppForeground';
 import type { AvailableDraftPlayer, DraftPlayer } from '../types';
 import { normalizeTeamId } from '../utils';
 
@@ -38,6 +39,20 @@ const RECONNECT_REFETCH_BASE_DELAY_MS = 500;
  * board (LS-8880).
  */
 const DRAFT_HEARTBEAT_MS = 15 * 1000;
+/**
+ * Background time past which returning to the foreground forces a brand-new
+ * socket rather than trusting the old one: the OS freezes a minimized app's
+ * JS thread, so a socket that "survived" a longer absence is likely a zombie
+ * that missed events and whose heartbeat never got a chance to notice
+ * (LS-10593).
+ */
+const FOREGROUND_FORCE_RECONNECT_MS = 5 * 1000;
+/**
+ * A foreground resync is typically followed within moments by the socket's
+ * disconnect -> reconnect edge; skip the second resync inside this window
+ * so the same data isn't refetched twice (LS-10593).
+ */
+const RESYNC_DEDUPE_MS = 2 * 1000;
 
 type ReconnectRefetchOutcome = 'ok' | 'cancelled' | 'failed';
 
@@ -396,11 +411,29 @@ export function useDraftWebSocket({
         setPickDeadline(new Date(notification.newPickDeadline));
       }
       setDraftComplete(false);
+      // Picks are announced once per overall pick number. After an undo the
+      // same slot (and every later one rolled back with it) gets re-picked —
+      // often by the commissioner on the team's behalf — so forget them, or
+      // the re-pick is silently swallowed and that team's user never sees
+      // it announced (LS-10593).
+      notifiedPicksRef.current.forEach((pickKey) => {
+        if (pickKey >= notification.overallPick) {
+          notifiedPicksRef.current.delete(pickKey);
+        }
+      });
       onPickUndone?.(notification.overallPick);
       if (draftId) void refetchCurrentPick({ draftId });
       void refetchPickHistory();
       void refetchAvailablePlayers();
       void refetchDraft();
+      // An undone pick may have consumed a queued player or flipped a team's
+      // auto-pick state — refresh both rather than show stale rails.
+      void refetchQueue().catch((e: unknown) =>
+        LOGGER.warn('Queue refetch failed:', String(e)),
+      );
+      void refetchAutoPickStatuses().catch((e: unknown) =>
+        LOGGER.warn('Auto-pick statuses refetch failed:', String(e)),
+      );
     },
     [
       draftId,
@@ -408,11 +441,14 @@ export function useDraftWebSocket({
       setLiveMessage,
       setDraftComplete,
       setPickDeadline,
+      notifiedPicksRef,
       onPickUndone,
       refetchCurrentPick,
       refetchPickHistory,
       refetchAvailablePlayers,
       refetchDraft,
+      refetchQueue,
+      refetchAutoPickStatuses,
     ],
   );
 
@@ -459,6 +495,7 @@ export function useDraftWebSocket({
     connected: wsConnected,
     connect: wsConnect,
     disconnect: wsDisconnect,
+    reconnectNow: wsReconnectNow,
     sendMessage,
   } = useWebSocket({
     url: websocketUrl,
@@ -527,6 +564,167 @@ export function useDraftWebSocket({
     };
   }, [wsConnect, wsDisconnect]);
 
+  // Cancels the in-flight resync's pending retries (if any).
+  const cancelResyncRef = useRef<(() => void) | null>(null);
+  // When the last resync started — see RESYNC_DEDUPE_MS.
+  const lastResyncAtRef = useRef(0);
+
+  /**
+   * Re-read everything a client may have missed while its socket was down,
+   * suspended or replaced: the reconnect edge below and the app returning to
+   * the foreground both call this (LS-10593). Returns a cancel function that
+   * stops pending retries (also invoked automatically by the next resync and
+   * on unmount).
+   */
+  const resync = useCallback(
+    (reason: 'reconnect' | 'foreground'): (() => void) => {
+      const noop = () => undefined;
+      if (draftId === null) return noop;
+
+      cancelResyncRef.current?.();
+      lastResyncAtRef.current = Date.now();
+      LOGGER.info('[useDraftWebSocket] resyncing draft state', {
+        reason,
+        draftId,
+      });
+
+      // A resync that lands during the 300ms pick-notification debounce
+      // window must cancel that timer — otherwise both it and the resync
+      // below fire their own refetches, doubling network traffic (LDB-031).
+      if (refetchDebounceRef.current) {
+        clearTimeout(refetchDebounceRef.current);
+        refetchDebounceRef.current = undefined;
+      }
+      pendingRefetchNotifRef.current = null;
+
+      let cancelled = false;
+      const pendingWaits = new Map<ReturnType<typeof setTimeout>, () => void>();
+
+      // Cancelling resolves pending waits rather than only clearing their
+      // timers, so a backoff suspended at unmount resumes once and exits via
+      // the `cancelled` check at the top of the retry loop instead of hanging
+      // forever.
+      const wait = (ms: number) =>
+        new Promise<void>((resolve) => {
+          const timer = setTimeout(() => {
+            pendingWaits.delete(timer);
+            resolve();
+          }, ms);
+          pendingWaits.set(timer, resolve);
+        });
+
+      /**
+       * Run one resync refetch, retrying transient failures with
+       * exponential backoff. The underlying error is logged as a structured
+       * object (not `String(e)`) so `name`/`stack`/Apollo's `graphQLErrors`
+       * survive into the Rollbar payload — stringifying it destroyed the
+       * cause and bypassed the `AbortError` noise filter in lib/rollbar
+       * (LS-8506).
+       */
+      const refetchWithRetry = async (
+        label: string,
+        run: () => Promise<unknown>,
+      ): Promise<ReconnectRefetchOutcome> => {
+        for (
+          let attempt = 1;
+          attempt <= RECONNECT_REFETCH_ATTEMPTS;
+          attempt++
+        ) {
+          if (cancelled) return 'cancelled';
+          try {
+            await run();
+            return 'ok';
+          } catch (error: unknown) {
+            if (cancelled || isAbortError(error)) {
+              LOGGER.debug(
+                `Refetch of ${label} cancelled after websocket ${reason}`,
+                { error },
+              );
+              return 'cancelled';
+            }
+            if (attempt === RECONNECT_REFETCH_ATTEMPTS) {
+              LOGGER.error(
+                `Failed to refetch ${label} after websocket ${reason}`,
+                { attempts: attempt, error },
+              );
+              return 'failed';
+            }
+            await wait(RECONNECT_REFETCH_BASE_DELAY_MS * 2 ** (attempt - 1));
+          }
+        }
+        return 'failed';
+      };
+
+      // Presence (onlineTeamIds) is WS-only — there is no GraphQL refetch to
+      // fall back on. The server pushes a fresh USER_LIST on every new
+      // connection, but that push is best-effort, so explicitly re-request
+      // one here too: userJoined/userLeft events missed while disconnected
+      // would otherwise leave presence stale until the next full page mount
+      // (LDB-028). Scoped to the draft room (LS-10160).
+      // A no-op if the socket isn't open yet; the reconnect edge re-asks.
+      sendMessage({ type: 'requestUserList', draftId });
+
+      void refetchWithRetry('current pick', () =>
+        refetchCurrentPick({ draftId }),
+      );
+      void refetchWithRetry('pick history', refetchPickHistory);
+      void refetchWithRetry('auto-pick statuses', refetchAutoPickStatuses);
+      void refetchWithRetry('draft', refetchDraft);
+      // Paused/resumed state is read from the league; a DRAFT_PAUSED /
+      // DRAFT_RESUMED event missed while away would otherwise leave the
+      // board showing the wrong state (and timer) until a reload (LS-10593).
+      void refetchWithRetry('league', refetchLeague);
+      // The queue is the server's first auto-pick source (auto-pick-scorer.ts),
+      // so a stale queue snapshot can show players already drafted while
+      // disconnected (LS-6787).
+      void refetchWithRetry('queue', refetchQueue);
+      // The available-players list is the one stale-state a user can act on:
+      // an out-of-date board lets them try to draft an already-taken player.
+      // Warn them explicitly rather than failing silently.
+      void refetchWithRetry('available players', refetchAvailablePlayers).then(
+        (outcome) => {
+          if (outcome === 'failed' && !cancelled) {
+            showToast(
+              'Could not refresh the player list after reconnecting — it may be out of date. Reload the page before drafting.',
+              'warning',
+            );
+          }
+        },
+      );
+
+      const cancel = () => {
+        cancelled = true;
+        pendingWaits.forEach((resolve, timer) => {
+          clearTimeout(timer);
+          resolve();
+        });
+        pendingWaits.clear();
+        if (cancelResyncRef.current === cancel) cancelResyncRef.current = null;
+      };
+      cancelResyncRef.current = cancel;
+      return cancel;
+    },
+    [
+      draftId,
+      sendMessage,
+      showToast,
+      refetchCurrentPick,
+      refetchPickHistory,
+      refetchAvailablePlayers,
+      refetchAutoPickStatuses,
+      refetchDraft,
+      refetchLeague,
+      refetchQueue,
+    ],
+  );
+
+  // Cancel any in-flight resync retries on unmount.
+  useEffect(() => {
+    return () => {
+      cancelResyncRef.current?.();
+    };
+  }, []);
+
   // Reconnection recovery
   const wsWasConnected = useRef(false);
   const wsHasEverConnected = useRef(false);
@@ -543,120 +741,45 @@ export function useDraftWebSocket({
     if (wsConnected) wsHasEverConnected.current = true;
     if (!isReconnect || draftId === null) return undefined;
 
-    // A reconnect that lands during the 300ms pick-notification debounce
-    // window must cancel that timer — otherwise both it and the reconnect
-    // recovery below fire their own refetches, doubling network traffic
-    // (LDB-031).
-    if (refetchDebounceRef.current) {
-      clearTimeout(refetchDebounceRef.current);
-      refetchDebounceRef.current = undefined;
+    // A foreground resync just ran (and the edge is the socket it forced
+    // coming back) — refetching everything again would only double traffic.
+    // Presence is WS-only, though, and the foreground request may have been
+    // sent before the new socket opened, so still re-ask for it (LS-10593).
+    if (Date.now() - lastResyncAtRef.current < RESYNC_DEDUPE_MS) {
+      sendMessage({ type: 'requestUserList', draftId });
+      return undefined;
     }
-    pendingRefetchNotifRef.current = null;
 
-    let cancelled = false;
-    const pendingWaits = new Map<ReturnType<typeof setTimeout>, () => void>();
+    return resync('reconnect');
+  }, [wsConnected, draftId, sendMessage, resync]);
 
-    // Cleanup resolves pending waits rather than only clearing their timers, so
-    // a backoff suspended at unmount resumes once and exits via the `cancelled`
-    // check at the top of the retry loop instead of hanging forever.
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(() => {
-          pendingWaits.delete(timer);
-          resolve();
-        }, ms);
-        pendingWaits.set(timer, resolve);
+  // Native apps get no browser visibility/online signals, so a minimized
+  // app's socket was never revived or resynced on return — the draft board
+  // stayed out of sync (missed picks, pauses, picks a commissioner made on
+  // the user's behalf) until a manual reload (LS-10593). On foreground:
+  // after a long absence force a brand-new socket (the old one is likely a
+  // zombie); after a short one just revive a client that gave up retrying.
+  // Either way, resync the data now rather than waiting on the socket.
+  const handleForeground = useCallback(
+    (backgroundMs: number) => {
+      if (!socketExpected) return;
+      LOGGER.info('[useDraftWebSocket] app foregrounded', {
+        backgroundMs,
+        draftId,
       });
-
-    /**
-     * Run one post-reconnect refetch, retrying transient failures with
-     * exponential backoff. The underlying error is logged as a structured
-     * object (not `String(e)`) so `name`/`stack`/Apollo's `graphQLErrors`
-     * survive into the Rollbar payload — stringifying it destroyed the cause
-     * and bypassed the `AbortError` noise filter in lib/rollbar (LS-8506).
-     */
-    const refetchWithRetry = async (
-      label: string,
-      run: () => Promise<unknown>,
-    ): Promise<ReconnectRefetchOutcome> => {
-      for (let attempt = 1; attempt <= RECONNECT_REFETCH_ATTEMPTS; attempt++) {
-        if (cancelled) return 'cancelled';
-        try {
-          await run();
-          return 'ok';
-        } catch (error: unknown) {
-          if (cancelled || isAbortError(error)) {
-            LOGGER.debug(
-              `Refetch of ${label} cancelled after websocket reconnect`,
-              { error },
-            );
-            return 'cancelled';
-          }
-          if (attempt === RECONNECT_REFETCH_ATTEMPTS) {
-            LOGGER.error(
-              `Failed to refetch ${label} after websocket reconnect`,
-              { attempts: attempt, error },
-            );
-            return 'failed';
-          }
-          await wait(RECONNECT_REFETCH_BASE_DELAY_MS * 2 ** (attempt - 1));
-        }
+      if (backgroundMs > FOREGROUND_FORCE_RECONNECT_MS) {
+        wsDisconnect();
+        wsConnect();
+      } else {
+        wsReconnectNow();
       }
-      return 'failed';
-    };
-
-    // Presence (onlineTeamIds) is WS-only — there is no GraphQL refetch to
-    // fall back on. The server pushes a fresh USER_LIST on every new
-    // connection, but that push is best-effort, so explicitly re-request one
-    // here too: userJoined/userLeft events missed while disconnected would
-    // otherwise leave presence stale until the next full page mount
-    // (LDB-028). Scoped to the draft room (LS-10160).
-    sendMessage({ type: 'requestUserList', draftId });
-
-    void refetchWithRetry('current pick', () =>
-      refetchCurrentPick({ draftId }),
-    );
-    void refetchWithRetry('pick history', refetchPickHistory);
-    void refetchWithRetry('auto-pick statuses', refetchAutoPickStatuses);
-    void refetchWithRetry('draft', refetchDraft);
-    // The queue is the server's first auto-pick source (auto-pick-scorer.ts),
-    // so a stale queue snapshot can show players already drafted while
-    // disconnected (LS-6787).
-    void refetchWithRetry('queue', refetchQueue);
-    // The available-players list is the one stale-state a user can act on: an
-    // out-of-date board lets them try to draft an already-taken player. Warn
-    // them explicitly rather than failing silently.
-    void refetchWithRetry('available players', refetchAvailablePlayers).then(
-      (outcome) => {
-        if (outcome === 'failed' && !cancelled) {
-          showToast(
-            'Could not refresh the player list after reconnecting — it may be out of date. Reload the page before drafting.',
-            'warning',
-          );
-        }
-      },
-    );
-
-    return () => {
-      cancelled = true;
-      pendingWaits.forEach((resolve, timer) => {
-        clearTimeout(timer);
-        resolve();
-      });
-      pendingWaits.clear();
-    };
-  }, [
-    wsConnected,
-    draftId,
-    sendMessage,
-    showToast,
-    refetchCurrentPick,
-    refetchPickHistory,
-    refetchAvailablePlayers,
-    refetchAutoPickStatuses,
-    refetchDraft,
-    refetchQueue,
-  ]);
+      if (Date.now() - lastResyncAtRef.current >= RESYNC_DEDUPE_MS) {
+        resync('foreground');
+      }
+    },
+    [socketExpected, draftId, wsConnect, wsDisconnect, wsReconnectNow, resync],
+  );
+  useAppForeground(handleForeground);
 
   /**
    * Debounced, renderable view of the socket state (LS-9856). The raw

@@ -792,6 +792,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               const effects = await executePickEffects({
                 db: context.db,
                 notificationService: notificationService ?? null,
+                notificationPublisher: context.notificationPublisher ?? null,
                 draftLeagueId,
                 draftId,
                 selectionMethod: (row.selection_method as string) ?? 'standard',

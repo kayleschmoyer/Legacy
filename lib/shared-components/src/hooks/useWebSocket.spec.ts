@@ -14,6 +14,7 @@ interface MockWSClient {
   updateContext: jest.Mock;
   setHeartbeatInterval: jest.Mock;
   reconnectNow: jest.Mock;
+  updateToken: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
   _emit: (event: string, ...args: unknown[]) => void;
@@ -42,6 +43,7 @@ function mockCreateInstance(): MockWSClient {
     updateContext: jest.fn(),
     setHeartbeatInterval: jest.fn(),
     reconnectNow: jest.fn(),
+    updateToken: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
     _emit(event: string, ...args: unknown[]) {
@@ -452,7 +454,7 @@ describe('useWebSocket', () => {
     expect(instance.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('disposes the stale client and reconnects with a rotated token (LS-6788)', async () => {
+  it('keeps the live client and hands it a rotated token instead of recreating it (LS-6788, LS-10593)', async () => {
     const { rerender } = renderHook(
       ({ token }) => useWebSocket({ url: 'wss://example.com', token }),
       { initialProps: { token: 'jwt-token-old' } },
@@ -462,8 +464,9 @@ describe('useWebSocket', () => {
       await Promise.resolve();
     });
 
-    const staleInstance = mockInstance;
+    const instance = mockInstance;
     expect(getConstructor()).toHaveBeenCalledTimes(1);
+    expect(instance.updateToken).not.toHaveBeenCalled();
 
     rerender({ token: 'jwt-token-new' });
 
@@ -471,12 +474,47 @@ describe('useWebSocket', () => {
       await Promise.resolve();
     });
 
-    expect(staleInstance.dispose).toHaveBeenCalledTimes(1);
-    expect(getConstructor()).toHaveBeenCalledTimes(2);
-    expect(getConstructor()).toHaveBeenLastCalledWith(
-      expect.objectContaining({ token: 'jwt-token-new' }),
+    // Recreating the client on every background JWT rotation tore down a
+    // live draft socket; the client only reads the token at connect time,
+    // so updating it is enough for the next (re)connect to use it.
+    expect(instance.dispose).not.toHaveBeenCalled();
+    expect(getConstructor()).toHaveBeenCalledTimes(1);
+    expect(instance.updateToken).toHaveBeenCalledWith('jwt-token-new');
+    // Revives a client that stopped retrying on the old, expired token
+    // (a no-op on a live socket — see WebSocketClient.reconnectNow).
+    expect(instance.reconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('tears the client down when the token goes away (sign-out)', () => {
+    const initialProps: { token: string | undefined } = { token: 'jwt-token' };
+    const { rerender } = renderHook(
+      ({ token }) => useWebSocket({ url: 'wss://example.com', token }),
+      { initialProps },
     );
-    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+
+    const instance = mockInstance;
+    rerender({ token: undefined });
+
+    expect(instance.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports connected=false when the client is replaced so consumers see a fresh connect edge (LS-10593)', () => {
+    const { result, rerender } = renderHook(
+      ({ draftId }) =>
+        useWebSocket({ url: 'wss://example.com', token: 'jwt', draftId }),
+      { initialProps: { draftId: 1 } },
+    );
+
+    act(() => mockInstance._emit('connected'));
+    expect(result.current.connected).toBe(true);
+
+    // The old client's handlers are unsubscribed before it is disposed, so
+    // its 'disconnected' never reaches the hook — the cleanup must reset it.
+    rerender({ draftId: 2 });
+    expect(result.current.connected).toBe(false);
+
+    act(() => mockInstance._emit('connected'));
+    expect(result.current.connected).toBe(true);
   });
 
   // ── Forwarding methods ──────────────────────────────────────────────────
@@ -514,6 +552,16 @@ describe('useWebSocket', () => {
     act(() => result.current.sendMessage(data));
 
     expect(mockInstance.send).toHaveBeenCalledWith(data);
+  });
+
+  it('reconnectNow() forwards to client.reconnectNow() (LS-10593)', () => {
+    const { result } = renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    act(() => result.current.reconnectNow());
+
+    expect(mockInstance.reconnectNow).toHaveBeenCalledTimes(1);
   });
 
   it('updateContext() forwards to client.updateContext()', () => {

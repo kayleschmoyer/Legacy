@@ -131,6 +131,8 @@ export function PickAnnouncement({
   leaving,
   onDismiss,
   commentary,
+  header,
+  footer,
 }: {
   player: DraftPlayer;
   pickNumber: number;
@@ -142,6 +144,19 @@ export function PickAnnouncement({
   leaving: boolean;
   onDismiss: () => void;
   commentary?: string;
+  /**
+   * Rendered in the card's flow above the pick label — the spectator splash's
+   * headshot + drafting team (LS-10593). It used to be a separate fixed
+   * overlay pinned on top of this card, which covered the label and the
+   * card's banner.
+   */
+  header?: React.ReactNode;
+  /**
+   * Rendered in the card's flow under the commentary — the spectator's
+   * highlight video / stat graphic and catch-up badge. In-flow so nothing is
+   * ever layered over the YouTube player (LS-9113 RMF rules).
+   */
+  footer?: React.ReactNode;
 }): React.JSX.Element {
   const posColor = getPositionColor('baseball', player.position);
   const labelColor = isAuto
@@ -171,11 +186,14 @@ export function PickAnnouncement({
         right: 0,
         bottom: 0,
         backdropFilter: 'blur(6px)',
+        // Spectator splash with media can outgrow short viewports.
+        overflowY: 'auto',
       }}
       zIndex={9999}
       alignItems="center"
       justifyContent="flex-start"
-      paddingTop={60}
+      paddingTop={header || footer ? 24 : 60}
+      paddingBottom={24}
       backgroundColor={withAlpha(colors.dark.surface.bg, 0.45)}
       animation="quick"
       opacity={leaving ? 0 : 1}
@@ -185,7 +203,8 @@ export function PickAnnouncement({
         onPress={(e: GestureResponderEvent) => e.stopPropagation()}
         testID="draft-announce"
         position="relative"
-        width={440}
+        // Wider when hosting the spectator's media footer (480px video).
+        width={footer ? 560 : 440}
         maxWidth="92%"
         overflow="hidden"
         borderRadius="$8"
@@ -215,6 +234,7 @@ export function PickAnnouncement({
           gap="$2"
           position="relative"
         >
+          {header}
           <YStack
             alignItems="center"
             paddingHorizontal="$3"
@@ -267,6 +287,7 @@ export function PickAnnouncement({
               {commentary}
             </Text>
           )}
+          {footer}
         </YStack>
       </YStack>
     </YStack>

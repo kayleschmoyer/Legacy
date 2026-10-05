@@ -95,6 +95,10 @@ function makeMockDb({
   return { select, transaction, insert, tx };
 }
 
+const notifyDraftStartPushes = jest.fn((..._args: unknown[]) =>
+  Promise.resolve(),
+);
+
 function makeNotificationService() {
   return {
     notifyDraftStarted: jest.fn(() => Promise.resolve()),
@@ -186,6 +190,8 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
   // scan, staleness cutoff and per-draft orchestration.
   jest.doMock('./participants', () => ({ reseatLeagueDraft }));
   jest.doMock('./draft-status', () => ({ setLeagueDraftStatus }));
+  // LS-10593: the draft-start pushes have their own coverage.
+  jest.doMock('./on-the-clock-push', () => ({ notifyDraftStartPushes }));
 
   await import('./auto-start-mutation');
   const resolve = captured.autoStartScheduledDrafts;
@@ -254,6 +260,44 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
     expect(result).toMatchObject({ draftsStarted: 1, errors: [] });
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(notificationService.notifyDraftStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the draft-start pushes for a started draft (LS-10593)', async () => {
+    notifyDraftStartPushes.mockClear();
+    const resolve = await captureAutoStartScheduledDraftsResolver();
+    const db = makeMockDb({
+      scheduledDraftsRows: [
+        {
+          draftId: 1,
+          leagueId: 10,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+          pickTimeLimitSeconds: 120,
+          scheduledAt: minutesAgo(1),
+        },
+      ],
+      teamsRowsInOrder: [[{ id: 100 }, { id: 101 }]],
+    });
+    const notificationPublisher = { publishToMany: jest.fn() };
+
+    await resolve(
+      {},
+      {},
+      {
+        isSystemRequest: true,
+        user: null,
+        db,
+        notificationService: makeNotificationService(),
+        notificationPublisher,
+      },
+    );
+
+    expect(notifyDraftStartPushes).toHaveBeenCalledWith(
+      db,
+      notificationPublisher,
+      { draftId: 1, leagueId: 10 },
+    );
   });
 
   it('skips a draft with fewer than 2 teams and reports it without starting a transaction', async () => {

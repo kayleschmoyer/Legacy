@@ -2132,32 +2132,41 @@ export const CSS = `
 .d-spec-layout {
   display: grid;
   grid-template-columns: 1fr 300px;
-  grid-template-rows: auto 1fr;
+  /* minmax(0, 1fr) + a bounded height let the board and rail scroll inside
+     \`.d-root\` (which is fixed + overflow:hidden) instead of growing past it,
+     which clipped later rounds and the depth chart (LS-10593). */
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     'topband topband'
     'board rail';
   gap: 14px;
   padding: 14px;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
 }
-/* Spectator board stacks on the same tablet boundary as \`.d-layout\`. */
+/* Spectator board stacks on the same tablet boundary as \`.d-layout\`.
+   Stacked, the layout itself scrolls so the rail below the board is reachable. */
 @media (max-width: ${BP_TABLET_MAX}px) {
   .d-spec-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
     grid-template-areas:
       'topband'
       'board'
       'rail';
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 .d-spec-topband {
   grid-area: topband;
   display: flex;
   align-items: center;
-  gap: 22px;
-  padding: 10px 18px;
+  gap: 14px;
+  padding: 6px 14px;
   background: var(--d-panel);
   border: 1px solid var(--d-panel-border);
   border-radius: var(--d-radius-lg);
@@ -2218,7 +2227,26 @@ export const CSS = `
 .d-spec-board {
   grid-area: board;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
+}
+@media (max-width: ${BP_TABLET_MAX}px) {
+  .d-spec-board { overflow: visible; overflow-x: auto; }
+}
+/* Compact clock in the spectator top band: the shared 140px CircularTimer
+   made the band eat half a phone screen (LS-10593). Scoped so the member
+   draft room's timer is unaffected. */
+.d-spec-topband .d-timer-wrap { margin-bottom: 0; }
+.d-spec-topband .d-timer-wrap::before { width: 72px; height: 72px; }
+.d-spec-topband .d-timer-svg { width: 64px; height: 64px; }
+@media (max-width: ${BP_PHONE_MAX}px) {
+  .d-spec-layout { padding: 8px; gap: 8px; }
+  .d-spec-topband { flex-wrap: wrap; gap: 6px 10px; padding: 6px 10px; }
+  .d-spec-league { flex: 1 1 100%; }
+  .d-spec-league-name { font-size: 16px; }
+  .d-spec-pickinfo { font-size: 13px; }
+  .d-spec-onclock-team { font-size: 16px; }
+  .d-spec-topband .d-timer-svg { width: 48px; height: 48px; }
 }
 /* TV-distance legibility: bump the grid's cell type on the spectator board. */
 .d-spec-board .d-draft-grid-cell-name { font-size: 13px; }
@@ -2228,6 +2256,8 @@ export const CSS = `
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 .d-spec-depth-team {
   font-family: var(--f-display);
@@ -2316,22 +2346,14 @@ export const CSS = `
   columns: 2;
   column-gap: 32px;
 }
-/* Splash chrome sits above the reused announcement overlay (z-index 9999). */
-.d-splash-chrome {
-  position: fixed;
-  top: 72px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10000;
+/* Splash chrome: header (headshot + drafting team) and footer (media +
+   queue badge) render in the announcement card's flow (LS-10593). */
+.d-splash-chrome-head,
+.d-splash-chrome-foot {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  pointer-events: none;
-  animation: fadeSlideUp 0.3s ease-out;
-}
-.d-splash-chrome.leaving {
-  animation: announceOut 0.4s ease-in forwards;
 }
 .d-splash-headshot {
   width: 96px;
@@ -2367,11 +2389,10 @@ export const CSS = `
   padding: 3px 10px;
 }
 /* Pick-splash YouTube highlight embed (LS-9113). RMF compliance: nothing is
-   ever layered over any part of the player (pick banner/name are adjacent
-   flex siblings in the chrome column), the 480x270 frame exceeds the 200x200
-   minimum, and the fixed splash position keeps it fully visible. The chrome
-   container is pointer-events:none, so re-enable events here — obscuring or
-   blocking player interaction is prohibited. */
+   ever layered over any part of the player (it is an in-flow sibling in the
+   announcement card's footer), the 480x270 frame exceeds the 200x200
+   minimum, and the overlay scrolls rather than clipping it. pointer-events
+   stays explicit — obscuring or blocking player interaction is prohibited. */
 .d-splash-video {
   pointer-events: auto;
   background: var(--d-panel);

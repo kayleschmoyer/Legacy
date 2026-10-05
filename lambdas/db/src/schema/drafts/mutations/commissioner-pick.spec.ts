@@ -578,4 +578,251 @@ describe('commissionerPick — draft row lock-wait retry (LS-8480)', () => {
   });
 });
 
+describe('commissionerPick — next seat on the clock (LS-10593)', () => {
+  const draftRow = {
+    id: 1,
+    league_id: 1,
+    pick_time_limit_seconds: 30,
+    selection_method: 'snake',
+  };
+  const nextPickInfo = {
+    draftId: 1,
+    teamId: 11,
+    participantId: 77,
+    round: 1,
+    pickNumber: 2,
+    overallPick: 2,
+    isComplete: false,
+  };
+
+  function setup(options: {
+    draftStatus: 'in-progress' | 'paused';
+    isDraftComplete?: boolean;
+  }) {
+    jest.resetModules();
+    const leagueRow = {
+      id: 1,
+      draftStatus: options.draftStatus,
+      playerPool: 'all',
+      maxRosterSize: 25,
+    };
+    const mockOffload = jest.fn().mockResolvedValue(undefined);
+    const mockNotifyOnTheClock = jest.fn().mockResolvedValue([]);
+    const mockNotifyDraftPickMade = jest.fn().mockResolvedValue(undefined);
+    const txUpdateSet = jest.fn().mockReturnThis();
+    const commitDeadline = new Date(Date.now() + 30_000);
+
+    let capturedFn: ((...args: unknown[]) => Promise<unknown>) | undefined;
+    jest.doMock('../../builder', () => ({
+      builder: {
+        mutationField: jest.fn((_name: string, fn: (t: unknown) => void) => {
+          fn({
+            field: (opts: {
+              resolve: (...args: unknown[]) => Promise<unknown>;
+            }) => {
+              capturedFn = opts.resolve;
+            },
+            arg: { int: () => ({}) },
+          });
+        }),
+      },
+    }));
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      getDbOptions: jest.fn(() => ({})),
+    }));
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createBadgeService: jest.fn(() => ({
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        })),
+        findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
+        PublicSchema: {
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          leagues: { id: 'id' },
+          drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
+          draftPicks: { draftId: 'draftId', playerId: 'playerId' },
+          players: { id: 'id' },
+        },
+      }),
+    );
+    jest.doMock('../types', () => ({ DraftPick: {} }));
+    jest.doMock('../helpers', () => ({
+      commitDraftPick: jest.fn().mockResolvedValue({
+        draftPick: { id: 100, playerId: 5 },
+        isDraftComplete: options.isDraftComplete ?? false,
+        nextDeadline: options.isDraftComplete ? null : commitDeadline,
+        nextPickInfo: options.isDraftComplete ? null : nextPickInfo,
+      }),
+      getCurrentDraftPickInfo: jest.fn().mockResolvedValue({
+        teamId: 10,
+        participantId: 66,
+        overallPick: 1,
+        round: 1,
+        pickNumber: 1,
+        isComplete: false,
+      }),
+    }));
+    jest.doMock('../offload-auto-pick', () => ({
+      offloadNextPickIfAutoPick: mockOffload,
+    }));
+    jest.doMock('../on-the-clock-push', () => ({
+      notifyOnTheClock: mockNotifyOnTheClock,
+    }));
+    jest.doMock('../../../services/roster-service', () => ({
+      checkRosterCapacity: jest.fn().mockResolvedValue({ isFull: false }),
+      isPlayerOnRoster: jest.fn().mockResolvedValue(false),
+    }));
+    jest.doMock('../../../services/activity-log', () => ({
+      logDraftPickActivity: jest.fn(),
+    }));
+    jest.doMock('../../matchups/mutations', () => ({
+      createAllMatchupsForLeague: jest
+        .fn()
+        .mockResolvedValue({ matchupCount: 0 }),
+    }));
+    jest.doMock('../scheduled-mutations', () => ({
+      isLockWaitTimeout: jest.fn().mockReturnValue(false),
+    }));
+    jest.doMock('../../leagues/delete-resilience', () => ({
+      describeDbError: jest.fn(() => ({ message: 'mock db error' })),
+      formatDbError: jest.fn(() => 'mock db error'),
+    }));
+
+    const tx = {
+      execute: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // SET LOCAL statement_timeout
+        .mockResolvedValueOnce({ rows: [draftRow] }), // FOR NO KEY UPDATE
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockResolvedValueOnce([leagueRow]) // league re-verify
+        .mockResolvedValueOnce([]), // no existing pick
+      update: jest.fn(() => ({
+        set: txUpdateSet,
+        where: jest.fn().mockResolvedValue(undefined),
+      })),
+    };
+    const publisher = { publishToMany: jest.fn() };
+    const db = {
+      execute: jest.fn().mockResolvedValueOnce({ rows: [draftRow] }),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([leagueRow])
+        .mockResolvedValueOnce([{ id: 5 }]),
+      transaction: jest.fn((fn: (t: unknown) => Promise<unknown>) => fn(tx)),
+    };
+    const ctx = {
+      user: { id: 99 },
+      db,
+      notificationService: {
+        notifyDraftPickMade: mockNotifyDraftPickMade,
+        notifyDraftCompleted: jest.fn().mockResolvedValue(undefined),
+      },
+      notificationPublisher: publisher,
+    };
+
+    require('./commissioner-pick');
+    if (!capturedFn)
+      throw new Error('commissionerPick resolver was not captured');
+    const resolve = capturedFn;
+
+    return {
+      run: () => resolve({}, { draftId: 1, playerId: 5 }, ctx, undefined),
+      ctx,
+      tx,
+      txUpdateSet,
+      publisher,
+      commitDeadline,
+      mockOffload,
+      mockNotifyOnTheClock,
+      mockNotifyDraftPickMade,
+    };
+  }
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('offloads an auto-pick next seat to autoProcessDraftPicks (mirrors makeDraftPick LS-8107)', async () => {
+    const { run, ctx, mockOffload } = setup({ draftStatus: 'in-progress' });
+
+    await run();
+
+    expect(mockOffload).toHaveBeenCalledWith(ctx.db, {
+      draftId: 1,
+      leagueId: 1,
+      nextParticipantId: 77,
+    });
+  });
+
+  it('pushes the next seat that it is on the clock', async () => {
+    const { run, ctx, publisher, mockNotifyOnTheClock } = setup({
+      draftStatus: 'in-progress',
+    });
+
+    await run();
+
+    expect(mockNotifyOnTheClock).toHaveBeenCalledWith(ctx.db, publisher, {
+      draftId: 1,
+      leagueId: 1,
+      participantId: 77,
+      round: 1,
+      pickNumber: 2,
+    });
+  });
+
+  it('keeps the timer armed and broadcast while the draft is running', async () => {
+    const { run, tx, commitDeadline, mockNotifyDraftPickMade } = setup({
+      draftStatus: 'in-progress',
+    });
+
+    await run();
+
+    expect(tx.update).not.toHaveBeenCalled();
+    const extras = mockNotifyDraftPickMade.mock.calls[0][10] as {
+      currentPickDeadline: string | null;
+    };
+    expect(extras.currentPickDeadline).toBe(commitDeadline.toISOString());
+  });
+
+  it('clears the deadline (in the transaction) and broadcasts null when the draft is paused', async () => {
+    const { run, tx, txUpdateSet, mockNotifyDraftPickMade, mockOffload } =
+      setup({ draftStatus: 'paused' });
+
+    await run();
+
+    expect(tx.update).toHaveBeenCalledTimes(1);
+    expect(txUpdateSet).toHaveBeenCalledWith({ currentPickDeadline: null });
+    const extras = mockNotifyDraftPickMade.mock.calls[0][10] as {
+      currentPickDeadline: string | null;
+    };
+    expect(extras.currentPickDeadline).toBeNull();
+    // A paused draft must not have its deadline expired for auto-pick.
+    expect(mockOffload).not.toHaveBeenCalled();
+  });
+
+  it('does neither offload nor push when the pick completes the draft', async () => {
+    const { run, mockOffload, mockNotifyOnTheClock } = setup({
+      draftStatus: 'in-progress',
+      isDraftComplete: true,
+    });
+
+    await run();
+
+    expect(mockOffload).not.toHaveBeenCalled();
+    expect(mockNotifyOnTheClock).not.toHaveBeenCalled();
+  });
+});
+
 export {};

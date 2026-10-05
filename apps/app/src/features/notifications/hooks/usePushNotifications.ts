@@ -273,11 +273,23 @@ export function navigateFromNotification(
   const sportPrefix =
     sport && ALLOWED_SPORT_PREFIXES.includes(sport) ? sport : 'baseball';
 
+  // LS-10593: "your draft has started" / "you're on the clock" are calls to
+  // act now, so they open the live draft room directly — the same
+  // `/DraftBoardPage` route the league Overview's "Join draft" banner uses
+  // (it serves both sports) — rather than the league screen.
   if (
     (notificationType === 'DRAFT_STARTED' ||
-      notificationType === 'DRAFT_PICK_MADE') &&
+      notificationType === 'DRAFT_ON_THE_CLOCK') &&
     leagueId
   ) {
+    router.navigate({
+      pathname: '/DraftBoardPage',
+      params: { leagueId: String(leagueId) },
+    });
+    return;
+  }
+
+  if (notificationType === 'DRAFT_PICK_MADE' && leagueId) {
     router.navigate(`/${sportPrefix}/league/${leagueId}`);
     return;
   }

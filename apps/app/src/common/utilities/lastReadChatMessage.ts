@@ -11,10 +11,24 @@ import { LOGGER } from '@legacy-sports/logging';
 
 const KEY_PREFIX = 'ls.lastReadChatMessage.';
 
+/**
+ * Storage key for a chat stream: a league id for league chat (shared by
+ * League Home and the league draft room so their badges agree), or a string
+ * key such as `draft-<draftId>` for a mock draft's own chat (LS-10593).
+ */
+export type ChatReadKey = number | string;
+
+function isValidKey(key: ChatReadKey): boolean {
+  return typeof key === 'number'
+    ? Number.isInteger(key) && key > 0
+    : key.length > 0;
+}
+
 /** Read the last-read message id for a league, or `null` if none/unavailable. */
 export async function getLastReadChatMessageId(
-  leagueId: number,
+  leagueId: ChatReadKey,
 ): Promise<number | null> {
+  if (!isValidKey(leagueId)) return null;
   try {
     const raw = await AsyncStorage.getItem(`${KEY_PREFIX}${leagueId}`);
     if (!raw) return null;
@@ -31,10 +45,10 @@ export async function getLastReadChatMessageId(
 
 /** Persist the id of the newest message the user has seen for a league. */
 export function setLastReadChatMessageId(
-  leagueId: number,
+  leagueId: ChatReadKey,
   messageId: number,
 ): void {
-  if (!Number.isInteger(leagueId) || leagueId <= 0) return;
+  if (!isValidKey(leagueId)) return;
   if (!Number.isFinite(messageId)) return;
   AsyncStorage.setItem(`${KEY_PREFIX}${leagueId}`, String(messageId)).catch(
     (error: unknown) => {

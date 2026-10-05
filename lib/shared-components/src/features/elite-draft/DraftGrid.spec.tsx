@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { DraftGrid } from './DraftGrid';
 import { getPositionColor } from './utils';
 import type {
@@ -291,7 +292,9 @@ describe('DraftGrid — pick inspector (LS-10163)', () => {
     ).toContain('is on the board at');
   });
 
-  it('closes on Escape', () => {
+  // Escape is a web-only affordance — on native the inspector never touches
+  // `document` (Hermes has none) and closes via Android back (LS-10593).
+  (Platform.OS === 'web' ? it : it.skip)('closes on Escape', () => {
     render(
       <DraftGrid
         teams={[team('1'), team('2')]}

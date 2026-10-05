@@ -102,6 +102,9 @@ let capturedOnViewMatchup: ((summary: Record<string, unknown>) => void) | null =
 let capturedOnBrowseStats: (() => void) | null = null;
 let capturedOnSetLineup: ((summary: Record<string, unknown>) => void) | null =
   null;
+// Capture the hero "Join Draft" callback (LS-10593)
+let capturedOnJoinDraft: ((summary: Record<string, unknown>) => void) | null =
+  null;
 
 /** Minimal stand-in for the ScrollView handle `scrollRef` receives (LS-9248). */
 type ScrollHandleStub = { scrollTo: jest.Mock };
@@ -120,6 +123,7 @@ type HomeScreenMockProps = {
   onViewMatchup?: (summary: Record<string, unknown>) => void;
   onBrowseStats?: () => void;
   onSetLineup?: (summary: Record<string, unknown>) => void;
+  onJoinDraft?: (summary: Record<string, unknown>) => void;
   refreshControl?: PullToRefreshControlElement;
   primarySport?: 'baseball' | 'football' | null;
   defaultSport?: 'baseball' | 'football';
@@ -186,6 +190,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onViewMatchup,
     onBrowseStats,
     onSetLineup,
+    onJoinDraft,
     refreshControl,
     primarySport,
     defaultSport,
@@ -200,6 +205,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnViewMatchup = onViewMatchup ?? null;
     capturedOnBrowseStats = onBrowseStats ?? null;
     capturedOnSetLineup = onSetLineup ?? null;
+    capturedOnJoinDraft = onJoinDraft ?? null;
     capturedRefreshControl = refreshControl ?? null;
     capturedScrollRef = scrollRef ?? null;
     capturedPrimarySport = primarySport;
@@ -650,6 +656,7 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
     capturedOnViewMatchup = null;
     capturedOnBrowseStats = null;
     capturedOnSetLineup = null;
+    capturedOnJoinDraft = null;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -758,6 +765,23 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
       params: { leagueId: '9', initialTab: 'roster' },
     });
   });
+
+  // LS-10593 — the hero ticket's "Join Draft" CTA opens the live draft room,
+  // the same `/DraftBoardPage` route the league Overview's join banner uses
+  // for both sports.
+  it.each([['baseball'], ['football']])(
+    'routes Join Draft to the draft room for a %s league',
+    (sport) => {
+      render(<HomeTab />);
+      void act(() => {
+        capturedOnJoinDraft?.({ leagueId: 12, sport });
+      });
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: '12' },
+      });
+    },
+  );
 });
 
 describe('HomeTab pull-to-refresh (LS-8847)', () => {

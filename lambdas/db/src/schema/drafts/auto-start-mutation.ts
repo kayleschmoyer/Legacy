@@ -37,6 +37,7 @@ import {
 } from './helpers';
 import { setLeagueDraftStatus } from './draft-status';
 import { reseatLeagueDraft } from './participants';
+import { notifyDraftStartPushes } from './on-the-clock-push';
 import { cancelPendingDraftSlotTradesForLeague } from '../draft-slot-trades/helpers';
 import { builder } from '../builder';
 
@@ -303,6 +304,14 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
                 initialDeadline.toISOString(),
               );
             }
+
+            // LS-10593: push the first-pick holder (on the clock) and every other
+            // league member (draft started). Never throws.
+            await notifyDraftStartPushes(
+              context.db,
+              context.notificationPublisher,
+              { draftId, leagueId },
+            );
 
             // Post system league message
             try {

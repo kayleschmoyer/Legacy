@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { DraftPickInspector } from './DraftPickInspector';
 import { buildPickInspectorData } from './draftPickInspectorModel';
 import { fireEvent, render, screen } from '../../test-utils';
@@ -114,7 +115,10 @@ describe('DraftPickInspector', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('closes on Escape', () => {
+  const itWeb = Platform.OS === 'web' ? it : it.skip;
+  const itNative = Platform.OS === 'web' ? it.skip : it;
+
+  itWeb('closes on Escape', () => {
     const onClose = jest.fn();
     render(<DraftPickInspector data={MADE} onClose={onClose} />);
 
@@ -122,6 +126,18 @@ describe('DraftPickInspector', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  itNative(
+    'never touches `document` on native — it does not exist on Hermes (LS-10593)',
+    () => {
+      const addSpy = jest.spyOn(document, 'addEventListener');
+      const onClose = jest.fn();
+      render(<DraftPickInspector data={MADE} onClose={onClose} />);
+
+      expect(addSpy).not.toHaveBeenCalledWith('keydown', expect.anything());
+      addSpy.mockRestore();
+    },
+  );
 
   it('does not listen for Escape once closed', () => {
     const onClose = jest.fn();

@@ -29,6 +29,7 @@ import {
   DraftPickSheet,
   SQUAD_SHEET_HEIGHT_PERCENT,
 } from './DraftPickSheet';
+import { DraftOpenSlotsBanner } from './DraftOpenSlotsBanner';
 import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
@@ -66,6 +67,7 @@ import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { useAuth } from '../../features/auth';
 import { handleKeyActivate } from '../../utils/keyboardActivation';
 import { useHasEntitlement } from '../../hooks/useEntitlement';
+import { useScreenWakeLock } from '../../hooks/useScreenWakeLock';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
@@ -117,6 +119,12 @@ export interface EliteDraftBoardScreenProps {
    * platforms without a safe-area concept (web).
    */
   bottomInset?: number;
+  /**
+   * Top safe-area inset (status bar), forwarded to the compact branch's
+   * sheets so their close control never lands under the status bar
+   * (LS-10593). Defaults to 0 (web).
+   */
+  topInset?: number;
   /**
    * Optional override for the Exit Draft control's navigation. When omitted,
    * Exit Draft falls back to `onNavigate('/baseball')` (web's behavior, where
@@ -234,6 +242,9 @@ interface CompactLiveDraftBoardProps {
   /** Bottom safe-area inset reserved under the squad strip, sheets and chat
    *  panel — the phone board's bottom-most surfaces (LS-9444, LS-10165). */
   bottomInset: number;
+  /** Top safe-area inset — keeps the sheets' close control below the status
+   *  bar (LS-10593). */
+  topInset: number;
   /** Read-only league/draft settings summary rendered under the Team tab (LS-9857). */
   draftDetails: DraftDetailsSettings;
   /**
@@ -273,6 +284,7 @@ function CompactLiveDraftBoard({
   isMock,
   controlAllTeams,
   bottomInset,
+  topInset,
   draftDetails,
   connectionStale,
   onRetryConnection,
@@ -503,6 +515,46 @@ function CompactLiveDraftBoard({
             pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
             onPress={openPickSheet}
           />
+          {/* Auto-pick status + toggle (LS-10593): the phone layout had
+              neither, so users with auto-pick on had no idea and no way to
+              turn it off. The server only accepts toggles mid-draft. */}
+          {!ui.draftPaused && (
+            <XStack
+              testID="draft-autopick-toggle"
+              marginTop={8}
+              alignSelf="center"
+              alignItems="center"
+              gap={6}
+              paddingHorizontal={10}
+              minHeight={32}
+              borderRadius={999}
+              borderWidth={1}
+              borderColor={
+                actions.isMyTeamAutoPick ? '$brandGold' : '$outlineDefault'
+              }
+              onPress={() => void actions.handleToggleUserAutoPick()}
+              pressStyle={{ opacity: 0.7 }}
+              cursor="pointer"
+              role="switch"
+              accessibilityRole="switch"
+              aria-checked={actions.isMyTeamAutoPick}
+              accessibilityState={{ checked: actions.isMyTeamAutoPick }}
+              aria-label="Auto-pick"
+              accessibilityLabel="Auto-pick"
+            >
+              <Text
+                fontSize={11}
+                fontWeight="800"
+                letterSpacing={1}
+                textTransform="uppercase"
+                color={actions.isMyTeamAutoPick ? '$brandGoldLight' : '$fg3'}
+              >
+                {actions.isMyTeamAutoPick
+                  ? 'Auto-pick on · tap to turn off'
+                  : 'Auto-pick off'}
+              </Text>
+            </XStack>
+          )}
         </YStack>
       </>
 
@@ -532,6 +584,7 @@ function CompactLiveDraftBoard({
         heightPercent={SQUAD_SHEET_HEIGHT_PERCENT}
         testID="draft-squad-sheet"
         bottomInset={bottomInset}
+        topInset={topInset}
       >
         {/* No wrapper scroller: DraftTeamTab owns its own ScrollView (the one
             its `footer` renders inside), and nesting a second would strand the
@@ -568,6 +621,7 @@ function CompactLiveDraftBoard({
         title={PICK_SHEET_TITLES[ui.activeTab]}
         subtitle={pickSheetSubtitle}
         bottomInset={bottomInset}
+        topInset={topInset}
       >
         <DraftSheetTabs
           activeTab={ui.activeTab}
@@ -590,30 +644,40 @@ function CompactLiveDraftBoard({
             teamNameById={queries.teamNameById}
           />
         ) : (
-          <DraftPlayersTab
-            players={playerData.enrichedPlayers}
-            myTeam={playerData.myTeam}
-            sport={sport}
-            leaguePositions={queries.leaguePositions}
-            defensiveFormat={defensiveFormat}
-            maxRosterSize={queries.maxRosterSize ?? null}
-            selectedPosition={ui.selectedPosition}
-            searchTerm={ui.searchTerm}
-            onSetSelectedPosition={ui.setSelectedPosition}
-            onSetSearchTerm={ui.setSearchTerm}
-            canDraft={canDraft}
-            draftActionLabel={isRealCommPick ? 'ASSIGN' : 'DRAFT'}
-            currentPickInfo={queries.currentPickInfo}
-            boardOrderedTeams={boardTeams}
-            myTeamId={queries.myTeamId}
-            draftOrder={queries.leagueDraft?.draftOrder}
-            queuedPlayerIds={queries.queuedPlayerIds}
-            onToggleQueue={handleToggleQueue}
-            onDraftPlayer={handleSheetDraft}
-            hasMorePlayers={queries.hasMorePlayers}
-            loadingMore={queries.loadingMore}
-            onLoadMore={onLoadMore}
-          />
+          <YStack flex={1}>
+            {/* Names the open-roster-slot filter (LS-10593). */}
+            <YStack paddingHorizontal="$3" paddingTop={8}>
+              <DraftOpenSlotsBanner
+                openSlotPositions={queries.openSlotPositions}
+                showAllPositions={ui.showAllPositions}
+                onToggleShowAll={ui.setShowAllPositions}
+              />
+            </YStack>
+            <DraftPlayersTab
+              players={playerData.enrichedPlayers}
+              myTeam={playerData.myTeam}
+              sport={sport}
+              leaguePositions={queries.leaguePositions}
+              defensiveFormat={defensiveFormat}
+              maxRosterSize={queries.maxRosterSize ?? null}
+              selectedPosition={ui.selectedPosition}
+              searchTerm={ui.searchTerm}
+              onSetSelectedPosition={ui.setSelectedPosition}
+              onSetSearchTerm={ui.setSearchTerm}
+              canDraft={canDraft}
+              draftActionLabel={isRealCommPick ? 'ASSIGN' : 'DRAFT'}
+              currentPickInfo={queries.currentPickInfo}
+              boardOrderedTeams={boardTeams}
+              myTeamId={queries.myTeamId}
+              draftOrder={queries.leagueDraft?.draftOrder}
+              queuedPlayerIds={queries.queuedPlayerIds}
+              onToggleQueue={handleToggleQueue}
+              onDraftPlayer={handleSheetDraft}
+              hasMorePlayers={queries.hasMorePlayers}
+              loadingMore={queries.loadingMore}
+              onLoadMore={onLoadMore}
+            />
+          </YStack>
         )}
       </DraftPickSheet>
 
@@ -687,6 +751,7 @@ function CompactLiveDraftBoard({
               draftId: chatDraftId ?? null,
               userId,
               onNewMessage: handleNewChatMessage,
+              chatOpen,
             })}
           </YStack>
         ) : (
@@ -798,6 +863,7 @@ export function EliteDraftBoardScreen({
   sport: sportOverride,
   onActiveDraftChange,
   bottomInset = 0,
+  topInset = 0,
   onExitDraft,
   onDownloadDraftPacket,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
@@ -859,6 +925,7 @@ export function EliteDraftBoardScreen({
     draftId,
     playerSearch: ui.playerSearch,
     selectedPosition: ui.selectedPosition,
+    showAllPositions: ui.showAllPositions,
     viewMode: ui.viewMode,
     isCompact,
   });
@@ -1136,6 +1203,19 @@ export function EliteDraftBoardScreen({
     onActiveDraftChange?.(isDraftRunning);
     return () => onActiveDraftChange?.(false);
   }, [isDraftRunning, onActiveDraftChange]);
+  // Keep the display awake for the whole live draft — browser fullscreen
+  // alone lets the PC sleep mid-draft (LS-10593). Native routes hold
+  // expo-keep-awake themselves.
+  useScreenWakeLock(isDraftRunning);
+
+  const playersRefreshFailed =
+    !!queries.availablePlayersError && queries.availablePlayers.length > 0;
+  const { showToast } = ui;
+  useEffect(() => {
+    if (playersRefreshFailed) {
+      showToast('Could not refresh players — showing last list', 'warning');
+    }
+  }, [playersRefreshFailed, showToast]);
 
   // ---- Derived values ----
   const onlineTeamIds = useMemo<ReadonlySet<string>>(() => {
@@ -1357,7 +1437,12 @@ export function EliteDraftBoardScreen({
     );
   }
 
-  if (queries.availablePlayersError) {
+  // Only take over the whole screen when there is no player list at all. A
+  // transient failure on the post-pick refetch (often mid-search) used to
+  // unmount the live board — open sheet included — for an exit-less error
+  // screen, which read as the app locking up (LS-10593). With a list already
+  // on screen, keep the board and toast instead (effect above).
+  if (queries.availablePlayersError && queries.availablePlayers.length === 0) {
     return (
       <PlayersErrorScreen
         message={queries.availablePlayersError.message}
@@ -1502,6 +1587,7 @@ export function EliteDraftBoardScreen({
         chatDraftId={isMock ? queries.draftId : null}
         controlAllTeams={controlAllTeams}
         bottomInset={bottomInset}
+        topInset={topInset}
         draftDetails={draftDetails}
         connectionStale={connectionStale}
         onRetryConnection={retryConnection}
@@ -1642,6 +1728,13 @@ export function EliteDraftBoardScreen({
         />
 
         <DraftPlayerBoard
+          openSlotsBanner={
+            <DraftOpenSlotsBanner
+              openSlotPositions={queries.openSlotPositions}
+              showAllPositions={ui.showAllPositions}
+              onToggleShowAll={ui.setShowAllPositions}
+            />
+          }
           viewMode={ui.viewMode}
           sport={sport}
           defensiveFormat={defensiveFormat}

@@ -42,6 +42,12 @@ export interface DraftChatTabRenderProps {
   draftId?: number | null;
   userId: number;
   onNewMessage: () => void;
+  /**
+   * Whether the chat panel is currently visible. Connectors use it to mark
+   * messages read (persisted last-read id) so already-seen messages don't
+   * re-raise the unread badge on every re-entry (LS-10593).
+   */
+  chatOpen?: boolean;
 }
 export type DraftChatTabRenderer = (
   props: DraftChatTabRenderProps,

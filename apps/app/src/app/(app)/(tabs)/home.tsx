@@ -194,6 +194,18 @@ export default function HomeTab() {
     [router],
   );
 
+  // Live draft room — same `/DraftBoardPage` route the league Overview's
+  // "Join draft" banner uses; it serves both sports (LS-10593).
+  const joinDraft = useCallback(
+    (s: HomeLeagueSummary) => {
+      router.navigate({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: String(s.leagueId) },
+      });
+    },
+    [router],
+  );
+
   const handleViewSport = useCallback((sport: ActiveSport) => {
     setMountedSports((prev) => {
       if (prev.has(sport)) return prev;
@@ -315,6 +327,7 @@ export default function HomeTab() {
           onViewLeague={viewLeague}
           onViewMatchup={viewMatchup}
           onSetLineup={setLineup}
+          onJoinDraft={joinDraft}
           onSeeAllLeagues={() => router.navigate('/leagues')}
           onOpenProfile={() => router.navigate('/you')}
           onMockDraft={() => router.push('/baseball/mock-draft')}

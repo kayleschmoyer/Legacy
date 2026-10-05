@@ -15,8 +15,15 @@ jest.mock('@legacy-sports/shared-components/elite-draft', () => ({
   },
 }));
 
+let mockDraftMessages:
+  | { id: number; userId: number; messageText: string }[]
+  | undefined;
 jest.mock('@apollo/client/react', () => ({
-  useQuery: () => ({ data: undefined, loading: false, refetch: jest.fn() }),
+  useQuery: () => ({
+    data: mockDraftMessages ? { draftMessages: mockDraftMessages } : undefined,
+    loading: false,
+    refetch: jest.fn(),
+  }),
   useMutation: () => [jest.fn(), { loading: false }],
 }));
 
@@ -54,6 +61,8 @@ function lastBoardProps(): Record<string, unknown> {
 describe('MockDraftBoardScreen', () => {
   beforeEach(() => {
     mockBoardProps.mockClear();
+    mockDraftMessages = undefined;
+    window.localStorage.clear();
   });
 
   it('renders the football board on the football mock draft route', () => {
@@ -70,5 +79,59 @@ describe('MockDraftBoardScreen', () => {
     renderAt('/baseball/mock-draft/7');
 
     expect(lastBoardProps()).toMatchObject({ sport: 'baseball', draftId: 7 });
+  });
+
+  // LS-10593: unread is keyed on a persisted last-read id per mock draft
+  // (`draft-<id>`) rather than a per-mount message count.
+  describe('chat unread tracking', () => {
+    const KEY = 'ls.lastReadChatMessage.draft-7';
+    type RenderChatTab = (props: Record<string, unknown>) => React.ReactNode;
+
+    function renderConnector(props: {
+      chatOpen?: boolean;
+      onNewMessage: () => void;
+    }): { rerender: (next: typeof props) => void } {
+      renderAt('/baseball/mock-draft/7');
+      const renderChatTab = lastBoardProps().renderChatTab as RenderChatTab;
+      const view = (p: typeof props) => (
+        <>{renderChatTab({ leagueId: null, draftId: 7, userId: 1, ...p })}</>
+      );
+      const utils = render(view(props));
+      return { rerender: (next) => utils.rerender(view(next)) };
+    }
+
+    it('does not raise unread for already-read history', () => {
+      window.localStorage.setItem(KEY, '4');
+      mockDraftMessages = [
+        { id: 3, userId: 2, messageText: 'hi' },
+        { id: 4, userId: 2, messageText: 'gl' },
+      ];
+      const onNewMessage = jest.fn();
+      renderConnector({ chatOpen: false, onNewMessage });
+
+      expect(onNewMessage).not.toHaveBeenCalled();
+    });
+
+    it('raises unread for a new message from someone else while closed', () => {
+      window.localStorage.setItem(KEY, '4');
+      mockDraftMessages = [{ id: 4, userId: 2, messageText: 'gl' }];
+      const onNewMessage = jest.fn();
+      const { rerender } = renderConnector({ chatOpen: false, onNewMessage });
+
+      mockDraftMessages = [
+        { id: 4, userId: 2, messageText: 'gl' },
+        { id: 5, userId: 3, messageText: 'nice pick' },
+      ];
+      rerender({ chatOpen: false, onNewMessage });
+
+      expect(onNewMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('persists the newest message as read when chat is open', () => {
+      mockDraftMessages = [{ id: 9, userId: 2, messageText: 'hi' }];
+      renderConnector({ chatOpen: true, onNewMessage: jest.fn() });
+
+      expect(window.localStorage.getItem(KEY)).toBe('9');
+    });
   });
 });

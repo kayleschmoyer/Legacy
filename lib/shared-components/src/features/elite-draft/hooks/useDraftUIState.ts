@@ -60,6 +60,9 @@ export interface PickSplashQueueItem {
 
 export function useDraftUIState() {
   const [selectedPosition, setSelectedPosition] = useState('ALL');
+  // The board defaults to the viewer's open roster-slot positions (LS-8065);
+  // this lets them see every position (LS-10593).
+  const [showAllPositions, setShowAllPositions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<
     'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth'
@@ -241,6 +244,8 @@ export function useDraftUIState() {
     // Position/search/view
     selectedPosition,
     setSelectedPosition,
+    showAllPositions,
+    setShowAllPositions,
     searchTerm,
     setSearchTerm,
     viewMode,

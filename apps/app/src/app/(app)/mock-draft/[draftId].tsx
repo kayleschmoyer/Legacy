@@ -7,9 +7,10 @@
  * `draft_messages` rather than league chat.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Share } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -30,11 +31,13 @@ import type { DraftChatTabRenderProps } from '@legacy-sports/shared-components/e
 
 import { config } from '@legacy-sports/app-config/native';
 import { closeToHomeTab, toIntId } from '../../../common/utilities/RouteUtils';
+import { useDraftChatUnread } from '../../../hooks/useDraftChatUnread';
 
 function DraftChatConnector({
   draftId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps & { draftId: number }): React.JSX.Element {
   const { data, loading, refetch } = useQuery<
     GetDraftMessagesQuery,
@@ -49,17 +52,23 @@ function DraftChatConnector({
   >(SEND_DRAFT_MESSAGE);
 
   const messages = data?.draftMessages ?? [];
-  const prevCountRef = useRef<number | null>(null);
+  const chatMessages = messages.map((m) => ({
+    id: m.id ?? 0,
+    userId: m.userId ?? 0,
+    username: m.user?.username ?? 'Manager',
+    messageText: m.messageText ?? '',
+  }));
 
-  useEffect(() => {
-    if (
-      prevCountRef.current !== null &&
-      messages.length > prevCountRef.current
-    ) {
-      onNewMessage();
-    }
-    prevCountRef.current = messages.length;
-  }, [messages.length, onNewMessage]);
+  // Persisted last-read id per mock draft instead of a per-mount message
+  // count, so the history load never re-raises the unread dot on re-entry
+  // (LS-10593).
+  useDraftChatUnread({
+    storageKey: `draft-${draftId}`,
+    messages: chatMessages,
+    currentUserId: userId,
+    chatOpen,
+    onNewMessage,
+  });
 
   const handleSend = useCallback(
     async (messageText: string) => {
@@ -74,12 +83,7 @@ function DraftChatConnector({
       currentUserId={userId}
       loading={loading}
       sending={sending}
-      messages={messages.map((m) => ({
-        id: m.id ?? 0,
-        userId: m.userId ?? 0,
-        username: m.user?.username ?? 'Manager',
-        messageText: m.messageText ?? '',
-      }))}
+      messages={chatMessages}
       onSend={(text) => void handleSend(text)}
     />
   );
@@ -90,7 +94,10 @@ export default function MockDraftRoomPage(): React.JSX.Element {
   const router = useRouter();
   const draftId = toIntId(draftIdParam);
   const websocketUrl = config.websocketUrl;
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
+  // Keep the phone awake for the live draft room, matching DraftWatchPage
+  // (LS-10593).
+  useKeepAwake('mock-draft');
 
   useEffect(() => {
     if (!websocketUrl) {
@@ -142,6 +149,7 @@ export default function MockDraftRoomPage(): React.JSX.Element {
         websocketUrl={websocketUrl ?? ''}
         renderChatTab={renderChatTab}
         bottomInset={bottomInset}
+        topInset={topInset}
         onExitDraft={() => closeToHomeTab(router)}
         onDownloadDraftPacket={(contents, filename) =>
           void handleDownloadDraftPacket(contents, filename)

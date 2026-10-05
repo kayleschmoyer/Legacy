@@ -39,6 +39,10 @@ jest.mock('@aws-sdk/client-apigatewaymanagementapi', () => ({
     _type: 'PostToConnection',
     input,
   })),
+  DeleteConnectionCommand: jest.fn().mockImplementation((input) => ({
+    _type: 'DeleteConnection',
+    input,
+  })),
 }));
 
 jest.mock('jsonwebtoken', () => ({
@@ -673,6 +677,69 @@ describe('WebSocket Lambda Handler', () => {
           }),
         }),
       );
+    });
+
+    it('only refreshes the TTL of an existing row — never upserts a bare one (LS-10593)', async () => {
+      const event = makeEvent({
+        routeKey: '$default',
+        body: JSON.stringify({ type: 'ping' }),
+      });
+
+      await handler(event);
+
+      expect(mockDynamoSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          _type: 'Update',
+          input: expect.objectContaining({
+            ConditionExpression: 'attribute_exists(connectionId)',
+          }),
+        }),
+      );
+    });
+
+    it('closes the socket instead of ponging when its connection row is gone (LS-10593)', async () => {
+      mockDynamoSend.mockImplementation((cmd: { _type: string }) =>
+        cmd._type === 'Update'
+          ? Promise.reject(
+              Object.assign(new Error('The conditional request failed'), {
+                name: 'ConditionalCheckFailedException',
+              }),
+            )
+          : Promise.resolve({}),
+      );
+      const event = makeEvent({
+        routeKey: '$default',
+        connectionId: 'orphan-conn',
+        body: JSON.stringify({ type: 'ping' }),
+      });
+
+      const result = asResult(await handler(event));
+
+      expect(result.statusCode).toBe(200);
+      expect(result.body).toBe('Connection reset');
+      expect(mockApiGatewaySend).toHaveBeenCalledWith({
+        _type: 'DeleteConnection',
+        input: { ConnectionId: 'orphan-conn' },
+      });
+      expect(mockApiGatewaySend).not.toHaveBeenCalledWith(
+        expect.objectContaining({ _type: 'PostToConnection' }),
+      );
+    });
+
+    it('still pongs when the TTL refresh fails for another reason', async () => {
+      mockDynamoSend.mockImplementation((cmd: { _type: string }) =>
+        cmd._type === 'Update'
+          ? Promise.reject(new Error('throttled'))
+          : Promise.resolve({}),
+      );
+      const event = makeEvent({
+        routeKey: '$default',
+        body: JSON.stringify({ type: 'ping' }),
+      });
+
+      const result = asResult(await handler(event));
+
+      expect(result.body).toBe('Pong sent');
     });
 
     it('handles malformed JSON body gracefully', async () => {

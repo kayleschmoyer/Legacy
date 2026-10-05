@@ -74,6 +74,21 @@ describe('useLeagueWebSocket', () => {
     expect(onMatchupScoreUpdated).toHaveBeenCalledWith(payload);
   });
 
+  // LS-10593: an open league screen never noticed the commissioner starting
+  // the draft — DRAFT_STARTED arrived on the league socket but had no handler.
+  it.each([
+    [ClientNotificationType.DRAFT_STARTED],
+    [ClientNotificationType.DRAFT_PAUSED],
+    [ClientNotificationType.DRAFT_RESUMED],
+  ])('fires onDraftStatusChanged when a %s notification arrives', (event) => {
+    const onDraftStatusChanged = jest.fn();
+    renderHook(() => useLeagueWebSocket({ onDraftStatusChanged }));
+
+    mockClient._emit(event, { type: event, leagueId: 7, draftId: 3 });
+
+    expect(onDraftStatusChanged).toHaveBeenCalledTimes(1);
+  });
+
   it('does not subscribe when there is no client', () => {
     mockUseLeagueWebSocketClient.mockReturnValue({
       client: null,

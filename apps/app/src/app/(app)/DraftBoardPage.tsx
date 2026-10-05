@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +11,12 @@ import {
 import type { DraftChatTabRenderProps } from '@legacy-sports/shared-components/elite-draft';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
+import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 import { closeToHomeTab, toIntId } from '../../common/utilities/RouteUtils';
+import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
 import { useLeagueChat } from '../../features/leagues/hooks/useLeagueChat';
+import { useDraftChatUnread } from '../../hooks/useDraftChatUnread';
+import { useLeagueWebSocketLifecycle } from '../../hooks/useLeagueWebSocketLifecycle';
 
 /**
  * Chat tab data connector (LS-9401) — same `useLeagueChat` data source
@@ -31,12 +36,14 @@ function renderChatTab({
   leagueId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps) {
   return (
     <ChatTabConnector
       leagueId={leagueId}
       userId={userId}
       onNewMessage={onNewMessage}
+      chatOpen={chatOpen}
     />
   );
 }
@@ -45,6 +52,7 @@ function ChatTabConnector({
   leagueId,
   userId,
   onNewMessage,
+  chatOpen,
 }: DraftChatTabRenderProps): React.JSX.Element {
   // League drafts always carry a league id; the mock-draft room has its own
   // chat connector ((app)/mock-draft/[draftId].tsx) and never mounts this
@@ -52,19 +60,16 @@ function ChatTabConnector({
   const { messages, loading, sending, sendError, sendMessage } = useLeagueChat(
     leagueId ?? 0,
   );
-  // null until the first sync so loading the existing message history never
-  // counts as a "new" message for the unread dot — only counts up from there.
-  const prevCountRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (
-      prevCountRef.current !== null &&
-      messages.length > prevCountRef.current
-    ) {
-      onNewMessage();
-    }
-    prevCountRef.current = messages.length;
-  }, [messages.length, onNewMessage]);
+  // Unread dot keyed on a persisted last-read id (same key as League Home's
+  // chat badge) rather than a per-mount message count, so loading history on
+  // re-entry never re-raises it (LS-10593).
+  useDraftChatUnread({
+    storageKey: leagueId ?? 0,
+    messages,
+    currentUserId: userId,
+    chatOpen,
+    onNewMessage,
+  });
 
   return (
     <DraftChatTab
@@ -98,7 +103,33 @@ export default function DraftBoardPage() {
   // the way React Navigation's tab bar does for the tab shell — the draft
   // room's own bottom nav has to reserve it itself (LS-9444). `(app)/_layout`
   // already supplies the matching top inset via the Stack's `contentStyle`.
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
+  // Keep the phone awake for the live draft room, matching DraftWatchPage
+  // (LS-10593).
+  useKeepAwake('draft-board');
+
+  // League chat broadcasts only reach sockets registered under the league id
+  // (LeagueIdIndex); the board's own draft socket registers the draft id, so
+  // without a league socket here `useLeagueChat` saw `connected: false`,
+  // queued every send offline forever, and never received anyone else's
+  // messages. Give the draft room its own league socket, read the token the
+  // same way the league screens do (LS-10593).
+  const [wsToken, setWsToken] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    void readKeychainValue(Secret.INTERNAL_JWT).then((token: string | null) => {
+      if (active && token) setWsToken(token);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({
+      leagueId: leagueId ?? undefined,
+      url: websocketUrl,
+      token: wsToken,
+    });
 
   useEffect(() => {
     if (!websocketUrl) {
@@ -133,26 +164,31 @@ export default function DraftBoardPage() {
     // Mandatory navigation-landing anchor for the Maestro live-draft-board flow
     // (LS-8446): a stable container present across every draft state so tapping
     // the draft-status chip fails the flow loudly if the board never mounts.
-    <YStack flex={1} testID="elite-draft-board-screen">
-      {!websocketUrl && (
-        <YStack backgroundColor="$yellow4" padding="$2">
-          <Text color="$yellow11" textAlign="center" fontSize="$2">
-            Real-time updates unavailable — polling for picks every 5s
-          </Text>
-        </YStack>
-      )}
-      <EliteDraftBoardScreen
-        leagueId={leagueId}
-        onNavigate={(path) => router.navigate(path)}
-        websocketUrl={websocketUrl ?? ''}
-        renderChatTab={renderChatTab}
-        bottomInset={bottomInset}
-        onExitDraft={() => closeToHomeTab(router)}
-        onDownloadDraftPacket={(contents, filename) =>
-          void handleDownloadDraftPacket(contents, filename)
-        }
-      />
-    </YStack>
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <YStack flex={1} testID="elite-draft-board-screen">
+        {!websocketUrl && (
+          <YStack backgroundColor="$yellow4" padding="$2">
+            <Text color="$yellow11" textAlign="center" fontSize="$2">
+              Real-time updates unavailable — polling for picks every 5s
+            </Text>
+          </YStack>
+        )}
+        <EliteDraftBoardScreen
+          leagueId={leagueId}
+          onNavigate={(path) => router.navigate(path)}
+          websocketUrl={websocketUrl ?? ''}
+          renderChatTab={renderChatTab}
+          bottomInset={bottomInset}
+          topInset={topInset}
+          onExitDraft={() => closeToHomeTab(router)}
+          onDownloadDraftPacket={(contents, filename) =>
+            void handleDownloadDraftPacket(contents, filename)
+          }
+        />
+      </YStack>
+    </LeagueWebSocketContext.Provider>
   );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

@@ -77,8 +77,41 @@ function route(data: NotificationData) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('navigateFromNotification (isolated payload → route mapping)', () => {
+  describe('draft call-to-action notifications → live draft room (LS-10593)', () => {
+    it.each([['DRAFT_STARTED'], ['DRAFT_ON_THE_CLOCK']])(
+      'routes %s with a leagueId to the draft board',
+      (notificationType) => {
+        const navigate = route({ notificationType, leagueId: 3 });
+        expect(navigate).toHaveBeenCalledWith({
+          pathname: '/DraftBoardPage',
+          params: { leagueId: '3' },
+        });
+      },
+    );
+
+    it('opens the same draft board regardless of sport', () => {
+      const navigate = route({
+        notificationType: 'DRAFT_ON_THE_CLOCK',
+        leagueId: 8,
+        sport: 'football',
+      });
+      expect(navigate).toHaveBeenCalledWith({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: '8' },
+      });
+    });
+
+    it.each([['DRAFT_STARTED'], ['DRAFT_ON_THE_CLOCK']])(
+      'falls back to /notifications when a %s payload has no leagueId',
+      (notificationType) => {
+        const navigate = route({ notificationType });
+        expect(navigate).toHaveBeenCalledWith('/notifications');
+      },
+    );
+  });
+
   describe('draft notifications → league detail', () => {
-    it.each([['DRAFT_STARTED'], ['DRAFT_PICK_MADE'], ['DRAFT_COMPLETED']])(
+    it.each([['DRAFT_PICK_MADE'], ['DRAFT_COMPLETED']])(
       'routes %s with a leagueId to the league screen',
       (notificationType) => {
         const navigate = route({ notificationType, leagueId: 3 });
@@ -88,7 +121,7 @@ describe('navigateFromNotification (isolated payload → route mapping)', () => 
 
     it('uses the sport prefix from the payload', () => {
       const navigate = route({
-        notificationType: 'DRAFT_STARTED',
+        notificationType: 'DRAFT_COMPLETED',
         leagueId: 8,
         sport: 'football',
       });
@@ -105,7 +138,7 @@ describe('navigateFromNotification (isolated payload → route mapping)', () => 
 
     it('ignores a sport value outside the allowlist to prevent path traversal', () => {
       const navigate = route({
-        notificationType: 'DRAFT_STARTED',
+        notificationType: 'DRAFT_COMPLETED',
         leagueId: 3,
         sport: '../../evil',
       });

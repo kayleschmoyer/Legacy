@@ -29,6 +29,7 @@
  * untestable at the unit level (see `DraftPickSheet.spec.tsx`'s note on this).
  */
 import React, { useEffect } from 'react';
+import { Modal, Platform } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 
 import type { PickInspectorData } from './draftPickInspectorModel';
@@ -59,8 +60,14 @@ export function DraftPickInspector({
   // `document.addEventListener('keydown', ...)` — a document-level listener
   // rather than a focus-scoped one because the popup here has no native
   // focus trap to route the key through (unlike Tamagui's Dialog).
+  //
+  // Web only: `document` doesn't exist on Hermes, so the unguarded listener
+  // crashed the native draft room on every board-tile tap (Rollbar #299,
+  // LS-10593). Native hosts the popup in a Modal whose onRequestClose
+  // handles Android back instead.
   useEffect(() => {
     if (data === null) return;
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
     };
@@ -70,10 +77,12 @@ export function DraftPickInspector({
 
   if (data === null) return null;
 
-  return (
+  const overlay = (
     <YStack
       testID={`${testID}-overlay`}
-      position="fixed"
+      // `fixed` is web-only; on native the Modal below already fills the
+      // screen.
+      position={Platform.OS === 'web' ? 'fixed' : 'absolute'}
       top={0}
       left={0}
       right={0}
@@ -213,6 +222,13 @@ export function DraftPickInspector({
         )}
       </YStack>
     </YStack>
+  );
+
+  if (Platform.OS === 'web') return overlay;
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      {overlay}
+    </Modal>
   );
 }
 

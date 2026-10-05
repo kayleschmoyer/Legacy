@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  clampSheetHeightPercent,
   DraftPickCta,
   draftPickCtaLabel,
   DraftPickSheet,
@@ -142,5 +143,21 @@ describe('DraftPickSheet', () => {
     });
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('clampSheetHeightPercent (LS-10593)', () => {
+  it('keeps the sheet top below the status bar on short windows', () => {
+    // 600px window, 40px status bar: the top edge must stay at >= 48px.
+    expect(clampSheetHeightPercent(95, 600, 40)).toBe(92);
+    // Split-screen / landscape sliver: 200px window, 32px status bar.
+    expect(clampSheetHeightPercent(PICK_SHEET_HEIGHT_PERCENT, 200, 32)).toBe(
+      80,
+    );
+  });
+
+  it('leaves the design height alone when there is room or no inset', () => {
+    expect(clampSheetHeightPercent(74, 800, 24)).toBe(74);
+    expect(clampSheetHeightPercent(84, 800, 0)).toBe(84);
   });
 });

@@ -2514,7 +2514,7 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
-  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. A missed pick is auto-picked for that pick only (auto-pick stays on permanently only for teams with no manager), and making a pick manually turns auto-pick off. */
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
@@ -3867,6 +3867,8 @@ export type Query = {
   getDraft?: Maybe<Draft>;
   /** Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478). */
   getDraftFootballPlayerStats?: Maybe<Array<DraftFootballPlayerStats>>;
+  /** Roster slot types (e.g. C, SS, SP) the caller's seat still has open — the positions getAvailableDraftPlayers filters to by default (openSlotsOnly). Empty when no filter applies (LS-10593). */
+  getDraftOpenSlotPositions?: Maybe<Array<Scalars['String']['output']>>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
   getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
@@ -4196,6 +4198,7 @@ export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  openSlotsOnly?: InputMaybe<Scalars['Boolean']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -4219,6 +4222,10 @@ export type QueryGetDirectMessagesArgs = {
 };
 
 export type QueryGetDraftArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftOpenSlotPositionsArgs = {
   draftId: Scalars['Int']['input'];
 };
 

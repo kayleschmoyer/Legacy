@@ -244,60 +244,69 @@ export function SplashQueue({
   const player = toDraftPlayer(active.player);
   const mlbId = mlbPlayerIdFor?.(player.id) ?? null;
 
-  return (
-    <>
-      <PickAnnouncement
-        player={player}
-        pickNumber={active.overallPick}
-        round={active.round}
-        roundPickNumber={active.roundPickNumber}
-        isMyPick={false}
-        isAuto={active.isAuto}
-        leaving={leaving}
-        onDismiss={onDismiss}
-        commentary={commentaryFor?.(active)}
-      />
-      <div className={`d-splash-chrome${leaving ? ' leaving' : ''}`}>
-        {mlbId != null && !headshotFailed ? (
-          <img
-            className="d-splash-headshot"
-            src={getMlbHeadshotUrl(mlbId)}
-            alt={player.name}
-            onError={() => setHeadshotFailed(true)}
-          />
-        ) : (
-          <div
-            className="d-splash-headshot d-splash-headshot-fallback"
-            aria-hidden="true"
-          >
-            <span role="img" aria-label="player silhouette">
-              ⚾
-            </span>
-          </div>
-        )}
-        <div className="d-splash-team">{active.teamName}</div>
-        {/* Highlight tier (LS-9113): validated YouTube clip when cached,
-            LS-9095 stat graphic otherwise. Keyed per pick so the player is
-            created and destroyed with each splash — the queue's single
-            `active` slot is what guarantees exactly one autoplaying player
-            per page. */}
-        <PickSplashHighlightVideo
-          key={active.overallPick}
-          video={highlightVideoFor?.(player.id) ?? null}
-          playerName={player.name}
-          fallback={
-            <PickSplashStatGraphic play={notablePlayFor?.(player.id) ?? null} />
-          }
+  // Headshot + team ride in the card's header slot and the media/queue badge
+  // in its footer, so they flow with the card instead of floating over it —
+  // the old fixed overlay covered the pick label and card banner on the
+  // watch screen (LS-10593).
+  const header = (
+    <div className="d-splash-chrome-head">
+      {mlbId != null && !headshotFailed ? (
+        <img
+          className="d-splash-headshot"
+          src={getMlbHeadshotUrl(mlbId)}
+          alt={player.name}
+          onError={() => setHeadshotFailed(true)}
         />
-        {pendingCount > 0 && (
-          <div
-            className="d-splash-queue-badge"
-            data-testid="splash-queue-badge"
-          >
-            +{pendingCount} more {pendingCount === 1 ? 'pick' : 'picks'}
-          </div>
-        )}
-      </div>
-    </>
+      ) : (
+        <div
+          className="d-splash-headshot d-splash-headshot-fallback"
+          aria-hidden="true"
+        >
+          <span role="img" aria-label="player silhouette">
+            ⚾
+          </span>
+        </div>
+      )}
+      <div className="d-splash-team">{active.teamName}</div>
+    </div>
+  );
+
+  const footer = (
+    <div className="d-splash-chrome-foot">
+      {/* Highlight tier (LS-9113): validated YouTube clip when cached,
+          LS-9095 stat graphic otherwise. Keyed per pick so the player is
+          created and destroyed with each splash — the queue's single
+          `active` slot is what guarantees exactly one autoplaying player
+          per page. */}
+      <PickSplashHighlightVideo
+        key={active.overallPick}
+        video={highlightVideoFor?.(player.id) ?? null}
+        playerName={player.name}
+        fallback={
+          <PickSplashStatGraphic play={notablePlayFor?.(player.id) ?? null} />
+        }
+      />
+      {pendingCount > 0 && (
+        <div className="d-splash-queue-badge" data-testid="splash-queue-badge">
+          +{pendingCount} more {pendingCount === 1 ? 'pick' : 'picks'}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <PickAnnouncement
+      player={player}
+      pickNumber={active.overallPick}
+      round={active.round}
+      roundPickNumber={active.roundPickNumber}
+      isMyPick={false}
+      isAuto={active.isAuto}
+      leaving={leaving}
+      onDismiss={onDismiss}
+      commentary={commentaryFor?.(active)}
+      header={header}
+      footer={footer}
+    />
   );
 }

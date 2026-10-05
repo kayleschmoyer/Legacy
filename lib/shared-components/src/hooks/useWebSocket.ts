@@ -209,6 +209,15 @@ export function useWebSocket({
   const onErrorRef = useLatestRef(onError);
   const onReconnectRef = useLatestRef(onReconnect);
 
+  // The token is read through a ref (not the client effect's deps) so a
+  // background JWT rotation doesn't tear down a live socket — see the
+  // `updateToken` effect below (LS-10593). Only token *presence* gates
+  // client creation.
+  const tokenRef = useLatestRef(token);
+  const hasToken = !!token;
+  /** Token the current client was created with / last told about. */
+  const appliedTokenRef = useRef<string | undefined>(undefined);
+
   // Get WebSocket URL from the passed prop.
   // Callers on web should pass `url={config.websocketUrl}` from
   // @legacy-sports/app-config; the prop is required for the hook to connect.
@@ -256,6 +265,18 @@ export function useWebSocket({
     }
   }, []);
 
+  /**
+   * Revive a client that has given up (or is waiting out a backoff) with a
+   * fresh reconnect budget. No-op while already connected/connecting — see
+   * `WebSocketClient.reconnectNow`. Used e.g. when a native app returns to
+   * the foreground (LS-10593).
+   */
+  const reconnectNow = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.reconnectNow();
+    }
+  }, []);
+
   const sendMessage = useCallback((data: unknown) => {
     if (clientRef.current) {
       clientRef.current.send(data as Record<string, unknown>);
@@ -286,16 +307,19 @@ export function useWebSocket({
       return;
     }
 
-    if (!token) {
+    if (!hasToken) {
       LOGGER.warn(
         '[useWebSocket] useEffect: no auth token, deferring client creation',
       );
       return;
     }
 
+    const token = tokenRef.current;
+    appliedTokenRef.current = token;
+
     LOGGER.info('[useWebSocket] creating WebSocketClient', {
       url: `${wsUrl.substring(0, 30)}...`,
-      hasToken: !!token,
+      hasToken,
       leagueId,
       draftId,
       viewContext,
@@ -557,6 +581,14 @@ export function useWebSocket({
       unsubscribeMessage();
       unsubscribeNotifications.forEach((unsub) => unsub());
       client.dispose();
+      if (clientRef.current === client) {
+        clientRef.current = null;
+      }
+      // The handlers are unsubscribed before dispose() emits 'disconnected',
+      // so without this `connected` stayed true across a client swap (e.g.
+      // draftId change) and consumers never saw the false→true edge they use
+      // to resync data missed while the old socket was going away (LS-10593).
+      setConnected(false);
     };
     // Only reconnect when connection parameters change — NOT when callbacks
     // change.  Callbacks are accessed via refs (stable identity from useRef)
@@ -565,7 +597,8 @@ export function useWebSocket({
     // completeness but never trigger re-runs.
   }, [
     wsUrl,
-    token,
+    hasToken,
+    tokenRef,
     leagueId,
     matchupId,
     draftId,
@@ -594,11 +627,30 @@ export function useWebSocket({
     onReconnectRef,
   ]);
 
+  // Tell the live client about a rotated token instead of disposing and
+  // recreating it (the same approach as useLeagueWebSocketLifecycle).
+  // `WebSocketClient` only reads the token at connect time, so this takes
+  // effect on the next (re)connect; `reconnectNow` (a no-op while the socket
+  // is open or connecting) revives a client that stopped retrying because
+  // its previous token had expired (LS-10593).
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!client || !token || token === appliedTokenRef.current) return;
+    appliedTokenRef.current = token;
+    LOGGER.info('[useWebSocket] auth token rotated — updating client', {
+      viewContext,
+      draftId,
+    });
+    client.updateToken(token);
+    client.reconnectNow();
+  }, [token, viewContext, draftId]);
+
   return {
     connected,
     error,
     connect,
     disconnect,
+    reconnectNow,
     sendMessage,
     updateContext,
   };

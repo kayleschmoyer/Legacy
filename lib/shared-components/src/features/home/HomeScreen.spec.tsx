@@ -532,6 +532,143 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('hero join-draft CTA (LS-10593)', () => {
+    const draftingLeague: HomeLeagueSummary = {
+      ...league,
+      leaguePhase: 'pre-draft',
+      draftStatus: 'in-progress',
+      draftMode: 'snake',
+    };
+
+    it('renders Join Draft on the ticket hero while the draft is live and opens the draft room', () => {
+      const onJoinDraft = jest.fn();
+      const onViewLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[draftingLeague]}
+          onViewLeague={onViewLeague}
+          onJoinDraft={onJoinDraft}
+        />,
+      );
+      const button = getByTestId('home-hero-join-draft');
+      expect(within(button).getByText('Join Draft')).toBeTruthy();
+      fireEvent.click(button);
+      expect(onJoinDraft).toHaveBeenCalledTimes(1);
+      expect(onJoinDraft).toHaveBeenCalledWith(draftingLeague);
+      // The card itself is pressable — the CTA must not also open the league.
+      expect(onViewLeague).not.toHaveBeenCalled();
+    });
+
+    it('does not fire the card press handler on keyboard activation of Join Draft', () => {
+      const onJoinDraft = jest.fn();
+      const onViewLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[draftingLeague]}
+          onViewLeague={onViewLeague}
+          onJoinDraft={onJoinDraft}
+        />,
+      );
+      fireEvent.keyDown(getByTestId('home-hero-join-draft'), { key: 'Enter' });
+      expect(onJoinDraft).toHaveBeenCalledTimes(1);
+      expect(onViewLeague).not.toHaveBeenCalled();
+    });
+
+    it('labels the CTA Return to Draft while the draft is paused', () => {
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[{ ...draftingLeague, draftStatus: 'paused' }]}
+          onJoinDraft={jest.fn()}
+        />,
+      );
+      expect(
+        within(getByTestId('home-hero-join-draft')).getByText(
+          'Return to Draft',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('replaces Set Lineup with the draft CTA and keeps View League', () => {
+      const onViewLeague = jest.fn();
+      const { getByTestId, queryByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[draftingLeague]}
+          onViewLeague={onViewLeague}
+          onSetLineup={jest.fn()}
+          onJoinDraft={jest.fn()}
+        />,
+      );
+      expect(queryByTestId('home-hero-set-lineup')).toBeNull();
+      fireEvent.click(getByTestId('home-hero-view-league'));
+      expect(onViewLeague).toHaveBeenCalledTimes(1);
+      expect(onViewLeague).toHaveBeenCalledWith(draftingLeague);
+    });
+
+    it.each([['not-started'], ['queued'], ['completed'], [null]])(
+      'hides the CTA when draftStatus is %s',
+      (draftStatus) => {
+        const { queryByTestId, getByTestId } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[{ ...league, draftStatus }]}
+            onSetLineup={jest.fn()}
+            onJoinDraft={jest.fn()}
+          />,
+        );
+        expect(queryByTestId('home-hero-join-draft')).toBeNull();
+        expect(getByTestId('home-hero-set-lineup')).toBeTruthy();
+      },
+    );
+
+    it('hides the CTA when no onJoinDraft handler is supplied', () => {
+      const { queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[draftingLeague]} />,
+      );
+      expect(queryByTestId('home-hero-join-draft')).toBeNull();
+    });
+
+    it('renders Join Draft on the football playboard hero while drafting', () => {
+      const footballDrafting: HomeLeagueSummary = {
+        ...draftingLeague,
+        leagueId: 77,
+        sport: 'football',
+      };
+      const onJoinDraft = jest.fn();
+      const onViewLeague = jest.fn();
+      const { getByTestId, queryByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[footballDrafting]}
+          onViewLeague={onViewLeague}
+          onSetLineup={jest.fn()}
+          onJoinDraft={onJoinDraft}
+        />,
+      );
+      expect(queryByTestId('home-playboard-set-lineup')).toBeNull();
+      fireEvent.click(getByTestId('home-playboard-join-draft'));
+      expect(onJoinDraft).toHaveBeenCalledWith(footballDrafting);
+      expect(onViewLeague).not.toHaveBeenCalled();
+    });
+
+    it('renders Join Draft on the hero in the narrow layout', () => {
+      (useMedia as jest.Mock).mockReturnValue({ xs: true, sm: true });
+      const onJoinDraft = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[draftingLeague]}
+          onJoinDraft={onJoinDraft}
+        />,
+      );
+      fireEvent.click(getByTestId('home-hero-join-draft'));
+      expect(onJoinDraft).toHaveBeenCalledWith(draftingLeague);
+    });
+  });
+
   describe('no-current-matchup hero state (LS-9047)', () => {
     it('renders the baseball standing block (record + rank) in place of the score zone', () => {
       // `league` has no matchupId/matchupStatus — the no-matchup branch.

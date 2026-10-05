@@ -51,6 +51,12 @@ export const SPECTATOR_POLL_INTERVAL_MS = 5000;
 
 interface UseSpectatorDraftDataParams {
   leagueId: number | null;
+  /**
+   * Player ids drafted over the live socket that may not be in `pickHistory`
+   * yet (it refetches on a debounce). Included in the highlight-video lookup
+   * so the pick splash can find its video immediately.
+   */
+  livePlayerIds?: readonly number[];
 }
 
 /**
@@ -67,6 +73,7 @@ interface UseSpectatorDraftDataParams {
  */
 export function useSpectatorDraftData({
   leagueId,
+  livePlayerIds,
 }: UseSpectatorDraftDataParams) {
   // ---- League ----
   const {
@@ -306,8 +313,9 @@ export function useSpectatorDraftData({
   const highlightPlayerIds = useMemo(() => {
     const ids = new Set<number>();
     for (const p of pickHistory) ids.add(p.playerId);
+    for (const id of livePlayerIds ?? []) ids.add(id);
     return [...ids].sort((a, b) => a - b);
-  }, [pickHistory]);
+  }, [pickHistory, livePlayerIds]);
 
   const { data: highlightVideosData } = useQuery<
     GetHighlightVideosQuery,

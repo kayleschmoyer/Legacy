@@ -8,6 +8,10 @@ import type {
   DraftPlayer,
   LeagueTeam,
 } from './types';
+import {
+  OPEN_SLOTS_EMPTY_MESSAGE,
+  OPEN_SLOTS_EMPTY_SEARCH_MESSAGE,
+} from './openSlotsCopy';
 import { DraftGrid } from './DraftGrid';
 import { DraftBoardTimeline } from './DraftBoardTimeline';
 import {
@@ -33,6 +37,7 @@ import { PlayerCard } from './PlayerCard';
 import { formatEligiblePositions, getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
 import { useDraftViewportTier } from './hooks/useDraftViewport';
+import { useLocalInputText } from './hooks/useLocalInputText';
 import type { SportKind } from '../../config/sports';
 import { getPositionLabel } from '../roster/rosterEligibility';
 import { csp } from '../players/crossPlatformStyle';
@@ -273,6 +278,8 @@ interface DraftPlayerBoardProps {
   draftOrder?: string | null;
   onSetSearchTerm: (v: string) => void;
   onSetSelectedPosition: (v: string) => void;
+  /** Names/lifts the server's open-roster-slot filter (LS-10593). */
+  openSlotsBanner?: React.ReactNode;
   onSetViewMode: (v: ViewMode) => void;
   onSetWatchlist: React.Dispatch<React.SetStateAction<number[]>>;
   onDraftPlayer: (playerId: number) => void;
@@ -475,6 +482,10 @@ function DraftPlayerFilters({
   onSetSearchTerm: (v: string) => void;
   onSetSelectedPosition: (v: string) => void;
 }): React.JSX.Element {
+  const [searchText, handleSearchChange] = useLocalInputText(
+    searchTerm,
+    onSetSearchTerm,
+  );
   return (
     <>
       <SearchWrap>
@@ -503,20 +514,20 @@ function DraftPlayerFilters({
           color={TEXT}
           fontSize={13}
           paddingLeft={38}
-          paddingRight={searchTerm ? 34 : 14}
+          paddingRight={searchText ? 34 : 14}
           placeholder="Search available players..."
           placeholderTextColor={TEXT_MUTED}
           aria-label="Search players"
-          value={searchTerm}
-          onChangeText={onSetSearchTerm}
+          value={searchText}
+          onChangeText={handleSearchChange}
         />
-        {searchTerm ? (
+        {searchText ? (
           <YStack
             role="button"
             tabIndex={0}
             accessibilityRole="button"
             aria-label="Clear search"
-            onPress={() => onSetSearchTerm('')}
+            onPress={() => handleSearchChange('')}
             cursor="pointer"
             position="absolute"
             right={8}
@@ -648,6 +659,7 @@ export function DraftPlayerBoard({
   draftOrder,
   onSetSearchTerm,
   onSetSelectedPosition,
+  openSlotsBanner,
   onSetViewMode,
   onSetWatchlist,
   onDraftPlayer,
@@ -973,6 +985,7 @@ export function DraftPlayerBoard({
             />
           </ControlsBar>
         )}
+        {showSearchControls && openSlotsBanner}
 
         {/* Draft Board view — the grid at `desktop`, the round-by-round
             timeline below it (LS-10003). Same picks, two projections. */}
@@ -1022,6 +1035,7 @@ export function DraftPlayerBoard({
             is mounted, at every tier this component renders. The mock places
             `.bd-dock` beside both `.board-timeline` and `.board-grid` and no
             width rule hides it; only its row count varies by tier. */}
+        {viewMode === 'board' && openSlotsBanner}
         {viewMode === 'board' && (
           <DraftPlayerDock
             sport={sport}
@@ -1263,8 +1277,8 @@ export function DraftPlayerBoard({
                 <YStack padding={24} alignItems="center">
                   <Text color={TEXT_MUTED}>
                     {searchTerm
-                      ? 'No players match your search'
-                      : 'All available players have been drafted'}
+                      ? OPEN_SLOTS_EMPTY_SEARCH_MESSAGE
+                      : OPEN_SLOTS_EMPTY_MESSAGE}
                   </Text>
                 </YStack>
               )}
@@ -1502,7 +1516,7 @@ export function DraftPlayerBoard({
                   <Text fontSize={13} marginTop={4} color={TEXT_MUTED}>
                     {searchTerm
                       ? 'Try a different search term'
-                      : 'All available players have been drafted'}
+                      : OPEN_SLOTS_EMPTY_MESSAGE}
                   </Text>
                 </YStack>
               )}
