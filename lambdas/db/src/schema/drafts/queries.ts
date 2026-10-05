@@ -26,7 +26,7 @@ import {
   getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
-import { getSeatForTeam } from './participants';
+import { getSeatForTeam, getSeatForUser } from './participants';
 import { effectiveFootballFpg } from './strategies/football';
 import {
   CurrentDraftPick,
@@ -1734,6 +1734,9 @@ builder.queryField('getDraftRecommendations', (t) =>
  * general manager — draft queues reveal strategic pick order and must stay
  * private even from other co-managers / assistant roles in the same league
  * (LS-2501).
+ *
+ * A mock draft has no league: its queue is keyed by the caller's seat
+ * (`participant_id`, `team_id` NULL), matching the queue mutations (LS-10525).
  */
 builder.queryField('getMyDraftQueue', (t) =>
   t.field({
@@ -1747,11 +1750,32 @@ builder.queryField('getMyDraftQueue', (t) =>
       const { draftId } = args;
 
       const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .select({
+          kind: PublicSchema.drafts.kind,
+          leagueId: PublicSchema.drafts.leagueId,
+        })
         .from(PublicSchema.drafts)
         .where(eq(PublicSchema.drafts.id, draftId))
         .limit(1);
       if (!draft) throw UserInputError('Draft not found');
+
+      // Every mock seat holder manages their own queue, which the queue
+      // mutations write by seat with a NULL team (LS-10076, LS-10525).
+      if (draft.kind === 'mock') {
+        const seat = await getSeatForUser(context.db, draftId, context.user.id);
+        if (!seat) throw ForbiddenError('You do not have a seat in this draft');
+
+        return context.db
+          .select()
+          .from(PublicSchema.draftQueue)
+          .where(
+            and(
+              eq(PublicSchema.draftQueue.draftId, draftId),
+              eq(PublicSchema.draftQueue.participantId, seat.id),
+            ),
+          )
+          .orderBy(asc(PublicSchema.draftQueue.priority));
+      }
 
       const [membership] = await context.db
         .select({

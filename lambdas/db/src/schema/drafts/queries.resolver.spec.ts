@@ -78,7 +78,8 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
         },
         draftQueue: {
           draftId: 'draftId',
-          teamId: 'teamId',
+          teamId: 'draftQueue.teamId',
+          participantId: 'draftQueue.participantId',
           priority: 'priority',
         },
       },
@@ -220,6 +221,67 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
     ).rejects.toMatchObject({
       message: 'You are not in this league',
       extensions: { code: 'FORBIDDEN' },
+    });
+  });
+  // LS-10525: a mock draft has no league; its queue rows are written by seat
+  // (participant_id) with a NULL team_id, so the read must key on the seat too.
+  describe('mock draft (no league)', () => {
+    it("reads the caller's queue by seat, not by league team", async () => {
+      const queueRows = [
+        {
+          draftId: 200,
+          teamId: null,
+          participantId: 900,
+          playerId: 5,
+          priority: 1,
+        },
+        {
+          draftId: 200,
+          teamId: null,
+          participantId: 900,
+          playerId: 9,
+          priority: 2,
+        },
+      ];
+      mockDb.limit
+        .mockResolvedValueOnce([{ kind: 'mock', leagueId: null }])
+        .mockResolvedValueOnce([
+          { id: 900, draftId: 200, slot: 1, teamId: null },
+        ]);
+      // getSeatForUser chains through orderBy before limit; the queue select
+      // ends on orderBy.
+      mockDb.orderBy
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce(queueRows);
+
+      const resolve = getResolver();
+      const result = await resolve(
+        {},
+        { draftId: 200 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual(queueRows);
+      const queueFilter = JSON.stringify(mockDb.where.mock.lastCall?.[0]);
+      expect(queueFilter).toContain('draftQueue.participantId');
+      expect(queueFilter).not.toContain('draftQueue.teamId');
+    });
+
+    it('rejects with FORBIDDEN when the caller holds no seat', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ kind: 'mock', leagueId: null }])
+        .mockResolvedValueOnce([]);
+
+      const resolve = getResolver();
+
+      await expect(
+        resolve({}, { draftId: 200 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'You do not have a seat in this draft',
+        extensions: { code: 'FORBIDDEN' },
+      });
+      expect(mockDb.orderBy).toHaveBeenCalledTimes(1);
     });
   });
 });
