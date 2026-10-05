@@ -998,15 +998,18 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
         Action   = ["s3:PutLifecycleConfiguration"]
         Resource = ["arn:aws:s3:::legacy-sports-terraform-state"]
       },
-      # Secrets Manager write for three Terraform-managed secrets missing from the
+      # Secrets Manager write for Terraform-managed secrets missing from the
       # per-secret allowlist on `github_actions_supplemental`:
       #   - ${var.environment}/vapid-public-key and .../vapid-private-key — the
       #     aws_secretsmanager_secret_version resources need PutSecretValue.
       #   - ${var.environment}/mcp-preview-app-token — the aws_secretsmanager_secret
       #     resource needs CreateSecret, plus TagResource because it carries
       #     local.common_tags (CreateSecret with tags authorizes both actions).
+      #   - ${var.environment}/youtube-api-key — created only when
+      #     TF_VAR_youtube_api_key is non-empty (secrets.tf), so the missing grant
+      #     stayed latent until the YOUTUBE_API_KEY GitHub secret was set (LS-10604).
       # Update/Delete/Untag round out the lifecycle Terraform manages for these
-      # three resources. Secrets Manager appends a random 6-char suffix to every
+      # resources. Secrets Manager appends a random 6-char suffix to every
       # secret ARN, hence the trailing wildcard — CreateSecret is authorized
       # against the suffixed ARN, which is not predictable before creation.
       {
@@ -1022,7 +1025,8 @@ resource "aws_iam_policy" "github_actions_supplemental_2" {
         Resource = [
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-public-key*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-private-key*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-preview-app-token*"
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-preview-app-token*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/youtube-api-key*"
         ]
       },
       # Glue Data Catalog permissions for the CloudTrail Athena forensics setup
