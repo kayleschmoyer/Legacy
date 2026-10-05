@@ -75,6 +75,7 @@ Retrosheet publishes each season's processed CSVs the winter after the season en
 | `queue-players`            | Discover + batch-enqueue players to the stats SQS queue. `--sport baseball\|football` (required), `--letter <x>`, `--skip-queue`. Football scrapes the PFR A–Z index first                                                                                                                                               |
 | `ingest-nflverse-football` | Stage the nflverse football corpus in S3, one object per player-season and per team-defense-season. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [in-season refresh](#in-season-nflverse-corpus-refresh)                                                                                        |
 | `seed-football-players`    | Insert football players PFR discovery missed (LS-9968 HOF gap) from nflverse `players.csv`, with authoritative `pfr_id`s and no PFR requests. Insert-only; dry run by default, `--apply` to write (shared dev DB, owner's call). See [ADR 0023](../../../../docs/decisions/0023-football-player-identity-without-pfr.md) |
+| `ingest-pfa-football`      | Stage the Pro Football Archives corpus (1960-1998) in S3, one object per player-season. Crawls profootballarchives.com (rate-limited) and crosswalks names against `players`. `--from`, `--to`, `--force`, `--dry-run`, `--bucket`, `--prefix`. See [PFA corpus ingest](#pfa-corpus-ingest)                              |
 
 ### In-season nflverse corpus refresh
 
@@ -93,6 +94,34 @@ Unlike Retrosheet, nflverse publishes the **current** season's weekly stats whil
   ```
 
 - **Verify:** the `Season <year>: N players in nflverse ...` log line reports the expected player count and the `unmapped` count is small. Players who debuted that season may lack a `pfr_id` in the nflverse crosswalk until it catches up; a later re-run picks them up.
+
+### PFA corpus ingest
+
+`ingest-pfa-football` builds the `pfa/v1/<pfrId>/<season>.json.gz` objects for 1960-1998 (LS-9995). Its name crosswalk resolves each PFA player against the football rows in `players` **at run time**, so a player who was not in `players` during an earlier ingest has no PFA objects. Re-run it after seeding new players (for example the HOF cohort from LS-10585; LS-9971).
+
+- **Why Actions:** the CCR egress proxy rejects profootballarchives.com, so agents cannot run this crawl from a cloud session (LS-10587).
+- **How:** dispatch the [Corpus Ingest workflow](../../../../.github/workflows/corpus-ingest.yml) with `source=pfa`. Run it with the default `dry_run=true` first. A dry run still crawls and reads `players`, so it proves both PFA reachability and DB access. Then run it with `dry_run=false`. Every run waits for the owner's approval on the `corpus-ingest` environment. Agents may dispatch dry runs. A `dry_run=false` run is the owner's call.
+- **Runtime and splitting:** `PfaRateLimiter` spaces requests at least 3s apart. The full range is about 7,000 regular-season box scores plus the 78-page player index and kicker game logs, so a single 1960-1998 run takes around 6-7 hours. The job timeout for `pfa` is 12h, but the self-hosted pool runs on spot instances, so split the run into season ranges with `from`/`to`, for example `1960`-`1972`, `1973`-`1985`, `1986`-`1998`. Each run crawls the player index again (about 4 minutes). Objects are per season, so the ranges are independent. To resume after a failed or interrupted range, dispatch the same range again: objects already written are skipped unless `force=true`. The crawl is repeated, though, because the crawl itself is not resumable.
+- **Verify:** the run summary shows the `PFA ingest: crosswalk resolved N/M` line, then `Season <year>: ...` per season, then `Ingest complete: ...`. A run for newly seeded players should show a higher resolved count than the previous ingest.
+
+#### Prerequisites: the DB access gap (open)
+
+Unlike `nflverse` and `retrosheet`, the `pfa` job needs DB read access. The workflow's `Check PFA crosswalk prerequisites` step fails fast until both of these are true:
+
+1. **Network:** the job runs on `vars.CI_RUNNER_LABEL` (the self-hosted pool inside the VPC), because the dev RDS is private. `check-migrations-applied.yml` relies on the same path. If that variable is unset, the job falls back to `ubuntu-latest` and the preflight fails.
+2. **Credentials (not provisioned yet):** the CLI resolves DB credentials from Secrets Manager via `DB_SECRET_NAME`. The workflow passes it `vars.CORPUS_INGEST_DB_SECRET_NAME`. The secret JSON needs `host`, `port`, `username` and `password`, and the role only needs `SELECT` on `public.players`. Closing this gap is an owner decision, because it grants the `corpus-ingest` OIDC role read access to DB credentials:
+   - Pick the DB role. The narrowest option is a dedicated read-only Postgres role with `SELECT` on `public.players`, created by a migration, plus its own Secrets Manager secret (modelled on `ci_readonly` in `terraform/main/secrets.tf`). The existing `mcp_readonly` secret (SELECT on all of `public`) also works.
+   - Grant `secretsmanager:GetSecretValue` on that secret's ARN in `aws_iam_policy.corpus_ingest` (`terraform/main/github-actions-corpus-ingest.tf`), and apply.
+   - Set the `CORPUS_INGEST_DB_SECRET_NAME` variable (the secret's full name) on the repo or the `corpus-ingest` environment.
+
+   Then dispatch a `source=pfa` dry run to confirm.
+
+- **Local fallback** (a maintainer with AWS credentials and a DB connection; agents cannot do either):
+
+  ```bash
+  ./ls-cli.sh ingest-pfa-football --from <year> --to <year> --dry-run
+  ./ls-cli.sh ingest-pfa-football --from <year> --to <year> --bucket <name_prefix>-football-corpus
+  ```
 
 ## Stats pipeline operations
 
