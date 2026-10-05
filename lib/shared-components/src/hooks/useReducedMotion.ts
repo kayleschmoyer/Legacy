@@ -27,7 +27,7 @@ function readAnimationsDisabled(): boolean {
  * `(prefers-reduced-motion: reduce)` or the user switched off "Enable
  * animations" in Preferences (`enableAnimations: false` in the
  * `ls_user_preferences` blob, LS-7073). Always `false` on native (and during
- * SSR) — there is no DOM `window` to query.
+ * SSR) — there is no DOM `matchMedia` to query.
  *
  * Consumers use this to collapse spring/timing animations (Dialog, Sheet,
  * etc.) to a near-instant duration so users who request reduced motion get
@@ -40,7 +40,17 @@ function readAnimationsDisabled(): boolean {
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = React.useState(false);
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // React Native defines a global `window` (an alias of `global`) but no
+    // DOM APIs, so `typeof window` alone does not detect native: calling
+    // `window.matchMedia` there threw "undefined is not a function" from this
+    // effect and crashed every screen rendering a Dialog/Sheet — e.g. Create
+    // League (LS-9249).
+    if (
+      typeof document === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    ) {
+      return;
+    }
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const sync = () => setReduced(mq.matches || readAnimationsDisabled());
     sync();

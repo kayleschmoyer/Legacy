@@ -27,6 +27,16 @@ describe('useReducedMotion', () => {
     expect(result.current).toBe(false);
   });
 
+  it('stays false without throwing when window has no matchMedia (React Native)', () => {
+    // React Native defines a global `window` without DOM APIs (LS-9249).
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: undefined,
+    });
+    const { result } = renderHook(() => useReducedMotion());
+    expect(result.current).toBe(false);
+  });
+
   it('is true when the OS requests reduced motion', () => {
     mockMatchMedia(true);
     const { result } = renderHook(() => useReducedMotion());

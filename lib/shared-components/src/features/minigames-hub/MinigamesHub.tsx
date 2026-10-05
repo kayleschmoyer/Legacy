@@ -76,7 +76,7 @@ const NARROW_QUERY = '(max-width: 720px)';
 function useIsNarrow(): boolean {
   const [narrow, setNarrow] = React.useState(false);
   React.useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
+    if (typeof document === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia(NARROW_QUERY);
     setNarrow(mq.matches);
     const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);

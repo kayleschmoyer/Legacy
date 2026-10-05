@@ -347,7 +347,7 @@ export function useWebSocket({
       client.reconnectNow();
     };
     const hasWindowEvents =
-      typeof window !== 'undefined' &&
+      typeof document !== 'undefined' &&
       typeof window.addEventListener === 'function';
     if (hasWindowEvents) {
       window.addEventListener('online', handleOnline);

@@ -352,7 +352,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const inviteUrl = useMemo(() => {
     if (!gameState?.inviteCode) return '';
     const origin =
-      typeof window !== 'undefined' ? (window.location?.origin ?? '') : '';
+      typeof document !== 'undefined' ? (window.location?.origin ?? '') : '';
     return `${origin}/games/season-draft/join/${gameState.inviteCode}`;
   }, [gameState?.inviteCode]);
 

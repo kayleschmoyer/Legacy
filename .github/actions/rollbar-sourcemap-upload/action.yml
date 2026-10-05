@@ -6,7 +6,7 @@ inputs:
     description: "Rollbar server-side (post_server_item) access token"
     required: true
   version:
-    description: "Version string to key the sourcemap with — must match the code_version the mobile Rollbar SDK reports at runtime (EXPO_PUBLIC_APP_VERSION)"
+    description: "Version string to key the sourcemap with — must match the code_version the mobile Rollbar SDK reports at runtime (EXPO_PUBLIC_COMMIT_SHA)"
     required: true
   search-dir:
     description: "Directory to search recursively for the composed Hermes sourcemap (*.bundle.map)"

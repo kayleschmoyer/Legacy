@@ -501,7 +501,7 @@ export function useDraftWebSocket({
   // instance in useWebSocket and are not re-created by connect/disconnect).
   useEffect(() => {
     if (
-      typeof window === 'undefined' ||
+      typeof document === 'undefined' ||
       typeof window.addEventListener !== 'function'
     ) {
       return undefined;

@@ -41,7 +41,7 @@ declare global {
 }
 
 const getSpeechRecognition = (): (new () => SpeechRecognition) | undefined => {
-  if (typeof window === 'undefined') return undefined;
+  if (typeof document === 'undefined') return undefined;
   return (
     window.SpeechRecognition ?? window.webkitSpeechRecognition ?? undefined
   );

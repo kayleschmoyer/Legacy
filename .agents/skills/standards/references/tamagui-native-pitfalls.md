@@ -151,8 +151,54 @@ number.
 
 ---
 
+## 2. `typeof window` is not a DOM check — React Native defines `window`
+
+### Symptom
+
+A screen renders its `ScreenErrorBoundary` ("try again") on iOS/Android with
+`TypeError: undefined is not a function`, thrown from a `useEffect`. Web and jest are fine.
+Retrying re-mounts the screen and crashes again.
+
+### Root cause
+
+React Native's `InitializeCore` aliases `global.window = global`, so in native-reachable code
+`typeof window === 'undefined'` is **false** — but `window.matchMedia`,
+`window.addEventListener`, `window.localStorage`, `document`, etc. do not exist. A guard written
+as "no `window` means native/SSR" passes on native and the next DOM call throws.
+
+**LS-9249** (the confirmed instance): `useReducedMotion` guarded its effect with
+`if (typeof window === 'undefined') return;` and then called `window.matchMedia(...)`. `Dialog`
+calls the hook unconditionally, so every native screen rendering a `Dialog` — e.g. Create
+League's success dialog — crashed on mount. Two earlier "fixes" chased a Home-tab
+`scrollTo` instead, because the Hermes stack was never symbolicated.
+
+### The correct patterns
+
+| Need                         | Write                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| "Is there a DOM?"            | `typeof document === 'undefined'` (React Native has no `document`)       |
+| Call one browser API         | Feature-detect it: `typeof window.matchMedia === 'function'`             |
+| A global RN _also_ provides  | `globalThis` feature check (e.g. `requestIdleCallback` in GameLogsTable) |
+| Whole module is web-only     | Put it in a `.web.ts(x)` file (see `platform-file-convention.md`)        |
+| Rendering/layout differences | Media props / `isWeb` per `shared-components-first`, never a DOM probe   |
+
+### Prevention
+
+Enforced: `lib/shared-components/eslint.config.mjs` adds a `no-restricted-syntax` selector
+(`WINDOW_DOM_GUARD`) that errors on any `typeof window === / !== 'undefined'` comparison in
+non-web files (`*.web.ts(x)`, `*.stories.tsx`, `platform-components/web/**` and specs are
+exempt).
+
+Debugging: Android release crashes are symbolicatable — the build tags Rollbar's `code_version`
+with the commit SHA and uploads the Hermes sourcemap under it. The About screen shows the
+same commit SHA, so a user report can be matched to the exact build.
+
+---
+
 ## Provenance
 
+- **LS-9249** — `useReducedMotion`'s `typeof window` guard (section 2); fixed alongside the
+  `WINDOW_DOM_GUARD` lint rule and commit-SHA Rollbar tagging.
 - **LS-8624** (Done) — the confirmed instance: `PlayerStatsDataGrid.tsx:1206` passed
   `letterSpacing="0.08em"` to the shared `PositionBadge`, which types the prop `number | string`
   and forwards it to a Tamagui `<Text letterSpacing={…}>`. Every stats-grid row that renders a

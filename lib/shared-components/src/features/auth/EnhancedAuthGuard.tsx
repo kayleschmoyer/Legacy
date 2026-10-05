@@ -223,7 +223,7 @@ export function EnhancedAuthGuard({
   // provide the router pathname and the fallback must remain safe during startup.
   const currentPath =
     currentPathOverride ??
-    (typeof window !== 'undefined' ? (window.location?.pathname ?? '') : '');
+    (typeof document !== 'undefined' ? (window.location?.pathname ?? '') : '');
   const isPublicPath =
     currentPath.length > 0 &&
     (publicPaths.some(

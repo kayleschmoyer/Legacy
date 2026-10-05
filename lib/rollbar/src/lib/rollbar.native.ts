@@ -19,6 +19,47 @@ import { DEFAULT_DEDUPE_WINDOW_MS, RollbarDeduper } from './dedupe';
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
 
+/** Hermes release-build frame filename, e.g. `address at index.android.bundle`. */
+const HERMES_FRAME_FILENAME = /^address at (.+\.(?:js)?bundle)$/;
+
+interface RollbarFrame {
+  filename?: string;
+}
+
+interface RollbarTracePayload {
+  body?: {
+    trace?: { frames?: RollbarFrame[] };
+    trace_chain?: { frames?: RollbarFrame[] }[];
+  };
+}
+
+/**
+ * Rewrites Hermes frame filenames (`address at index.android.bundle`) to the
+ * `minified_url` the CI sourcemap upload is keyed by
+ * (`app://android/index.android.bundle`, see
+ * .github/actions/rollbar-sourcemap-upload), so Rollbar can apply the uploaded
+ * Hermes sourcemap. Without this every release crash stays an unreadable
+ * bytecode offset (LS-9249).
+ */
+export function rewriteHermesFrameFilenames(
+  payload: RollbarTracePayload,
+): void {
+  const traces = [
+    ...(payload.body?.trace ? [payload.body.trace] : []),
+    ...(payload.body?.trace_chain ?? []),
+  ];
+  for (const trace of traces) {
+    for (const frame of trace.frames ?? []) {
+      const match = frame.filename?.match(HERMES_FRAME_FILENAME);
+      if (match) {
+        const bundle = match[1];
+        const os = bundle.includes('android') ? 'android' : 'ios';
+        frame.filename = `app://${os}/${bundle}`;
+      }
+    }
+  }
+}
+
 class ReactNativeRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   private breadcrumbs: RollbarBreadcrumb[] = [];
@@ -52,6 +93,17 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
         itemsPerMinute: config.itemsPerMinute ?? 25,
         payload: {
           code_version: config.release,
+          // Symbolicate release crashes against the Hermes sourcemap CI
+          // uploads under the same version (LS-9249).
+          client: {
+            javascript: {
+              source_map_enabled: true,
+              code_version: config.release,
+            },
+          },
+        },
+        transform: (payload) => {
+          rewriteHermesFrameFilenames(payload);
         },
       });
       LOGGER.info('Rollbar initialized for React Native environment', {
@@ -192,7 +244,13 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
       return null;
     }
 
-    const release = process.env['EXPO_PUBLIC_APP_VERSION'] || undefined;
+    // Prefer the commit SHA (unique per build, like web's VITE_COMMIT_SHA) over
+    // the package version, which stays `0.0.1` across every build — sharing it
+    // meant each build's sourcemap upload overwrote the last (LS-9249).
+    const release =
+      process.env['EXPO_PUBLIC_COMMIT_SHA'] ||
+      process.env['EXPO_PUBLIC_APP_VERSION'] ||
+      undefined;
 
     return {
       accessToken,

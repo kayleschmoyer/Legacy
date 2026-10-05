@@ -143,7 +143,7 @@ export function compareCells(
 
 function loadColumnPrefs(sport: string): ColumnPreferences | null {
   if (Platform.OS !== 'web') return null;
-  if (typeof window === 'undefined' || !window.localStorage) return null;
+  if (typeof document === 'undefined' || !window.localStorage) return null;
   try {
     const raw = window.localStorage.getItem(columnPrefsKey(sport));
     if (!raw) return null;
@@ -164,7 +164,7 @@ function loadColumnPrefs(sport: string): ColumnPreferences | null {
 
 function saveColumnPrefs(sport: string, prefs: ColumnPreferences): void {
   if (Platform.OS !== 'web') return;
-  if (typeof window === 'undefined' || !window.localStorage) return;
+  if (typeof document === 'undefined' || !window.localStorage) return;
   try {
     window.localStorage.setItem(columnPrefsKey(sport), JSON.stringify(prefs));
   } catch {
@@ -184,12 +184,13 @@ const MIN_TABLE_WIDTH_PX = 600;
 type IdleHandle = number;
 function scheduleIdle(fn: () => void): IdleHandle {
   if (
-    typeof window !== 'undefined' &&
-    typeof (window as unknown as { requestIdleCallback?: unknown })
+    typeof (globalThis as unknown as { requestIdleCallback?: unknown })
       .requestIdleCallback === 'function'
   ) {
     return (
-      window as unknown as { requestIdleCallback: (cb: () => void) => number }
+      globalThis as unknown as {
+        requestIdleCallback: (cb: () => void) => number;
+      }
     ).requestIdleCallback(fn);
   }
   // setTimeout resolves to a number handle on web/native (and jsdom); the
@@ -200,12 +201,11 @@ function scheduleIdle(fn: () => void): IdleHandle {
 function cancelIdle(h: IdleHandle | null): void {
   if (h == null) return;
   if (
-    typeof window !== 'undefined' &&
-    typeof (window as unknown as { cancelIdleCallback?: unknown })
+    typeof (globalThis as unknown as { cancelIdleCallback?: unknown })
       .cancelIdleCallback === 'function'
   ) {
     (
-      window as unknown as { cancelIdleCallback: (h: number) => void }
+      globalThis as unknown as { cancelIdleCallback: (h: number) => void }
     ).cancelIdleCallback(h);
     return;
   }

@@ -99,7 +99,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const hasWindowEventTarget = (): boolean =>
-  typeof window !== 'undefined' &&
+  typeof document !== 'undefined' &&
   typeof window.addEventListener === 'function' &&
   typeof window.removeEventListener === 'function';
 

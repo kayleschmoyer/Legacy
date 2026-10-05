@@ -25,7 +25,7 @@ const loggerMock = {
 };
 jest.mock('@legacy-sports/logging', () => ({ LOGGER: loggerMock }));
 
-import { rollbar } from './rollbar.native';
+import { rewriteHermesFrameFilenames, rollbar } from './rollbar.native';
 
 describe('ReactNativeRollbarImplementation', () => {
   beforeEach(() => {
@@ -104,6 +104,73 @@ describe('ReactNativeRollbarImplementation', () => {
       rollbar.captureError(new Error('same'));
 
       expect(rollbarInstanceMock.error).toHaveBeenCalledTimes(3);
+    });
+  });
+  describe('release tagging and sourcemaps (LS-9249)', () => {
+    const originalEnv = process.env;
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('prefers the commit SHA over the shared package version', () => {
+      process.env = {
+        ...originalEnv,
+        EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: 'token',
+        EXPO_PUBLIC_APP_VERSION: '0.0.1',
+        EXPO_PUBLIC_COMMIT_SHA: 'abc1234',
+      };
+      expect(rollbar.getRollbarConfigFromEnv()?.release).toBe('abc1234');
+    });
+
+    it('falls back to the package version without a commit SHA', () => {
+      process.env = {
+        ...originalEnv,
+        EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: 'token',
+        EXPO_PUBLIC_APP_VERSION: '0.0.1',
+        EXPO_PUBLIC_COMMIT_SHA: '',
+      };
+      expect(rollbar.getRollbarConfigFromEnv()?.release).toBe('0.0.1');
+    });
+
+    it('enables sourcemaps keyed to the release', () => {
+      rollbar.init({
+        accessToken: 'token',
+        environment: 'test',
+        release: 'abc1234',
+      });
+      const calls = RollbarCtorMock.mock.calls as unknown as [
+        { payload: unknown },
+      ][];
+      const [options] = calls[calls.length - 1];
+      expect(options.payload).toMatchObject({
+        code_version: 'abc1234',
+        client: {
+          javascript: { source_map_enabled: true, code_version: 'abc1234' },
+        },
+      });
+    });
+
+    it('rewrites Hermes frame filenames to the uploaded minified_url', () => {
+      const payload = {
+        body: {
+          trace: {
+            frames: [
+              { filename: 'address at index.android.bundle' },
+              { filename: 'node_modules/foo.js' },
+            ],
+          },
+          trace_chain: [{ frames: [{ filename: 'address at main.jsbundle' }] }],
+        },
+      };
+      rewriteHermesFrameFilenames(payload);
+      expect(payload.body.trace.frames.map((f) => f.filename)).toEqual([
+        'app://android/index.android.bundle',
+        'node_modules/foo.js',
+      ]);
+      expect(payload.body.trace_chain[0].frames[0].filename).toBe(
+        'app://ios/main.jsbundle',
+      );
     });
   });
 });

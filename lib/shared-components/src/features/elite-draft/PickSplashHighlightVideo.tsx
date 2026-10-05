@@ -69,7 +69,7 @@ let iframeApiPromise: Promise<YTNamespace> | null = null;
  */
 function loadYouTubeIframeApi(): Promise<YTNamespace> {
   // SSR guard — never resolves; the first-frame timeout owns the fallback.
-  if (typeof window === 'undefined') {
+  if (typeof document === 'undefined') {
     return new Promise<YTNamespace>(() => undefined);
   }
   if (window.YT?.Player) return Promise.resolve(window.YT);

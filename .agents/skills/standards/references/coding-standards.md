@@ -67,7 +67,7 @@ All code must pass `make pc` before being pushed. This runs formatting, linting,
 
 > Full catalog with code examples: [standards-catalog.md](standards-catalog.md)
 > Tamagui web pitfalls (overlapping content, lineHeight, UA margin leaks): [tamagui-web-pitfalls.md](tamagui-web-pitfalls.md)
-> Tamagui native-only pitfalls (string `letterSpacing`/`lineHeight` crashes `RCTText`): [tamagui-native-pitfalls.md](tamagui-native-pitfalls.md)
+> Tamagui native-only pitfalls (string `letterSpacing`/`lineHeight` crashes `RCTText`; `typeof window` is not a DOM check because React Native defines `window` — use `typeof document` or feature-detect the API): [tamagui-native-pitfalls.md](tamagui-native-pitfalls.md)
 
 ### Security & Input Validation
 
