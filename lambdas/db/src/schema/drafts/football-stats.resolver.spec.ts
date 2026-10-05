@@ -53,9 +53,7 @@ async function captureResolver(): Promise<
   // Real PublicSchema (real drizzle Column objects) — required for eq/and/
   // or/isNotNull to build serializable SQL. Everything else from db-client
   // stays real too; nothing else in this module is invoked by this resolver.
-  jest.doMock('@legacy-sports/db-client', () =>
-    jest.requireActual('@legacy-sports/db-client'),
-  );
+  jest.doMock('@legacy-sports/db-client', () => mockDbClientModule());
 
   jest.doMock('./helpers', () => ({
     countRecentMockDrafts: jest.fn(),

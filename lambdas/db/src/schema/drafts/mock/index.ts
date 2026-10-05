@@ -11,4 +11,5 @@ import './lobby';
 import './draft-room';
 import './chat';
 import './jobs';
+import './hub';
 import './active';

@@ -50,19 +50,25 @@ async function captureCareerBattingResolver(): Promise<
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    createDatabaseService: jest.fn(() => ({ players: {} })),
-    PublicSchema: { users: { id: 'id', accessLevel: 'accessLevel' } },
-    InternalSchema: {
-      usersInAppInternal: { id: 'id', subscriptionTier: 'subscription_tier' },
-    },
-  }));
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      createDatabaseService: jest.fn(() => ({ players: {} })),
+      PublicSchema: { users: { id: 'id', accessLevel: 'accessLevel' } },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 'subscription_tier' },
+      },
+    }),
+  );
 
   jest.doMock('@legacy-sports/utils/node', () => ({
     getDbOptions: jest.fn(() => ({})),
   }));
 
-  jest.doMock('drizzle-orm', () => ({ eq: jest.fn() }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      eq: jest.fn(),
+    }),
+  );
 
   jest.doMock('./leagues/types', () => ({ SportKindEnum: {} }));
 

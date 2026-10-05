@@ -18,15 +18,17 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 // Mocked at module level so the builder import does not pull in DB/env deps.
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  PublicSchema: {
-    leagueMembers: {
-      leagueId: 'league_members.league_id',
-      userId: 'league_members.user_id',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    PublicSchema: {
+      leagueMembers: {
+        leagueId: 'league_members.league_id',
+        userId: 'league_members.user_id',
+      },
     },
-  },
-}));
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({})),

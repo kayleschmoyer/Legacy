@@ -42,117 +42,121 @@ describe('myEntitlements query', () => {
       },
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          getUserByEmail: jest.fn(),
-          getUsers: jest.fn().mockResolvedValue([]),
-          countUsers: jest.fn().mockResolvedValue(0),
-          searchUsers: jest.fn().mockResolvedValue([]),
-          getUserIdentities: jest.fn().mockResolvedValue([]),
-          updateUserAccessLevel: jest.fn(),
-          updateUsername: jest.fn(),
-          updateUserAvatar: jest.fn(),
-          updateUserTheme: jest.fn(),
-          deleteLeakedTestUsers: jest.fn(),
-          setCanonicalEmail: jest.fn(),
-        },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-        badges: {
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            getUserByEmail: jest.fn(),
+            getUsers: jest.fn().mockResolvedValue([]),
+            countUsers: jest.fn().mockResolvedValue(0),
+            searchUsers: jest.fn().mockResolvedValue([]),
+            getUserIdentities: jest.fn().mockResolvedValue([]),
+            updateUserAccessLevel: jest.fn(),
+            updateUsername: jest.fn(),
+            updateUserAvatar: jest.fn(),
+            updateUserTheme: jest.fn(),
+            deleteLeakedTestUsers: jest.fn(),
+            setCanonicalEmail: jest.fn(),
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+          badges: {
+            getUserBadges: jest.fn().mockResolvedValue([]),
+            getTeamBadges: jest.fn().mockResolvedValue([]),
+            getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+            evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+            evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+            awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+            awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
           getUserBadges: jest.fn().mockResolvedValue([]),
-          getTeamBadges: jest.fn().mockResolvedValue([]),
-          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'w',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            playerId: 'playerId',
+            positionId: 'positionId',
+          },
+          players: {
+            id: 'id',
+            firstName: 'firstName',
+            lastName: 'lastName',
+            brefId: 'brefId',
+          },
+          matchups: {
+            id: 'id',
+            leagueId: 'leagueId',
+            weekNumber: 'weekNumber',
+            status: 'status',
+            team1Id: 'team1Id',
+            team2Id: 'team2Id',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'matchupId',
+            playerId: 'playerId',
+            teamId: 'teamId',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'playerId',
+            season: 'season',
+            leagueId: 'leagueId',
+            weekNumber: 'weekNumber',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'leagueId',
+            season: 'season',
+            playerId: 'playerId',
+            awardType: 'awardType',
+            notes: 'notes',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'leagueId',
+            eventType: 'eventType',
+            occurredAt: 'occurredAt',
+          },
+          leagueActivityEventType: { enumValues: [] },
         },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'w',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+            entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
+          },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          playerId: 'playerId',
-          positionId: 'positionId',
-        },
-        players: {
-          id: 'id',
-          firstName: 'firstName',
-          lastName: 'lastName',
-          brefId: 'brefId',
-        },
-        matchups: {
-          id: 'id',
-          leagueId: 'leagueId',
-          weekNumber: 'weekNumber',
-          status: 'status',
-          team1Id: 'team1Id',
-          team2Id: 'team2Id',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'matchupId',
-          playerId: 'playerId',
-          teamId: 'teamId',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'playerId',
-          season: 'season',
-          leagueId: 'leagueId',
-          weekNumber: 'weekNumber',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'leagueId',
-          season: 'season',
-          playerId: 'playerId',
-          awardType: 'awardType',
-          notes: 'notes',
-          createdAt: 'createdAt',
-          updatedAt: 'updatedAt',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'leagueId',
-          eventType: 'eventType',
-          occurredAt: 'occurredAt',
-        },
-        leagueActivityEventType: { enumValues: [] },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-          entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
-        },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {

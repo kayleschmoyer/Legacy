@@ -25,15 +25,16 @@ jest.mock('./system-auth', () => ({
   assertAuthorized: jest.fn(),
 }));
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn(),
-  asc: jest.fn(),
-  eq: jest.fn(),
-  gte: jest.fn(),
-  isNotNull: jest.fn(),
-  lte: jest.fn(),
-  sql: Object.assign(jest.fn(), { join: jest.fn() }),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn(),
+    asc: jest.fn(),
+    eq: jest.fn(),
+    gte: jest.fn(),
+    isNotNull: jest.fn(),
+    lte: jest.fn(),
+  }),
+);
 
 jest.mock('@aws-sdk/client-sqs', () => ({
   SQSClient: jest.fn().mockImplementation(() => ({ send: jest.fn() })),
@@ -66,83 +67,86 @@ jest.mock('@legacy-sports/utils', () => ({
   isNegroLeague: jest.fn(() => false),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  PublicSchema: {
-    leagues: {
-      id: 'leagues.id',
-      name: 'leagues.name',
-      discordWebhookUrl: 'leagues.discord_webhook_url',
-      discordReminderHours: 'leagues.discord_reminder_hours',
-      discordLastReminderMatchupId: 'leagues.discord_last_reminder_matchup_id',
-      currentWeek: 'leagues.current_week',
-      rosterLockTiming: 'leagues.roster_lock_timing',
-      leaguePhase: 'leagues.league_phase',
-      isMockDraft: 'leagues.is_mock_draft',
-      draftStatus: 'leagues.draft_status',
-      gamesPerMatchup: 'leagues.games_per_matchup',
-      weekAdvanceStatus: 'leagues.week_advance_status',
-      pitcherStartsPerMatchup: 'leagues.sp_starts_per_matchup',
-      totalMatchups: 'leagues.total_matchups',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    PublicSchema: {
+      leagues: {
+        id: 'leagues.id',
+        name: 'leagues.name',
+        discordWebhookUrl: 'leagues.discord_webhook_url',
+        discordReminderHours: 'leagues.discord_reminder_hours',
+        discordLastReminderMatchupId:
+          'leagues.discord_last_reminder_matchup_id',
+        currentWeek: 'leagues.current_week',
+        rosterLockTiming: 'leagues.roster_lock_timing',
+        leaguePhase: 'leagues.league_phase',
+        isMockDraft: 'leagues.is_mock_draft',
+        draftStatus: 'leagues.draft_status',
+        gamesPerMatchup: 'leagues.games_per_matchup',
+        weekAdvanceStatus: 'leagues.week_advance_status',
+        pitcherStartsPerMatchup: 'leagues.sp_starts_per_matchup',
+        totalMatchups: 'leagues.total_matchups',
+      },
+      matchups: {
+        id: 'matchups.id',
+        leagueId: 'matchups.league_id',
+        weekNumber: 'matchups.week_number',
+        status: 'matchups.status',
+        startTime: 'matchups.start_time',
+        team1Id: 'matchups.team1_id',
+        team2Id: 'matchups.team2_id',
+        team1Score: 'matchups.team1_score',
+        team2Score: 'matchups.team2_score',
+        gamesPerMatchup: 'matchups.games_per_matchup',
+        statsLoadingStatus: 'matchups.stats_loading_status',
+        pitcherStartsPerMatchup: 'matchups.sp_starts_per_matchup',
+        endTime: 'matchups.end_time',
+      },
+      matchupPlayers: {
+        id: 'matchup_players.id',
+        matchupId: 'matchup_players.matchup_id',
+        playerId: 'matchup_players.player_id',
+        teamId: 'matchup_players.team_id',
+        positionId: 'matchup_players.position_id',
+      },
+      matchupPlayerGames: {
+        matchupPlayerId: 'matchup_player_games.matchup_player_id',
+        gameNum: 'matchup_player_games.game_num',
+      },
+      teams: {
+        id: 'teams.id',
+        name: 'teams.name',
+        leagueId: 'teams.league_id',
+      },
+      teamMembers: {
+        playerId: 'team_members.player_id',
+        positionId: 'team_members.position_id',
+        leagueId: 'team_members.league_id',
+        teamId: 'team_members.team_id',
+      },
+      leagueMembers: {
+        leagueId: 'league_members.league_id',
+        userId: 'league_members.user_id',
+        permissionLevel: 'league_members.permission_level',
+      },
+      rosterLockRules: {
+        leagueId: 'roster_lock_rules.league_id',
+        customLockTime: 'roster_lock_rules.custom_lock_time',
+        lockHoursBeforeMatchup: 'roster_lock_rules.lock_hours_before_matchup',
+      },
     },
-    matchups: {
-      id: 'matchups.id',
-      leagueId: 'matchups.league_id',
-      weekNumber: 'matchups.week_number',
-      status: 'matchups.status',
-      startTime: 'matchups.start_time',
-      team1Id: 'matchups.team1_id',
-      team2Id: 'matchups.team2_id',
-      team1Score: 'matchups.team1_score',
-      team2Score: 'matchups.team2_score',
-      gamesPerMatchup: 'matchups.games_per_matchup',
-      statsLoadingStatus: 'matchups.stats_loading_status',
-      pitcherStartsPerMatchup: 'matchups.sp_starts_per_matchup',
-      endTime: 'matchups.end_time',
-    },
-    matchupPlayers: {
-      id: 'matchup_players.id',
-      matchupId: 'matchup_players.matchup_id',
-      playerId: 'matchup_players.player_id',
-      teamId: 'matchup_players.team_id',
-      positionId: 'matchup_players.position_id',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchup_player_games.matchup_player_id',
-      gameNum: 'matchup_player_games.game_num',
-    },
-    teams: {
-      id: 'teams.id',
-      name: 'teams.name',
-      leagueId: 'teams.league_id',
-    },
-    teamMembers: {
-      playerId: 'team_members.player_id',
-      positionId: 'team_members.position_id',
-      leagueId: 'team_members.league_id',
-      teamId: 'team_members.team_id',
-    },
-    leagueMembers: {
-      leagueId: 'league_members.league_id',
-      userId: 'league_members.user_id',
-      permissionLevel: 'league_members.permission_level',
-    },
-    rosterLockRules: {
-      leagueId: 'roster_lock_rules.league_id',
-      customLockTime: 'roster_lock_rules.custom_lock_time',
-      lockHoursBeforeMatchup: 'roster_lock_rules.lock_hours_before_matchup',
-    },
-  },
-  createBadgeService: jest.fn(() => ({
-    getUserBadges: jest.fn().mockResolvedValue([]),
-    getTeamBadges: jest.fn().mockResolvedValue([]),
-    getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-    evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-    evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-    awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-    awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
+    createBadgeService: jest.fn(() => ({
+      getUserBadges: jest.fn().mockResolvedValue([]),
+      getTeamBadges: jest.fn().mockResolvedValue([]),
+      getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+      evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+      evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+      awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+      awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+    })),
+  }),
+);
 
 import { formatTimeUntilLock } from './discord-reminders';
 

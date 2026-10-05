@@ -133,44 +133,48 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
     shuffleArray,
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: {
-        id: 'drafts.id',
-        leagueId: 'drafts.league_id',
-        draftMode: 'drafts.draft_mode',
-        selectionMethod: 'drafts.selection_method',
-        draftOrder: 'drafts.draft_order',
-        pickTimeLimitSeconds: 'drafts.pick_time_limit_seconds',
-        scheduledAt: 'drafts.scheduled_at',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: {
+          id: 'drafts.id',
+          leagueId: 'drafts.league_id',
+          draftMode: 'drafts.draft_mode',
+          selectionMethod: 'drafts.selection_method',
+          draftOrder: 'drafts.draft_order',
+          pickTimeLimitSeconds: 'drafts.pick_time_limit_seconds',
+          scheduledAt: 'drafts.scheduled_at',
+        },
+        leagues: {
+          id: 'leagues.id',
+          draftStatus: 'leagues.draft_status',
+          rosterContinuity: 'leagues.roster_continuity',
+          previousLeagueId: 'leagues.previous_league_id',
+        },
+        teams: {
+          id: 'teams.id',
+          leagueId: 'teams.league_id',
+        },
+        draftPicks: {
+          draftId: 'draft_picks.draft_id',
+        },
+        draftSlotTrades: {
+          leagueId: 'draft_slot_trades.league_id',
+          status: 'draft_slot_trades.status',
+        },
+        leagueMessages: {},
       },
-      leagues: {
-        id: 'leagues.id',
-        draftStatus: 'leagues.draft_status',
-        rosterContinuity: 'leagues.roster_continuity',
-        previousLeagueId: 'leagues.previous_league_id',
-      },
-      teams: {
-        id: 'teams.id',
-        leagueId: 'teams.league_id',
-      },
-      draftPicks: {
-        draftId: 'draft_picks.draft_id',
-      },
-      draftSlotTrades: {
-        leagueId: 'draft_slot_trades.league_id',
-        status: 'draft_slot_trades.status',
-      },
-      leagueMessages: {},
-    },
-  }));
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({
-    and: jest.fn(),
-    eq: jest.fn(),
-    lte: jest.fn(),
-    inArray: jest.fn(),
-  }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      and: jest.fn(),
+      eq: jest.fn(),
+      lte: jest.fn(),
+      inArray: jest.fn(),
+    }),
+  );
 
   jest.doMock('./helpers', () => ({
     enableAutoPickForUnmanagedTeams,

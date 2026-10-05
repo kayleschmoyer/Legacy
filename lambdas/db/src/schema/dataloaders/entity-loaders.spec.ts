@@ -6,78 +6,76 @@
  * underlying DB query.
  */
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: {
-      id: 'leagues.id',
-      salaryCapEnabled: 'leagues.salaryCapEnabled',
-      salaryCap: 'leagues.salaryCap',
-      luxuryTaxThreshold: 'leagues.luxuryTaxThreshold',
-      maxRosterSize: 'leagues.maxRosterSize',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: {
+        id: 'leagues.id',
+        salaryCapEnabled: 'leagues.salaryCapEnabled',
+        salaryCap: 'leagues.salaryCap',
+        luxuryTaxThreshold: 'leagues.luxuryTaxThreshold',
+        maxRosterSize: 'leagues.maxRosterSize',
+      },
+      teamMembers: {
+        teamId: 'teamMembers.teamId',
+        leagueId: 'teamMembers.leagueId',
+        salary: 'teamMembers.salary',
+      },
+      leaguePosition: {
+        id: 'leaguePosition.id',
+        leagueId: 'leaguePosition.leagueId',
+        positionType: 'leaguePosition.positionType',
+      },
+      playerEligiblePositions: {
+        playerId: 'pep.playerId',
+        position: 'pep.position',
+        games: 'pep.games',
+      },
+      footballPlayerEligiblePositions: {
+        playerId: 'fpep.playerId',
+        position: 'fpep.position',
+      },
+      seasonBatting: {
+        playerId: 'sb.playerId',
+        team: 'sb.team',
+        g: 'sb.g',
+        season: 'sb.season',
+      },
+      seasonPitching: {
+        playerId: 'sp.playerId',
+        team: 'sp.team',
+        g: 'sp.g',
+        season: 'sp.season',
+      },
+      players: {
+        id: 'players.id',
+        nflTeam: 'players.nflTeam',
+      },
+      teams: {
+        id: 'teams.id',
+      },
     },
-    teamMembers: {
-      teamId: 'teamMembers.teamId',
-      leagueId: 'teamMembers.leagueId',
-      salary: 'teamMembers.salary',
-    },
-    leaguePosition: {
-      id: 'leaguePosition.id',
-      leagueId: 'leaguePosition.leagueId',
-      positionType: 'leaguePosition.positionType',
-    },
-    playerEligiblePositions: {
-      playerId: 'pep.playerId',
-      position: 'pep.position',
-      games: 'pep.games',
-    },
-    footballPlayerEligiblePositions: {
-      playerId: 'fpep.playerId',
-      position: 'fpep.position',
-    },
-    seasonBatting: {
-      playerId: 'sb.playerId',
-      team: 'sb.team',
-      g: 'sb.g',
-      season: 'sb.season',
-    },
-    seasonPitching: {
-      playerId: 'sp.playerId',
-      team: 'sp.team',
-      g: 'sp.g',
-      season: 'sp.season',
-    },
-    players: {
-      id: 'players.id',
-      nflTeam: 'players.nflTeam',
-    },
-    teams: {
-      id: 'teams.id',
-    },
-  },
-  // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
-  // up to 2x on the pool's connection-timeout message) so the loader-level
-  // regression test below (LS-8478) exercises the same retry contract without
-  // pulling in the real Helpers module (and its pg/drizzle dependencies).
-  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
-    const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
-    const isPoolTimeout = (err: unknown): boolean => {
-      let current: unknown = err;
-      while (current instanceof Error) {
-        if (current.message === POOL_TIMEOUT_MESSAGE) return true;
-        current = (current as Error & { cause?: unknown }).cause;
+    withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+      const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+      const isPoolTimeout = (err: unknown): boolean => {
+        let current: unknown = err;
+        while (current instanceof Error) {
+          if (current.message === POOL_TIMEOUT_MESSAGE) return true;
+          current = (current as Error & { cause?: unknown }).cause;
+        }
+        return false;
+      };
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          return await queryFn();
+        } catch (err) {
+          if (isPoolTimeout(err) && attempt < 2) continue;
+          throw err;
+        }
       }
-      return false;
-    };
-    for (let attempt = 0; attempt <= 2; attempt++) {
-      try {
-        return await queryFn();
-      } catch (err) {
-        if (isPoolTimeout(err) && attempt < 2) continue;
-        throw err;
-      }
-    }
-  },
-}));
+    },
+  }),
+);
 
 import {
   clearEligiblePositionsCache,

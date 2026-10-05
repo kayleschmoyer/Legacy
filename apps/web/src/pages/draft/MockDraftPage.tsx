@@ -206,6 +206,7 @@ function SetupScreen({
             initialDraftOrder={initialDraftOrder}
             usageLabel={usageLabel}
             onJoinInstead={onJoinInstead}
+            onBrowseMockDrafts={() => navigate('/mock-drafts')}
             isControlAllTeamsEntitled={isControlAllTeamsEntitled}
             onControlAllTeamsUpgrade={() => setShowControlAllTeamsUpgrade(true)}
           />

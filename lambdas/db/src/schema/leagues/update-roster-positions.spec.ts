@@ -88,101 +88,97 @@ describe('updateRosterPositions (LS-9099)', () => {
       ...jest.requireActual('@legacy-sports/utils/node'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          permissionLevel: 'permissionLevel',
-        },
-        leaguePosition: {
-          id: 'id',
-          leagueId: 'leagueId',
-          positionType: 'positionType',
-        },
-        leagues: {
-          id: 'id',
-          maxRosterSize: 'maxRosterSize',
-          sport: 'sport',
-          name: 'name',
-          owner: 'owner',
-          updatedAt: 'updatedAt',
-        },
-        teams: { id: 'id', leagueId: 'leagueId' },
-        teamMembers: {
-          id: 'id',
-          leagueId: 'leagueId',
-          teamId: 'teamId',
-          positionId: 'positionId',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'matchupId',
-          teamId: 'teamId',
-          positionId: 'positionId',
-        },
-        matchups: {
-          id: 'id',
-          leagueId: 'leagueId',
-        },
-        positionSlot: {
-          enumValues: [
-            'QB',
-            'RB',
-            'WR',
-            'TE',
-            'FLEX',
-            'K',
-            'DST',
-            'DL',
-            'LB',
-            'DB',
-            'BN',
-            'DP',
-            'SFLEX',
-            'KP',
-          ],
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          leaguePosition: {
+            id: 'id',
+            leagueId: 'leagueId',
+            positionType: 'positionType',
+          },
+          leagues: {
+            id: 'id',
+            maxRosterSize: 'maxRosterSize',
+            sport: 'sport',
+            name: 'name',
+            owner: 'owner',
+            updatedAt: 'updatedAt',
+          },
+          teams: { id: 'id', leagueId: 'leagueId' },
+          teamMembers: {
+            id: 'id',
+            leagueId: 'leagueId',
+            teamId: 'teamId',
+            positionId: 'positionId',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'matchupId',
+            teamId: 'teamId',
+            positionId: 'positionId',
+          },
+          matchups: {
+            id: 'id',
+            leagueId: 'leagueId',
+          },
+          positionSlot: {
+            enumValues: [
+              'QB',
+              'RB',
+              'WR',
+              'TE',
+              'FLEX',
+              'K',
+              'DST',
+              'DL',
+              'LB',
+              'DB',
+              'BN',
+              'DP',
+              'SFLEX',
+              'KP',
+            ],
+          },
         },
         InternalSchema: {
           usersInAppInternal: {
             id: 'app_internal.users.id',
             subscriptionTier: 'app_internal.users.subscription_tier',
           },
+          subscriptions: {
+            userId: 'app_internal.subscriptions.user_id',
+            stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
+            createdAt: 'app_internal.subscriptions.created_at',
+            id: 'app_internal.subscriptions.id',
+          },
         },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-        subscriptions: {
-          userId: 'app_internal.subscriptions.user_id',
-          stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
-          createdAt: 'app_internal.subscriptions.created_at',
-          id: 'app_internal.subscriptions.id',
-        },
-      },
-    }));
+      }),
+    );
 
     // The requireFreshEntitlement advanced-gate path (fresh-entitlements.ts)
     // resolves a live Stripe client to read active entitlements. Tests never

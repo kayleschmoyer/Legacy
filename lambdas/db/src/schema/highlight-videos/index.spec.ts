@@ -44,26 +44,28 @@ const mockPurge = jest.fn();
 const mockPurgeStale = jest.fn();
 const mockGetByPlayerIds = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(() => ({
-    players: {
-      getHighlightVideoResolutionCandidates: mockGetCandidates,
-      upsertHighlightVideoResolutions: mockUpsertResolutions,
-      getHighlightVideosForVerification: mockGetForVerification,
-      applyHighlightVideoVerifications: mockApplyVerifications,
-      purgeHighlightVideos: mockPurge,
-      purgeStaleHighlightVideos: mockPurgeStale,
-      getHighlightVideosByPlayerIds: mockGetByPlayerIds,
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(() => ({
+      players: {
+        getHighlightVideoResolutionCandidates: mockGetCandidates,
+        upsertHighlightVideoResolutions: mockUpsertResolutions,
+        getHighlightVideosForVerification: mockGetForVerification,
+        applyHighlightVideoVerifications: mockApplyVerifications,
+        purgeHighlightVideos: mockPurge,
+        purgeStaleHighlightVideos: mockPurgeStale,
+        getHighlightVideosByPlayerIds: mockGetByPlayerIds,
+      },
+    })),
+    PublicSchema: {
+      leagueMembers: {
+        leagueId: 'league_members.league_id',
+        userId: 'league_members.user_id',
+        permissionLevel: 'league_members.permission_level',
+      },
     },
-  })),
-  PublicSchema: {
-    leagueMembers: {
-      leagueId: 'league_members.league_id',
-      userId: 'league_members.user_id',
-      permissionLevel: 'league_members.permission_level',
-    },
-  },
-}));
+  }),
+);
 
 const mockSearch = jest.fn();
 const mockGetVideoStatuses = jest.fn();

@@ -338,6 +338,7 @@ export function MockDraftPage(): React.JSX.Element {
           usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
           onJoinInstead={() => router.navigate('/join')}
+          onBrowseMockDrafts={() => router.navigate('/mock-drafts')}
           isControlAllTeamsEntitled={isControlAllTeamsEntitled}
           onControlAllTeamsUpgrade={handleControlAllTeamsUpgrade}
         />

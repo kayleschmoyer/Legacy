@@ -79,15 +79,12 @@ describe('League scoring GraphQL resolvers', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => {
-      const actual = jest.requireActual('@legacy-sports/db-client');
-
-      return {
-        ...actual,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
         createDatabaseService: jest.fn(() => databaseServiceMock),
         runWithPublicClient: runWithPublicClientMock,
-      };
-    });
+      }),
+    );
 
     jest.isolateModules(() => {
       const schemaModule = require('../schema') as { schema: GraphQLSchema };

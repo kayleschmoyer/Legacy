@@ -88,44 +88,52 @@ async function captureResolvers(): Promise<Record<string, Resolver>> {
   // so identity strings are sufficient.
   const columns = (...names: string[]) =>
     Object.fromEntries(names.map((n) => [n, n]));
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      teamMembers: columns(
-        'id',
-        'teamId',
-        'leagueId',
-        'playerId',
-        'positionId',
-        'onTradeBlock',
-      ),
-      leagues: columns('id', 'sport', 'currentWeek', 'currentMatchup'),
-      leaguePosition: columns('id', 'leagueId', 'positionType'),
-      players: columns('id', 'firstName', 'lastName'),
-      playerEligiblePositions: columns('playerId', 'position'),
-      footballPlayerEligiblePositions: columns('playerId', 'position'),
-      teams: columns('id', 'leagueId', 'name'),
-      matchups: columns('id', 'leagueId', 'weekNumber', 'team1Id', 'team2Id'),
-      matchupPlayers: columns(
-        'matchupId',
-        'teamId',
-        'playerId',
-        'positionId',
-        'manuallyEdited',
-      ),
-      leagueMembers: columns('leagueId', 'userId', 'teamId', 'permissionLevel'),
-      leagueMessages: columns('id', 'leagueId'),
-    },
-  }));
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        teamMembers: columns(
+          'id',
+          'teamId',
+          'leagueId',
+          'playerId',
+          'positionId',
+          'onTradeBlock',
+        ),
+        leagues: columns('id', 'sport', 'currentWeek', 'currentMatchup'),
+        leaguePosition: columns('id', 'leagueId', 'positionType'),
+        players: columns('id', 'firstName', 'lastName'),
+        playerEligiblePositions: columns('playerId', 'position'),
+        footballPlayerEligiblePositions: columns('playerId', 'position'),
+        teams: columns('id', 'leagueId', 'name'),
+        matchups: columns('id', 'leagueId', 'weekNumber', 'team1Id', 'team2Id'),
+        matchupPlayers: columns(
+          'matchupId',
+          'teamId',
+          'playerId',
+          'positionId',
+          'manuallyEdited',
+        ),
+        leagueMembers: columns(
+          'leagueId',
+          'userId',
+          'teamId',
+          'permissionLevel',
+        ),
+        leagueMessages: columns('id', 'leagueId'),
+      },
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({
-    and: jest.fn(),
-    eq: jest.fn(),
-    gte: jest.fn(),
-    ilike: jest.fn(),
-    inArray: jest.fn(),
-    ne: jest.fn(),
-    sql: jest.fn(),
-  }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      and: jest.fn(),
+      eq: jest.fn(),
+      gte: jest.fn(),
+      ilike: jest.fn(),
+      inArray: jest.fn(),
+      ne: jest.fn(),
+    }),
+  );
 
   jest.doMock('../leagues/types', () => ({
     Team: {},

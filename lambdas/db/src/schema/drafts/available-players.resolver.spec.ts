@@ -67,25 +67,27 @@ async function captureResolver(): Promise<
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: { id: 'drafts.id', leagueId: 'drafts.league_id' },
-      leagues: {
-        id: 'leagues.id',
-        sport: 'leagues.sport',
-        playerPool: 'leagues.player_pool',
-        minCareerGames: 'leagues.min_career_games',
-        minCareerSeasons: 'leagues.min_career_seasons',
-        gamesPerMatchup: 'leagues.games_per_matchup',
-        pitcherStartsPerMatchup: 'leagues.pitcher_starts_per_matchup',
-        baseballHofOnly: 'leagues.baseball_hof_only',
-        baseballEraFilter: 'leagues.baseball_era_filter',
-        customEraStartYear: 'leagues.custom_era_start_year',
-        customEraEndYear: 'leagues.custom_era_end_year',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: { id: 'drafts.id', leagueId: 'drafts.league_id' },
+        leagues: {
+          id: 'leagues.id',
+          sport: 'leagues.sport',
+          playerPool: 'leagues.player_pool',
+          minCareerGames: 'leagues.min_career_games',
+          minCareerSeasons: 'leagues.min_career_seasons',
+          gamesPerMatchup: 'leagues.games_per_matchup',
+          pitcherStartsPerMatchup: 'leagues.pitcher_starts_per_matchup',
+          baseballHofOnly: 'leagues.baseball_hof_only',
+          baseballEraFilter: 'leagues.baseball_era_filter',
+          customEraStartYear: 'leagues.custom_era_start_year',
+          customEraEndYear: 'leagues.custom_era_end_year',
+        },
       },
-    },
-    buildEligibilityConditions,
-  }));
+      buildEligibilityConditions,
+    }),
+  );
 
   jest.doMock('./helpers', () => ({
     countRecentMockDrafts: jest.fn(),

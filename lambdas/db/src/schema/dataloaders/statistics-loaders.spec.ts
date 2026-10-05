@@ -21,30 +21,32 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
 // up to 2x on the pool's connection-timeout message).
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    seasonBatting: { playerId: 'sb.playerId', season: 'sb.season' },
-    seasonPitching: { playerId: 'sp.playerId', season: 'sp.season' },
-    seasonFielding: { playerId: 'sf.playerId', season: 'sf.season' },
-  },
-  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
-    const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
-    for (let attempt = 0; attempt <= 2; attempt++) {
-      try {
-        return await queryFn();
-      } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === POOL_TIMEOUT_MESSAGE &&
-          attempt < 2
-        ) {
-          continue;
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      seasonBatting: { playerId: 'sb.playerId', season: 'sb.season' },
+      seasonPitching: { playerId: 'sp.playerId', season: 'sp.season' },
+      seasonFielding: { playerId: 'sf.playerId', season: 'sf.season' },
+    },
+    withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+      const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          return await queryFn();
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            err.message === POOL_TIMEOUT_MESSAGE &&
+            attempt < 2
+          ) {
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
-    }
-  },
-}));
+    },
+  }),
+);
 
 import {
   createSeasonBattingLoader,

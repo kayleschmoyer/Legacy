@@ -13,28 +13,28 @@ const getLatestScoringChangeAtByLeague: jest.Mock<
   [unknown, number[]]
 > = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {},
-  getLatestScoringChangeAtByLeague,
-  // Minimal stand-in for Helpers.ts's `withPoolTimeoutRetry` (retry up to 2x on
-  // the pool's connection-timeout message) — see the LS-10258 test below.
-  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
-    for (let attempt = 0; attempt <= 2; attempt++) {
-      try {
-        return await queryFn();
-      } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === 'timeout exceeded when trying to connect' &&
-          attempt < 2
-        ) {
-          continue;
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {},
+    getLatestScoringChangeAtByLeague,
+    withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          return await queryFn();
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            err.message === 'timeout exceeded when trying to connect' &&
+            attempt < 2
+          ) {
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
-    }
-  },
-}));
+    },
+  }),
+);
 
 import { createLatestScoringChangeAtLoader } from './matchup-loaders';
 

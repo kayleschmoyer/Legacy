@@ -74,46 +74,48 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
     const sentinelTable = (name: string) =>
       name as unknown as Record<string, unknown>;
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: sentinelTable('leagues'),
-        teams: sentinelTable('teams'),
-        leagueMembers: sentinelTable('leagueMembers'),
-        leaguePosition: sentinelTable('leaguePosition'),
-        teamMembers: sentinelTable('teamMembers'),
-        leagueMessages: sentinelTable('leagueMessages'),
-        // Referenced at module scope by football.ts's FOOTBALL_STAT_SORTS /
-        // CATEGORY_TABLES (LS-8566/LS-8567) — the full `../../schema` import
-        // below pulls football.ts in transitively, so these keys must exist
-        // even though this suite never queries them.
-        careerFootballPassing: sentinelTable('careerFootballPassing'),
-        careerFootballRushing: sentinelTable('careerFootballRushing'),
-        careerFootballReceiving: sentinelTable('careerFootballReceiving'),
-        careerFootballKicking: sentinelTable('careerFootballKicking'),
-        careerFootballDefense: sentinelTable('careerFootballDefense'),
-        careerFootballDefenseIdp: sentinelTable('careerFootballDefenseIdp'),
-      },
-      InternalSchema: {
-        usersInAppInternal: sentinelTable('usersInAppInternal'),
-      },
-    }));
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: sentinelTable('leagues'),
+          teams: sentinelTable('teams'),
+          leagueMembers: sentinelTable('leagueMembers'),
+          leaguePosition: sentinelTable('leaguePosition'),
+          teamMembers: sentinelTable('teamMembers'),
+          leagueMessages: sentinelTable('leagueMessages'),
+          // Referenced at module scope by football.ts's FOOTBALL_STAT_SORTS /
+          // CATEGORY_TABLES (LS-8566/LS-8567) — the full `../../schema` import
+          // below pulls football.ts in transitively, so these keys must exist
+          // even though this suite never queries them.
+          careerFootballPassing: sentinelTable('careerFootballPassing'),
+          careerFootballRushing: sentinelTable('careerFootballRushing'),
+          careerFootballReceiving: sentinelTable('careerFootballReceiving'),
+          careerFootballKicking: sentinelTable('careerFootballKicking'),
+          careerFootballDefense: sentinelTable('careerFootballDefense'),
+          careerFootballDefenseIdp: sentinelTable('careerFootballDefenseIdp'),
+        },
+        InternalSchema: {
+          usersInAppInternal: sentinelTable('usersInAppInternal'),
+        },
+      }),
+    );
 
     // Dynamic import (not require) so the module loads against the mocks
     // registered above while keeping the file free of lint suppressions.

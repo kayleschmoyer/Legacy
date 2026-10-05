@@ -15,19 +15,20 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  PublicDb: {},
-  PublicSchema: {},
-  InternalSchema: {
-    subscriptions: {
-      userId: 'app_internal.subscriptions.user_id',
-      stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
-      createdAt: 'app_internal.subscriptions.created_at',
-      id: 'app_internal.subscriptions.id',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    PublicSchema: {},
+    InternalSchema: {
+      subscriptions: {
+        userId: 'app_internal.subscriptions.user_id',
+        stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
+        createdAt: 'app_internal.subscriptions.created_at',
+        id: 'app_internal.subscriptions.id',
+      },
     },
-  },
-}));
+  }),
+);
 
 const mockList = jest.fn();
 jest.mock('../server/stripe', () => ({

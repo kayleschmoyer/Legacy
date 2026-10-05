@@ -23,38 +23,40 @@ const mockHandleSubscriptionDowngrade = jest.fn();
 const mockClearLeagueTierFreezes = jest.fn();
 const mockReapplyLeagueRestrictions = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  runWithInternalClient: (...args: unknown[]) =>
-    mockRunWithInternalClient(...args),
-  handleSubscriptionDowngrade: (...args: unknown[]) =>
-    mockHandleSubscriptionDowngrade(...args),
-  clearLeagueTierFreezes: (...args: unknown[]) =>
-    mockClearLeagueTierFreezes(...args),
-  reapplyLeagueRestrictions: (...args: unknown[]) =>
-    mockReapplyLeagueRestrictions(...args),
-  InternalSchema: {
-    subscriptions: {
-      id: 'subscriptions.id',
-      userId: 'subscriptions.user_id',
-      stripeCustomerId: 'subscriptions.stripe_customer_id',
-      stripeSubscriptionId: 'subscriptions.stripe_subscription_id',
-      currentPeriodEnd: 'subscriptions.current_period_end',
-      cancelAtPeriodEnd: 'subscriptions.cancel_at_period_end',
-      trialEndsAt: 'subscriptions.trial_ends_at',
-      gracePeriodEndsAt: 'subscriptions.grace_period_ends_at',
-      status: 'subscriptions.status',
-      tier: 'subscriptions.tier',
-      createdAt: 'subscriptions.created_at',
-      updatedAt: 'subscriptions.updated_at',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    runWithInternalClient: (...args: unknown[]) =>
+      mockRunWithInternalClient(...args),
+    handleSubscriptionDowngrade: (...args: unknown[]) =>
+      mockHandleSubscriptionDowngrade(...args),
+    clearLeagueTierFreezes: (...args: unknown[]) =>
+      mockClearLeagueTierFreezes(...args),
+    reapplyLeagueRestrictions: (...args: unknown[]) =>
+      mockReapplyLeagueRestrictions(...args),
+    InternalSchema: {
+      subscriptions: {
+        id: 'subscriptions.id',
+        userId: 'subscriptions.user_id',
+        stripeCustomerId: 'subscriptions.stripe_customer_id',
+        stripeSubscriptionId: 'subscriptions.stripe_subscription_id',
+        currentPeriodEnd: 'subscriptions.current_period_end',
+        cancelAtPeriodEnd: 'subscriptions.cancel_at_period_end',
+        trialEndsAt: 'subscriptions.trial_ends_at',
+        gracePeriodEndsAt: 'subscriptions.grace_period_ends_at',
+        status: 'subscriptions.status',
+        tier: 'subscriptions.tier',
+        createdAt: 'subscriptions.created_at',
+        updatedAt: 'subscriptions.updated_at',
+      },
+      usersInAppInternal: {
+        id: 'users.id',
+        subscriptionTier: 'users.subscription_tier',
+        updatedAt: 'users.updated_at',
+      },
     },
-    usersInAppInternal: {
-      id: 'users.id',
-      subscriptionTier: 'users.subscription_tier',
-      updatedAt: 'users.updated_at',
-    },
-  },
-}));
+  }),
+);
 
 // Stub out the Stripe client loader (subscriptions.ts imports it at the top).
 jest.mock('../server/stripe', () => ({
@@ -75,10 +77,11 @@ jest.mock('../server/google-play', () => ({
 
 // Keep drizzle-orm helpers real, but make `desc()` produce an assertable marker
 // so getSubscriptionForUser's ORDER BY arguments can be checked (LS-5201).
-jest.mock('drizzle-orm', () => ({
-  ...jest.requireActual('drizzle-orm'),
-  desc: (col: unknown) => `${String(col)}-desc`,
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    desc: (col: unknown) => `${String(col)}-desc`,
+  }),
+);
 
 import { isObjectType } from 'graphql';
 import { PgDialect } from 'drizzle-orm/pg-core';

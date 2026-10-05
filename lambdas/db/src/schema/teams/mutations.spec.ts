@@ -51,33 +51,35 @@ async function captureTeamMutationResolvers(): Promise<
 
   jest.doMock('@legacy-sports/logging', () => ({ LOGGER }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      teams: {
-        id: 'id',
-        leagueId: 'leagueId',
-        name: 'name',
-        divisionId: 'divisionId',
-        waiverOrder: 'waiverOrder',
-        faabBudget: 'faabBudget',
-        createdAt: 'createdAt',
-        updatedAt: 'updatedAt',
-        logoUrl: 'logoUrl',
-        primaryColor: 'primaryColor',
-        secondaryColor: 'secondaryColor',
-        isLocked: 'isLocked',
-        avatarUrl: 'avatarUrl',
-        bannerUrl: 'bannerUrl',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        teams: {
+          id: 'id',
+          leagueId: 'leagueId',
+          name: 'name',
+          divisionId: 'divisionId',
+          waiverOrder: 'waiverOrder',
+          faabBudget: 'faabBudget',
+          createdAt: 'createdAt',
+          updatedAt: 'updatedAt',
+          logoUrl: 'logoUrl',
+          primaryColor: 'primaryColor',
+          secondaryColor: 'secondaryColor',
+          isLocked: 'isLocked',
+          avatarUrl: 'avatarUrl',
+          bannerUrl: 'bannerUrl',
+        },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+          permissionLevel: 'permissionLevel',
+        },
+        leagueMessages: { id: 'id', leagueId: 'leagueId' },
       },
-      leagueMembers: {
-        leagueId: 'leagueId',
-        userId: 'userId',
-        teamId: 'teamId',
-        permissionLevel: 'permissionLevel',
-      },
-      leagueMessages: { id: 'id', leagueId: 'leagueId' },
-    },
-  }));
+    }),
+  );
 
   jest.doMock('../leagues/types', () => ({
     Team: {},

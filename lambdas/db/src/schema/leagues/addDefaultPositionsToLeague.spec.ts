@@ -73,61 +73,57 @@ describe('addDefaultPositionsToLeague authorization (LS-5137)', () => {
       ...jest.requireActual('@legacy-sports/utils/node'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          permissionLevel: 'permissionLevel',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          leaguePosition: {
+            id: 'id',
+            leagueId: 'leagueId',
+            positionType: 'positionType',
+          },
+          leagues: {
+            id: 'id',
+            maxRosterSize: 'maxRosterSize',
+            sport: 'sport',
+            name: 'name',
+            owner: 'owner',
+          },
+          teams: { id: 'id', leagueId: 'leagueId' },
+          teamMembers: { id: 'id', leagueId: 'leagueId' },
         },
-        leaguePosition: {
-          id: 'id',
-          leagueId: 'leagueId',
-          positionType: 'positionType',
-        },
-        leagues: {
-          id: 'id',
-          maxRosterSize: 'maxRosterSize',
-          sport: 'sport',
-          name: 'name',
-          owner: 'owner',
-        },
-        teams: { id: 'id', leagueId: 'leagueId' },
-        teamMembers: { id: 'id', leagueId: 'leagueId' },
         InternalSchema: {
           usersInAppInternal: {
             id: 'app_internal.users.id',
             subscriptionTier: 'app_internal.users.subscription_tier',
           },
         },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-    }));
+      }),
+    );
 
     const schemaModule = require('../index') as { schema: GraphQLSchema };
     schema = schemaModule.schema;

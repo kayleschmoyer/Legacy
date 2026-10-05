@@ -24,11 +24,13 @@ jest.mock('../builder', () => ({
   },
 }));
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn(),
-  eq: jest.fn(),
-  inArray: jest.fn(),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn(),
+    eq: jest.fn(),
+    inArray: jest.fn(),
+  }),
+);
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -39,28 +41,30 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: {},
-    matchups: {},
-    teams: {},
-    matchupPlayers: {},
-    leaguePosition: {},
-    players: {},
-    gameFootballDefense: { $inferSelect: {} },
-    gameFootballDefenseIdp: { $inferSelect: {} },
-    gameFootballPassing: { $inferSelect: {} },
-    gameFootballRushing: { $inferSelect: {} },
-    gameFootballReceiving: { $inferSelect: {} },
-    gameFootballKicking: { $inferSelect: {} },
-    gameBatting: {},
-    gamePitching: {},
-    gameFielding: {},
-    leagueWeekPlayerSeasons: {},
-    matchupPlayerGames: {},
-  },
-  getMatchupFootballPlayerGameStats: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: {},
+      matchups: {},
+      teams: {},
+      matchupPlayers: {},
+      leaguePosition: {},
+      players: {},
+      gameFootballDefense: { $inferSelect: {} },
+      gameFootballDefenseIdp: { $inferSelect: {} },
+      gameFootballPassing: { $inferSelect: {} },
+      gameFootballRushing: { $inferSelect: {} },
+      gameFootballReceiving: { $inferSelect: {} },
+      gameFootballKicking: { $inferSelect: {} },
+      gameBatting: {},
+      gamePitching: {},
+      gameFielding: {},
+      leagueWeekPlayerSeasons: {},
+      matchupPlayerGames: {},
+    },
+    getMatchupFootballPlayerGameStats: jest.fn(),
+  }),
+);
 
 import { computeFootballGamePoints, worseDataQuality } from './matchupScores';
 

@@ -28,84 +28,86 @@ describe('Draft Slot Trades Resolver', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        draftSlotTrades: {
-          id: 'id',
-          leagueId: 'leagueId',
-          proposerTeamId: 'proposerTeamId',
-          counterpartTeamId: 'counterpartTeamId',
-          status: 'status',
-          createdAt: 'createdAt',
-          updatedAt: 'updatedAt',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          draftSlotTrades: {
+            id: 'id',
+            leagueId: 'leagueId',
+            proposerTeamId: 'proposerTeamId',
+            counterpartTeamId: 'counterpartTeamId',
+            status: 'status',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
+          drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
+          teams: {
+            id: 'id',
+            leagueId: 'leagueId',
+            isLocked: 'isLocked',
+            name: 'name',
+          },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          leagues: {
+            id: 'id',
+            allowDraftSlotTrading: 'allowDraftSlotTrading',
+            draftStatus: 'draftStatus',
+          },
+          leagueMessages: {
+            id: 'id',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            messageText: 'messageText',
+            messageType: 'messageType',
+            metadata: 'metadata',
+            timestamp: 'timestamp',
+          },
         },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-        drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
-        teams: {
-          id: 'id',
-          leagueId: 'leagueId',
-          isLocked: 'isLocked',
-          name: 'name',
-        },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
-        },
-        leagues: {
-          id: 'id',
-          allowDraftSlotTrading: 'allowDraftSlotTrading',
-          draftStatus: 'draftStatus',
-        },
-        leagueMessages: {
-          id: 'id',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          messageText: 'messageText',
-          messageType: 'messageType',
-          metadata: 'metadata',
-          timestamp: 'timestamp',
-        },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-    }));
+      }),
+    );
 
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;

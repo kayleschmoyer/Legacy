@@ -2814,6 +2814,23 @@ type MockDraftInvitePreview {
   totalSeats: Int
 }
 
+enum MockDraftListStatus {
+  """
+  Finished; results only.
+  """
+  COMPLETED
+
+  """
+  Drafting now.
+  """
+  LIVE
+
+  """
+  Online lobby, not started yet.
+  """
+  LOBBY
+}
+
 """
 What a mock-draft maintenance sweep did (LS-10076).
 """
@@ -3832,6 +3849,40 @@ type MyInvoice {
 }
 
 """
+A mock draft the caller holds a seat in (LS-10079). Lobbies and live drafts resume in the draft room; completed ones open their results.
+"""
+type MyMockDraft {
+  completedAt: String
+  createdAt: String
+  draftId: Int
+  filledSeats: Int
+  hostUsername: String
+  isHost: Boolean
+  isPublic: Boolean
+  listStatus: MockDraftListStatus
+  lobbyExpiresAt: String
+  mode: MockDraftMode
+  playerPool: String
+  rounds: Int
+  sport: Sport
+
+  """
+  The raw drafts.status.
+  """
+  status: String
+  totalSeats: Int
+}
+
+"""
+A page of the caller's mock drafts, newest first. Pass `endCursor` back as `after` for the next page.
+"""
+type MyMockDraftConnection {
+  endCursor: String
+  hasNextPage: Boolean
+  nodes: [MyMockDraft!]
+}
+
+"""
 Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044)
 """
 type NflTeamSeasonMetadata {
@@ -4334,6 +4385,36 @@ type PublicLeagueInfo {
   totalSpots: Int
 }
 
+"""
+A public online mock-draft lobby with an open seat (LS-10079). Only what a stranger browsing the list may see.
+"""
+type PublicMockDraft {
+  createdAt: String
+  draftId: Int
+  filledSeats: Int
+  hostUsername: String
+  lobbyExpiresAt: String
+
+  """
+  Open seats minus pending invite reservations.
+  """
+  openSeats: Int
+  pickTimeLimitSeconds: Int
+  playerPool: String
+  rounds: Int
+  sport: Sport
+  totalSeats: Int
+}
+
+"""
+A page of public mock-draft lobbies, newest first. Pass `endCursor` back as `after` for the next page.
+"""
+type PublicMockDraftConnection {
+  endCursor: String
+  hasNextPage: Boolean
+  nodes: [PublicMockDraft!]
+}
+
 type Query {
   """
   Return all achievement restrictions configured for a league, sorted by achievement type
@@ -4748,6 +4829,15 @@ type Query {
   myLeagues(sport: Sport): [League!]!
 
   """
+  Mock drafts the caller holds a seat in (LS-10079), newest first, cursor-paged. Lobbies past their expiry are left out — the hourly job deletes them.
+  """
+  myMockDrafts(
+    after: String
+    first: Int
+    status: MockDraftListStatus
+  ): MyMockDraftConnection
+
+  """
   Get the current subscription for the authenticated user.
   """
   mySubscription: SubscriptionInfo
@@ -4903,6 +4993,20 @@ type Query {
     search: String
     sport: String
   ): Int!
+
+  """
+  Public ONLINE mock-draft lobbies a signed-in user can join by id (LS-10079): not started, not expired, at least one open unreserved seat, and not one the caller already sits in. Newest first, cursor-paged.
+  """
+  publicMockDrafts(
+    after: String
+    first: Int
+
+    """
+    Only lobbies drafting this pool; every pool when omitted.
+    """
+    playerPool: String
+    sport: Sport!
+  ): PublicMockDraftConnection
 
   """
   Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data.

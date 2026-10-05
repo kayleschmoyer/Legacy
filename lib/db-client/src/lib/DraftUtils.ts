@@ -1,7 +1,11 @@
 import { and, eq, sql, SQL } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
-import { PublicDb, PublicSchema, runWithPublicClient } from '../index';
+// Import from the defining modules, never the package barrel: '../index'
+// re-exports this file, so the barrel import was a cycle — and in specs it
+// re-entered the mocked @legacy-sports/db-client factory mid-load (LS-10079).
+import { runWithPublicClient } from './client/Helpers';
+import { type PublicDb, PublicSchema } from './client/PublicDbClient';
 
 /**
  * Shared utilities for draft operations

@@ -21,13 +21,15 @@ jest.mock('../builder', () => ({
   },
 }));
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => ({ _and: args })),
-  eq: jest.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
-  inArray: jest.fn((col: unknown, vals: unknown) => ({
-    _inArray: [col, vals],
-  })),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn((...args: unknown[]) => ({ _and: args })),
+    eq: jest.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
+    inArray: jest.fn((col: unknown, vals: unknown) => ({
+      _inArray: [col, vals],
+    })),
+  }),
+);
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -47,57 +49,59 @@ jest.mock('../authorization', () => ({
   }),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: { id: {}, sport: {} },
-    matchups: {
-      id: {},
-      leagueId: {},
-      weekNumber: {},
-      team1Id: {},
-      team2Id: {},
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: { id: {}, sport: {} },
+      matchups: {
+        id: {},
+        leagueId: {},
+        weekNumber: {},
+        team1Id: {},
+        team2Id: {},
+      },
+      teams: { id: {}, name: {} },
+      matchupPlayers: {
+        id: {},
+        matchupId: {},
+        teamId: {},
+        playerId: {},
+        positionId: {},
+      },
+      leaguePosition: { id: {}, positionType: {} },
+      players: {
+        id: {},
+        firstName: {},
+        lastName: {},
+        isDst: {},
+        nflTeam: {},
+      },
+      gameFootballDefense: { $inferSelect: {} },
+      gameFootballDefenseIdp: { $inferSelect: {} },
+      gameFootballPassing: { $inferSelect: {} },
+      gameFootballRushing: { $inferSelect: {} },
+      gameFootballReceiving: { $inferSelect: {} },
+      gameFootballKicking: { $inferSelect: {} },
+      gameBatting: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
+      gamePitching: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
+      gameFielding: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
+      leagueWeekPlayerSeasons: {
+        leagueId: {},
+        weekNumber: {},
+        playerId: {},
+        season: {},
+      },
+      matchupPlayerGames: { matchupPlayerId: {}, gameIdentifier: {} },
+      footballSeasonPassing: { playerId: {}, season: {} },
+      footballSeasonRushing: { playerId: {}, season: {} },
+      footballSeasonReceiving: { playerId: {}, season: {} },
+      footballSeasonKicking: { playerId: {}, season: {} },
+      footballSeasonDefense: { playerId: {}, season: {} },
+      footballSeasonDefenseIdp: { playerId: {}, season: {} },
     },
-    teams: { id: {}, name: {} },
-    matchupPlayers: {
-      id: {},
-      matchupId: {},
-      teamId: {},
-      playerId: {},
-      positionId: {},
-    },
-    leaguePosition: { id: {}, positionType: {} },
-    players: {
-      id: {},
-      firstName: {},
-      lastName: {},
-      isDst: {},
-      nflTeam: {},
-    },
-    gameFootballDefense: { $inferSelect: {} },
-    gameFootballDefenseIdp: { $inferSelect: {} },
-    gameFootballPassing: { $inferSelect: {} },
-    gameFootballRushing: { $inferSelect: {} },
-    gameFootballReceiving: { $inferSelect: {} },
-    gameFootballKicking: { $inferSelect: {} },
-    gameBatting: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
-    gamePitching: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
-    gameFielding: { $inferSelect: {}, playerId: {}, gameIdentifier: {} },
-    leagueWeekPlayerSeasons: {
-      leagueId: {},
-      weekNumber: {},
-      playerId: {},
-      season: {},
-    },
-    matchupPlayerGames: { matchupPlayerId: {}, gameIdentifier: {} },
-    footballSeasonPassing: { playerId: {}, season: {} },
-    footballSeasonRushing: { playerId: {}, season: {} },
-    footballSeasonReceiving: { playerId: {}, season: {} },
-    footballSeasonKicking: { playerId: {}, season: {} },
-    footballSeasonDefense: { playerId: {}, season: {} },
-    footballSeasonDefenseIdp: { playerId: {}, season: {} },
-  },
-  getMatchupFootballPlayerGameStats: jest.fn(),
-}));
+    getMatchupFootballPlayerGameStats: jest.fn(),
+  }),
+);
 
 jest.mock('@legacy-sports/scoring/server', () => ({
   getFootballScoringSettingsForLeague: jest.fn(),

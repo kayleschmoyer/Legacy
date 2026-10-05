@@ -303,6 +303,24 @@ describe('MockDraftSetup', () => {
     );
   });
 
+  it('links to the Mock Drafts hub in every mode when onBrowseMockDrafts is provided (LS-10079)', () => {
+    const onBrowseMockDrafts = jest.fn();
+    const { getByText, queryByText } = render(
+      <MockDraftSetup
+        onStart={noop}
+        onCancel={noop}
+        onBrowseMockDrafts={onBrowseMockDrafts}
+      />,
+    );
+    const label = 'Browse public lobbies and your mock drafts →';
+
+    fireEvent.click(getByText(label));
+    expect(onBrowseMockDrafts).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(getByText('Offline'));
+    expect(queryByText(label)).not.toBeNull();
+  });
+
   it('hides the join-instead link when onJoinInstead is not provided', () => {
     const { queryByText } = render(
       <MockDraftSetup onStart={noop} onCancel={noop} />,

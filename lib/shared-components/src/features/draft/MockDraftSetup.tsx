@@ -104,6 +104,11 @@ export interface MockDraftSetupProps {
    */
   onJoinInstead?: () => void;
   /**
+   * Opens the Mock Drafts hub (LS-10079): public lobbies to join, the user's
+   * own mock drafts and their invites. Hidden when omitted.
+   */
+  onBrowseMockDrafts?: () => void;
+  /**
    * Whether the current user's plan grants Control All Teams (LS-9253).
    * Defaults to false. When false the option is still shown (an upgrade
    * surface, not hidden) but selecting it calls `onControlAllTeamsUpgrade`
@@ -330,6 +335,7 @@ export function MockDraftSetup({
   usageLabel,
   header,
   onJoinInstead,
+  onBrowseMockDrafts,
   isControlAllTeamsEntitled = false,
   onControlAllTeamsUpgrade,
 }: MockDraftSetupProps): React.JSX.Element {
@@ -478,6 +484,28 @@ export function MockDraftSetup({
                 textDecorationLine="underline"
               >
                 Have an invite code? Join a friend&apos;s draft →
+              </Text>
+            </Button>
+          </XStack>
+        )}
+        {onBrowseMockDrafts && (
+          <XStack justifyContent="center" marginTop="$1">
+            <Button
+              size="$2"
+              backgroundColor="transparent"
+              borderWidth={0}
+              onPress={onBrowseMockDrafts}
+              pressStyle={{ opacity: 0.7 }}
+              testID="mock-draft-browse-hub"
+            >
+              <Text
+                fontFamily="$body"
+                fontSize={13}
+                fontWeight="600"
+                color={BRAND_GOLD}
+                textDecorationLine="underline"
+              >
+                Browse public lobbies and your mock drafts →
               </Text>
             </Button>
           </XStack>

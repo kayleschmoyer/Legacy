@@ -33,9 +33,8 @@ describe('League Mutations', () => {
     // the real definition instead of `undefined` (LS-10128: the hand-written
     // replica drifted and every gate test failed on a TypeError before the
     // gate). The string stubs below override only what assertions inspect.
-    jest.doMock('@legacy-sports/db-client', () => {
-      const actual = jest.requireActual('@legacy-sports/db-client');
-      return {
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
         createDatabaseService: jest.fn(), // Mock database service initialization
         runWithPublicClient: jest.fn(async (options, callback) => {
           return callback(mockDb);
@@ -49,7 +48,6 @@ describe('League Mutations', () => {
           getDraftStatus: jest.fn(),
         })),
         PublicSchema: {
-          ...actual.PublicSchema,
           leagues: {
             id: 'id',
             owner: 'owner',
@@ -105,7 +103,6 @@ describe('League Mutations', () => {
           // schema via the spread above.
         },
         InternalSchema: {
-          ...actual.InternalSchema,
           usersInAppInternal: {
             id: 'app_internal.users.id',
             subscriptionTier: 'app_internal.users.subscription_tier',
@@ -131,8 +128,8 @@ describe('League Mutations', () => {
           awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
           awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
         })),
-      };
-    });
+      }),
+    );
 
     // Load the schema after mocks are set up
     // Note: Do NOT use jest.isolateModules() as it creates a separate module realm

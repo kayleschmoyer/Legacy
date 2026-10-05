@@ -1,9 +1,8 @@
 const mockSend = jest.fn();
 
 jest.mock('@aws-sdk/client-secrets-manager', () => ({
-  // The client is constructed at AwsSecrets module scope, which runs before
-  // this file's `const` bindings initialize — so `send` has to reach mockSend
-  // lazily, at call time, rather than capturing it in the factory.
+  // `send` reaches mockSend at call time rather than capturing it in the
+  // factory, so the mock works whenever AwsSecrets constructs its client.
   SecretsManagerClient: jest.fn().mockImplementation(() => ({
     send: (...args: unknown[]) =>
       mockSend(...args) as Promise<{ SecretString?: string }>,

@@ -16,51 +16,52 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  InternalSchema: {
-    usersInAppInternal: {
-      id: 'app_internal.users.id',
-      subscriptionTier: 'app_internal.users.subscription_tier',
-      entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    InternalSchema: {
+      usersInAppInternal: {
+        id: 'app_internal.users.id',
+        subscriptionTier: 'app_internal.users.subscription_tier',
+        entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
+      },
     },
-  },
-  PublicDb: {},
-  PublicSchema: {
-    leagueMembers: {
-      leagueId: 'league_members.league_id',
-      userId: 'league_members.user_id',
-      teamId: 'league_members.team_id',
-      permissionLevel: 'league_members.permission_level',
+    PublicSchema: {
+      leagueMembers: {
+        leagueId: 'league_members.league_id',
+        userId: 'league_members.user_id',
+        teamId: 'league_members.team_id',
+        permissionLevel: 'league_members.permission_level',
+      },
+      leagues: {
+        id: 'leagues.id',
+        currentMatchup: 'leagues.current_matchup',
+      },
+      teamMembers: {
+        id: 'team_members.id',
+        teamId: 'team_members.team_id',
+        leagueId: 'team_members.league_id',
+        playerId: 'team_members.player_id',
+      },
+      matchupPlayerGames: {
+        matchupPlayerId: 'matchup_player_games.matchup_player_id',
+      },
+      matchupPlayers: {
+        id: 'matchup_players.id',
+        matchupId: 'matchup_players.matchup_id',
+        playerId: 'matchup_players.player_id',
+        teamId: 'matchup_players.team_id',
+      },
+      matchups: {
+        id: 'matchups.id',
+        weekNumber: 'matchups.week_number',
+        leagueId: 'matchups.league_id',
+        team1Id: 'matchups.team1_id',
+        team2Id: 'matchups.team2_id',
+      },
     },
-    leagues: {
-      id: 'leagues.id',
-      currentMatchup: 'leagues.current_matchup',
-    },
-    teamMembers: {
-      id: 'team_members.id',
-      teamId: 'team_members.team_id',
-      leagueId: 'team_members.league_id',
-      playerId: 'team_members.player_id',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchup_player_games.matchup_player_id',
-    },
-    matchupPlayers: {
-      id: 'matchup_players.id',
-      matchupId: 'matchup_players.matchup_id',
-      playerId: 'matchup_players.player_id',
-      teamId: 'matchup_players.team_id',
-    },
-    matchups: {
-      id: 'matchups.id',
-      weekNumber: 'matchups.week_number',
-      leagueId: 'matchups.league_id',
-      team1Id: 'matchups.team1_id',
-      team2Id: 'matchups.team2_id',
-    },
-  },
-}));
+  }),
+);
 
 // Build a chainable mock DB that returns a configurable result
 function makeMockDb(result: unknown[] = []) {

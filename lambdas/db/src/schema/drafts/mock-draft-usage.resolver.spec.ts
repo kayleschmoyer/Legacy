@@ -48,19 +48,22 @@ async function captureGetMyMockDraftUsageResolver(): Promise<
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {},
-    careerGamesCondition: jest.fn(),
-    careerSeasonsCondition: jest.fn(),
-  }));
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {},
+      careerGamesCondition: jest.fn(),
+      careerSeasonsCondition: jest.fn(),
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({
-    and: jest.fn(),
-    asc: jest.fn(),
-    desc: jest.fn(),
-    eq: jest.fn(),
-    sql: jest.fn(),
-  }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      and: jest.fn(),
+      asc: jest.fn(),
+      desc: jest.fn(),
+      eq: jest.fn(),
+    }),
+  );
 
   jest.doMock('./types', () => ({
     CurrentDraftPick: {},

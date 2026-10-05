@@ -23,62 +23,63 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  getTeamKickoffTimes: jest.fn().mockResolvedValue(new Map()),
-  InternalSchema: {
-    usersInAppInternal: {
-      id: 'app_internal.users.id',
-      subscriptionTier: 'app_internal.users.subscription_tier',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    getTeamKickoffTimes: jest.fn().mockResolvedValue(new Map()),
+    InternalSchema: {
+      usersInAppInternal: {
+        id: 'app_internal.users.id',
+        subscriptionTier: 'app_internal.users.subscription_tier',
+      },
     },
-  },
-  PublicDb: {},
-  PublicSchema: {
-    players: {
-      id: 'players.id',
-      nflTeam: 'players.nfl_team',
-      firstName: 'players.first_name',
-      lastName: 'players.last_name',
+    PublicSchema: {
+      players: {
+        id: 'players.id',
+        nflTeam: 'players.nfl_team',
+        firstName: 'players.first_name',
+        lastName: 'players.last_name',
+      },
+      leagueMembers: {
+        leagueId: 'league_members.league_id',
+        userId: 'league_members.user_id',
+        teamId: 'league_members.team_id',
+        permissionLevel: 'league_members.permission_level',
+      },
+      leagues: {
+        id: 'leagues.id',
+        currentMatchup: 'leagues.current_matchup',
+      },
+      teamMembers: {
+        id: 'team_members.id',
+        teamId: 'team_members.team_id',
+        leagueId: 'team_members.league_id',
+        playerId: 'team_members.player_id',
+      },
+      matchupPlayerGames: {
+        matchupPlayerId: 'matchup_player_games.matchup_player_id',
+      },
+      matchupPlayers: {
+        id: 'matchup_players.id',
+        matchupId: 'matchup_players.matchup_id',
+        playerId: 'matchup_players.player_id',
+        teamId: 'matchup_players.team_id',
+      },
+      matchups: {
+        id: 'matchups.id',
+        weekNumber: 'matchups.week_number',
+        leagueId: 'matchups.league_id',
+        team1Id: 'matchups.team1_id',
+        team2Id: 'matchups.team2_id',
+        status: 'matchups.status',
+      },
+      users: {
+        id: 'users.id',
+        accessLevel: 'users.access_level',
+      },
     },
-    leagueMembers: {
-      leagueId: 'league_members.league_id',
-      userId: 'league_members.user_id',
-      teamId: 'league_members.team_id',
-      permissionLevel: 'league_members.permission_level',
-    },
-    leagues: {
-      id: 'leagues.id',
-      currentMatchup: 'leagues.current_matchup',
-    },
-    teamMembers: {
-      id: 'team_members.id',
-      teamId: 'team_members.team_id',
-      leagueId: 'team_members.league_id',
-      playerId: 'team_members.player_id',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchup_player_games.matchup_player_id',
-    },
-    matchupPlayers: {
-      id: 'matchup_players.id',
-      matchupId: 'matchup_players.matchup_id',
-      playerId: 'matchup_players.player_id',
-      teamId: 'matchup_players.team_id',
-    },
-    matchups: {
-      id: 'matchups.id',
-      weekNumber: 'matchups.week_number',
-      leagueId: 'matchups.league_id',
-      team1Id: 'matchups.team1_id',
-      team2Id: 'matchups.team2_id',
-      status: 'matchups.status',
-    },
-    users: {
-      id: 'users.id',
-      accessLevel: 'users.access_level',
-    },
-  },
-}));
+  }),
+);
 
 import { getTeamKickoffTimes } from '@legacy-sports/db-client';
 import {

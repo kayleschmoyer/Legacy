@@ -68,36 +68,38 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
     const sentinelTable = (name: string) =>
       name as unknown as Record<string, unknown>;
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: sentinelTable('leagues'),
-        teams: sentinelTable('teams'),
-        leagueMembers: sentinelTable('leagueMembers'),
-        leaguePosition: sentinelTable('leaguePosition'),
-        teamMembers: sentinelTable('teamMembers'),
-        leagueMessages: sentinelTable('leagueMessages'),
-      },
-      InternalSchema: {
-        usersInAppInternal: sentinelTable('usersInAppInternal'),
-      },
-    }));
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: sentinelTable('leagues'),
+          teams: sentinelTable('teams'),
+          leagueMembers: sentinelTable('leagueMembers'),
+          leaguePosition: sentinelTable('leaguePosition'),
+          teamMembers: sentinelTable('teamMembers'),
+          leagueMessages: sentinelTable('leagueMessages'),
+        },
+        InternalSchema: {
+          usersInAppInternal: sentinelTable('usersInAppInternal'),
+        },
+      }),
+    );
 
     const schemaModule = (await import('../../schema')) as {
       schema: GraphQLSchema;

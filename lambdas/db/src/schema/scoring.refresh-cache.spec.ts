@@ -48,14 +48,16 @@ async function loadScoringModule(): Promise<typeof import('./scoring')> {
     .mockResolvedValue(undefined);
   const refreshPlayerScoringCache = jest.fn().mockResolvedValue(undefined);
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    createDatabaseService: jest.fn(() => ({ scoring: {} })),
-    PublicSchema: {
-      leagues: { id: 'id', sport: 'sport' },
-    },
-    refreshFootballPlayerScoringCache,
-    refreshPlayerScoringCache,
-  }));
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      createDatabaseService: jest.fn(() => ({ scoring: {} })),
+      PublicSchema: {
+        leagues: { id: 'id', sport: 'sport' },
+      },
+      refreshFootballPlayerScoringCache,
+      refreshPlayerScoringCache,
+    }),
+  );
 
   jest.doMock('./authorization', () => ({
     checkAdminInDb: jest.fn(),

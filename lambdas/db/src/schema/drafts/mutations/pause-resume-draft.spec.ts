@@ -49,17 +49,19 @@ function capturePauseResumeResolvers(): Record<string, Resolver> {
 
   jest.doMock('../../commissioner-tools', () => ({ writeAuditLog }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      leagueMembers: {
-        leagueId: 'leagueId',
-        userId: 'userId',
-        permissionLevel: 'permissionLevel',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          permissionLevel: 'permissionLevel',
+        },
+        leagues: { id: 'id' },
+        drafts: { leagueId: 'leagueId', id: 'id', createdAt: 'createdAt' },
       },
-      leagues: { id: 'id' },
-      drafts: { leagueId: 'leagueId', id: 'id', createdAt: 'createdAt' },
-    },
-  }));
+    }),
+  );
 
   jest.doMock('../types', () => ({ Draft: {} }));
 

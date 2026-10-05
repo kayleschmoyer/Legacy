@@ -39,67 +39,69 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          kind: 'kind',
-          status: 'status',
-        },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            kind: 'kind',
+            status: 'status',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
 
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          draftQueue: {
+            draftId: 'draftId',
+            teamId: 'draftQueue.teamId',
+            participantId: 'draftQueue.participantId',
+            priority: 'priority',
+          },
         },
-        draftQueue: {
-          draftId: 'draftId',
-          teamId: 'draftQueue.teamId',
-          participantId: 'draftQueue.participantId',
-          priority: 'priority',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      }),
+    );
 
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
@@ -328,61 +330,63 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          kind: 'kind',
-          status: 'status',
-        },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            kind: 'kind',
+            status: 'status',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
 
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
         },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-      },
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      }),
+    );
 
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
@@ -595,61 +599,63 @@ describe('getCurrentDraftPick resolver — LS-4853', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          kind: 'kind',
-          status: 'status',
-        },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            kind: 'kind',
+            status: 'status',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
 
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
         },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-      },
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      }),
+    );
 
     jest.doMock('./helpers', () => ({
       ...jest.requireActual('./helpers'),
@@ -883,69 +889,71 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          kind: 'kind',
-          status: 'status',
-        },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            kind: 'kind',
+            status: 'status',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
 
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          draftPicks: {
+            draftId: 'draftId',
+            overallPick: 'overallPick',
+          },
+          leagues: {
+            id: 'id',
+            isPublic: 'isPublic',
+          },
         },
-        draftPicks: {
-          draftId: 'draftId',
-          overallPick: 'overallPick',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-        leagues: {
-          id: 'id',
-          isPublic: 'isPublic',
-        },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      }),
+    );
 
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
@@ -1179,106 +1187,108 @@ describe('spectator read access — LS-8939 access matrix', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      PublicSchema: {
-        drafts: {
-          id: 'id',
-          leagueId: 'leagueId',
-          kind: 'kind',
-          status: 'status',
-          createdAt: 'createdAt',
-        },
-        // Seats replaced draft_teams for the draft domain (LS-10074).
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        PublicSchema: {
+          drafts: {
+            id: 'id',
+            leagueId: 'leagueId',
+            kind: 'kind',
+            status: 'status',
+            createdAt: 'createdAt',
+          },
+          // Seats replaced draft_teams for the draft domain (LS-10074).
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
 
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          leagues: { id: 'id', isPublic: 'isPublic' },
+          draftPicks: {
+            id: 'id',
+            draftId: 'draftId',
+            overallPick: 'overallPick',
+            playerId: 'playerId',
+            teamId: 'teamId',
+          },
+          teams: {
+            id: 'id',
+            name: 'name',
+            leagueId: 'leagueId',
+            divisionId: 'divisionId',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+            waiverOrder: 'waiverOrder',
+            faabBudget: 'faabBudget',
+            logoUrl: 'logoUrl',
+            primaryColor: 'primaryColor',
+            secondaryColor: 'secondaryColor',
+            isLocked: 'isLocked',
+            avatarUrl: 'avatarUrl',
+            bannerUrl: 'bannerUrl',
+          },
+          leaguePosition: {
+            id: 'id',
+            leagueId: 'leagueId',
+            positionType: 'positionType',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            playerId: 'playerId',
+            positionId: 'positionId',
+            onTradeBlock: 'onTradeBlock',
+            salary: 'salary',
+            nickname: 'nickname',
+          },
+          draftQueue: {
+            draftId: 'draftId',
+            teamId: 'teamId',
+            priority: 'priority',
+          },
         },
-        leagues: { id: 'id', isPublic: 'isPublic' },
-        draftPicks: {
-          id: 'id',
-          draftId: 'draftId',
-          overallPick: 'overallPick',
-          playerId: 'playerId',
-          teamId: 'teamId',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-        teams: {
-          id: 'id',
-          name: 'name',
-          leagueId: 'leagueId',
-          divisionId: 'divisionId',
-          createdAt: 'createdAt',
-          updatedAt: 'updatedAt',
-          waiverOrder: 'waiverOrder',
-          faabBudget: 'faabBudget',
-          logoUrl: 'logoUrl',
-          primaryColor: 'primaryColor',
-          secondaryColor: 'secondaryColor',
-          isLocked: 'isLocked',
-          avatarUrl: 'avatarUrl',
-          bannerUrl: 'bannerUrl',
-        },
-        leaguePosition: {
-          id: 'id',
-          leagueId: 'leagueId',
-          positionType: 'positionType',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          playerId: 'playerId',
-          positionId: 'positionId',
-          onTradeBlock: 'onTradeBlock',
-          salary: 'salary',
-          nickname: 'nickname',
-        },
-        draftQueue: {
-          draftId: 'draftId',
-          teamId: 'teamId',
-          priority: 'priority',
-        },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-    }));
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+      }),
+    );
 
     // getCurrentDraftPick delegates its data read to a helper with its own
     // query chain — stub just that helper so the guard behavior stays real.

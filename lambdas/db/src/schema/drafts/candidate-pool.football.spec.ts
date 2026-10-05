@@ -42,20 +42,20 @@ async function loadCandidatePoolModule(
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      leagues: { id: 'id', sport: 'sport' },
-      footballPlayerEligiblePositions: {
-        playerId: 'playerId',
-        position: 'position',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        leagues: { id: 'id', sport: 'sport' },
+        footballPlayerEligiblePositions: {
+          playerId: 'playerId',
+          position: 'position',
+        },
       },
-    },
-    // Identity passthrough — league eligibility filtering (playerPool, min
-    // career games, etc.) is exercised by its own test suite, not this one.
-    filterPlayerIdsByLeagueEligibility: jest.fn(
-      async (_db: unknown, ids: number[]) => ({ eligibleIds: new Set(ids) }),
-    ),
-  }));
+      filterPlayerIdsByLeagueEligibility: jest.fn(
+        async (_db: unknown, ids: number[]) => ({ eligibleIds: new Set(ids) }),
+      ),
+    }),
+  );
 
   // fetchCandidatePool reads the draft's DraftRules (LS-10074/LS-10076) — the
   // sport, the eligibility settings and the roster slot list — rather than the

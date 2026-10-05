@@ -1,7 +1,19 @@
 import baseConfig from '../../eslint.config.mjs';
+import dbClientMockRule from './eslint-rules/db-client-mock.cjs';
 
 export default [
   ...baseConfig,
+  {
+    // LS-10079: a partial @legacy-sports/db-client mock crashes every schema
+    // module that reads what it left out, at import time. Its own rule name
+    // (not a no-restricted-syntax selector) so it can't clobber, or be
+    // clobbered by, the root config's no-restricted-syntax blocks.
+    files: ['**/*.ts'],
+    plugins: {
+      'legacy-sports-db': { rules: { 'db-client-mock': dbClientMockRule } },
+    },
+    rules: { 'legacy-sports-db/db-client-mock': 'error' },
+  },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {

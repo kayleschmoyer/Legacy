@@ -410,9 +410,11 @@ export const MobileNavDrawer: React.FC<Props> = ({
           },
           {
             Icon: Shuffle,
-            label: 'Mock Draft',
-            to: '/baseball/mock-draft',
-            active: isPathActive('/baseball/mock-draft'),
+            label: 'Mock Drafts',
+            to: '/mock-drafts',
+            active:
+              isPathActive('/mock-drafts') ||
+              isPathActive('/baseball/mock-draft'),
           },
           {
             Icon: ListOrdered,

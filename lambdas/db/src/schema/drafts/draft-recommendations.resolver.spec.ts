@@ -45,27 +45,30 @@ async function captureGetDraftRecommendationsResolver(): Promise<
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: { id: 'id', leagueId: 'leagueId' },
-      draftPicks: {
-        draftId: 'draftId',
-        playerId: 'playerId',
-        teamId: 'teamId',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: { id: 'id', leagueId: 'leagueId' },
+        draftPicks: {
+          draftId: 'draftId',
+          playerId: 'playerId',
+          teamId: 'teamId',
+        },
       },
-    },
-    careerGamesCondition: jest.fn(),
-    careerSeasonsCondition: jest.fn(),
-  }));
+      careerGamesCondition: jest.fn(),
+      careerSeasonsCondition: jest.fn(),
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({
-    and: jest.fn(),
-    asc: jest.fn(),
-    desc: jest.fn(),
-    eq: jest.fn(),
-    inArray: jest.fn(),
-    sql: jest.fn(),
-  }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      and: jest.fn(),
+      asc: jest.fn(),
+      desc: jest.fn(),
+      eq: jest.fn(),
+      inArray: jest.fn(),
+    }),
+  );
 
   jest.doMock('./types', () => ({
     CurrentDraftPick: {},

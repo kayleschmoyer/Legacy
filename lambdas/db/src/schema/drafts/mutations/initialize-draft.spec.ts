@@ -43,27 +43,29 @@ function captureInitializeDraftResolver(): Resolver {
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: {
-        leagueId: 'leagueId',
-        id: 'id',
-        createdAt: 'createdAt',
-        draftMode: 'draftMode',
-        selectionMethod: 'selectionMethod',
-        draftOrder: 'draftOrder',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: {
+          leagueId: 'leagueId',
+          id: 'id',
+          createdAt: 'createdAt',
+          draftMode: 'draftMode',
+          selectionMethod: 'selectionMethod',
+          draftOrder: 'draftOrder',
+        },
+        leagues: { id: 'id', draftStatus: 'draftStatus' },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          permissionLevel: 'permissionLevel',
+        },
+        teams: { id: 'id', leagueId: 'leagueId' },
+        draftTeams: { draftId: 'draftId' },
+        draftPicks: { draftId: 'draftId' },
       },
-      leagues: { id: 'id', draftStatus: 'draftStatus' },
-      leagueMembers: {
-        leagueId: 'leagueId',
-        userId: 'userId',
-        permissionLevel: 'permissionLevel',
-      },
-      teams: { id: 'id', leagueId: 'leagueId' },
-      draftTeams: { draftId: 'draftId' },
-      draftPicks: { draftId: 'draftId' },
-    },
-  }));
+    }),
+  );
 
   jest.doMock('@legacy-sports/aws-utils', () => ({
     DraftSqsService: mockDraftSqsService,

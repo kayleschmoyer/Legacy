@@ -76,106 +76,110 @@ describe('impersonateUser mutation', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: mockGetUserById,
-          countUsers: mockCountUsers,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: mockGetUserById,
+            countUsers: mockCountUsers,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'currentWeek',
+            currentMatchup: 'currentMatchup',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            playerId: 'playerId',
+            positionId: 'positionId',
+          },
+          players: {
+            id: 'id',
+            firstName: 'firstName',
+            lastName: 'lastName',
+            brefId: 'brefId',
+          },
+          matchups: {
+            id: 'id',
+            leagueId: 'leagueId',
+            weekNumber: 'weekNumber',
+            status: 'status',
+            team1Id: 'team1Id',
+            team2Id: 'team2Id',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'matchupId',
+            playerId: 'playerId',
+            teamId: 'teamId',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'playerId',
+            season: 'season',
+            leagueId: 'leagueId',
+            weekNumber: 'weekNumber',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'leagueId',
+            season: 'season',
+            playerId: 'playerId',
+            awardType: 'awardType',
+            notes: 'notes',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'leagueId',
+            eventType: 'eventType',
+            occurredAt: 'occurredAt',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'currentWeek',
-          currentMatchup: 'currentMatchup',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          playerId: 'playerId',
-          positionId: 'positionId',
-        },
-        players: {
-          id: 'id',
-          firstName: 'firstName',
-          lastName: 'lastName',
-          brefId: 'brefId',
-        },
-        matchups: {
-          id: 'id',
-          leagueId: 'leagueId',
-          weekNumber: 'weekNumber',
-          status: 'status',
-          team1Id: 'team1Id',
-          team2Id: 'team2Id',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'matchupId',
-          playerId: 'playerId',
-          teamId: 'teamId',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'playerId',
-          season: 'season',
-          leagueId: 'leagueId',
-          weekNumber: 'weekNumber',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'leagueId',
-          season: 'season',
-          playerId: 'playerId',
-          awardType: 'awardType',
-          notes: 'notes',
-          createdAt: 'createdAt',
-          updatedAt: 'updatedAt',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'leagueId',
-          eventType: 'eventType',
-          occurredAt: 'occurredAt',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -458,98 +462,102 @@ describe('cleanupLeakedTestUsers mutation', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          deleteLeakedTestUsers: mockDeleteLeakedTestUsers,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            deleteLeakedTestUsers: mockDeleteLeakedTestUsers,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -787,99 +795,103 @@ describe('users / usersCount queries (LS-8653)', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          getUsers: mockGetUsers,
-          countUsers: mockCountUsers,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            getUsers: mockGetUsers,
+            countUsers: mockCountUsers,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -1090,98 +1102,102 @@ describe('updateUserTheme mutation', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          updateUserTheme: mockUpdateUserTheme,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            updateUserTheme: mockUpdateUserTheme,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -1329,96 +1345,100 @@ describe('updateUsername mutation rate limit (LS-7239)', () => {
       checkAndIncrementRateLimit: mockCheckAndIncrementRateLimit,
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          updateUsername: mockUpdateUsername,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            updateUsername: mockUpdateUsername,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -1556,98 +1576,102 @@ describe('myIdentities query', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          getUserIdentities: mockGetUserIdentities,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            getUserIdentities: mockGetUserIdentities,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {
@@ -1789,99 +1813,103 @@ describe('setCanonicalEmail mutation', () => {
       getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(() => ({
-        users: {
-          getUserById: jest.fn(),
-          getUserIdentities: jest.fn(),
-          setCanonicalEmail: mockSetCanonicalEmail,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(() => ({
+          users: {
+            getUserById: jest.fn(),
+            getUserIdentities: jest.fn(),
+            setCanonicalEmail: mockSetCanonicalEmail,
+          },
+          statistics: {
+            getOnThisDay: jest.fn(),
+            getOnThisDayEvents: jest.fn(),
+          },
+        })),
+        runWithPublicClient: jest.fn(),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            name: 'name',
+            currentWeek: 'cw',
+            currentMatchup: 'cm',
+          },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'l',
+            userId: 'u',
+            teamId: 't',
+            permissionLevel: 'p',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 't',
+            leagueId: 'l',
+            playerId: 'p',
+            positionId: 'pos',
+          },
+          players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+          matchups: {
+            id: 'id',
+            leagueId: 'l',
+            weekNumber: 'w',
+            status: 's',
+            team1Id: 't1',
+            team2Id: 't2',
+          },
+          matchupPlayers: {
+            id: 'id',
+            matchupId: 'm',
+            playerId: 'p',
+            teamId: 't',
+          },
+          leagueWeekPlayerSeasons: {
+            playerId: 'p',
+            season: 's',
+            leagueId: 'l',
+            weekNumber: 'w',
+          },
+          leagueSeasonAwards: {
+            id: 'id',
+            leagueId: 'l',
+            season: 's',
+            playerId: 'p',
+            awardType: 'a',
+            notes: 'n',
+            createdAt: 'c',
+            updatedAt: 'u',
+          },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'l',
+            eventType: 'e',
+            occurredAt: 'o',
+          },
+          leagueActivityEventType: { enumValues: [] },
+          // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+          // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+          users: { id: 'id', accessLevel: 'accessLevel' },
         },
-        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
-      })),
-      runWithPublicClient: jest.fn(),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          name: 'name',
-          currentWeek: 'cw',
-          currentMatchup: 'cm',
+        InternalSchema: {
+          usersInAppInternal: { id: 'id', subscriptionTier: 's' },
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'l',
-          userId: 'u',
-          teamId: 't',
-          permissionLevel: 'p',
-        },
-        teamMembers: {
-          id: 'id',
-          teamId: 't',
-          leagueId: 'l',
-          playerId: 'p',
-          positionId: 'pos',
-        },
-        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
-        matchups: {
-          id: 'id',
-          leagueId: 'l',
-          weekNumber: 'w',
-          status: 's',
-          team1Id: 't1',
-          team2Id: 't2',
-        },
-        matchupPlayers: {
-          id: 'id',
-          matchupId: 'm',
-          playerId: 'p',
-          teamId: 't',
-        },
-        leagueWeekPlayerSeasons: {
-          playerId: 'p',
-          season: 's',
-          leagueId: 'l',
-          weekNumber: 'w',
-        },
-        leagueSeasonAwards: {
-          id: 'id',
-          leagueId: 'l',
-          season: 's',
-          playerId: 'p',
-          awardType: 'a',
-          notes: 'n',
-          createdAt: 'c',
-          updatedAt: 'u',
-        },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'l',
-          eventType: 'e',
-          occurredAt: 'o',
-        },
-        leagueActivityEventType: { enumValues: [] },
-        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
-        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
-        users: { id: 'id', accessLevel: 'accessLevel' },
-      },
-      InternalSchema: {
-        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
-      },
-      PublicDb: {},
-    }));
+      }),
+    );
 
     jest.doMock('../services/standings-service', () => ({
       StandingsService: {

@@ -34,6 +34,9 @@ export interface CapturedMockDraftResolvers {
   sendDraftMessage: CapturedResolver;
   expireMockDraftLobbies: CapturedResolver<ResolverPayload>;
   purgeStaleOfflineMockDrafts: CapturedResolver<ResolverPayload>;
+  // Mock Drafts hub (LS-10079).
+  publicMockDrafts: CapturedResolver<ResolverPayload>;
+  myMockDrafts: CapturedResolver<ResolverPayload>;
   myActiveMockDrafts: CapturedResolver<ResolverPayload[]>;
   // Invites (LS-10078) — mock and league targets share one module.
   resolveInviteCode: CapturedResolver<ResolverPayload | null>;
@@ -144,6 +147,7 @@ export async function captureMockDraftResolvers(): Promise<CapturedMockDraftReso
   await import('./draft-room');
   await import('./chat');
   await import('./jobs');
+  await import('./hub');
   await import('./active');
   await import('../../invites/resolve-invite-code');
   await import('../../invites/direct-invites');

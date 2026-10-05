@@ -86,14 +86,12 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => {
-      const actual = jest.requireActual('@legacy-sports/db-client');
-      return {
-        ...actual,
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
         createDatabaseService: jest.fn(() => databaseServiceMock),
         refreshPlayerScoringCache: mockRefreshPlayerScoringCache,
-      };
-    });
+      }),
+    );
 
     jest.isolateModules(() => {
       const schemaModule = require('../schema') as { schema: GraphQLSchema };

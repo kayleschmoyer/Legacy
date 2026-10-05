@@ -55,87 +55,92 @@ describe('Season Draft Game Resolver', () => {
       loadCareerStats: mockLoadCareerStats,
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createDatabaseService: jest.fn(),
-      runWithPublicClient: jest.fn(
-        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
-      ),
-      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
-      createDraftForLeague: jest.fn(),
-      DraftService: jest.fn().mockImplementation(() => ({
-        startDraft: jest.fn(),
-        getDraftStatus: jest.fn(),
-      })),
-      BADGE_DEFINITIONS: [],
-      createBadgeService: jest.fn(() => ({
-        getUserBadges: jest.fn().mockResolvedValue([]),
-        getTeamBadges: jest.fn().mockResolvedValue([]),
-        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
-        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
-        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
-      })),
-      SeasonDraftGameService: mockSeasonDraftGameService,
-      SeasonDraftJoinError,
-      HITTER_STAT_KEYS: ['hr', 'rbi', 'avg', 'r', 'sb'],
-      PITCHER_STAT_KEYS: ['w', 'era', 'so', 'sv', 'whip'],
-      PublicSchema: {
-        seasonDraftPlayers: {
-          id: 'id',
-          userId: 'userId',
-          gameId: 'gameId',
-          playerName: 'playerName',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createDatabaseService: jest.fn(),
+        runWithPublicClient: jest.fn(
+          async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+        ),
+        createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+        createDraftForLeague: jest.fn(),
+        DraftService: jest.fn().mockImplementation(() => ({
+          startDraft: jest.fn(),
+          getDraftStatus: jest.fn(),
+        })),
+        BADGE_DEFINITIONS: [],
+        createBadgeService: jest.fn(() => ({
+          getUserBadges: jest.fn().mockResolvedValue([]),
+          getTeamBadges: jest.fn().mockResolvedValue([]),
+          getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+          evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+          awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+          awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+        })),
+        SeasonDraftGameService: mockSeasonDraftGameService,
+        SeasonDraftJoinError,
+        HITTER_STAT_KEYS: ['hr', 'rbi', 'avg', 'r', 'sb'],
+        PITCHER_STAT_KEYS: ['w', 'era', 'so', 'sv', 'whip'],
+        PublicSchema: {
+          seasonDraftPlayers: {
+            id: 'id',
+            userId: 'userId',
+            gameId: 'gameId',
+            playerName: 'playerName',
+          },
+          seasonDraftRosterSlots: {
+            id: 'id',
+            seasonDraftPlayerId: 'seasonDraftPlayerId',
+            position: 'position',
+            slotNumber: 'slotNumber',
+            isFilled: 'isFilled',
+          },
+          teamMembers: {
+            id: 'id',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            playerId: 'playerId',
+          },
+          matchups: {
+            id: 'id',
+            leagueId: 'leagueId',
+            team1Id: 'team1Id',
+            team2Id: 'team2Id',
+          },
+          leagues: { id: 'id', name: 'name' },
+          teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          players: { id: 'id', firstName: 'firstName', lastName: 'lastName' },
+          matchupPlayers: { id: 'id', matchupId: 'matchupId' },
+          matchupPlayerGames: { matchupPlayerId: 'matchupPlayerId' },
+          leagueWeekPlayerSeasons: {
+            playerId: 'playerId',
+            leagueId: 'leagueId',
+          },
+          leagueAchievementRestrictions: { id: 'id', leagueId: 'leagueId' },
+          leagueSeasonAwards: { id: 'id', leagueId: 'leagueId' },
+          leagueActivityLog: {
+            id: 'id',
+            leagueId: 'leagueId',
+            eventType: 'eventType',
+            occurredAt: 'occurredAt',
+          },
+          commissionerAuditLog: { id: 'id', leagueId: 'leagueId' },
+          leagueActivityEventType: { enumValues: [] },
         },
-        seasonDraftRosterSlots: {
-          id: 'id',
-          seasonDraftPlayerId: 'seasonDraftPlayerId',
-          position: 'position',
-          slotNumber: 'slotNumber',
-          isFilled: 'isFilled',
+        InternalSchema: {
+          usersInAppInternal: {
+            id: 'app_internal.users.id',
+            subscriptionTier: 'app_internal.users.subscription_tier',
+          },
         },
-        teamMembers: {
-          id: 'id',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          playerId: 'playerId',
-        },
-        matchups: {
-          id: 'id',
-          leagueId: 'leagueId',
-          team1Id: 'team1Id',
-          team2Id: 'team2Id',
-        },
-        leagues: { id: 'id', name: 'name' },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
-        },
-        players: { id: 'id', firstName: 'firstName', lastName: 'lastName' },
-        matchupPlayers: { id: 'id', matchupId: 'matchupId' },
-        matchupPlayerGames: { matchupPlayerId: 'matchupPlayerId' },
-        leagueWeekPlayerSeasons: { playerId: 'playerId', leagueId: 'leagueId' },
-        leagueAchievementRestrictions: { id: 'id', leagueId: 'leagueId' },
-        leagueSeasonAwards: { id: 'id', leagueId: 'leagueId' },
-        leagueActivityLog: {
-          id: 'id',
-          leagueId: 'leagueId',
-          eventType: 'eventType',
-          occurredAt: 'occurredAt',
-        },
-        commissionerAuditLog: { id: 'id', leagueId: 'leagueId' },
-        leagueActivityEventType: { enumValues: [] },
-      },
-      InternalSchema: {
-        usersInAppInternal: {
-          id: 'app_internal.users.id',
-          subscriptionTier: 'app_internal.users.subscription_tier',
-        },
-      },
-    }));
+      }),
+    );
 
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;

@@ -12,70 +12,72 @@ jest.mock('@legacy-sports/scoring/server', () => ({
   getFootballScoringSettingsForLeague: jest.fn(),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: {
-      id: 'leagues.id',
-      currentWeek: 'leagues.currentWeek',
-      currentMatchup: 'leagues.currentMatchup',
-      rosterLockTiming: 'leagues.rosterLockTiming',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: {
+        id: 'leagues.id',
+        currentWeek: 'leagues.currentWeek',
+        currentMatchup: 'leagues.currentMatchup',
+        rosterLockTiming: 'leagues.rosterLockTiming',
+      },
+      rosterLockRules: {
+        leagueId: 'rosterLockRules.leagueId',
+        customLockTime: 'rosterLockRules.customLockTime',
+        lockHoursBeforeMatchup: 'rosterLockRules.lockHoursBeforeMatchup',
+      },
+      matchups: {
+        id: 'matchups.id',
+        weekNumber: 'matchups.weekNumber',
+        leagueId: 'matchups.leagueId',
+        team1Id: 'matchups.team1Id',
+        team2Id: 'matchups.team2Id',
+        status: 'matchups.status',
+      },
+      teamMembers: {
+        teamId: 'teamMembers.teamId',
+        playerId: 'teamMembers.playerId',
+      },
+      matchupPlayers: {
+        id: 'matchupPlayers.id',
+        matchupId: 'matchupPlayers.matchupId',
+        teamId: 'matchupPlayers.teamId',
+        playerId: 'matchupPlayers.playerId',
+      },
+      matchupPlayerGames: {
+        matchupPlayerId: 'matchupPlayerGames.matchupPlayerId',
+        gameNum: 'matchupPlayerGames.gameNum',
+      },
+      leagueWeekPlayerSeasons: {
+        leagueId: 'leagueWeekPlayerSeasons.leagueId',
+        weekNumber: 'leagueWeekPlayerSeasons.weekNumber',
+        playerId: 'leagueWeekPlayerSeasons.playerId',
+        season: 'leagueWeekPlayerSeasons.season',
+      },
     },
-    rosterLockRules: {
-      leagueId: 'rosterLockRules.leagueId',
-      customLockTime: 'rosterLockRules.customLockTime',
-      lockHoursBeforeMatchup: 'rosterLockRules.lockHoursBeforeMatchup',
-    },
-    matchups: {
-      id: 'matchups.id',
-      weekNumber: 'matchups.weekNumber',
-      leagueId: 'matchups.leagueId',
-      team1Id: 'matchups.team1Id',
-      team2Id: 'matchups.team2Id',
-      status: 'matchups.status',
-    },
-    teamMembers: {
-      teamId: 'teamMembers.teamId',
-      playerId: 'teamMembers.playerId',
-    },
-    matchupPlayers: {
-      id: 'matchupPlayers.id',
-      matchupId: 'matchupPlayers.matchupId',
-      teamId: 'matchupPlayers.teamId',
-      playerId: 'matchupPlayers.playerId',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchupPlayerGames.matchupPlayerId',
-      gameNum: 'matchupPlayerGames.gameNum',
-    },
-    leagueWeekPlayerSeasons: {
-      leagueId: 'leagueWeekPlayerSeasons.leagueId',
-      weekNumber: 'leagueWeekPlayerSeasons.weekNumber',
-      playerId: 'leagueWeekPlayerSeasons.playerId',
-      season: 'leagueWeekPlayerSeasons.season',
-    },
-  },
-  // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
-  // up to 2x on the pool's connection-timeout message), so the LS-10043
-  // regression test below exercises the same retry contract without pulling
-  // in the real Helpers module (and its pg/drizzle dependencies).
-  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
-    const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
-    for (let attempt = 0; attempt <= 2; attempt++) {
-      try {
-        return await queryFn();
-      } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message === POOL_TIMEOUT_MESSAGE &&
-          attempt < 2
-        ) {
-          continue;
+    // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
+    // up to 2x on the pool's connection-timeout message), so the LS-10043
+    // regression test below exercises the same retry contract without pulling
+    // in the real Helpers module (and its pg/drizzle dependencies).
+    withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+      const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          return await queryFn();
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            err.message === POOL_TIMEOUT_MESSAGE &&
+            attempt < 2
+          ) {
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
-    }
-  },
-}));
+    },
+  }),
+);
 
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import {

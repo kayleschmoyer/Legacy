@@ -10,12 +10,14 @@
  * `dataloaders/matchup-loaders.spec.ts`.
  */
 
-jest.mock('@legacy-sports/db-client', () => ({
-  computeRosterLockTime: jest.fn(
-    (matchupStartTime: string | null) =>
-      matchupStartTime && new Date(matchupStartTime),
-  ),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    computeRosterLockTime: jest.fn(
+      (matchupStartTime: string | null) =>
+        matchupStartTime && new Date(matchupStartTime),
+    ),
+  }),
+);
 
 import { computeRosterLockTime } from '@legacy-sports/db-client';
 import { resolveMatchupLockTime } from './lockTime';

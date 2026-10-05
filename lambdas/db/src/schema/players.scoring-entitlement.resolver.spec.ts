@@ -71,31 +71,37 @@ async function captureScoringResolver(): Promise<
     getDbOptions: jest.fn(() => ({})),
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    createDatabaseService: jest.fn(() => ({
-      players: {
-        getPlayers: jest.fn(),
-        getPlayerById: jest.fn(),
-        getPlayerByBrefId: jest.fn(),
-        getPlayerByMlbId: jest.fn(),
-        searchPlayers: jest.fn(),
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      createDatabaseService: jest.fn(() => ({
+        players: {
+          getPlayers: jest.fn(),
+          getPlayerById: jest.fn(),
+          getPlayerByBrefId: jest.fn(),
+          getPlayerByMlbId: jest.fn(),
+          searchPlayers: jest.fn(),
+        },
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          minCareerGames: 'minCareerGames',
+          minCareerSeasons: 'minCareerSeasons',
+          baseballEraFilter: 'baseballEraFilter',
+          baseballHofOnly: 'baseballHofOnly',
+          customEraStartYear: 'customEraStartYear',
+          customEraEndYear: 'customEraEndYear',
+          sport: 'sport',
+        },
       },
-    })),
-    PublicSchema: {
-      leagues: {
-        id: 'id',
-        minCareerGames: 'minCareerGames',
-        minCareerSeasons: 'minCareerSeasons',
-        baseballEraFilter: 'baseballEraFilter',
-        baseballHofOnly: 'baseballHofOnly',
-        customEraStartYear: 'customEraStartYear',
-        customEraEndYear: 'customEraEndYear',
-        sport: 'sport',
-      },
-    },
-  }));
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({ eq: jest.fn() }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      eq: jest.fn(),
+    }),
+  );
 
   jest.doMock('./authorization', () => ({ hasEntitlement }));
 

@@ -21,28 +21,30 @@ jest.mock('@legacy-sports/utils/node', () => ({
 
 const mockRunWithInternalClient = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  runWithInternalClient: (...args: unknown[]) =>
-    mockRunWithInternalClient(...args),
-  handleSubscriptionDowngrade: jest.fn(),
-  clearLeagueTierFreezes: jest.fn(),
-  reapplyLeagueRestrictions: jest.fn(),
-  InternalSchema: {
-    subscriptions: {
-      id: 'subscriptions.id',
-      userId: 'subscriptions.user_id',
-      stripeCustomerId: 'subscriptions.stripe_customer_id',
-      stripeSubscriptionId: 'subscriptions.stripe_subscription_id',
-      currentPeriodEnd: 'subscriptions.current_period_end',
-      cancelAtPeriodEnd: 'subscriptions.cancel_at_period_end',
-      trialEndsAt: 'subscriptions.trial_ends_at',
-      gracePeriodEndsAt: 'subscriptions.grace_period_ends_at',
-      status: 'subscriptions.status',
-      tier: 'subscriptions.tier',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    runWithInternalClient: (...args: unknown[]) =>
+      mockRunWithInternalClient(...args),
+    handleSubscriptionDowngrade: jest.fn(),
+    clearLeagueTierFreezes: jest.fn(),
+    reapplyLeagueRestrictions: jest.fn(),
+    InternalSchema: {
+      subscriptions: {
+        id: 'subscriptions.id',
+        userId: 'subscriptions.user_id',
+        stripeCustomerId: 'subscriptions.stripe_customer_id',
+        stripeSubscriptionId: 'subscriptions.stripe_subscription_id',
+        currentPeriodEnd: 'subscriptions.current_period_end',
+        cancelAtPeriodEnd: 'subscriptions.cancel_at_period_end',
+        trialEndsAt: 'subscriptions.trial_ends_at',
+        gracePeriodEndsAt: 'subscriptions.grace_period_ends_at',
+        status: 'subscriptions.status',
+        tier: 'subscriptions.tier',
+      },
     },
-  },
-}));
+  }),
+);
 
 jest.mock('../server/stripe', () => ({
   getStripeClient: jest.fn(),

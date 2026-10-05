@@ -6,10 +6,11 @@
 import { calculateStandings } from '@legacy-sports/db-client';
 import { resolveReverseStandingsSeedOrder } from './helpers';
 
-jest.mock('@legacy-sports/db-client', () => ({
-  ...jest.requireActual('@legacy-sports/db-client'),
-  calculateStandings: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    calculateStandings: jest.fn(),
+  }),
+);
 
 const mockCalculateStandings = calculateStandings as jest.Mock;
 

@@ -13,21 +13,25 @@
  *   - No season stats (g=0 or no rows): returns 0
  */
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    footballSeasonPassing: { playerId: {}, season: {} },
-    footballSeasonRushing: { playerId: {}, season: {} },
-    footballSeasonReceiving: { playerId: {}, season: {} },
-    footballSeasonKicking: { playerId: {}, season: {} },
-    footballSeasonDefense: { playerId: {}, season: {} },
-    footballSeasonDefenseIdp: { playerId: {}, season: {} },
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      footballSeasonPassing: { playerId: {}, season: {} },
+      footballSeasonRushing: { playerId: {}, season: {} },
+      footballSeasonReceiving: { playerId: {}, season: {} },
+      footballSeasonKicking: { playerId: {}, season: {} },
+      footballSeasonDefense: { playerId: {}, season: {} },
+      footballSeasonDefenseIdp: { playerId: {}, season: {} },
+    },
+  }),
+);
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => ({ _and: args })),
-  eq: jest.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn((...args: unknown[]) => ({ _and: args })),
+    eq: jest.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
+  }),
+);
 
 import { getDefaultFootballScoringSettings } from '@legacy-sports/scoring';
 import { getFootballPlayerSeasonAverage } from './football-season-projection';

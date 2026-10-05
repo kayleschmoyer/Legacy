@@ -58,51 +58,55 @@ function captureDraftQueueResolvers(): Record<string, Resolver> {
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: {
-        id: 'drafts.id',
-        kind: 'drafts.kind',
-        leagueId: 'drafts.leagueId',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: {
+          id: 'drafts.id',
+          kind: 'drafts.kind',
+          leagueId: 'drafts.leagueId',
+        },
+        leagueMembers: {
+          leagueId: 'leagueMembers.leagueId',
+          userId: 'leagueMembers.userId',
+          teamId: 'leagueMembers.teamId',
+          permissionLevel: 'leagueMembers.permissionLevel',
+        },
+        // The queue is keyed on the seat since LS-10076 — a mock draft's queue
+        // has no team behind it.
+        draftParticipants: {
+          id: 'draftParticipants.id',
+          draftId: 'draftParticipants.draftId',
+          slot: 'draftParticipants.slot',
+          teamId: 'draftParticipants.teamId',
+          leagueId: 'draftParticipants.leagueId',
+          userId: 'draftParticipants.userId',
+          controller: 'draftParticipants.controller',
+          seatName: 'draftParticipants.seatName',
+          autoPick: 'draftParticipants.autoPick',
+        },
+        draftQueue: {
+          id: 'draftQueue.id',
+          draftId: 'draftQueue.draftId',
+          teamId: 'draftQueue.teamId',
+          participantId: 'draftQueue.participantId',
+          playerId: 'draftQueue.playerId',
+          priority: 'draftQueue.priority',
+        },
       },
-      leagueMembers: {
-        leagueId: 'leagueMembers.leagueId',
-        userId: 'leagueMembers.userId',
-        teamId: 'leagueMembers.teamId',
-        permissionLevel: 'leagueMembers.permissionLevel',
-      },
-      // The queue is keyed on the seat since LS-10076 — a mock draft's queue
-      // has no team behind it.
-      draftParticipants: {
-        id: 'draftParticipants.id',
-        draftId: 'draftParticipants.draftId',
-        slot: 'draftParticipants.slot',
-        teamId: 'draftParticipants.teamId',
-        leagueId: 'draftParticipants.leagueId',
-        userId: 'draftParticipants.userId',
-        controller: 'draftParticipants.controller',
-        seatName: 'draftParticipants.seatName',
-        autoPick: 'draftParticipants.autoPick',
-      },
-      draftQueue: {
-        id: 'draftQueue.id',
-        draftId: 'draftQueue.draftId',
-        teamId: 'draftQueue.teamId',
-        participantId: 'draftQueue.participantId',
-        playerId: 'draftQueue.playerId',
-        priority: 'draftQueue.priority',
-      },
-    },
-  }));
+    }),
+  );
 
   // Cut the scoring.ts → createDatabaseService chain
   jest.doMock('../types', () => ({ DraftQueueEntry: {} }));
 
-  jest.doMock('drizzle-orm', () => ({
-    eq: jest.fn((_col: unknown, _val: unknown) => `eq`),
-    and: jest.fn((...args: unknown[]) => args),
-    asc: jest.fn(() => 'asc'),
-  }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      eq: jest.fn((_col: unknown, _val: unknown) => `eq`),
+      and: jest.fn((...args: unknown[]) => args),
+      asc: jest.fn(() => 'asc'),
+    }),
+  );
 
   require('./draft-queue');
 

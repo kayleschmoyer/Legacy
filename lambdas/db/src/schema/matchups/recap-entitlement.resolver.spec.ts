@@ -56,11 +56,17 @@ async function captureRecapResolver(): Promise<
     generateMatchupRecap: jest.fn(),
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: { matchupPlayers: { matchupId: 'matchupId' } },
-  }));
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: { matchupPlayers: { matchupId: 'matchupId' } },
+    }),
+  );
 
-  jest.doMock('drizzle-orm', () => ({ eq: jest.fn() }));
+  jest.doMock('drizzle-orm', () =>
+    mockDrizzleOrm({
+      eq: jest.fn(),
+    }),
+  );
 
   // `types.ts` imports `./winProbability`, which pulls in `../scoring` and its
   // module-level `createDatabaseService(getDbOptions())` call. Stub the module

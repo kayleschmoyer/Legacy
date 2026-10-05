@@ -18,16 +18,18 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: { id: 'leagues.id', draftStatus: 'leagues.draft_status' },
-    teamMembers: {
-      teamId: 'team_members.team_id',
-      leagueId: 'team_members.league_id',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: { id: 'leagues.id', draftStatus: 'leagues.draft_status' },
+      teamMembers: {
+        teamId: 'team_members.team_id',
+        leagueId: 'team_members.league_id',
+      },
+      drafts: { id: 'drafts.id' },
     },
-    drafts: { id: 'drafts.id' },
-  },
-}));
+  }),
+);
 
 const getSeatByIdMock = jest.fn().mockResolvedValue(null);
 

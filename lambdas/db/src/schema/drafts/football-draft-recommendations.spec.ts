@@ -44,18 +44,20 @@ async function loadQueriesModule(): Promise<typeof import('./queries')> {
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: { id: 'id', leagueId: 'leagueId' },
-      draftPicks: {
-        draftId: 'draftId',
-        playerId: 'playerId',
-        teamId: 'teamId',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: { id: 'id', leagueId: 'leagueId' },
+        draftPicks: {
+          draftId: 'draftId',
+          playerId: 'playerId',
+          teamId: 'teamId',
+        },
+        leagues: { id: 'id', sport: 'sport' },
       },
-      leagues: { id: 'id', sport: 'sport' },
-    },
-    buildEligibilityConditions: jest.fn(),
-  }));
+      buildEligibilityConditions: jest.fn(),
+    }),
+  );
 
   jest.doMock('./types', () => ({
     CurrentDraftPick: {},

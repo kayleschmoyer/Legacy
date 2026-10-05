@@ -18,28 +18,30 @@ jest.mock('@legacy-sports/utils/node', () => ({
   ...jest.requireActual('@legacy-sports/utils/node'),
   getDbOptions: jest.fn(() => ({})),
 }));
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(),
-  runWithInternalClient: jest.fn(),
-  handleSubscriptionDowngrade: jest.fn(),
-  clearLeagueTierFreezes: jest.fn(),
-  reapplyLeagueRestrictions: jest.fn(),
-  InternalSchema: {
-    subscriptions: {
-      id: 'subscriptions.id',
-      userId: 'subscriptions.user_id',
-      googlePurchaseToken: 'subscriptions.google_purchase_token',
-      status: 'subscriptions.status',
-      tier: 'subscriptions.tier',
-      updatedAt: 'subscriptions.updated_at',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(),
+    runWithInternalClient: jest.fn(),
+    handleSubscriptionDowngrade: jest.fn(),
+    clearLeagueTierFreezes: jest.fn(),
+    reapplyLeagueRestrictions: jest.fn(),
+    InternalSchema: {
+      subscriptions: {
+        id: 'subscriptions.id',
+        userId: 'subscriptions.user_id',
+        googlePurchaseToken: 'subscriptions.google_purchase_token',
+        status: 'subscriptions.status',
+        tier: 'subscriptions.tier',
+        updatedAt: 'subscriptions.updated_at',
+      },
+      usersInAppInternal: {
+        id: 'users.id',
+        subscriptionTier: 'users.subscription_tier',
+        updatedAt: 'users.updated_at',
+      },
     },
-    usersInAppInternal: {
-      id: 'users.id',
-      subscriptionTier: 'users.subscription_tier',
-      updatedAt: 'users.updated_at',
-    },
-  },
-}));
+  }),
+);
 jest.mock('../server/stripe', () => ({ getStripeClient: jest.fn() }));
 jest.mock('../server/google-play', () => ({
   fetchGoogleSubscription: jest.fn(),

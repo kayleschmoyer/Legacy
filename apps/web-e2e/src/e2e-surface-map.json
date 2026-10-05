@@ -11121,6 +11121,38 @@
       "lib/tamagui-config/src/lib/**",
       "lib/utils/src/lib/**",
       "lib/shared-components/src/features/auth/**"
+    ],
+    "apps/web-e2e/src/tests/mock-drafts-hub.spec.ts": [
+      "apps/web/src/app/app.tsx",
+      "apps/web/src/main.tsx",
+      "apps/web/src/pages/mock-drafts/**",
+      "apps/web/src/pages/join/**",
+      "apps/web/src/components/MockDraftBoard.tsx",
+      "lib/shared-components/src/features/draft/**",
+      "lib/shared-components/src/features/elite-draft/**",
+      "lib/shared-components/src/features/invites/**",
+      "lib/shared-components/src/components/**",
+      "lib/graphql/src/mockDraftHub.graphql",
+      "lib/graphql/src/liveDraft.graphql",
+      "lib/graphql/src/invites.graphql",
+      "apps/web/src/pages/notifications/**",
+      "lib/shared-components/src/features/notifications/**",
+      "apps/web/src/components/**",
+      "apps/web/src/config/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/graphql/src/**",
+      "lib/logging/src/**",
+      "lib/rollbar/src/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/utils/src/lib/**",
+      "lib/shared-components/src/features/auth/**"
     ]
   }
 }

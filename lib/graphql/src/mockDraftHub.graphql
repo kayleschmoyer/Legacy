@@ -1,0 +1,59 @@
+# Mock Drafts hub (LS-10079): Join a draft | My mock drafts | Invites.
+
+query GetPublicMockDrafts(
+  $sport: Sport!
+  $playerPool: String
+  $first: Int
+  $after: String
+) {
+  publicMockDrafts(
+    sport: $sport
+    playerPool: $playerPool
+    first: $first
+    after: $after
+  ) {
+    nodes {
+      draftId
+      sport
+      hostUsername
+      playerPool
+      filledSeats
+      totalSeats
+      openSeats
+      pickTimeLimitSeconds
+      rounds
+      lobbyExpiresAt
+      createdAt
+    }
+    endCursor
+    hasNextPage
+  }
+}
+
+query GetMyMockDrafts(
+  $status: MockDraftListStatus
+  $first: Int
+  $after: String
+) {
+  myMockDrafts(status: $status, first: $first, after: $after) {
+    nodes {
+      draftId
+      sport
+      status
+      listStatus
+      mode
+      isPublic
+      isHost
+      hostUsername
+      playerPool
+      rounds
+      filledSeats
+      totalSeats
+      lobbyExpiresAt
+      createdAt
+      completedAt
+    }
+    endCursor
+    hasNextPage
+  }
+}

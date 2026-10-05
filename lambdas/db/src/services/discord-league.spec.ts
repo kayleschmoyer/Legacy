@@ -6,28 +6,30 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 // Mock db-client
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    leagues: {
-      id: 'leagues.id',
-      discordWebhookUrl: 'leagues.discordWebhookUrl',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      leagues: {
+        id: 'leagues.id',
+        discordWebhookUrl: 'leagues.discordWebhookUrl',
+      },
+      tradeOfferPlayers: {
+        playerId: 'tradeOfferPlayers.playerId',
+        fromTeamId: 'tradeOfferPlayers.fromTeamId',
+        tradeOfferId: 'tradeOfferPlayers.tradeOfferId',
+      },
+      players: {
+        id: 'players.id',
+        firstName: 'players.firstName',
+        lastName: 'players.lastName',
+      },
+      tradeOffers: {
+        id: 'tradeOffers.id',
+        proposingTeamId: 'tradeOffers.proposingTeamId',
+      },
     },
-    tradeOfferPlayers: {
-      playerId: 'tradeOfferPlayers.playerId',
-      fromTeamId: 'tradeOfferPlayers.fromTeamId',
-      tradeOfferId: 'tradeOfferPlayers.tradeOfferId',
-    },
-    players: {
-      id: 'players.id',
-      firstName: 'players.firstName',
-      lastName: 'players.lastName',
-    },
-    tradeOffers: {
-      id: 'tradeOffers.id',
-      proposingTeamId: 'tradeOffers.proposingTeamId',
-    },
-  },
-}));
+  }),
+);
 
 import {
   getDiscordWebhookUrls,

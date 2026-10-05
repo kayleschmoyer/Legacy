@@ -125,6 +125,12 @@ const MockDraftBoardScreen = lazyWithRetry(() =>
     default: m.MockDraftBoardScreen,
   })),
 );
+// The Mock Drafts hub (LS-10079): public lobbies, my mock drafts, invites.
+const MockDraftsHubPage = lazyWithRetry(() =>
+  import('../pages/mock-drafts/MockDraftsHubPage').then((m) => ({
+    default: m.MockDraftsHubPage,
+  })),
+);
 const JoinByCodePage = lazyWithRetry(() =>
   import('../pages/join/JoinByCodePage').then((m) => ({
     default: m.JoinByCodePage,
@@ -883,6 +889,7 @@ function App() {
               path="/baseball/league/:id/draft/watch"
               element={<EliteDraftSpectatorScreen />}
             />
+            <Route path="/mock-drafts" element={<MockDraftsHubPage />} />
             <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
             {/* A mock draft has no league, so it has its own room route
                 (LS-10076). */}

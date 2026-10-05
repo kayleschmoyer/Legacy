@@ -9,18 +9,20 @@
  * rows cost at most one query per touched category table.
  */
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    careerFootballPassing: { playerId: 'careerFootballPassing.playerId' },
-    careerFootballRushing: { playerId: 'careerFootballRushing.playerId' },
-    careerFootballReceiving: { playerId: 'careerFootballReceiving.playerId' },
-    careerFootballKicking: { playerId: 'careerFootballKicking.playerId' },
-    careerFootballDefense: { playerId: 'careerFootballDefense.playerId' },
-    careerFootballDefenseIdp: {
-      playerId: 'careerFootballDefenseIdp.playerId',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema: {
+      careerFootballPassing: { playerId: 'careerFootballPassing.playerId' },
+      careerFootballRushing: { playerId: 'careerFootballRushing.playerId' },
+      careerFootballReceiving: { playerId: 'careerFootballReceiving.playerId' },
+      careerFootballKicking: { playerId: 'careerFootballKicking.playerId' },
+      careerFootballDefense: { playerId: 'careerFootballDefense.playerId' },
+      careerFootballDefenseIdp: {
+        playerId: 'careerFootballDefenseIdp.playerId',
+      },
     },
-  },
-}));
+  }),
+);
 
 import {
   createCareerFootballDefenseIdpLoader,

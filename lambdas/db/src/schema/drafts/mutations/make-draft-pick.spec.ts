@@ -250,33 +250,35 @@ function setupResolver(options: {
     getDbOptions: jest.fn(() => ({})),
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    createBadgeService: jest.fn(() => ({
-      evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-    })),
-    filterPlayerIdsByLeagueEligibility: jest
-      .fn()
-      .mockResolvedValue({ eligibleIds: new Set([42]) }),
-    findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
-    PublicSchema: {
-      leagues: { id: 'id', draftStatus: 'draftStatus' },
-      leagueMembers: {
-        leagueId: 'leagueId',
-        userId: 'userId',
-        teamId: 'teamId',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      createBadgeService: jest.fn(() => ({
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+      })),
+      filterPlayerIdsByLeagueEligibility: jest
+        .fn()
+        .mockResolvedValue({ eligibleIds: new Set([42]) }),
+      findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
+      PublicSchema: {
+        leagues: { id: 'id', draftStatus: 'draftStatus' },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+        },
+        draftPicks: {
+          draftId: 'draftId',
+          playerId: 'playerId',
+          teamId: 'teamId',
+          participantId: 'participantId',
+          overallPick: 'overallPick',
+        },
+        drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
+        players: { id: 'id' },
+        playerEligiblePositions: { playerId: 'playerId', position: 'position' },
       },
-      draftPicks: {
-        draftId: 'draftId',
-        playerId: 'playerId',
-        teamId: 'teamId',
-        participantId: 'participantId',
-        overallPick: 'overallPick',
-      },
-      drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
-      players: { id: 'id' },
-      playerEligiblePositions: { playerId: 'playerId', position: 'position' },
-    },
-  }));
+    }),
+  );
 
   jest.doMock('../types', () => ({ DraftPick: {} }));
 

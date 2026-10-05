@@ -32,57 +32,59 @@ describe('draft-slot-trades helpers', () => {
       },
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      PublicSchema: {
-        leagues: {
-          id: 'id',
-          allowDraftSlotTrading: 'allowDraftSlotTrading',
-          draftStatus: 'draftStatus',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        PublicSchema: {
+          leagues: {
+            id: 'id',
+            allowDraftSlotTrading: 'allowDraftSlotTrading',
+            draftStatus: 'draftStatus',
+          },
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            teamId: 'teamId',
+            permissionLevel: 'permissionLevel',
+          },
+          teams: {
+            id: 'id',
+            leagueId: 'leagueId',
+            isLocked: 'isLocked',
+            name: 'name',
+          },
+          drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
+          draftParticipants: {
+            id: 'id',
+            draftId: 'draftId',
+            slot: 'slot',
+            teamId: 'teamId',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            controller: 'controller',
+            seatName: 'seatName',
+            autoPick: 'autoPick',
+          },
+          draftSlotTrades: {
+            id: 'id',
+            leagueId: 'leagueId',
+            proposerTeamId: 'proposerTeamId',
+            counterpartTeamId: 'counterpartTeamId',
+            status: 'status',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+          },
+          leagueMessages: {
+            id: 'id',
+            leagueId: 'leagueId',
+            userId: 'userId',
+            messageText: 'messageText',
+            messageType: 'messageType',
+            metadata: 'metadata',
+            timestamp: 'timestamp',
+          },
         },
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          teamId: 'teamId',
-          permissionLevel: 'permissionLevel',
-        },
-        teams: {
-          id: 'id',
-          leagueId: 'leagueId',
-          isLocked: 'isLocked',
-          name: 'name',
-        },
-        drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
-        draftParticipants: {
-          id: 'id',
-          draftId: 'draftId',
-          slot: 'slot',
-          teamId: 'teamId',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          controller: 'controller',
-          seatName: 'seatName',
-          autoPick: 'autoPick',
-        },
-        draftSlotTrades: {
-          id: 'id',
-          leagueId: 'leagueId',
-          proposerTeamId: 'proposerTeamId',
-          counterpartTeamId: 'counterpartTeamId',
-          status: 'status',
-          createdAt: 'createdAt',
-          updatedAt: 'updatedAt',
-        },
-        leagueMessages: {
-          id: 'id',
-          leagueId: 'leagueId',
-          userId: 'userId',
-          messageText: 'messageText',
-          messageType: 'messageType',
-          metadata: 'metadata',
-          timestamp: 'timestamp',
-        },
-      },
-    }));
+      }),
+    );
 
     helpers = require('./helpers') as typeof import('./helpers');
   });

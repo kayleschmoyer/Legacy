@@ -103,7 +103,8 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     jest.doMock('@legacy-sports/db-client', () => {
-      const mocked = {
+      // The overrides double as this spec's handle on the scoring spies.
+      const overrides = {
         createDatabaseService: jest.fn(),
         runWithPublicClient: jest.fn(
           async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
@@ -215,8 +216,8 @@ describe('Commissioner Tools Resolver', () => {
           },
         },
       };
-      dbClientMock = mocked;
-      return mocked;
+      dbClientMock = overrides;
+      return mockDbClientModule(overrides);
     });
 
     jest.doMock('./authorization', () => ({

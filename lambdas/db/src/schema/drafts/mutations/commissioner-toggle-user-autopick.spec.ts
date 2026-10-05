@@ -107,28 +107,30 @@ function captureResolver(): Resolver {
     },
   }));
 
-  jest.doMock('@legacy-sports/db-client', () => ({
-    PublicSchema: {
-      drafts: {
-        id: 'drafts.id',
-        leagueId: 'drafts.leagueId',
-        status: 'drafts.status',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      PublicSchema: {
+        drafts: {
+          id: 'drafts.id',
+          leagueId: 'drafts.leagueId',
+          status: 'drafts.status',
+        },
+        leagueMembers: {
+          leagueId: 'leagueMembers.leagueId',
+          userId: 'leagueMembers.userId',
+          permissionLevel: 'leagueMembers.permissionLevel',
+        },
+        leagues: { id: 'leagues.id', draftStatus: 'leagues.draftStatus' },
+        teams: { id: 'teams.id', name: 'teams.name' },
+        leagueMessages: {
+          leagueId: 'leagueMessages.leagueId',
+          userId: 'leagueMessages.userId',
+          messageText: 'leagueMessages.messageText',
+          messageType: 'leagueMessages.messageType',
+        },
       },
-      leagueMembers: {
-        leagueId: 'leagueMembers.leagueId',
-        userId: 'leagueMembers.userId',
-        permissionLevel: 'leagueMembers.permissionLevel',
-      },
-      leagues: { id: 'leagues.id', draftStatus: 'leagues.draftStatus' },
-      teams: { id: 'teams.id', name: 'teams.name' },
-      leagueMessages: {
-        leagueId: 'leagueMessages.leagueId',
-        userId: 'leagueMessages.userId',
-        messageText: 'leagueMessages.messageText',
-        messageType: 'leagueMessages.messageType',
-      },
-    },
-  }));
+    }),
+  );
 
   require('./commissioner-toggle-user-autopick');
 

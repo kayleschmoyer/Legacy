@@ -48,23 +48,26 @@ function captureCommissionerPickResolver(overrides?: {
   jest.doMock('@legacy-sports/utils/node', () => ({
     getDbOptions: jest.fn(() => ({})),
   }));
-  jest.doMock('@legacy-sports/db-client', () => ({
-    createBadgeService: jest.fn(() => ({
-      evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-    })),
-    findFailedEligibilityRule:
-      overrides?.findFailedEligibilityRule ?? jest.fn().mockResolvedValue(null),
-    PublicSchema: {
-      leagueMembers: {
-        leagueId: 'leagueId',
-        userId: 'userId',
-        permissionLevel: 'permissionLevel',
+  jest.doMock('@legacy-sports/db-client', () =>
+    mockDbClientModule({
+      createBadgeService: jest.fn(() => ({
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+      })),
+      findFailedEligibilityRule:
+        overrides?.findFailedEligibilityRule ??
+        jest.fn().mockResolvedValue(null),
+      PublicSchema: {
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          permissionLevel: 'permissionLevel',
+        },
+        leagues: { id: 'id' },
+        draftPicks: { draftId: 'draftId', playerId: 'playerId' },
+        players: { id: 'id' },
       },
-      leagues: { id: 'id' },
-      draftPicks: { draftId: 'draftId', playerId: 'playerId' },
-      players: { id: 'id' },
-    },
-  }));
+    }),
+  );
   jest.doMock('../types', () => ({ DraftPick: {} }));
   jest.doMock('../helpers', () => ({
     commitDraftPick: jest.fn(),
@@ -181,22 +184,24 @@ describe('commissionerPick resolver', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createBadgeService: jest.fn(() => ({
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-      })),
-      findFailedEligibilityRule: mockFindFailedEligibilityRule,
-      PublicSchema: {
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          permissionLevel: 'permissionLevel',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createBadgeService: jest.fn(() => ({
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        })),
+        findFailedEligibilityRule: mockFindFailedEligibilityRule,
+        PublicSchema: {
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          leagues: { id: 'id' },
+          draftPicks: { draftId: 'draftId', playerId: 'playerId' },
+          players: { id: 'id' },
         },
-        leagues: { id: 'id' },
-        draftPicks: { draftId: 'draftId', playerId: 'playerId' },
-        players: { id: 'id' },
-      },
-    }));
+      }),
+    );
 
     jest.doMock('../types', () => ({ DraftPick: {} }));
 
@@ -480,22 +485,24 @@ describe('commissionerPick — draft row lock-wait retry (LS-8480)', () => {
     jest.doMock('@legacy-sports/utils/node', () => ({
       getDbOptions: jest.fn(() => ({})),
     }));
-    jest.doMock('@legacy-sports/db-client', () => ({
-      createBadgeService: jest.fn(() => ({
-        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
-      })),
-      findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
-      PublicSchema: {
-        leagueMembers: {
-          leagueId: 'leagueId',
-          userId: 'userId',
-          permissionLevel: 'permissionLevel',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        createBadgeService: jest.fn(() => ({
+          evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        })),
+        findFailedEligibilityRule: jest.fn().mockResolvedValue(null),
+        PublicSchema: {
+          leagueMembers: {
+            leagueId: 'leagueId',
+            userId: 'userId',
+            permissionLevel: 'permissionLevel',
+          },
+          leagues: { id: 'id' },
+          draftPicks: { draftId: 'draftId', playerId: 'playerId' },
+          players: { id: 'id' },
         },
-        leagues: { id: 'id' },
-        draftPicks: { draftId: 'draftId', playerId: 'playerId' },
-        players: { id: 'id' },
-      },
-    }));
+      }),
+    );
     jest.doMock('../types', () => ({ DraftPick: {} }));
     jest.doMock('../helpers', () => ({
       commitDraftPick: mockCommitDraftPick,

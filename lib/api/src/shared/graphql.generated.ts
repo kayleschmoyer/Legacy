@@ -2250,6 +2250,15 @@ export type MockDraftInvitePreview = {
   totalSeats?: Maybe<Scalars['Int']['output']>;
 };
 
+export enum MockDraftListStatus {
+  /** Finished; results only. */
+  Completed = 'COMPLETED',
+  /** Drafting now. */
+  Live = 'LIVE',
+  /** Online lobby, not started yet. */
+  Lobby = 'LOBBY',
+}
+
 /** What a mock-draft maintenance sweep did (LS-10076). */
 export type MockDraftMaintenanceResult = {
   __typename?: 'MockDraftMaintenanceResult';
@@ -3387,6 +3396,35 @@ export type MyInvoice = {
   status?: Maybe<Scalars['String']['output']>;
 };
 
+/** A mock draft the caller holds a seat in (LS-10079). Lobbies and live drafts resume in the draft room; completed ones open their results. */
+export type MyMockDraft = {
+  __typename?: 'MyMockDraft';
+  completedAt?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  filledSeats?: Maybe<Scalars['Int']['output']>;
+  hostUsername?: Maybe<Scalars['String']['output']>;
+  isHost?: Maybe<Scalars['Boolean']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
+  listStatus?: Maybe<MockDraftListStatus>;
+  lobbyExpiresAt?: Maybe<Scalars['String']['output']>;
+  mode?: Maybe<MockDraftMode>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  rounds?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  /** The raw drafts.status. */
+  status?: Maybe<Scalars['String']['output']>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A page of the caller's mock drafts, newest first. Pass `endCursor` back as `after` for the next page. */
+export type MyMockDraftConnection = {
+  __typename?: 'MyMockDraftConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage?: Maybe<Scalars['Boolean']['output']>;
+  nodes?: Maybe<Array<MyMockDraft>>;
+};
+
 /** Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044) */
 export type NflTeamSeasonMetadata = {
   __typename?: 'NflTeamSeasonMetadata';
@@ -3750,6 +3788,31 @@ export type PublicLeagueInfo = {
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A public online mock-draft lobby with an open seat (LS-10079). Only what a stranger browsing the list may see. */
+export type PublicMockDraft = {
+  __typename?: 'PublicMockDraft';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  filledSeats?: Maybe<Scalars['Int']['output']>;
+  hostUsername?: Maybe<Scalars['String']['output']>;
+  lobbyExpiresAt?: Maybe<Scalars['String']['output']>;
+  /** Open seats minus pending invite reservations. */
+  openSeats?: Maybe<Scalars['Int']['output']>;
+  pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  rounds?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+  totalSeats?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A page of public mock-draft lobbies, newest first. Pass `endCursor` back as `after` for the next page. */
+export type PublicMockDraftConnection = {
+  __typename?: 'PublicMockDraftConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage?: Maybe<Scalars['Boolean']['output']>;
+  nodes?: Maybe<Array<PublicMockDraft>>;
+};
+
 export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
@@ -3897,6 +3960,8 @@ export type Query = {
   /** List the authenticated user’s most recent Stripe invoices (billing history). */
   myInvoices: Array<MyInvoice>;
   myLeagues: Array<League>;
+  /** Mock drafts the caller holds a seat in (LS-10079), newest first, cursor-paged. Lobbies past their expiry are left out — the hourly job deletes them. */
+  myMockDrafts?: Maybe<MyMockDraftConnection>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
   /** Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table). */
@@ -3931,6 +3996,8 @@ export type Query = {
   publicLeagues: Array<PublicLeagueInfo>;
   /** Total public leagues matching the given filters, ignoring pagination. */
   publicLeaguesCount: Scalars['Int']['output'];
+  /** Public ONLINE mock-draft lobbies a signed-in user can join by id (LS-10079): not started, not expired, at least one open unreserved seat, and not one the caller already sits in. Newest first, cursor-paged. */
+  publicMockDrafts?: Maybe<PublicMockDraftConnection>;
   /** Preview what an invite code joins — a mock-draft lobby or a league — for the universal /join/:code route (LS-10078). Null for an unknown code. Never returns member-only data. */
   resolveInviteCode?: Maybe<InvitePreview>;
   /** Live MLB scoreboard for the given date (defaults to today). Uses the provider configured via MLB_DATA_PROVIDER (defaults to mlb-statsapi in dev). */
@@ -4406,6 +4473,12 @@ export type QueryMyLeaguesArgs = {
   sport?: InputMaybe<Sport>;
 };
 
+export type QueryMyMockDraftsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<MockDraftListStatus>;
+};
+
 export type QueryNflTeamSeasonMetadataArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -4522,6 +4595,13 @@ export type QueryPublicLeaguesCountArgs = {
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryPublicMockDraftsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  sport: Sport;
 };
 
 export type QueryResolveInviteCodeArgs = {

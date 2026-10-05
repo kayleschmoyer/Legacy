@@ -20,15 +20,18 @@ const mockListAllowlist = jest.fn();
 const mockAddAllowlistEntry = jest.fn();
 const mockSetAllowlistRevoked = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(() => ({})),
-  listAllowlist: (...args: unknown[]) => mockListAllowlist(...args),
-  addAllowlistEntry: (...args: unknown[]) => mockAddAllowlistEntry(...args),
-  setAllowlistRevoked: (...args: unknown[]) => mockSetAllowlistRevoked(...args),
-  PublicSchema: {
-    users: { id: 'users.id', accessLevel: 'users.access_level' },
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(() => ({})),
+    listAllowlist: (...args: unknown[]) => mockListAllowlist(...args),
+    addAllowlistEntry: (...args: unknown[]) => mockAddAllowlistEntry(...args),
+    setAllowlistRevoked: (...args: unknown[]) =>
+      mockSetAllowlistRevoked(...args),
+    PublicSchema: {
+      users: { id: 'users.id', accessLevel: 'users.access_level' },
+    },
+  }),
+);
 
 import {
   resolveAddAppDownloadAllowlistEntry,

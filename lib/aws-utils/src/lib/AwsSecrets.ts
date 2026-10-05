@@ -4,10 +4,16 @@ import {
 } from '@aws-sdk/client-secrets-manager';
 import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 
-// Create client outside of handler to reuse
-export const secretsClient = new SecretsManagerClient({
-  region: 'us-east-1',
-});
+// Created on first use, then reused across invocations. Not at module scope:
+// constructing the client starts the SDK's async region/config lookup, and a
+// test runner that re-evaluates this module (jest.resetModules) kept every
+// load's whole module graph alive through that lookup's error stack (LS-10079).
+let secretsClient: SecretsManagerClient | undefined;
+
+function getSecretsClient(): SecretsManagerClient {
+  secretsClient ??= new SecretsManagerClient({ region: 'us-east-1' });
+  return secretsClient;
+}
 
 export interface SecretConfiguration {
   localEnvVar: string | undefined;
@@ -87,7 +93,7 @@ export function invalidateSecretCache(secret_name?: string): void {
 }
 
 async function fetchSecretParameterValue(secret_name: string): Promise<string> {
-  const response = await secretsClient.send(
+  const response = await getSecretsClient().send(
     new GetSecretValueCommand({
       SecretId: secret_name,
       VersionStage: 'AWSCURRENT', // VersionStage defaults to AWSCURRENT if unspecified
