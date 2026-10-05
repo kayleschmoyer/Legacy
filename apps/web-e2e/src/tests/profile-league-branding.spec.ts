@@ -144,7 +144,10 @@ test.describe('Profile Settings — Avatar Picker @regression', () => {
     await page.goto('/profile/settings');
 
     await expect(page.getByText('Avatar Preview')).toBeVisible();
-    await expect(page.getByText('No image selected')).toBeVisible();
+    // New users get a preset pre-selected rather than an empty preview.
+    await expect(
+      page.getByText('Image selected', { exact: true }),
+    ).toBeVisible();
   });
 
   // LS-10443: user avatars are presets-only — the server rejects any avatar

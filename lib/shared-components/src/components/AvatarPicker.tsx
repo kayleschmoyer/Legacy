@@ -64,12 +64,20 @@ export function AvatarPicker({
 
   const [customUrl, setCustomUrl] = useState('');
   const [customUrlError, setCustomUrlError] = useState<string | null>(null);
+  // New users (no avatar yet) start on a random preset so the preview is
+  // never an empty placeholder and Save never silently writes null.
   const [pendingUrl, setPendingUrl] = useState<string | null>(
-    currentUrl ?? null,
+    () =>
+      currentUrl ??
+      (variant === 'user'
+        ? presets[Math.floor(Math.random() * presets.length)].url
+        : null),
   );
+  const [confirmingEmpty, setConfirmingEmpty] = useState(false);
 
   const handlePresetClick = (url: string) => {
     setPendingUrl(url);
+    setConfirmingEmpty(false);
   };
 
   const handleCustomApply = () => {
@@ -79,6 +87,7 @@ export function AvatarPicker({
     setCustomUrlError(error);
     if (error) return;
     setPendingUrl(trimmed);
+    setConfirmingEmpty(false);
   };
 
   const handleCustomUrlChange = (text: string) => {
@@ -94,11 +103,22 @@ export function AvatarPicker({
   };
 
   const handleSave = () => {
-    onSelect(pendingUrl ? resolve(pendingUrl) : null);
+    if (!pendingUrl) {
+      // Saving "no image" must be deliberate, not an accidental click.
+      setConfirmingEmpty(true);
+      return;
+    }
+    onSelect(resolve(pendingUrl));
+  };
+
+  const handleConfirmEmpty = () => {
+    setConfirmingEmpty(false);
+    onSelect(null);
   };
 
   const handleClear = () => {
     setPendingUrl(null);
+    setConfirmingEmpty(false);
     onSelect(null);
   };
 
@@ -215,6 +235,26 @@ export function AvatarPicker({
               {customUrlError}
             </Text>
           ) : null}
+        </YStack>
+      ) : null}
+
+      {confirmingEmpty ? (
+        <YStack gap="$2">
+          <Text {...TYPE_BODY.caption} color="$textMuted">
+            No image is selected. Save without an image?
+          </Text>
+          <XStack gap="$3" justifyContent="flex-end">
+            <Button
+              size="$3"
+              chromeless
+              onPress={() => setConfirmingEmpty(false)}
+            >
+              Cancel
+            </Button>
+            <Button size="$3" onPress={handleConfirmEmpty} disabled={loading}>
+              Save without image
+            </Button>
+          </XStack>
         </YStack>
       ) : null}
 

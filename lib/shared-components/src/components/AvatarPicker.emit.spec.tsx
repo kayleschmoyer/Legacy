@@ -43,8 +43,8 @@ describe('AvatarPicker emit contract (LS-7212)', () => {
     jest.clearAllMocks();
   });
 
-  it('starts with no image selected', () => {
-    render(<AvatarPicker onSelect={onSelect} />);
+  it('starts with no image selected for the team variant', () => {
+    render(<AvatarPicker onSelect={onSelect} variant="team" />);
     expect(screen.getByText('No image selected')).toBeTruthy();
   });
 
@@ -79,7 +79,10 @@ describe('AvatarPicker emit contract (LS-7212)', () => {
     fireEvent.change(screen.getByLabelText('Custom logo URL'), {
       target: { value: 'https://cdn.example.com/me.png' },
     });
+    // Nothing is selected, so Save asks for confirmation before emitting null.
     press(screen.getByText('Save'));
+    expect(onSelect).not.toHaveBeenCalled();
+    press(screen.getByText('Save without image'));
 
     expect(onSelect).toHaveBeenCalledWith(null);
   });

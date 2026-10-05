@@ -322,7 +322,8 @@ test.describe('Profile Settings Page — App Avatar picker (LS-7212) @regression
   }) => {
     const sent = await setupAvatarGraphQL(page);
     await settingsPage.profile.goto();
-    await settingsPage.profile.expectAvatarPreviewCaption('No image selected');
+    // New users start on a pre-selected preset rather than an empty preview.
+    await settingsPage.profile.expectAvatarPreviewCaption('Image selected');
 
     await settingsPage.profile.selectAvatarPreset('Astronaut');
     await settingsPage.profile.expectAvatarPreviewCaption('Image selected');

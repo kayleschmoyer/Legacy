@@ -39,6 +39,51 @@ describe('AvatarPicker', () => {
     expect(getByText('Saving...')).toBeTruthy();
   });
 
+  describe('default selection', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('preselects a random preset for a user with no avatar and saves it', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const { getByText, queryByText } = render(
+        <AvatarPicker onSelect={onSelect} variant="user" />,
+      );
+      expect(queryByText('No image selected')).toBeNull();
+      fireEvent.click(getByText('Save'));
+      expect(onSelect).toHaveBeenCalledWith('/presets/avatar-astronaut.png');
+    });
+
+    it('keeps the existing avatar instead of randomizing', () => {
+      const { getByText } = render(
+        <AvatarPicker
+          onSelect={onSelect}
+          variant="user"
+          currentUrl="https://example.com/me.png"
+        />,
+      );
+      fireEvent.click(getByText('Save'));
+      expect(onSelect).toHaveBeenCalledWith('https://example.com/me.png');
+    });
+
+    it('does not default the team variant', () => {
+      const { getByText } = render(
+        <AvatarPicker onSelect={onSelect} variant="team" />,
+      );
+      expect(getByText('No image selected')).toBeTruthy();
+    });
+
+    it('requires confirmation before saving a null avatar', () => {
+      const { getByText } = render(
+        <AvatarPicker onSelect={onSelect} variant="team" />,
+      );
+      fireEvent.click(getByText('Save'));
+      expect(onSelect).not.toHaveBeenCalled();
+      fireEvent.click(getByText('Save without image'));
+      expect(onSelect).toHaveBeenCalledWith(null);
+    });
+  });
+
   // LS-10443: the server only accepts user avatars on the legacy-fantasy.com
   // allowlist, so the user variant offers presets only.
   it('does not render the custom URL input for the user variant', () => {
@@ -69,7 +114,10 @@ describe('AvatarPicker', () => {
     expect(getByRole('alert').textContent).toBe('Logo URL must be a valid URL');
     expect(getByText('No image selected')).toBeTruthy();
 
+    // Saving with nothing selected asks for confirmation (LS-6883).
     fireEvent.click(getByText('Save'));
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(getByText('Save without image'));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
