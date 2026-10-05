@@ -1,8 +1,24 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MinigamesHub } from '@legacy-sports/shared-components/games';
+import {
+  type MinigameId,
+  MinigamesHub,
+} from '@legacy-sports/shared-components/games';
 import { PageMeta } from '../../components/PageMeta';
 import { ResumeMockDraftBanner } from '../../components/ResumeMockDraftBanner';
+
+/**
+ * Where each hub card's CTA goes. A `Record` keyed by `MinigameId` (rather
+ * than an if/else chain) makes the mapping exhaustive at compile time, so a
+ * new or renamed game can't silently fall through to — or be wired to — the
+ * wrong page (LS-10460).
+ */
+export const MINIGAME_ROUTES: Record<MinigameId, string> = {
+  'season-draft': '/games/season-draft',
+  disclosure: '/games/disclosure',
+  'twenty-questions': '/games/twenty-questions',
+  'mock-draft': '/baseball/mock-draft',
+};
 
 /**
  * Minigames Hub Page
@@ -21,13 +37,7 @@ export const MinigamesHubPage: React.FC = () => {
       />
       <MinigamesHub
         banner={<ResumeMockDraftBanner />}
-        onNavigate={(id) => {
-          if (id === 'season-draft') navigate('/games/season-draft');
-          else if (id === 'disclosure') navigate('/games/disclosure');
-          else if (id === 'twenty-questions')
-            navigate('/games/twenty-questions');
-          else if (id === 'mock-draft') navigate('/baseball/mock-draft');
-        }}
+        onNavigate={(id) => navigate(MINIGAME_ROUTES[id])}
       />
     </>
   );

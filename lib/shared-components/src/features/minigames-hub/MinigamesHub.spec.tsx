@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, within } from '@testing-library/react';
 import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
@@ -9,6 +9,7 @@ import {
 } from '@legacy-sports/graphql';
 import { formatDraftDate } from '@legacy-sports/utils';
 import { MinigamesHub } from './MinigamesHub';
+import { GAME_TEMPLATES } from './MinigamesHub.shared';
 import { render } from '../../test-utils';
 
 jest.mock('@legacy-sports/graphql');
@@ -160,27 +161,44 @@ describe('MinigamesHub', () => {
     expect(getAllByText('—').length).toBeGreaterThan(0);
   });
 
-  it('calls onNavigate with the pressed game id', () => {
-    const onNavigate = jest.fn();
-    const { getByText } = render(
-      <MinigamesHub onNavigate={onNavigate} isNarrow={false} />,
+  // LS-10460: two cards share the "Play Now" label, so each CTA is located
+  // inside the card carrying its title — a press must report that card's own
+  // id, exactly once, never a neighbour's. The expected ids are spelled out
+  // here rather than read from GAME_TEMPLATES so a template carrying the wrong
+  // id fails the spec instead of agreeing with itself.
+  const CARD_TARGETS = [
+    ['Season Draft', 'Enter Lobby', 'season-draft'],
+    ['Who Am I?', 'Play Now', 'disclosure'],
+    ['20 Questions', 'Play Now', 'twenty-questions'],
+    ['Mock Draft', 'Start Draft', 'mock-draft'],
+  ] as const;
+
+  it('covers every game card', () => {
+    expect(CARD_TARGETS.map(([title]) => title)).toEqual(
+      GAME_TEMPLATES.map((g) => g.title),
     );
-
-    fireEvent.click(getByText('Enter Lobby'));
-
-    expect(onNavigate).toHaveBeenCalledWith('season-draft');
   });
 
-  it('calls onNavigate when the Mock Draft card is pressed', () => {
-    const onNavigate = jest.fn();
-    const { getByText } = render(
-      <MinigamesHub onNavigate={onNavigate} isNarrow={false} />,
-    );
+  it.each(CARD_TARGETS)(
+    'pressing the %s card\'s "%s" CTA calls onNavigate with %s',
+    (title, cta, id) => {
+      const onNavigate = jest.fn();
+      const { getAllByRole } = render(
+        <MinigamesHub onNavigate={onNavigate} isNarrow={false} />,
+      );
+      const card = getAllByRole('button').find(
+        (el) =>
+          within(el).queryByText(title) !== null &&
+          within(el).queryByText(cta) !== null,
+      );
+      if (!card) throw new Error(`No card found for ${title}`);
 
-    fireEvent.click(getByText('Start Draft'));
+      fireEvent.click(within(card).getByText(cta));
 
-    expect(onNavigate).toHaveBeenCalledWith('mock-draft');
-  });
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenCalledWith(id);
+    },
+  );
 
   it('logs a non-fatal query error instead of throwing', () => {
     const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(

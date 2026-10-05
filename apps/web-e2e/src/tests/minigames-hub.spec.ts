@@ -82,3 +82,45 @@ test.describe('Minigames Hub navigation @critical', () => {
     await expect(page).toHaveURL(/\/games\/disclosure$/);
   });
 });
+
+// LS-10460: a user reported 20 Questions' "Play Now" landing on
+// /baseball/mock-draft. Click each card's own CTA pill (not the card centre)
+// at the reporter's 1280×713 viewport — where the cards stack one per row,
+// the 20 Questions card directly above Mock Draft — and assert it routes to
+// its own game. "Play Now" is shared by two cards, so each CTA is scoped to
+// the card carrying its title.
+test.describe('Minigames Hub card CTAs (LS-10460) @critical', () => {
+  test.use({ viewport: { width: 1280, height: 713 } });
+
+  const CARDS = [
+    {
+      title: 'Season Draft',
+      cta: 'Enter Lobby',
+      url: /\/games\/season-draft$/,
+    },
+    { title: 'Who Am I?', cta: 'Play Now', url: /\/games\/disclosure$/ },
+    {
+      title: '20 Questions',
+      cta: 'Play Now',
+      url: /\/games\/twenty-questions$/,
+    },
+    { title: 'Mock Draft', cta: 'Start Draft', url: /\/baseball\/mock-draft$/ },
+  ];
+
+  for (const { title, cta, url } of CARDS) {
+    test(`"${cta}" on the ${title} card routes to ${String(url)}`, async ({
+      page,
+    }) => {
+      await mockHubQueries(page);
+      await page.goto('/games');
+
+      const card = page
+        .getByRole('button')
+        .filter({ has: page.getByText(title, { exact: true }) });
+      await expect(card).toHaveCount(1);
+      await card.getByText(cta, { exact: true }).click();
+
+      await expect(page).toHaveURL(url);
+    });
+  }
+});
