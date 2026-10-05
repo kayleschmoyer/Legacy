@@ -167,6 +167,13 @@ export interface DraftPickRecord {
    * never a 0, which would read as "drafted exactly on consensus".
    */
   adp?: number | null;
+  /**
+   * The drafted player's projected fantasy points per matchup, from the
+   * server — the same value AvailableDraftPlayer.projectedMatchupPoints
+   * carried before the pick. Lets a client that loaded mid-draft show a
+   * projection for players picked before it opened (LS-10595).
+   */
+  projectedMatchupPoints?: number | null;
   /** Player name fields returned directly from getDraftPicks. Used to display
    * names for picks that are absent from the careerBattingStats map (e.g. pure
    * pitchers). eligiblePositions is used to fix position display for drafted

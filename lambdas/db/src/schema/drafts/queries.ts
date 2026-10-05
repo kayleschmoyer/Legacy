@@ -16,6 +16,7 @@ import {
   findTierBreakCandidateIds,
 } from './draft-recommendation-signals';
 import { authorizeDraft, authorizeLoadedDraft } from './authorize-draft';
+import { buildProjectedMatchupPointsExpr } from './draft-projection';
 import { loadDraftRules } from './draft-rules';
 import { requireLeagueId } from './league-draft';
 import {
@@ -554,13 +555,9 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const offsetVal = Math.max(0, resultOffset ?? 0);
 
       // ---- Build SELECT fragments ----
-      // Matchup schedule settings for projected points calculation.
-      // sql.raw is safe: gpm and spm are integers sourced from our own DB, not user input.
-      const gpm = rules.gamesPerMatchup ?? 5;
-      const spm = rules.pitcherStartsPerMatchup ?? 1;
-      const projMatchupExpr = sql.raw(
-        `COALESCE(cs.hitter_avg_ppg, 0) * ${gpm} + COALESCE(cs.pitching_avg_ppg, 0) * ${spm}`,
-      );
+      // Projected points per matchup — shared with DraftPick.projectedMatchupPoints
+      // so a drafted player keeps the number the board showed (LS-10595).
+      const projMatchupExpr = buildProjectedMatchupPointsExpr(rules);
 
       // The rank shown in this column is the same stack rank DraftPick.adp
       // reports for picks already made — both come from buildDraftAdpCte(),

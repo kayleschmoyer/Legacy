@@ -282,6 +282,7 @@ query GetDraftPicks($draftId: Int!) {
     participantId
     playerId
     adp
+    projectedMatchupPoints
     player {
       id
       firstName

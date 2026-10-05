@@ -381,6 +381,7 @@ export function useDraftQueries({
           teamId: (p.teamId ?? p.participantId) as number,
           playerId: p.playerId as number,
           adp: p.adp ?? null,
+          projectedMatchupPoints: p.projectedMatchupPoints ?? null,
           player:
             p.player?.id != null
               ? {

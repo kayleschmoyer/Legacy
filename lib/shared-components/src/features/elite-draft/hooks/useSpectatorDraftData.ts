@@ -225,6 +225,7 @@ export function useSpectatorDraftData({
           teamId: p.teamId as number,
           playerId: p.playerId as number,
           adp: p.adp ?? null,
+          projectedMatchupPoints: p.projectedMatchupPoints ?? null,
           player:
             p.player?.id != null
               ? {

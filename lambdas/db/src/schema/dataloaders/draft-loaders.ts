@@ -6,6 +6,7 @@ import DataLoader from 'dataloader';
 import type { GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 
 import { loadDraftedPlayerAdp } from '../drafts/draft-adp';
+import { loadDraftedPlayerProjections } from '../drafts/draft-projection';
 
 /**
  * Consensus rank (stack-rank ADP) for players already drafted, keyed
@@ -34,6 +35,36 @@ export const createDraftedPlayerAdpLoader = (
     await Promise.all(
       draftIds.map(async (draftId) => {
         byDraft.set(draftId, await loadDraftedPlayerAdp(db, draftId));
+      }),
+    );
+
+    return keys.map((key) => {
+      const [draftId, playerId] = key.split(':').map(Number);
+      return byDraft.get(draftId)?.get(playerId) ?? null;
+    });
+  });
+
+/**
+ * Projected fantasy points per matchup for players already drafted, keyed
+ * `"<draftId>:<playerId>"` (LS-10595).
+ *
+ * Batched by draft like {@link createDraftedPlayerAdpLoader}: a pick-history
+ * page asks for every pick at once, and this answers it with one rules read
+ * plus one query per draft. Resolves to `null` when there is no projection
+ * (football drafts — see `loadDraftedPlayerProjections`).
+ */
+export const createDraftedPlayerProjectionLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<string, number | null>(async (keys) => {
+    const draftIds = [
+      ...new Set(keys.map((key) => Number(key.split(':')[0]))),
+    ].filter((id) => Number.isFinite(id));
+
+    const byDraft = new Map<number, Map<number, number>>();
+    await Promise.all(
+      draftIds.map(async (draftId) => {
+        byDraft.set(draftId, await loadDraftedPlayerProjections(db, draftId));
       }),
     );
 

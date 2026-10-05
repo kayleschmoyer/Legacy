@@ -224,6 +224,35 @@ describe('usePlayerData — ppg retained for drafted players (LS-10473)', () => 
     });
     expect(result.current.myTeam[0].ppg).toBeUndefined();
   });
+
+  it("uses the pick's server projection for players drafted before the client loaded (LS-10595)", () => {
+    // Cold load mid-draft: the player was never in availablePlayers this
+    // session, so the only source of his projection is the pick itself.
+    const { result } = renderDraft({
+      availablePlayers: [],
+      pickHistory: [
+        { ...makePick(40, 1), projectedMatchupPoints: 12.4 },
+        { ...makePick(41, 2), projectedMatchupPoints: null },
+      ],
+    });
+    expect(result.current.statsLookup.get(40)?.ppg).toBe(12.4);
+    // A null server projection stays absent rather than becoming 0.
+    expect(result.current.statsLookup.get(41)?.ppg).toBeUndefined();
+  });
+
+  it('prefers the projection last seen on the board over the pick value', () => {
+    const { result, rerender } = renderDraft({
+      availablePlayers: [
+        makeAvailablePlayer({ id: 50, projectedMatchupPoints: 8 }),
+      ],
+      pickHistory: [],
+    });
+    rerender({
+      availablePlayers: [],
+      pickHistory: [{ ...makePick(50, 1), projectedMatchupPoints: 8.5 }],
+    });
+    expect(result.current.statsLookup.get(50)?.ppg).toBe(8);
+  });
 });
 
 /**

@@ -27,7 +27,10 @@ import {
   createSeasonPitchingLoader,
 } from './statistics-loaders';
 
-import { createDraftedPlayerAdpLoader } from './draft-loaders';
+import {
+  createDraftedPlayerAdpLoader,
+  createDraftedPlayerProjectionLoader,
+} from './draft-loaders';
 
 import {
   createEligiblePositionsLoader,
@@ -117,6 +120,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   latestScoringChangeAt: createLatestScoringChangeAtLoader(db),
   scoringChangeLog: createScoringChangeLogLoader(db),
   draftedPlayerAdp: createDraftedPlayerAdpLoader(db),
+  draftedPlayerProjection: createDraftedPlayerProjectionLoader(db),
 });
 
 /**

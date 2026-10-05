@@ -269,10 +269,21 @@ export function usePlayerData({
     }
     // Restore the projection for players no longer in availablePlayers
     // (drafted) — the entries seeded above from playerStatsMap / pickHistory
-    // carry no ppg of their own.
+    // carry no ppg of their own. Prefer the value last seen on the board, and
+    // fall back to the server's per-pick projection for players drafted
+    // before this client loaded, which it never saw as available (LS-10595).
+    const pickPpg = new Map<number, number>();
+    for (const pick of pickHistory) {
+      if (pick.projectedMatchupPoints != null) {
+        pickPpg.set(pick.playerId, pick.projectedMatchupPoints);
+      }
+    }
     for (const [pid, player] of map) {
-      if (player.ppg === undefined && lastKnownPpg.has(pid)) {
+      if (player.ppg !== undefined) continue;
+      if (lastKnownPpg.has(pid)) {
         map.set(pid, { ...player, ppg: lastKnownPpg.get(pid) });
+      } else if (pickPpg.has(pid)) {
+        map.set(pid, { ...player, ppg: pickPpg.get(pid) });
       }
     }
     return map;

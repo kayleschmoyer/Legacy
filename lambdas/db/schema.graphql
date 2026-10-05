@@ -991,6 +991,11 @@ type DraftPick {
   """
   player: Player
   playerId: Int
+
+  """
+  The drafted player's projected fantasy points per matchup — the same value DraftPlayer.projectedMatchupPoints reports for undrafted players, built from the same expression and league schedule. Exposed here because a player leaves the available-player list the moment they are drafted, so a client that loaded mid-draft had no projection for anyone picked before it opened (LS-10595). Null for football drafts, which have no projection on either side.
+  """
+  projectedMatchupPoints: Float
   round: Int
 
   """

@@ -799,6 +799,8 @@ export type DraftPick = {
   /** The drafted player. Enables the draft board to render pick names without a secondary lookup. */
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
+  /** The drafted player's projected fantasy points per matchup — the same value DraftPlayer.projectedMatchupPoints reports for undrafted players, built from the same expression and league schedule. Exposed here because a player leaves the available-player list the moment they are drafted, so a client that loaded mid-draft had no projection for anyone picked before it opened (LS-10595). Null for football drafts, which have no projection on either side. */
+  projectedMatchupPoints?: Maybe<Scalars['Float']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
   /** The seat's league team. Null for a mock draft (LS-10076). */
   team?: Maybe<Team>;
@@ -13831,6 +13833,7 @@ export type GetDraftPicksQuery = {
     participantId?: number | null;
     playerId?: number | null;
     adp?: number | null;
+    projectedMatchupPoints?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -34513,6 +34516,7 @@ export const GetDraftPicks = gql`
       participantId
       playerId
       adp
+      projectedMatchupPoints
       player {
         id
         firstName
