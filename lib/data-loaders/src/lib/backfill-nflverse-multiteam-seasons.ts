@@ -43,6 +43,27 @@ import {
 
 export type NflverseRow = Record<string, string>;
 
+const NFLVERSE_RELEASE_BASE =
+  'https://github.com/nflverse/nflverse-data/releases/download';
+
+/** nflverse release assets: the id crosswalk and the three weekly stat files. */
+export const NFLVERSE_CSV_URLS = {
+  players: `${NFLVERSE_RELEASE_BASE}/players/players.csv`,
+  offense: `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats.csv`,
+  defense: `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats_def.csv`,
+  kicking: `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats_kicking.csv`,
+} as const;
+
+const FETCH_TIMEOUT_MS = 120_000;
+
+export async function fetchNflverseCsvText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`GET ${url} failed: ${response.status}`);
+  return response.text();
+}
+
 /** Minimal CSV reader — nflverse's weekly stats/players CSVs are machine
  * generated with no embedded newlines, but do quote fields containing commas
  * (player names). Mirrors the reader in `ingestRetrosheet.ts` (LS-9817). */
@@ -230,6 +251,84 @@ export type FootballStatCategory =
   | 'receiving'
   | 'kicking'
   | 'defense_idp';
+
+/**
+ * Per-category aggregation config for nflverse's weekly stats files —
+ * `player_stats.csv` (passing/rushing/receiving), `player_stats_def.csv`
+ * (defense_idp) and `player_stats_kicking.csv` (kicking). Shared by the
+ * LS-9919 multi-team repair and the LS-10586 season derivation so both read
+ * the same columns with the same activity rules.
+ */
+export const NFLVERSE_CATEGORY_CONFIGS: Record<
+  FootballStatCategory,
+  CategoryConfig
+> = {
+  passing: {
+    sumFields: [
+      'completions',
+      'attempts',
+      'passing_yards',
+      'passing_tds',
+      'interceptions',
+      'sacks',
+      'sack_yards',
+      'passing_first_downs',
+    ],
+    activityFields: ['attempts', 'sacks'],
+  },
+  rushing: {
+    sumFields: [
+      'carries',
+      'rushing_yards',
+      'rushing_tds',
+      'rushing_first_downs',
+      'rushing_fumbles',
+    ],
+    activityFields: ['carries'],
+  },
+  receiving: {
+    sumFields: [
+      'receptions',
+      'targets',
+      'receiving_yards',
+      'receiving_tds',
+      'receiving_first_downs',
+      'receiving_fumbles',
+    ],
+    activityFields: ['targets'],
+  },
+  defense_idp: {
+    sumFields: [
+      'def_tackles_solo',
+      'def_tackle_assists',
+      'def_sacks',
+      'def_interceptions',
+      'def_pass_defended',
+      'def_fumbles_forced',
+      'def_tds',
+      'def_safety',
+      'def_fumble_recovery_own',
+      'def_fumble_recovery_opp',
+    ],
+    activityFields: [
+      'def_tackles_solo',
+      'def_tackle_assists',
+      'def_sacks',
+      'def_interceptions',
+      'def_pass_defended',
+      'def_fumbles_forced',
+      'def_tds',
+      'def_safety',
+    ],
+    teamField: 'team',
+  },
+  kicking: {
+    sumFields: ['fg_made', 'fg_att', 'pat_made', 'pat_att'],
+    maxFields: ['fg_long'],
+    activityFields: ['fg_att', 'pat_att'],
+    teamField: 'team',
+  },
+};
 
 /** Minimal shape of an existing season row, as read from the DB. */
 export interface ExistingSeasonRow {

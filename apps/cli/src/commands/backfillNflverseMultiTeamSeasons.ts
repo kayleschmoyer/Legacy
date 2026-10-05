@@ -9,7 +9,10 @@ import {
   CATEGORY_TABLE,
   computeMultiTeamRepairs,
   ExistingSeasonRow,
+  fetchNflverseCsvText,
   FootballStatCategory,
+  NFLVERSE_CATEGORY_CONFIGS,
+  NFLVERSE_CSV_URLS,
   parseNflverseCsv,
 } from '@legacy-sports/data-loaders';
 
@@ -20,63 +23,9 @@ import {
  * for the combination/diff logic and licensing note.
  */
 
-const NFLVERSE_RELEASE_BASE =
-  'https://github.com/nflverse/nflverse-data/releases/download';
-const PLAYERS_URL = `${NFLVERSE_RELEASE_BASE}/players/players.csv`;
-const OFFENSE_URL = `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats.csv`;
-const DEFENSE_URL = `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats_def.csv`;
-const KICKING_URL = `${NFLVERSE_RELEASE_BASE}/player_stats/player_stats_kicking.csv`;
-
-const FETCH_TIMEOUT_MS = 120_000;
-
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`GET ${url} failed: ${response.status}`);
-  return response.text();
-}
-
 export interface BackfillNflverseMultiTeamSeasonsArgs {
   dryRun?: boolean;
 }
-
-const OFFENSE_CATEGORIES = {
-  passing: {
-    sumFields: [
-      'completions',
-      'attempts',
-      'passing_yards',
-      'passing_tds',
-      'interceptions',
-      'sacks',
-      'sack_yards',
-      'passing_first_downs',
-    ],
-    activityFields: ['attempts', 'sacks'],
-  },
-  rushing: {
-    sumFields: [
-      'carries',
-      'rushing_yards',
-      'rushing_tds',
-      'rushing_first_downs',
-      'rushing_fumbles',
-    ],
-    activityFields: ['carries'],
-  },
-  receiving: {
-    sumFields: [
-      'receptions',
-      'targets',
-      'receiving_yards',
-      'receiving_tds',
-      'receiving_first_downs',
-      'receiving_fumbles',
-    ],
-    activityFields: ['targets'],
-  },
-} as const;
 
 /** 1999+ players whose whole career falls in scope, with their pfr_id. */
 async function loadEligiblePlayers(db: PublicDb): Promise<Map<number, string>> {
@@ -136,10 +85,10 @@ export async function handleBackfillNflverseMultiTeamSeasons(
 
     LOGGER.info('Fetching nflverse crosswalk + weekly stats...');
     const [playersCsv, offenseCsv, defenseCsv, kickingCsv] = await Promise.all([
-      fetchText(PLAYERS_URL),
-      fetchText(OFFENSE_URL),
-      fetchText(DEFENSE_URL),
-      fetchText(KICKING_URL),
+      fetchNflverseCsvText(NFLVERSE_CSV_URLS.players),
+      fetchNflverseCsvText(NFLVERSE_CSV_URLS.offense),
+      fetchNflverseCsvText(NFLVERSE_CSV_URLS.defense),
+      fetchNflverseCsvText(NFLVERSE_CSV_URLS.kicking),
     ]);
 
     const pfrToGsis = buildPfrToGsisCrosswalk(parseNflverseCsv(playersCsv));
@@ -163,69 +112,28 @@ export async function handleBackfillNflverseMultiTeamSeasons(
     const defenseRows = parseNflverseCsv(defenseCsv);
     const kickingRows = parseNflverseCsv(kickingCsv);
 
-    const passingAgg = aggregateNflverseSeasonStats(
-      offenseRows,
-      OFFENSE_CATEGORIES.passing,
-      gsisIds,
-    );
-    const rushingAgg = aggregateNflverseSeasonStats(
-      offenseRows,
-      OFFENSE_CATEGORIES.rushing,
-      gsisIds,
-    );
-    const receivingAgg = aggregateNflverseSeasonStats(
-      offenseRows,
-      OFFENSE_CATEGORIES.receiving,
-      gsisIds,
-    );
-    const defenseIdpAgg = aggregateNflverseSeasonStats(
-      defenseRows,
-      {
-        sumFields: [
-          'def_tackles_solo',
-          'def_tackle_assists',
-          'def_sacks',
-          'def_interceptions',
-          'def_pass_defended',
-          'def_fumbles_forced',
-          'def_tds',
-          'def_safety',
-          'def_fumble_recovery_own',
-          'def_fumble_recovery_opp',
-        ],
-        activityFields: [
-          'def_tackles_solo',
-          'def_tackle_assists',
-          'def_sacks',
-          'def_interceptions',
-          'def_pass_defended',
-          'def_fumbles_forced',
-          'def_tds',
-          'def_safety',
-        ],
-        teamField: 'team',
-      },
-      gsisIds,
-    );
-    const kickingAgg = aggregateNflverseSeasonStats(
-      kickingRows,
-      {
-        sumFields: ['fg_made', 'fg_att', 'pat_made', 'pat_att'],
-        maxFields: ['fg_long'],
-        activityFields: ['fg_att', 'pat_att'],
-        teamField: 'team',
-      },
-      gsisIds,
-    );
+    const rowsByCategory: Record<FootballStatCategory, typeof offenseRows> = {
+      passing: offenseRows,
+      rushing: offenseRows,
+      receiving: offenseRows,
+      kicking: kickingRows,
+      defense_idp: defenseRows,
+    };
+    const categoryAggs = Object.fromEntries(
+      (Object.keys(rowsByCategory) as FootballStatCategory[]).map((c) => [
+        c,
+        aggregateNflverseSeasonStats(
+          rowsByCategory[c],
+          NFLVERSE_CATEGORY_CONFIGS[c],
+          gsisIds,
+        ),
+      ]),
+    ) as Record<
+      FootballStatCategory,
+      ReturnType<typeof aggregateNflverseSeasonStats>
+    >;
 
     const playerIds = [...eligiblePlayers.keys()];
-    const categoryAggs: Record<FootballStatCategory, typeof passingAgg> = {
-      passing: passingAgg,
-      rushing: rushingAgg,
-      receiving: receivingAgg,
-      kicking: kickingAgg,
-      defense_idp: defenseIdpAgg,
-    };
 
     let totalRepaired = 0;
     let totalNflverseMultiTeam = 0;

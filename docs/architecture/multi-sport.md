@@ -48,6 +48,8 @@ Baseball players use `brefId` (Baseball Reference). Football players use `pfrId`
 
 For the 1999+ multi-team season backfill (LS-9919), `pfrId` is also crosswalked against [nflverse](https://github.com/nflverse/nflverse-data)'s `gsis_id` via its published `players.csv` id-mapping file — see `backfill-nflverse-multiteam-seasons.ts` in `@legacy-sports/data-loaders`. nflverse-data is CC-BY 4.0 licensed (confirmed per LS-9908); attribute it as "nflverse" (https://nflverse.com) wherever its data is surfaced.
 
+Football players with no PFR-scraped stats (e.g. those seeded from nflverse's `players.csv`, LS-10585) get `football_season_*` / `career_football_*` rows from per-game data via the `derive-football-season-stats` CLI (LS-10586, `derive-football-season-stats.ts` in `@legacy-sports/data-loaders`): nflverse weekly stats for 1999+, the PFA corpus for 1960-1998. Derived rows are marked by `pfr_row_id` (`nflverse-<season>` / `pfa-<season>`), never overwrite PFR-sourced rows, and keep PFA fumbles NULL. PFA rows carry an empty `team` because the corpus has no per-player team.
+
 ### Sport-tagged lookup tables
 
 Two tables allow per-sport configuration without code changes:

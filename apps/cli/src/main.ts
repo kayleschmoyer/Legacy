@@ -33,6 +33,10 @@ import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
 import { handleIngestNflverseFootball } from './commands/ingestNflverseFootball';
 import { handleIngestPfaFootball } from './commands/ingestPfaFootball';
 import { handleBackfillNflverseMultiTeamSeasons } from './commands/backfillNflverseMultiTeamSeasons';
+import {
+  handleDeriveFootballSeasonStats,
+  parsePlayerIds,
+} from './commands/deriveFootballSeasonStats';
 import { handleListUsers } from './commands/listUsers';
 import { handleAddUser } from './commands/addUser';
 import { handleAuth } from './commands/auth';
@@ -294,6 +298,26 @@ export function buildProgram(): Command {
     )
     .action((options: { apply?: boolean }) =>
       handleBackfillNflverseMultiTeamSeasons({ dryRun: !options.apply }),
+    );
+
+  program
+    .command('derive-football-season-stats')
+    .description(
+      'Derive football_season_* / career_football_* rows from per-game data ' +
+        '(nflverse 1999+, PFA corpus 1960-1998) for football players with no ' +
+        'stat rows yet (LS-10586). Never overwrites PFR-sourced rows.',
+    )
+    .option(
+      '--apply',
+      'Write rows to the database (default: dry-run report only)',
+    )
+    .option(
+      '--player-ids <ids>',
+      'Comma-separated players.id values to limit the run to',
+      parsePlayerIds,
+    )
+    .action((options: { apply?: boolean; playerIds?: number[] }) =>
+      handleDeriveFootballSeasonStats(options),
     );
 
   program

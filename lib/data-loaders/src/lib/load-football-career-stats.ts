@@ -29,8 +29,10 @@ function sumNullable(a: number | null, b: number | null): number | null {
   return (a ?? 0) + (b ?? 0);
 }
 
-// Aggregate season passing rows into career totals.
-function aggregatePassingSeasons(
+// Aggregate season passing rows into career totals. The aggregate*Seasons
+// builders are exported so the LS-10586 corpus derivation
+// (derive-football-season-stats.ts) rebuilds career rows the same way.
+export function aggregatePassingSeasons(
   seasons: FootballSeasonPassing[],
   playerId: number,
 ): typeof PublicSchema.careerFootballPassing.$inferInsert | null {
@@ -82,7 +84,7 @@ function aggregatePassingSeasons(
   };
 }
 
-function aggregateRushingSeasons(
+export function aggregateRushingSeasons(
   seasons: FootballSeasonRushing[],
   playerId: number,
 ): typeof PublicSchema.careerFootballRushing.$inferInsert | null {
@@ -110,7 +112,7 @@ function aggregateRushingSeasons(
   return { playerId, g, att, yds, td, lng, fumbles };
 }
 
-function aggregateReceivingSeasons(
+export function aggregateReceivingSeasons(
   seasons: FootballSeasonReceiving[],
   playerId: number,
 ): typeof PublicSchema.careerFootballReceiving.$inferInsert | null {
@@ -140,7 +142,7 @@ function aggregateReceivingSeasons(
   return { playerId, g, rec, tgt, yds, td, lng, fumbles };
 }
 
-function aggregateKickingSeasons(
+export function aggregateKickingSeasons(
   seasons: FootballSeasonKicking[],
   playerId: number,
 ): typeof PublicSchema.careerFootballKicking.$inferInsert | null {
@@ -182,7 +184,7 @@ function aggregateKickingSeasons(
   };
 }
 
-function aggregateDefenseSeasons(
+export function aggregateDefenseSeasons(
   seasons: FootballSeasonDefense[],
   playerId: number,
 ): typeof PublicSchema.careerFootballDefense.$inferInsert | null {
@@ -519,8 +521,9 @@ export interface FootballCareerResult {
   groupsUpserted: string[];
 }
 
-// IDP positions that route to career_football_defense_idp
-const IDP_POSITIONS = new Set(['DL', 'LB', 'DB']);
+// IDP positions that route to career_football_defense_idp. Exported so the
+// LS-10586 derivation splits players the same way.
+export const IDP_POSITIONS = new Set(['DL', 'LB', 'DB']);
 
 /**
  * Load a football player's career stats and stamp players.stats_last_fetched_at
