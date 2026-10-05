@@ -157,7 +157,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.6",
-    "expo": "^56.0.22",
+    "expo": "^56.0.23",
     "expo-asset": "~56.0.15",
     "expo-constants": "~56.0.16",
     "expo-file-system": "~56.0.7",

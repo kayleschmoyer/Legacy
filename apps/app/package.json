@@ -31,7 +31,7 @@
     "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native-picker/picker": "2.11.4",
-    "expo": "^56.0.22",
+    "expo": "^56.0.23",
     "expo-apple-authentication": "~56.0.4",
     "expo-audio": "~56.0.13",
     "expo-crypto": "~56.0.0",
