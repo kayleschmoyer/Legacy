@@ -127,6 +127,21 @@ genuine failure still strips the label (LS-10091). Keeping the label is safe
 precisely because the gate is pending: the label is not what holds an
 unverified SHA out of the merge queue, the required status is.
 
+### A green run whose verdict was withheld (LS-10576)
+
+When the Summarize job is rate-limited while posting, `postCiGate` posts
+`pending` ("withheld (status-lookup-failed) — retry pending", LS-9591) instead
+of the success it could not confirm. The run still concludes `success`, so
+`rerun-cancelled-ci.yml` never sees it, and an approved PR with green jobs gets
+no further CI run to supersede the pending.
+[`ci-gate-stuck-sweep.yml`](../../.github/workflows/ci-gate-stuck-sweep.yml)
+runs every 30 minutes and re-runs the Summarize job for any open PR whose
+head-SHA `CI Gate` has been `pending` for 30+ minutes behind a CI run that
+finished `success` on that same SHA. The decision
+([`ci-gate-stuck-sweep.js`](../../.github/scripts/ci-gate-stuck-sweep.js)) fails
+closed on a superseded SHA, an in-flight or non-green run, a run with no
+Summarize job, or a run at its attempt cap (5).
+
 ## Verdict recency (LS-9378)
 
 Latest-status-wins is what makes a commit status immune to cancelled duplicates

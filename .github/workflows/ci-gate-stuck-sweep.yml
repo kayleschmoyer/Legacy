@@ -1,0 +1,154 @@
+# =============================================================================
+# CI Gate Stuck Sweep
+# =============================================================================
+# LS-10576. When the CI Pipeline's Summarize job hits the installation rate
+# limit while posting `CI Gate`, ci-gate.js posts a `pending` "withheld
+# (status-lookup-failed) — retry pending" status (LS-9591) and leaves the
+# real verdict to "a later run". Nothing schedules that run. An approved PR
+# whose jobs are all green never gets another CI run, so the SHA sits at
+# pending and the merge queue waits on it forever. The run itself concludes
+# `success`, so rerun-cancelled-ci.yml (cancelled/failed runs only) never sees
+# it, and the LS-10322 "verdict lost" guard does not fire on this path.
+#
+# On 2026-10-04 this stranded PR #8341 (~7h), #8359 (~2h) and #8168 (~20h);
+# each went green the moment Summarize & Report was re-run by hand.
+#
+# This sweep regenerates the verdict the same way: for every open PR whose
+# head-SHA `CI Gate` has been `pending` for 30+ minutes behind a CI run that
+# finished green on that same SHA, it re-runs that run's Summarize job. The
+# decision lives in .github/scripts/ci-gate-stuck-sweep.js (unit-tested) and
+# fails CLOSED; it is capped by the run's attempt count.
+# =============================================================================
+
+name: "CI Gate Stuck Sweep"
+
+on:
+  schedule:
+    # Every 30 minutes, off the top of the hour.
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+# `actions: write` to re-run a job. Scoped to this workflow alone.
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: ci-gate-stuck-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: "🔁 Re-run Summarize for stuck CI Gates"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Reads go through the Agent Author app installation so the sweep does
+      # not drain the shared GITHUB_TOKEN bucket — the same exhaustion that
+      # strands these gates in the first place. Falls back to GITHUB_TOKEN.
+      - name: Generate App Token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/ci-gate-stuck-sweep.js
+          sparse-checkout-cone-mode: false
+
+      - name: "Find stuck gates and re-run Summarize"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          READ_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        with:
+          # Re-runs use GITHUB_TOKEN: it carries this workflow's
+          # `actions: write` grant.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const {
+              latestGateStatus,
+              runIdFromTargetUrl,
+              findSummarizeJob,
+              shouldRerunStuckGate,
+            } = require('./.github/scripts/ci-gate-stuck-sweep.js');
+
+            const { owner, repo } = context.repo;
+            // github-script injects `getOctokit`; `@actions/github` is not
+            // requireable from the script sandbox (LS-10559).
+            const reader = getOctokit(process.env.READ_TOKEN);
+
+            const prs = await reader.paginate(reader.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+
+            const rows = [];
+            let errors = 0;
+            const now = Date.now();
+
+            for (const pr of prs) {
+              const prHeadSha = pr.head.sha;
+              try {
+                const { data: statuses } = await reader.rest.repos.listCommitStatusesForRef({
+                  owner, repo, ref: prHeadSha, per_page: 100,
+                });
+                const gateStatus = latestGateStatus(statuses);
+                if (!gateStatus || gateStatus.state !== 'pending') continue;
+
+                let run = null;
+                let summarizeJob = null;
+                const runId = runIdFromTargetUrl(gateStatus.target_url);
+                if (runId !== null) {
+                  try {
+                    ({ data: run } = await reader.rest.actions.getWorkflowRun({
+                      owner, repo, run_id: runId,
+                    }));
+                    const { data: jobData } = await reader.rest.actions.listJobsForWorkflowRun({
+                      owner, repo, run_id: runId, filter: 'latest', per_page: 100,
+                    });
+                    summarizeJob = findSummarizeJob(jobData.jobs);
+                  } catch (e) {
+                    core.warning(`PR #${pr.number}: could not read run ${runId}: ${e.message}`);
+                  }
+                }
+
+                const decision = shouldRerunStuckGate({
+                  gateStatus, prHeadSha, run, summarizeJob, now,
+                });
+                core.info(`PR #${pr.number}: ${decision.reason}`);
+
+                let action = decision.needsHuman ? 'needs a human' : 'left alone';
+                if (decision.rerun) {
+                  await github.rest.actions.reRunJobForWorkflowRun({
+                    owner, repo, job_id: summarizeJob.id,
+                  });
+                  action = `re-ran job ${summarizeJob.id}`;
+                }
+                rows.push([`#${pr.number}`, action, decision.reason]);
+              } catch (e) {
+                errors += 1;
+                core.warning(`PR #${pr.number}: ${e.message}`);
+                rows.push([`#${pr.number}`, 'error', e.message]);
+              }
+            }
+
+            await core.summary
+              .addHeading('CI Gate stuck sweep')
+              .addRaw(`${prs.length} open PRs scanned; ${rows.length} with a pending CI Gate.`)
+              .addTable([
+                [{ data: 'PR', header: true }, { data: 'Action', header: true }, { data: 'Reason', header: true }],
+                ...rows,
+              ])
+              .write();
+
+            // A sweep that could not check a PR must be red, not green with
+            // buried warnings.
+            if (errors > 0) {
+              core.setFailed(`${errors} PR(s) could not be checked — see warnings above.`);
+            }
