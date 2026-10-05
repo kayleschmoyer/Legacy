@@ -57,6 +57,80 @@ interface PitchingStats {
   winPct: number;
 }
 
+/**
+ * Whether a player gets the pitcher card. Shared by the live board and the
+ * completed-draft lookup so both pick the same stat set (LS-10508): any
+ * pitcher-eligible position (authoritative, from player_eligible_positions)
+ * first, then pitchingStatsMap presence, then position — covers pure pitchers
+ * that are absent from playerStatsMap (no career batting row) (LS-3115).
+ */
+function resolveIsPitcher(
+  playerId: number,
+  eligiblePositions: readonly string[] | null | undefined,
+  position: string,
+  pitchingStatsMap: Map<number, PitchingStats>,
+): boolean {
+  return (
+    (eligiblePositions?.some(isPitcherPosition) ?? false) ||
+    pitchingStatsMap.has(playerId) ||
+    isPitcherPosition(position)
+  );
+}
+
+/**
+ * Baseball stat fields for a DraftPlayer card. `isPitcher` drives which set
+ * BaseballCard / PlayerCard render, and pitchers carry the full pitching line
+ * (ERA / W / K / WHIP …) — the same fields on every path that builds a card,
+ * so a completed-draft result card matches the live one (LS-10508).
+ */
+function baseballStatFields(
+  stats: PlayerStatsEntry | undefined,
+  pitching: PitchingStats | undefined,
+  pitcher: boolean,
+): Pick<
+  DraftPlayer,
+  | 'avg'
+  | 'hr'
+  | 'rbi'
+  | 'runs'
+  | 'sb'
+  | 'games'
+  | 'hits'
+  | 'obp'
+  | 'slg'
+  | 'isPitcher'
+  | 'wins'
+  | 'losses'
+  | 'era'
+  | 'strikeouts'
+  | 'saves'
+  | 'whip'
+  | 'winPct'
+  | 'gamesStarted'
+> {
+  const ps = pitcher ? pitching : undefined;
+  return {
+    avg: stats?.avg ?? 0,
+    hr: stats?.hr ?? 0,
+    rbi: stats?.rbi ?? 0,
+    runs: stats?.runs ?? 0,
+    sb: stats?.sb ?? 0,
+    games: ps?.games ?? stats?.games ?? 0,
+    hits: stats?.hits ?? 0,
+    obp: stats?.obp ?? 0,
+    slg: stats?.slg ?? 0,
+    isPitcher: pitcher,
+    wins: ps?.wins,
+    losses: ps?.losses,
+    era: ps?.era,
+    strikeouts: ps?.strikeouts,
+    saves: ps?.saves,
+    whip: ps?.whip,
+    winPct: ps?.winPct,
+    gamesStarted: ps?.gamesStarted,
+  };
+}
+
 interface UsePlayerDataParams {
   availablePlayers: AvailableDraftPlayer[];
   pickHistory: DraftPickRecord[];
@@ -100,32 +174,17 @@ export function usePlayerData({
     const map = new Map<number, DraftPlayer>();
     // Seed from playerStatsMap
     for (const [pid, s] of playerStatsMap) {
-      const pitcher = isPitcherPosition(s.position);
-      const ps = pitcher ? pitchingStatsMap.get(pid) : undefined;
       map.set(pid, {
         id: pid,
         name:
           `${s.firstName} ${s.lastName}`.trim() ||
           `Unknown Player (ID: ${pid})`,
         position: s.position,
-        avg: s.avg,
-        hr: s.hr,
-        rbi: s.rbi,
-        runs: s.runs,
-        sb: s.sb,
-        games: ps?.games ?? s.games,
-        hits: s.hits,
-        obp: s.obp,
-        slg: s.slg,
-        isPitcher: pitcher,
-        wins: ps?.wins,
-        losses: ps?.losses,
-        era: ps?.era,
-        strikeouts: ps?.strikeouts,
-        saves: ps?.saves,
-        whip: ps?.whip,
-        winPct: ps?.winPct,
-        gamesStarted: ps?.gamesStarted,
+        ...baseballStatFields(
+          s,
+          pitchingStatsMap.get(pid),
+          isPitcherPosition(s.position),
+        ),
       });
     }
     // Override with available players (authoritative firstName/lastName)
@@ -136,37 +195,18 @@ export function usePlayerData({
       // from eligiblePositions (authoritative, from player_eligible_positions
       // materialized view) and fall back to the stats entry when absent.
       const pos = ap.eligiblePositions?.[0] ?? s?.position ?? 'UTIL';
-      // Determine pitcher status using eligiblePositions (authoritative) first,
-      // then pitchingStatsMap presence, then position — covers pure pitchers that
-      // are absent from playerStatsMap (no career batting row) (LS-3115).
-      const pitcher =
-        (ap.eligiblePositions?.some(isPitcherPosition) ?? false) ||
-        pitchingStatsMap.has(ap.id) ||
-        isPitcherPosition(pos);
-      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
+      const pitcher = resolveIsPitcher(
+        ap.id,
+        ap.eligiblePositions,
+        pos,
+        pitchingStatsMap,
+      );
       map.set(ap.id, {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
         position: pos,
         eligiblePositions: ap.eligiblePositions ?? undefined,
-        avg: s?.avg ?? 0,
-        hr: s?.hr ?? 0,
-        rbi: s?.rbi ?? 0,
-        runs: s?.runs ?? 0,
-        sb: s?.sb ?? 0,
-        games: ps?.games ?? s?.games ?? 0,
-        hits: s?.hits ?? 0,
-        obp: s?.obp ?? 0,
-        slg: s?.slg ?? 0,
-        isPitcher: pitcher,
-        wins: ps?.wins,
-        losses: ps?.losses,
-        era: ps?.era,
-        strikeouts: ps?.strikeouts,
-        saves: ps?.saves,
-        whip: ps?.whip,
-        winPct: ps?.winPct,
-        gamesStarted: ps?.gamesStarted,
+        ...baseballStatFields(s, pitchingStatsMap.get(ap.id), pitcher),
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
         club: ap.club ?? null,
@@ -185,48 +225,46 @@ export function usePlayerData({
       const name = `${pick.player.firstName} ${pick.player.lastName}`.trim();
       if (!name) continue;
       const ps = pitchingStatsMap.get(pick.playerId);
-      if (!map.has(pick.playerId)) {
+      const eligible = pick.player.eligiblePositions?.length
+        ? pick.player.eligiblePositions
+        : undefined;
+      // Football 'P' is a punter, not a pitcher — never the pitcher card.
+      const pitcherAt = (position: string) =>
+        !isFootball &&
+        resolveIsPitcher(pick.playerId, eligible, position, pitchingStatsMap);
+      const existing = map.get(pick.playerId);
+      if (!existing) {
         // Player has no batting stats (e.g. pure pitcher) — add entry
+        const position =
+          eligible?.[0] ??
+          (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'P');
         map.set(pick.playerId, {
           id: pick.playerId,
           name,
-          position:
-            pick.player.eligiblePositions?.[0] ??
-            (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'P'),
-          eligiblePositions: pick.player.eligiblePositions ?? undefined,
+          position,
+          eligiblePositions: eligible,
           club: pick.player.club ?? null,
-          avg: 0,
-          hr: 0,
-          rbi: 0,
-          runs: 0,
-          sb: 0,
-          games: ps?.games ?? 0,
-          hits: 0,
-          obp: 0,
-          slg: 0,
-          ...(ps && {
-            era: ps.era,
-            wins: ps.wins,
-            losses: ps.losses,
-            saves: ps.saves,
-            strikeouts: ps.strikeouts,
-            gamesStarted: ps.gamesStarted,
-          }),
+          ...baseballStatFields(undefined, ps, pitcherAt(position)),
           ...footballStatFields(
             isFootball ? footballStatsMap.get(pick.playerId) : undefined,
           ),
         });
-      } else if (pick.player.eligiblePositions?.length) {
+      } else if (existing.position === 'UTIL') {
         // Player is in map from playerStatsMap with hardcoded 'UTIL' — patch
-        // position and eligiblePositions using the authoritative server data.
-        const existing = map.get(pick.playerId);
-        if (existing?.position === 'UTIL') {
-          map.set(pick.playerId, {
-            ...existing,
-            position: pick.player.eligiblePositions[0],
-            eligiblePositions: pick.player.eligiblePositions,
-          });
-        }
+        // position and eligiblePositions using the authoritative server data,
+        // and re-derive the stat set so a drafted pitcher with a career
+        // batting row gets the pitcher card, not batting zeros (LS-10508).
+        const position = eligible?.[0] ?? existing.position;
+        map.set(pick.playerId, {
+          ...existing,
+          position,
+          eligiblePositions: eligible ?? existing.eligiblePositions,
+          ...baseballStatFields(
+            playerStatsMap.get(pick.playerId),
+            ps,
+            pitcherAt(position),
+          ),
+        });
       }
     }
     // Restore the projection for players no longer in availablePlayers
@@ -254,37 +292,18 @@ export function usePlayerData({
       // Derive position from eligiblePositions (authoritative) since primaryPosition
       // is no longer fetched in GetDraftPlayerStats (LS-3113).
       const pos = ap.eligiblePositions?.[0] ?? s?.position ?? 'UTIL';
-      // Determine pitcher status using eligiblePositions (authoritative) first,
-      // then pitchingStatsMap presence, then position — covers pure pitchers that
-      // are absent from playerStatsMap (no career batting row) (LS-3115).
-      const pitcher =
-        (ap.eligiblePositions?.some(isPitcherPosition) ?? false) ||
-        pitchingStatsMap.has(ap.id) ||
-        isPitcherPosition(pos);
-      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
+      const pitcher = resolveIsPitcher(
+        ap.id,
+        ap.eligiblePositions,
+        pos,
+        pitchingStatsMap,
+      );
       return {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
         position: pos,
         eligiblePositions: ap.eligiblePositions ?? undefined,
-        avg: s?.avg ?? 0,
-        hr: s?.hr ?? 0,
-        rbi: s?.rbi ?? 0,
-        runs: s?.runs ?? 0,
-        sb: s?.sb ?? 0,
-        games: ps?.games ?? s?.games ?? 0,
-        hits: s?.hits ?? 0,
-        obp: s?.obp ?? 0,
-        slg: s?.slg ?? 0,
-        isPitcher: pitcher,
-        wins: ps?.wins,
-        losses: ps?.losses,
-        era: ps?.era,
-        strikeouts: ps?.strikeouts,
-        saves: ps?.saves,
-        whip: ps?.whip,
-        winPct: ps?.winPct,
-        gamesStarted: ps?.gamesStarted,
+        ...baseballStatFields(s, pitchingStatsMap.get(ap.id), pitcher),
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
         club: ap.club ?? null,

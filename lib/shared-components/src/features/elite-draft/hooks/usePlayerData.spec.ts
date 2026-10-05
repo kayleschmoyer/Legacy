@@ -336,3 +336,261 @@ describe('usePlayerData — football stat fields (LS-9478)', () => {
     expect(player.td).toBeUndefined();
   });
 });
+
+/**
+ * usePlayerData — completed-draft pitcher cards (LS-10508)
+ *
+ * Once a draft completes every drafted player has left availablePlayers, so
+ * the "Your Roster" result cards come from statsLookup's playerStatsMap seed
+ * and pick-history add/patch paths. Those paths must flag pitchers
+ * (isPitcher) and carry the same pitching line the live card showed, or
+ * BaseballCard renders an all-zero batting summary for e.g. Greg Maddux.
+ */
+describe('usePlayerData — completed-draft pitcher cards (LS-10508)', () => {
+  const MY_TEAM_ID = 3;
+
+  const STAT_FIELDS = [
+    'position',
+    'avg',
+    'hr',
+    'rbi',
+    'runs',
+    'sb',
+    'games',
+    'hits',
+    'obp',
+    'slg',
+    'isPitcher',
+    'wins',
+    'losses',
+    'era',
+    'strikeouts',
+    'saves',
+    'whip',
+    'winPct',
+    'gamesStarted',
+  ] as const;
+
+  function statFields(player: object | undefined) {
+    const record = (player ?? {}) as Record<string, unknown>;
+    return Object.fromEntries(STAT_FIELDS.map((k) => [k, record[k]]));
+  }
+
+  function makeStats(
+    playerId: number,
+    overrides: Partial<PlayerStatsEntry> = {},
+  ): PlayerStatsEntry {
+    // playerStatsMap entries arrive with position hard-coded to 'UTIL'.
+    return {
+      playerId,
+      firstName: 'Stat',
+      lastName: `Row${playerId}`,
+      position: 'UTIL',
+      games: 100,
+      hits: 50,
+      hr: 5,
+      rbi: 30,
+      runs: 40,
+      sb: 3,
+      avg: 0.25,
+      obp: 0.31,
+      slg: 0.4,
+      war: 1,
+      ...overrides,
+    };
+  }
+
+  function makePitching(overrides: Partial<PitchingStats> = {}): PitchingStats {
+    return {
+      wins: 378,
+      losses: 227,
+      era: 3.23,
+      strikeouts: 3586,
+      saves: 0,
+      games: 744,
+      gamesStarted: 740,
+      whip: 1.148,
+      winPct: 0.61,
+      ...overrides,
+    };
+  }
+
+  function makePick(
+    playerId: number,
+    overallPick: number,
+    eligiblePositions: string[] | null,
+  ): DraftPickRecord {
+    return {
+      id: `pick-${overallPick}`,
+      draftId: 1,
+      round: 1,
+      pickNumber: overallPick,
+      overallPick,
+      pickedAt: '2026-10-04T05:00:00.000Z',
+      teamId: MY_TEAM_ID,
+      playerId,
+      player: {
+        id: playerId,
+        firstName: 'Drafted',
+        lastName: `Player${playerId}`,
+        eligiblePositions,
+      },
+    };
+  }
+
+  type Props = {
+    availablePlayers: AvailableDraftPlayer[];
+    pickHistory: DraftPickRecord[];
+  };
+
+  function renderDraft(
+    initial: Props,
+    maps: {
+      playerStatsMap?: Map<number, PlayerStatsEntry>;
+      pitchingStatsMap?: Map<number, PitchingStats>;
+      sport?: 'baseball' | 'football';
+    } = {},
+  ) {
+    const playerStatsMap = maps.playerStatsMap ?? emptyStatsMap;
+    const pitchingStatsMap = maps.pitchingStatsMap ?? emptyPitchingMap;
+    return renderHook(
+      (props: Props) =>
+        usePlayerData({
+          ...props,
+          playerStatsMap,
+          pitchingStatsMap,
+          myTeamId: MY_TEAM_ID,
+          sport: maps.sport,
+        }),
+      { initialProps: initial },
+    );
+  }
+
+  it('patch path: a drafted SP with a career batting row gets the live pitcher card', () => {
+    // Greg Maddux: has both a batting row (seeded as 'UTIL') and a pitching row.
+    const maddux = makeAvailablePlayer({ id: 31, eligiblePositions: ['SP'] });
+    const playerStatsMap = new Map([
+      [31, makeStats(31, { avg: 0.171, hr: 5, rbi: 84, sb: 0 })],
+    ]);
+    const pitchingStatsMap = new Map([[31, makePitching()]]);
+    const { result, rerender } = renderDraft(
+      { availablePlayers: [maddux], pickHistory: [] },
+      { playerStatsMap, pitchingStatsMap },
+    );
+    const liveCard = statFields(result.current.enrichedPlayers[0]);
+
+    rerender({ availablePlayers: [], pickHistory: [makePick(31, 8, ['SP'])] });
+
+    const resultCard = result.current.myTeam[0];
+    expect(resultCard.isPitcher).toBe(true);
+    expect(resultCard).toMatchObject({
+      era: 3.23,
+      wins: 378,
+      strikeouts: 3586,
+      whip: 1.148,
+    });
+    expect(statFields(resultCard)).toEqual(liveCard);
+  });
+
+  it('add path: a drafted SP with no batting row gets the live pitcher card, including WHIP', () => {
+    const ace = makeAvailablePlayer({ id: 40, eligiblePositions: ['SP'] });
+    const pitchingStatsMap = new Map([[40, makePitching()]]);
+    const { result, rerender } = renderDraft(
+      { availablePlayers: [ace], pickHistory: [] },
+      { pitchingStatsMap },
+    );
+    const liveCard = statFields(result.current.enrichedPlayers[0]);
+
+    rerender({ availablePlayers: [], pickHistory: [makePick(40, 1, ['SP'])] });
+
+    const resultCard = result.current.myTeam[0];
+    expect(resultCard.isPitcher).toBe(true);
+    expect(resultCard.whip).toBe(1.148);
+    expect(statFields(resultCard)).toEqual(liveCard);
+  });
+
+  it('add path: an RP with no eligible positions is derived from games started and gets the pitcher card', () => {
+    const pitchingStatsMap = new Map([
+      [
+        41,
+        makePitching({
+          era: 2.21,
+          wins: 82,
+          strikeouts: 1173,
+          saves: 652,
+          games: 1115,
+          gamesStarted: 0,
+          whip: 1.0,
+        }),
+      ],
+    ]);
+    const { result } = renderDraft(
+      { availablePlayers: [], pickHistory: [makePick(41, 2, null)] },
+      { pitchingStatsMap },
+    );
+
+    expect(result.current.myTeam[0]).toMatchObject({
+      position: 'RP',
+      isPitcher: true,
+      era: 2.21,
+      wins: 82,
+      strikeouts: 1173,
+      saves: 652,
+      whip: 1.0,
+      games: 1115,
+    });
+  });
+
+  it('patch path: a drafted hitter keeps the batting card and stats', () => {
+    const shortstop = makeAvailablePlayer({
+      id: 50,
+      eligiblePositions: ['SS'],
+    });
+    const playerStatsMap = new Map([[50, makeStats(50, { avg: 0.312 })]]);
+    const { result, rerender } = renderDraft(
+      { availablePlayers: [shortstop], pickHistory: [] },
+      { playerStatsMap },
+    );
+    const liveCard = statFields(result.current.enrichedPlayers[0]);
+
+    rerender({ availablePlayers: [], pickHistory: [makePick(50, 3, ['SS'])] });
+
+    const resultCard = result.current.myTeam[0];
+    expect(resultCard).toMatchObject({
+      position: 'SS',
+      isPitcher: false,
+      avg: 0.312,
+      hr: 5,
+      rbi: 30,
+      sb: 3,
+    });
+    expect(resultCard.era).toBeUndefined();
+    expect(statFields(resultCard)).toEqual(liveCard);
+  });
+
+  it('seed path: an undrafted playerStatsMap hitter is unchanged', () => {
+    const playerStatsMap = new Map([[60, makeStats(60)]]);
+    const { result } = renderDraft(
+      { availablePlayers: [], pickHistory: [] },
+      { playerStatsMap },
+    );
+
+    expect(result.current.statsLookup.get(60)).toMatchObject({
+      position: 'UTIL',
+      isPitcher: false,
+      avg: 0.25,
+      games: 100,
+    });
+    expect(result.current.statsLookup.get(60)?.era).toBeUndefined();
+  });
+
+  it('never gives a drafted football punter (P) the pitcher card', () => {
+    const { result } = renderDraft(
+      { availablePlayers: [], pickHistory: [makePick(70, 4, ['P'])] },
+      { sport: 'football' },
+    );
+
+    expect(result.current.myTeam[0].position).toBe('P');
+    expect(result.current.myTeam[0].isPitcher).toBe(false);
+  });
+});
