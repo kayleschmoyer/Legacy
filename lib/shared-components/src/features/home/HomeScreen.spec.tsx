@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, within } from '@testing-library/react';
 import type { ScrollView as ScrollViewHandle } from 'react-native';
 import { useMedia } from 'tamagui';
+import { formatDraftDate } from '@legacy-sports/utils';
 import {
   homeContentTopPadding,
   type HomeLeagueSummary,
@@ -886,6 +887,40 @@ describe('HomeScreen', () => {
       expect(onStartMockDraft).not.toHaveBeenCalled();
       expect(
         getByText(/you've used your free mock drafts this week/i),
+      ).toBeTruthy();
+    });
+
+    it('shows the local-time next-free-draft date at cap when resetsAt is set', () => {
+      const resetsAt = '2026-10-09T16:00:00.000Z';
+      const { getByText, queryByText } = render(
+        <HomeScreen
+          {...baseProps}
+          onStartMockDraft={jest.fn()}
+          mockDraftAtCap
+          mockDraftResetsAt={resetsAt}
+        />,
+      );
+      expect(
+        getByText(
+          `You've used your free mock drafts this week. Upgrade, or your next free draft opens ${formatDraftDate(resetsAt)}.`,
+        ),
+      ).toBeTruthy();
+      expect(queryByText(/check back next week/i)).toBeNull();
+    });
+
+    it('keeps the "check back next week" fallback at cap when resetsAt is null', () => {
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          onStartMockDraft={jest.fn()}
+          mockDraftAtCap
+          mockDraftResetsAt={null}
+        />,
+      );
+      expect(
+        getByText(
+          "You've used your free mock drafts this week. Upgrade or check back next week.",
+        ),
       ).toBeTruthy();
     });
   });

@@ -132,6 +132,12 @@ export interface HomeScreenProps {
   onStartMockDraft?: () => void;
   /** When true, the mock-draft CTA button is disabled (free user at weekly cap). */
   mockDraftAtCap?: boolean;
+  /**
+   * ISO instant when the next free mock draft opens (`MockDraftUsage.resetsAt`).
+   * Shown in the viewer's local time on the at-cap mock-draft card; null/absent
+   * falls back to "check back next week" (LS-10487).
+   */
+  mockDraftResetsAt?: string | null;
   onPlayerPress?: (playerId: number) => void;
   onHowItWorks?: () => void;
   /** Navigate to create a salary cap league. Shown only when isPremium is true. */
@@ -2134,10 +2140,13 @@ function StatsCta({
 function MockDraftCta({
   onPress,
   atCap = false,
+  resetsAt,
 }: {
   onPress: () => void;
   atCap?: boolean;
+  resetsAt?: string | null;
 }) {
+  const nextFreeDraftAt = formatDraftDate(resetsAt);
   return (
     <XStack
       backgroundColor="$surfacePanel"
@@ -2177,7 +2186,9 @@ function MockDraftCta({
         </Text>
         <Text fontFamily={BODY_FONT} fontSize={14} color="$textMuted">
           {atCap
-            ? "You've used your free mock drafts this week. Upgrade or check back next week."
+            ? nextFreeDraftAt
+              ? `You've used your free mock drafts this week. Upgrade, or your next free draft opens ${nextFreeDraftAt}.`
+              : "You've used your free mock drafts this week. Upgrade or check back next week."
             : 'Run a 12-team snake against bots in under ten minutes. Once you join a real league, mocks pull from that league’s exact era and ruleset.'}
         </Text>
       </YStack>
@@ -2865,6 +2876,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onViewSport,
     onStartMockDraft,
     mockDraftAtCap,
+    mockDraftResetsAt,
     onHowItWorks,
     onCreateSalaryCapLeague,
     onCreateAuctionLeague,
@@ -3537,7 +3549,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
         {onStartMockDraft ? (
           <YStack gap="$5">
             <SectionHead eyebrow="Scout the room" title="Try a mock draft" />
-            <MockDraftCta onPress={onStartMockDraft} atCap={mockDraftAtCap} />
+            <MockDraftCta
+              onPress={onStartMockDraft}
+              atCap={mockDraftAtCap}
+              resetsAt={mockDraftResetsAt}
+            />
           </YStack>
         ) : null}
 

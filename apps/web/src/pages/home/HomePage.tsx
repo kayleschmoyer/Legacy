@@ -340,6 +340,7 @@ export function HomePage(): React.JSX.Element {
           }
           onStartMockDraft={() => navigate(MOCK_DRAFT_ROUTE)}
           mockDraftAtCap={mockDraftAtCap}
+          mockDraftResetsAt={mockDraftUsage?.resetsAt ?? null}
           onHowItWorks={() => setTutorialOpen(true)}
           onCreateSalaryCapLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
           onCreateAuctionLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
