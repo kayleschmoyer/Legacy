@@ -159,9 +159,9 @@ jobs:
           set -o pipefail
           read -r -a argv <<< "$ARGS"
           bash ./ls-cli.sh "$COMMAND" "${argv[@]}" 2>&1 | tee "$RUNNER_TEMP/ingest.log"
-          # The CLI's global uncaughtException handler (lib/logging) only logs,
-          # so a crash outside the command (e.g. a module failing to load) exits
-          # 0. Require the command's own completion line so that cannot pass.
+          # Defense in depth: lib/logging's global handlers now exit non-zero on
+          # an uncaught crash (LS-10565), but still require the command's own
+          # completion line so a run that ends early without throwing fails too.
           if ! grep -q 'Ingest complete:' "$RUNNER_TEMP/ingest.log"; then
             echo "::error::The CLI exited without logging 'Ingest complete:'; treating the run as failed"
             exit 1

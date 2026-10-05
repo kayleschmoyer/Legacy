@@ -1,4 +1,5 @@
 import { createServerLogger } from './lib/factories.server';
+import { installGlobalErrorHandlers } from './lib/global-error-handlers';
 import { routeProcessWarnings } from './lib/process-warnings';
 
 // Export the server logger (console + file) for server environments
@@ -12,6 +13,10 @@ export { ConsoleOutputDestination } from './lib/destinations';
 export { FileOutputDestination } from './lib/destinations/server';
 export { emitMetric } from './lib/metrics';
 export { routeProcessWarnings } from './lib/process-warnings';
+export {
+  installGlobalErrorHandlers,
+  FATAL_EXIT_GRACE_MS,
+} from './lib/global-error-handlers';
 export type {
   ILogger,
   LoggerConfig,
@@ -32,28 +37,9 @@ export type {
 // is needed — that caused double-reporting (LS-1948).
 const isNode = typeof process !== 'undefined' && !!process.versions?.node;
 if (isNode && typeof process !== 'undefined') {
-  process.on('uncaughtException', (error) => {
-    LOGGER.error('Uncaught Exception', error);
-  });
-
-  process.on('unhandledRejection', (reason) => {
-    const error =
-      reason instanceof Error
-        ? reason
-        : new Error(
-            typeof reason === 'string'
-              ? reason
-              : typeof reason === 'number' || typeof reason === 'boolean'
-                ? String(reason)
-                : typeof reason === 'object' && reason !== null
-                  ? JSON.stringify(reason)
-                  : reason === null || reason === undefined
-                    ? String(reason)
-                    : '[Unknown rejection reason]',
-          );
-
-    LOGGER.error('Promise rejected', error);
-  });
+  // Log, then exit non-zero — a log-only listener makes crashes exit 0
+  // (LS-10565). See installGlobalErrorHandlers for the Lambda carve-out.
+  installGlobalErrorHandlers(LOGGER);
 
   // Node prints process warnings (e.g. the AWS SDK NodeVersionSupportWarning)
   // to stderr, which Lambda's JSON log format records at ERROR. Route them
