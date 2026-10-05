@@ -3,6 +3,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   PublicDb,
   PublicSchema,
+  refreshFootballPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { and, eq, like, sql } from 'drizzle-orm';
@@ -304,6 +305,19 @@ async function queueFootballPlayers(
     if (allEligible.length === 0) {
       LOGGER.info('No eligible players to queue.');
       return;
+    }
+
+    // players.position / is_dst feed football_player_eligible_positions, a
+    // materialized view (LS-10553) — refresh once after the upserts so newly
+    // imported players are draftable. Non-fatal: the import itself succeeded.
+    try {
+      await refreshFootballPlayerEligiblePositions(db);
+      LOGGER.info('football_player_eligible_positions refreshed.');
+    } catch (refreshError) {
+      LOGGER.error(
+        'Failed to refresh football_player_eligible_positions:',
+        toError(refreshError),
+      );
     }
 
     if (skipQueue) {

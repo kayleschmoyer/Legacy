@@ -2,7 +2,10 @@ import { InvalidArgumentError } from 'commander';
 import { SendMessageBatchCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
-import { PublicDb } from '@legacy-sports/db-client';
+import {
+  PublicDb,
+  refreshFootballPlayerEligiblePositions,
+} from '@legacy-sports/db-client';
 import * as pfrClient from '@legacy-sports/pfr-client';
 import {
   buildBaseballBatchEntries,
@@ -35,6 +38,7 @@ jest.mock('@legacy-sports/db-client', () => ({
     (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
       cb({ execute: jest.fn().mockResolvedValue({ rows: [] }) }),
   ),
+  refreshFootballPlayerEligiblePositions: jest.fn(),
 }));
 jest.mock('@legacy-sports/pfr-client', () => ({
   getPlayersByLetter: jest.fn(),
@@ -240,6 +244,8 @@ describe('handleQueuePlayers --skip-queue (football)', () => {
 
     expect(getPlayersByLetter).toHaveBeenCalledWith('A');
     expect(sendSpy).not.toHaveBeenCalled();
+    // LS-10553: newly imported positions must reach the materialized view.
+    expect(refreshFootballPlayerEligiblePositions).toHaveBeenCalledTimes(1);
 
     sendSpy.mockRestore();
   });

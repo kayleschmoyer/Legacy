@@ -1,6 +1,7 @@
 import {
   pgTable,
   pgView,
+  pgMaterializedView,
   integer,
   varchar,
   doublePrecision,
@@ -729,8 +730,13 @@ export const careerFootballDefenseIdp = pgView('career_football_defense_idp', {
  *   3. players.position IN ('QB','RB','WR','TE','K') → offensive position (authoritative from PFR)
  *   4. career_football_passing.att > 0, position IS NULL → 'QB' (stat-inferred fallback)
  *   5. career_football_kicking.fga > 0, position IS NULL, no passing att → 'K' (stat-inferred fallback)
+ *
+ * MATERIALIZED (LS-10553) with a unique (player_id, position) index so id
+ * lookups seek instead of scanning every branch. Refresh via
+ * refreshFootballPlayerEligiblePositions() after writing players.position /
+ * is_dst or career_football_passing / career_football_kicking.
  */
-export const footballPlayerEligiblePositions = pgView(
+export const footballPlayerEligiblePositions = pgMaterializedView(
   'football_player_eligible_positions',
   {
     playerId: integer('player_id').notNull(),

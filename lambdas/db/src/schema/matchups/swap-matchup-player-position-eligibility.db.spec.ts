@@ -21,6 +21,7 @@ import {
   cleanupTestData,
   getTestDatabase,
   integrationTestSchema,
+  refreshFootballEligiblePositions,
 } from '../../../integration-test-setup';
 import { getLeague, getUser } from '../../__fixtures__';
 
@@ -80,6 +81,7 @@ describe('swapMatchupPlayerPositions — DST/IDP eligibility (LS-6372 / FMD-015)
         isDst,
       })
       .returning();
+    await refreshFootballEligiblePositions();
     return player;
   }
 

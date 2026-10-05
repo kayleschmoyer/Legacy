@@ -83,8 +83,8 @@ export function canFillSlot(
  * league's sport.
  *
  * The two sports are backed by different objects — `player_eligible_positions`
- * (materialized, baseball) and `football_player_eligible_positions` (plain
- * view over `players.position` / `players.is_dst`) — and the lookups are
+ * (materialized, baseball) and `football_player_eligible_positions`
+ * (materialized over `players.position` / `players.is_dst`, LS-10553) — and the lookups are
  * disjoint, which is why this branches rather than unioning. Mirrors the same
  * branch in `drafts/helpers.ts`.
  *

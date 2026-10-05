@@ -209,6 +209,16 @@ export async function cleanupTestData(): Promise<void> {
   `);
 }
 
+// football_player_eligible_positions is a materialized view (LS-10553), so a
+// suite that inserts football players and reads their eligibility must
+// refresh it after seeding. CONCURRENTLY keeps readers on a shared DB unblocked.
+export async function refreshFootballEligiblePositions(): Promise<void> {
+  const testDb = await getTestDatabase();
+  await testDb.execute(sql`
+    REFRESH MATERIALIZED VIEW CONCURRENTLY public.football_player_eligible_positions
+  `);
+}
+
 export async function teardownIntegrationTestDatabase(): Promise<void> {
   await pool?.end();
   pool = undefined;

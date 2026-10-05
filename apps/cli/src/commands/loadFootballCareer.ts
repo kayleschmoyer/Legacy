@@ -4,12 +4,14 @@ import { loadFootballCareerStats } from '@legacy-sports/data-loaders';
 import {
   PublicDb,
   PublicSchema,
+  refreshFootballPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { toError } from '../utils/errors';
 
 export interface HandleLoadFootballCareerArgs {
   playerId?: number;
@@ -135,6 +137,23 @@ async function getFootballPlayersPrioritized(db: PublicDb, limit: number) {
     .limit(limit);
 }
 
+/**
+ * Refresh football_player_eligible_positions once per run (LS-10553) — the
+ * stat-inferred QB/K branches read career_football_passing / _kicking, which
+ * this command writes. Non-fatal: stale eligibility beats a failed load.
+ */
+async function refreshEligiblePositions(db: PublicDb): Promise<void> {
+  try {
+    await refreshFootballPlayerEligiblePositions(db);
+    LOGGER.info('football_player_eligible_positions refreshed.');
+  } catch (refreshError) {
+    LOGGER.error(
+      'Failed to refresh football_player_eligible_positions:',
+      toError(refreshError),
+    );
+  }
+}
+
 async function loadSinglePlayer(
   db: PublicDb,
   playerId: number,
@@ -233,6 +252,10 @@ async function runPlayerBatch(
     }
   }
 
+  if (attempted > failed) {
+    await refreshEligiblePositions(db);
+  }
+
   // One `error`-level line per run — the only signal that reaches Rollbar.
   // Skipped when the abort above already logged it, so a run never
   // double-alerts.
@@ -278,6 +301,7 @@ export async function handleLoadFootballCareer(
         LOGGER.error(`Failed: ${error}`);
         process.exit(1);
       }
+      await refreshEligiblePositions(db);
       return;
     }
 

@@ -9,9 +9,9 @@
  * rows, and the real per-sport eligibility views.
  *
  * Football coverage is fully end-to-end. `football_player_eligible_positions`
- * is a plain view over `players.position` / `players.is_dst`, so inserting a
- * player with `position: 'QB'` produces a genuine eligibility row and the
- * loader reads it back.
+ * is a materialized view over `players.position` / `players.is_dst` (LS-10553),
+ * so inserting a player with `position: 'QB'` and refreshing the view produces
+ * a genuine eligibility row and the loader reads it back.
  *
  * Baseball's `player_eligible_positions` is a MATERIALIZED view fed by a chain
  * of career-stat views over the season stat tables, so a synthetic player
@@ -33,6 +33,7 @@ import {
   getTestDatabase,
   getTestPlayers,
   integrationTestSchema,
+  refreshFootballEligiblePositions,
 } from '../../../integration-test-setup';
 import { getLeague, getUser } from '../../__fixtures__';
 
@@ -100,6 +101,7 @@ describe('slot-eligibility gate (LS-6427)', () => {
         position,
       })
       .returning();
+    await refreshFootballEligiblePositions();
     return player;
   }
 

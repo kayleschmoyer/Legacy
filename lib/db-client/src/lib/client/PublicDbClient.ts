@@ -235,6 +235,24 @@ export async function refreshPlayerEligiblePositions(
 }
 
 /**
+ * Refresh the football_player_eligible_positions materialized view (LS-10553).
+ *
+ * Call once after a run that writes its inputs — players.position / is_dst
+ * (football player import) or career_football_passing / career_football_kicking
+ * (football career-stats load) — not per player.
+ *
+ * CONCURRENTLY allows reads to continue during the refresh; it requires the
+ * unique index created by migration 20261004_120000 to already exist.
+ */
+export async function refreshFootballPlayerEligiblePositions(
+  db: PublicDb,
+): Promise<void> {
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.football_player_eligible_positions`,
+  );
+}
+
+/**
  * ANALYZE the season stat tables so planner stats are fresh after a bulk
  * stats-load run (LS-10554).
  *

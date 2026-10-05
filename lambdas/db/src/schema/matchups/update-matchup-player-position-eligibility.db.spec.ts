@@ -26,6 +26,7 @@ import {
   cleanupTestData,
   getTestDatabase,
   integrationTestSchema,
+  refreshFootballEligiblePositions,
 } from '../../../integration-test-setup';
 import { getLeague, getUser } from '../../__fixtures__';
 
@@ -85,6 +86,7 @@ describe('updateMatchupPlayerPosition — eligibility gate (LS-9682 / FMD-015 fo
         isDst,
       })
       .returning();
+    await refreshFootballEligiblePositions();
     return player;
   }
 

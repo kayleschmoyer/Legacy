@@ -1,4 +1,5 @@
 import { loadFootballCareerStats } from '@legacy-sports/data-loaders';
+import { refreshFootballPlayerEligiblePositions } from '@legacy-sports/db-client';
 import { handleLoadFootballCareer } from './loadFootballCareer';
 
 const mockReadFileSync = jest.fn();
@@ -74,6 +75,7 @@ jest.mock('@legacy-sports/db-client', () => ({
     (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
       cb(currentFakeDb),
   ),
+  refreshFootballPlayerEligiblePositions: jest.fn(),
   PublicSchema: {
     players: {
       sport: 'players.sport',
@@ -412,5 +414,82 @@ describe('handleLoadFootballCareer — Rollbar noise reduction', () => {
     await handleLoadFootballCareer({ limit: 2 });
 
     expect(authAlerts()).toHaveLength(0);
+  });
+});
+
+describe('handleLoadFootballCareer — football_player_eligible_positions refresh (LS-10553)', () => {
+  const loadStats = loadFootballCareerStats as jest.Mock;
+  const refresh = refreshFootballPlayerEligiblePositions as jest.Mock;
+  let exitSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    exitSpy = jest
+      .spyOn(process, 'exit')
+      .mockImplementation(() => undefined as never);
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+  });
+
+  it('refreshes once after a batch run with at least one success', async () => {
+    currentFakeDb = makeFakeDb(makePlayers(3));
+    loadStats.mockResolvedValue({
+      playerId: 1,
+      pfrId: 'PlayerX00',
+      groupsUpserted: ['passing'],
+    });
+
+    await handleLoadFootballCareer({ limit: 3 });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith(currentFakeDb);
+  });
+
+  it('refreshes after a successful single-player load', async () => {
+    currentFakeDb = makeFakeDb([]);
+    loadStats.mockResolvedValue({
+      playerId: 7,
+      pfrId: 'Player700',
+      groupsUpserted: ['kicking'],
+    });
+
+    await handleLoadFootballCareer({ playerId: 7 });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the refresh when every player failed', async () => {
+    currentFakeDb = makeFakeDb(makePlayers(2));
+    loadStats.mockRejectedValue(new Error('boom'));
+
+    await handleLoadFootballCareer({ limit: 2 });
+
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('does not fail the run when the refresh throws', async () => {
+    currentFakeDb = makeFakeDb(makePlayers(1));
+    loadStats.mockResolvedValue({
+      playerId: 1,
+      pfrId: 'Player100',
+      groupsUpserted: [],
+    });
+    refresh.mockRejectedValueOnce(new Error('lock timeout'));
+
+    await expect(
+      handleLoadFootballCareer({ limit: 1 }),
+    ).resolves.toBeUndefined();
+    expect(exitSpy).not.toHaveBeenCalled();
+    // The Error instance (not a string) reaches the logger so Rollbar keeps
+    // the stack trace.
+    const { LOGGER }: { LOGGER: { error: jest.Mock } } = jest.requireMock(
+      '@legacy-sports/logging',
+    );
+    expect(LOGGER.error).toHaveBeenCalledWith(
+      'Failed to refresh football_player_eligible_positions:',
+      expect.objectContaining({ message: 'lock timeout' }),
+    );
   });
 });
