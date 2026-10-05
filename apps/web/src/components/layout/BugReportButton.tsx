@@ -6,7 +6,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Dialog } from 'tamagui';
+import { Dialog, ScrollView } from 'tamagui';
 import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { env } from '../../config/environment';
 import { CSRF_HEADER, getCsrfToken } from '../../lib/csrf';
@@ -123,6 +123,7 @@ interface BugReportButtonUncontrolledProps {
   onDialogOpenChange?: (open: boolean) => void;
   /** Which flow to render. Defaults to the bug-report flow. */
   kind?: ReportKind;
+  returnFocusRef?: undefined;
 }
 
 /** Controlled mode — dialog open state is managed externally, no trigger
@@ -133,6 +134,13 @@ interface BugReportButtonControlledProps {
   onDialogOpenChange: (open: boolean) => void;
   /** Which flow to render. Defaults to the bug-report flow. */
   kind?: ReportKind;
+  /**
+   * Element to focus when the dialog closes. Controlled mode has no
+   * `Dialog.Trigger`, so Tamagui has nothing to restore focus to, and the
+   * menu item that opened the dialog is usually unmounted by then — without
+   * this, focus falls to `<body>` (LS-10451).
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 type BugReportButtonProps =
@@ -147,6 +155,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
   onDialogOpenChange,
   controlledOpen,
   kind = 'bug',
+  returnFocusRef,
 }) => {
   const copy = REPORT_KINDS[kind];
   const auth = useAuth();
@@ -445,6 +454,11 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           elevate
           width="92%"
           maxWidth={480}
+          // Cap the height so short viewports scroll the body instead of
+          // pushing the pinned actions off-screen (LS-10430).
+          maxHeight="min(90dvh, calc(100dvh - 32px))"
+          overflow="hidden"
+          padding={0}
           backgroundColor="$background"
           borderRadius="$6"
           animation="quick"
@@ -452,6 +466,13 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           exitStyle={{ opacity: 0, y: 8, scale: 0.98 }}
           aria-labelledby="bug-report-title"
           aria-describedby="bug-report-desc"
+          onCloseAutoFocus={(event: Event) => {
+            const target = returnFocusRef?.current;
+            if (target?.isConnected) {
+              event.preventDefault();
+              target.focus();
+            }
+          }}
           onInteractOutside={(e: { preventDefault(): void }) => {
             // Prevent accidentally losing typed content or attachments when clicking outside
             if (description.trim() || attachments.length > 0) {
@@ -459,381 +480,405 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
             }
           }}
         >
-          <YStack gap="$4" padding="$5">
-            {/* Header */}
-            <XStack justifyContent="space-between" alignItems="center" gap="$2">
-              <YStack gap="$1" flex={1}>
-                <Paragraph
-                  id="bug-report-title"
-                  fontSize={18}
-                  fontWeight="700"
-                  color="$color"
-                >
-                  {copy.title}
-                </Paragraph>
-                <Paragraph id="bug-report-desc" size="$2" color="$colorPress">
-                  {copy.subtitle}
-                </Paragraph>
-              </YStack>
-              <Dialog.Close asChild>
-                <Button
-                  size="$2"
-                  flexShrink={0}
-                  backgroundColor="transparent"
-                  borderWidth={0}
-                  borderRadius="$10"
-                  hoverStyle={{ backgroundColor: '$color3' }}
-                  aria-label="Close"
-                >
-                  <Paragraph fontSize={16}>✕</Paragraph>
-                </Button>
-              </Dialog.Close>
-            </XStack>
+          {/* Header */}
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            gap="$2"
+            padding="$5"
+            paddingBottom="$3"
+          >
+            <YStack gap="$1" flex={1}>
+              <Paragraph
+                id="bug-report-title"
+                fontSize={18}
+                fontWeight="700"
+                color="$color"
+              >
+                {copy.title}
+              </Paragraph>
+              <Paragraph id="bug-report-desc" size="$2" color="$colorPress">
+                {copy.subtitle}
+              </Paragraph>
+            </YStack>
+            <Dialog.Close asChild>
+              <Button
+                size="$2"
+                flexShrink={0}
+                backgroundColor="transparent"
+                borderWidth={0}
+                borderRadius="$10"
+                hoverStyle={{ backgroundColor: '$color3' }}
+                aria-label="Close"
+              >
+                <Paragraph fontSize={16}>✕</Paragraph>
+              </Button>
+            </Dialog.Close>
+          </XStack>
 
-            {/* Success state */}
-            {isSuccess ? (
-              <YStack gap="$3" alignItems="center" paddingVertical="$4">
-                <Paragraph fontSize={36} lineHeight={40}>
-                  <span role="img" aria-label="success">
-                    ✅
-                  </span>
-                </Paragraph>
-                <Paragraph
-                  size="$4"
-                  color="$green10"
-                  fontWeight="600"
-                  textAlign="center"
-                >
-                  {submitState.message}
-                </Paragraph>
-                <Button
-                  size="$3"
-                  onPress={() => handleOpenChange(false)}
-                  backgroundColor="$color3"
-                  borderWidth={0}
-                  borderRadius="$5"
-                >
-                  <Paragraph>Close</Paragraph>
-                </Button>
-              </YStack>
-            ) : (
-              <>
-                {/* Description input */}
-                <YStack gap="$2">
-                  <Paragraph size="$3" fontWeight="600" color="$color">
-                    What happened?
-                  </Paragraph>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    maxLength={MAX_DESCRIPTION_LENGTH}
-                    rows={5}
-                    placeholder={copy.placeholder}
-                    aria-label={copy.inputLabel}
-                    disabled={isLoading}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: '1px solid var(--borderColor, #d1d5db)',
-                      backgroundColor: 'var(--background, #ffffff)',
-                      color: 'var(--color, #0b1220)',
-                      fontSize: 14,
-                      lineHeight: 1.5,
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box',
-                      outline: 'none',
-                    }}
-                  />
-                  <Paragraph
-                    data-testid="bug-char-counter"
-                    size="$1"
-                    color="$colorPress"
-                    textAlign="right"
-                  >
-                    {description.length}/{MAX_DESCRIPTION_LENGTH}
-                  </Paragraph>
-                </YStack>
+          {/* Success state */}
+          {isSuccess ? (
+            <YStack
+              gap="$3"
+              alignItems="center"
+              paddingTop="$4"
+              paddingHorizontal="$5"
+              paddingBottom="$5"
+            >
+              <Paragraph fontSize={36} lineHeight={40}>
+                <span role="img" aria-label="success">
+                  ✅
+                </span>
+              </Paragraph>
+              <Paragraph
+                size="$4"
+                color="$green10"
+                fontWeight="600"
+                textAlign="center"
+              >
+                {submitState.message}
+              </Paragraph>
+              <Button
+                size="$3"
+                onPress={() => handleOpenChange(false)}
+                backgroundColor="$color3"
+                borderWidth={0}
+                borderRadius="$5"
+              >
+                <Paragraph>Close</Paragraph>
+              </Button>
+            </YStack>
+          ) : (
+            <>
+              {/* Scrollable body — actions stay pinned below (LS-10430) */}
+              <ScrollView flexGrow={0} flexShrink={1}>
+                <YStack gap="$4" paddingHorizontal="$5" paddingVertical="$2">
+                  {/* Description input */}
+                  <YStack gap="$2">
+                    <Paragraph size="$3" fontWeight="600" color="$color">
+                      What happened?
+                    </Paragraph>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      maxLength={MAX_DESCRIPTION_LENGTH}
+                      rows={5}
+                      placeholder={copy.placeholder}
+                      aria-label={copy.inputLabel}
+                      disabled={isLoading}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--borderColor, #d1d5db)',
+                        backgroundColor: 'var(--background, #ffffff)',
+                        color: 'var(--color, #0b1220)',
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                      }}
+                    />
+                    <Paragraph
+                      data-testid="bug-char-counter"
+                      size="$1"
+                      color="$colorPress"
+                      textAlign="right"
+                    >
+                      {description.length}/{MAX_DESCRIPTION_LENGTH}
+                    </Paragraph>
+                  </YStack>
 
-                {/* Search for similar bugs — skipped in feature mode: the
+                  {/* Search for similar bugs — skipped in feature mode: the
                     endpoint's JQL is scoped to `type = Bug`, so it can't
                     surface relevant results for a feature request (LS-9272). */}
-                {kind === 'bug' && (
-                  <Button
-                    size="$2"
-                    onPress={handleSearchSimilar}
-                    disabled={
-                      searchLoading ||
-                      description.trim().length < SEARCH_MIN_LENGTH
-                    }
-                    alignSelf="flex-start"
-                  >
-                    {searchLoading
-                      ? 'Searching…'
-                      : 'Search for similar reports'}
-                  </Button>
-                )}
-
-                {/* Similar existing bugs */}
-                {kind === 'bug' &&
-                  similarBugs.length > 0 &&
-                  description.trim().length >= SEARCH_MIN_LENGTH && (
-                    <YStack
-                      gap="$2"
-                      backgroundColor="$yellow2"
-                      borderRadius="$4"
-                      padding="$3"
-                      borderWidth={1}
-                      borderColor="$yellow7"
+                  {kind === 'bug' && (
+                    <Button
+                      size="$2"
+                      onPress={handleSearchSimilar}
+                      disabled={
+                        searchLoading ||
+                        description.trim().length < SEARCH_MIN_LENGTH
+                      }
+                      alignSelf="flex-start"
                     >
-                      <Paragraph size="$2" fontWeight="600" color="$yellow11">
-                        {`Similar bug${similarBugs.length === 1 ? '' : 's'} already reported:`}
-                      </Paragraph>
-                      {similarBugs.map((bug) => (
-                        <XStack
-                          key={bug.issueKey}
-                          gap="$2"
-                          alignItems="flex-start"
-                          paddingVertical="$1"
-                        >
-                          <Paragraph
-                            size="$2"
-                            fontWeight="600"
-                            color="$yellow11"
-                            flexShrink={0}
+                      {searchLoading
+                        ? 'Searching…'
+                        : 'Search for similar reports'}
+                    </Button>
+                  )}
+
+                  {/* Similar existing bugs */}
+                  {kind === 'bug' &&
+                    similarBugs.length > 0 &&
+                    description.trim().length >= SEARCH_MIN_LENGTH && (
+                      <YStack
+                        gap="$2"
+                        backgroundColor="$yellow2"
+                        borderRadius="$4"
+                        padding="$3"
+                        borderWidth={1}
+                        borderColor="$yellow7"
+                      >
+                        <Paragraph size="$2" fontWeight="600" color="$yellow11">
+                          {`Similar bug${similarBugs.length === 1 ? '' : 's'} already reported:`}
+                        </Paragraph>
+                        {similarBugs.map((bug) => (
+                          <XStack
+                            key={bug.issueKey}
+                            gap="$2"
+                            alignItems="flex-start"
+                            paddingVertical="$1"
                           >
-                            {bug.issueKey}
-                          </Paragraph>
-                          <YStack flex={1}>
                             <Paragraph
                               size="$2"
-                              color="$color"
-                              numberOfLines={2}
+                              fontWeight="600"
+                              color="$yellow11"
+                              flexShrink={0}
                             >
-                              {bug.summary}
+                              {bug.issueKey}
                             </Paragraph>
-                            <Paragraph size="$1" color="$colorPress">
-                              Status: {bug.status}
-                            </Paragraph>
-                          </YStack>
-                        </XStack>
-                      ))}
-                      {similarBugs.length > 0 && (
-                        <Paragraph size="$1" color="$yellow11">
-                          You can still submit your report — it helps us know
-                          more people are affected.
-                        </Paragraph>
-                      )}
-                    </YStack>
-                  )}
-
-                {/* Collapsible technical details */}
-                <YStack gap="$2">
-                  <Button
-                    size="$2"
-                    backgroundColor="transparent"
-                    borderWidth={0}
-                    paddingHorizontal={0}
-                    onPress={() => setShowDetails((v) => !v)}
-                    aria-expanded={showDetails}
-                    alignSelf="flex-start"
-                  >
-                    <Paragraph size="$2" color="$colorPress">
-                      {showDetails ? '▾' : '▸'} Technical details (included
-                      automatically)
-                    </Paragraph>
-                  </Button>
-
-                  {showDetails && (
-                    <YStack
-                      backgroundColor="$color2"
-                      borderRadius="$4"
-                      padding="$3"
-                      gap="$1"
-                    >
-                      {[
-                        ['User', auth?.user?.email ?? 'unauthenticated'],
-                        ['Page', window.location.href],
-                        ['Version', env.appVersion],
-                        ['Commit', env.commitSha],
-                        ['Environment', detectEnvironment()],
-                        [
-                          'Viewport',
-                          `${String(window.innerWidth)}x${String(window.innerHeight)}`,
-                        ],
-                        ['Browser', navigator.userAgent.slice(0, 80)],
-                      ].map(([label, value]) => (
-                        <XStack key={label} gap="$2">
-                          <Paragraph
-                            size="$1"
-                            color="$colorPress"
-                            fontWeight="600"
-                            width={80}
-                            flexShrink={0}
-                          >
-                            {label}:
+                            <YStack flex={1}>
+                              <Paragraph
+                                size="$2"
+                                color="$color"
+                                numberOfLines={2}
+                              >
+                                {bug.summary}
+                              </Paragraph>
+                              <Paragraph size="$1" color="$colorPress">
+                                Status: {bug.status}
+                              </Paragraph>
+                            </YStack>
+                          </XStack>
+                        ))}
+                        {similarBugs.length > 0 && (
+                          <Paragraph size="$1" color="$yellow11">
+                            You can still submit your report — it helps us know
+                            more people are affected.
                           </Paragraph>
-                          <Paragraph
-                            size="$1"
-                            color="$colorPress"
-                            flex={1}
-                            numberOfLines={2}
-                          >
-                            {value}
-                          </Paragraph>
-                        </XStack>
-                      ))}
-                      {capturedErrors.length > 0 && (
-                        <YStack gap="$1" marginTop="$2">
-                          <Paragraph
-                            size="$1"
-                            color="$colorPress"
-                            fontWeight="600"
-                          >
-                            Recent errors ({String(capturedErrors.length)}):
-                          </Paragraph>
-                          {capturedErrors.map((e: CapturedError, i: number) => (
-                            <Paragraph
-                              key={String(i)}
-                              size="$1"
-                              color="$red10"
-                              numberOfLines={2}
-                            >
-                              {e.message}
-                            </Paragraph>
-                          ))}
-                        </YStack>
-                      )}
-                    </YStack>
-                  )}
-                </YStack>
+                        )}
+                      </YStack>
+                    )}
 
-                {/* Attachments */}
-                <YStack gap="$2">
-                  <XStack alignItems="center" gap="$2">
-                    <Paragraph size="$3" fontWeight="600" color="$color">
-                      Attachments
-                    </Paragraph>
-                    <Paragraph size="$2" color="$colorPress">
-                      (optional · images or videos · max {MAX_ATTACHMENTS}{' '}
-                      files, {MAX_FILE_SIZE_MB} MB each · paste to attach)
-                    </Paragraph>
-                  </XStack>
-
-                  {/* Hidden file input */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,video/mp4,video/webm,video/quicktime"
-                    multiple
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                    aria-label="Add screenshot or video"
-                  />
-
-                  {/* File list */}
-                  {attachments.length > 0 && (
-                    <YStack gap="$1">
-                      {attachments.map((file, i) => (
-                        <XStack
-                          key={`${file.name}-${String(i)}`}
-                          alignItems="center"
-                          gap="$2"
-                          backgroundColor="$color2"
-                          borderRadius="$3"
-                          paddingVertical="$1"
-                          paddingHorizontal="$2"
-                        >
-                          <Paragraph size="$2" flex={1} numberOfLines={1}>
-                            {file.type.startsWith('image/') ? '🖼 ' : '🎥 '}
-                            {file.name}
-                          </Paragraph>
-                          <Paragraph size="$1" color="$colorPress">
-                            {formatFileSize(file.size)}
-                          </Paragraph>
-                          <Button
-                            size="$1"
-                            backgroundColor="transparent"
-                            borderWidth={0}
-                            padding="$1"
-                            onPress={() => removeAttachment(i)}
-                            aria-label={`Remove ${file.name}`}
-                            disabled={isLoading}
-                          >
-                            <Paragraph size="$2" color="$colorPress">
-                              ✕
-                            </Paragraph>
-                          </Button>
-                        </XStack>
-                      ))}
-                    </YStack>
-                  )}
-
-                  {/* Add-file button */}
-                  {attachments.length < MAX_ATTACHMENTS && (
+                  {/* Collapsible technical details */}
+                  <YStack gap="$2">
                     <Button
                       size="$2"
                       backgroundColor="transparent"
-                      borderWidth={1}
-                      borderColor="$borderColor"
-                      borderRadius="$4"
-                      onPress={() => fileInputRef.current?.click()}
-                      disabled={isLoading}
+                      borderWidth={0}
+                      paddingHorizontal={0}
+                      onPress={() => setShowDetails((v) => !v)}
+                      aria-expanded={showDetails}
                       alignSelf="flex-start"
                     >
                       <Paragraph size="$2" color="$colorPress">
-                        + Add screenshot or video
+                        {showDetails ? '▾' : '▸'} Technical details (included
+                        automatically)
                       </Paragraph>
                     </Button>
-                  )}
 
-                  {attachmentError && (
+                    {showDetails && (
+                      <YStack
+                        backgroundColor="$color2"
+                        borderRadius="$4"
+                        padding="$3"
+                        gap="$1"
+                      >
+                        {[
+                          ['User', auth?.user?.email ?? 'unauthenticated'],
+                          ['Page', window.location.href],
+                          ['Version', env.appVersion],
+                          ['Commit', env.commitSha],
+                          ['Environment', detectEnvironment()],
+                          [
+                            'Viewport',
+                            `${String(window.innerWidth)}x${String(window.innerHeight)}`,
+                          ],
+                          ['Browser', navigator.userAgent.slice(0, 80)],
+                        ].map(([label, value]) => (
+                          <XStack key={label} gap="$2">
+                            <Paragraph
+                              size="$1"
+                              color="$colorPress"
+                              fontWeight="600"
+                              width={80}
+                              flexShrink={0}
+                            >
+                              {label}:
+                            </Paragraph>
+                            <Paragraph
+                              size="$1"
+                              color="$colorPress"
+                              flex={1}
+                              numberOfLines={2}
+                            >
+                              {value}
+                            </Paragraph>
+                          </XStack>
+                        ))}
+                        {capturedErrors.length > 0 && (
+                          <YStack gap="$1" marginTop="$2">
+                            <Paragraph
+                              size="$1"
+                              color="$colorPress"
+                              fontWeight="600"
+                            >
+                              Recent errors ({String(capturedErrors.length)}):
+                            </Paragraph>
+                            {capturedErrors.map(
+                              (e: CapturedError, i: number) => (
+                                <Paragraph
+                                  key={String(i)}
+                                  size="$1"
+                                  color="$red10"
+                                  numberOfLines={2}
+                                >
+                                  {e.message}
+                                </Paragraph>
+                              ),
+                            )}
+                          </YStack>
+                        )}
+                      </YStack>
+                    )}
+                  </YStack>
+
+                  {/* Attachments */}
+                  <YStack gap="$2">
+                    <XStack alignItems="center" gap="$2">
+                      <Paragraph size="$3" fontWeight="600" color="$color">
+                        Attachments
+                      </Paragraph>
+                      <Paragraph size="$2" color="$colorPress">
+                        (optional · images or videos · max {MAX_ATTACHMENTS}{' '}
+                        files, {MAX_FILE_SIZE_MB} MB each · paste to attach)
+                      </Paragraph>
+                    </XStack>
+
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/mp4,video/webm,video/quicktime"
+                      multiple
+                      onChange={handleFileChange}
+                      style={{ display: 'none' }}
+                      aria-label="Add screenshot or video"
+                    />
+
+                    {/* File list */}
+                    {attachments.length > 0 && (
+                      <YStack gap="$1">
+                        {attachments.map((file, i) => (
+                          <XStack
+                            key={`${file.name}-${String(i)}`}
+                            alignItems="center"
+                            gap="$2"
+                            backgroundColor="$color2"
+                            borderRadius="$3"
+                            paddingVertical="$1"
+                            paddingHorizontal="$2"
+                          >
+                            <Paragraph size="$2" flex={1} numberOfLines={1}>
+                              {file.type.startsWith('image/') ? '🖼 ' : '🎥 '}
+                              {file.name}
+                            </Paragraph>
+                            <Paragraph size="$1" color="$colorPress">
+                              {formatFileSize(file.size)}
+                            </Paragraph>
+                            <Button
+                              size="$1"
+                              backgroundColor="transparent"
+                              borderWidth={0}
+                              padding="$1"
+                              onPress={() => removeAttachment(i)}
+                              aria-label={`Remove ${file.name}`}
+                              disabled={isLoading}
+                            >
+                              <Paragraph size="$2" color="$colorPress">
+                                ✕
+                              </Paragraph>
+                            </Button>
+                          </XStack>
+                        ))}
+                      </YStack>
+                    )}
+
+                    {/* Add-file button */}
+                    {attachments.length < MAX_ATTACHMENTS && (
+                      <Button
+                        size="$2"
+                        backgroundColor="transparent"
+                        borderWidth={1}
+                        borderColor="$borderColor"
+                        borderRadius="$4"
+                        onPress={() => fileInputRef.current?.click()}
+                        disabled={isLoading}
+                        alignSelf="flex-start"
+                      >
+                        <Paragraph size="$2" color="$colorPress">
+                          + Add screenshot or video
+                        </Paragraph>
+                      </Button>
+                    )}
+
+                    {attachmentError && (
+                      <Paragraph size="$2" color="$red10">
+                        ⚠ {attachmentError}
+                      </Paragraph>
+                    )}
+                  </YStack>
+
+                  {/* Error message */}
+                  {submitState.status === 'error' && (
                     <Paragraph size="$2" color="$red10">
-                      ⚠ {attachmentError}
+                      ⚠ {submitState.message}
                     </Paragraph>
                   )}
                 </YStack>
+              </ScrollView>
 
-                {/* Error message */}
-                {submitState.status === 'error' && (
-                  <Paragraph size="$2" color="$red10">
-                    ⚠ {submitState.message}
-                  </Paragraph>
-                )}
-
-                {/* Actions */}
-                <XStack gap="$3" justifyContent="flex-end">
-                  <Dialog.Close asChild>
-                    <Button
-                      data-testid="bug-report-dialog-cancel"
-                      size="$3"
-                      backgroundColor="transparent"
-                      borderWidth={1}
-                      borderColor="$borderColor"
-                      borderRadius="$5"
-                      disabled={isLoading}
-                    >
-                      <Paragraph>Cancel</Paragraph>
-                    </Button>
-                  </Dialog.Close>
+              {/* Actions */}
+              <XStack
+                gap="$3"
+                justifyContent="flex-end"
+                padding="$5"
+                paddingTop="$3"
+                borderTopWidth={1}
+                borderColor="$borderColor"
+              >
+                <Dialog.Close asChild>
                   <Button
+                    data-testid="bug-report-dialog-cancel"
                     size="$3"
-                    backgroundColor="$brandNavyLight"
-                    borderWidth={0}
+                    backgroundColor="transparent"
+                    borderWidth={1}
+                    borderColor="$borderColor"
                     borderRadius="$5"
-                    disabled={isLoading || !description.trim()}
-                    onPress={() => void handleSubmit()}
-                    opacity={isLoading || !description.trim() ? 0.6 : 1}
+                    disabled={isLoading}
                   >
-                    <Paragraph color="white" fontWeight="600">
-                      {isLoading ? 'Submitting...' : copy.submitLabel}
-                    </Paragraph>
+                    <Paragraph>Cancel</Paragraph>
                   </Button>
-                </XStack>
-              </>
-            )}
-          </YStack>
+                </Dialog.Close>
+                <Button
+                  size="$3"
+                  backgroundColor="$brandNavyLight"
+                  borderWidth={0}
+                  borderRadius="$5"
+                  disabled={isLoading || !description.trim()}
+                  onPress={() => void handleSubmit()}
+                  opacity={isLoading || !description.trim() ? 0.6 : 1}
+                >
+                  <Paragraph color="white" fontWeight="600">
+                    {isLoading ? 'Submitting...' : copy.submitLabel}
+                  </Paragraph>
+                </Button>
+              </XStack>
+            </>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog>

@@ -362,6 +362,15 @@ function Navigation() {
   const navLinks = useDesktopNavLinks();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bugDialogOpen, setBugDialogOpen] = useState(false);
+  // The bug-report dialog is controlled with no Dialog.Trigger, and the menu
+  // item that opens it unmounts as its menu closes — so remember which
+  // still-mounted control to return focus to on close (LS-10451).
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const bugReportReturnFocusRef = useRef<HTMLElement | null>(null);
+  const openBugReport = (returnFocusTo: HTMLElement | null) => {
+    bugReportReturnFocusRef.current = returnFocusTo;
+    setBugDialogOpen(true);
+  };
   const [compact, setCompact] = useState(false);
 
   // Condense nav when user scrolls down
@@ -502,7 +511,7 @@ function Navigation() {
               trailing={
                 <XStack alignItems="center" gap="$2">
                   <NotificationDropdown />
-                  <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
+                  <HelpMenuButton onBugReport={openBugReport} />
                   <UserProfileDropdown />
                 </XStack>
               }
@@ -520,6 +529,7 @@ function Navigation() {
           >
             {/* Hamburger → drawer */}
             <button
+              ref={menuButtonRef}
               onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
               aria-expanded={drawerOpen}
@@ -546,7 +556,7 @@ function Navigation() {
             <div style={{ flex: 1 }} />
 
             {/* Help & bug-report (mobile parity with desktop) */}
-            <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
+            <HelpMenuButton onBugReport={openBugReport} />
 
             {/* Notifications */}
             <NotificationDropdown />
@@ -558,13 +568,14 @@ function Navigation() {
       <MobileNavDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onBugReport={() => setBugDialogOpen(true)}
+        onBugReport={() => openBugReport(menuButtonRef.current)}
       />
 
       {/* Bug report dialog (controlled — no trigger button rendered) */}
       <BugReportButton
         controlledOpen={bugDialogOpen}
         onDialogOpenChange={setBugDialogOpen}
+        returnFocusRef={bugReportReturnFocusRef}
       />
     </YStack>
   );

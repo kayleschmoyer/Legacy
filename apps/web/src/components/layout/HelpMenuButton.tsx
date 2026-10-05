@@ -22,7 +22,9 @@ import {
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 
 interface Props {
-  onBugReport?: () => void;
+  /** Receives this menu's trigger button so the caller can return focus to
+   *  it when the bug-report dialog closes (LS-10451). */
+  onBugReport?: (trigger: HTMLButtonElement | null) => void;
 }
 
 const ICON_BTN_STYLE: React.CSSProperties = {
@@ -62,6 +64,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -98,6 +101,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
+        ref={triggerRef}
         onClick={() => setIsOpen((o) => !o)}
         aria-label="Help & support"
         aria-haspopup="menu"
@@ -170,7 +174,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               icon: <Bug size={16} color={TEXT_MUTED} />,
               label: 'Report a bug',
               action: () => {
-                onBugReport?.();
+                onBugReport?.(triggerRef.current);
                 setIsOpen(false);
               },
             },

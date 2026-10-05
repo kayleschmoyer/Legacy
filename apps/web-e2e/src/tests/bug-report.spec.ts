@@ -181,6 +181,78 @@ test.describe('Bug Report Button – Mobile @regression', () => {
   });
 });
 
+test.describe('Bug Report Dialog – short viewport (LS-10430) @regression', () => {
+  test.use({ viewport: { width: 500, height: 363 } });
+
+  test('Submit stays reachable when the dialog is taller than the viewport', async ({
+    page,
+  }) => {
+    await injectJiraProxyUrl(page);
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('button', { name: /report a bug/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog
+      .getByRole('textbox', { name: /bug description/i })
+      .fill('Short viewport regression: Submit must stay reachable.');
+
+    const submit = dialog.getByRole('button', { name: /submit report/i });
+    await expect(submit).toBeEnabled();
+    await expect(submit).toBeInViewport({ ratio: 1 });
+    // A trial click runs Playwright's actionability checks (visible, stable,
+    // receives pointer events) without submitting the report.
+    await submit.click({ trial: true });
+  });
+});
+
+test.describe('Bug Report Dialog – focus return (LS-10451) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await injectJiraProxyUrl(page);
+  });
+
+  test('Escape returns focus to the Open menu button when opened from the mobile drawer', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    const hamburger = page.getByRole('button', { name: /open menu/i });
+    await hamburger.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: /report a bug/i }).focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await expect(dialog).toBeHidden();
+    await expect(hamburger).toBeFocused();
+  });
+
+  test('Escape returns focus to the Help & support button when opened from its menu', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    const helpButton = page.getByRole('button', { name: /help & support/i });
+    await helpButton.click();
+    await page.getByRole('menuitem', { name: /report a bug/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await expect(dialog).toBeHidden();
+    await expect(helpButton).toBeFocused();
+  });
+});
+
 test.describe('Bug Report Dialog Interactions @regression', () => {
   test.beforeEach(async ({ page }) => {
     await injectJiraProxyUrl(page);
