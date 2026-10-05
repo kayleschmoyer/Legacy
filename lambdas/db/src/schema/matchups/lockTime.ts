@@ -12,12 +12,7 @@
  * actually gates roster moves.
  */
 
-import {
-  computeRosterLockTime,
-  PublicSchema,
-  withPoolTimeoutRetry,
-} from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
+import { computeRosterLockTime } from '@legacy-sports/db-client';
 import { type Context } from '../builder';
 
 interface MatchupForLockTime {
@@ -35,36 +30,20 @@ export async function resolveMatchupLockTime(
   // (or never applies, e.g. cancelled) — nothing left to count down to.
   if (matchup.status !== 'scheduled') return null;
 
-  // Resolved once per scheduled matchup — the same per-request fan-out
-  // pattern as Matchup.winProbability, so it's exposed to the same pool
-  // exhaustion under concurrent load. Wrapped in withPoolTimeoutRetry
-  // (LS-8478 pattern). See LS-10042/LS-10045.
-  const [league] = await withPoolTimeoutRetry(() =>
-    context.db
-      .select({ rosterLockTiming: PublicSchema.leagues.rosterLockTiming })
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, matchup.leagueId))
-      .limit(1),
+  // Resolved once per scheduled matchup, but the inputs are per-league — so
+  // read them through a request-scoped loader. Selecting them per matchup
+  // (LS-10042/LS-10045) issued 2 identical queries for every matchup in a
+  // league-wide query and exhausted the pool (LS-10307).
+  const inputs = await context.loaders.leagueRosterLockInputs.load(
+    matchup.leagueId,
   );
 
-  if (!league) return null;
-
-  const [lockRules] = await withPoolTimeoutRetry(() =>
-    context.db
-      .select({
-        customLockTime: PublicSchema.rosterLockRules.customLockTime,
-        lockHoursBeforeMatchup:
-          PublicSchema.rosterLockRules.lockHoursBeforeMatchup,
-      })
-      .from(PublicSchema.rosterLockRules)
-      .where(eq(PublicSchema.rosterLockRules.leagueId, matchup.leagueId))
-      .limit(1),
-  );
+  if (!inputs) return null;
 
   const lockTime = computeRosterLockTime(
     matchup.startTime,
-    league.rosterLockTiming,
-    lockRules,
+    inputs.rosterLockTiming,
+    inputs.lockRules,
   );
 
   return lockTime ? lockTime.toISOString() : null;

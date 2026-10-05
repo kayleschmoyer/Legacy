@@ -11,8 +11,7 @@
  * returning null for unauthenticated or non-entitled callers.
  */
 
-import { eq } from 'drizzle-orm';
-import { PublicSchema, withPoolTimeoutRetry } from '@legacy-sports/db-client';
+import DataLoader from 'dataloader';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   applyMultiplierGroups,
@@ -66,6 +65,35 @@ interface MatchupForWinProbability {
   pitcherStartsPerMatchup: number | null;
 }
 
+/**
+ * Request-scoped league scoring config, keyed off the per-request Context
+ * object (LS-10307). Lives here rather than in `createLoaders()` because
+ * `loadLeagueScoringConfig` is in `../scoring`, which imports the builder —
+ * pulling it into the dataloaders barrel would create an import cycle.
+ */
+const scoringConfigLoaders = new WeakMap<
+  Context,
+  DataLoader<number, Awaited<ReturnType<typeof loadLeagueScoringConfig>>>
+>();
+
+function scoringConfigLoaderFor(context: Context) {
+  let loader = scoringConfigLoaders.get(context);
+  if (!loader) {
+    // Per-key errors, so one league's failure never rejects the others.
+    loader = new DataLoader((leagueIds) =>
+      Promise.all(
+        leagueIds.map((id) =>
+          loadLeagueScoringConfig(id).catch((err: unknown) =>
+            err instanceof Error ? err : new Error(String(err)),
+          ),
+        ),
+      ),
+    );
+    scoringConfigLoaders.set(context, loader);
+  }
+  return loader;
+}
+
 function numberOfGamesForPlayer(
   matchup: MatchupForWinProbability,
   positionType: string | null | undefined,
@@ -94,21 +122,21 @@ export async function resolveMatchupWinProbability(
   }
 
   try {
-    // LS-10038: this resolver fans out heavily (see the Promise.all fan-out
-    // below), and it's hit once per unresolved matchup in a league — a
-    // scoring refresh can trigger many of these concurrently against the
-    // same small per-Lambda connection pool. Retry a pool-exhaustion timeout
-    // here rather than surfacing it as a resolver failure (LS-8478 pattern).
-    const matchupPlayers = await withPoolTimeoutRetry(() =>
-      context.db
-        .select()
-        .from(PublicSchema.matchupPlayers)
-        .where(eq(PublicSchema.matchupPlayers.matchupId, matchup.id)),
+    // This resolver is hit once per unresolved matchup in a league
+    // (GetMatchupsForLeague), so everything it reads goes through
+    // request-scoped loaders: per-matchup rows batch into one query, and
+    // per-league scoring config loads once. Direct per-matchup reads here
+    // exhausted the Lambda's connection pool and nulled this field for the
+    // whole league (LS-10038, LS-10307).
+    const matchupPlayers = await context.loaders.matchupPlayersByMatchupId.load(
+      matchup.id,
     );
 
     if (matchupPlayers.length === 0) return null;
 
-    const scoringConfig = await loadLeagueScoringConfig(matchup.leagueId);
+    const scoringConfig = await scoringConfigLoaderFor(context).load(
+      matchup.leagueId,
+    );
     const scoringSettings = applyMultiplierGroups(
       scoringConfig.multiplierGroups,
     );

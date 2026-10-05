@@ -18,6 +18,12 @@ jest.mock('@legacy-sports/db-client', () => ({
       id: 'leagues.id',
       currentWeek: 'leagues.currentWeek',
       currentMatchup: 'leagues.currentMatchup',
+      rosterLockTiming: 'leagues.rosterLockTiming',
+    },
+    rosterLockRules: {
+      leagueId: 'rosterLockRules.leagueId',
+      customLockTime: 'rosterLockRules.customLockTime',
+      lockHoursBeforeMatchup: 'rosterLockRules.lockHoursBeforeMatchup',
     },
     matchups: {
       id: 'matchups.id',
@@ -74,9 +80,11 @@ jest.mock('@legacy-sports/db-client', () => ({
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import {
   createFootballScoringSettingsLoader,
+  createLeagueRosterLockInputsLoader,
   createLeagueWeekPlayerSeasonsLoader,
   createLockedTeamMembersLoader,
   createMatchupPlayerGamesLoader,
+  createMatchupPlayersByMatchupIdLoader,
   createSelectedGamesCountLoader,
 } from './matchup-loaders';
 
@@ -383,6 +391,94 @@ describe('createSelectedGamesCountLoader (LS-10043)', () => {
     await expect(loader.load(1)).rejects.toThrow(
       'syntax error at or near "SELECT"',
     );
+  });
+});
+
+describe('createMatchupPlayersByMatchupIdLoader (LS-10307)', () => {
+  it('batches every matchup in one query and groups rows by matchupId', async () => {
+    const { db, queryCalls } = makeMockDb([
+      () => [
+        { id: 1, matchupId: 10, playerId: 100 },
+        { id: 2, matchupId: 11, playerId: 101 },
+        { id: 3, matchupId: 10, playerId: 102 },
+      ],
+    ]);
+    const loader = createMatchupPlayersByMatchupIdLoader(db);
+
+    const [m10, m11, m12] = await Promise.all([
+      loader.load(10),
+      loader.load(11),
+      loader.load(12),
+    ]);
+
+    expect(queryCalls).toHaveLength(1);
+    expect(m10.map((r) => r.id)).toEqual([1, 3]);
+    expect(m11.map((r) => r.id)).toEqual([2]);
+    expect(m12).toEqual([]);
+  });
+
+  it('retries after a pool connection-timeout error', async () => {
+    let attempt = 0;
+    const where = jest.fn(() => {
+      attempt += 1;
+      return attempt === 1
+        ? Promise.reject(new Error('timeout exceeded when trying to connect'))
+        : Promise.resolve([{ id: 1, matchupId: 10 }]);
+    });
+    const db = {
+      select: () => ({ from: () => ({ where }) }),
+    } as unknown as Parameters<typeof createMatchupPlayersByMatchupIdLoader>[0];
+
+    await expect(
+      createMatchupPlayersByMatchupIdLoader(db).load(10),
+    ).resolves.toEqual([{ id: 1, matchupId: 10 }]);
+    expect(where).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createLeagueRosterLockInputsLoader (LS-10307)', () => {
+  it('reads league timing and lock rules once for every matchup in the league', async () => {
+    const { db, queryCalls } = makeMockDb([
+      () => [{ id: 5, rosterLockTiming: 'custom' }],
+      () => [
+        { leagueId: 5, customLockTime: null, lockHoursBeforeMatchup: 2 },
+        { leagueId: 5, customLockTime: null, lockHoursBeforeMatchup: 9 },
+      ],
+    ]);
+    const loader = createLeagueRosterLockInputsLoader(db);
+
+    // Twenty matchups in one league → one key, two queries total.
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => loader.load(5)),
+    );
+
+    expect(queryCalls).toHaveLength(2);
+    // First rule row wins, matching the previous per-matchup `.limit(1)`.
+    for (const result of results) {
+      expect(result).toEqual({
+        rosterLockTiming: 'custom',
+        lockRules: { customLockTime: null, lockHoursBeforeMatchup: 2 },
+      });
+    }
+  });
+
+  it('returns null lockRules when the league has none, and null for a missing league', async () => {
+    const { db } = makeMockDb([
+      () => [{ id: 5, rosterLockTiming: 'matchup_start' }],
+      () => [],
+    ]);
+    const loader = createLeagueRosterLockInputsLoader(db);
+
+    const [present, missing] = await Promise.all([
+      loader.load(5),
+      loader.load(6),
+    ]);
+
+    expect(present).toEqual({
+      rosterLockTiming: 'matchup_start',
+      lockRules: null,
+    });
+    expect(missing).toBeNull();
   });
 });
 

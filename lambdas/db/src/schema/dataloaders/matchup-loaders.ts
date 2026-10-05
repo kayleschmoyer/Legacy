@@ -544,3 +544,114 @@ export const createScoringChangeLogLoader = (
     );
     return keys.map((key) => changeLogByLeague.get(key) ?? []);
   });
+
+/**
+ * DataLoader for every matchup_players row of a matchup (LS-10307).
+ *
+ * Key: matchupId (number)
+ * Returns: all matchup_players rows for that matchup (starters and bench).
+ *
+ * `Matchup.winProbability` used to run one direct `matchup_players` select
+ * per matchup, so resolving it across a league (GetMatchupsForLeague) issued
+ * one query per matchup against the Lambda's small connection pool. Batching
+ * by matchupId collapses that to a single `IN (...)` query per request.
+ */
+export const createMatchupPlayersByMatchupIdLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    Array<typeof PublicSchema.matchupPlayers.$inferSelect>
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await withPoolTimeoutRetry(() =>
+      db
+        .select()
+        .from(PublicSchema.matchupPlayers)
+        .where(inArray(PublicSchema.matchupPlayers.matchupId, ids)),
+    );
+
+    const byMatchup = new Map<
+      number,
+      Array<typeof PublicSchema.matchupPlayers.$inferSelect>
+    >();
+    for (const row of rows) {
+      const list = byMatchup.get(row.matchupId);
+      if (list) list.push(row);
+      else byMatchup.set(row.matchupId, [row]);
+    }
+    return keys.map((key) => byMatchup.get(key) ?? []);
+  });
+
+/** Per-league inputs to `computeRosterLockTime` (LS-10307). */
+export interface LeagueRosterLockInputs {
+  rosterLockTiming: string;
+  lockRules: {
+    customLockTime: string | null;
+    lockHoursBeforeMatchup: number | null;
+  } | null;
+}
+
+/**
+ * DataLoader for a league's roster-lock inputs (LS-10307).
+ *
+ * Key: leagueId (number)
+ * Returns: the league's `rosterLockTiming` plus its `roster_lock_rules` row,
+ *   or null when the league does not exist.
+ *
+ * `Matchup.lockTime` used to select both per matchup — identical rows for
+ * every matchup in a league — which, alongside `Matchup.winProbability`,
+ * exhausted the pool on league-wide matchup queries (25s+ invocations in
+ * nightly runs 36342761127 / 36899444053). One batch per request instead.
+ */
+export const createLeagueRosterLockInputsLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, LeagueRosterLockInputs | null>(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const [leagues, rules] = await Promise.all([
+      withPoolTimeoutRetry(() =>
+        db
+          .select({
+            id: PublicSchema.leagues.id,
+            rosterLockTiming: PublicSchema.leagues.rosterLockTiming,
+          })
+          .from(PublicSchema.leagues)
+          .where(inArray(PublicSchema.leagues.id, ids)),
+      ),
+      withPoolTimeoutRetry(() =>
+        db
+          .select({
+            leagueId: PublicSchema.rosterLockRules.leagueId,
+            customLockTime: PublicSchema.rosterLockRules.customLockTime,
+            lockHoursBeforeMatchup:
+              PublicSchema.rosterLockRules.lockHoursBeforeMatchup,
+          })
+          .from(PublicSchema.rosterLockRules)
+          .where(inArray(PublicSchema.rosterLockRules.leagueId, ids)),
+      ),
+    ]);
+
+    // First rule row per league wins, matching the previous `.limit(1)` read.
+    const rulesByLeague = new Map<
+      number,
+      LeagueRosterLockInputs['lockRules']
+    >();
+    for (const rule of rules) {
+      if (!rulesByLeague.has(rule.leagueId)) {
+        rulesByLeague.set(rule.leagueId, {
+          customLockTime: rule.customLockTime,
+          lockHoursBeforeMatchup: rule.lockHoursBeforeMatchup,
+        });
+      }
+    }
+
+    const byLeague = new Map<number, LeagueRosterLockInputs>();
+    for (const league of leagues) {
+      byLeague.set(league.id, {
+        rosterLockTiming: league.rosterLockTiming,
+        lockRules: rulesByLeague.get(league.id) ?? null,
+      });
+    }
+    return keys.map((key) => byLeague.get(key) ?? null);
+  });
