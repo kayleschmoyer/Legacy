@@ -22,8 +22,6 @@ describe('CONFIG_KEYS registry', () => {
       'rollbarCaptureRate',
       'googleAnalyticsMeasurementId',
       'jiraProxyUrl',
-      'stripeMonthlyPriceId',
-      'stripeAnnualPriceId',
       'vapidPublicKey',
       'imageUploadUrl',
       'repoUrl',

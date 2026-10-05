@@ -92,8 +92,6 @@ jest.mock('../../config/environment', () => ({
     branch: 'main',
     repoUrl: 'https://github.com/bkrupa/legacy-sports',
     jiraProxyUrl: '',
-    stripeMonthlyPriceId: '',
-    stripeAnnualPriceId: '',
     vapidPublicKey: '',
   },
   envConfigErrors: [] as string[],

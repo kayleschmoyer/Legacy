@@ -36,12 +36,6 @@ export function buildWebConfig(): AppConfig {
       | string
       | undefined,
     jiraProxyUrl: import.meta.env['VITE_JIRA_PROXY_URL'] as string | undefined,
-    stripeMonthlyPriceId: import.meta.env['VITE_STRIPE_MONTHLY_PRICE_ID'] as
-      | string
-      | undefined,
-    stripeAnnualPriceId: import.meta.env['VITE_STRIPE_ANNUAL_PRICE_ID'] as
-      | string
-      | undefined,
     vapidPublicKey: import.meta.env['VITE_VAPID_PUBLIC_KEY'] as
       | string
       | undefined,

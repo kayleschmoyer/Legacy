@@ -35,10 +35,6 @@ export interface EnvironmentConfig {
   readonly googleAnalyticsMeasurementId?: string;
   /** URL for the Jira proxy lambda used by the bug report button. */
   readonly jiraProxyUrl: string;
-  /** Stripe price ID for monthly Premium subscription. */
-  readonly stripeMonthlyPriceId: string;
-  /** Stripe price ID for annual Premium subscription. */
-  readonly stripeAnnualPriceId: string;
   /** VAPID public key for Web Push subscription (base64url-encoded). */
   readonly vapidPublicKey: string;
   /** GrowthBook SDK client key for feature flags and A/B tests. */
@@ -123,8 +119,6 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
       : import.meta.env.DEV && config.jiraProxyUrl
         ? '/__jira-proxy'
         : (config.jiraProxyUrl ?? ''),
-  stripeMonthlyPriceId: config.stripeMonthlyPriceId ?? '',
-  stripeAnnualPriceId: config.stripeAnnualPriceId ?? '',
   vapidPublicKey: config.vapidPublicKey ?? '',
   growthbookClientKey: config.growthbookClientKey,
   giphyApiKey: config.giphyApiKey,

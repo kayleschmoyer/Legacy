@@ -23,8 +23,6 @@ export function buildNodeConfig(): AppConfig {
     rollbarCaptureRate: undefined,
     googleAnalyticsMeasurementId: undefined,
     jiraProxyUrl: undefined,
-    stripeMonthlyPriceId: undefined,
-    stripeAnnualPriceId: undefined,
     vapidPublicKey: undefined,
     imageUploadUrl: undefined,
     repoUrl: undefined,

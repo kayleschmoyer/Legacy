@@ -137,12 +137,6 @@ jobs:
           # '' (apps/web/src/config/environment.ts:128). See lambdas/notifications
           # for the server-side Lambda that consumes the matching private key. LS-6838.
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
-          # Stripe subscription price IDs — the same neutral secrets the Android
-          # build prefixes as EXPO_PUBLIC_STRIPE_* (account-global price IDs, one
-          # value per platform, no drift). Unset → the web subscription screen
-          # renders no plans. (The Stripe *secret* key lives only server-side.)
-          VITE_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
-          VITE_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
           VITE_VERSION: ${{ needs.setup.outputs.version }}
           VITE_APP_VERSION: ${{ needs.setup.outputs.version }}
           VITE_COMMIT_SHA: ${{ needs.setup.outputs.commit_sha }}

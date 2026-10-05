@@ -121,16 +121,6 @@ export const CONFIG_KEYS = {
     mobile: 'EXPO_PUBLIC_JIRA_PROXY_URL',
     required: false,
   },
-  stripeMonthlyPriceId: {
-    clientSafe: true,
-    web: 'VITE_STRIPE_MONTHLY_PRICE_ID',
-    required: false,
-  },
-  stripeAnnualPriceId: {
-    clientSafe: true,
-    web: 'VITE_STRIPE_ANNUAL_PRICE_ID',
-    required: false,
-  },
   vapidPublicKey: {
     clientSafe: true,
     web: 'VITE_VAPID_PUBLIC_KEY',
