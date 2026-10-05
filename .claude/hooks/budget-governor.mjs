@@ -21,14 +21,22 @@
  *                               tools, Task*, Skill, AskUserQuestion) stay
  *                               allowed so wrapping up — or safely bailing out
  *                               of a stuck rebase/merge — is always possible.
+ *   count >= HARD (handoff)     session-handoff tools (create_session,
+ *                               send_message, send_later, spawn_task,
+ *                               continuation_post/status) get a separate
+ *                               grace allowance of HANDOFF calls on top of
+ *                               the hard budget, so a session that has run
+ *                               out of budget can still hand its remaining
+ *                               work to a fresh session to continue. They
+ *                               never consume block budget while grace lasts.
  *
  * Loop safety: after MAX_BLOCKS blocked calls the governor disarms itself for
  * the rest of the session (advisory only) — an agent is never trapped.
  * Bash bypass marker: `# budget-ok: <reason>` anywhere in the command.
  *
  * Config (env): LS_BUDGET_SOFT_CALLS (default 250), LS_BUDGET_HARD_CALLS
- * (default 500), LS_BUDGET_WARN_EVERY (default 50). Set LS_BUDGET_HARD_CALLS=0
- * to disable blocking entirely.
+ * (default 500), LS_BUDGET_WARN_EVERY (default 50), LS_BUDGET_HANDOFF_CALLS
+ * (default 10). Set LS_BUDGET_HARD_CALLS=0 to disable blocking entirely.
  *
  * State: <os-tmpdir>/claude-hooks/<session_id>/budget.json — per-session, so
  * concurrent sessions never share a meter. Audit: .claude/audit/budget-governor.jsonl.
@@ -53,6 +61,7 @@ function envInt(name, fallback) {
 const SOFT = envInt('LS_BUDGET_SOFT_CALLS', 250);
 const HARD = envInt('LS_BUDGET_HARD_CALLS', 500);
 const WARN_EVERY = Math.max(1, envInt('LS_BUDGET_WARN_EVERY', 50));
+const HANDOFF = envInt('LS_BUDGET_HANDOFF_CALLS', 10);
 const MAX_BLOCKS = 5;
 
 const input = readHookInput();
@@ -66,6 +75,7 @@ const state = readJson(stateFile, {
   blocks: 0,
   disarmed: false,
 });
+state.handoffCalls ??= 0;
 state.count += 1;
 
 const elapsedMin = Math.round((Date.now() - state.firstTs) / 60000);
@@ -96,10 +106,38 @@ function isCheckpointSafe() {
   return false;
 }
 
+/**
+ * Tools that hand the remaining work to a fresh session (cloud: CCR
+ * create_session/send_message/send_later; local: spawn_task chips) or record
+ * the resume point for one (continuation_post/status). Allowed past HARD up to
+ * the HANDOFF grace allowance so running out of budget ends in a handoff, not
+ * a dead stop.
+ */
+function isHandoffTool() {
+  return /^(mcp__claude-code-remote__|mcp__Claude_Code_Remote__)(create_session|send_message|send_later)$|^mcp__ccd_session__spawn_task$|^mcp__legacy-sports-dev-process__continuation_(post|status)$/.test(
+    tool,
+  );
+}
+
+const handoffLeft = () => Math.max(0, HANDOFF - state.handoffCalls);
+
 let stdout = '';
 let exitCode = 0;
 
-if (HARD > 0 && state.count >= HARD && !state.disarmed && !isCheckpointSafe()) {
+const pastHard = HARD > 0 && state.count >= HARD && !state.disarmed;
+
+if (pastHard && isHandoffTool() && handoffLeft() > 0) {
+  state.handoffCalls += 1;
+  appendJsonl(join(auditDir(input), 'budget-governor.jsonl'), {
+    ts: new Date().toISOString(),
+    sessionId: input.session_id,
+    event: 'handoff',
+    count: state.count,
+    handoffCalls: state.handoffCalls,
+    elapsedMin,
+    tool,
+  });
+} else if (pastHard && !isCheckpointSafe()) {
   state.blocks += 1;
   if (state.blocks > MAX_BLOCKS) {
     state.disarmed = true;
@@ -114,7 +152,10 @@ if (HARD > 0 && state.count >= HARD && !state.disarmed && !isCheckpointSafe()) {
       `  1. Commit and push whatever is complete (git commit/push/status/diff/log/rev-parse, ` +
       `git rebase/merge --abort, and worktree_*/github_*/jira_*/Atlassian MCP tools remain allowed).\n` +
       `  2. Update the PR and tracking tasks with honest state — done, remaining, blocked.\n` +
-      `  3. Summarise where you are and stop; do not open new lines of work.\n\n` +
+      `  3. If work remains, hand it off to a fresh session — ${handoffLeft()} of ${HANDOFF} handoff calls left ` +
+      `(cloud: claude-code-remote create_session with source_url + a cold-start prompt, send_message, send_later; ` +
+      `local: spawn_task; continuation_post to record the resume point on the PR).\n` +
+      `  4. Summarise where you are and stop; do not open new lines of work.\n\n` +
       `If ONE specific Bash call is essential to checkpointing, add \`# budget-ok: <reason>\` anywhere in the command.\n` +
       `(Block ${state.blocks} of ${MAX_BLOCKS} — after that the governor disarms and flags the session for review.)\n`;
     exitCode = 2;

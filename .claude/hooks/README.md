@@ -53,12 +53,13 @@ Command patterns are matched with heredoc bodies and quoted strings stripped, so
 
 ## Configuration knobs (env vars)
 
-| Var                    | Default                       | Meaning                                                                                                             |
-| ---------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `LS_EXPECTED_MODELS`   | `opus\|sonnet\|fable\|mythos` | Pipe-separated model-id substrings (never compiled to a regex); warn at SessionStart when none match. `*` disables. |
-| `LS_BUDGET_SOFT_CALLS` | `250`                         | Tool calls before `[BUDGET]` advisories start                                                                       |
-| `LS_BUDGET_HARD_CALLS` | `500`                         | Tool calls before non-checkpoint tools are blocked (`0` disables blocking)                                          |
-| `LS_BUDGET_WARN_EVERY` | `50`                          | Advisory cadence past the soft budget                                                                               |
+| Var                       | Default                       | Meaning                                                                                                                                                                                |
+| ------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LS_EXPECTED_MODELS`      | `opus\|sonnet\|fable\|mythos` | Pipe-separated model-id substrings (never compiled to a regex); warn at SessionStart when none match. `*` disables.                                                                    |
+| `LS_BUDGET_SOFT_CALLS`    | `250`                         | Tool calls before `[BUDGET]` advisories start                                                                                                                                          |
+| `LS_BUDGET_HARD_CALLS`    | `500`                         | Tool calls before non-checkpoint tools are blocked (`0` disables blocking)                                                                                                             |
+| `LS_BUDGET_WARN_EVERY`    | `50`                          | Advisory cadence past the soft budget                                                                                                                                                  |
+| `LS_BUDGET_HANDOFF_CALLS` | `10`                          | Extra calls past the hard budget reserved for handing off to a fresh session (`create_session`, `send_message`, `send_later`, `spawn_task`, `continuation_post`/`continuation_status`) |
 
 ## Testing a hook manually
 
@@ -73,4 +74,4 @@ echo '{"session_id":"t1","tool_name":"Bash","tool_input":{"command":"git push --
 
 - `session-models.jsonl` — one record per SessionStart/Stop with the detected model
 - `risk-guard.jsonl` — every risk-guard hit, including bypassed ones
-- `budget-governor.jsonl` — budget warnings, blocks, and disarms
+- `budget-governor.jsonl` — budget warnings, blocks, handoff-grace calls, and disarms
