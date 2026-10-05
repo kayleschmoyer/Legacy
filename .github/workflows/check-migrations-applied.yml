@@ -265,6 +265,8 @@ jobs:
           # set by the expected GitHub app" — which froze the merge queue for
           # every PR after LS-10559 made the CI app token mint succeed.
           # Re-run via workflow_dispatch (pr_number) to replace a CI-app status.
+          # Runbook: docs/ci-cd/ci-troubleshooting-guide.md -> "not set by the
+          # expected GitHub app".
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;

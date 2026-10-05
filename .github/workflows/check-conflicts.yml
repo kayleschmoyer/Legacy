@@ -257,6 +257,8 @@ jobs:
           # set by the expected GitHub app" — which froze the merge queue for
           # every PR after LS-10559 made the CI app token mint succeed.
           # check-conflicts-sweep.yml re-posts any status left by another app.
+          # Runbook: docs/ci-cd/ci-troubleshooting-guide.md -> "not set by the
+          # expected GitHub app".
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;

@@ -80,6 +80,14 @@ jobs:
           # workflow's own `statuses: write` grant, the same token CI Gate
           # posts through (ci-pipeline.yml). (The Agent Author app token used
           # for the read-heavy calls above is not granted the statuses scope.)
+          # LS-10561 required-status SOURCE APP: "No Merge Conflicts" must be
+          # posted as github-actions[bot] (GITHUB_TOKEN), here and in
+          # check-conflicts.yml. Classic branch protection on main binds this
+          # context to the github-actions app, so a status from any other app
+          # (e.g. the Legacy Sports CI app) 405s the merge queue with "Required
+          # status check ... was not set by the expected GitHub app". Runbook:
+          # docs/ci-cd/ci-troubleshooting-guide.md -> "not set by the expected
+          # GitHub app".
           STATUS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           BASE_SHA: ${{ github.sha }}

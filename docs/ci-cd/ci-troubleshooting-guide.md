@@ -204,14 +204,15 @@ See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue refere
 
 **Common blockers:**
 
-| Symptom                                      | Cause                                                  | Fix                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| PR not merging after CI passes               | 30 s debounce                                          | Wait 60 s; check merge queue workflow run                                                                     |
-| "Unresolved review threads"                  | Human or bot threads open                              | Resolve all threads in Files Changed tab                                                                      |
-| "Status checks failing"                      | CI or bot-review failure                               | Fix the failing check                                                                                         |
-| Queue appears stuck                          | Race condition                                         | Remove and re-add `merge-when-ready` label                                                                    |
-| Green checks but `N of 8 expected` 405       | Ruleset `integration_id` drift (live)                  | Re-sync ruleset (`bash scripts/apply-ruleset.sh`); nudge stuck PRs with `ci:run` — see below                  |
-| Green checks, 405, but ruleset already clean | Cached per-commit merge verdict (drift already healed) | Bump the SHA (`node scripts/detect-stalled-prs.mjs --fix`, empty commit, or rebase) — see "stalled PRs" below |
+| Symptom                                          | Cause                                                         | Fix                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| PR not merging after CI passes                   | 30 s debounce                                                 | Wait 60 s; check merge queue workflow run                                                                     |
+| "Unresolved review threads"                      | Human or bot threads open                                     | Resolve all threads in Files Changed tab                                                                      |
+| "Status checks failing"                          | CI or bot-review failure                                      | Fix the failing check                                                                                         |
+| Queue appears stuck                              | Race condition                                                | Remove and re-add `merge-when-ready` label                                                                    |
+| Green checks but `N of 8 expected` 405           | Ruleset `integration_id` drift (live)                         | Re-sync ruleset (`bash scripts/apply-ruleset.sh`); nudge stuck PRs with `ci:run` — see below                  |
+| Green checks, 405, but ruleset already clean     | Cached per-commit merge verdict (drift already healed)        | Bump the SHA (`node scripts/detect-stalled-prs.mjs --fix`, empty commit, or rebase) — see "stalled PRs" below |
+| 405 "... was not set by the expected GitHub app" | Required status posted by an app the check is bound to reject | Re-post it from the bound app (sweep / `workflow_dispatch`) — see below                                       |
 
 ### Merge blocked: "N of 8 required status checks are expected" (405) despite all checks green
 
@@ -256,6 +257,40 @@ If any `🚀 CI Pipeline / *` context shows `integration_id=15368` (the others s
 - ruleset `id=1524440` — this repo's "Protect Main" ruleset. `apply-ruleset.sh` matches by name and `PUT`s in place (never creates a duplicate), so the ID is stable.
 
 **`apply-ruleset.sh` is idempotent.** It updates in place (no duplicate rulesets), the committed `ruleset.json` has no `_staged` rules (so the staged-merge branch appends nothing and cannot accumulate), and payload generation is deterministic. Re-running converges to the same state and no-ops once the live ruleset already matches the committed config — making it safe to run repeatedly or on a schedule.
+
+### Merge blocked: "Required status check ... was not set by the expected GitHub app" (405)
+
+**Symptom.** Every required status is green and the queue picks the PR, but `PUT /merge` returns 405 with `Required status check "No Merge Conflicts" was not set by the expected GitHub app`. This froze the queue on 2026-10-04 after LS-10559 (#8361) fixed the Legacy Sports CI app token mint. LS-10561 fixed it in #8376.
+
+**Root cause.** Classic branch protection on `main` binds some required contexts to the GitHub Actions app. A status for a bound context posted by any other app is rejected at merge time. The `Protect Main` ruleset itself has no `integration_id`. Agent tokens cannot read classic protection (403, which `github_get_branch_protection` swallows), so the binding was inferred from which statuses the queue accepts and which it rejects.
+
+**Source app per required status.** Keep each one posted by the app listed here. The `LS-10561` comment next to each post repeats this.
+
+| Required context                | Must be posted by                                                                                                    | Where                                              |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `No Merge Conflicts`            | `github-actions[bot]` (`GITHUB_TOKEN`). **Bound.**                                                                   | `check-conflicts.yml`, `check-conflicts-sweep.yml` |
+| `Verify All Migrations Applied` | `github-actions[bot]` (`GITHUB_TOKEN`). **Bound.**                                                                   | `check-migrations-applied.yml`                     |
+| `CI Gate`                       | Legacy Sports CI app (`legacy-sports-ci[bot]`, client-id 3148299); `github-actions[bot]` on token fallback. Unbound. | `ci-pipeline.yml` (summarize job)                  |
+| `bot-review`                    | Legacy Sports Code Reviewer Bot (`legacy-sports-review-bot[bot]`)                                                    | `.github/scripts/reviewer/lib/github.mjs`          |
+
+Do not switch the token on a bound context's status post (for example back to the CI app for its separate rate-limit budget) unless an admin first removes the binding.
+
+**Diagnose.** Compare `creator.login` on the stuck PR's head against the table:
+
+```bash
+gh api repos/bkrupa/legacy-sports/commits/<sha>/statuses \
+  -q '.[] | "\(.context)\t\(.state)\t\(.created_at)\t\(.creator.login)"'
+```
+
+The newest status per context is the one evaluated. The combined `/commits/<sha>/status` endpoint does not return `creator`.
+
+**Fix.**
+
+- `No Merge Conflicts` from the wrong app: `check-conflicts-sweep.yml` treats it as absent and re-posts it as github-actions on the next push to `main`.
+- `Verify All Migrations Applied` from the wrong app: re-run `check-migrations-applied.yml` via `workflow_dispatch` with `pr_number`.
+- If a context should accept more than one app, a repo admin can remove the binding, either by setting the check to **Any source** under Settings → Branches → `main` or by deleting the classic required checks (`gh api -X DELETE repos/bkrupa/legacy-sports/branches/main/protection/required_status_checks`), since the ruleset already requires the same contexts. Then run `bash scripts/apply-ruleset.sh` and update the table above.
+
+**Distinguish it from the cached verdict.** This error names the app. The cached-verdict variant below reports `N of M ... expected` instead, and re-posting the status from the right app does not clear it. That one needs a SHA change.
 
 ### Failure mode: "stalled" PRs — green + bot-approved but merge-blocked
 

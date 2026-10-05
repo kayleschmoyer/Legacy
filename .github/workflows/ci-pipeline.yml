@@ -1561,6 +1561,15 @@ jobs:
           DISPATCH_HEAD_SHA: ${{ inputs.head-sha }}
           BATCH_HEAD_SHA: ${{ !inputs.pr-number && inputs.base-sha && inputs.head-sha || '' }}
         with:
+          # LS-10561 required-status SOURCE APP: "CI Gate" is posted by the
+          # Legacy Sports CI app (legacy-sports-ci[bot], client-id 3148299), or
+          # by github-actions[bot] on the GITHUB_TOKEN fallback. Unlike "No Merge
+          # Conflicts" / "Verify All Migrations Applied" (bound to github-actions,
+          # see check-conflicts.yml), CI Gate is not app-bound, so both sources
+          # are accepted. Keep it unbound: pinning it to one app would 405 the
+          # merge queue with "Required status check ... was not set by the
+          # expected GitHub app". Runbook: docs/ci-cd/ci-troubleshooting-guide.md
+          # -> "not set by the expected GitHub app".
           # LS-9571 follow-up: both the Agent Author app and the Merge Queue
           # app 403'd this specific call with "Resource not accessible by
           # integration" — neither is granted "Commit statuses: write" on
