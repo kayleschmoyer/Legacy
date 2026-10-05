@@ -12,7 +12,8 @@ export type Sport = 'baseball' | 'football';
  *   • /:sport/league/create        — creation form (basic + advanced + sport)
  *   • /:sport/league/:id/:tab       — detail (overview / standings / roster / …)
  *   • /:sport/leagues               — public discovery list
- *   • /:sport/league/join[/:code]   — join by invite code
+ *   • /:sport/league/join[/:code]   — join by invite code (coded links
+ *                                     redirect to /join/:code)
  *
  * Migrated to the platform-neutral driver interface (ADR-0016): the object is
  * a screen (extends {@link BaseScreen}, holds an {@link AppDriver}) and every
@@ -502,6 +503,21 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byText(/Invite code loaded from link/i);
   }
 
+  /** The universal `/join/:code` screen (LS-10422 — coded links land here). */
+  get joinByCodeScreen(): UIElement {
+    return this.driver.byTestId('join-by-code');
+  }
+
+  /** The league preview card on the universal `/join/:code` screen. */
+  get joinPreviewLeague(): UIElement {
+    return this.driver.byTestId('join-preview-league');
+  }
+
+  /** The submit button on the universal `/join/:code` screen. */
+  get joinByCodeSubmit(): UIElement {
+    return this.driver.byTestId('join-submit');
+  }
+
   /** The inline join-form error card. */
   get formErrorCard(): UIElement {
     return this.driver.byTestId('join-form-error');
@@ -578,7 +594,11 @@ export class LeaguePage extends BaseScreen {
     await this.discoveryHeading.expectVisible({ timeout: 30000 });
   }
 
-  /** Navigate to the join-by-code page (optionally with a deep-link code). */
+  /**
+   * Navigate to the join-by-code page (optionally with a deep-link code). A
+   * coded link redirects to the universal `/join/:code` screen (LS-10422);
+   * the bare link stays on the public-league Quick Join page.
+   */
   async gotoJoin(inviteCode?: string): Promise<void> {
     const path = inviteCode
       ? `/baseball/league/join/${inviteCode}`

@@ -84,37 +84,37 @@ export async function validateInviteCodePreflight(
 }
 
 /**
- * Wait for the join-league page to finish invite code validation.
+ * Wait for the universal `/join/:code` screen (LS-10422) to preview the
+ * league the invite code points at.
  *
- * After `switchUser` navigates to the join page, the `validateInviteCode`
- * GraphQL query fires immediately. Due to a race condition between the
- * cookie/localStorage swap and the query execution, the validation can
- * fail transiently — the page shows "Unable to verify code" instead of
- * the expected "X spot(s) available" text.
+ * After `switchUser` navigates to the join page, the `resolveInviteCode`
+ * query fires immediately (network-only, once per mount). The cookie /
+ * localStorage swap can race it, and a cold Lambda can transiently answer
+ * null for a valid code, so the screen may settle on one of:
  *
- * "Invalid invite code" can also appear transiently: the component renders
- * that message on the initial render (before the lazy query fires) and when
- * the backend returns null for a valid code (slow Lambda cold start).  When
- * detected, the helper waits a 5 s grace period for the query to self-resolve
- * before deciding to reload — avoiding premature reloads caused by catching
- * the initial-render flash before the async query completes (LS-4364).
+ *   - `join-preview-league` — success, the league preview card
+ *   - `join-sign-in` — the query came back UNAUTHENTICATED (auth race)
+ *   - `join-not-found` — the query answered null (cold start)
+ *   - "Couldn't check this code" — any other query error
  *
- * This helper waits for the success text and, if any error message appears
- * or the 15 s poll times out, reloads the page to retry validation. The
+ * The query does not re-run on its own, so every failure outcome (and a 15 s
+ * timeout) reloads the page to retry. `join-already-in` means the manager is
+ * already a member — a test-setup bug no reload fixes — and fails fast. The
  * first attempt plus up to `maxRetries` reload retries are performed (i.e.
  * `maxRetries + 1` total attempts).
  */
-export async function waitForJoinPageValidation(
+export async function waitForJoinPreview(
   page: Page,
   maxRetries = 2,
 ): Promise<void> {
-  const spotsLocator = page.getByText(/spot(s)?\s+available/i).first();
-  const errorLocator = page.getByText(/unable to verify code/i).first();
-  // "Invalid invite code" appears transiently on initial render (before the
-  // validateInviteCode query fires) or when the backend returns null for a
-  // valid code. Detect it quickly so we can apply the grace period rather
-  // than waiting the full 15 s timeout before reacting.
-  const invalidLocator = page.getByText(/invalid invite code/i).first();
+  const previewLocator = page.getByTestId('join-preview-league');
+  const outcomes = [
+    ['preview', previewLocator],
+    ['sign-in', page.getByTestId('join-sign-in')],
+    ['not-found', page.getByTestId('join-not-found')],
+    ['already-in', page.getByTestId('join-already-in')],
+    ['error', page.getByText(/couldn.t check this code/i).first()],
+  ] as const;
 
   // Re-throws non-TimeoutError failures (page closed, navigation errors) so
   // genuine failures are not silently swallowed and retried as a timeout.
@@ -126,67 +126,31 @@ export async function waitForJoinPageValidation(
   };
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    // Catch only Playwright TimeoutErrors on each waitFor. Any other error
-    // (page/context closed, navigation failure) is re-thrown immediately so it
-    // isn't silently swallowed and retried. The 4th racer is a defensive
-    // wall-clock timeout that guarantees an outcome at 15 s even if a locator
-    // wait stalls past its own timeout.
+    // The last racer is a defensive wall-clock timeout that guarantees an
+    // outcome at 15 s even if a locator wait stalls past its own timeout.
     const outcome = await Promise.race([
-      spotsLocator
-        .waitFor({ state: 'visible', timeout: 15_000 })
-        .then(() => 'success' as const)
-        .catch(onlyTimeout),
-      errorLocator
-        .waitFor({ state: 'visible', timeout: 15_000 })
-        .then(() => 'error' as const)
-        .catch(onlyTimeout),
-      invalidLocator
-        .waitFor({ state: 'visible', timeout: 15_000 })
-        .then(() => 'invalid' as const)
-        .catch(onlyTimeout),
+      ...outcomes.map(([name, locator]) =>
+        locator
+          .waitFor({ state: 'visible', timeout: 15_000 })
+          .then(() => name)
+          .catch(onlyTimeout),
+      ),
       new Promise<'timeout'>((resolve) =>
         setTimeout(() => resolve('timeout'), 15_000),
       ),
     ]);
 
-    if (outcome === 'success') {
-      await expect(spotsLocator).toBeVisible();
+    if (outcome === 'preview') {
+      await expect(previewLocator).toBeVisible();
       return;
     }
 
-    if (outcome === 'invalid') {
-      // "Invalid invite code" appears on the initial render (before the lazy
-      // validateInviteCode query fires) and again when the backend transiently
-      // returns null (Lambda cold start).  The Promise.race above resolves as
-      // soon as the text is *visible* — which can happen within milliseconds
-      // of the page load — so we may be firing a reload before the query has
-      // had a chance to complete (LS-4364).
-      //
-      // Give the query a 5 s grace period to self-resolve.  If the backend
-      // returns a valid code, the "spot(s) available" text will appear within
-      // that window and we can return immediately without an unnecessary
-      // reload.  If it is still invalid after 5 s, fall through to the
-      // reload/retry path — the backend is genuinely returning null.
-      // Use the `onlyTimeout` predicate so a page-closed or navigation error
-      // during the grace period rethrows instead of being silently treated
-      // as "not visible" (LS-4461).
-      const selfResolved = await spotsLocator
-        .waitFor({ state: 'visible', timeout: 5_000 })
-        .then(() => true)
-        .catch((err: unknown) => {
-          onlyTimeout(err);
-          return false;
-        });
-      if (selfResolved) {
-        await expect(spotsLocator).toBeVisible();
-        return;
-      }
-      // Still invalid after grace period — fall through to reload/retry below.
+    if (outcome === 'already-in') {
+      throw new Error(
+        `Join page reports the user is already in this league. URL: ${page.url()}`,
+      );
     }
 
-    // Retry on explicit errors ("Unable to verify code"), persistent
-    // "Invalid invite code" (backend still returning null after grace period),
-    // and timeouts (slow Lambda cold start or transient auth race).
     if (attempt < maxRetries) {
       await page.reload();
       await page.waitForLoadState('load');
@@ -194,7 +158,7 @@ export async function waitForJoinPageValidation(
     }
 
     throw new Error(
-      `Join page validation failed after ${attempt + 1} attempt(s). ` +
+      `Join page preview failed after ${attempt + 1} attempt(s). ` +
         `Outcome: ${outcome}. URL: ${page.url()}`,
     );
   }
@@ -307,9 +271,9 @@ export interface JoinLeagueAsManagerOptions {
  * integration spec (LS-4270, LS-4298, LS-4360, LS-4364, LS-4385, LS-4447):
  *
  *   1. `validateInviteCodePreflight(jwt, code)` — warm the query Lambda
- *   2. `page.goto('/baseball/league/join/<code>')`
- *   3. `waitForJoinPageValidation(page)` — wait for "X spot(s) available"
- *   4. Fill the team-name field and assert the Join button is enabled
+ *   2. `page.goto('/join/<code>')` — the universal join route (LS-10422)
+ *   3. `waitForJoinPreview(page)` — wait for the league preview card
+ *   4. Fill the "Team name" field and assert the Join button is enabled
  *   5. Listen for the `JoinLeagueByCode` GraphQL response, then click Join
  *   6. Surface any `errors[]` (with AWS request id) or return the new leagueId
  *      after the URL has changed to `/baseball/league/<id>`
@@ -317,7 +281,7 @@ export interface JoinLeagueAsManagerOptions {
  * The post-click race is the failure mode this helper exists to fix. Earlier
  * iterations only asserted on the URL change with a 15s timeout — when the
  * mutation Lambda was cold or returned `errors[]`, the test would time out
- * with "URL stuck on /league/join/XXXXXXXX" and no clue why. This helper:
+ * with "URL stuck on /join/XXXXXXXX" and no clue why. This helper:
  *
  * - Captures the mutation response (30s window — long enough for a cold start)
  * - Re-throws `errors[]` with message/path/`requestId`/`trace` (LS-4444 pattern)
@@ -339,17 +303,17 @@ export async function joinLeagueAsManager(
 ): Promise<number> {
   await validateInviteCodePreflight(jwt, inviteCode);
 
-  const joinUrl = `/baseball/league/join/${inviteCode}`;
+  const joinUrl = `/join/${inviteCode}`;
   await page.goto(joinUrl);
   await page.waitForLoadState('load');
 
-  await waitForJoinPageValidation(page);
+  await waitForJoinPreview(page);
 
-  const teamNameInput = page.getByTestId('team-name');
+  const teamNameInput = page.getByLabel('Team name');
   await expect(teamNameInput).toBeVisible({ timeout: 5_000 });
   await teamNameInput.fill(teamName);
 
-  const joinBtn = page.getByRole('button', { name: /Join League/i });
+  const joinBtn = page.getByTestId('join-submit');
   await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
 
   // Capture every JoinLeagueByCode response — including any Apollo silent

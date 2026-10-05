@@ -236,7 +236,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
   const [copyFailed, setCopyFailed] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const inviteUrl = league.inviteCode
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/baseball/league/join/${league.inviteCode}`
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${league.inviteCode}`
     : '';
   const copy = async (what: 'link' | 'code', text: string) => {
     let success = false;

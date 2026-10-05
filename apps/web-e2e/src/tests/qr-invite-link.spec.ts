@@ -178,12 +178,11 @@ test.describe('QR Invite Link @critical', () => {
 
     // V2 InviteCard uses "Invite Link" (not "Share Link")
     await expect(page.getByText('Invite Link')).toBeVisible();
-    const urlInput = page
-      .locator('input[value*="/baseball/league/join/"]')
-      .first();
+    // Share links point at the universal /join/:code route (LS-10422).
+    const urlInput = page.locator('input[value$="/join/INVITE123"]').first();
     await expect(urlInput).toBeVisible({ timeout: 10_000 });
     const displayedUrl = await urlInput.inputValue();
-    expect(displayedUrl).toContain('/baseball/league/join/INVITE123');
+    expect(displayedUrl).toMatch(/^https?:\/\/[^/]+\/join\/INVITE123$/);
   });
 
   test('invite link section shows share options', async ({ page }) => {
@@ -245,9 +244,7 @@ test.describe('QR Invite Link @critical', () => {
     await expect(page.getByText('INVITE123')).not.toBeVisible();
 
     // No invite URL input rendered
-    const urlInput = page
-      .locator('input[value*="/baseball/league/join/"]')
-      .first();
+    const urlInput = page.locator('input[value*="/join/"]').first();
     await expect(urlInput).not.toBeVisible({ timeout: 5_000 });
   });
 });

@@ -813,7 +813,7 @@ function App() {
               path="/football/league/join/:inviteCode"
               element={
                 <FootballGate>
-                  <JoinLeagueByCodePage />
+                  <LegacyJoinRedirect />
                 </FootballGate>
               }
             />
@@ -910,9 +910,10 @@ function App() {
               path="/baseball/league/join"
               element={<JoinLeagueByCodePage />}
             />
+            {/* Coded league invite links land on /join/:code (LS-10422). */}
             <Route
               path="/baseball/league/join/:inviteCode"
-              element={<JoinLeagueByCodePage />}
+              element={<LegacyJoinRedirect />}
             />
             {/* The universal invite route (LS-10078): league and mock-draft codes. */}
             <Route path="/join" element={<JoinByCodePage />} />

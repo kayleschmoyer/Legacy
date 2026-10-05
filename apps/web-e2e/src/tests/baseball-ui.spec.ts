@@ -8,6 +8,8 @@
  */
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { resolveInviteCodeLeagueResponse } from '../mocks/graphql/league.mocks';
+import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
 // Baseball Hub (/baseball)
@@ -200,8 +202,16 @@ test.describe('Join League By Code Form @regression', () => {
   });
 
   test('invite code from URL param is pre-filled', async ({ page }) => {
+    // Coded links redirect to the universal /join/:code screen (LS-10422),
+    // which previews the code via ResolveInviteCode.
+    await createGraphQLRouter(page, {
+      resolveinvitecode: (route) =>
+        fulfillJson(route, resolveInviteCodeLeagueResponse()),
+    });
+
     await page.goto('/baseball/league/join/TESTCODE');
-    await page.waitForLoadState('load');
+    await expect(page).toHaveURL('/join/TESTCODE');
+    await expect(page.getByTestId('join-preview-league')).toBeVisible();
 
     const codeInput = page.getByPlaceholder(/invite code|enter.*code/i).first();
     await expect(codeInput).toBeVisible();

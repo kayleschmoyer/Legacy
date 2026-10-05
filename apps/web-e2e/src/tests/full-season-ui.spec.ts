@@ -740,56 +740,64 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
   test('Phase 2: Join league via invite code', async ({ page }) => {
     await test.step('Navigate to join page with invite code', async () => {
-      await page.route(isGraphQLEndpoint, async (route) => {
-        const operation = extractOperationName(route).toLowerCase();
-        if (operation === 'validateinvitecode') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                validateInviteCode: {
-                  leagueName: LEAGUE_NAME,
-                  totalSpots: 4,
-                  availableSpots: 2,
+      // The coded link redirects to the universal /join/:code screen
+      // (LS-10422): ResolveInviteCode drives its preview. The league mocks
+      // answer the league page the join lands on.
+      await installGraphQLMocks(page, {
+        league: mockLeague(),
+        extra: (operation) => {
+          if (operation === 'resolveinvitecode') {
+            return {
+              handled: true,
+              body: {
+                data: {
+                  resolveInviteCode: {
+                    __typename: 'LeagueInvitePreview',
+                    code: INVITE_CODE,
+                    leagueId: LEAGUE_ID,
+                    sport: 'baseball',
+                    name: LEAGUE_NAME,
+                    totalTeams: 4,
+                    openTeams: 2,
+                    draftScheduledAt: null,
+                    isAlreadyMember: false,
+                  },
                 },
               },
-            }),
-          });
-        } else if (operation === 'joinleaguebycode') {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                joinLeagueByCode: {
-                  team: {
+            };
+          }
+          if (operation === 'joinleaguebycode') {
+            return {
+              handled: true,
+              body: {
+                data: {
+                  joinLeagueByCode: {
+                    __typename: 'Team',
                     id: TEAM_2.id,
                     name: TEAM_2.name,
                     leagueId: LEAGUE_ID,
                   },
                 },
               },
-            }),
-          });
-        } else {
-          await unmockedGraphQLFallback(route);
-        }
+            };
+          }
+          return undefined;
+        },
       });
 
       await page.goto(`/baseball/league/join/${INVITE_CODE}`);
-      await page.waitForLoadState('domcontentloaded');
-      await expect(
-        page.getByRole('heading', { name: /Join League/i }),
-      ).toBeVisible();
+      await expect(page).toHaveURL(`/join/${INVITE_CODE}`);
+      await expect(page.getByTestId('join-preview-league')).toContainText(
+        LEAGUE_NAME,
+      );
     });
 
     await test.step('Fill team name and submit', async () => {
-      await expect(
-        page.getByText(/Invite code loaded from link/i),
-      ).toBeVisible();
-      await page.getByPlaceholder('Enter your team name').fill(TEAM_2.name);
-      await page.getByRole('button', { name: /join league/i }).click();
+      await page.getByLabel('Team name').fill(TEAM_2.name);
+      await page.getByTestId('join-submit').click();
+      await expect(page).toHaveURL(
+        new RegExp(`/baseball/league/${String(LEAGUE_ID)}(?:[/?#]|$)`),
+      );
     });
   });
 

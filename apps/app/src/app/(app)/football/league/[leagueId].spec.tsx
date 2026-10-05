@@ -1514,7 +1514,7 @@ describe('FootballLeagueId', () => {
       await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
       expect(mockShareFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://legacysports.app/football/league/join/TESTCODE?src=share&platform=ios',
+          url: 'https://legacysports.app/join/TESTCODE?src=share&platform=ios',
         }),
       );
     });

@@ -359,6 +359,49 @@ export function joinLeagueByCodeResponse(leagueId = 999, teamId = 42) {
   };
 }
 
+// ── Universal /join/:code mock factories (LS-10422) ───────────────
+
+/** The `LeagueInvitePreview` arm of the `ResolveInviteCode` union. */
+export interface MockLeagueInvitePreview {
+  __typename: 'LeagueInvitePreview';
+  code: string;
+  leagueId: number;
+  sport: string;
+  name: string;
+  totalTeams: number;
+  openTeams: number;
+  draftScheduledAt: string | null;
+  isAlreadyMember: boolean;
+}
+
+export function mockLeagueInvitePreview(
+  overrides: Partial<MockLeagueInvitePreview> = {},
+): MockLeagueInvitePreview {
+  return {
+    __typename: 'LeagueInvitePreview',
+    code: 'TESTCODE',
+    leagueId: 1,
+    sport: 'baseball',
+    name: 'Test League',
+    totalTeams: 10,
+    openTeams: 4,
+    draftScheduledAt: null,
+    isAlreadyMember: false,
+    ...overrides,
+  };
+}
+
+/**
+ * Mock response for the ResolveInviteCode query — a joinable league. Coded
+ * league invite links (`/:sport/league/join/:code`) redirect to `/join/:code`,
+ * whose preview is driven by this query.
+ */
+export function resolveInviteCodeLeagueResponse(
+  preview?: Partial<MockLeagueInvitePreview>,
+) {
+  return { data: { resolveInviteCode: mockLeagueInvitePreview(preview) } };
+}
+
 // ── Public League Discovery mock factories ────────────────────────
 
 export interface MockPublicLeague {

@@ -111,7 +111,13 @@ test.describe
         .locator('input[readonly]');
       await expect(urlInput).toBeVisible({ timeout: 15_000 });
       const displayedUrl = await urlInput.inputValue();
-      expect(displayedUrl).toMatch(/\/baseball\/league\/join\/[A-Z0-9]+/);
+      // Share links point at the universal /join/:code route (LS-10422). This
+      // suite runs against the deployed site, so the legacy
+      // /baseball/league/join/<code> form (which still redirects there) is
+      // accepted until the LS-10422 deploy lands.
+      expect(displayedUrl).toMatch(
+        /\/(?:baseball\/league\/)?join\/[A-Z0-9]{8}$/,
+      );
       state.inviteUrl = displayedUrl.trim();
     });
 

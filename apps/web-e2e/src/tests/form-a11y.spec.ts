@@ -8,7 +8,12 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { extractOperationName } from '../fixtures/shared-mocks';
-import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { resolveInviteCodeLeagueResponse } from '../mocks/graphql/league.mocks';
+import {
+  createGraphQLRouter,
+  fulfillJson,
+  isGraphQLEndpoint,
+} from '../mocks/graphql/router';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
 /**
@@ -564,15 +569,17 @@ test.describe('Form field accessibility @regression', () => {
 
   test.describe('Join league form', () => {
     test('join league form fields have accessible labels', async ({ page }) => {
-      await page.route(
-        (url) => isGraphQLEndpoint(url),
-        async (route) => {
-          await route.fallback();
-        },
-      );
+      // A coded link redirects to the universal /join/:code screen
+      // (LS-10422); its team-name field renders once ResolveInviteCode
+      // previews a joinable league.
+      await createGraphQLRouter(page, {
+        resolveinvitecode: (route) =>
+          fulfillJson(route, resolveInviteCodeLeagueResponse()),
+      });
 
       // Use a placeholder join code for navigation
       await page.goto('/baseball/league/join/TESTCODE');
+      await expect(page).toHaveURL('/join/TESTCODE');
       await page.waitForLoadState('networkidle');
       // Auth guard runs in a useEffect after first paint; networkidle may fire
       // while the loading spinner is still showing. Wait for the form to render

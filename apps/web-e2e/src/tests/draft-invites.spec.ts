@@ -7,7 +7,7 @@
  *   - /join/:code previews a mock-draft code and a league code, and joins each
  *     with the right mutation, landing in the draft room / league.
  *   - An unknown code says so.
- *   - Legacy mock-draft invite links redirect to /join/:code.
+ *   - Legacy mock-draft and coded league invite links redirect to /join/:code.
  *   - DRAFT_INVITE notifications: accept (mock + league), decline, and an
  *     invite that was revoked or has expired (no longer in myInvites) offers
  *     no actions; accepting one that lapsed meanwhile fails with a message.
@@ -222,10 +222,17 @@ test.describe('Universal join route — /join/:code @regression', () => {
   });
 });
 
-test.describe('Legacy mock-draft invite links redirect to /join @regression', () => {
+test.describe('Legacy invite links redirect to /join @regression', () => {
   const cases: [string, string][] = [
     [`/baseball/mock-draft/join/${MOCK_CODE}`, `/join/${MOCK_CODE}`],
     ['/baseball/mock-draft/join', '/join'],
+    // Coded league links (LS-10422); the bare /:sport/league/join page stays.
+    [`/baseball/league/join/${LEAGUE_CODE}`, `/join/${LEAGUE_CODE}`],
+    [`/football/league/join/${LEAGUE_CODE}`, `/join/${LEAGUE_CODE}`],
+    [
+      `/baseball/league/join/${LEAGUE_CODE}?src=share&platform=ios`,
+      `/join/${LEAGUE_CODE}?src=share&platform=ios`,
+    ],
   ];
 
   for (const [from, to] of cases) {
@@ -239,7 +246,7 @@ test.describe('Legacy mock-draft invite links redirect to /join @regression', ()
 
       await page.goto(from);
 
-      await expect(page).toHaveURL(new RegExp(`${to}$`));
+      await expect(page).toHaveURL(new RegExp(`${to.replace('?', '\\?')}$`));
       await expect(page.getByTestId('join-by-code')).toBeVisible();
     });
   }

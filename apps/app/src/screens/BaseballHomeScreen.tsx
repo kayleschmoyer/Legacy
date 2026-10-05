@@ -107,7 +107,7 @@ export default function BaseballHomeScreen({
         return;
       }
 
-      const inviteUrl = `${APP_BASE_URL}/baseball/league/join/${inviteCode}`;
+      const inviteUrl = `${APP_BASE_URL}/join/${inviteCode}`;
       const message = `Join my league "${leagueName}" on Legacy Sports!\n\n${inviteUrl}`;
 
       try {

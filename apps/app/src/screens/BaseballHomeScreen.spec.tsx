@@ -497,9 +497,7 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
       ];
       expect(shareArg.message).toContain('Fantasy Legends');
       expect(shareArg.message).toContain('ABC12345');
-      expect(shareArg.url).toBe(
-        'https://legacysports.app/baseball/league/join/ABC12345',
-      );
+      expect(shareArg.url).toBe('https://legacysports.app/join/ABC12345');
       expect(shareArg.title).toBe('Join Fantasy Legends');
     });
 

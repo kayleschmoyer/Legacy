@@ -3,7 +3,7 @@
  *
  * Covers:
  * - Invite code entry form at /baseball/league/join
- * - Deep-link pre-fill via /baseball/league/join/:inviteCode
+ * - Deep links: /baseball/league/join/:inviteCode redirects to /join/:code
  * - Live invite code validation preview (league name, spots available)
  * - Successful join and redirect to league detail
  * - Form validation (empty fields, invalid format)
@@ -23,6 +23,7 @@ import {
 } from '../fixtures/shared-mocks';
 import {
   joinLeagueByCodeResponse,
+  resolveInviteCodeLeagueResponse,
   validateInviteCodeNotFoundResponse,
   validateInviteCodeResponse,
 } from '../mocks/graphql/league.mocks';
@@ -159,38 +160,40 @@ test.describe('Join League — page load @critical', () => {
 // ── critical: deep link ───────────────────────────────────────────
 
 test.describe('Join League — deep link @critical', () => {
-  test('pre-fills invite code from URL and shows banner after validation', async ({
+  // Coded league links redirect to the universal /join/:code screen
+  // (LS-10422), whose preview comes from ResolveInviteCode.
+  test('redirects to /join/:code, pre-fills the code and previews the league', async ({
     page,
     leaguePage,
   }) => {
-    // The banner is gated on leagueInfo being returned from validateInviteCode,
-    // so we must mock the query before navigating (it fires on mount).
     await routeGraphQL(page, {
-      validateinvitecode: validateInviteCodeResponse({
-        leagueName: 'Summer Sluggers',
-        totalSpots: 10,
-        availableSpots: 3,
+      resolveinvitecode: resolveInviteCodeLeagueResponse({
+        code: 'ABC12XYZ',
+        name: 'Summer Sluggers',
+        totalTeams: 10,
+        openTeams: 3,
       }),
     });
 
     await leaguePage.gotoJoin('ABC12XYZ');
-    await leaguePage.expectJoinFormVisible();
+
+    await expect(page).toHaveURL(/\/join\/ABC12XYZ$/);
+    await leaguePage.joinByCodeScreen.expectVisible();
 
     // Code is pre-filled from the URL
     await leaguePage.inviteCodeInput.expectValue('ABC12XYZ');
 
-    // Deep-link confirmation banner appears after the code is validated
-    await leaguePage.deepLinkBanner.expectVisible();
-
-    // Subtext changes to indicate code is pre-filled
-    await leaguePage
-      .text(/Your invite code has been pre-filled/i)
-      .expectVisible();
+    // The preview card names the league once the code resolves
+    await leaguePage.joinPreviewLeague.expectContainsText('Summer Sluggers');
   });
 
-  test('deep-link code is auto-uppercased', async ({ leaguePage }) => {
+  test('deep-link code is auto-uppercased', async ({ page, leaguePage }) => {
+    await routeGraphQL(page, {
+      resolveinvitecode: resolveInviteCodeLeagueResponse({ code: 'ABC12XYZ' }),
+    });
+
     await leaguePage.gotoJoin('abc12xyz');
-    await leaguePage.expectJoinFormVisible();
+    await leaguePage.joinByCodeScreen.expectVisible();
 
     await leaguePage.inviteCodeInput.expectValue('ABC12XYZ');
   });
@@ -285,16 +288,19 @@ test.describe('Join League — successful join @critical', () => {
     leaguePage,
   }) => {
     await routeGraphQL(page, {
-      validateinvitecode: validateInviteCodeResponse(),
+      resolveinvitecode: resolveInviteCodeLeagueResponse({
+        code: 'DEEPLINK',
+        leagueId: 77,
+      }),
       joinleaguebycode: joinLeagueByCodeResponse(77),
     });
 
     await leaguePage.gotoJoin('DEEPLINK');
-    await leaguePage.expectJoinFormVisible();
+    await leaguePage.joinPreviewLeague.expectVisible();
 
     // Code is pre-filled; just add team name
     await leaguePage.teamNameInput.fill('Deep Liners');
-    await leaguePage.joinButton.tap();
+    await leaguePage.joinByCodeSubmit.tap();
 
     await expect(page).toHaveURL(/\/baseball\/league\/77/, { timeout: 15000 });
   });

@@ -378,7 +378,7 @@ export default function LeagueId(): React.JSX.Element {
   const inviteCode = league?.inviteCode ?? '';
   const appBaseUrl = config.appBaseUrl ?? 'https://legacysports.app';
   const inviteUrl = inviteCode
-    ? `${appBaseUrl}/baseball/league/join/${inviteCode}?src=share&platform=${Platform.OS}`
+    ? `${appBaseUrl}/join/${inviteCode}?src=share&platform=${Platform.OS}`
     : '';
 
   const handleInviteShare = useCallback(async () => {

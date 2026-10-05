@@ -186,7 +186,7 @@ export interface SeededLeagueInvite {
   leagueName: string;
   /** 8-character alphanumeric invite code. */
   inviteCode: string;
-  /** Full join URL for the invite code (`/baseball/league/join/<code>`). */
+  /** Full join URL for the invite code (`/join/<code>`, LS-10422). */
   inviteUrl: string;
 }
 
@@ -846,7 +846,7 @@ export class MockTestData implements TestData {
       leagueId,
       leagueName,
       inviteCode,
-      inviteUrl: `/baseball/league/join/${inviteCode}`,
+      inviteUrl: `/join/${inviteCode}`,
     };
   }
 
@@ -1365,7 +1365,7 @@ export class LiveTestData implements TestData {
       leagueId,
       leagueName,
       inviteCode,
-      inviteUrl: `${WEB_BASE}/baseball/league/join/${inviteCode}`,
+      inviteUrl: `${WEB_BASE}/join/${inviteCode}`,
     };
   }
 

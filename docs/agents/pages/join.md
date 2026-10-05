@@ -33,7 +33,8 @@ The universal invite route (LS-10078). One code box takes any invite code. `reso
 ## Legacy links (redirect here)
 
 - `/baseball/mock-draft/join[/:inviteCode]` → `/join[/:code]`
-- League links (`/:sport/league/join[/:inviteCode]`) still open the league join page on web (`JoinLeagueByCodePage`, which the live integration suite drives); `/join/:code` accepts league codes too.
+- `/baseball/league/join/:inviteCode` and `/football/league/join/:inviteCode` → `/join/:code` (LS-10422), keeping any query string. The bare `/:sport/league/join` page (public-league Quick Join, `JoinLeagueByCodePage`) is not redirected.
+- Share links (league detail Invite card, native league share, home-screen invite) emit `/join/<code>`.
 - On native, `+native-intent.ts` rewrites the same legacy links to `/join/<code>`.
 
 ## Related
