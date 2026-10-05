@@ -201,9 +201,19 @@ export function useDraftActions({
     ],
   );
 
-  const handleMakePick = useCallback(
-    async (playerId: number, isAutoPick = false) => {
-      if (!draftId || !isMyPick || isPickingRef.current || draftPaused) return;
+  // `requireOwnTurn: false` is the Control All Teams mock-draft host picking
+  // for another seat: the server's turn check accepts the host for every seat
+  // (pick-authorization.ts), so gating on isMyPick here would silently drop
+  // the click and leave the draft stuck on that pick (LS-10433).
+  const submitPick = useCallback(
+    async (playerId: number, isAutoPick: boolean, requireOwnTurn: boolean) => {
+      if (
+        !draftId ||
+        (requireOwnTurn && !isMyPick) ||
+        isPickingRef.current ||
+        draftPaused
+      )
+        return;
       isPickingRef.current = true;
       try {
         setUrgentMessage('');
@@ -276,6 +286,17 @@ export function useDraftActions({
       setUrgentMessage,
       _setDraftPaused,
     ],
+  );
+
+  const handleMakePick = useCallback(
+    (playerId: number, isAutoPick = false) =>
+      submitPick(playerId, isAutoPick, true),
+    [submitPick],
+  );
+
+  const handleMockHostPick = useCallback(
+    (playerId: number) => submitPick(playerId, false, false),
+    [submitPick],
   );
 
   const handlePauseDraft = useCallback(async () => {
@@ -508,6 +529,7 @@ export function useDraftActions({
   return {
     handleInitializeDraft,
     handleMakePick,
+    handleMockHostPick,
     handlePauseDraft,
     handleResumeDraft,
     handleToggleAutoPickDisabled,

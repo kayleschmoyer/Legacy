@@ -1180,6 +1180,7 @@ export function EliteDraftBoardScreen({
   // objects are recreated each render, but the individual methods inside are stable.
   const {
     handleMakePick,
+    handleMockHostPick,
     handleCommissionerPick: commissionerPick,
     handleToggleQueue,
   } = actions;
@@ -1200,17 +1201,19 @@ export function EliteDraftBoardScreen({
   // `commissionerPick` is a league tool — a mock draft has no commissioner
   // (LS-10076). Control All Teams still lets the host pick for every seat, so
   // a mock draft's forced picks go through `makeDraftPick`, whose turn check
-  // recognises that host. Routed here, at the prop boundary, so every board
-  // surface (rail, player board, compact board) inherits it unchanged.
+  // recognises that host — without the client-side own-turn gate, which would
+  // drop every pick for a seat other than the host's (LS-10433). Routed here,
+  // at the prop boundary, so every board surface (rail, player board, compact
+  // board) inherits it unchanged.
   const handleCommissionerPick = useCallback(
     (id: number) => {
       if (isMockDraft) {
-        void handleMakePick(id);
+        void handleMockHostPick(id);
         return;
       }
       void commissionerPick(id);
     },
-    [isMockDraft, handleMakePick, commissionerPick],
+    [isMockDraft, handleMockHostPick, commissionerPick],
   );
   const handleToggleQueuePlayer = useCallback(
     (id: number) => {

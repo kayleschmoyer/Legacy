@@ -546,3 +546,51 @@ describe('useDraftActions handleInitializeDraft state-machine error handling (LS
     expect(refetchLeague).not.toHaveBeenCalled();
   });
 });
+
+describe('useDraftActions Control All Teams mock host picks (LS-10433)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockMakeDraftPick.mockReset();
+    mockNoop.mockReset();
+  });
+
+  it('handleMockHostPick fires makeDraftPick for a seat that is not the host', async () => {
+    mockMakeDraftPick.mockResolvedValue({ data: {} });
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ isMyPick: false })),
+    );
+
+    await act(async () => {
+      await result.current.handleMockHostPick(101);
+    });
+
+    expect(mockMakeDraftPick).toHaveBeenCalledTimes(1);
+    expect(mockMakeDraftPick).toHaveBeenCalledWith(
+      expect.objectContaining({ variables: { draftId: 42, playerId: 101 } }),
+    );
+  });
+
+  it('handleMakePick still refuses when it is not the viewer’s turn', async () => {
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ isMyPick: false })),
+    );
+
+    await act(async () => {
+      await result.current.handleMakePick(101);
+    });
+
+    expect(mockMakeDraftPick).not.toHaveBeenCalled();
+  });
+
+  it('handleMockHostPick still respects a paused draft', async () => {
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ isMyPick: false, draftPaused: true })),
+    );
+
+    await act(async () => {
+      await result.current.handleMockHostPick(101);
+    });
+
+    expect(mockMakeDraftPick).not.toHaveBeenCalled();
+  });
+});

@@ -725,6 +725,7 @@ function makeBaseActions(
     handleResumeDraft: jest.fn(),
     handlePauseDraft: jest.fn(),
     handleMakePick: jest.fn(),
+    handleMockHostPick: jest.fn(),
     handleCommissionerPick: jest.fn(),
     handleToggleQueue: jest.fn(),
     handleInitializeDraft: jest.fn(),
@@ -1869,8 +1870,11 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
   // LS-10076: a mock draft has no commissioner, so a Control All Teams pick
   // for another seat goes through makeDraftPick (whose turn check recognises
   // the host) rather than the league-only commissionerPick tool.
+  // LS-10433: via handleMockHostPick, not handleMakePick — the latter's
+  // own-turn gate silently dropped every pick for another seat.
   it("offers a first-class DRAFT action (not ASSIGN) on another team's turn when Control All Teams is on, and routes the pick through makeDraftPick", () => {
     const handleMakePick = jest.fn();
+    const handleMockHostPick = jest.fn();
     const handleCommissionerPick = jest.fn();
     setupCompactLiveDraft({
       isMyPick: false,
@@ -1888,7 +1892,11 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
       },
     });
     mockUseDraftActions.mockReturnValue(
-      makeBaseActions({ handleMakePick, handleCommissionerPick }),
+      makeBaseActions({
+        handleMakePick,
+        handleMockHostPick,
+        handleCommissionerPick,
+      }),
     );
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
@@ -1899,7 +1907,8 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(browser.getAttribute('data-draft-action-label')).toBe('DRAFT');
     fireEvent.click(screen.getByText('draft-player'));
 
-    expect(handleMakePick).toHaveBeenCalledWith(7);
+    expect(handleMockHostPick).toHaveBeenCalledWith(7);
+    expect(handleMakePick).not.toHaveBeenCalled();
     expect(handleCommissionerPick).not.toHaveBeenCalled();
   });
 
