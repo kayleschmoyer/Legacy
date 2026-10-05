@@ -266,6 +266,9 @@ export const careerBatting = pgView('career_batting', {
   offensiveWar: doublePrecision('offensive_war'),
   defensiveWar: doublePrecision('defensive_war'),
   totalWar: doublePrecision('total_war'),
+  // Distinct AL/NL seasons with a batting row (LS-10552) — backs the draft
+  // min-career-seasons eligibility rule.
+  seasons: integer('seasons'),
 }).as(sql`SELECT player_id,
        sum(g)       AS g,
        sum(pa)      AS pa,

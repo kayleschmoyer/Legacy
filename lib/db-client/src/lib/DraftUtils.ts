@@ -585,12 +585,18 @@ export function careerGamesCondition(minCareerGames: number): SQL {
  * hash build is eliminated entirely. Verified via EXPLAIN ANALYZE against dev
  * RDS: ~2.8s → ~1.5s for a representative getAvailableDraftPlayers call
  * (minCareerGames=50, minCareerSeasons=3).
+ *
+ * Optimized (LS-10552): the count is precomputed as `career_batting.seasons`
+ * (career_batting aggregates exactly the AL/NL season_batting rows, so the
+ * count is identical), turning the per-player correlated aggregate — ~23.6k
+ * index scans + sorts per call — into one hash anti-join, the same shape as
+ * {@link careerGamesCondition}. A player with no AL/NL batting seasons has no
+ * career_batting row and passes, exactly as `COUNT(DISTINCT season) = 0` did.
  */
 export function careerSeasonsCondition(minCareerSeasons: number): SQL {
-  return sql`(
-    SELECT COUNT(DISTINCT season) = 0 OR COUNT(DISTINCT season) >= ${minCareerSeasons}
-    FROM season_batting
-    WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
+  return sql`NOT EXISTS (
+    SELECT 1 FROM career_batting cb
+    WHERE cb.player_id = p.id AND cb.seasons < ${minCareerSeasons}
   )`;
 }
 
@@ -713,24 +719,15 @@ export async function filterPlayerIdsByLeagueEligibility(
 
   // 3. Minimum career seasons
   if (settings.minCareerSeasons > 0 && currentIds.length > 0) {
-    // LS-4693: replaces the previous correlated NOT EXISTS + COUNT(DISTINCT)
-    // pair (two passes over season_batting per player) with a single pre-
-    // aggregated CTE so the index on (player_id, lg_id, season) is scanned
-    // once per batch instead of 2× per row.
+    // LS-10552: same predicate as the draft board (careerSeasonsCondition),
+    // reading the precomputed career_batting.seasons instead of re-counting
+    // distinct season_batting seasons per batch (LS-4693's grouped CTE).
     const rows = await db.execute(
       sql`
-        WITH eligibility AS (
-          SELECT player_id, COUNT(DISTINCT season) AS season_count
-          FROM season_batting
-          WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
-            AND lg_id IN ('AL', 'NL')
-          GROUP BY player_id
-        )
         SELECT p.id AS player_id
         FROM players p
-        LEFT JOIN eligibility e ON e.player_id = p.id
         WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
-          AND (e.player_id IS NULL OR e.season_count >= ${settings.minCareerSeasons})
+          AND ${careerSeasonsCondition(settings.minCareerSeasons)}
       `,
     );
 
