@@ -92,10 +92,23 @@ fi
 # breaks. Stale logs are kept short via tail-truncate below.
 if [ "$RUN_SETUP" = "true" ]; then
   SETUP_LOG="${TMPDIR:-/tmp}/claude-setup-worktree-symlink.log"
-  {
+  LINK_OUT=$(
     echo "--- $(date -u +%Y-%m-%dT%H:%M:%SZ) WORKTREE=$WORKTREE ---"
-    (cd "$WORKTREE" && node "scripts/modules-pool/link.mjs")
-  } >>"$SETUP_LOG" 2>&1
+    (cd "$WORKTREE" && node "scripts/modules-pool/link.mjs") 2>&1
+  )
+  LINK_RC=$?
+  printf '%s\n' "$LINK_OUT" >>"$SETUP_LOG"
+  # Non-blocking, but never silent (LS-10597): a swallowed failure (typically
+  # Developer Mode off → mklink /D denied) otherwise surfaces much later as a
+  # confusing "'nx' is not recognized" from the pre-push hook.
+  if [ "$LINK_RC" -ne 0 ]; then
+    echo "[SETUP ERROR] scripts/modules-pool/link.mjs failed (exit $LINK_RC) — node_modules is NOT linked in this worktree."
+    printf '%s\n' "$LINK_OUT" | grep -m1 '\[ERROR\]' | cut -c1-400
+    if printf '%s' "$LINK_OUT" | grep -q 'Developer Mode'; then
+      echo "  Cause: directory symlinks require Windows Developer Mode (Settings > System > For Developers > Developer Mode)."
+    fi
+    echo "  Full log: $SETUP_LOG — fix, re-run node scripts/modules-pool/link.mjs, then restart the session."
+  fi
   # Cap log at 500 lines so it doesn't grow unbounded over many sessions.
   if [ -f "$SETUP_LOG" ]; then
     tail -500 "$SETUP_LOG" > "${SETUP_LOG}.tmp" 2>/dev/null \

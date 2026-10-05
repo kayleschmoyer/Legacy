@@ -56,7 +56,21 @@ if (-not $isWorktree) { exit 0 }
 $tempDir = if ($env:TEMP) { $env:TEMP } elseif ($env:TMP) { $env:TMP } else { '/tmp' }
 $setupLog = Join-Path $tempDir 'claude-setup-worktree-symlink.log'
 "--- $((Get-Date).ToUniversalTime().ToString('o')) worktree=$worktree ---" | Out-File -FilePath $setupLog -Append -Encoding utf8
-& node "$worktree\scripts\modules-pool\link.mjs" "--worktree=$worktree" *>> $setupLog
+$linkOut = & node "$worktree\scripts\modules-pool\link.mjs" "--worktree=$worktree" 2>&1 | ForEach-Object { "$_" }
+$linkRc = $LASTEXITCODE
+$linkOut | Out-File -FilePath $setupLog -Append -Encoding utf8
+# Non-blocking, but never silent (LS-10597): a swallowed failure (typically
+# Developer Mode off -> mklink /D denied) otherwise surfaces much later as a
+# confusing "'nx' is not recognized" from the pre-push hook.
+if ($linkRc -ne 0) {
+    Write-Output "[SETUP ERROR] scripts/modules-pool/link.mjs failed (exit $linkRc) - node_modules is NOT linked in this worktree."
+    $errLine = $linkOut | Where-Object { $_ -match '\[ERROR\]' } | Select-Object -First 1
+    if ($errLine) { Write-Output $errLine }
+    if (($linkOut -join "`n") -match 'Developer Mode') {
+        Write-Output "  Cause: directory symlinks require Windows Developer Mode (Settings > System > For Developers > Developer Mode)."
+    }
+    Write-Output "  Full log: $setupLog - fix, re-run node scripts/modules-pool/link.mjs, then restart the session."
+}
 # Cap log at 500 lines so it doesn't grow unbounded over many sessions.
 if (Test-Path $setupLog) {
     $tail = Get-Content -LiteralPath $setupLog -Tail 500 -ErrorAction SilentlyContinue

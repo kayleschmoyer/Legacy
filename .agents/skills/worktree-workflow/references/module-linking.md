@@ -12,6 +12,21 @@ Run from the worktree root. It hashes the worktree's `pnpm-lock.yaml` and links 
 
 In addition to `node_modules`, the resolver also links the main repo's gitignored secret files (`.env`, `.env.local`) into the worktree as file symlinks. This is what lets agents run integration tests locally — `playwright.integration.config.ts` loads `<repo>/.env` for `E2E_COMMISSIONER_*`, `E2E_MANAGER_*`, `VITE_OAUTH_PROXY_URL`, etc. — without manual per-worktree credential copying. Symlinks (not copies) ensure secret rotations in main propagate automatically. If a real file is already present in the worktree (not a symlink), the resolver leaves it alone — delete it manually if you want to switch to the linked copy.
 
+### Prerequisite: Windows Developer Mode
+
+`node_modules` is a directory symlink (`mklink /D`), which an unelevated Windows user can only create with **Developer Mode** on (Settings > System > For Developers > Developer Mode). Check quickly from Git Bash: `cmd //c mklink //D "%TEMP%\\probe-link" "%TEMP%"`. If that prints "You do not have sufficient privilege", Developer Mode is off. Turning it on is a system setting the **user** must change. Agents must not change it or fall back to junctions.
+
+**Failure signature (LS-10597):**
+
+```
+[modules-pool/link][ERROR] Failed to create directory symlink: Command failed: cmd /c mklink /D <wt>\node_modules <main>\.modules-pool\<hash>\node_modules
+You do not have sufficient privilege to perform this operation.
+
+Directory symlinks require Windows Developer Mode.
+```
+
+`link.mjs` exits **1** and leaves no `node_modules` in the worktree, not even an empty directory. The SessionStart hook (`.claude/hooks/setup-worktree-symlink.sh`/`.ps1`) stays non-blocking. It now prints a `[SETUP ERROR] scripts/modules-pool/link.mjs failed (exit 1) — node_modules is NOT linked` banner, and the full output goes to `$TMPDIR/claude-setup-worktree-symlink.log`. If you skip past it, the same root cause shows up later as `'nx' is not recognized` from the pre-push hook or as stdio MCP servers timing out. Callers that chain on `link.mjs` must check its exit code, not whether `node_modules` exists.
+
 > **Verify after setup**: confirm the linked slot is populated:
 >
 > ```

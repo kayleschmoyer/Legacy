@@ -119,6 +119,7 @@ import {
   mkdirSync,
   renameSync,
   rmSync,
+  rmdirSync,
   symlinkSync,
   readlinkSync,
 } from 'node:fs';
@@ -366,6 +367,10 @@ function linkWorktreeToSlot(target) {
   try {
     ensureDirSymlink(nmPath, target, 'node_modules');
   } catch (err) {
+    // Never leave an empty real node_modules dir behind on failure: callers
+    // that only test for its existence would treat the worktree as linked and
+    // fail much later with e.g. "'nx' is not recognized" (LS-10597).
+    removeEmptyDir(nmPath);
     fail(String(err.message ?? err));
   }
 }
@@ -1118,6 +1123,17 @@ function removeNodeModulesEntry(p) {
 function removeDir(p) {
   try {
     rmSync(p, { recursive: true, force: true });
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Remove `p` only if it is a real (non-symlink) directory with no entries. */
+function removeEmptyDir(p) {
+  const st = safeLstat(p);
+  if (!st || st.isSymbolicLink() || !st.isDirectory()) return;
+  try {
+    if (readdirSync(p).length === 0) rmdirSync(p);
   } catch {
     /* best effort */
   }

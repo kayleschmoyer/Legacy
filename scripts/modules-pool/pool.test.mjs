@@ -298,6 +298,46 @@ test(
   },
 );
 
+// The inverse of the skip above: only a host that CANNOT create directory
+// symlinks (Windows without Developer Mode) exercises the real mklink failure.
+test(
+  'symlink failure exits non-zero and leaves no node_modules behind (LS-10597)',
+  {
+    skip:
+      process.platform === 'win32' && !SYMLINK_OK
+        ? false
+        : 'needs a Windows host without Developer Mode',
+  },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      makeHealthyNodeModules(join(root, '.modules-pool', hash, 'node_modules'));
+      // A pre-existing empty husk must not survive the failed run either.
+      mkdirSync(join(wt, 'node_modules'));
+
+      const { status, output } = runLinkExpectFail([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+      ]);
+      assert.equal(status, 1);
+      assert.match(output, /\[ERROR\] Failed to create directory symlink/);
+      assert.match(output, /Developer Mode/);
+      assert.ok(
+        !existsSync(join(wt, 'node_modules')),
+        'no node_modules dir may be left in the worktree',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
 test(
   'pool hit self-heals a stale real (non-symlink) node_modules directory (LS-8649)',
   { skip: SYMLINK_OK ? false : 'no symlink capability' },
