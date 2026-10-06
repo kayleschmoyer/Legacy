@@ -71,7 +71,7 @@ const mockSearch = jest.fn();
 const mockGetVideoStatuses = jest.fn();
 
 jest.mock('./youtube-api', () => ({
-  MLB_CHANNEL_ID: 'UCoLrcjPV5PbUrUyXq5mjcA',
+  MLB_CHANNEL_ID: 'UCoLrcjPV5PbUrUyXq5mjc_A',
   VIDEOS_LIST_BATCH_SIZE: 50,
   getYouTubeApiKey: () => Promise.resolve('test-key'),
   searchMlbChannelHighlights: (...args: unknown[]) => mockSearch(...args),

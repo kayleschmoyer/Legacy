@@ -16,7 +16,7 @@
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 
 /** MLB's official YouTube channel (https://www.youtube.com/@MLB) — LS-9111. */
-export const MLB_CHANNEL_ID = 'UCoLrcjPV5PbUrUyXq5mjcA';
+export const MLB_CHANNEL_ID = 'UCoLrcjPV5PbUrUyXq5mjc_A';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 /** videos.list accepts at most 50 ids per call. */
