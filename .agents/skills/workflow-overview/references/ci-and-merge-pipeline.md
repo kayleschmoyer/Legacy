@@ -276,7 +276,7 @@ A queued PR whose head SHA has no `bot-review` status would otherwise wait forev
 
 The re-applied label fires Reviewer (W1) through its normal trigger; the review submission re-wakes the queue via `pull_request_review`, so remediation chains drain a backlog without a timer. Capped at 10 remediations per run; idempotent (skips when the label is already present or the SHA already carries a verdict).
 
-**Label semantics are single-purpose (LS-8297):** `bot:ready-for-review` is the only review trigger; `merge-when-ready` only feeds the queue. The queue deliberately has **no cron** — it is fully event-driven (labels, review submissions, CI completions). The one residual corner (a crashed reviewer run in a totally idle repo) clears on the next repo event or a manual `workflow_dispatch`.
+**Label semantics are single-purpose (LS-8297):** `bot:ready-for-review` is the only review trigger; `merge-when-ready` only feeds the queue. The queue is event-driven (labels, review submissions, CI completions), with one safety-net cron every 30 minutes (`19,49 * * * *`, LS-10600). The cron covers a lost trigger: a queue run that fails runner provisioning before any step executes, or a webhook that is never delivered. A tick exits at its "Idle check" step when no open PR carries `merge-when-ready` or `merge-to-parent` and no `mq/test/*` batch set is in flight. The residual corner (a crashed reviewer run on a non-queued PR in a totally idle repo) clears on the next repo event or a manual `workflow_dispatch`.
 
 ### Codeowner-Blocked Merges (LS-8297)
 

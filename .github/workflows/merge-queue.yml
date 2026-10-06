@@ -1,15 +1,24 @@
 name: Enhanced Merge Queue
 
 on:
-  # NOTE (LS-8289): deliberately NO schedule trigger — a cron would spin a
-  # runner ~48×/day for a usually-empty queue. The deadlock the cron would
-  # have papered over (bot-review never registering on the head SHA of a
-  # queued PR, freezing 30+ PRs on 2026-07-01) is instead closed event-wise:
-  # review.yml fires Reviewer (W1) on labeled merge-when-ready and on pushes
-  # to queued PRs, and the processor's self-heal re-applies
-  # bot:ready-for-review on any queue run that finds a queued PR whose head
-  # SHA lacks a bot-review status. Residual corner (crashed reviewer run +
-  # totally idle repo) clears on the next repo event or a manual dispatch.
+  # LS-10600: a low-frequency safety-net cron. LS-8289 dropped the cron
+  # because each tick spun a self-hosted runner for a usually-empty queue.
+  # LS-10312 has since pinned this job to GitHub-hosted ubuntu-latest, and an
+  # idle tick exits at the "Idle check" step below after three read-only API
+  # calls, so that cost argument no longer holds. Without it, a lost
+  # trigger stalls the queue indefinitely: PR #8394 sat green in the queue
+  # after both batch attempts on mq/test/muvm507g were killed by spot
+  # shutdowns and the next queue run (37365045732) failed runner
+  # provisioning before any step ran. The batch logic would have discarded
+  # the infra-exhausted set on the next run, but nothing fired one. Lost
+  # webhook deliveries leave the same gap. Cron minutes are jittered off the
+  # top of the hour (ci-gate-stuck-sweep.yml uses 7,37).
+  # Event-driven triggers stay primary: review.yml fires Reviewer (W1) on
+  # labeled merge-when-ready and on pushes to queued PRs, and the processor
+  # re-applies bot:ready-for-review on any run that finds a queued PR whose
+  # head SHA lacks a bot-review status (LS-8289).
+  schedule:
+    - cron: "19,49 * * * *"
   # Manual trigger for on-demand queue processing
   workflow_dispatch:
     inputs:
@@ -65,6 +74,7 @@ jobs:
       github.repository_owner == 'bkrupa' &&
       (
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule' ||
         (github.event_name == 'workflow_run' && (github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'pull_request_review')) ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'workflow_dispatch' && startsWith(github.event.workflow_run.head_branch, 'mq/test/')) ||
         github.event_name == 'pull_request_review' ||
@@ -93,8 +103,39 @@ jobs:
       actions: write
 
     steps:
+      # LS-10600: the cron tick's cheap early return. Uses the built-in
+      # GITHUB_TOKEN (no app-token mint) and makes three read-only calls. When
+      # no open PR carries merge-when-ready or merge-to-parent and no
+      # mq/test/* batch set is in flight, every later step is skipped.
+      # Event-triggered runs skip this step, so idle stays '' and they
+      # proceed as before. If a lookup fails, the step fails and the run
+      # retries on the next tick. That stops at most 30 minutes of queue work.
+      - name: Idle check (scheduled runs)
+        id: idle
+        if: github.event_name == 'schedule'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          labeled=0
+          for label in merge-when-ready merge-to-parent; do
+            n="$(gh pr list --state open --label "$label" --limit 1 --json number --jq 'length')"
+            labeled=$((labeled + n))
+          done
+          batches="$(gh api "repos/$GH_REPO/git/matching-refs/heads/mq/test/" --jq 'length')"
+          echo "Queue labels present: $labeled of 2; in-flight mq/test/* sets: $batches"
+          if [ "$labeled" -eq 0 ] && [ "$batches" -eq 0 ]; then
+            echo "Queue is idle; skipping this scheduled run."
+            echo "idle=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "idle=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate GitHub App Token
         id: generate-token
+        if: steps.idle.outputs.idle != 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
@@ -109,6 +150,7 @@ jobs:
       # so the mint fails and the existing GITHUB_TOKEN fallback still applies.
       - name: "Decode CI App Key"
         id: ci-app-key
+        if: steps.idle.outputs.idle != 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -133,6 +175,7 @@ jobs:
       # than failing the whole job.
       - name: Generate CI App Token
         id: ci-app-token
+        if: steps.idle.outputs.idle != 'true'
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
@@ -140,6 +183,7 @@ jobs:
           private-key: ${{ steps.ci-app-key.outputs.private-key }}
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: steps.idle.outputs.idle != 'true'
         with:
           token: ${{ steps.generate-token.outputs.token }}
           persist-credentials: true
@@ -260,6 +304,7 @@ jobs:
         run: sleep 30
 
       - name: Process Enhanced Merge Queue
+        if: steps.idle.outputs.idle != 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           ESCALATION_WEBHOOK_URL: ${{ secrets.ESCALATION_WEBHOOK_URL }}

@@ -251,9 +251,10 @@ jobs:
       # bot-review stayed pending "Review cycle starting — awaiting Reviewer
       # (W1)" for 45 minutes as the PR's sole merge blocker. Nothing recovers
       # that on its own: merge-queue-processor.js's remediateStaleBotReview is
-      # the designed healer, but merge-queue.yml has no schedule trigger by
-      # design (LS-8289), so on a quiet repo nothing ever wakes it and the
-      # stall is unbounded rather than the ~45min that was observed.
+      # the designed healer, but merge-queue.yml's safety-net schedule
+      # (LS-10600) runs the processor only while a PR is queued, so on a
+      # quiet repo nothing ever wakes it and the stall is unbounded rather
+      # than the ~45min that was observed.
       #
       # So: whenever this run ends without a terminal bot-review status on the
       # SHA it was dispatched for, write one. A loud failure is recoverable by
