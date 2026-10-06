@@ -217,6 +217,61 @@ describe('deliverNotification', () => {
 
       expect(result.tokensSent).toBe(1);
     });
+
+    // LS-7091 (PRF-020): prove the disabled push channel is suppressed at
+    // dispatch time even when the user has deliverable Expo + web tokens and
+    // VAPID is configured — neither transport may be invoked.
+    it('sends nothing on any push transport when pushEnabled is false, even with active tokens', async () => {
+      await loadDeliverModule({
+        publicKey: 'test-public-key',
+        privateKey: 'test-private-key',
+      });
+      mockGetUserNotificationPreferences.mockResolvedValue({
+        pushEnabled: false,
+        emailEnabled: false,
+      });
+      mockGetUserDeviceTokens.mockResolvedValue([
+        makeDeviceToken(),
+        makeDeviceToken({
+          id: 2,
+          platform: 'web',
+          deviceToken: JSON.stringify({
+            endpoint: 'https://push.example.com/subscription/abc',
+            keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
+          }),
+        }),
+      ]);
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(result).toEqual({
+        userId: 1,
+        tokensAttempted: 0,
+        tokensSent: 0,
+        tokensFailed: 0,
+        historyId: null,
+      });
+      expect(mockSendPushNotificationsAsync).not.toHaveBeenCalled();
+      expect(mockWebPushSendNotification).not.toHaveBeenCalled();
+    });
+
+    // LS-7091 (PRF-020): emailEnabled gates only the email channel, which has
+    // no dispatcher — the notifications Lambda delivers push only. A disabled
+    // email preference must not suppress (or otherwise alter) push delivery.
+    it('still delivers push when emailEnabled is false and pushEnabled is true', async () => {
+      mockGetUserNotificationPreferences.mockResolvedValue({
+        pushEnabled: true,
+        emailEnabled: false,
+      });
+      mockGetUserDeviceTokens.mockResolvedValue([makeDeviceToken()]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: 'ok' }]);
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(result.tokensAttempted).toBe(1);
+      expect(result.tokensSent).toBe(1);
+      expect(mockSendPushNotificationsAsync).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('no active tokens', () => {
