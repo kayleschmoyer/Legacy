@@ -426,6 +426,44 @@ unauthTest.describe(
     );
 
     unauthTest(
+      'new user with zero leagues who skips the tutorial lands on the Home empty state with the Create League CTA (LS-6917)',
+      async ({ page }) => {
+        await mockGoogleLogin(page, 504);
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const loginButton = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(loginButton).toBeVisible({ timeout: 15000 });
+        await loginButton.click();
+
+        await expect(page).toHaveURL('/');
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+
+        // An explicit skip (✕) closes the tutorial and leaves the user on Home.
+        await page.getByLabel('Skip tutorial').click();
+        await expect(page.getByRole('dialog')).not.toBeVisible({
+          timeout: 10000,
+        });
+        await expect(page).toHaveURL('/');
+
+        // Getting-started view for a user with no leagues: welcome copy plus
+        // the Create League CTA (a renamed label or dropped CTA fails here).
+        await expect(
+          page.getByRole('heading', { name: 'Start your dynasty.' }),
+        ).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('Welcome, onboardinguser')).toBeVisible();
+        await expect(page.getByTestId('home-empty-create')).toBeVisible();
+        await expect(
+          page.getByTestId('home-empty-create').getByText('Create League'),
+        ).toBeVisible();
+        await expect(page.getByTestId('home-empty-join')).toBeVisible();
+      },
+    );
+
+    unauthTest(
       'returning user who already completed onboarding does not see the tutorial after login (LS-2098)',
       async ({ page }) => {
         await mockGoogleLogin(page, 502);
