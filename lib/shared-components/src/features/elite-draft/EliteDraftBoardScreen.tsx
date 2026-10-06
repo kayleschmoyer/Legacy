@@ -1784,6 +1784,7 @@ export function EliteDraftBoardScreen({
         <DraftRail
           isPremium={isPremium}
           isMyPick={isMyPick}
+          isMockDraft={isMock}
           commPickMode={ui.commPickMode}
           controlAllTeams={controlAllTeams}
           isOwner={queries.isCommissioner}

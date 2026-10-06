@@ -300,6 +300,10 @@ interface DraftRailProps {
   // Intelligence
   isPremium: boolean;
   isMyPick: boolean;
+  /** LS-10568: mock drafts have no league team — `myTeamId` is a room seat id,
+   *  and `getDraftRecommendations` is league-only (requireLeagueId). Hides the
+   *  Draft Intelligence panel so the query never fires in a mock room. */
+  isMockDraft?: boolean;
   commPickMode: boolean;
   /** Premium (LS-9253): every team's turn is pickable — no CPU auto-picker
    *  exists in this mode. Kept separate from commPickMode; see DraftPlayerBoard. */
@@ -360,6 +364,7 @@ function getPositionPill(pos: string): { bg: string; color: string } {
 export function DraftRail({
   isPremium,
   isMyPick,
+  isMockDraft = false,
   commPickMode,
   controlAllTeams,
   isOwner,
@@ -494,8 +499,9 @@ export function DraftRail({
           />
         )}
 
-        {/* Draft Intelligence — only on user's pick, premium only */}
-        {isMyPick && (
+        {/* Draft Intelligence — only on user's pick, premium only; league
+            drafts only (LS-10568 — recommendations are keyed by league team). */}
+        {isMyPick && !isMockDraft && (
           <YStack
             backgroundColor={withAlpha(BRAND_GOLD, 0.07)}
             borderWidth={1}

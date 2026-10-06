@@ -288,6 +288,38 @@ describe('DraftRail current-pick panel and actions (LS-8783)', () => {
     expect(onInitializeDraft).toHaveBeenCalledWith('snake');
   });
 
+  // LS-10568: getDraftRecommendations is league-only; a mock room's
+  // myTeamId is a seat id, so Draft Intelligence must not mount there.
+  describe('Draft Intelligence gating', () => {
+    it('renders Draft Intelligence for a premium user on their pick', () => {
+      const { queryByTestId } = render(
+        <DraftRail
+          {...baseProps}
+          isPremium
+          isMyPick
+          draftId={1}
+          myTeamId={2}
+        />,
+      );
+      expect(queryByTestId('intel')).toBeTruthy();
+    });
+
+    it('hides Draft Intelligence in a mock draft', () => {
+      const { queryByTestId, queryByText } = render(
+        <DraftRail
+          {...baseProps}
+          isPremium
+          isMyPick
+          isMockDraft
+          draftId={1}
+          myTeamId={2}
+        />,
+      );
+      expect(queryByTestId('intel')).toBeNull();
+      expect(queryByText('Draft Intelligence')).toBeNull();
+    });
+  });
+
   it('toggles league chat via the League Chat button', () => {
     const onToggleChat = jest.fn();
     const { getByLabelText } = render(
