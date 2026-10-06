@@ -22,6 +22,11 @@ set -euo pipefail
 #
 # Cross-platform: runs on Windows (Git Bash) and Linux (cloud sessions).
 
+# JSON parsing helper (LS-10612). Located from this script's own path, not the
+# project dir, so it resolves even when CLAUDE_PROJECT_DIR points elsewhere.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 0
+JSON_HELPER="${HOOK_DIR}/lib/check-open-pr-json.mjs"
+
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 WORKTREE_NORM="${WORKTREE//\\//}"
 
@@ -44,25 +49,25 @@ esac
 # --- gh CLI required ---
 command -v gh >/dev/null 2>&1 || exit 0
 
+# --- node required for JSON parsing (LS-10612) ---
+# Python was dropped: on Windows `python` often resolves only to the Microsoft
+# Store App Execution Alias (%LOCALAPPDATA%\Microsoft\WindowsApps), which
+# prints "Python was not found..." and exits non-zero, so every parse silently
+# came back empty and the guard never fired. Node is a hard repo prerequisite
+# (every MCP server needs it). `node -e ''` rather than `command -v` so a
+# broken shim or stub on PATH is caught too. Still fail open, but say why.
+if ! node -e '' >/dev/null 2>&1 || [ ! -f "$JSON_HELPER" ]; then
+  echo "check-open-pr: skipped — node is not runnable or ${JSON_HELPER} is missing; the open-PR stop guard is OFF until fixed" >&2
+  exit 0
+fi
+
 # --- Look up the PR for this branch (view carries mergeable; list does not) ---
 PR_JSON=$(gh pr view "$BRANCH" --json number,state,isDraft,labels,mergeable,headRefOid 2>/dev/null || true)
 [ -z "$PR_JSON" ] && exit 0
 
-# Parse with python (no jq on Windows).
+# Parse with node (no jq on Windows, no python — see preflight above).
 # Emits: "<number>|<state>|<isDraft>|<labels-csv>|<mergeable>|<head-sha>"
-PARSED=$(PR_JSON="$PR_JSON" python -c '
-import json, os, sys
-pr = json.loads(os.environ["PR_JSON"])
-if not pr:
-    sys.exit(0)
-num = pr["number"]
-state = pr["state"]
-draft = "true" if pr["isDraft"] else "false"
-labels = ",".join(l["name"] for l in pr.get("labels", []))
-mergeable = pr.get("mergeable") or "UNKNOWN"
-sha = (pr.get("headRefOid") or "")[:7]
-print("{}|{}|{}|{}|{}|{}".format(num, state, draft, labels, mergeable, sha))
-' 2>/dev/null || true)
+PARSED=$(PR_JSON="$PR_JSON" node "$JSON_HELPER" pr 2>/dev/null || true)
 
 [ -z "$PARSED" ] && exit 0
 
@@ -172,18 +177,7 @@ if [ -f "$STATE_FILE" ]; then
   state_age=$(( $(date +%s) - state_mtime ))
   STATE_STALE_SECONDS=1800
   if [ "$state_age" -lt "$STATE_STALE_SECONDS" ]; then
-    STATE_TERMINAL=$(python -c '
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        state = json.load(f)
-except Exception:
-    print("unknown")
-    sys.exit(0)
-idle = state.get("idleCount") or 0
-cycle = state.get("cycleCount") or 0
-print("terminal" if idle >= 6 or cycle >= 12 else "ok")
-' "$STATE_FILE" 2>/dev/null || echo "unknown")
+    STATE_TERMINAL=$(node "$JSON_HELPER" state "$STATE_FILE" 2>/dev/null || echo "unknown")
     if [ "$STATE_TERMINAL" = "ok" ]; then
       {
         echo ""
