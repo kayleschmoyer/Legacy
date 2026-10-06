@@ -285,6 +285,49 @@ jobs:
           path: apps/app/android/${{ steps.build.outputs.apk-path }}
           retention-days: 3
 
+      # LS-10622: the release APK carries arm64-v8a + x86_64 so the emulator
+      # smoke test can boot it, which makes it ~92 MB. Testers on phones only
+      # need arm64-v8a, and a download that size stalls on flaky mobile links.
+      # Derive a phone-only APK from the same build (no second native compile):
+      # drop lib/x86_64 and the old signature, zipalign, then re-sign with the
+      # committed debug keystore the release build already signs with, so the
+      # signature is identical and in-place upgrades keep working. The universal
+      # APK stays the artifact the smoke job boots.
+      - name: Derive arm64-only tester APK
+        if: steps.version.outputs.build_type == 'release'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          BT="$(ls -d "$SDK"/build-tools/*/ | sort -V | tail -1)"
+          command -v zip >/dev/null || sudo apt-get install -y zip
+          APK_NAME="${{ steps.apk-name.outputs.apk_name }}"
+          OUT="apps/app/android/app/build/outputs/apk/release-arm64"
+          mkdir -p "$OUT"
+          cp "apps/app/android/${{ steps.build.outputs.apk-path }}" "$OUT/stripped.apk"
+          # Exit 12 = "nothing to delete" for a pattern; the asserts below are the real check.
+          zip -q -d "$OUT/stripped.apk" 'lib/x86_64/*' 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/MANIFEST.MF' || [ $? -eq 12 ]
+          "${BT}zipalign" -p -f 4 "$OUT/stripped.apk" "$OUT/aligned.apk"
+          "${BT}apksigner" sign \
+            --ks apps/app/android/app/debug.keystore \
+            --ks-pass pass:android --key-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --out "$OUT/$APK_NAME" "$OUT/aligned.apk"
+          "${BT}apksigner" verify "$OUT/$APK_NAME"
+          LIBS="$(unzip -Z1 "$OUT/$APK_NAME")"
+          echo "$LIBS" | grep -q '^lib/arm64-v8a/' || { echo "::error::arm64-only APK has no arm64-v8a libs"; exit 1; }
+          if echo "$LIBS" | grep -q '^lib/x86_64/'; then echo "::error::x86_64 libs survived the strip"; exit 1; fi
+          rm "$OUT/stripped.apk" "$OUT/aligned.apk"
+          ls -lh "$OUT"
+
+      - name: Upload arm64-only APK Artifact
+        if: steps.version.outputs.build_type == 'release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-apk-release-arm64
+          path: apps/app/android/app/build/outputs/apk/release-arm64/*.apk
+          retention-days: 3
+
   smoke-android:
     name: Boot Smoke (Emulator)
     # GH-hosted ubuntu-latest is used here (not the self-hosted m7a.xlarge runner)
@@ -380,11 +423,21 @@ jobs:
           cd artifacts
           mv *.apk "${{ needs.build-android.outputs.apk_name }}"
 
+      # LS-10622: the stable-named "latest" APK (QR / gated download / S3
+      # current pointer) is the phone-only arm64 build — about half the size of
+      # the universal APK, which stalled on mobile connections. The universal
+      # APK keeps its versioned name for emulator / ChromeOS users.
+      - name: Download arm64-only APK Artifact
+        if: needs.build-android.outputs.build_type == 'release'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: android-apk-release-arm64
+          path: ./artifacts-arm64
+
       - name: Stable-named copy for QR / direct-download URL
         if: needs.build-android.outputs.build_type == 'release'
         run: |
-          cp "artifacts/${{ needs.build-android.outputs.apk_name }}" \
-             "artifacts/legacy-sports-latest.apk"
+          cp ./artifacts-arm64/*.apk "artifacts/legacy-sports-latest.apk"
           sha256sum "artifacts/legacy-sports-latest.apk" | awk '{print $1}' \
              > "artifacts/legacy-sports-latest.apk.sha256"
 

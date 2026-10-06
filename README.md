@@ -58,30 +58,30 @@ These are published automatically by CI workflows — no manual steps required.
 
 ### Android APK
 
-[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://github.com/bkrupa/legacy-sports/releases/latest/download/legacy-sports-latest.apk)
+[![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-green?style=for-the-badge&logo=android)](https://api.legacy-fantasy.com/oauth/download/android)
 [![Latest Release Date](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Released.json&style=for-the-badge)](https://github.com/bkrupa/legacy-sports/releases/latest)
 
 **Latest Release:** [View all Android releases →](https://github.com/bkrupa/legacy-sports/releases?q=android)
 
 **Scan to download on your phone:**
 
-<a href="https://github.com/bkrupa/legacy-sports/releases/latest/download/legacy-sports-latest.apk"><img src="docs/assets/apk-qr.svg" alt="QR code that downloads the latest Android APK directly" width="180" height="180" /></a>
+<a href="https://api.legacy-fantasy.com/oauth/download/android"><img src="docs/assets/apk-qr.svg" alt="QR code for the Android APK download" width="180" height="180" /></a>
 
 **Installation Instructions:**
 
-1. Tap the button or scan the QR code — the APK downloads directly
+1. Tap the button or scan the QR code and sign in with Google
 2. Enable "Install from Unknown Sources" in your Android settings (if prompted)
 3. Open the downloaded APK to install it
 
-#### Gated download (testers)
+#### Who can download
 
-There is also an authenticated download that checks the caller against an approved-tester allowlist before serving the app:
+**https://api.legacy-fantasy.com/oauth/download/android** checks the caller against an approved-tester allowlist before serving the app. Opening it signs you in with Google and then hands back the current phone (arm64) APK. Admins are always allowed; everyone else needs their address on the allowlist, which an admin manages from the admin area. An address can be added before that person has ever signed up: their account is created when they first sign in here. Every attempt is recorded, so an admin can see who tried and was refused.
 
-**https://api.legacy-fantasy.com/oauth/download/android**
+If a download stalls, tap the link again — the download link stays valid for 30 minutes, so resuming from your browser's downloads list also works.
 
-Opening it signs you in with Google and then hands back the current release APK — the same build the link above serves. Admins are always allowed; everyone else needs their address on the allowlist, which an admin manages from the admin area. An address can be added before that person has ever signed up: their account is created when they first sign in here. Every attempt is recorded, so an admin can see who tried and was refused.
+#### Emulator / ChromeOS build
 
-> **The public link and QR code above are still live and still unauthenticated.** The gated URL is an additional path, not a replacement — anyone with the release link can still install the app. Restricting that is a separate change.
+The phone APK only contains arm64 code. For an x86_64 emulator or ChromeOS, use the versioned (larger, universal) APK from the [GitHub releases page](https://github.com/bkrupa/legacy-sports/releases?q=android). The repository is private, so that page needs a GitHub account with access.
 
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 

@@ -39,11 +39,12 @@ export const DOWNLOAD_RETURN_STATE = 'download:android';
 export const ANDROID_DOWNLOAD_PATH = '/oauth/download/android';
 
 /**
- * Presigned URL lifetime. Short on purpose: the URL is a bearer credential —
- * anyone holding it can fetch the APK until it expires — so it is scoped to
- * about as long as one redirect plus one download start.
+ * Presigned URL lifetime. The URL is a bearer credential — anyone holding it
+ * can fetch the APK until it expires — so it is kept short, but long enough
+ * that resuming a stalled download (the browser re-requests the same URL)
+ * still works on a slow mobile connection (LS-10622).
  */
-const PRESIGN_TTL_SECONDS = 300;
+const PRESIGN_TTL_SECONDS = 1800;
 
 let s3Client: S3Client | undefined;
 

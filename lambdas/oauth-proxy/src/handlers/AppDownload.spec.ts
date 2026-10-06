@@ -165,11 +165,12 @@ describe('handleAndroidDownload', () => {
       expect(result.headers?.['Cache-Control']).toBe('no-store, private');
     });
 
-    it('presigns with a TTL of at most five minutes', async () => {
+    it('presigns with a TTL long enough to resume a stalled download but at most thirty minutes', async () => {
       await handleAndroidDownload(buildEvent());
 
       const [, , options] = mockGetSignedUrl.mock.calls[0];
-      expect(options?.expiresIn).toBeLessThanOrEqual(300);
+      expect(options?.expiresIn).toBeGreaterThanOrEqual(900);
+      expect(options?.expiresIn).toBeLessThanOrEqual(1800);
     });
 
     it('records exactly one listed-grant row, with the user agent', async () => {
