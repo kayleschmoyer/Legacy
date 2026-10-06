@@ -1012,21 +1012,21 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ gifUrl: msg.gifUrl });
     });
 
-    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+    it('persists messageText as typed, not HTML-escaped (LS-10678)', async () => {
       mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
       mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);
 
       const resolver = getMutation('sendLeagueMessage');
       await resolver(
         {},
-        { leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        { leagueId: 1, messageText: `QA_<b>x</b> & "q" it's` },
         mockContext,
         undefined as never,
       );
 
       expect(mockDb.values).toHaveBeenCalledWith(
         expect.objectContaining({
-          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+          messageText: `QA_<b>x</b> & "q" it's`,
         }),
       );
     });
@@ -1468,6 +1468,25 @@ describe('Chat and Tiebreakers Resolver', () => {
       );
       expect(result).toMatchObject({ status: 'pending' });
     });
+
+    it('persists the reason as typed, not HTML-escaped (LS-10678)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 1 }]) // message found
+        .mockResolvedValueOnce([{ id: 1 }]); // membership
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMessageReport()]);
+
+      const resolver = getMutation('reportLeagueMessage');
+      await resolver(
+        {},
+        { messageId: 1, reason: `Spam <a> & "links" it's` },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: `Spam <a> & "links" it's` }),
+      );
+    });
   });
 
   // ── postLeagueAnnouncement ─────────────────────────────────────────────────
@@ -1542,7 +1561,7 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ messageType: 'announcement' });
     });
 
-    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+    it('persists messageText as typed, not HTML-escaped (LS-10678)', async () => {
       mockDb.limit.mockResolvedValueOnce([{ owner: 1 }]); // is commissioner
       mockDb.returning.mockResolvedValueOnce([
         makeLeagueMsg({ messageType: 'announcement' }),
@@ -1551,14 +1570,14 @@ describe('Chat and Tiebreakers Resolver', () => {
       const resolver = getMutation('postLeagueAnnouncement');
       await resolver(
         {},
-        { leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        { leagueId: 1, messageText: `QA_<b>x</b> & "q" it's` },
         mockContext,
         undefined as never,
       );
 
       expect(mockDb.values).toHaveBeenCalledWith(
         expect.objectContaining({
-          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+          messageText: `QA_<b>x</b> & "q" it's`,
         }),
       );
     });
@@ -1616,7 +1635,7 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result.messageText).toBe('Updated');
     });
 
-    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+    it('persists messageText as typed, not HTML-escaped (LS-10678)', async () => {
       mockDb.limit
         .mockResolvedValueOnce([{ owner: 1 }]) // is commissioner
         .mockResolvedValueOnce([makeLeagueMsg()]); // existing found
@@ -1625,13 +1644,13 @@ describe('Chat and Tiebreakers Resolver', () => {
       const resolver = getMutation('updateLeagueAnnouncement');
       await resolver(
         {},
-        { id: 1, leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        { id: 1, leagueId: 1, messageText: `QA_<b>x</b> & "q" it's` },
         mockContext,
         undefined as never,
       );
 
       expect(mockDb.set).toHaveBeenCalledWith({
-        messageText: '&lt;img src=x onerror=alert(1)&gt;',
+        messageText: `QA_<b>x</b> & "q" it's`,
       });
     });
   });
@@ -1727,20 +1746,20 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ fromUserId: 1, toUserId: 2 });
     });
 
-    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+    it('persists messageText as typed, not HTML-escaped (LS-10678)', async () => {
       mockDb.returning.mockResolvedValueOnce([makeDirectMsg()]);
 
       const resolver = getMutation('sendDirectMessage');
       await resolver(
         {},
-        { toUserId: 2, messageText: '<img src=x onerror=alert(1)>' },
+        { toUserId: 2, messageText: `QA_<b>x</b> & "q" it's` },
         mockContext,
         undefined as never,
       );
 
       expect(mockDb.values).toHaveBeenCalledWith(
         expect.objectContaining({
-          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+          messageText: `QA_<b>x</b> & "q" it's`,
         }),
       );
     });

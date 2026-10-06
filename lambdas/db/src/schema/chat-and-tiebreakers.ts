@@ -52,22 +52,6 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Escape HTML-significant characters before persisting user-supplied chat
- * text (LS-6300). The web chat renders messageText through React's default
- * text-node escaping today, but this stores a value that stays inert even if
- * a future or non-React consumer (email digest, admin panel, etc.) ever
- * interpolates it into HTML.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
  * Resolve `@TeamName` tokens in a league chat message to the mentioned
  * team(s)' managing user id(s) (LS-9216). Mirrors the client's
  * `splitMentions` highlighting algorithm (LS-9097, `apps/app/.../mentions.ts`)
@@ -1018,11 +1002,14 @@ builder.mutationField('sendLeagueMessage', (t) =>
       }
 
       const gifUrl = validateGifUrl(args.gifUrl);
-      const rawText = args.messageText.trim();
-      if (!gifUrl && rawText.length === 0) {
+      // Stored as typed, not HTML-escaped (LS-10678): every client renders
+      // it as a React/RN text node, which escapes on output. Escaping on
+      // write (LS-6300) made users see literal `&amp;`/`&lt;` entities.
+      const text = args.messageText.trim();
+      if (!gifUrl && text.length === 0) {
         throw UserInputError('Message cannot be empty');
       }
-      if (rawText.length > 2000) {
+      if (text.length > 2000) {
         throw UserInputError('Message cannot exceed 2000 characters');
       }
       // Reject non-https URLs so a stored gifUrl can never be a javascript:
@@ -1031,7 +1018,6 @@ builder.mutationField('sendLeagueMessage', (t) =>
       if (gifUrl && !/^https:\/\//i.test(gifUrl)) {
         throw UserInputError('gifUrl must be an https URL');
       }
-      const text = escapeHtml(rawText);
 
       // Verify the caller is a member of the league
       const membership = await context.db
@@ -1279,14 +1265,13 @@ builder.mutationField('reportLeagueMessage', (t) =>
         throw AuthenticationError();
       }
 
-      const trimmedReason = args.reason.trim();
-      if (trimmedReason.length === 0) {
+      const reason = args.reason.trim();
+      if (reason.length === 0) {
         throw UserInputError('Report reason cannot be empty');
       }
-      if (trimmedReason.length > 1000) {
+      if (reason.length > 1000) {
         throw UserInputError('Report reason cannot exceed 1000 characters');
       }
-      const reason = escapeHtml(trimmedReason);
 
       const messages = await context.db
         .select({ leagueId: PublicSchema.leagueMessages.leagueId })
@@ -1402,14 +1387,13 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         throw AuthenticationError();
       }
 
-      const rawText = args.messageText.trim();
-      if (rawText.length === 0) {
+      const text = args.messageText.trim();
+      if (text.length === 0) {
         throw UserInputError('Announcement cannot be empty');
       }
-      if (rawText.length > 2000) {
+      if (text.length > 2000) {
         throw UserInputError('Announcement cannot exceed 2000 characters');
       }
-      const text = escapeHtml(rawText);
 
       // Verify caller is the commissioner of the league
       const leagueRows = await context.db
@@ -1502,14 +1486,13 @@ builder.mutationField('updateLeagueAnnouncement', (t) =>
         throw AuthenticationError();
       }
 
-      const rawText = args.messageText.trim();
-      if (rawText.length === 0) {
+      const text = args.messageText.trim();
+      if (text.length === 0) {
         throw UserInputError('Announcement cannot be empty');
       }
-      if (rawText.length > 2000) {
+      if (text.length > 2000) {
         throw UserInputError('Announcement cannot exceed 2000 characters');
       }
-      const text = escapeHtml(rawText);
 
       // Verify caller is the commissioner of the league
       const leagueRows = await context.db
@@ -1654,14 +1637,13 @@ builder.mutationField('sendDirectMessage', (t) =>
         throw new Error('Cannot send a direct message to yourself');
       }
 
-      const rawText = args.messageText.trim();
-      if (rawText.length === 0) {
+      const text = args.messageText.trim();
+      if (text.length === 0) {
         throw UserInputError('Message cannot be empty');
       }
-      if (rawText.length > 2000) {
+      if (text.length > 2000) {
         throw UserInputError('Message cannot exceed 2000 characters');
       }
-      const text = escapeHtml(rawText);
 
       // Persist the direct message
       const rows = await context.db
