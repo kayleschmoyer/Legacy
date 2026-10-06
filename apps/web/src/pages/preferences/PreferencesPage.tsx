@@ -1128,8 +1128,8 @@ function NotificationPreferencesSection({
   const emailEnabled = prefs?.emailEnabled ?? false;
   const matchupStartedEnabled = prefs?.matchupStartedEnabled ?? true;
   const matchupEndedEnabled = prefs?.matchupEndedEnabled ?? true;
-  const matchupCloseGameEnabled = prefs?.matchupCloseGameEnabled ?? true;
-  const matchupReminderEnabled = prefs?.matchupReminderEnabled ?? true;
+  const matchupCloseGameEnabled = prefs?.matchupCloseGameEnabled ?? false;
+  const matchupReminderEnabled = prefs?.matchupReminderEnabled ?? false;
   const touchdownAlertEnabled = prefs?.touchdownAlertEnabled ?? false;
   const closeGameThreshold = prefs?.closeGameThreshold ?? CLOSE_GAME_DEFAULT;
 

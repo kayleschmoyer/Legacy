@@ -29,10 +29,10 @@ export const notificationPreferences = pgTable(
       .default(true),
     matchupCloseGameEnabled: boolean('matchup_close_game_enabled')
       .notNull()
-      .default(true),
+      .default(false),
     matchupReminderEnabled: boolean('matchup_reminder_enabled')
       .notNull()
-      .default(true),
+      .default(false),
     touchdownAlertEnabled: boolean('touchdown_alert_enabled')
       .notNull()
       .default(false),

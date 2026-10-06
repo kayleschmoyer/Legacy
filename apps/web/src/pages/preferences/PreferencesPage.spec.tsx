@@ -301,6 +301,29 @@ describe('PreferencesPage push toggle OS permission (LS-7089)', () => {
   });
 });
 
+describe('PreferencesPage matchup alert defaults (LS-7087)', () => {
+  it('shows started/ended on and close-game/reminders off for a user with no saved prefs', () => {
+    mockUseQuery.mockReturnValue({
+      data: { getUserNotificationPreferences: null },
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+      updateQuery: jest.fn(),
+    });
+
+    render(<PreferencesPage />);
+
+    const checked = (name: string): string | null =>
+      screen.getByRole('switch', { name }).getAttribute('aria-checked');
+    expect(checked('Matchup started')).toBe('true');
+    expect(checked('Matchup ended')).toBe('true');
+    expect(checked('Close game alerts')).toBe('false');
+    expect(checked('Matchup reminders')).toBe('false');
+    expect(checked('Touchdown alerts')).toBe('false');
+  });
+});
+
 describe('PreferencesPage notifications Retry (LS-7095)', () => {
   it('requests network-status updates so refetch state is observable', () => {
     mockQueryState(NetworkStatus.error, jest.fn());

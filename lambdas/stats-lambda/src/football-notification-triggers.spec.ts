@@ -309,7 +309,7 @@ describe('publishFootballGameAlerts', () => {
     expect(publisher.publish).not.toHaveBeenCalled();
   });
 
-  it('sends a MATCHUP_CLOSE_GAME alert for a premium owner with no notification_preferences row (matchupCloseGameEnabled defaults true)', async () => {
+  it('does not send a MATCHUP_CLOSE_GAME alert for a premium owner with no notification_preferences row (matchupCloseGameEnabled defaults false)', async () => {
     mockGetMatchupFootballPlayerGameStats.mockResolvedValueOnce([]);
 
     const queues = new Map<object, unknown[][]>([
@@ -340,10 +340,7 @@ describe('publishFootballGameAlerts', () => {
 
     await publishFootballGameAlerts(db as never, publisher as never, 7);
 
-    expect(publisher.publish).toHaveBeenCalledTimes(2);
-    const [event] = publisher.publish.mock.calls[0];
-    expect(event.notificationType).toBe('MATCHUP_CLOSE_GAME');
-    expect(event.data).toMatchObject({ matchupId: 7, margin: 3 });
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 
   it('does not re-send a TD_ALERT already logged for this matchupPlayerId', async () => {

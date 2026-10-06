@@ -52,13 +52,14 @@ async function isPremiumUser(db: PublicDb, userId: number): Promise<boolean> {
  * lib/db-client/src/drizzle/public/models/Notifications.ts (matching
  * deliver.ts's `prefs && !prefs.pushEnabled` convention, which treats a
  * missing row as enabled, not disabled) rather than skipping these users
- * entirely. `touchdownAlertEnabled` is the one opt-in field (column default
- * false), so it stays off until the user explicitly enables it.
+ * entirely. `touchdownAlertEnabled` and `matchupCloseGameEnabled` are opt-in
+ * (column default false, LS-7087), so they stay off until the user explicitly
+ * enables them.
  */
 const DEFAULT_PREFERENCES: RelevantPreferences = {
   pushEnabled: true,
   touchdownAlertEnabled: false,
-  matchupCloseGameEnabled: true,
+  matchupCloseGameEnabled: false,
   closeGameThreshold: 50,
 };
 
