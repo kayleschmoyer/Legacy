@@ -228,6 +228,40 @@ describe('PricingPage — Premium plan price loading state (LS-8813)', () => {
     expect(screen.getByTestId('plan-price-annual')).toHaveTextContent('3.33');
     expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
   });
+
+  // LS-7191: $39.99 / 12 = $3.3325 — 12 × $3.33 ≠ $39.99, so the per-month
+  // figure must be flagged as approximate.
+  it('marks the annual per-month price as approximate when it does not divide evenly', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('plan-price-annual')).toHaveTextContent(
+      '~$3.33/mo',
+    );
+  });
+
+  it('shows an exact annual per-month price without the approximate marker', () => {
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 7.99,
+      annualTotal: 83.88,
+      annualSavingsPct: '13%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+
+    render(<PricingPage />);
+
+    const price = screen.getByTestId('plan-price-annual');
+    expect(price).toHaveTextContent('$6.99/mo');
+    expect(price).not.toHaveTextContent('~');
+  });
 });
 
 // LS-7182 — pricing copy must not silently drift from the entitlement catalog.

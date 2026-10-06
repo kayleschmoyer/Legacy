@@ -545,6 +545,10 @@ export default function PricingPage() {
   const annualTotal = prices.annualTotal.toFixed(2);
   // Derive per-month cost from annualTotal so display always matches the billed amount.
   const annualMonthlyPrice = prices.annualTotal / 12;
+  // LS-7191: when the annual total doesn't split evenly into 12 cents-exact
+  // months (e.g. $39.99/yr → $3.3325), the rounded per-month figure can't
+  // reconcile with the billed total, so mark it as approximate.
+  const annualMonthlyIsApprox = Math.round(prices.annualTotal * 100) % 12 !== 0;
   const ANNUAL_SAVINGS_PCT = prices.annualSavingsPct;
   const pricesLoading = prices.loading;
 
@@ -820,7 +824,7 @@ export default function PricingPage() {
                         marginBottom={0}
                         color={BRAND_GOLD}
                       >
-                        $
+                        {isAnnual && annualMonthlyIsApprox ? '~$' : '$'}
                         {isAnnual
                           ? annualMonthlyPrice.toFixed(2)
                           : monthlyPrice.toFixed(2)}
