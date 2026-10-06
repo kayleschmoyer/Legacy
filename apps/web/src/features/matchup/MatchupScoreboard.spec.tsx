@@ -22,8 +22,16 @@ import type {
   MatchupFragment,
   MatchupPlayerFragment,
 } from '@legacy-sports/graphql';
-import { MatchupStatus, StatsLoadingStatus } from '@legacy-sports/graphql';
-import { computeMatchupScores, MatchupScoreboard } from './MatchupScoreboard';
+import {
+  FootballStatsDataQuality,
+  MatchupStatus,
+  StatsLoadingStatus,
+} from '@legacy-sports/graphql';
+import {
+  computeFootballMatchupPlayerStats,
+  computeMatchupScores,
+  MatchupScoreboard,
+} from './MatchupScoreboard';
 import type { ScoringSettings } from '../../lib/scoring';
 
 import { getEnvironmentConfig } from '../../config/environment';
@@ -74,8 +82,33 @@ jest.mock('../../lib/scoring', () => ({
     mockUseLeagueScoringSettings(id),
 }));
 
+const mockScoreboardView = jest.fn();
+const mockRefetchFootballScores = jest.fn();
+const mockUseFootballMatchupScores = jest.fn((_args: unknown) => ({
+  playerScores: new Map(),
+  teamScores: new Map([[101, { actual: 1, projected: 2 }]]),
+  loading: false,
+  hasError: false,
+  refetch: mockRefetchFootballScores,
+}));
+const mockComputeFootballMatchupTotals = jest.fn(
+  (_matchup: unknown, _teamScores: unknown) => ({
+    team1Score: 105.2,
+    team2Score: 98.4,
+    team1Projected: 107.2,
+    team2Projected: 101.9,
+    scoresUnavailable: false,
+  }),
+);
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
-  MatchupScoreboardView: () => <div data-testid="scoreboard-view" />,
+  MatchupScoreboardView: (props: unknown) => {
+    mockScoreboardView(props);
+    return <div data-testid="scoreboard-view" />;
+  },
+  useFootballMatchupScores: (args: unknown) =>
+    mockUseFootballMatchupScores(args),
+  computeFootballMatchupTotals: (matchup: unknown, teamScores: unknown) =>
+    mockComputeFootballMatchupTotals(matchup, teamScores),
 }));
 
 // Typing warn as jest.Mock (not the original method) sidesteps
@@ -650,5 +683,139 @@ describe('MatchupScoreboard — live score updates via liveUpdateSignal (LS-5425
     rerender(<MatchupScoreboard matchup={matchup} liveUpdateSignal={2} />);
 
     expect(refetchPlayers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('computeFootballMatchupPlayerStats (LS-10829)', () => {
+  const players = [
+    { playerId: 17, teamId: 10, positionId: 1, season: 2020 },
+    { playerId: 41, teamId: 10, positionId: 2, season: 2019 },
+    // Bench (no slot): matchupScores never scores bench players.
+    { playerId: 87, teamId: 10, positionId: null, season: 2011 },
+    // Starter matchupScores has not returned (yet).
+    { playerId: 99, teamId: 20, positionId: 3, season: 2015 },
+  ] as unknown as MatchupPlayerFragment[];
+  const playerScores = new Map([
+    [
+      17,
+      {
+        actual: 21.7,
+        projected: 21.7,
+        gamesPlayed: 1,
+        dataQuality: FootballStatsDataQuality.Ok,
+      },
+    ],
+    [
+      41,
+      {
+        actual: 0,
+        projected: 17.5,
+        gamesPlayed: 0,
+        dataQuality: FootballStatsDataQuality.Ok,
+      },
+    ],
+    [
+      87,
+      {
+        actual: 9,
+        projected: 9,
+        gamesPlayed: 1,
+        dataQuality: FootballStatsDataQuality.Ok,
+      },
+    ],
+  ]);
+
+  it('reads per-starter actual/projected points from matchupScores', () => {
+    expect(computeFootballMatchupPlayerStats(players, playerScores)).toEqual([
+      {
+        playerId: 17,
+        actual: 21.7,
+        projected: 21.7,
+        gamesPlayed: 1,
+        totalGames: 1,
+        season: 2020,
+        teamId: 10,
+        positionId: 1,
+      },
+      {
+        playerId: 41,
+        actual: 0,
+        projected: 17.5,
+        gamesPlayed: 0,
+        totalGames: 1,
+        season: 2019,
+        teamId: 10,
+        positionId: 2,
+      },
+    ]);
+  });
+
+  it('sums to the matchupScores team projection, not 0.0', () => {
+    const rows = computeFootballMatchupPlayerStats(players, playerScores);
+    const teamProjected = rows.reduce((sum, r) => sum + r.projected, 0);
+    expect(teamProjected).toBeCloseTo(39.2);
+  });
+});
+
+describe('MatchupScoreboard — football league (LS-10829)', () => {
+  const matchup = makeMatchup({ leagueId: 10, weekNumber: 3 });
+  const lastViewProps = () =>
+    mockScoreboardView.mock.calls.at(-1)?.[0] as {
+      team1Score: number | null;
+      team2Score: number | null;
+      team1Projected: number | null;
+      team2Projected: number | null;
+    };
+
+  beforeEach(() => {
+    mockScoreboardView.mockClear();
+    mockUseFootballMatchupScores.mockClear();
+    mockComputeFootballMatchupTotals.mockClear();
+    mockRefetchFootballScores.mockClear();
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      data: undefined,
+      error: undefined,
+      refetch: jest.fn(),
+    });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: { leagueTeams: [] } });
+  });
+
+  it('renders the matchupScores team totals instead of the baseball recompute', () => {
+    render(<MatchupScoreboard matchup={matchup} isFootball />);
+
+    expect(mockUseFootballMatchupScores).toHaveBeenCalledWith({
+      leagueId: 10,
+      weekNum: 3,
+      skip: false,
+    });
+    expect(mockUseGetMatchupPlayersQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(lastViewProps()).toMatchObject({
+      team1Score: 105.2,
+      team2Score: 98.4,
+      team1Projected: 107.2,
+      team2Projected: 101.9,
+    });
+  });
+
+  it('refetches matchupScores on a live update signal', () => {
+    const { rerender } = render(
+      <MatchupScoreboard matchup={matchup} isFootball liveUpdateSignal={0} />,
+    );
+    rerender(
+      <MatchupScoreboard matchup={matchup} isFootball liveUpdateSignal={1} />,
+    );
+
+    expect(mockRefetchFootballScores).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips matchupScores for a baseball league', () => {
+    render(<MatchupScoreboard matchup={matchup} />);
+
+    expect(mockUseFootballMatchupScores).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(mockComputeFootballMatchupTotals).not.toHaveBeenCalled();
   });
 });

@@ -258,6 +258,13 @@ export interface MatchupScoreboardHeroProps {
    * @deprecated No longer read. Remove once both platforms stop passing it.
    */
   isPremium?: boolean;
+  /**
+   * True when the matchup is live but its scores have not loaded (or failed
+   * to load). Both scores render as a placeholder and nothing is announced as
+   * a lead or a tie — a 0–0 computed from missing stats is not a real score
+   * (LS-10794/LS-10829).
+   */
+  scoresUnavailable?: boolean;
 }
 
 // ── Team panel ──────────────────────────────────────────────────────────────
@@ -269,6 +276,7 @@ function TeamPanel({
   totalGames,
   onTeamPress,
   preLock,
+  unavailable,
   onTouchdown,
 }: {
   team: MatchupScoreboardHeroTeam;
@@ -277,12 +285,14 @@ function TeamPanel({
   totalGames: number;
   onTeamPress?: (teamId: number) => void;
   preLock: boolean;
+  unavailable: boolean;
   onTouchdown: () => void;
 }) {
   const score = team.score ?? 0;
   // Pre-lock (scheduled, no games started), a 0 score means "no stats yet",
-  // not "your team scored zero" — show a placeholder instead (LS-6386).
-  const showPlaceholder = preLock && score === 0;
+  // not "your team scored zero" — show a placeholder instead (LS-6386). The
+  // same applies while live scores are unavailable (LS-10829).
+  const showPlaceholder = unavailable || (preLock && score === 0);
   // Count the score up to its new value instead of swapping it instantly
   // (LS-6392). Suppressed pre-lock, where the score is a placeholder rather
   // than a number to count toward.
@@ -410,6 +420,7 @@ export function MatchupScoreboardHero({
   scoringIsStale,
   scoringChangeLog,
   audioEnabled = false,
+  scoresUnavailable = false,
 }: MatchupScoreboardHeroProps) {
   const isBye = status === 'bye';
   // One burst for the whole card, whichever side scored (LS-10111). The seed
@@ -444,9 +455,11 @@ export function MatchupScoreboardHero({
     ? `${byeTeamName} is on a bye this week`
     : preLock && score1 === 0 && score2 === 0
       ? `${team1Name} vs ${team2Name}: matchup has not started yet`
-      : score1 === score2
-        ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
-        : `${team1Leading ? team1Name : team2Name} now leads ${Math.max(score1, score2).toFixed(2)} to ${Math.min(score1, score2).toFixed(2)}`;
+      : scoresUnavailable
+        ? `${team1Name} vs ${team2Name}: live scores are not available yet`
+        : score1 === score2
+          ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
+          : `${team1Leading ? team1Name : team2Name} now leads ${Math.max(score1, score2).toFixed(2)} to ${Math.min(score1, score2).toFixed(2)}`;
 
   return (
     <HeroCard role="region" aria-label={`Week ${weekNumber ?? 1} scoreboard`}>
@@ -536,13 +549,18 @@ export function MatchupScoreboardHero({
         </YStack>
       ) : (
         <XStack alignItems="flex-start">
+          {/* Keyed on availability: the panel remounts when live scores
+              arrive, so the jump from the placeholder to the real score is
+              not counted as a scoring play (no "+N" badge or touchdown). */}
           <TeamPanel
+            key={scoresUnavailable ? 'team1-pending' : 'team1'}
             team={team1}
-            leading={team1Leading}
+            leading={!scoresUnavailable && team1Leading}
             gamesPlayed={gamesPlayed}
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
+            unavailable={scoresUnavailable}
             onTouchdown={onTouchdown}
           />
           <YStack alignSelf="center" paddingHorizontal="$2">
@@ -557,12 +575,14 @@ export function MatchupScoreboardHero({
             </Text>
           </YStack>
           <TeamPanel
+            key={scoresUnavailable ? 'team2-pending' : 'team2'}
             team={team2}
-            leading={!team1Leading}
+            leading={!scoresUnavailable && !team1Leading}
             gamesPlayed={gamesPlayed}
             totalGames={totalGames}
             onTeamPress={onTeamPress}
             preLock={preLock}
+            unavailable={scoresUnavailable}
             onTouchdown={onTouchdown}
           />
         </XStack>

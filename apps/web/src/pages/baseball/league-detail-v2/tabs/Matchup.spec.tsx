@@ -136,7 +136,37 @@ jest.mock('../../../../features/matchup/MatchupScoreboard', () => ({
   }),
 }));
 const mockMatchupScoreboardHero = jest.fn();
+// Football scores (LS-10829): the hook and the totals helper are unit-tested
+// in shared-components; here they are stubbed so the tab's wiring is visible.
+const mockUseFootballMatchupScores = jest.fn((_args: unknown) => ({
+  playerScores: new Map(),
+  teamScores: new Map(),
+  loading: false,
+  hasError: false,
+  refetch: mockRefetchFootballScores,
+}));
+const mockRefetchFootballScores = jest.fn();
+interface MockFootballTotals {
+  team1Score: number | null;
+  team2Score: number | null;
+  team1Projected: number | null;
+  team2Projected: number | null;
+  scoresUnavailable: boolean;
+}
+const mockComputeFootballMatchupTotals = jest.fn(
+  (_matchup: unknown, _teamScores: unknown): MockFootballTotals => ({
+    team1Score: 105.2,
+    team2Score: 98.4,
+    team1Projected: 107.2,
+    team2Projected: 101.9,
+    scoresUnavailable: false,
+  }),
+);
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
+  useFootballMatchupScores: (args: unknown) =>
+    mockUseFootballMatchupScores(args),
+  computeFootballMatchupTotals: (matchup: unknown, teamScores: unknown) =>
+    mockComputeFootballMatchupTotals(matchup, teamScores),
   MatchupScoreboardHero: (props: {
     team1: { name?: string | null; record?: string | null };
     team2: { name?: string | null; record?: string | null };
@@ -239,6 +269,9 @@ beforeEach(() => {
   });
   mockMatchupGrid.mockClear();
   mockMatchupScoreboardHero.mockClear();
+  mockUseFootballMatchupScores.mockClear();
+  mockComputeFootballMatchupTotals.mockClear();
+  mockRefetchFootballScores.mockClear();
   mockUseGetUserPreferencesQuery.mockReset();
   mockUseGetUserPreferencesQuery.mockReturnValue({ data: undefined });
   mockUseAuth.mockReturnValue({ isAuthenticated: true });
@@ -277,6 +310,83 @@ describe('MatchupTab — touchdown horn opt-in (LS-10195)', () => {
     expect(mockUseGetUserPreferencesQuery).toHaveBeenCalledWith({
       skip: true,
     });
+  });
+});
+
+describe('MatchupTab — football scores (LS-10829)', () => {
+  type HeroProps = {
+    team1: { score?: number | null; projectedScore?: number | null };
+    team2: { score?: number | null; projectedScore?: number | null };
+    scoresUnavailable?: boolean;
+  };
+  const lastHeroProps = () =>
+    mockMatchupScoreboardHero.mock.calls.at(-1)?.[0] as HeroProps;
+
+  it('feeds the header from matchupScores team totals for a football league', () => {
+    const teamScores = new Map([
+      [10, { actual: 105.2, projected: 107.2 }],
+      [20, { actual: 98.4, projected: 101.9 }],
+    ]);
+    mockUseFootballMatchupScores.mockReturnValueOnce({
+      playerScores: new Map(),
+      teamScores,
+      loading: false,
+      hasError: false,
+      refetch: mockRefetchFootballScores,
+    });
+    renderTab({ sport: 'football' });
+
+    expect(mockUseFootballMatchupScores).toHaveBeenCalledWith(
+      expect.objectContaining({ leagueId: 1, weekNum: 1, skip: false }),
+    );
+    expect(mockComputeFootballMatchupTotals).toHaveBeenCalledWith(
+      baseMatchup,
+      teamScores,
+    );
+    expect(lastHeroProps().team1).toMatchObject({
+      score: 105.2,
+      projectedScore: 107.2,
+    });
+    expect(lastHeroProps().team2).toMatchObject({
+      score: 98.4,
+      projectedScore: 101.9,
+    });
+    expect(lastHeroProps().scoresUnavailable).toBe(false);
+  });
+
+  it('passes scoresUnavailable through so the hero never announces a 0–0 tie', () => {
+    mockComputeFootballMatchupTotals.mockReturnValueOnce({
+      team1Score: null,
+      team2Score: null,
+      team1Projected: null,
+      team2Projected: null,
+      scoresUnavailable: true,
+    });
+    renderTab({ sport: 'football' });
+
+    expect(lastHeroProps().scoresUnavailable).toBe(true);
+    expect(lastHeroProps().team1.score).toBeNull();
+  });
+
+  it('keeps the baseball client recompute (and skips matchupScores) for MLB', () => {
+    renderTab();
+
+    expect(mockUseFootballMatchupScores).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+    expect(mockComputeFootballMatchupTotals).not.toHaveBeenCalled();
+    expect(lastHeroProps().team1.score).toBe(0);
+    expect(lastHeroProps().scoresUnavailable).toBe(false);
+  });
+
+  it('refetches football scores when stats complete for this matchup', () => {
+    renderTab({ sport: 'football' });
+    const options = mockUseLeagueWebSocket.mock.calls.at(-1)?.[0] as {
+      onMatchupStatsComplete: (n: { matchupId: number }) => void;
+    };
+    options.onMatchupStatsComplete({ matchupId: 1 });
+
+    expect(mockRefetchFootballScores).toHaveBeenCalled();
   });
 });
 

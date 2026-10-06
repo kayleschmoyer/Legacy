@@ -645,6 +645,7 @@ export function FootballMatchupScreen(
           standings={standings}
           totalMatchups={totalMatchups}
           showTimeInfo
+          isFootball
           team1ProjectedScore={team1Projection}
           team2ProjectedScore={team2Projection}
         />

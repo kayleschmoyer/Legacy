@@ -312,6 +312,7 @@ export function MatchupDetailPage() {
             gamesRemaining={gamesRemaining}
             showTimeInfo={leagueSport === Sport.Football}
             liveUpdateSignal={liveUpdateSignal}
+            isFootball={leagueSport === Sport.Football}
           />
         }
         winProbabilityPanel={

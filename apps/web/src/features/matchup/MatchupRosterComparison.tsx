@@ -19,8 +19,8 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
-  useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
+import { useFootballMatchupScores } from '@legacy-sports/shared-components/matchup';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import { FootballPlayerDetailModal } from '../../components/FootballPlayerDetailModal';
@@ -395,47 +395,15 @@ export function MatchupRosterComparison({
   // baseball-only — football players have no equivalent per-game stat blocks
   // there. Real football per-game/actual/projected points already exist via
   // `matchupScores` (`FootballMatchupPlayer.totalPoints`/`projectedPoints`
-  // and `FootballMatchupStats.totalPoints`/`projectedPoints` for the team),
-  // the same query `MatchupAdditionalSections` already uses successfully —
-  // so reuse it here instead of inventing a second scoring path.
-  const { data: footballScoresData } = useMatchupScoresQuery({
-    variables: { leagueId, weekNum: matchup.weekNumber || 1 },
-    skip: !isFootball || !leagueId || !matchup.weekNumber,
-  });
-
-  const { footballPlayerScores, footballTeamScores } = useMemo(() => {
-    const playerScores = new Map<
-      number,
-      {
-        actual: number;
-        projected: number;
-        dataQuality: FootballStatsDataQuality;
-      }
-    >();
-    const teamScores = new Map<number, { actual: number; projected: number }>();
-    footballScoresData?.matchupScores?.forEach((teamStats) => {
-      if (teamStats.__typename !== 'FootballMatchupStats') return;
-      if (teamStats.teamId != null) {
-        teamScores.set(teamStats.teamId, {
-          actual: teamStats.totalPoints ?? 0,
-          projected: teamStats.projectedPoints ?? 0,
-        });
-      }
-      teamStats.players?.forEach((player) => {
-        if (player.playerId != null) {
-          playerScores.set(player.playerId, {
-            actual: player.totalPoints ?? 0,
-            projected: player.projectedPoints ?? 0,
-            dataQuality: player.dataQuality ?? FootballStatsDataQuality.Ok,
-          });
-        }
-      });
+  // and `FootballMatchupStats.totalPoints`/`projectedPoints` for the team).
+  // `useFootballMatchupScores` is shared with the My Roster tab and the
+  // scoreboards so every football surface reads the same totals (LS-10829).
+  const { playerScores: footballPlayerScores, teamScores: footballTeamScores } =
+    useFootballMatchupScores({
+      leagueId,
+      weekNum: matchup.weekNumber,
+      skip: !isFootball,
     });
-    return {
-      footballPlayerScores: playerScores,
-      footballTeamScores: teamScores,
-    };
-  }, [footballScoresData]);
 
   // Football equivalents of `calculateGameScore`/`calculatePlayerProjection`
   // below — those two remain baseball-only and unchanged.

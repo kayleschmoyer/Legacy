@@ -6,8 +6,11 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import {
+  computeFootballMatchupTotals,
+  type FootballPlayerScore,
   formatMatchupTimeInfo,
   MatchupScoreboardView,
+  useFootballMatchupScores,
 } from '@legacy-sports/shared-components/matchup';
 import { formatRecord } from '@legacy-sports/shared-components/utils';
 import {
@@ -174,6 +177,38 @@ export function computeMatchupPlayerStats(
 }
 
 /**
+ * Football counterpart of `computeMatchupPlayerStats` (LS-10829): the same
+ * per-row shape, but actual/projected points come from the server-computed
+ * `matchupScores` starters (see `useFootballMatchupScores`) — the client
+ * scoring above reads baseball stat blocks only. Bench players, and starters
+ * `matchupScores` has not returned yet, get no row, so the roster falls back
+ * to its eligibility sub-line instead of showing a fabricated 0.0.
+ */
+export function computeFootballMatchupPlayerStats(
+  players: readonly MatchupPlayerFragment[],
+  playerScores: ReadonlyMap<number, FootballPlayerScore>,
+): MatchupPlayerComputedStats[] {
+  const result: MatchupPlayerComputedStats[] = [];
+  players.forEach((player) => {
+    if (player.positionId == null || player.playerId == null) return;
+    const score = playerScores.get(player.playerId);
+    if (!score) return;
+    result.push({
+      playerId: player.playerId,
+      actual: score.actual,
+      projected: score.projected,
+      gamesPlayed: score.gamesPlayed,
+      // One game per NFL week; a double-header reports both as played.
+      totalGames: Math.max(1, score.gamesPlayed),
+      season: player.season ?? null,
+      teamId: player.teamId ?? null,
+      positionId: player.positionId,
+    });
+  });
+  return result;
+}
+
+/**
  * Sum per-player scores (and projections) onto each team via
  * `computeMatchupPlayerStats`. Bench players (null positionId) are excluded.
  */
@@ -327,6 +362,12 @@ export interface MatchupScoreboardProps {
    * component can't establish its own via `useLeagueWebSocket`.
    */
   liveUpdateSignal?: number;
+  /**
+   * Football league: scores and projections come from the server-computed
+   * `matchupScores` totals instead of the baseball-only client recompute
+   * (LS-10829).
+   */
+  isFootball?: boolean;
 }
 
 /**
@@ -345,6 +386,7 @@ export function MatchupScoreboard({
   showTimeInfo = false,
   onTeamClick,
   liveUpdateSignal,
+  isFootball = false,
 }: MatchupScoreboardProps) {
   // Gates the premium "+N points" score flourish (LS-6392). Resolved here in
   // the data wrapper so the shared view stays presentational.
@@ -362,16 +404,27 @@ export function MatchupScoreboard({
     refetch: refetchPlayers,
   } = useGetMatchupPlayersQuery({
     variables: { matchupId: matchupIdNum },
-    skip: !matchupIdNum,
+    skip: !matchupIdNum || isFootball,
   });
+
+  const { teamScores: footballTeamScores, refetch: refetchFootballScores } =
+    useFootballMatchupScores({
+      leagueId: leagueIdNum,
+      weekNum: matchup?.weekNumber,
+      skip: !isFootball,
+    });
 
   // This wrapper previously had no live-update mechanism at all — the score
   // never refreshed without a manual page reload (LS-5425). Refetch players
   // whenever the parent's `liveUpdateSignal` changes (MATCHUP_STATS_COMPLETE
   // for this matchup, or a websocket reconnect) — skip the initial mount so
   // this doesn't double-fire the query useGetMatchupPlayersQuery already ran.
-  const refetchPlayersRef = useRef(refetchPlayers);
-  refetchPlayersRef.current = refetchPlayers;
+  const refetchPlayersRef = useRef(
+    isFootball ? refetchFootballScores : refetchPlayers,
+  );
+  refetchPlayersRef.current = isFootball
+    ? refetchFootballScores
+    : refetchPlayers;
   const isFirstLiveUpdateRender = useRef(true);
   useEffect(() => {
     if (isFirstLiveUpdateRender.current) {
@@ -398,16 +451,36 @@ export function MatchupScoreboard({
   // query errors (or returns partial data with a non-null errors array), fall
   // back to the matchup's server-stored scores — see `computeMatchupScores`
   // for the full rationale (LS-2937).
-  const { team1Score, team2Score, team1Projected, team2Projected } = useMemo(
+  //
+  // Football is scored server-side (`matchupScores`); the client recompute
+  // only understands baseball stat blocks and sums NFL rosters to 0–0
+  // (LS-10829). While those totals are unavailable the scores are null, so
+  // the view never shows a "Tied" verdict computed from missing stats.
+  const { team1Score, team2Score, team1Projected, team2Projected } = useMemo<{
+    team1Score: number | null;
+    team2Score: number | null;
+    team1Projected: number | null;
+    team2Projected: number | null;
+  }>(
     () =>
-      computeMatchupScores({
-        matchup,
-        players: playersData?.getMatchupPlayers,
-        hasPlayersError: playersError != null,
-        scoringSettings,
-        seasonStatsMap,
-      }),
-    [playersData, playersError, scoringSettings, matchup, seasonStatsMap],
+      isFootball
+        ? computeFootballMatchupTotals(matchup, footballTeamScores)
+        : computeMatchupScores({
+            matchup,
+            players: playersData?.getMatchupPlayers,
+            hasPlayersError: playersError != null,
+            scoringSettings,
+            seasonStatsMap,
+          }),
+    [
+      isFootball,
+      footballTeamScores,
+      playersData,
+      playersError,
+      scoringSettings,
+      matchup,
+      seasonStatsMap,
+    ],
   );
 
   // Fetch team names

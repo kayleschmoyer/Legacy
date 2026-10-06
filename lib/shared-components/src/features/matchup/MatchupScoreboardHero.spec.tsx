@@ -270,6 +270,43 @@ describe('MatchupScoreboardHero', () => {
     expect(screen.getByText('Team A and Team B tied at 100.00')).toBeTruthy();
   });
 
+  it('shows placeholders and announces no tie while live scores are unavailable (LS-10829)', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          team1: { id: 10, name: 'Team A', score: null },
+          team2: { id: 20, name: 'Team B', score: null },
+          scoresUnavailable: true,
+        })}
+      />,
+    );
+    expect(screen.queryByText('0.00')).toBeNull();
+    expect(screen.queryByText(/tied at/)).toBeNull();
+    expect(
+      screen.getByText('Team A vs Team B: live scores are not available yet'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Team A score not yet available'),
+    ).toBeTruthy();
+  });
+
+  it('renders the real scores once they arrive after being unavailable', () => {
+    const { rerender } = render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          team1: { id: 10, name: 'Team A', score: null },
+          team2: { id: 20, name: 'Team B', score: null },
+          scoresUnavailable: true,
+        })}
+      />,
+    );
+    rerender(<MatchupScoreboardHero {...baseProps()} />);
+    expect(screen.getByText('87.50')).toBeTruthy();
+    expect(screen.getByText('Team B now leads 138.00 to 87.50')).toBeTruthy();
+    // The jump from the placeholder is not a scoring play.
+    expect(screen.queryByTestId('touchdown-confetti')).toBeNull();
+  });
+
   it('renders the timeInfo label when provided', () => {
     render(
       <MatchupScoreboardHero

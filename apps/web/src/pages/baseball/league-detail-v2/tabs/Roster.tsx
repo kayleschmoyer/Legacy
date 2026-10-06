@@ -9,7 +9,11 @@ import {
   type RosterScorelineTeam,
   RosterStatusBanners,
 } from '@legacy-sports/shared-components/roster';
-import { PendingTradeOfferBanner } from '@legacy-sports/shared-components/matchup';
+import {
+  computeFootballMatchupTotals,
+  PendingTradeOfferBanner,
+  useFootballMatchupScores,
+} from '@legacy-sports/shared-components/matchup';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
   type LeagueFragment,
@@ -30,6 +34,7 @@ import { CombinedGraphQLErrors } from '@apollo/client';
 import { Button, Text, useMedia, XStack, YStack } from 'tamagui';
 import { PendingWaiverClaims } from '../../../../features/roster';
 import {
+  computeFootballMatchupPlayerStats,
   computeMatchupPlayerStats,
   computeMatchupScores,
   type MatchupPlayerComputedStats,
@@ -307,16 +312,36 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     return map;
   }, [playersData?.getMatchupPlayers]);
 
-  const computed = useMemo(
+  // Football is scored server-side by `matchupScores` — the client scoring
+  // pipeline reads baseball stat blocks only and sums NFL rosters to 0.0
+  // (LS-10829). Same source as Matchup > Roster Comparison, so the two tabs
+  // show the same per-player and team projections.
+  const { playerScores: footballPlayerScores, teamScores: footballTeamScores } =
+    useFootballMatchupScores({
+      leagueId: league.id,
+      weekNum: week,
+      skip: !isFootball,
+    });
+
+  const computed = useMemo<{
+    team1Score: number | null;
+    team2Score: number | null;
+    team1Projected: number | null;
+    team2Projected: number | null;
+  }>(
     () =>
-      computeMatchupScores({
-        matchup,
-        players: playersData?.getMatchupPlayers,
-        hasPlayersError: playersError != null,
-        scoringSettings,
-        seasonStatsMap,
-      }),
+      isFootball
+        ? computeFootballMatchupTotals(matchup, footballTeamScores)
+        : computeMatchupScores({
+            matchup,
+            players: playersData?.getMatchupPlayers,
+            hasPlayersError: playersError != null,
+            scoringSettings,
+            seasonStatsMap,
+          }),
     [
+      isFootball,
+      footballTeamScores,
       matchup,
       playersData?.getMatchupPlayers,
       playersError,
@@ -326,6 +351,13 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   );
 
   const perPlayerStats = useMemo<readonly MatchupPlayerComputedStats[]>(() => {
+    if (isFootball) {
+      if (!playersData?.getMatchupPlayers || playersError != null) return [];
+      return computeFootballMatchupPlayerStats(
+        playersData.getMatchupPlayers,
+        footballPlayerScores,
+      );
+    }
     if (
       !matchup ||
       !playersData?.getMatchupPlayers ||
@@ -340,6 +372,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       seasonStatsMap,
     );
   }, [
+    isFootball,
+    footballPlayerScores,
     matchup,
     playersData?.getMatchupPlayers,
     playersError,

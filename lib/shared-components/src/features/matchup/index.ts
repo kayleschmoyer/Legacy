@@ -22,4 +22,5 @@ export * from './PlayoffBracket';
 export * from './usePlayoffBracket';
 export * from './paceThresholds';
 export * from './matchupTimeInfo';
+export * from './footballMatchupScores';
 export * from './FootballScoringBreakdown';

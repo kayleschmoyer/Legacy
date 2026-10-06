@@ -277,6 +277,7 @@ interface MockScoreboardProps {
   isRefreshing?: boolean;
   team1ProjectedScore?: number;
   team2ProjectedScore?: number;
+  isFootball?: boolean;
 }
 const mockMatchupScoreboard = jest.fn<React.JSX.Element, [MockScoreboardProps]>(
   () =>
@@ -452,6 +453,8 @@ describe('FootballMatchupScreen', () => {
     expect(props.leagueId).toBe(55);
     expect(props.showTimeInfo).toBe(true);
     expect(props.matchup?.id).toBe(1);
+    // LS-10829: live scores come from matchupScores, not the baseball recompute.
+    expect(props.isFootball).toBe(true);
   });
 
   it('wires totalMatchups through to the scoreboard when provided', () => {

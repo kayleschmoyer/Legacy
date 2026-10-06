@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
+  computeFootballMatchupTotals,
   MatchupScoreboardHero,
   type MatchupScoreboardHeroTeam,
+  useFootballMatchupScores,
 } from '@legacy-sports/shared-components/matchup';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { formatRecord } from '@legacy-sports/shared-components/utils';
@@ -178,11 +180,25 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   refetchMatchupRef.current = refetchMatchup;
   const matchupIdRef = useRef(matchupId);
   matchupIdRef.current = matchupId;
+  // Football scores come from the server-computed `matchupScores` totals —
+  // the client recompute below is baseball-only and sums NFL rosters to 0–0
+  // (LS-10829). Same query and variables as the Roster Comparison table, so
+  // the header and the table read one Apollo cache entry.
+  const { teamScores: footballTeamScores, refetch: refetchFootballScores } =
+    useFootballMatchupScores({
+      leagueId: league.id,
+      weekNum: matchup?.weekNumber,
+      skip: !isFootball,
+    });
+  const refetchFootballScoresRef = useRef(refetchFootballScores);
+  refetchFootballScoresRef.current = refetchFootballScores;
+
   useLeagueWebSocket({
     onMatchupStatsComplete: (notification) => {
       if (notification.matchupId !== matchupIdRef.current) return;
       void refetchMatchupsRef.current();
       void refetchMatchupRef.current();
+      if (isFootball) void refetchFootballScoresRef.current();
     },
     // Force a refetch on reconnect (LS-6357) — a dropped connection means any
     // number of onMatchupStatsComplete pushes may have been missed, so we
@@ -190,6 +206,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     onReconnect: () => {
       void refetchMatchupsRef.current();
       void refetchMatchupRef.current();
+      if (isFootball) void refetchFootballScoresRef.current();
     },
   });
 
@@ -211,7 +228,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   // client-side, mirroring the canonical MatchupScoreboard behaviour.
   const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
     variables: { matchupId: matchupId ?? 0 },
-    skip: !matchupId,
+    skip: !matchupId || isFootball,
     errorPolicy: 'all',
   });
   const { settings: scoringSettings } = useLeagueScoringSettings(
@@ -226,16 +243,26 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     return map;
   }, [playersData?.getMatchupPlayers]);
 
-  const computed = useMemo(
+  const computed = useMemo<{
+    team1Score: number | null;
+    team2Score: number | null;
+    team1Projected: number | null;
+    team2Projected: number | null;
+    scoresUnavailable?: boolean;
+  }>(
     () =>
-      computeMatchupScores({
-        matchup,
-        players: playersData?.getMatchupPlayers,
-        hasPlayersError: playersError != null,
-        scoringSettings,
-        seasonStatsMap,
-      }),
+      isFootball
+        ? computeFootballMatchupTotals(matchup, footballTeamScores)
+        : computeMatchupScores({
+            matchup,
+            players: playersData?.getMatchupPlayers,
+            hasPlayersError: playersError != null,
+            scoringSettings,
+            seasonStatsMap,
+          }),
     [
+      isFootball,
+      footballTeamScores,
       matchup,
       playersData?.getMatchupPlayers,
       playersError,
@@ -530,6 +557,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         onTeamPress={onTeam}
         isPremium={isPremium}
         audioEnabled={audioEnabled}
+        scoresUnavailable={computed.scoresUnavailable ?? false}
       />
 
       {!isFootball && totalGames > 0 ? (

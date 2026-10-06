@@ -2,8 +2,10 @@ import React, { useContext, useMemo } from 'react';
 import { Spinner, YStack } from 'tamagui';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
+  computeFootballMatchupTotals,
   formatMatchupTimeInfo,
   MatchupScoreboardHero,
+  useFootballMatchupScores,
 } from '@legacy-sports/shared-components/matchup';
 import {
   type AppMatchupFragment,
@@ -70,6 +72,12 @@ export interface MatchupScoreboardProps {
    */
   team1ProjectedScore?: number;
   team2ProjectedScore?: number;
+  /**
+   * Football league: live scores come from the server-computed
+   * `matchupScores` team totals instead of the baseball-only client
+   * recompute, which sums NFL rosters to 0–0 (LS-10829).
+   */
+  isFootball?: boolean;
 }
 
 /**
@@ -93,6 +101,7 @@ export function MatchupScoreboard({
   onTeamPress,
   team1ProjectedScore,
   team2ProjectedScore,
+  isFootball = false,
 }: MatchupScoreboardProps) {
   // Gates the premium "+N points" score flourish (LS-6392). Resolved here in
   // the data wrapper so the shared hero stays presentational.
@@ -109,8 +118,16 @@ export function MatchupScoreboard({
 
   const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
     variables: { matchupId: matchupIdNum },
-    skip: !matchupIdNum,
+    skip: !matchupIdNum || isFootball,
     errorPolicy: 'all',
+  });
+
+  // Same query and variables as FootballMatchupScreen's own `matchupScores`
+  // read, so this shares its Apollo cache entry rather than refetching.
+  const { teamScores: footballTeamScores } = useFootballMatchupScores({
+    leagueId,
+    weekNum: matchup?.weekNumber,
+    skip: !isFootball,
   });
 
   const { settings: scoringSettings } = useLeagueScoringSettings(
@@ -126,16 +143,38 @@ export function MatchupScoreboard({
     return map;
   }, [playersData]);
 
-  const { team1Score, team2Score, team1Projected, team2Projected } = useMemo(
+  const {
+    team1Score,
+    team2Score,
+    team1Projected,
+    team2Projected,
+    scoresUnavailable = false,
+  } = useMemo<{
+    team1Score: number | null;
+    team2Score: number | null;
+    team1Projected: number | null;
+    team2Projected: number | null;
+    scoresUnavailable?: boolean;
+  }>(
     () =>
-      computeMatchupScores({
-        matchup,
-        players: playersData?.getMatchupPlayers,
-        hasPlayersError: playersError != null,
-        scoringSettings,
-        seasonStatsMap,
-      }),
-    [matchup, playersData, playersError, scoringSettings, seasonStatsMap],
+      isFootball
+        ? computeFootballMatchupTotals(matchup, footballTeamScores)
+        : computeMatchupScores({
+            matchup,
+            players: playersData?.getMatchupPlayers,
+            hasPlayersError: playersError != null,
+            scoringSettings,
+            seasonStatsMap,
+          }),
+    [
+      isFootball,
+      footballTeamScores,
+      matchup,
+      playersData,
+      playersError,
+      scoringSettings,
+      seasonStatsMap,
+    ],
   );
 
   const { data: teamsData } = useGetLeagueTeamsQuery({
@@ -210,6 +249,7 @@ export function MatchupScoreboard({
         onTeamPress={onTeamPress}
         scoringIsStale={matchup?.scoringIsStale}
         scoringChangeLog={matchup?.scoringChangeLog}
+        scoresUnavailable={scoresUnavailable}
       />
     </YStack>
   );
