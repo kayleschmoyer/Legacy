@@ -263,6 +263,39 @@ describe('OnboardingTutorial — Get Started routing (LS-6908)', () => {
   });
 });
 
+describe('OnboardingTutorial — Escape is not a confirmed skip (LS-6909)', () => {
+  it('calls onDismiss, not onClose, when Escape is pressed', () => {
+    const onClose = jest.fn();
+    const onDismiss = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} onDismiss={onDismiss} />);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'the ✕ button',
+      () => fireEvent.click(screen.getByLabelText('Skip tutorial')),
+    ],
+    [
+      'the footer Skip button',
+      () => fireEvent.click(screen.getByText('Skip tutorial')),
+    ],
+  ])('still calls onClose, not onDismiss, from %s', (_label, act) => {
+    const onClose = jest.fn();
+    const onDismiss = jest.fn();
+    render(<OnboardingTutorial onClose={onClose} onDismiss={onDismiss} />);
+
+    act();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+});
+
 describe('OnboardingTutorial — funnel analytics (LS-6903)', () => {
   beforeEach(() => jest.clearAllMocks());
 

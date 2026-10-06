@@ -252,10 +252,17 @@ export function HomePage(): React.JSX.Element {
     }
   };
 
+  // Escape hides the tutorial for this visit only (LS-6909): it is not a
+  // confirmed skip, so the completion flag and saved step are left alone and
+  // the tutorial resumes where the user was on their next visit to Home.
+  const handleTutorialDismiss = () => {
+    setTutorialOpen(false);
+  };
+
   // "Get Started" on the final step sends a user with no leagues straight to
-  // league creation (LS-6908). Skip / Escape / backdrop still call
-  // handleTutorialClose and leave them on Home, whose empty state carries the
-  // create-league CTA. A user re-launching the tutorial with leagues stays put.
+  // league creation (LS-6908). The Skip buttons still call handleTutorialClose
+  // and leave them on Home, whose empty state carries the create-league CTA.
+  // A user re-launching the tutorial with leagues stays put.
   const handleTutorialGetStarted = () => {
     handleTutorialClose();
     if (!hasLeagues) navigate(CREATE_BASEBALL_LEAGUE_ROUTE);
@@ -312,6 +319,7 @@ export function HomePage(): React.JSX.Element {
         <OnboardingTutorial
           onClose={handleTutorialClose}
           onGetStarted={handleTutorialGetStarted}
+          onDismiss={handleTutorialDismiss}
           initialStep={tutorialInitialStep}
           onStepChange={handleTutorialStepChange}
         />

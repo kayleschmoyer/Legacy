@@ -458,5 +458,39 @@ unauthTest.describe(
         });
       },
     );
+
+    unauthTest(
+      'pressing Escape hides the auto-triggered tutorial without marking onboarding complete (LS-6909)',
+      async ({ page }) => {
+        await mockGoogleLogin(page, 503);
+
+        await page.goto('/');
+        await page.waitForLoadState('load');
+
+        const loginButton = page.getByRole('button', {
+          name: /continue with google/i,
+        });
+        await expect(loginButton).toBeVisible({ timeout: 15000 });
+        await loginButton.click();
+
+        await expect(page).toHaveURL('/');
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+
+        await page.getByRole('button', { name: /next/i }).click();
+        await page.keyboard.press('Escape');
+
+        await expect(page.getByRole('dialog')).not.toBeVisible({
+          timeout: 10000,
+        });
+
+        // Escape is not a confirmed skip: no completion flag, and the step
+        // the user reached is kept so the tutorial resumes on the next visit.
+        const stored = await page.evaluate(() => ({
+          completed: window.localStorage.getItem('ls_onboarding_complete_503'),
+          step: window.localStorage.getItem('ls_onboarding_step_503'),
+        }));
+        expect(stored).toEqual({ completed: null, step: '1' });
+      },
+    );
   },
 );

@@ -35,11 +35,18 @@ interface OnboardingTutorialProps {
   onClose: () => void;
   /**
    * Called instead of `onClose` when the user finishes the tutorial via the
-   * final "Get Started" button (LS-6908). Skip and Escape dismissals still call
+   * final "Get Started" button (LS-6908). Skip dismissals still call
    * `onClose`; clicking the backdrop does nothing (LS-6901). Falls back to
    * `onClose` when omitted.
    */
   onGetStarted?: () => void;
+  /**
+   * Called instead of `onClose` when the tutorial is dismissed with Escape
+   * (LS-6909). Escape is a reflexive gesture, not a confirmed skip, so hosts
+   * can hide the tutorial without marking onboarding complete. Falls back to
+   * `onClose` when omitted.
+   */
+  onDismiss?: () => void;
   /** Step index to open on (e.g. restored after a reload). Clamped to range. */
   initialStep?: number;
   /** Called with the new step index whenever the user navigates */
@@ -657,6 +664,7 @@ function useModalDialogFocus(
 export function OnboardingTutorial({
   onClose,
   onGetStarted,
+  onDismiss,
   initialStep = 0,
   onStepChange,
 }: OnboardingTutorialProps) {
@@ -709,7 +717,9 @@ export function OnboardingTutorial({
   // the host can route onward; it still counts as a completed run.
   const getStarted = () => finish('completed', onGetStarted ?? onClose);
 
-  useModalDialogFocus(backdropRef, () => finish('escape'));
+  useModalDialogFocus(backdropRef, () =>
+    finish('escape', onDismiss ?? onClose),
+  );
   const bodyContent =
     typeof step.body === 'function'
       ? step.body({ onClose: complete })
