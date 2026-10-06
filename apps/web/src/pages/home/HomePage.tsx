@@ -11,6 +11,7 @@ import {
   OnThisDayFeed,
 } from '@legacy-sports/shared-components/leagues';
 import { HomeScreen } from '@legacy-sports/shared-components/sports';
+import { OnboardingTutorial } from '@legacy-sports/shared-components/ui';
 import {
   DEFAULT_SPORT_FALLBACK,
   type DefaultSport,
@@ -34,8 +35,11 @@ import {
 } from '@legacy-sports/shared-components/utils';
 import { getOnboardingStepKey, readOnboardingStep } from './onboardingStorage';
 import { formatDisplayName } from '../../lib/formatDisplayName';
-import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
+import {
+  onboardingTutorialAnalytics,
+  renderOnboardingLink,
+} from '../../utils/onboardingTutorialWeb';
 import {
   BRAND_GOLD,
   BRAND_NAVY,
@@ -322,6 +326,8 @@ export function HomePage(): React.JSX.Element {
           onDismiss={handleTutorialDismiss}
           initialStep={tutorialInitialStep}
           onStepChange={handleTutorialStepChange}
+          analytics={onboardingTutorialAnalytics}
+          renderLink={renderOnboardingLink}
         />
       )}
       <div style={pageBackgroundStyle}>

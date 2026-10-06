@@ -6297,7 +6297,7 @@
       "lib/shared-components/src/features/stats/**"
     ],
     "apps/web-e2e/src/tests/onboarding-tutorial.spec.ts": [
-      "apps/web/src/components/onboarding/**",
+      "lib/shared-components/src/features/onboarding/**",
       "apps/web/src/pages/help/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",

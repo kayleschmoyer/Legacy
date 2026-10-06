@@ -38,6 +38,9 @@ export function ImpersonationBanner(): React.JSX.Element | null {
         position: 'sticky',
         top: 0,
         zIndex: 9999,
+        // Stay clickable above modal dialogs (e.g. the onboarding tutorial),
+        // which disable pointer events on the rest of the page.
+        pointerEvents: 'auto',
         background: BRAND_SEAM_RED,
         borderBottom: `2px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.4)}`,
       }}

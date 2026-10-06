@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
+import {
+  Button,
+  OnboardingTutorial,
+  XStack,
+  YStack,
+} from '@legacy-sports/shared-components/ui';
 import { ScrollView, styled } from 'tamagui';
 import {
   DISCORD_URL,
@@ -20,8 +25,11 @@ import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { BugReportButton } from '../../components/layout/BugReportButton';
 import { env } from '../../config/environment';
-import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
+import {
+  onboardingTutorialAnalytics,
+  renderOnboardingLink,
+} from '../../utils/onboardingTutorialWeb';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 import {
   BG_DARK,
@@ -449,7 +457,11 @@ export default function HelpPage() {
   return (
     <>
       {tutorialOpen && (
-        <OnboardingTutorial onClose={() => setTutorialOpen(false)} />
+        <OnboardingTutorial
+          onClose={() => setTutorialOpen(false)}
+          analytics={onboardingTutorialAnalytics}
+          renderLink={renderOnboardingLink}
+        />
       )}
       <BugReportButton
         controlledOpen={bugReportOpen}
