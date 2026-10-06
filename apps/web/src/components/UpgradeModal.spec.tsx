@@ -1,6 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import {
+  PREMIUM_FEATURES,
+  premiumFeatureBenefitLabel,
+} from '@legacy-sports/shared-components/premium-features';
+
 import { UpgradeModal } from './UpgradeModal';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -139,6 +144,40 @@ describe('UpgradeModal', () => {
         'Pricing information could not be loaded. Displayed prices may be outdated.',
       ),
     ).toBeInTheDocument();
+  });
+
+  // LS-10462 — the modal's list must match /pricing and the league premium
+  // lock, which both advertise advanced stats.
+  it('lists every premium benefit from the canonical list, including advanced stats', () => {
+    render(
+      <UpgradeModal open onOpenChange={jest.fn()} featureName="Mock Drafts" />,
+    );
+
+    for (const feature of PREMIUM_FEATURES.filter((f) => f.free !== true)) {
+      expect(
+        screen.getByText(premiumFeatureBenefitLabel(feature)),
+      ).toBeInTheDocument();
+    }
+    expect(
+      screen.getByText('Advanced stats + projections'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Advanced projections')).toBeNull();
+  });
+
+  it('links to the full plan comparison on /pricing and closes', () => {
+    const onOpenChange = jest.fn();
+    render(
+      <UpgradeModal
+        open
+        onOpenChange={onOpenChange}
+        featureName="Mock Drafts"
+      />,
+    );
+
+    fireEvent.click(screen.getByText('See full plan comparison'));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
   // CLF-012 — the free-tier league-cap modal needs an escape hatch besides

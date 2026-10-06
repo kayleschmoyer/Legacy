@@ -342,6 +342,12 @@ const PREMIUM_PLAN_FEATURES = PREMIUM_FEATURES.map(({ label, premium }) => ({
   included: premium !== false,
 }));
 
+const STATS_FEATURE = (() => {
+  const row = PREMIUM_FEATURES.find((f) => f.label === 'Stats');
+  if (!row) throw new Error('Canonical PREMIUM_FEATURES is missing "Stats"');
+  return row;
+})();
+
 // Each row is pinned to the catalog entitlement it advertises (LS-7182) so
 // PricingPage.spec.tsx can fail when pricing copy and the gating catalog drift.
 export const COMPARISON_ROWS: ReadonlyArray<{
@@ -357,9 +363,11 @@ export const COMPARISON_ROWS: ReadonlyArray<{
     entitlement: ENTITLEMENTS.unlimited_leagues,
   },
   {
+    // Values come from the canonical list so this row can't drift from the
+    // Upgrade modal and Subscription pages (LS-10462).
     feature: 'Stats',
-    free: 'Basic',
-    premium: 'Advanced + Projections',
+    free: STATS_FEATURE.free,
+    premium: STATS_FEATURE.premium,
     entitlement: ENTITLEMENTS.football_projections,
   },
   {

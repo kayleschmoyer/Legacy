@@ -38,7 +38,14 @@ export const PREMIUM_FEATURES: PremiumFeature[] = [
   { label: 'FAAB waivers', free: false, premium: true },
   { label: 'Historical era filters', free: false, premium: true },
   { label: 'Player comparison', free: false, premium: true },
-  { label: 'Advanced projections', free: false, premium: true },
+  // One row for stats + projections so every surface matches /pricing's
+  // "Stats: Basic vs Advanced + Projections" (LS-10462).
+  {
+    label: 'Stats',
+    free: 'Basic',
+    premium: 'Advanced + Projections',
+    lossLabel: 'Advanced stats + projections',
+  },
   { label: 'AI-powered recaps', free: false, premium: true },
   { label: 'Draft recommendations', free: false, premium: true },
 ];

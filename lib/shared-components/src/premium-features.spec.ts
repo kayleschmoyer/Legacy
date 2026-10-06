@@ -15,7 +15,7 @@ describe('PREMIUM_FEATURES (canonical list, LS-7393)', () => {
       expect.arrayContaining([
         'Active leagues',
         'Player comparison',
-        'Advanced projections',
+        'Stats',
         'AI-powered recaps',
         'Draft recommendations',
       ]),
@@ -31,6 +31,20 @@ describe('PREMIUM_FEATURES (canonical list, LS-7393)', () => {
     );
     const row = PREMIUM_FEATURES.find((f) => f.label === 'Active leagues');
     expect(row).toMatchObject({ free: 'Up to 3', premium: 'Unlimited' });
+  });
+
+  it('advertises advanced stats and projections in one row (LS-10462)', () => {
+    const row = PREMIUM_FEATURES.find((f) => f.label === 'Stats');
+    expect(row).toMatchObject({
+      free: 'Basic',
+      premium: 'Advanced + Projections',
+    });
+    expect(row && premiumFeatureBenefitLabel(row)).toBe(
+      'Advanced stats + projections',
+    );
+    expect(PREMIUM_FEATURES.map((f) => f.label)).not.toContain(
+      'Advanced projections',
+    );
   });
 
   it('never gives the Free tier something Premium lacks', () => {

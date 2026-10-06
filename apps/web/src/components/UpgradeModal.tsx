@@ -193,6 +193,20 @@ export function UpgradeModal({
               {secondaryAction.label}
             </Button>
           )}
+          <Button
+            size="$3"
+            chromeless
+            color={BRAND_GOLD_LIGHT}
+            fontWeight="600"
+            pressStyle={{ opacity: 0.7 }}
+            hoverStyle={{ color: TEXT_PRIMARY }}
+            onPress={() => {
+              onOpenChange(false);
+              void navigate('/pricing');
+            }}
+          >
+            See full plan comparison
+          </Button>
           <Text color={TEXT_MUTED} fontSize="$2" textAlign="center">
             Cancel anytime. No hidden fees.
           </Text>
