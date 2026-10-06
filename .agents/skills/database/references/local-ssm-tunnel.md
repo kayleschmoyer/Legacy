@@ -26,6 +26,7 @@ Window 2, the command:
 ```powershell
 $env:DB_TUNNEL = "localhost:5432"
 pnpm --prefix lib/db-client run db:resync-role -- --role corpus_ingest_readonly --secret-name "<secret name>"
+pnpm --prefix lib/db-client run db:query -- "SELECT 1"
 ```
 
 ## bash
@@ -33,9 +34,11 @@ pnpm --prefix lib/db-client run db:resync-role -- --role corpus_ingest_readonly 
 ```bash
 DB_TUNNEL_TARGET=<instance id> DB_TUNNEL_HOST=<rds endpoint> make db-tunnel   # leave running
 DB_TUNNEL=localhost:5432 pnpm --prefix lib/db-client run db:status
+DB_TUNNEL=localhost:5432 pnpm --prefix lib/db-client run db:query -- "SELECT 1"
 ```
 
 Notes:
 
+- The `db-cli` commands (`db:query`, `db:test`, and the command printed by `db:psql`) honor `DB_TUNNEL` too (LS-10641). A relative `DB_CERT_PATH` (e.g. `certs/us-east-1-bundle.pem` from `.env`) is resolved from the repo root, so `pnpm --prefix lib/db-client` works.
 - Port 5432 must be free locally (stop any local Postgres or Docker DB first), or pick another `localPortNumber` and match it in `DB_TUNNEL`.
 - If `describe-instance-information` returns `None`, no SSM-managed instance in the VPC is online to tunnel through (the self-hosted runners are spot instances and can scale to zero).

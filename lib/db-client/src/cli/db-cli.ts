@@ -57,6 +57,7 @@ import {
   ProductionCredentialConfig,
   resolveDatabaseCredentials,
 } from '../config/credentials';
+import { applyDbTunnel, DatabaseConfig } from '../config/database';
 
 // Type definitions for database query results
 interface PostgresVersionResult {
@@ -100,40 +101,67 @@ export const isReadOnlyQuery = (sql: string): boolean => {
 };
 
 /**
+ * Repo root, used to resolve relative `DB_CERT_PATH` values the same way
+ * `getDatabaseConfig()` does — so `DB_CERT_PATH=certs/us-east-1-bundle.pem`
+ * from `.env` works regardless of the process cwd (e.g. `pnpm --prefix`).
+ */
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+type QuerySslConfig = NonNullable<DatabaseConfig['ssl']>;
+
+/**
  * Resolve the `pg` SSL config for the `query` command.
  *
  * Defaults to strict verification (safe by default — never weakened
- * implicitly): reads a CA bundle from `DB_CERT_PATH` (falling back to the
- * conventional `certs/us-east-1-bundle.pem` location documented in
- * `.env.example`) and rejects unauthorized certs.
+ * implicitly): reads a CA bundle from `DB_CERT_PATH` (resolved relative to
+ * the repo root, falling back to the conventional `certs/us-east-1-bundle.pem`
+ * location documented in `.env.example`) and rejects unauthorized certs.
  *
- * Set `DB_SSL_SELF_SIGNED=true` to explicitly opt into skipping certificate
- * verification — required when connecting through an SSM tunnel, since the
- * tunnel terminates at 127.0.0.1 while the RDS cert's CN is the real
- * hostname, so hostname verification can never pass through it even with a
- * valid CA bundle.
+ * Connecting through an SSM tunnel does not need `DB_SSL_SELF_SIGNED`: set
+ * `DB_TUNNEL=host:port` and `applyDbTunnel` keeps TLS verified against the
+ * real RDS hostname (LS-10609). `DB_SSL_SELF_SIGNED=true` remains an explicit
+ * last-resort opt-out of certificate verification.
  */
-export const resolveQuerySslConfig = (): {
-  rejectUnauthorized: boolean;
-  ca?: string;
-} => {
+export const resolveQuerySslConfig = (): QuerySslConfig => {
   if (process.env.DB_SSL_SELF_SIGNED === 'true') {
     return { rejectUnauthorized: false };
   }
 
-  const certPath =
-    process.env.DB_CERT_PATH ||
-    path.join(__dirname, '../../../../certs/us-east-1-bundle.pem');
+  const certPath = path.resolve(
+    REPO_ROOT,
+    process.env.DB_CERT_PATH || 'certs/us-east-1-bundle.pem',
+  );
   try {
-    return { rejectUnauthorized: true, ca: readFileSync(certPath).toString() };
+    return { rejectUnauthorized: true, ca: readFileSync(certPath) };
   } catch (error) {
     throw new Error(
       `Failed to read CA certificate at "${certPath}": ${String(error instanceof Error ? error.message : error)}. ` +
-        'Set DB_CERT_PATH to a valid certificate file, or set DB_SSL_SELF_SIGNED=true to skip ' +
-        'certificate verification (e.g. when connecting through an SSM tunnel).',
+        'Set DB_CERT_PATH to a valid certificate file (absolute, or relative to the repo root), ' +
+        'or set DB_SSL_SELF_SIGNED=true to skip certificate verification as a last resort.',
     );
   }
 };
+
+/**
+ * Build the pg connection config for a db-cli command from resolved
+ * credentials, routed through `DB_TUNNEL` when set (LS-10641). Without this,
+ * the secret's private RDS host wins and the tunnel is never used.
+ */
+export const buildCliConnectionConfig = (
+  credentials: Pick<
+    DatabaseConfig,
+    'host' | 'port' | 'user' | 'password' | 'database'
+  >,
+  ssl?: QuerySslConfig,
+): DatabaseConfig =>
+  applyDbTunnel({
+    host: credentials.host,
+    port: credentials.port,
+    user: credentials.user,
+    password: credentials.password,
+    database: credentials.database,
+    ssl,
+  });
 
 const program = new Command();
 
@@ -172,16 +200,11 @@ program
 
       // Test actual connection
       const { Pool } = await import('pg');
-      const pool = new Pool({
-        host: credentials.host,
-        port: credentials.port,
-        database: credentials.database,
-        user: credentials.user,
-        password: credentials.password,
-        ssl: {
+      const pool = new Pool(
+        buildCliConnectionConfig(credentials, {
           rejectUnauthorized: process.env.DB_SSL_SELF_SIGNED !== 'true',
-        },
-      });
+        }),
+      );
 
       const client = await pool.connect();
       let result;
@@ -282,7 +305,9 @@ program
           };
 
       console.log('Resolving database credentials from environment variables');
-      const credentials = await resolveDatabaseCredentials(config);
+      const credentials = buildCliConnectionConfig(
+        await resolveDatabaseCredentials(config),
+      );
 
       console.log('PostgreSQL Connection Commands:');
       console.log('');
@@ -352,14 +377,9 @@ program
         // Create database connection
         const { Pool } = await import('pg');
 
-        const pool = new Pool({
-          host: credentials.host,
-          port: credentials.port,
-          user: credentials.user,
-          password: credentials.password,
-          database: credentials.database,
-          ssl: resolveQuerySslConfig(),
-        });
+        const pool = new Pool(
+          buildCliConnectionConfig(credentials, resolveQuerySslConfig()),
+        );
 
         try {
           const result = await pool.query(query);
