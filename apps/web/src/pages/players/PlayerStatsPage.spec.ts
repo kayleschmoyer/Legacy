@@ -1108,6 +1108,7 @@ const PITCHING_ROW = {
   outRate: 9.2,
   era: 3.25,
   whip: 1.12,
+  strikeoutsPerNine: 3.42944535,
   winPercentage: 0.652,
   pitchingWAR: 5.1,
   player: { id: 2, firstName: 'Gerrit', lastName: 'Cole' },
@@ -1145,6 +1146,33 @@ describe('buildCsvExport (PST-014 / LS-7112)', () => {
       ],
     });
     expect(csv).toContain('Gerrit Cole');
+  });
+
+  it('exports K/9 from strikeoutsPerNine rounded to 2 decimals (LS-10810)', () => {
+    const csv = buildCsvExport({
+      batting: [],
+      pitching: [
+        PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
+      ],
+    });
+    const [header, row] = csv.split('\r\n');
+    const k9Index = header.split(',').indexOf('K/9');
+    expect(row.split(',')[k9Index]).toBe('3.43');
+  });
+
+  it('exports an empty K/9 cell when strikeoutsPerNine is null (LS-10810)', () => {
+    const csv = buildCsvExport({
+      batting: [],
+      pitching: [
+        {
+          ...PITCHING_ROW,
+          strikeoutsPerNine: null,
+        } as unknown as PlayerStatsExportData['pitching'][0],
+      ],
+    });
+    const [header, row] = csv.split('\r\n');
+    const k9Index = header.split(',').indexOf('K/9');
+    expect(row.split(',')[k9Index]).toBe('');
   });
 
   it('returns empty string for empty data', () => {
@@ -1256,5 +1284,14 @@ describe('buildXlsxExport (PST-014 / LS-7112)', () => {
     const sheet2 = entries.get('xl/worksheets/sheet2.xml') ?? '';
     expect(sheet2).toContain('W');
     expect(sheet2).toContain('ERA');
+  });
+
+  it('sheet2.xml (Pitching) K/9 cell is strikeoutsPerNine rounded to 2 decimals (LS-10810)', () => {
+    const result = buildXlsxExport(DATA);
+    const entries = parseZipEntries(result);
+    const sheet2 = entries.get('xl/worksheets/sheet2.xml') ?? '';
+    // K/9 is the 14th pitching column (N); row 2 is the first data row.
+    expect(sheet2).toContain('<c r="N1" t="inlineStr"><is><t>K/9</t></is></c>');
+    expect(sheet2).toContain('<c r="N2"><v>3.43</v></c>');
   });
 });

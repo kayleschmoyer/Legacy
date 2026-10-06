@@ -629,6 +629,13 @@ const PITCHING_CSV_HEADERS = [
   'K/9',
 ] as const;
 
+/** K/9 rounded to 2 decimals to match the stats table; empty when unknown. */
+function strikeoutsPerNineCell(value: number | null | undefined): number | '' {
+  return value === null || value === undefined
+    ? ''
+    : Math.round(value * 100) / 100;
+}
+
 function csvCell(value: string | number | null | undefined): string {
   const s = value === null || value === undefined ? '' : String(value);
   return s.includes(',') || s.includes('"') || s.includes('\n')
@@ -696,7 +703,7 @@ export function buildCsvExport(data: PlayerStatsExportData): string {
         r.strikeouts,
         r.baseOnBalls,
         r.homeRuns,
-        r.outRate,
+        strikeoutsPerNineCell(r.strikeoutsPerNine),
       ]
         .map(csvCell)
         .join(',');
@@ -899,7 +906,7 @@ export function buildXlsxExport(data: PlayerStatsExportData): Uint8Array {
       r.strikeouts,
       r.baseOnBalls,
       r.homeRuns,
-      r.outRate,
+      strikeoutsPerNineCell(r.strikeoutsPerNine),
     ] as (string | number)[];
   });
 
