@@ -215,6 +215,8 @@ function decodePfaPayload(
       `holds ${String(heldKey)} ${String(payload.season)}, expected ${corpusKey} ${season}`,
     );
   }
+  const normalized: Record<string, unknown> = { ...payload };
+  let passingRowsWithoutInt = 0;
   for (const family of [
     'passing',
     'rushing',
@@ -225,8 +227,8 @@ function decodePfaPayload(
     if (!Array.isArray(rows)) {
       throw new PfaPayloadError(key, `"${family}" is not an array`);
     }
-    for (const row of rows as unknown[]) {
-      const r = row as { gameNum?: unknown; gameIdentifier?: unknown } | null;
+    normalized[family] = (rows as unknown[]).map((row) => {
+      const r = row as Record<string, unknown> | null;
       if (
         typeof r !== 'object' ||
         r === null ||
@@ -235,9 +237,34 @@ function decodePfaPayload(
       ) {
         throw new PfaPayloadError(key, `"${family}" has a malformed row`);
       }
-    }
+      // Objects staged before the LS-9995 ingest (the LS-9948 build on dev)
+      // carry the season only at the top level. The consumer copies
+      // `row.season` into a NOT NULL column, so a missing one failed every
+      // pre-1999 insert (LS-10820). The payload season is already checked
+      // against the key above, so it is authoritative for every row.
+      if (r.season !== undefined && r.season !== season) {
+        throw new PfaPayloadError(
+          key,
+          `"${family}" row holds season ${JSON.stringify(r.season)}, expected ${season}`,
+        );
+      }
+      const out: Record<string, unknown> = { ...r, season };
+      if (family === 'passing' && r.int === undefined) {
+        // Same pre-LS-9995 objects: interceptions are absent under `int`.
+        // Accept the long name if that is where they live; otherwise the
+        // value is unknown (null), never a fabricated 0.
+        out.int = typeof r.interceptions === 'number' ? r.interceptions : null;
+        if (out.int === null) passingRowsWithoutInt++;
+      }
+      return out;
+    });
   }
-  return parsed as PfaPlayerSeasonPayload;
+  if (passingRowsWithoutInt > 0) {
+    LOGGER.warn(
+      `PFA corpus object ${key} has ${passingRowsWithoutInt} passing row(s) with no interceptions value; loading them with interceptions = null. Re-ingest with ingest-pfa-football --force to restore them.`,
+    );
+  }
+  return normalized as unknown as PfaPlayerSeasonPayload;
 }
 
 /**

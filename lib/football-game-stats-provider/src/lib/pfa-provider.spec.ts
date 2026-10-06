@@ -292,6 +292,79 @@ describe('PFA read path (LS-9997)', () => {
     });
   });
 
+  describe('objects staged before the LS-9995 ingest (LS-10820)', () => {
+    /*
+     * The shape the LS-9948 corpus on dev actually holds, reconstructed from
+     * the failed inserts in Rollbar #303-#305: rows carry no `season`, and
+     * passing rows carry no `int`. Every other column is present.
+     */
+    const { season: _s1, int: _i, ...legacyPassing } = PAYLOAD.passing[0];
+    const { season: _s2, ...legacyRushing } = PAYLOAD.rushing[0];
+    const legacyPayload = {
+      ...PAYLOAD,
+      passing: [legacyPassing],
+      rushing: [legacyRushing],
+    };
+
+    it('fills each row season from the payload season', async () => {
+      installClient(
+        jest.fn().mockResolvedValue(respondWith(gz(legacyPayload))),
+      );
+
+      const log = await PfaCareerStats.getGameLog(player, 1960);
+
+      expect(log?.passing[0].season).toBe(1960);
+      expect(log?.rushing[0].season).toBe(1960);
+      expect(log?.rushing[0]).toEqual({ ...PAYLOAD.rushing[0], playerId: 42 });
+    });
+
+    it('returns season-filled rows from getPfaPlayerSeasonPayload too (the stats-lambda path)', async () => {
+      installClient(
+        jest.fn().mockResolvedValue(respondWith(gz(legacyPayload))),
+      );
+
+      const payload = await getPfaPlayerSeasonPayload('UnitJo00', 1960);
+
+      expect(payload?.passing.every((row) => row.season === 1960)).toBe(true);
+      expect(payload?.rushing.every((row) => row.season === 1960)).toBe(true);
+    });
+
+    it('loads a passing row with no interceptions key as int null, never 0', async () => {
+      installClient(
+        jest.fn().mockResolvedValue(respondWith(gz(legacyPayload))),
+      );
+
+      const log = await PfaCareerStats.getGameLog(player, 1960);
+
+      expect(log?.passing[0].int).toBeNull();
+      expect(log?.passing[0].cmp).toBe(13);
+    });
+
+    it('reads interceptions from the long key when that is where they are', async () => {
+      const payload = {
+        ...legacyPayload,
+        passing: [{ ...legacyPassing, interceptions: 2 }],
+      };
+      installClient(jest.fn().mockResolvedValue(respondWith(gz(payload))));
+
+      const log = await PfaCareerStats.getGameLog(player, 1960);
+
+      expect(log?.passing[0].int).toBe(2);
+    });
+
+    it('still rejects a row that names a different season', async () => {
+      const payload = {
+        ...PAYLOAD,
+        rushing: [{ ...PAYLOAD.rushing[0], season: 1961 }],
+      };
+      installClient(jest.fn().mockResolvedValue(respondWith(gz(payload))));
+
+      await expect(PfaCareerStats.getGameLog(player, 1960)).rejects.toThrow(
+        /"rushing" row holds season 1961, expected 1960/,
+      );
+    });
+  });
+
   describe('player with no pfr_id (ADR 0023, LS-10588)', () => {
     const pfaOnlyPayload = { ...PAYLOAD, pfrId: null, pfaId: 'unit00100' };
 
