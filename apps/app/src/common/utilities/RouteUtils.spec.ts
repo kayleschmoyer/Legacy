@@ -5,7 +5,39 @@ import {
   sanitizeSearchParam,
   tabHrefFor,
   toIntId,
+  toNativeLeagueHref,
 } from './RouteUtils';
+
+// The draft-complete "Set My Lineup" CTA emits the web path
+// `/<sport>/league/<id>/roster`, which has no native file route.
+describe('toNativeLeagueHref', () => {
+  it.each(['baseball', 'football'])(
+    'maps the %s roster path to the flat league route with initialTab',
+    (sport) => {
+      expect(toNativeLeagueHref(`/${sport}/league/42/roster`)).toBe(
+        `/${sport}/league/42?initialTab=roster`,
+      );
+    },
+  );
+
+  it.each(['baseball', 'football'])(
+    'resolves the mapped %s href into the Leagues tab stack',
+    (sport) => {
+      expect(tabHrefFor(toNativeLeagueHref(`/${sport}/league/42/roster`))).toBe(
+        `/(tabs)/(leagues)/${sport}/league/42?initialTab=roster`,
+      );
+    },
+  );
+
+  it('passes other paths through unchanged', () => {
+    expect(toNativeLeagueHref('/baseball/league/42')).toBe(
+      '/baseball/league/42',
+    );
+    expect(toNativeLeagueHref('/baseball/mock-draft')).toBe(
+      '/baseball/mock-draft',
+    );
+  });
+});
 
 // LS-8823 — cancel handlers used to push a concrete home path (`/baseball`,
 // `/football`), which dropped the user on a standalone copy of the sport home

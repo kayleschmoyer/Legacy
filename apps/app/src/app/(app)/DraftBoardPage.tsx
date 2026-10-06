@@ -16,6 +16,7 @@ import {
   closeToHomeTab,
   navigateFromModal,
   toIntId,
+  toNativeLeagueHref,
 } from '../../common/utilities/RouteUtils';
 import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
 import { useLeagueChat } from '../../features/leagues/hooks/useLeagueChat';
@@ -189,7 +190,9 @@ export default function DraftBoardPage() {
         )}
         <EliteDraftBoardScreen
           leagueId={leagueId}
-          onNavigate={(path) => navigateFromModal(router, path)}
+          onNavigate={(path) =>
+            navigateFromModal(router, toNativeLeagueHref(path))
+          }
           websocketUrl={websocketUrl ?? ''}
           renderChatTab={renderChatTab}
           bottomInset={bottomInset}

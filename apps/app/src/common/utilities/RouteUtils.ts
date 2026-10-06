@@ -111,6 +111,21 @@ export function closeToHomeTab(router: CloseNavigator): void {
 }
 
 /**
+ * Maps a shared (web-shaped) draft-completion path to a route the native app
+ * actually has. Web serves `/<sport>/league/<id>/<tab>`; native has only the
+ * flat `/<sport>/league/[leagueId]` route, which opens on a tab via the
+ * `initialTab` search param — so "Set My Lineup" (`.../roster`) was an
+ * unmatched route on native. Any other path passes through unchanged.
+ */
+export function toNativeLeagueHref(path: string): string {
+  const match = /^\/(baseball|football)\/league\/(\d+)\/(roster)\/?$/.exec(
+    path,
+  );
+  if (!match) return path;
+  return `/${match[1]}/league/${match[2]}?initialTab=${match[3]}`;
+}
+
+/**
  * Safely parses a route param (string | string[] | undefined | unknown) as a
  * positive integer ID. Returns null for missing, non-string, non-finite, or
  * array params (takes first element of arrays). Eliminates silent NaN
