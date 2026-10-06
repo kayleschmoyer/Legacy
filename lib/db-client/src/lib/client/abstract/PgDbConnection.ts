@@ -38,7 +38,7 @@ export class PgDbConnection<
       database: dbConfig.database,
       host: dbConfig.host,
       password: dbConfig.password,
-      port: 5432,
+      port: dbConfig.port ?? 5432,
       user: dbConfig.user,
 
       // Connection pool limits to prevent exhaustion

@@ -18,7 +18,7 @@ metadata:
 
 ## Tools
 
-The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over HTTPS with no SSM tunnel. **Naming**: live connector sessions expose it as `legacy-sports-db` (tool prefix `mcp__legacy-sports-db__*`); the repo-side alias in Copilot/VS Code configs and `tools/mcp/db-admin-server/` is `legacy-sports-db-admin` — same server, see [mcp-first](../mcp-first/SKILL.md). Everything else is a shell command.
+The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over HTTPS with no SSM tunnel. **Naming**: live connector sessions expose it as `legacy-sports-db` (tool prefix `mcp__legacy-sports-db__*`); the repo-side alias in Copilot/VS Code configs and `tools/mcp/db-admin-server/` is `legacy-sports-db-admin` — same server, see [mcp-first](../mcp-first/SKILL.md). Everything else is a shell command. Maintainers running those shell commands against the private dev RDS from a local machine: see [references/local-ssm-tunnel.md](references/local-ssm-tunnel.md) (SSM tunnel + `DB_TUNNEL`).
 
 | Operation                      | Command                                                                                                                                                                                                                |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

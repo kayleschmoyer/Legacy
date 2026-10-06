@@ -17,4 +17,10 @@ export enum EnvironmentVariable {
   // the RDS cert instead. Must NOT be set when USE_LOCAL_CREDENTIALS=true since
   // local connections skip SSL entirely.
   DB_SSL_SELF_SIGNED = 'DB_SSL_SELF_SIGNED',
+
+  // Local port-forward (host:port, e.g. localhost:5432) for reaching the
+  // private dev RDS through an SSM tunnel. Swaps only the TCP endpoint; TLS is
+  // still verified against the secret's RDS hostname (LS-10609). Ignored in
+  // Lambda.
+  DB_TUNNEL = 'DB_TUNNEL',
 }

@@ -5,6 +5,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { checkServerIdentity, type PeerCertificate } from 'tls';
 import { CredentialConfig, resolveDatabaseCredentials } from './credentials';
 import { EnvironmentVariable } from '../types/EnvironmentVariable';
 
@@ -20,6 +21,11 @@ export interface DatabaseConfig {
   ssl?: {
     ca?: Buffer;
     rejectUnauthorized?: boolean;
+    servername?: string;
+    checkServerIdentity?: (
+      hostname: string,
+      cert: PeerCertificate,
+    ) => Error | undefined;
   };
 }
 
@@ -102,7 +108,57 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
     }
   }
 
-  return config;
+  return applyDbTunnel(config);
+}
+
+/**
+ * Route the connection through a local port-forward (e.g. an SSM tunnel to
+ * the private dev RDS) when DB_TUNNEL=host:port is set (LS-10609).
+ *
+ * The resolved host usually comes from the Secrets Manager secret and wins
+ * over DB_HOST (see resolveAwsSecretCredentials), so a tunnel on
+ * localhost:5432 was unreachable without a hosts-file entry. DB_TUNNEL only
+ * swaps the TCP endpoint: TLS is still verified against the original RDS
+ * hostname. checkServerIdentity pins that, because pg overwrites servername
+ * with the connect host whenever the host is a name rather than an IP.
+ *
+ * Opt-in and local-only: ignored inside Lambda, and a no-op when unset.
+ */
+export function applyDbTunnel(config: DatabaseConfig): DatabaseConfig {
+  const tunnel = getEnvVarOptional(EnvironmentVariable.DB_TUNNEL);
+  if (!tunnel) {
+    return config;
+  }
+
+  if (process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    LOGGER.warn('DB_TUNNEL is set inside Lambda; ignoring it');
+    return config;
+  }
+
+  const [tunnelHost, portStr = '5432'] = tunnel.split(':');
+  const tunnelPort = parseInt(portStr, 10);
+  if (!tunnelHost || Number.isNaN(tunnelPort)) {
+    throw new Error(
+      `DB_TUNNEL must be host:port (e.g. localhost:5432), got "${tunnel}"`,
+    );
+  }
+
+  const targetHost = config.host;
+  LOGGER.info(
+    `DB_TUNNEL set: connecting via ${tunnelHost}:${tunnelPort}, verifying TLS as ${targetHost}`,
+  );
+
+  return {
+    ...config,
+    host: tunnelHost,
+    port: tunnelPort,
+    ssl: config.ssl && {
+      ...config.ssl,
+      servername: targetHost,
+      checkServerIdentity: (_hostname, cert) =>
+        checkServerIdentity(targetHost, cert),
+    },
+  };
 }
 
 /**
