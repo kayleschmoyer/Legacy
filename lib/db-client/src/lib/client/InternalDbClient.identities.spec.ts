@@ -17,6 +17,8 @@
  * (thenable), deletes via delete().where().returning(), and the canonical
  * writes via update().set().where()[.returning()].
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   type InternalDb,
   linkIdentity,
@@ -185,22 +187,26 @@ describe('unlinkIdentity', () => {
 function makeLinkDb(
   insertError: Error | undefined,
   inserted?: unknown,
+  selectRows: unknown[] = [],
+  onInsert: () => void = () => undefined,
 ): InternalDb {
   return {
     select: () => ({
       from: () => ({
         where: () => ({
           then: (onFulfilled: (rows: unknown[]) => unknown) =>
-            Promise.resolve([]).then(onFulfilled),
+            Promise.resolve(selectRows).then(onFulfilled),
         }),
       }),
     }),
     insert: () => ({
       values: () => ({
-        returning: () =>
-          insertError
+        returning: () => {
+          onInsert();
+          return insertError
             ? Promise.reject(insertError)
-            : Promise.resolve([inserted]),
+            : Promise.resolve([inserted]);
+        },
       }),
     }),
   } as unknown as InternalDb;
@@ -263,4 +269,65 @@ describe('linkIdentity', () => {
 
     await expect(linkIdentity(makeLinkDb(other), input)).rejects.toBe(other);
   });
+
+  it('returns PROVIDER_ACCOUNT_TAKEN without inserting while the other user still holds the link', async () => {
+    // Unlink-vs-link ordering: user B links before user A's unlink commits, so
+    // the pre-check still sees A's row. B gets the friendly conflict and no
+    // insert is attempted; retrying after A's delete commits succeeds.
+    const insert = jest.fn();
+    const db = makeLinkDb(
+      undefined,
+      undefined,
+      [identity({ id: 5, userId: 1 })],
+      insert,
+    );
+
+    const result = await linkIdentity(db, input);
+
+    expect(result).toEqual({ ok: false, reason: 'PROVIDER_ACCOUNT_TAKEN' });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent when the same user re-links the account they already own', async () => {
+    const row = identity({ id: 5, userId: 2 });
+    const insert = jest.fn();
+
+    const result = await linkIdentity(
+      makeLinkDb(undefined, undefined, [row], insert),
+      input,
+    );
+
+    expect(result).toEqual({ ok: true, identity: row });
+    expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('user_identities constraint names', () => {
+  // linkIdentity matches racing unique violations by constraint name. If the
+  // migration renames a constraint the mapping silently degrades to a raw 500,
+  // so pin the names in both places (LS-7215).
+  const names = [
+    'user_identities_provider_account_uk',
+    'user_identities_user_provider_uk',
+  ];
+
+  it.each(names)(
+    '%s exists in the migration and in the link mapping',
+    (name) => {
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '../../../migrations/20260607_120000_add_user_identities_table.ts',
+        ),
+        'utf8',
+      );
+      const client = readFileSync(
+        join(__dirname, 'InternalDbClient.ts'),
+        'utf8',
+      );
+
+      expect(migration).toContain(`CONSTRAINT ${name} UNIQUE`);
+      expect(client).toContain(`'${name}'`);
+    },
+  );
 });
