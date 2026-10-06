@@ -1151,6 +1151,8 @@ export type FootballMatchupPlayer = {
   position: Scalars['String']['output'];
   /** Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364). */
   projectedPoints: Scalars['Float']['output'];
+  /** Running totals for this league’s fantasy season through the requested week, including this week’s played games (LS-10823). Null when the player has no scored game in a starting slot in weeks 1..weekNum. Resolved lazily, once per league week per request, so it costs nothing unless selected. */
+  seasonToDate?: Maybe<FootballMatchupPlayerSeasonToDate>;
   totalPoints: Scalars['Float']['output'];
 };
 
@@ -1179,6 +1181,25 @@ export type FootballMatchupPlayerGame = {
   passing?: Maybe<FootballGamePassingStats>;
   receiving?: Maybe<FootballGameReceivingStats>;
   rushing?: Maybe<FootballGameRushingStats>;
+};
+
+/** A football matchup player’s running totals for this league’s fantasy season through the requested week (LS-10823): the sum of every game the league scored for the player in a starting slot across matchup weeks 1..weekNum, on any team. Not a real-world season total — each league week can assign a different historical season. Stat groups reuse the per-game types and hold summed values. */
+export type FootballMatchupPlayerSeasonToDate = {
+  __typename?: 'FootballMatchupPlayerSeasonToDate';
+  /** Worst data-quality state across the summed games (LS-6394). Anything other than `ok` means the totals may under-count. */
+  dataQuality: FootballStatsDataQuality;
+  defense?: Maybe<FootballGameDefenseStats>;
+  /** Fantasy points summed across the scored games, under the league’s current scoring settings. */
+  fantasyPoints: Scalars['Float']['output'];
+  /** Scheduled games that produced a stat line. */
+  gamesPlayed: Scalars['Int']['output'];
+  idp?: Maybe<FootballGameIdpStats>;
+  kicking?: Maybe<FootballGameKickingStats>;
+  passing?: Maybe<FootballGamePassingStats>;
+  receiving?: Maybe<FootballGameReceivingStats>;
+  rushing?: Maybe<FootballGameRushingStats>;
+  /** Distinct matchup weeks in which the player produced a stat line. */
+  weeksPlayed: Scalars['Int']['output'];
 };
 
 /** Stats for one team in a football matchup */

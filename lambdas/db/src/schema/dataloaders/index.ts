@@ -46,6 +46,7 @@ import {
 
 import {
   createFootballScoringSettingsLoader,
+  createFootballSeasonToDateLoader,
   createLatestScoringChangeAtLoader,
   createLeagueRosterLockInputsLoader,
   createLeagueWeekPlayerSeasonsLoader,
@@ -97,6 +98,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   matchupsById: createMatchupsLoader(db),
   leagueWeekPlayerSeasons: createLeagueWeekPlayerSeasonsLoader(db),
   footballScoringSettingsByLeagueId: createFootballScoringSettingsLoader(db),
+  footballSeasonToDate: createFootballSeasonToDateLoader(db),
   selectedGamesCount: createSelectedGamesCountLoader(db),
   careerFielding: createCareerFieldingLoader(db),
   careerBatting: createCareerBattingLoader(db),

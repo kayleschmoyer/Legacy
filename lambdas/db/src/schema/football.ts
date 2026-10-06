@@ -36,6 +36,7 @@ import {
 } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { builder } from './builder';
+import { type FootballSeasonToDateShape } from './matchups/football-season-to-date';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { requireEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
@@ -2839,7 +2840,73 @@ export interface FootballMatchupPlayerShape {
    * season (LS-6364). Mirrors the baseball projection model.
    */
   projectedPoints: number;
+  /** League and week this row was resolved for; keys `seasonToDate` (LS-10823). */
+  leagueId: number;
+  weekNum: number;
 }
+
+export const FootballMatchupPlayerSeasonToDateRef =
+  builder.objectRef<FootballSeasonToDateShape>(
+    'FootballMatchupPlayerSeasonToDate',
+  );
+
+FootballMatchupPlayerSeasonToDateRef.implement({
+  description:
+    'A football matchup player\u2019s running totals for this league\u2019s fantasy season through the requested week (LS-10823): the sum of every game the league scored for the player in a starting slot across matchup weeks 1..weekNum, on any team. Not a real-world season total — each league week can assign a different historical season. Stat groups reuse the per-game types and hold summed values.',
+  fields: (t) => ({
+    weeksPlayed: t.exposeInt('weeksPlayed', {
+      nullable: false,
+      description:
+        'Distinct matchup weeks in which the player produced a stat line.',
+    }),
+    gamesPlayed: t.exposeInt('gamesPlayed', {
+      nullable: false,
+      description: 'Scheduled games that produced a stat line.',
+    }),
+    fantasyPoints: t.exposeFloat('fantasyPoints', {
+      nullable: false,
+      description:
+        'Fantasy points summed across the scored games, under the league\u2019s current scoring settings.',
+    }),
+    dataQuality: t.field({
+      type: FootballStatsDataQualityEnum,
+      nullable: false,
+      description:
+        'Worst data-quality state across the summed games (LS-6394). Anything other than `ok` means the totals may under-count.',
+      resolve: (parent) => parent.dataQuality,
+    }),
+    passing: t.field({
+      type: FootballGamePassingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.passing,
+    }),
+    rushing: t.field({
+      type: FootballGameRushingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.rushing,
+    }),
+    receiving: t.field({
+      type: FootballGameReceivingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.receiving,
+    }),
+    kicking: t.field({
+      type: FootballGameKickingStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.kicking,
+    }),
+    defense: t.field({
+      type: FootballGameDefenseStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.defense,
+    }),
+    idp: t.field({
+      type: FootballGameIDPStatsRef,
+      nullable: true,
+      resolve: (parent) => parent.idp,
+    }),
+  }),
+});
 
 export const FootballMatchupPlayerRef =
   builder.objectRef<FootballMatchupPlayerShape>('FootballMatchupPlayer');
@@ -2869,6 +2936,18 @@ FootballMatchupPlayerRef.implement({
       description:
         'Worst data-quality state across this player’s scheduled games (LS-6394). Anything other than `ok` means `totalPoints` may under-count because a scheduled game produced no stat rows.',
       resolve: (parent) => parent.dataQuality,
+    }),
+    seasonToDate: t.field({
+      type: FootballMatchupPlayerSeasonToDateRef,
+      nullable: true,
+      description:
+        'Running totals for this league\u2019s fantasy season through the requested week, including this week\u2019s played games (LS-10823). Null when the player has no scored game in a starting slot in weeks 1..weekNum. Resolved lazily, once per league week per request, so it costs nothing unless selected.',
+      resolve: async (parent, _args, context) => {
+        const totals = await context.loaders.footballSeasonToDate.load(
+          `${parent.leagueId}:${parent.weekNum}`,
+        );
+        return totals.get(parent.playerId) ?? null;
+      },
     }),
   }),
 });

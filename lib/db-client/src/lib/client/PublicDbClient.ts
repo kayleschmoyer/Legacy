@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, not, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, not, sql } from 'drizzle-orm';
 import { conflictUpdateAllExcept } from './utils/ConflictUpdateAllExcept';
 import { TakeUniqueOrNull } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
@@ -2023,6 +2023,31 @@ export async function getMatchupFootballPlayerGameStats(
     )
     .where(eq(Schema.matchupPlayers.matchupId, matchupId));
 
+  return buildFootballPlayerGameStats(db, matchupPlayersResult);
+}
+
+/**
+ * A rostered matchup player with the season their league week assigns them
+ * (`league_week_player_seasons`) and their roster slot's position type.
+ */
+interface FootballMatchupPlayerSeasonRow {
+  matchupPlayerId: number;
+  playerId: number;
+  season: number | null;
+  positionType: string | null;
+}
+
+/**
+ * Per-scheduled-game stat rows for a set of matchup players. Shared by
+ * `getMatchupFootballPlayerGameStats` (one matchup) and
+ * `getLeagueFootballPlayerGameStatsThroughWeek` (a league's weeks 1..N,
+ * LS-10823), so both read stats with the same season assignment and
+ * DST/IDP/offense routing.
+ */
+async function buildFootballPlayerGameStats(
+  db: PublicDb,
+  matchupPlayersResult: FootballMatchupPlayerSeasonRow[],
+): Promise<FootballMatchupPlayerGameStats[]> {
   if (matchupPlayersResult.length === 0) {
     return [];
   }
@@ -2182,5 +2207,89 @@ export async function getMatchupFootballPlayerGameStats(
     });
   }
 
+  return results;
+}
+
+/**
+ * One scheduled game for a player rostered in a league matchup, tagged with
+ * the matchup week and roster slot it was played in (LS-10823).
+ */
+export interface FootballLeaguePlayerGameStats extends FootballMatchupPlayerGameStats {
+  weekNumber: number;
+  /** Roster slot position type; null for a bench slot. */
+  positionType: string | null;
+}
+
+/**
+ * Every scheduled game for every player rostered in `leagueId`'s matchups
+ * for weeks 1..`throughWeek` inclusive (LS-10823).
+ *
+ * Each league week can assign a player a different historical season
+ * (`league_week_player_seasons`), so stats are read per matchup week with
+ * that week's assignment, exactly as `getMatchupFootballPlayerGameStats` does
+ * for a single matchup. Entries are keyed by matchup player, so a player
+ * traded mid-season appears under each team's matchup they were rostered in.
+ *
+ * Runs a fixed number of queries regardless of how many weeks or matchups the
+ * league has.
+ */
+export async function getLeagueFootballPlayerGameStatsThroughWeek(
+  db: PublicDb,
+  leagueId: number,
+  throughWeek: number,
+): Promise<FootballLeaguePlayerGameStats[]> {
+  const matchupPlayerRows = await db
+    .select({
+      matchupPlayerId: Schema.matchupPlayers.id,
+      playerId: Schema.matchupPlayers.playerId,
+      season: Schema.leagueWeekPlayerSeasons.season,
+      positionType: Schema.leaguePosition.positionType,
+      weekNumber: Schema.matchups.weekNumber,
+    })
+    .from(Schema.matchupPlayers)
+    .innerJoin(
+      Schema.matchups,
+      eq(Schema.matchups.id, Schema.matchupPlayers.matchupId),
+    )
+    .leftJoin(
+      Schema.leagueWeekPlayerSeasons,
+      and(
+        eq(Schema.leagueWeekPlayerSeasons.leagueId, Schema.matchups.leagueId),
+        eq(
+          Schema.leagueWeekPlayerSeasons.weekNumber,
+          Schema.matchups.weekNumber,
+        ),
+        eq(
+          Schema.leagueWeekPlayerSeasons.playerId,
+          Schema.matchupPlayers.playerId,
+        ),
+      ),
+    )
+    .leftJoin(
+      Schema.leaguePosition,
+      eq(Schema.leaguePosition.id, Schema.matchupPlayers.positionId),
+    )
+    .where(
+      and(
+        eq(Schema.matchups.leagueId, leagueId),
+        lte(Schema.matchups.weekNumber, throughWeek),
+      ),
+    );
+
+  const rowByMatchupPlayerId = new Map(
+    matchupPlayerRows.map((r) => [r.matchupPlayerId, r]),
+  );
+  const games = await buildFootballPlayerGameStats(db, matchupPlayerRows);
+
+  const results: FootballLeaguePlayerGameStats[] = [];
+  for (const game of games) {
+    const row = rowByMatchupPlayerId.get(game.matchupPlayerId);
+    if (!row) continue;
+    results.push({
+      ...game,
+      weekNumber: row.weekNumber,
+      positionType: row.positionType,
+    });
+  }
   return results;
 }

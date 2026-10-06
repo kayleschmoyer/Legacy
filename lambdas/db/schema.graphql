@@ -1440,6 +1440,11 @@ type FootballMatchupPlayer {
   Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364).
   """
   projectedPoints: Float!
+
+  """
+  Running totals for this league’s fantasy season through the requested week, including this week’s played games (LS-10823). Null when the player has no scored game in a starting slot in weeks 1..weekNum. Resolved lazily, once per league week per request, so it costs nothing unless selected.
+  """
+  seasonToDate: FootballMatchupPlayerSeasonToDate
   totalPoints: Float!
 }
 
@@ -1478,6 +1483,37 @@ type FootballMatchupPlayerGame {
   passing: FootballGamePassingStats
   receiving: FootballGameReceivingStats
   rushing: FootballGameRushingStats
+}
+
+"""
+A football matchup player’s running totals for this league’s fantasy season through the requested week (LS-10823): the sum of every game the league scored for the player in a starting slot across matchup weeks 1..weekNum, on any team. Not a real-world season total — each league week can assign a different historical season. Stat groups reuse the per-game types and hold summed values.
+"""
+type FootballMatchupPlayerSeasonToDate {
+  """
+  Worst data-quality state across the summed games (LS-6394). Anything other than `ok` means the totals may under-count.
+  """
+  dataQuality: FootballStatsDataQuality!
+  defense: FootballGameDefenseStats
+
+  """
+  Fantasy points summed across the scored games, under the league’s current scoring settings.
+  """
+  fantasyPoints: Float!
+
+  """
+  Scheduled games that produced a stat line.
+  """
+  gamesPlayed: Int!
+  idp: FootballGameIDPStats
+  kicking: FootballGameKickingStats
+  passing: FootballGamePassingStats
+  receiving: FootballGameReceivingStats
+  rushing: FootballGameRushingStats
+
+  """
+  Distinct matchup weeks in which the player produced a stat line.
+  """
+  weeksPlayed: Int!
 }
 
 """

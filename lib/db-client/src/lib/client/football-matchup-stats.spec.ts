@@ -4,7 +4,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- test mocks use any for DB interactions */
 
-import { getMatchupFootballPlayerGameStats } from './PublicDbClient';
+import {
+  getLeagueFootballPlayerGameStatsThroughWeek,
+  getMatchupFootballPlayerGameStats,
+} from './PublicDbClient';
 
 function createMockDbWithMultipleQueries(results: any[]): any {
   let queryIndex = 0;
@@ -19,6 +22,7 @@ function createMockDbWithMultipleQueries(results: any[]): any {
       where: jest.fn(),
       limit: jest.fn(),
       leftJoin: jest.fn(),
+      innerJoin: jest.fn(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
       then: jest.fn((resolve: (v: any) => any) => resolve(currentResult)),
     };
@@ -28,6 +32,7 @@ function createMockDbWithMultipleQueries(results: any[]): any {
     chain.where.mockReturnValue(chain);
     chain.limit.mockReturnValue(chain);
     chain.leftJoin.mockReturnValue(chain);
+    chain.innerJoin.mockReturnValue(chain);
 
     return chain;
   };
@@ -370,5 +375,59 @@ describe('getMatchupFootballPlayerGameStats', () => {
     expect(dlRow?.idpDefense).toEqual(idpDefenseStats);
     expect(dlRow?.defense).toBeNull();
     expect(dlRow?.offense).toBeNull();
+  });
+});
+
+describe('getLeagueFootballPlayerGameStatsThroughWeek (LS-10823)', () => {
+  it('returns empty array when the league has no matchup players in the window', async () => {
+    const db = createMockDbWithMultipleQueries([[]]);
+    const result = await getLeagueFootballPlayerGameStatsThroughWeek(
+      db,
+      LEAGUE_ID,
+      WEEK_NUMBER,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('tags each game with its matchup week and roster slot, one row per matchup player', async () => {
+    // Query order: league matchupPlayers (weeks 1..N), matchupPlayerGames,
+    // offense (view). The same player appears in two weeks, under
+    // different matchup players (e.g. after a trade).
+    const week1 = { ...qbMatchupPlayer, weekNumber: 1 };
+    const week5 = {
+      ...qbMatchupPlayer,
+      matchupPlayerId: 901,
+      season: 2019,
+      positionType: null,
+      weekNumber: 5,
+    };
+    const db = createMockDbWithMultipleQueries([
+      [week1, week5],
+      [qbGame, { ...qbGame, matchupPlayerId: 901, id: 299 }],
+      [qbOffenseStats],
+    ]);
+
+    const result = await getLeagueFootballPlayerGameStatsThroughWeek(
+      db,
+      LEAGUE_ID,
+      WEEK_NUMBER,
+    );
+
+    expect(result).toHaveLength(2);
+    const byMatchupPlayer = new Map(result.map((r) => [r.matchupPlayerId, r]));
+    expect(byMatchupPlayer.get(101)).toMatchObject({
+      playerId: 1001,
+      weekNumber: 1,
+      positionType: 'QB',
+      offense: qbOffenseStats,
+    });
+    // Week 5 assigns a different season, so the 2024 stat row must not be
+    // attributed to it.
+    expect(byMatchupPlayer.get(901)).toMatchObject({
+      playerId: 1001,
+      weekNumber: 5,
+      positionType: null,
+      offense: null,
+    });
   });
 });

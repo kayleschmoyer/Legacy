@@ -15,6 +15,10 @@ import {
 import { type FootballScoringSettings } from '@legacy-sports/scoring';
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { withTransientRetry } from '../leagues/delete-resilience';
+import {
+  type FootballSeasonToDateShape,
+  loadFootballSeasonToDate,
+} from '../matchups/football-season-to-date';
 
 /**
  * DataLoader for locked team members by leagueId (LS-5955).
@@ -457,6 +461,33 @@ export const createFootballScoringSettingsLoader = (
         new Error(`No scoring settings resolved for league ${key}`),
     );
   });
+
+/**
+ * DataLoader for football season-to-date totals (LS-10823).
+ * Key: `${leagueId}:${weekNum}` (string)
+ * Returns: season-to-date totals by player id for every player who started
+ *   in that league across weeks 1..weekNum.
+ *
+ * Every `FootballMatchupPlayer.seasonToDate` in one `matchupScores` response
+ * shares the same key, so the field runs one league-wide aggregation per
+ * request instead of one per player, and only when a client selects it.
+ * Failures are caught per key, as in `createFootballScoringSettingsLoader`.
+ */
+export const createFootballSeasonToDateLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<string, Map<number, FootballSeasonToDateShape>>(async (keys) =>
+    Promise.all(
+      keys.map(async (key) => {
+        const [leagueId, weekNum] = key.split(':').map(Number);
+        try {
+          return await loadFootballSeasonToDate(db, leagueId, weekNum);
+        } catch (err) {
+          return err as Error;
+        }
+      }),
+    ),
+  );
 
 /**
  * DataLoader for playoff matchups by bracket
