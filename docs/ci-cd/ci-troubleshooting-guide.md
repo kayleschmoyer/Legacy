@@ -210,7 +210,7 @@ See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue refere
 | "Unresolved review threads"                  | Human or bot threads open                              | Resolve all threads in Files Changed tab                                                                      |
 | "Status checks failing"                      | CI or bot-review failure                               | Fix the failing check                                                                                         |
 | Queue appears stuck                          | Race condition                                         | Remove and re-add `merge-when-ready` label                                                                    |
-| Green checks but `N of 8 expected` 405       | Ruleset `integration_id` drift (live)                  | Re-sync ruleset (`bash scripts/apply-ruleset.sh`); nudge stuck PRs with `ci:run` — see below                  |
+| Green checks but `N of 8 expected` 405       | Ruleset `integration_id` drift (live)                  | Re-sync ruleset (`make apply-ruleset`); nudge stuck PRs with `ci:run` — see below                             |
 | Green checks, 405, but ruleset already clean | Cached per-commit merge verdict (drift already healed) | Bump the SHA (`node scripts/detect-stalled-prs.mjs --fix`, empty commit, or rebase) — see "stalled PRs" below |
 | 405 "not set by the expected GitHub app"     | A protection rule pins the context to another app      | Admin removes the pin — see "not set by the expected GitHub app" below                                        |
 
@@ -238,8 +238,10 @@ If any `🚀 CI Pipeline / *` context shows `integration_id=15368` (the others s
 1. **Re-sync the ruleset** (requires repo admin). This strips `integration_id` to match the committed `.github/ruleset.json`:
 
    ```bash
-   bash scripts/apply-ruleset.sh          # DRYRUN=1 to preview first
+   make apply-ruleset                     # DRYRUN=1 to preview first
    ```
+
+   `make apply-ruleset` runs `scripts/apply-ruleset.sh` through Git Bash on Windows (a bare `bash` there is usually the WSL launcher and fails with `execvpe /bin/bash failed 2`). On non-Windows, `bash scripts/apply-ruleset.sh` is equivalent. Requires `gh` (admin-authenticated) and `jq`; the script also finds a winget-installed `jq` that has no `WinGet\Links` shim.
 
    Re-run the diagnose command — all 8 contexts should now show `integration_id=None`.
 

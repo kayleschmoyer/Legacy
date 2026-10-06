@@ -41,6 +41,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * otherwise demand.
  */
 export const EXPECTED_LOCAL_ONLY = {
+  'apply-ruleset':
+    'owner-gated admin action (live GitHub ruleset PUT needing admin gh auth); not agent-reachable',
   'check-services':
     'checks locally-running dev servers; not meaningful in a headless MCP session',
   clean:

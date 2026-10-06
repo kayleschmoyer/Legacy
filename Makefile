@@ -10,7 +10,7 @@
 	android ios app-dev build-android build-ios maestro \
 	db-migrate verify-migration db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars rebuild-tfvars tfvars-from-aws \
-	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
+	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync apply-ruleset \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
@@ -49,6 +49,26 @@ else
 	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry sync || echo Poetry not found, skipping
 	PATH_SEP := /
 	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; pids=$$(pgrep -f "$$workspace" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
+endif
+
+# Bash used by recipes that run .sh scripts (LS-10563).
+# On Windows a bare `bash` on PATH usually resolves to C:\Windows\System32\bash.exe
+# (the WSL launcher), which fails with `execvpe /bin/bash failed 2` when no distro
+# is installed. Resolve Git Bash explicitly instead — same candidates as
+# tools/mcp/make-server/src/resolve-bash.ts — and fall back to the git install root
+# derived from the `git` on PATH, then to plain `bash`.
+# BASH_PATH is the raw path (for use inside quoted strings such as a PowerShell
+# -Command); BASH is the same path quoted for direct use in a recipe.
+# Both are recursively expanded so the lookups only run for recipes that use them.
+ifeq ($(DETECTED_OS),Windows)
+_GIT_BASH_PF := $(wildcard C:/Program\ Files/Git/bin/bash.exe)
+_GIT_BASH_PF86 := $(wildcard C:/Program\ Files\ (x86)/Git/bin/bash.exe)
+_GIT_BASH_FROM_GIT = $(shell powershell -NoProfile -Command "$$g = (Get-Command git -ErrorAction SilentlyContinue).Source; if ($$g) { $$d = Split-Path $$g; for ($$i = 0; $$i -lt 3 -and $$d; $$i++) { $$b = Join-Path $$d 'bin\bash.exe'; if (Test-Path $$b) { $$b -replace '\\', '/'; break }; $$d = Split-Path $$d } }")
+BASH_PATH = $(if $(_GIT_BASH_PF),C:/Program Files/Git/bin/bash.exe,$(if $(_GIT_BASH_PF86),C:/Program Files (x86)/Git/bin/bash.exe,$(if $(strip $(_GIT_BASH_FROM_GIT)),$(strip $(_GIT_BASH_FROM_GIT)),bash)))
+BASH = $(if $(filter bash,$(BASH_PATH)),bash,"$(BASH_PATH)")
+else
+BASH_PATH := bash
+BASH := bash
 endif
 
 # Base ref for Nx affected commands.
@@ -180,7 +200,7 @@ endif
 # or shell commands. The scripts read MODULES_POOL_* from process.env.
 lockfile: ## Regenerate pnpm-lock.yaml in an isolated temp dir, without touching the worktree's node_modules pool symlink (LS-9837)
 	@$(call echo_blue,Regenerating pnpm-lock.yaml in isolation...)
-	@bash scripts/lockfile-regen.sh
+	@$(BASH) scripts/lockfile-regen.sh
 
 modules-link: export MODULES_POOL_WT := $(WT)
 modules-link: ## Link this worktree's node_modules to a content-addressable pool slot (RFC: docs/rfcs/modules-pool). Usage: make modules-link [WT=<path>]
@@ -725,7 +745,7 @@ ifeq ($(DETECTED_OS),Windows)
 # Without -l, make on Windows hands the recipe to cmd.exe and packer is not
 # found; without the login flag, bash -c skips profile init files so ~/bin/packer
 # (installed via Git Bash) is still missing from PATH.
-	bash -lc "cd terraform/runners/packer && packer init runner-ami.pkr.hcl && packer build -var 'vpc_id=$(VPC_ID)' -var 'subnet_id=$(SUBNET_ID)' runner-ami.pkr.hcl"
+	$(BASH) -lc "cd terraform/runners/packer && packer init runner-ami.pkr.hcl && packer build -var 'vpc_id=$(VPC_ID)' -var 'subnet_id=$(SUBNET_ID)' runner-ami.pkr.hcl"
 else
 	cd terraform/runners/packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
 endif
@@ -738,16 +758,24 @@ ami-list: ## List existing runner AMIs (most recent first)
 runner-secrets-rotate: ## Rotate GitHub App webhook secret and walk through private key rotation. Usage: make runner-secrets-rotate [ENVIRONMENT=prod] [DRY_RUN=1]
 	@$(call echo_blue,Rotating runner GitHub App credentials...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$env:ENVIRONMENT = '$(or $(ENVIRONMENT),prod)'; $$env:DRY_RUN = '$(DRY_RUN)'; bash scripts$(PATH_SEP)rotate-runner-secrets.sh"
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$env:ENVIRONMENT = '$(or $(ENVIRONMENT),prod)'; $$env:DRY_RUN = '$(DRY_RUN)'; & '$(BASH_PATH)' scripts$(PATH_SEP)rotate-runner-secrets.sh"
 else
-	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) bash scripts$(PATH_SEP)rotate-runner-secrets.sh
+	ENVIRONMENT=$(or $(ENVIRONMENT),prod) DRY_RUN=$(DRY_RUN) $(BASH) scripts$(PATH_SEP)rotate-runner-secrets.sh
 endif
 
 runner-lambdas-sync: ## Sync runner Lambda zips (downloads webhook + syncer, builds patched control-plane runners.zip) matching the github-aws-runners version in terraform/runners/github-runners.tf. Usage: make runner-lambdas-sync [VERSION=x.y.z]
 	@$(call echo_blue,Syncing runner Lambda zips...)
 	node scripts$(PATH_SEP)download-runner-lambdas.js $(VERSION)
 	@$(call echo_blue,Building patched control-plane runners.zip (LS-7874/LS-7877 scale-down job heartbeat)...)
-	bash scripts/build-runner-control-plane-lambda.sh $(VERSION)
+	$(BASH) scripts/build-runner-control-plane-lambda.sh $(VERSION)
+
+apply-ruleset: ## Idempotently apply .github/ruleset.json to the live "Protect Main" ruleset (admin gh auth). Usage: make apply-ruleset [DRYRUN=1]
+	@$(call echo_blue,Applying branch protection ruleset...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$env:DRYRUN = '$(DRYRUN)'; & '$(BASH_PATH)' scripts/apply-ruleset.sh; exit $$LASTEXITCODE"
+else
+	@DRYRUN=$(DRYRUN) $(BASH) scripts/apply-ruleset.sh
+endif
 
 # Environment Management
 sync-env: ## Sync environment variables

@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # apply-ruleset.sh — Idempotently apply the branch protection ruleset to the repository.
 #
-# Usage (Windows PowerShell: prefix with `bash`, no `.\` — `.\scripts\apply-ruleset.sh`
-# makes Windows open the file by association instead of executing it):
+# Usage (preferred, any platform — on Windows `make` resolves Git Bash for you,
+# because a bare `bash` there is often the WSL launcher, which fails with
+# `execvpe /bin/bash failed 2` when no distro is installed):
+#   make apply-ruleset                        # apply ruleset
+#   make apply-ruleset DRYRUN=1               # dry-run: show what would be sent without applying
+# Direct (Windows PowerShell: no `.\` — `.\scripts\apply-ruleset.sh` makes Windows
+# open the file by association instead of executing it; use Git Bash's bash.exe):
 #   bash scripts/apply-ruleset.sh             # apply ruleset
-#   DRYRUN=1 bash scripts/apply-ruleset.sh    # dry-run: show what would be sent without applying
+#   DRYRUN=1 bash scripts/apply-ruleset.sh    # dry-run
 #
 # Requires: gh CLI authenticated with admin permissions on the repository.
 #
@@ -33,9 +38,18 @@ set -euo pipefail
 # On Windows, winget installs tools into a Links directory that Git Bash does not
 # include in PATH by default. Prepend it so jq is discoverable without a manual
 # PATH export. $LOCALAPPDATA is a Windows-style path; cygpath converts it for bash.
+#
+# winget sometimes installs the package but does NOT create the Links shim (the
+# Links dir can be empty), so also look inside the package directory itself
+# (Packages/jqlang.jq_*/jq.exe).
 if ! command -v jq &>/dev/null && command -v cygpath &>/dev/null && [[ -n "${LOCALAPPDATA:-}" ]]; then
-  _winget_links="$(cygpath -u "$LOCALAPPDATA")/Microsoft/WinGet/Links"
-  [[ -d "$_winget_links" ]] && export PATH="$_winget_links:$PATH"
+  _winget_root="$(cygpath -u "$LOCALAPPDATA")/Microsoft/WinGet"
+  [[ -d "$_winget_root/Links" ]] && export PATH="$_winget_root/Links:$PATH"
+  if ! command -v jq &>/dev/null; then
+    for _jq_exe in "$_winget_root"/Packages/jqlang.jq_*/jq.exe; do
+      [[ -f "$_jq_exe" ]] && export PATH="$(dirname "$_jq_exe"):$PATH" && break
+    done
+  fi
 fi
 
 # --- Dependency checks ---
