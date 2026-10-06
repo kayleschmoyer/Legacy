@@ -109,7 +109,7 @@ Unlike Retrosheet, nflverse publishes the **current** season's weekly stats whil
 Unlike `nflverse` and `retrosheet`, the `pfa` job reads the dev RDS (LS-10605):
 
 1. **Network:** the job runs on `vars.CI_RUNNER_LABEL` (the self-hosted pool inside the VPC), because the dev RDS is private. `check-migrations-applied.yml` relies on the same path. If that variable is unset, the job falls back to `ubuntu-latest` and the `Check PFA runner` step fails.
-2. **Credentials:** the job connects as `corpus_ingest_readonly`, a Postgres role with `SELECT` on `public.players` only. It reads the secret name from the SSM parameter `/legacy-sports/<env>/corpus-ingest/db-creds-secret-name` and passes it to the CLI as `DB_SECRET_NAME`. The `corpus-ingest` OIDC role can read that parameter and that secret, nothing else in SSM or Secrets Manager (`terraform/main/github-actions-corpus-ingest.tf`; the secret is in `terraform/main/secrets.tf`).
+2. **Credentials:** the job connects as `corpus_ingest_readonly`, a Postgres role with `SELECT` on `public.players` and the six `public.football_season_*` tables only (the crosswalk reads each player's season span from them; LS-10621). It reads the secret name from the SSM parameter `/legacy-sports/<env>/corpus-ingest/db-creds-secret-name` and passes it to the CLI as `DB_SECRET_NAME`. The `corpus-ingest` OIDC role can read that parameter and that secret, nothing else in SSM or Secrets Manager (`terraform/main/github-actions-corpus-ingest.tf`; the secret is in `terraform/main/secrets.tf`).
 
 **One-time setup** (in this order):
 

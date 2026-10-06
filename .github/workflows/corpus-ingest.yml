@@ -13,8 +13,9 @@
 #   - Its name crosswalk SELECTs football rows from public.players, so it needs
 #     the dev RDS. RDS is private (publicly_accessible=false), so the job runs
 #     on the self-hosted runner pool (vars.CI_RUNNER_LABEL). It connects as
-#     corpus_ingest_readonly (SELECT on players only, LS-10605), whose secret
-#     name it reads from SSM; the corpus-ingest role can read both.
+#     corpus_ingest_readonly (SELECT on players and football_season_*,
+#     LS-10605/LS-10621), whose secret name it reads from SSM; the
+#     corpus-ingest role can read both.
 #   - The crawl is rate-limited (>= 3s per request, ~7,000 box scores for
 #     1960-1998), so it gets a 12h timeout. Split it into season ranges with
 #     from/to; a re-run of a range skips objects already written.
