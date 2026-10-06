@@ -9,6 +9,7 @@
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
+  seedFeatureFlags,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -462,6 +463,109 @@ test.describe('Mock Draft setup on a 375x667 viewport (LS-7575) @regression', ()
     await expect
       .poll(() => capture.createMockDraftVariables)
       .toMatchObject({ numTeams: 8, mode: 'ONLINE', controlAllTeams: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-7648: the `football-mock-players` GrowthBook flag (LS-4666) gates the
+// Sport selector on the setup screen — MockDraftSetup renders the Sport
+// section only when the flag is on, and does not render it at all otherwise.
+// The flag fails closed (docs/feature-flags.md), so an explicit OFF and an
+// unloaded SDK must look identical. The unseeded case needs no extra setup:
+// CI builds have no VITE_GROWTHBOOK_CLIENT_KEY (loadFeatures is skipped) and
+// the api-isolation baseline rejects any request to cdn.growthbook.io, so
+// GrowthBook never receives a definition for the flag.
+// Note: this is not the unrelated `football_enabled` nav flag (enableFootball).
+// ---------------------------------------------------------------------------
+
+const FOOTBALL_MOCK_PLAYERS_FLAG = 'football-mock-players';
+
+test.describe('Mock Draft — football-mock-players flag (LS-7648) @regression', () => {
+  /** Asserts the Sport section is gone and a baseball draft still starts. */
+  async function expectBaseballOnlyFlow(
+    page: import('@playwright/test').Page,
+    capture: { createMockDraftVariables?: Record<string, unknown> },
+  ) {
+    await expect(
+      page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+    ).toBeVisible();
+
+    // The Sport section is not rendered at all — not merely disabled.
+    await expect(page.getByText('Sport', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Football/ })).toHaveCount(0);
+
+    // The rest of the baseball setup form still works.
+    await page.getByRole('button', { name: '10', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Linear', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'All MLB', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    await page.getByRole('button', { name: /Start Mock Draft/i }).click();
+
+    await expect
+      .poll(() => capture.createMockDraftVariables)
+      .toMatchObject({
+        sport: 'baseball',
+        numTeams: 10,
+        draftOrder: 'linear',
+        playerPool: 'all',
+      });
+  }
+
+  test('flag ON: Sport selector shows a selectable Football option', async ({
+    page,
+  }) => {
+    await seedFeatureFlags(page, {
+      [FOOTBALL_MOCK_PLAYERS_FLAG]: { defaultValue: true },
+    });
+    await setupGraphQL(page);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText('Sport', { exact: true })).toBeVisible();
+    const baseballTile = page.getByRole('button', { name: /Baseball/ });
+    const footballTile = page.getByRole('button', { name: /Football/ });
+    await expect(baseballTile).toHaveAttribute('aria-pressed', 'true');
+    await expect(footballTile).toBeVisible();
+    await expect(footballTile).toHaveAttribute('aria-pressed', 'false');
+
+    await footballTile.click();
+
+    // Selecting Football flips the form to the football player pool.
+    await expect(footballTile).toHaveAttribute('aria-pressed', 'true');
+    await expect(baseballTile).toHaveAttribute('aria-pressed', 'false');
+    await expect(
+      page.getByRole('button', { name: 'All NFL', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      page.getByRole('button', { name: 'All MLB', exact: true }),
+    ).toHaveCount(0);
+  });
+
+  test('flag OFF: Sport selector is absent and the baseball flow works', async ({
+    page,
+  }) => {
+    await seedFeatureFlags(page, {
+      [FOOTBALL_MOCK_PLAYERS_FLAG]: { defaultValue: false },
+    });
+    const capture: { createMockDraftVariables?: Record<string, unknown> } = {};
+    await setupGraphQL(page, capture);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expectBaseballOnlyFlow(page, capture);
+  });
+
+  test('flag unseeded (SDK not loaded): falls back to OFF', async ({
+    page,
+  }) => {
+    const capture: { createMockDraftVariables?: Record<string, unknown> } = {};
+    await setupGraphQL(page, capture);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expectBaseballOnlyFlow(page, capture);
   });
 });
 
