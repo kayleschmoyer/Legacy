@@ -4,6 +4,7 @@ import { Paragraph, YStack } from '@legacy-sports/shared-components/ui';
 import { Spinner } from 'tamagui';
 import { AuthService, useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
+import { SUPPORT_EMAIL } from '@legacy-sports/utils';
 import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
 /**
@@ -22,9 +23,6 @@ import { BRAND_GOLD_LIGHT } from '../../constants/colors';
  *    next step for the already-linked case, and a "Contact support" affordance
  *    so the user never hits a dead end (LS-6659).
  */
-
-/** Address used for the "Contact support" affordance on the error state. */
-const SUPPORT_EMAIL = 'support@legacysports.com';
 
 /**
  * The oauth-proxy Discord handler returns this intentionally-vague 409 when the

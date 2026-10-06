@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
+import { SUPPORT_EMAIL } from '@legacy-sports/utils';
 import {
   OAuthErrorCode,
   OAuthProvider,
@@ -762,7 +763,7 @@ export function LoginPage(): React.JSX.Element {
               Trouble signing in?{' '}
               <a
                 className="ll-link-gold"
-                href="mailto:support@legacysports.com?subject=Trouble%20signing%20in"
+                href={`mailto:${SUPPORT_EMAIL}?subject=Trouble%20signing%20in`}
               >
                 Get help accessing your account
               </a>

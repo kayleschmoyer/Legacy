@@ -91,7 +91,7 @@ describe('DiscordCallbackPage — actionable link errors (LS-6659)', () => {
     });
     expect(supportLink).toHaveAttribute(
       'href',
-      expect.stringContaining('mailto:support@legacysports.com'),
+      expect.stringContaining('mailto:legacy.fantasy.support@gmail.com'),
     );
   });
 

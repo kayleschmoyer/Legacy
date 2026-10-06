@@ -139,6 +139,13 @@ export const HELP_GETTING_STARTED_STEPS: HelpGettingStartedStep[] = [
 /** Canonical Discord invite URL — single source of truth for all help UI. */
 export const DISCORD_URL = 'https://discord.gg/JBhRrE8ZtK';
 
+/**
+ * Canonical support email address — single source of truth for every
+ * support/contact mailto across web, mobile, Help, FAQ and legal pages
+ * (LS-10761).
+ */
+export const SUPPORT_EMAIL = 'legacy.fantasy.support@gmail.com';
+
 export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
   {
     icon: '🐛',

@@ -475,7 +475,7 @@ describe('LoginPage account-recovery affordance (LGN-024)', () => {
       name: /get help accessing your account/i,
     });
     expect(recoveryLink.getAttribute('href')).toMatch(
-      /^mailto:support@legacysports\.com/,
+      /^mailto:legacy\.fantasy\.support@gmail\.com\?subject=Trouble%20signing%20in$/,
     );
     // The surrounding prompt frames it as a recovery affordance.
     expect(recoveryLink.parentElement?.textContent).toMatch(
