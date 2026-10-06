@@ -13,7 +13,7 @@
 4. Sports & Stats section _(collapsible)_
 5. Notifications section _(collapsible, authenticated users only)_
 
-Section collapse states persist to localStorage.
+Section collapse states persist to localStorage on web and AsyncStorage on mobile (`apps/app/src/app/(app)/preferences.tsx`, same `ls_prefs_sections_collapsed` key). Collapse state is device-local by design — it is a per-device layout choice and is not synced across devices (LS-7096).
 
 ---
 

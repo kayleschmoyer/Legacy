@@ -367,6 +367,81 @@ describe('PreferencesScreen', () => {
     });
   });
 
+  describe('section collapse (LS-7096)', () => {
+    it('renders every section expanded by default', async () => {
+      renderWithUser(false);
+      await waitFor(() => {
+        expect(mockAsyncStorageGetItem).toHaveBeenCalledWith(
+          'ls_prefs_sections_collapsed',
+        );
+      });
+      expect(screen.getByText('Theme')).toBeTruthy();
+      expect(screen.getByText('Default sport')).toBeTruthy();
+    });
+
+    it('hides the section body and persists the state when a header is pressed', async () => {
+      renderWithUser(false);
+
+      fireEvent.press(screen.getByTestId('section-header-appearance'));
+
+      expect(screen.queryByText('Theme')).toBeNull();
+      expect(screen.getByText('Default sport')).toBeTruthy();
+      await waitFor(() => {
+        expect(mockAsyncStorageSetItem).toHaveBeenCalledWith(
+          'ls_prefs_sections_collapsed',
+          JSON.stringify({ appearance: true, sports: false, admin: false }),
+        );
+      });
+    });
+
+    it('expands a collapsed section when its header is pressed again', () => {
+      renderWithUser(false);
+
+      fireEvent.press(screen.getByTestId('section-header-appearance'));
+      fireEvent.press(screen.getByTestId('section-header-appearance'));
+
+      expect(screen.getByText('Theme')).toBeTruthy();
+    });
+
+    it('restores persisted collapse state on mount', async () => {
+      mockAsyncStorageGetItem.mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'ls_prefs_sections_collapsed'
+            ? JSON.stringify({ sports: true })
+            : null,
+        ),
+      );
+      renderWithUser(false);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Default sport')).toBeNull();
+      });
+      expect(screen.getByText('Theme')).toBeTruthy();
+    });
+
+    it('falls back to expanded when the stored value is corrupt', async () => {
+      mockAsyncStorageGetItem.mockImplementation((key: string) =>
+        Promise.resolve(key === 'ls_prefs_sections_collapsed' ? '{oops' : null),
+      );
+      renderWithUser(false);
+
+      await waitFor(() => {
+        expect(mockAsyncStorageGetItem).toHaveBeenCalledWith(
+          'ls_prefs_sections_collapsed',
+        );
+      });
+      expect(screen.getByText('Theme')).toBeTruthy();
+    });
+
+    it('lets admins collapse the Admin Tools section', () => {
+      renderWithUser(true);
+
+      fireEvent.press(screen.getByTestId('section-header-admin'));
+
+      expect(screen.queryByTestId('device-logs-toggle')).toBeNull();
+    });
+  });
+
   describe('Admin Tools section', () => {
     it('does not render for non-admin users', () => {
       renderWithUser(false);

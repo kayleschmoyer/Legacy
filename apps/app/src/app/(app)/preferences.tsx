@@ -29,6 +29,18 @@ import { useDeviceLoggingPreference } from '../../features/device-logs/useDevice
 import { shareCurrentLogFile } from '../../features/device-logs/deviceLogs';
 
 const STORAGE_KEY = 'ls_user_preferences';
+// Same key web uses for its collapsible sections (LS-7096). Device-local on
+// both platforms: collapse is a per-device layout choice, not an account setting.
+const COLLAPSED_SECTIONS_KEY = 'ls_prefs_sections_collapsed';
+
+type SectionId = 'appearance' | 'sports' | 'admin';
+type CollapsedSections = Record<SectionId, boolean>;
+
+const DEFAULT_COLLAPSED: CollapsedSections = {
+  appearance: false,
+  sports: false,
+  admin: false,
+};
 
 /* ─── Types ─── */
 
@@ -103,6 +115,60 @@ function savePrefsAsync(prefs: UserPreferences): void {
     const err = error instanceof Error ? error : new Error(String(error));
     LOGGER.error('Failed to save user preferences', err);
   });
+}
+
+async function loadCollapsedSections(): Promise<CollapsedSections> {
+  try {
+    const raw = await AsyncStorage.getItem(COLLAPSED_SECTIONS_KEY);
+    if (!raw) return { ...DEFAULT_COLLAPSED };
+    return {
+      ...DEFAULT_COLLAPSED,
+      ...(JSON.parse(raw) as Partial<CollapsedSections>),
+    };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Failed to load collapsed preference sections', err);
+    return { ...DEFAULT_COLLAPSED };
+  }
+}
+
+function saveCollapsedSections(sections: CollapsedSections): void {
+  AsyncStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(sections)).catch(
+    (error) => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      LOGGER.error('Failed to save collapsed preference sections', err);
+    },
+  );
+}
+
+/** Collapse state for the preference sections, persisted per device. */
+function useCollapsedSections(): {
+  collapsed: CollapsedSections;
+  toggle: (id: SectionId) => void;
+} {
+  const [collapsed, setCollapsed] =
+    useState<CollapsedSections>(DEFAULT_COLLAPSED);
+
+  useEffect(() => {
+    let active = true;
+    void loadCollapsedSections().then((loaded) => {
+      if (active) setCollapsed(loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const toggle = useCallback(
+    (id: SectionId) => {
+      const next = { ...collapsed, [id]: !collapsed[id] };
+      setCollapsed(next);
+      saveCollapsedSections(next);
+    },
+    [collapsed],
+  );
+
+  return { collapsed, toggle };
 }
 
 /* ─── Toggle component ─── */
@@ -200,10 +266,21 @@ interface SectionProps {
   icon: string;
   title: string;
   subtitle: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  testID: string;
   children: React.ReactNode;
 }
 
-function SectionCard({ icon, title, subtitle, children }: SectionProps) {
+function SectionCard({
+  icon,
+  title,
+  subtitle,
+  isCollapsed,
+  onToggle,
+  testID,
+  children,
+}: SectionProps) {
   return (
     <YStack
       borderRadius="$6"
@@ -216,8 +293,13 @@ function SectionCard({ icon, title, subtitle, children }: SectionProps) {
         paddingVertical="$4"
         alignItems="center"
         gap="$3"
-        borderBottomWidth={1}
+        borderBottomWidth={isCollapsed ? 0 : 1}
         borderBottomColor="$borderColor"
+        onPress={onToggle}
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${isCollapsed ? 'collapsed' : 'expanded'}`}
+        accessibilityState={{ expanded: !isCollapsed }}
       >
         <YStack
           width={36}
@@ -237,17 +319,28 @@ function SectionCard({ icon, title, subtitle, children }: SectionProps) {
             {subtitle}
           </Paragraph>
         </YStack>
+        <Text fontSize={14} color="$colorPress">
+          {isCollapsed ? '▼' : '▲'}
+        </Text>
       </XStack>
-      <YStack padding="$5" gap="$5">
-        {children}
-      </YStack>
+      {isCollapsed ? null : (
+        <YStack padding="$5" gap="$5">
+          {children}
+        </YStack>
+      )}
     </YStack>
   );
 }
 
 /* ─── Main Component ─── */
 
-function AdminToolsSection(): React.JSX.Element {
+function AdminToolsSection({
+  isCollapsed,
+  onToggle,
+}: {
+  isCollapsed: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
   const { enabled, setEnabled } = useDeviceLoggingPreference(true);
   const [shareError, setShareError] = useState<string | null>(null);
 
@@ -265,6 +358,9 @@ function AdminToolsSection(): React.JSX.Element {
       icon="🛠️"
       title="Admin Tools"
       subtitle="Diagnostic tooling — only visible to admins"
+      isCollapsed={isCollapsed}
+      onToggle={onToggle}
+      testID="section-header-admin"
     >
       <PrefToggle
         value={enabled}
@@ -307,7 +403,6 @@ export default function PreferencesScreen(): React.JSX.Element {
   });
   const [saved, setSaved] = useState(false);
   const initialLoadDone = useRef(false);
-
   // The audio opt-in is persisted server-side so it syncs across devices
   // (LS-10111), the same basis as web's stats-format sync (LS-7138). Every
   // other preference on this screen remains device-local.
@@ -336,6 +431,8 @@ export default function PreferencesScreen(): React.JSX.Element {
       });
     });
   }, []);
+
+  const { collapsed, toggle } = useCollapsedSections();
 
   // Keep local mirror in sync when context changes (e.g. system preference flip)
   useEffect(() => {
@@ -430,6 +527,9 @@ export default function PreferencesScreen(): React.JSX.Element {
           icon="🎨"
           title="Appearance"
           subtitle="Display theme and visual settings"
+          isCollapsed={collapsed.appearance}
+          onToggle={() => toggle('appearance')}
+          testID="section-header-appearance"
         >
           <XStack
             alignItems="flex-start"
@@ -480,6 +580,9 @@ export default function PreferencesScreen(): React.JSX.Element {
           icon="⚾"
           title="Sports & Stats"
           subtitle="Default view and statistics display preferences"
+          isCollapsed={collapsed.sports}
+          onToggle={() => toggle('sports')}
+          testID="section-header-sports"
         >
           <XStack
             alignItems="flex-start"
@@ -539,7 +642,12 @@ export default function PreferencesScreen(): React.JSX.Element {
           />
         </SectionCard>
 
-        {currentUser?.isAdmin ? <AdminToolsSection /> : null}
+        {currentUser?.isAdmin ? (
+          <AdminToolsSection
+            isCollapsed={collapsed.admin}
+            onToggle={() => toggle('admin')}
+          />
+        ) : null}
       </YStack>
     </ScrollView>
   );
