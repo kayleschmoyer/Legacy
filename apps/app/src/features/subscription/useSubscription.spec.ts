@@ -73,6 +73,8 @@ let mockCtorOpts: Record<string, unknown> | null = null;
 const mockRegisteredHandlers = new Map<string, (n: unknown) => void>();
 const mockClientDispose = jest.fn();
 const mockReconnectNow = jest.fn();
+const mockSuspend = jest.fn();
+const mockResume = jest.fn();
 jest.mock('@legacy-sports/websocket-client', () => ({
   WebSocketClient: class {
     constructor(opts: Record<string, unknown>) {
@@ -87,6 +89,12 @@ jest.mock('@legacy-sports/websocket-client', () => ({
     }
     reconnectNow(): void {
       mockReconnectNow();
+    }
+    suspend(): void {
+      mockSuspend();
+    }
+    resume(): void {
+      mockResume();
     }
   },
 }));
@@ -382,9 +390,11 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     appStateListeners[0]('active');
 
     expect(mockReconnectNow).toHaveBeenCalledTimes(1);
+    expect(mockResume).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call reconnectNow for a background transition', async () => {
+  // LS-10625: park the socket while minimized instead of letting it churn.
+  it('suspends (and does not reconnect) on a background transition', async () => {
     mockUseGetMySubscriptionQuery.mockReturnValue(
       makeQueryResult({ status: 'active', tier: 'premium' }),
     );
@@ -397,7 +407,24 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
 
     appStateListeners[0]('background');
 
+    expect(mockSuspend).toHaveBeenCalledTimes(1);
     expect(mockReconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('does not suspend for the transient inactive state', async () => {
+    mockUseGetMySubscriptionQuery.mockReturnValue(
+      makeQueryResult({ status: 'active', tier: 'premium' }),
+    );
+
+    renderHook(() => useSubscription());
+
+    await waitFor(() => {
+      expect(appStateListeners).toHaveLength(1);
+    });
+
+    appStateListeners[0]('inactive');
+
+    expect(mockSuspend).not.toHaveBeenCalled();
   });
 
   it('removes the AppState subscription on unmount', async () => {

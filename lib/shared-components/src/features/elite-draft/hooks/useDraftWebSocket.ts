@@ -496,6 +496,8 @@ export function useDraftWebSocket({
     connect: wsConnect,
     disconnect: wsDisconnect,
     reconnectNow: wsReconnectNow,
+    suspend: wsSuspend,
+    resume: wsResume,
     sendMessage,
   } = useWebSocket({
     url: websocketUrl,
@@ -760,6 +762,18 @@ export function useDraftWebSocket({
   // after a long absence force a brand-new socket (the old one is likely a
   // zombie); after a short one just revive a client that gave up retrying.
   // Either way, resync the data now rather than waiting on the socket.
+  //
+  // While minimized the socket is parked (LS-10625) rather than left to
+  // churn: the OS drops or freezes it, and the client's heartbeat/backoff
+  // would otherwise keep reconnecting — and burning its attempt budget — in
+  // the background. Foreground then resumes it with one clean connect.
+  const suspendedForBackgroundRef = useRef(false);
+  const handleBackground = useCallback(() => {
+    if (!socketExpected) return;
+    suspendedForBackgroundRef.current = true;
+    wsSuspend();
+  }, [socketExpected, wsSuspend]);
+
   const handleForeground = useCallback(
     (backgroundMs: number) => {
       if (!socketExpected) return;
@@ -767,7 +781,16 @@ export function useDraftWebSocket({
         backgroundMs,
         draftId,
       });
-      if (backgroundMs > FOREGROUND_FORCE_RECONNECT_MS) {
+      if (suspendedForBackgroundRef.current) {
+        // The parked client holds no socket, so a fresh one is already the
+        // "force a brand-new socket" outcome the long-absence branch wants.
+        suspendedForBackgroundRef.current = false;
+        wsResume();
+        // `resume` only acts on a client that was actually parked; if it
+        // wasn't (no client yet when the background signal fired), still
+        // revive one that gave up. A no-op once connected/connecting.
+        wsReconnectNow();
+      } else if (backgroundMs > FOREGROUND_FORCE_RECONNECT_MS) {
         wsDisconnect();
         wsConnect();
       } else {
@@ -777,9 +800,17 @@ export function useDraftWebSocket({
         resync('foreground');
       }
     },
-    [socketExpected, draftId, wsConnect, wsDisconnect, wsReconnectNow, resync],
+    [
+      socketExpected,
+      draftId,
+      wsConnect,
+      wsDisconnect,
+      wsReconnectNow,
+      wsResume,
+      resync,
+    ],
   );
-  useAppForeground(handleForeground);
+  useAppForeground(handleForeground, handleBackground);
 
   /**
    * Debounced, renderable view of the socket state (LS-9856). The raw

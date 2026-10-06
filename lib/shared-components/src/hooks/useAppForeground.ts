@@ -14,10 +14,17 @@ export type AppForegroundCallback = (backgroundMs: number) => void;
  * (`useAppForeground.native.ts`) uses `AppState` instead; platform
  * resolution picks the right file, so callers import `./useAppForeground`.
  *
+ * The optional `onBackground` parameter exists for signature parity with the
+ * native variant and is intentionally ignored here: a hidden browser tab keeps
+ * its sockets (LS-10625 only parks native apps).
+ *
  * The callback is read through a ref, so passing an inline function does not
  * re-register the listener on every render.
  */
-export function useAppForeground(onForeground: AppForegroundCallback): void {
+export const useAppForeground: (
+  onForeground: AppForegroundCallback,
+  onBackground?: () => void,
+) => void = function useAppForeground(onForeground: AppForegroundCallback) {
   const callbackRef = useRef(onForeground);
   callbackRef.current = onForeground;
 
@@ -48,4 +55,4 @@ export function useAppForeground(onForeground: AppForegroundCallback): void {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-}
+};

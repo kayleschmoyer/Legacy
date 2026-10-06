@@ -99,7 +99,12 @@ function useOnSubscriptionUpdated(onUpdate: () => void): void {
         appStateSubscription = AppState.addEventListener(
           'change',
           (nextState) => {
-            if (nextState === 'active') {
+            // Park while minimized so the client doesn't churn reconnects in
+            // the background; resume with one clean connect (LS-10625).
+            if (nextState === 'background') {
+              client.suspend();
+            } else if (nextState === 'active') {
+              client.resume();
               client.reconnectNow();
             }
           },

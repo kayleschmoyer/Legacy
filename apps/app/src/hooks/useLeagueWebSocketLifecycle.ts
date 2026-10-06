@@ -95,11 +95,22 @@ export function useLeagueWebSocketLifecycle({
   // else re-triggers the leagueId/url/token/isFocused effect above. Treat the
   // app returning to the foreground as a signal worth a fresh attempt,
   // mirroring the resume-refetch pattern in FootballMatchupScreen (LS-6388).
+  //
+  // The mirror image: while the app is minimized the OS drops or freezes the
+  // socket, and the client's heartbeat/backoff would keep reconnecting (and
+  // burning its attempt budget) in the background. Park it on `background`
+  // (not the transient `inactive`) and resume with one clean connect on
+  // `active` (LS-10625).
   useEffect(() => {
     if (!client) return;
 
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
+      if (nextState === 'background') {
+        client.suspend();
+      } else if (nextState === 'active') {
+        // `resume` is a no-op unless suspended, so keep `reconnectNow` for
+        // the give-up revival it has always covered (LS-8985).
+        client.resume();
         client.reconnectNow();
       }
     });

@@ -87,6 +87,47 @@ describe('useAppForeground (native, LS-10593)', () => {
     expect(onForeground).toHaveBeenCalledWith(3_000);
   });
 
+  describe('onBackground (LS-10625)', () => {
+    it('fires once on the transition into background', () => {
+      const onBackground = jest.fn();
+      renderHook(() => useAppForeground(jest.fn(), onBackground));
+
+      emit('background');
+      emit('background');
+
+      expect(onBackground).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire for the transient inactive state', () => {
+      const onBackground = jest.fn();
+      renderHook(() => useAppForeground(jest.fn(), onBackground));
+
+      emit('inactive');
+      emit('active');
+
+      expect(onBackground).not.toHaveBeenCalled();
+    });
+
+    it('fires again on the next background after returning to active', () => {
+      const onBackground = jest.fn();
+      renderHook(() => useAppForeground(jest.fn(), onBackground));
+
+      emit('background');
+      emit('active');
+      emit('background');
+
+      expect(onBackground).toHaveBeenCalledTimes(2);
+    });
+
+    it('fires on mount when the app is already backgrounded', () => {
+      mockAppState.currentState = 'background';
+      const onBackground = jest.fn();
+      renderHook(() => useAppForeground(jest.fn(), onBackground));
+
+      expect(onBackground).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('removes the AppState subscription on unmount', () => {
     const onForeground = jest.fn();
     const { unmount } = renderHook(() => useAppForeground(onForeground));

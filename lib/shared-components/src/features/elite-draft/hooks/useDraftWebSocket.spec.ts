@@ -24,6 +24,8 @@ interface MockWSClient {
   updateContext: jest.Mock;
   setHeartbeatInterval: jest.Mock;
   reconnectNow: jest.Mock;
+  suspend: jest.Mock;
+  resume: jest.Mock;
   updateToken: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
@@ -53,6 +55,8 @@ function mockMakeWSClient(): MockWSClient {
     updateContext: jest.fn(),
     setHeartbeatInterval: jest.fn(),
     reconnectNow: jest.fn(),
+    suspend: jest.fn(),
+    resume: jest.fn(),
     updateToken: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
@@ -72,9 +76,14 @@ jest.mock('@legacy-sports/websocket-client', () => ({
 // Capture the foreground callback so tests can simulate the app returning
 // from the background without depending on the platform variant (LS-10593).
 let mockForegroundCallback: ((backgroundMs: number) => void) | null = null;
+let mockBackgroundCallback: (() => void) | null = null;
 jest.mock('../../../hooks/useAppForeground', () => ({
-  useAppForeground: (cb: (backgroundMs: number) => void) => {
+  useAppForeground: (
+    cb: (backgroundMs: number) => void,
+    onBackground?: () => void,
+  ) => {
     mockForegroundCallback = cb;
+    mockBackgroundCallback = onBackground ?? null;
   },
 }));
 
@@ -949,6 +958,7 @@ describe('useDraftWebSocket — app foreground resync (LS-10593)', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     mockForegroundCallback = null;
+    mockBackgroundCallback = null;
   });
 
   afterEach(() => {
@@ -1054,6 +1064,67 @@ describe('useDraftWebSocket — app foreground resync (LS-10593)', () => {
     expect(params.refetchAvailablePlayers).not.toHaveBeenCalled();
     expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
     expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+
+  // LS-10625: a minimized app's socket must be parked, not left to churn.
+  describe('parking the socket while backgrounded (LS-10625)', () => {
+    function background() {
+      act(() => {
+        mockBackgroundCallback?.();
+      });
+    }
+
+    it('suspends the client when the app is backgrounded', () => {
+      renderHook(() => useDraftWebSocket(makeDefaultParams()));
+
+      background();
+
+      expect(mockInstance.suspend).toHaveBeenCalledTimes(1);
+    });
+
+    it('resumes with a single clean connect on foreground, whatever the absence length', () => {
+      renderHook(() => useDraftWebSocket(makeDefaultParams()));
+      mockInstance.disconnect.mockClear();
+      mockInstance.connect.mockClear();
+
+      background();
+      foreground(60_000);
+
+      expect(mockInstance.resume).toHaveBeenCalledTimes(1);
+      // No forced teardown/reconnect on top of the resume.
+      expect(mockInstance.disconnect).not.toHaveBeenCalled();
+      expect(mockInstance.connect).not.toHaveBeenCalled();
+    });
+
+    it('still resyncs the board after resuming', async () => {
+      const params = makeDefaultParams();
+      renderHook(() => useDraftWebSocket(params));
+
+      background();
+      foreground(60_000);
+      await flushRefetches();
+
+      expect(params.refetchDraft).toHaveBeenCalledTimes(1);
+      expect(params.refetchLeague).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to the legacy foreground path when no background was seen', () => {
+      renderHook(() => useDraftWebSocket(makeDefaultParams()));
+
+      foreground(60_000);
+
+      expect(mockInstance.resume).not.toHaveBeenCalled();
+      expect(mockInstance.disconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not suspend a socket-less (auction) draft', () => {
+      const params = { ...makeDefaultParams(), isAuctionDraft: true };
+      renderHook(() => useDraftWebSocket(params));
+
+      background();
+
+      expect(mockInstance.suspend).not.toHaveBeenCalled();
+    });
   });
 });
 

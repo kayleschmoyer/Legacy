@@ -59,6 +59,8 @@ function makeMockClient() {
     connect: jest.fn(),
     dispose: jest.fn(),
     reconnectNow: jest.fn(),
+    suspend: jest.fn(),
+    resume: jest.fn(),
     _emit(event: string, ...args: unknown[]) {
       (handlers[event] ?? []).forEach((h) => h(...args));
     },
@@ -168,16 +170,29 @@ describe('useLeagueWebSocketLifecycle', () => {
     });
 
     expect(mockClient.reconnectNow).toHaveBeenCalledTimes(1);
+    expect(mockClient.resume).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call reconnectNow for a background transition', () => {
+  // LS-10625: park the socket while minimized instead of letting it churn.
+  it('suspends the client (without reconnecting) on a background transition', () => {
     renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
 
     void act(() => {
       appStateListeners[0]('background');
     });
 
+    expect(mockClient.suspend).toHaveBeenCalledTimes(1);
     expect(mockClient.reconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('does not suspend for the transient inactive state', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    void act(() => {
+      appStateListeners[0]('inactive');
+    });
+
+    expect(mockClient.suspend).not.toHaveBeenCalled();
   });
 
   it('removes the AppState subscription on unmount', () => {

@@ -277,6 +277,19 @@ export function useWebSocket({
     }
   }, []);
 
+  /**
+   * Park the client (no heartbeat, no reconnect attempts, socket closed) while
+   * the native app is backgrounded; `resume` reconnects it with a fresh
+   * budget (LS-10625). See `WebSocketClient.suspend`.
+   */
+  const suspend = useCallback(() => {
+    clientRef.current?.suspend();
+  }, []);
+
+  const resume = useCallback(() => {
+    clientRef.current?.resume();
+  }, []);
+
   const sendMessage = useCallback((data: unknown) => {
     if (clientRef.current) {
       clientRef.current.send(data as Record<string, unknown>);
@@ -651,6 +664,8 @@ export function useWebSocket({
     connect,
     disconnect,
     reconnectNow,
+    suspend,
+    resume,
     sendMessage,
     updateContext,
   };

@@ -833,6 +833,130 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
 
+    // LS-10625: a minimized app must not churn reconnects in the background.
+    describe('suspend / resume (LS-10625)', () => {
+      it('suspend closes the socket, emits disconnected and stops reconnecting', () => {
+        mockServer = new Server(mockUrl);
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: true,
+        });
+        jest.advanceTimersByTime(100);
+        expect(client.getState()).toBe('connected');
+        const onDisconnected = jest.fn();
+        client.on('disconnected', onDisconnected);
+
+        client.suspend();
+        // Well past every backoff step, heartbeat tick and the give-up cooldown.
+        jest.advanceTimersByTime(10 * 60 * 1000);
+
+        expect(client.getState()).toBe('disconnected');
+        expect(onDisconnected).toHaveBeenCalledTimes(1);
+        client.dispose();
+      });
+
+      it('cancels a pending reconnect backoff', () => {
+        mockServer = new Server(mockUrl);
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: true,
+        });
+        jest.advanceTimersByTime(100);
+        // Drop the connection so a backoff timer is pending, then park.
+        mockServer.close();
+        jest.advanceTimersByTime(50);
+        mockServer = new Server(mockUrl);
+
+        client.suspend();
+        jest.advanceTimersByTime(60_000);
+
+        expect(client.getState()).toBe('disconnected');
+        client.dispose();
+      });
+
+      it('connect and reconnectNow are no-ops while suspended', () => {
+        mockServer = new Server(mockUrl);
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: false,
+        });
+        client.suspend();
+
+        client.connect();
+        client.reconnectNow();
+        jest.advanceTimersByTime(1000);
+
+        expect(client.getState()).toBe('disconnected');
+        client.dispose();
+      });
+
+      it('resume reconnects once with a fresh attempt budget', () => {
+        mockServer = new Server(mockUrl);
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: true,
+        });
+        jest.advanceTimersByTime(100);
+        const onConnected = jest.fn();
+        client.on('connected', onConnected);
+
+        client.suspend();
+        jest.advanceTimersByTime(1000);
+        client.resume();
+        jest.advanceTimersByTime(100);
+
+        expect(client.getState()).toBe('connected');
+        expect(onConnected).toHaveBeenCalledTimes(1);
+        client.dispose();
+      });
+
+      it('suspend is idempotent and resume is a no-op when not suspended', () => {
+        mockServer = new Server(mockUrl);
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: true,
+        });
+        jest.advanceTimersByTime(100);
+
+        // Not suspended: must not tear down the live connection.
+        client.resume();
+        expect(client.getState()).toBe('connected');
+
+        const onDisconnected = jest.fn();
+        client.on('disconnected', onDisconnected);
+        client.suspend();
+        client.suspend();
+        expect(onDisconnected).toHaveBeenCalledTimes(1);
+        client.dispose();
+      });
+
+      it('suspend and resume are no-ops after disposal', () => {
+        const client = new WebSocketClient({
+          url: mockUrl,
+          token: 'test-token',
+          leagueId: 123,
+          autoConnect: false,
+        });
+        client.dispose();
+
+        expect(() => {
+          client.suspend();
+          client.resume();
+        }).not.toThrow();
+        expect(client.getState()).toBe('disconnected');
+      });
+    });
+
     it('reconnectNow is a no-op after disposal', () => {
       const client = new WebSocketClient({
         url: mockUrl,

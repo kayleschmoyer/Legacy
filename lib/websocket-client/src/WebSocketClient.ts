@@ -85,6 +85,7 @@ export class WebSocketClient {
   private lastMessageTime = 0;
   private consecutivePings = 0;
   private disposed = false;
+  private suspended = false;
 
   // Event handlers
   private eventHandlers = new Map<string, Set<EventHandler>>();
@@ -127,6 +128,11 @@ export class WebSocketClient {
   public connect(): void {
     if (this.disposed) {
       LOGGER.warn('Cannot connect - client is disposed');
+      return;
+    }
+
+    if (this.suspended) {
+      LOGGER.debug('Cannot connect - client is suspended');
       return;
     }
 
@@ -732,6 +738,7 @@ export class WebSocketClient {
   public reconnectNow(): void {
     if (
       this.disposed ||
+      this.suspended ||
       this.ws?.readyState === WebSocket.OPEN ||
       this.ws?.readyState === WebSocket.CONNECTING
     ) {
@@ -742,6 +749,38 @@ export class WebSocketClient {
     this.reconnectAttempts = 0;
     this.hasRetriedAfterGiveUp = false;
     this.connect();
+  }
+
+  /**
+   * Park the client while the host app is backgrounded (LS-10625).
+   *
+   * The OS freezes or drops a minimized app's sockets, and left alone the
+   * client reads that as an outage: its heartbeat declares a zombie, the
+   * close handler burns the reconnect budget, and the give-up cooldown fires
+   * another attempt — all churn nobody can see. Suspending closes the socket
+   * deliberately, stops the heartbeat, cancels every pending retry timer and
+   * makes `connect`/`reconnectNow` no-ops until `resume()`. Emits
+   * `disconnected` once. No-op if disposed or already suspended.
+   */
+  public suspend(): void {
+    if (this.disposed || this.suspended) {
+      return;
+    }
+    this.suspended = true;
+    this.disconnect();
+  }
+
+  /**
+   * Leave the suspended state and connect once with a fresh attempt budget
+   * (LS-10625). No-op if disposed, not suspended, or a socket is already
+   * open/connecting.
+   */
+  public resume(): void {
+    if (this.disposed || !this.suspended) {
+      return;
+    }
+    this.suspended = false;
+    this.reconnectNow();
   }
 
   /**
