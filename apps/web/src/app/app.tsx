@@ -21,6 +21,7 @@ import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { prefetchHomePage } from '../utils/prefetchHomePage';
 import { PlayersStatsRedirectPage } from '../pages/players/PlayersStatsRedirectPage';
 import { LegacyJoinRedirect } from '../pages/join/LegacyJoinRedirect';
+import { CatchAllRoute } from '../pages/not-found/NotFoundPage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
@@ -1059,6 +1060,10 @@ function App() {
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            {/* Catch-all — keep last. Unmatched URLs used to render an empty
+                <main> (LS-10704); this shows a Not Found page instead and
+                redirects legacy sport-less /league/:id links. */}
+            <Route path="*" element={<CatchAllRoute />} />
           </Routes>
         </Suspense>
       </YStack>

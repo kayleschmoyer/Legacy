@@ -6129,6 +6129,16 @@
       "lib/shared-components/src/features/roster/**",
       "lib/shared-components/src/features/stats/**"
     ],
+    "apps/web-e2e/src/tests/not-found-page.spec.ts": [
+      "apps/web/src/app/**",
+      "apps/web/src/main.tsx",
+      "apps/web/src/pages/not-found/**",
+      "apps/web/src/pages/baseball/league-detail-v2/**",
+      "apps/web/src/components/PageMeta.tsx",
+      "apps/web/src/constants/**",
+      "apps/web-e2e/src/fixtures/**",
+      "apps/web-e2e/src/tests/not-found-page.spec.ts"
+    ],
     "apps/web-e2e/src/tests/notification-dropdown-navigation.spec.ts": [
       "apps/web/src/pages/notifications/**",
       "apps/web/src/components/**",

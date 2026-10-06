@@ -1,5 +1,5 @@
 import { act, render } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import React from 'react';
 
 import App from './app';
@@ -156,6 +156,13 @@ jest.mock('tamagui', () => ({
     children: React.ReactNode;
     [key: string]: unknown;
   }) => <div {...props}>{children}</div>,
+  YStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => <div {...props}>{children}</div>,
   Text: ({
     children,
     ...props
@@ -215,6 +222,10 @@ jest.mock('../pages/baseball/LeagueCreatePage', () => () => (
 
 jest.mock('../pages/baseball/LeagueDetailPage', () => () => (
   <div>League Detail Page</div>
+));
+
+jest.mock('../pages/baseball/league-detail-v2/LeagueDetailPageV2', () => () => (
+  <div>League Detail Page V2</div>
 ));
 
 jest.mock('../pages/baseball/TeamDetailPage', () => ({
@@ -766,6 +777,65 @@ describe('App', () => {
       );
       await act(() => Promise.resolve());
       expect(container).toHaveTextContent('Home Page');
+    });
+  });
+
+  describe('Unknown routes (LS-10704)', () => {
+    // Renders the current pathname so a redirect's destination is observable.
+    function LocationProbe() {
+      const { pathname } = useLocation();
+      return <div data-testid="location-probe">{pathname}</div>;
+    }
+
+    function renderAt(path: string) {
+      return render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={[path]}
+        >
+          <App />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+    }
+
+    it.each([
+      '/qa_nonexistent',
+      '/baseball/qa_nonexistent',
+      '/settings',
+      '/account',
+    ])('renders a Page not found message with a link home at %s', (path) => {
+      const { getByText, getByRole } = renderAt(path);
+      expect(getByText('Page not found')).toBeInTheDocument();
+      expect(getByRole('link', { name: 'Go to home' })).toHaveAttribute(
+        'href',
+        '/',
+      );
+    });
+
+    it('redirects the legacy sport-less /league/:id URL to the baseball league page', async () => {
+      const { container, getByTestId } = renderAt('/league/14109');
+      await act(() => Promise.resolve());
+      expect(getByTestId('location-probe')).toHaveTextContent(
+        '/baseball/league/14109',
+      );
+      expect(container).toHaveTextContent('League Detail Page V2');
+      expect(container).not.toHaveTextContent('Page not found');
+    });
+
+    it('keeps the tab segment when redirecting /league/:id/:tab', async () => {
+      const { getByTestId } = renderAt('/league/14109/standings');
+      await act(() => Promise.resolve());
+      expect(getByTestId('location-probe')).toHaveTextContent(
+        '/baseball/league/14109/standings',
+      );
+    });
+
+    it('does not shadow existing routes', async () => {
+      const { container } = renderAt('/about');
+      await act(() => Promise.resolve());
+      expect(container).toHaveTextContent('About Page');
+      expect(container).not.toHaveTextContent('Page not found');
     });
   });
 
