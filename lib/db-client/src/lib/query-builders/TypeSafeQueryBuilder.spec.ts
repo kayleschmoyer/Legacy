@@ -1,6 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   battingPlayerTypeFilter,
+  buildCareerBattingConditions,
   buildPlayerNameSearch,
   getCareerBattingOrderByClause,
   positionEligibilityFilter,
@@ -150,5 +151,61 @@ describe('buildPlayerNameSearch (shared by career batting + pitching search)', (
       /lower\("players"\."first_name" \|\| ' ' \|\| "players"\."last_name"\) ilike \$3/,
     );
     expect(query.params).toEqual(['%Babe Ruth%', '%Babe Ruth%', '%babe ruth%']);
+  });
+});
+
+describe('buildCareerBattingConditions (LS-10808)', () => {
+  function render(
+    filters: Parameters<typeof buildCareerBattingConditions>[0],
+  ): { sql: string; params: unknown[] }[] {
+    return buildCareerBattingConditions(filters).map((condition) =>
+      dialect.sqlToQuery(condition),
+    );
+  }
+
+  it('returns no conditions when no filters are set', () => {
+    expect(render({})).toEqual([]);
+  });
+
+  it('caps career home runs with maxHomeRuns', () => {
+    const [condition] = render({ maxHomeRuns: 240 });
+    expect(condition.sql).toMatch(/"career_batting"\."hr" <= \$1/);
+    expect(condition.params).toEqual([240]);
+  });
+
+  it('caps career RBI with maxRBI', () => {
+    const [condition] = render({ maxRBI: 500 });
+    expect(condition.sql).toMatch(/"career_batting"\."rbi" <= \$1/);
+    expect(condition.params).toEqual([500]);
+  });
+
+  it('caps career batting average with maxBattingAvg, guarding zero at-bats', () => {
+    const [condition] = render({ maxBattingAvg: 0.27 });
+    expect(condition.sql).toMatch(/"career_batting"\."ab" > 0/);
+    expect(condition.sql).toMatch(
+      /\("career_batting"\."h"::numeric \/ "career_batting"\."ab"::numeric\) <= \$1/,
+    );
+    expect(condition.params).toEqual([0.27]);
+  });
+
+  it('combines minimums and maximums into a closed range', () => {
+    const rendered = render({
+      minHomeRuns: 100,
+      maxHomeRuns: 240,
+      minRBI: 200,
+      maxRBI: 500,
+      minBattingAvg: 0.25,
+      maxBattingAvg: 0.27,
+    });
+    const sql = rendered.map((condition) => condition.sql).join(' AND ');
+    expect(sql).toMatch(/"career_batting"\."hr" >= /);
+    expect(sql).toMatch(/"career_batting"\."hr" <= /);
+    expect(sql).toMatch(/"career_batting"\."rbi" >= /);
+    expect(sql).toMatch(/"career_batting"\."rbi" <= /);
+    expect(sql).toMatch(/::numeric\) >= /);
+    expect(sql).toMatch(/::numeric\) <= /);
+    expect(rendered.flatMap((condition) => condition.params)).toEqual([
+      100, 240, 200, 500, 0.25, 0.27,
+    ]);
   });
 });

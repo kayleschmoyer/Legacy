@@ -220,6 +220,33 @@ describe('Statistics Resolver', () => {
       );
     });
 
+    it('passes batting maxima to both the rows and count queries (LS-10808)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver(
+        {},
+        { first: 25, maxHomeRuns: 240, maxRBI: 500, maxBattingAvg: 0.27 },
+        emptyCtx,
+        undefined as never,
+      );
+
+      const expectedFilters = expect.objectContaining({
+        filters: expect.objectContaining({
+          maxHomeRuns: 240,
+          maxRBI: 500,
+          maxBattingAvg: 0.27,
+        }),
+      });
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expectedFilters,
+      );
+      expect(mockStatistics.getCareerBattingStatsCount).toHaveBeenCalledWith(
+        expectedFilters,
+      );
+    });
+
     it('caps first at MAX_CAREER_BATTING_LIMIT (5000) for premium when client requests more', async () => {
       mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
       mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);

@@ -1,11 +1,22 @@
+import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import type { DbOptions } from '@legacy-sports/utils/node';
 import {
   getCareerBattingFantasyScoreSql,
   getCareerPitchingFantasyScoreSql,
   getCareerPitchingOrderByClause,
   getGameBattingFantasyScoreSql,
   getGamePitchingFantasyScoreSql,
+  StatisticsService,
 } from './StatisticsService';
+
+jest.mock('../client/Helpers', () => ({
+  runWithPublicClient: jest.fn(),
+}));
+
+const mockedHelpers = jest.mocked<typeof import('../client/Helpers')>(
+  jest.requireMock('../client/Helpers'),
+);
 
 const dialect = new PgDialect();
 
@@ -218,4 +229,66 @@ describe('getCareerPitchingFantasyScoreSql — LS-9145', () => {
     expect(sql).toMatch(/\* -2/); // er & l
     expect(sql).toMatch(/\* -1/); // bb & h
   });
+});
+
+describe('career batting maximum filters reach SQL — LS-10808', () => {
+  /**
+   * Minimal Drizzle-shaped fake: every builder method chains, `where` records
+   * its condition, and `execute` resolves an empty result set. Lets the test
+   * render exactly the WHERE clause each rows/count variant would send.
+   */
+  function useRecordingDb(): { whereClauses: SQL[] } {
+    const whereClauses: SQL[] = [];
+    const chain: Record<string, unknown> = {};
+    for (const method of [
+      'select',
+      'from',
+      'innerJoin',
+      'orderBy',
+      'limit',
+      'offset',
+    ]) {
+      chain[method] = () => chain;
+    }
+    chain.where = (condition: SQL) => {
+      whereClauses.push(condition);
+      return chain;
+    };
+    chain.execute = () => Promise.resolve([]);
+    mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
+      (handler as (db: unknown) => Promise<unknown>)(chain),
+    );
+    return { whereClauses };
+  }
+
+  const maxima = { maxHomeRuns: 240, maxRBI: 500, maxBattingAvg: 0.27 };
+
+  it.each([
+    ['no join', {}],
+    ['player-name search', { searchTerm: 'ruth' }],
+    ['position', { position: 'OF' }],
+    ['search + position', { searchTerm: 'ruth', position: 'OF' }],
+  ])(
+    'applies Max HR/RBI/AVG to rows and totalCount (%s)',
+    async (_variant, extraFilters) => {
+      const { whereClauses } = useRecordingDb();
+      const service = new StatisticsService({} as DbOptions);
+      const queryOptions = {
+        filters: { ...maxima, ...extraFilters },
+        limit: 25,
+      };
+
+      await service.getCareerBattingStats(queryOptions);
+      await service.getCareerBattingStatsCount(queryOptions);
+
+      expect(whereClauses).toHaveLength(2);
+      for (const clause of whereClauses) {
+        const { sql, params } = dialect.sqlToQuery(clause);
+        expect(sql).toMatch(/"career_batting"\."hr" <= \$\d+/);
+        expect(sql).toMatch(/"career_batting"\."rbi" <= \$\d+/);
+        expect(sql).toMatch(/::numeric\) <= \$\d+/);
+        expect(params).toEqual(expect.arrayContaining([240, 500, 0.27]));
+      }
+    },
+  );
 });

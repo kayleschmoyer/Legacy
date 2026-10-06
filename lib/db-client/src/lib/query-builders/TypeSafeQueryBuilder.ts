@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   ilike,
+  lte,
   or,
   sql,
   SQL,
@@ -92,10 +93,13 @@ export interface StatisticsQueryFilters {
   playerId?: number;
   minGames?: number;
   minHomeRuns?: number;
+  maxHomeRuns?: number;
   minRBI?: number;
+  maxRBI?: number;
   minWins?: number;
   minStrikeouts?: number;
   minBattingAvg?: number;
+  maxBattingAvg?: number;
   searchTerm?: string;
   position?: string;
   team?: string;
@@ -237,6 +241,60 @@ export function getCareerBattingOrderByClause(
  * Type-safe career batting query builder using Drizzle's recommended conditional patterns
  * Following Drizzle best practices: builds complete queries conditionally instead of using .$dynamic()
  */
+/**
+ * Career-batting stat-range WHERE conditions shared by every
+ * `CareerBattingQueryBuilder` row and count variant, so the min/max filters
+ * cannot drift between them again (LS-10808: the maxima were never applied
+ * because each of the five copies only carried the minimums). Search and
+ * position conditions are added by the individual variants.
+ */
+export function buildCareerBattingConditions(
+  filters: StatisticsQueryFilters,
+): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = [];
+  const battingAvg = sql`(${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric)`;
+
+  if (filters.playerId !== undefined) {
+    conditions.push(eq(PublicSchema.careerBatting.playerId, filters.playerId));
+  }
+  if (filters.minGames !== undefined) {
+    conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
+  }
+  if (filters.minHomeRuns !== undefined) {
+    conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
+  }
+  if (filters.maxHomeRuns !== undefined) {
+    conditions.push(lte(PublicSchema.careerBatting.hr, filters.maxHomeRuns));
+  }
+  if (filters.minRBI !== undefined) {
+    conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+  }
+  if (filters.maxRBI !== undefined) {
+    conditions.push(lte(PublicSchema.careerBatting.rbi, filters.maxRBI));
+  }
+  if (filters.minBattingAvg !== undefined) {
+    conditions.push(
+      sql`${PublicSchema.careerBatting.ab} > 0 AND ${battingAvg} >= ${filters.minBattingAvg}`,
+    );
+  }
+  if (filters.maxBattingAvg !== undefined) {
+    conditions.push(
+      sql`${PublicSchema.careerBatting.ab} > 0 AND ${battingAvg} <= ${filters.maxBattingAvg}`,
+    );
+  }
+  if (filters.team !== undefined) {
+    conditions.push(battingTeamFilter(filters.team));
+  }
+  if (filters.playerType !== undefined) {
+    const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+    if (playerTypeCondition) {
+      conditions.push(playerTypeCondition);
+    }
+  }
+
+  return conditions;
+}
+
 export class CareerBattingQueryBuilder {
   private db: PublicDb;
 
@@ -252,42 +310,7 @@ export class CareerBattingQueryBuilder {
     options: QueryOptions = {},
   ) {
     // Build base conditions for batting stats
-    const battingConditions: SQL<unknown>[] = [];
-
-    if (filters.playerId !== undefined) {
-      battingConditions.push(
-        eq(PublicSchema.careerBatting.playerId, filters.playerId),
-      );
-    }
-    if (filters.minGames !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.g, filters.minGames),
-      );
-    }
-    if (filters.minHomeRuns !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.hr, filters.minHomeRuns),
-      );
-    }
-    if (filters.minRBI !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.rbi, filters.minRBI),
-      );
-    }
-    if (filters.minBattingAvg !== undefined) {
-      battingConditions.push(
-        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
-      );
-    }
-    if (filters.team !== undefined) {
-      battingConditions.push(battingTeamFilter(filters.team));
-    }
-    if (filters.playerType !== undefined) {
-      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
-      if (playerTypeCondition) {
-        battingConditions.push(playerTypeCondition);
-      }
-    }
+    const battingConditions = buildCareerBattingConditions(filters);
 
     // Determine ordering clause
     const orderByClause = this.getOrderByClause(options);
@@ -535,41 +558,7 @@ export class CareerBattingQueryBuilder {
     const filters = options.filters || {};
 
     // Build batting conditions
-    const battingConditions: SQL<unknown>[] = [];
-    if (filters.playerId !== undefined) {
-      battingConditions.push(
-        eq(PublicSchema.careerBatting.playerId, filters.playerId),
-      );
-    }
-    if (filters.minGames !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.g, filters.minGames),
-      );
-    }
-    if (filters.minHomeRuns !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.hr, filters.minHomeRuns),
-      );
-    }
-    if (filters.minRBI !== undefined) {
-      battingConditions.push(
-        gte(PublicSchema.careerBatting.rbi, filters.minRBI),
-      );
-    }
-    if (filters.minBattingAvg !== undefined) {
-      battingConditions.push(
-        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
-      );
-    }
-    if (filters.team !== undefined) {
-      battingConditions.push(battingTeamFilter(filters.team));
-    }
-    if (filters.playerType !== undefined) {
-      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
-      if (playerTypeCondition) {
-        battingConditions.push(playerTypeCondition);
-      }
-    }
+    const battingConditions = buildCareerBattingConditions(filters);
 
     // Add search condition if provided
     const allConditions = [...battingConditions];
@@ -613,35 +602,7 @@ export class CareerBattingQueryBuilder {
     const filters = options.filters || {};
 
     // Build conditions
-    const conditions: SQL<unknown>[] = [];
-    if (filters.playerId !== undefined) {
-      conditions.push(
-        eq(PublicSchema.careerBatting.playerId, filters.playerId),
-      );
-    }
-    if (filters.minGames !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
-    }
-    if (filters.minHomeRuns !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
-    }
-    if (filters.minRBI !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
-    }
-    if (filters.minBattingAvg !== undefined) {
-      conditions.push(
-        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
-      );
-    }
-    if (filters.team !== undefined) {
-      conditions.push(battingTeamFilter(filters.team));
-    }
-    if (filters.playerType !== undefined) {
-      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
-      if (playerTypeCondition) {
-        conditions.push(playerTypeCondition);
-      }
-    }
+    const conditions = buildCareerBattingConditions(filters);
 
     // Build query using function-based approach
     const baseQuery = () =>
@@ -668,35 +629,7 @@ export class CareerBattingQueryBuilder {
   }): Promise<{ count: number }[]> {
     const filters = options.filters || {};
 
-    const conditions: SQL<unknown>[] = [];
-    if (filters.playerId !== undefined) {
-      conditions.push(
-        eq(PublicSchema.careerBatting.playerId, filters.playerId),
-      );
-    }
-    if (filters.minGames !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
-    }
-    if (filters.minHomeRuns !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
-    }
-    if (filters.minRBI !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
-    }
-    if (filters.minBattingAvg !== undefined) {
-      conditions.push(
-        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
-      );
-    }
-    if (filters.team !== undefined) {
-      conditions.push(battingTeamFilter(filters.team));
-    }
-    if (filters.playerType !== undefined) {
-      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
-      if (playerTypeCondition) {
-        conditions.push(playerTypeCondition);
-      }
-    }
+    const conditions = buildCareerBattingConditions(filters);
     if (filters.position) {
       conditions.push(positionEligibilityFilter(filters.position));
     }
@@ -725,35 +658,7 @@ export class CareerBattingQueryBuilder {
   }): Promise<{ count: number }[]> {
     const filters = options.filters || {};
 
-    const conditions: SQL<unknown>[] = [];
-    if (filters.playerId !== undefined) {
-      conditions.push(
-        eq(PublicSchema.careerBatting.playerId, filters.playerId),
-      );
-    }
-    if (filters.minGames !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
-    }
-    if (filters.minHomeRuns !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
-    }
-    if (filters.minRBI !== undefined) {
-      conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
-    }
-    if (filters.minBattingAvg !== undefined) {
-      conditions.push(
-        sql`${PublicSchema.careerBatting.ab} > 0 AND (${PublicSchema.careerBatting.h}::numeric / ${PublicSchema.careerBatting.ab}::numeric) >= ${filters.minBattingAvg}`,
-      );
-    }
-    if (filters.team !== undefined) {
-      conditions.push(battingTeamFilter(filters.team));
-    }
-    if (filters.playerType !== undefined) {
-      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
-      if (playerTypeCondition) {
-        conditions.push(playerTypeCondition);
-      }
-    }
+    const conditions = buildCareerBattingConditions(filters);
     if (filters.position) {
       conditions.push(positionEligibilityFilter(filters.position));
     }
