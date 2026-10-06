@@ -224,3 +224,34 @@ export function openStarterSlotLabels(
   }
   return [...seen];
 }
+
+/** One row of the rail's "My Roster" summary: a slot type and its fill. */
+export interface RosterSlotTypeCount {
+  /** Bucket key, e.g. `'QB'`, `'P'`, `'SFLEX'`, `'BENCH'`. */
+  positionType: string;
+  filled: number;
+  total: number;
+}
+
+/**
+ * Collapse the per-slot expansion back into one `{ filled, total }` row per
+ * slot type, in lineup order — the rail's "My Roster" bars (LS-10501). Built
+ * from {@link buildRosterSlotInstances} output rather than a sport template so
+ * the rail always agrees with the depth chart and the slot strip, bench and
+ * IDP/Superflex slots included.
+ */
+export function rosterSlotTypeCounts(
+  slots: readonly RosterSlotInstance[],
+): RosterSlotTypeCount[] {
+  const rows = new Map<string, RosterSlotTypeCount>();
+  for (const slot of slots) {
+    let row = rows.get(slot.positionType);
+    if (!row) {
+      row = { positionType: slot.positionType, filled: 0, total: 0 };
+      rows.set(slot.positionType, row);
+    }
+    row.total += 1;
+    if (slot.player != null) row.filled += 1;
+  }
+  return [...rows.values()];
+}

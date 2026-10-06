@@ -1,9 +1,9 @@
 /**
  * LS-8068: drag-to-draft slot eligibility.
  *
- * Verifies the rail display-slot codes map onto the canonical position
- * eligibility table, including the display-only codes (baseball P / UTIL,
- * football DEF) and the "no classification = defer to server" rule.
+ * Verifies the rail's depth-chart bucket keys map onto the canonical position
+ * eligibility table, including the collapsed baseball P bucket, the synthetic
+ * BENCH bucket (LS-10501) and the "no classification = defer to server" rule.
  */
 import { isPlayerEligibleForSlot } from './draftDnd';
 
@@ -31,10 +31,15 @@ describe('isPlayerEligibleForSlot — baseball', () => {
     expect(isPlayerEligibleForSlot('baseball', 'P', ['SS'])).toBe(false);
   });
 
-  it('treats the UTIL (U) slot as any batter but not a pure pitcher', () => {
-    expect(isPlayerEligibleForSlot('baseball', 'U', ['1B'])).toBe(true);
-    expect(isPlayerEligibleForSlot('baseball', 'U', ['C'])).toBe(true);
-    expect(isPlayerEligibleForSlot('baseball', 'U', ['SP'])).toBe(false);
+  it('treats the DH slot as any batter but not a pure pitcher', () => {
+    expect(isPlayerEligibleForSlot('baseball', 'DH', ['1B'])).toBe(true);
+    expect(isPlayerEligibleForSlot('baseball', 'DH', ['C'])).toBe(true);
+    expect(isPlayerEligibleForSlot('baseball', 'DH', ['SP'])).toBe(false);
+  });
+
+  it('accepts any player on the bench', () => {
+    expect(isPlayerEligibleForSlot('baseball', 'BENCH', ['SP'])).toBe(true);
+    expect(isPlayerEligibleForSlot('baseball', 'BENCH', ['C'])).toBe(true);
   });
 });
 
@@ -45,9 +50,21 @@ describe('isPlayerEligibleForSlot — football', () => {
     expect(isPlayerEligibleForSlot('football', 'FLEX', ['QB'])).toBe(false);
   });
 
-  it('maps the DEF display slot onto DST eligibility', () => {
-    expect(isPlayerEligibleForSlot('football', 'DEF', ['DST'])).toBe(true);
-    expect(isPlayerEligibleForSlot('football', 'DEF', ['QB'])).toBe(false);
+  it('uses the canonical DST code for the team-defense slot', () => {
+    expect(isPlayerEligibleForSlot('football', 'DST', ['DST'])).toBe(true);
+    expect(isPlayerEligibleForSlot('football', 'DST', ['QB'])).toBe(false);
+  });
+
+  it('resolves IDP and Superflex slots from the league config', () => {
+    expect(isPlayerEligibleForSlot('football', 'SFLEX', ['QB'])).toBe(true);
+    expect(isPlayerEligibleForSlot('football', 'SFLEX', ['K'])).toBe(false);
+    expect(isPlayerEligibleForSlot('football', 'LB', ['LB'])).toBe(true);
+    expect(isPlayerEligibleForSlot('football', 'LB', ['DST'])).toBe(false);
+  });
+
+  it('accepts any player on the bench', () => {
+    expect(isPlayerEligibleForSlot('football', 'BENCH', ['K'])).toBe(true);
+    expect(isPlayerEligibleForSlot('football', 'BENCH', ['DL'])).toBe(true);
   });
 });
 

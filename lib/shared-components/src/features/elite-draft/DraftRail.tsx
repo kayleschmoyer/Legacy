@@ -13,6 +13,13 @@ import { pickPlayerName, pickRoundLabel } from './DraftPickHistoryList';
 import type { DraftDetailsSettings } from './draftDetails';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
+import { slotChipLabel } from './DraftSlotChip';
+import {
+  BENCH_SLOT,
+  buildRosterSlotInstances,
+  rosterSlotFillCounts,
+  rosterSlotTypeCounts,
+} from './rosterSlots';
 import { useDraftViewportTier } from './hooks/useDraftViewport';
 // Platform-resolved: Metro picks DraftOrderControl.native.tsx on native,
 // bundlers take the web (@dnd-kit) variant. Imported by module path rather
@@ -265,37 +272,6 @@ const GlassButton = tamaguiStyled(XStack, {
   },
 }) as StyledComponent;
 
-// Position slot configuration for the depth-chart-style roster summary,
-// sport-scoped per ADR 0011 §6 / LS-4663.
-type PositionSlotConfig = { pos: string; label: string; slots: number };
-
-const BASEBALL_POSITION_SLOTS: PositionSlotConfig[] = [
-  { pos: 'C', label: 'C', slots: 1 },
-  { pos: '1B', label: '1B', slots: 1 },
-  { pos: '2B', label: '2B', slots: 1 },
-  { pos: '3B', label: '3B', slots: 1 },
-  { pos: 'SS', label: 'SS', slots: 1 },
-  { pos: 'OF', label: 'OF', slots: 3 },
-  { pos: 'P', label: 'P', slots: 9 },
-  { pos: 'U', label: 'UTIL', slots: 2 },
-];
-
-const FOOTBALL_POSITION_SLOTS: PositionSlotConfig[] = [
-  { pos: 'QB', label: 'QB', slots: 1 },
-  { pos: 'RB', label: 'RB', slots: 2 },
-  { pos: 'WR', label: 'WR', slots: 3 },
-  { pos: 'TE', label: 'TE', slots: 1 },
-  { pos: 'K', label: 'K', slots: 1 },
-  { pos: 'DEF', label: 'DEF', slots: 1 },
-  { pos: 'FLEX', label: 'FLEX', slots: 1 },
-];
-
-export function getPositionSlotsForSport(sport: Sport): PositionSlotConfig[] {
-  return sport === 'football'
-    ? FOOTBALL_POSITION_SLOTS
-    : BASEBALL_POSITION_SLOTS;
-}
-
 interface DraftRailProps {
   // Intelligence
   isPremium: boolean;
@@ -324,8 +300,13 @@ interface DraftRailProps {
   autoPickDisabled: boolean;
   // Roster
   myTeam: DraftPlayer[];
-  positionCounts: Record<string, number>;
-  /** League sport — drives depth-chart slot layout and roster-bar fill colors. */
+  /** Configured roster slots — the same list the depth chart and slot strip
+   *  read (`useDraftQueries.leaguePositions`: the league's `league_positions`
+   *  rows, or a mock draft's `draftRoom.rules` sport defaults). LS-10501. */
+  leaguePositions: ReadonlyArray<{ positionType: string }>;
+  /** Roster size cap; sizes the bench. `null` → sport default. */
+  maxRosterSize: number | null;
+  /** League sport — drives slot eligibility and roster-bar fill colors. */
   sport?: Sport;
   // History
   pickHistory: DraftPickRecord[];
@@ -379,7 +360,8 @@ export function DraftRail({
   initDraftLoading,
   autoPickDisabled,
   myTeam,
-  positionCounts,
+  leaguePositions,
+  maxRosterSize,
   sport = 'baseball',
   pickHistory,
   statsLookup,
@@ -398,9 +380,21 @@ export function DraftRail({
   onToggleChat,
   onRefresh,
 }: DraftRailProps): React.JSX.Element {
-  const positionSlots = getPositionSlotsForSport(sport);
-  const totalDrafted = myTeam.length;
-  const totalSlots = positionSlots.reduce((sum, s) => sum + s.slots, 0);
+  // LS-10501: the My Roster bars come from the same per-slot expansion the
+  // depth chart and Positions Drafted strip use, so all three agree with the
+  // league's roster config (bench, IDP and Superflex slots included) instead
+  // of a hard-coded per-sport template.
+  const rosterSlots = React.useMemo(
+    () =>
+      buildRosterSlotInstances(leaguePositions, myTeam, sport, maxRosterSize),
+    [leaguePositions, myTeam, sport, maxRosterSize],
+  );
+  const slotRows = React.useMemo(
+    () => rosterSlotTypeCounts(rosterSlots),
+    [rosterSlots],
+  );
+  const { filled: totalDrafted, total: totalSlots } =
+    rosterSlotFillCounts(rosterSlots);
 
   // LS-8068: drag-to-draft. A player card dropped onto an eligible roster slot
   // drafts that player (the server is the final gate on the pick). Mirrors the
@@ -583,96 +577,104 @@ export function DraftRail({
             </RailPanelCount>
           </RailPanelHead>
           <YStack gap={2} role="list">
-            {positionSlots.map(({ pos, label, slots }) => {
-              const count = positionCounts[pos] ?? 0;
-              const fill = slots > 0 ? Math.min(1, count / slots) : 0;
-              const barColor = getPositionColor(sport ?? 'baseball', pos);
-              const isFilled = count > 0;
-              const isComplete = count >= slots;
-              // Drag-to-draft highlight: only when a draggable player is active.
-              const dropEligible =
-                draggedPlayer != null &&
-                canDraft &&
-                isPlayerEligibleForSlot(
-                  sport,
-                  pos,
-                  draggedPlayer.eligiblePositions,
-                );
-              const isDragActive = draggedPlayer != null;
-              const dropState = isDragActive
-                ? dropEligible
-                  ? 'eligible'
-                  : 'ineligible'
-                : undefined;
-              return (
-                <PosProgressRow
-                  key={pos}
-                  role="listitem"
-                  aria-label={`${label}: ${count} of ${slots}`}
-                  data-drop-state={dropState}
-                  opacity={dropState === 'ineligible' ? 0.4 : 1}
-                  style={
-                    dropState === 'eligible'
-                      ? {
-                          backgroundColor: withAlpha(SCORE_WIN, 0.08),
-                          outline: `1px dashed ${withAlpha(SCORE_WIN, 0.7)}`,
-                        }
-                      : undefined
-                  }
-                  onDragOver={
-                    isDragActive
-                      ? (e: React.DragEvent) => {
-                          // preventDefault makes every rail row a valid drop
-                          // target so an ineligible drop still fires and we can
-                          // toast *why* it was rejected. Eligibility is conveyed
-                          // visually via the drop-state background/outline
-                          // while hovering.
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = 'move';
-                        }
-                      : undefined
-                  }
-                  onDrop={
-                    isDragActive
-                      ? (e: React.DragEvent) => {
-                          e.preventDefault();
-                          handleSlotDrop(pos, label);
-                        }
-                      : undefined
-                  }
-                >
-                  <PosProgressLabel color={isFilled ? TEXT_PRIMARY : undefined}>
-                    {label}
-                  </PosProgressLabel>
-                  <PosProgressBar aria-hidden={true}>
-                    <YStack
-                      testID={`pos-fill-${pos}`}
-                      position="absolute"
-                      left={0}
-                      top={0}
-                      bottom={0}
-                      borderRadius={9999}
-                      style={{
-                        width: `${fill * 100}%`,
-                        background: barColor,
-                        transition: 'width 0.4s ease',
-                      }}
-                    />
-                  </PosProgressBar>
-                  <PosProgressCount
-                    color={
-                      isComplete
-                        ? SCORE_WIN
-                        : isFilled
-                          ? TEXT_PRIMARY
-                          : undefined
+            {slotRows.map(
+              ({ positionType: pos, filled: count, total: slots }) => {
+                const label = slotChipLabel(pos);
+                const fill = slots > 0 ? Math.min(1, count / slots) : 0;
+                // Bench is de-accented, matching the slot strip's BN chips.
+                const barColor =
+                  pos === BENCH_SLOT
+                    ? TEXT_MUTED_DIM
+                    : getPositionColor(sport, pos);
+                const isFilled = count > 0;
+                const isComplete = count >= slots;
+                // Drag-to-draft highlight: only when a draggable player is active.
+                const dropEligible =
+                  draggedPlayer != null &&
+                  canDraft &&
+                  isPlayerEligibleForSlot(
+                    sport,
+                    pos,
+                    draggedPlayer.eligiblePositions,
+                  );
+                const isDragActive = draggedPlayer != null;
+                const dropState = isDragActive
+                  ? dropEligible
+                    ? 'eligible'
+                    : 'ineligible'
+                  : undefined;
+                return (
+                  <PosProgressRow
+                    key={pos}
+                    role="listitem"
+                    aria-label={`${label}: ${count} of ${slots}`}
+                    data-drop-state={dropState}
+                    opacity={dropState === 'ineligible' ? 0.4 : 1}
+                    style={
+                      dropState === 'eligible'
+                        ? {
+                            backgroundColor: withAlpha(SCORE_WIN, 0.08),
+                            outline: `1px dashed ${withAlpha(SCORE_WIN, 0.7)}`,
+                          }
+                        : undefined
+                    }
+                    onDragOver={
+                      isDragActive
+                        ? (e: React.DragEvent) => {
+                            // preventDefault makes every rail row a valid drop
+                            // target so an ineligible drop still fires and we can
+                            // toast *why* it was rejected. Eligibility is conveyed
+                            // visually via the drop-state background/outline
+                            // while hovering.
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                          }
+                        : undefined
+                    }
+                    onDrop={
+                      isDragActive
+                        ? (e: React.DragEvent) => {
+                            e.preventDefault();
+                            handleSlotDrop(pos, label);
+                          }
+                        : undefined
                     }
                   >
-                    {count}/{slots}
-                  </PosProgressCount>
-                </PosProgressRow>
-              );
-            })}
+                    <PosProgressLabel
+                      color={isFilled ? TEXT_PRIMARY : undefined}
+                    >
+                      {label}
+                    </PosProgressLabel>
+                    <PosProgressBar aria-hidden={true}>
+                      <YStack
+                        testID={`pos-fill-${pos}`}
+                        position="absolute"
+                        left={0}
+                        top={0}
+                        bottom={0}
+                        borderRadius={9999}
+                        style={{
+                          width: `${fill * 100}%`,
+                          background: barColor,
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
+                    </PosProgressBar>
+                    <PosProgressCount
+                      color={
+                        isComplete
+                          ? SCORE_WIN
+                          : isFilled
+                            ? TEXT_PRIMARY
+                            : undefined
+                      }
+                    >
+                      {count}/{slots}
+                    </PosProgressCount>
+                  </PosProgressRow>
+                );
+              },
+            )}
           </YStack>
         </RailPanel>
 

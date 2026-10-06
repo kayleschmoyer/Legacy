@@ -29,6 +29,10 @@ const mockRecordedCalls: {
 // query failure without needing a real Apollo error shape per case.
 let mockDraftError: unknown;
 
+// Settable by individual tests (LS-10501) to give a mock draft a
+// `draftRoom` payload — its roster slots arrive on `rules`.
+let mockDraftRoom: unknown;
+
 // One stable refetch spy per operation (LS-10464), so a test can tell which
 // query a returned `refetch*` callback actually re-runs.
 const mockRefetchByOperation = new Map<string, jest.Mock>();
@@ -74,6 +78,14 @@ jest.mock('@apollo/client/react', () => ({
     if (opName === 'GetLeagueById') {
       return {
         data: { league: { id: 1, draftStatus: 'in-progress' } },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetchFor(opName),
+      };
+    }
+    if (opName === 'GetDraftRoom' && mockDraftRoom) {
+      return {
+        data: { draftRoom: mockDraftRoom },
         loading: false,
         error: undefined,
         refetch: mockRefetchFor(opName),
@@ -259,5 +271,49 @@ describe('useDraftQueries — refetchDraft in draft-room mode (LS-10464)', () =>
     void result.current.refetchDraft();
 
     expect(mockRefetchFor('GetLiveDraftLeagueDraft')).toHaveBeenCalledTimes(1);
+  });
+});
+
+// LS-10501 — a mock draft has no `league_positions`, so every roster summary
+// on the draft screen (depth chart, slot strip, My Roster rail) reads the
+// sport defaults the draft room delivers on `rules`.
+describe('useDraftQueries — mock-draft roster slots (LS-10501)', () => {
+  beforeEach(() => {
+    mockRecordedCalls.length = 0;
+    mockRefetchByOperation.clear();
+    mockDraftError = undefined;
+  });
+
+  afterEach(() => {
+    mockDraftRoom = undefined;
+  });
+
+  it('derives leaguePositions and maxRosterSize from draftRoom.rules', () => {
+    mockDraftRoom = {
+      id: 13800,
+      seats: [],
+      rules: {
+        sport: 'football',
+        rosterPositions: ['QB', 'RB', 'RB', 'DST'],
+        maxRosterSize: 16,
+      },
+    };
+    const { result } = renderHook(() =>
+      useDraftQueries({
+        leagueId: null,
+        draftId: 13800,
+        playerSearch: '',
+        selectedPosition: '',
+        viewMode: 'grid',
+      }),
+    );
+
+    expect(result.current.leaguePositions.map((p) => p.positionType)).toEqual([
+      'QB',
+      'RB',
+      'RB',
+      'DST',
+    ]);
+    expect(result.current.maxRosterSize).toBe(16);
   });
 });

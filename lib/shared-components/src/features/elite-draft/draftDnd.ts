@@ -1,18 +1,19 @@
 /**
  * Drag-and-drop eligibility for the live draft board (LS-8068).
  *
- * The draft "My Roster" rail renders depth-chart display slots (C / 1B / OF /
- * P / UTIL for baseball, QB / RB / FLEX / DEF for football). When a player card
- * is dragged onto one of those rows we need to know whether the player may fill
- * that slot so the drop either drafts them or is rejected with a toast.
+ * The draft "My Roster" rail renders one row per depth-chart bucket — the
+ * league's configured slot types from `buildRosterSlotInstances` (LS-10501),
+ * e.g. C / 1B / OF / P / DH / BENCH for baseball, QB / RB / FLEX / SFLEX /
+ * DST / DL / BENCH for football. When a player card is dragged onto one of
+ * those rows we need to know whether the player may fill that slot so the
+ * drop either drafts them or is rejected with a toast.
  *
- * The display slot codes used by the rail (`DraftRail.getPositionSlotsForSport`)
- * are a superset/relabeling of the league `position_slot` codes, so we map them
- * onto the canonical `ALLOWED_POSITIONS_BY_SPORT` eligibility table rather than
- * duplicating the position rules. Two display-only codes need translation:
- *   - baseball `P`  → any pitching position (SP / RP / P)
- *   - baseball `U`  (UTIL) → any batter (mirrors the DH "any non-pitcher" rule)
- *   - football `DEF` → the canonical `DST` team-defense slot
+ * Bucket keys are league `position_slot` codes, so they map straight onto the
+ * canonical `ALLOWED_POSITIONS_BY_SPORT` eligibility table. Two keys need
+ * translation:
+ *   - baseball `P` → any pitching position (the SP/RP rows collapse into one
+ *     `P` bucket, see `buildDepthChartBuckets`)
+ *   - `BENCH` (synthetic overflow bucket, any sport) → anyone
  *
  * An empty / missing eligibility list is treated as universally eligible — the
  * server-side draft mutation is the final gate, matching `canPlayerPlayPosition`
@@ -22,6 +23,7 @@ import {
   ALLOWED_POSITIONS_BY_SPORT,
   PITCHING_POSITIONS,
 } from '@legacy-sports/utils';
+import { BENCH_SLOT } from './rosterSlots';
 import type { Sport } from '../../utils/colors';
 
 /**
@@ -33,14 +35,7 @@ function allowedPositionsForSlot(
   slotPos: string,
 ): readonly string[] | undefined {
   const map = ALLOWED_POSITIONS_BY_SPORT[sport];
-  if (sport === 'baseball') {
-    if (slotPos === 'P') return [...PITCHING_POSITIONS];
-    // UTIL accepts any batter — reuse the DH "any non-pitcher" eligibility list.
-    if (slotPos === 'U') return map['DH'];
-    return map[slotPos];
-  }
-  // Football: the rail labels the team-defense slot "DEF"; canonical code is "DST".
-  if (slotPos === 'DEF') return map['DST'];
+  if (sport === 'baseball' && slotPos === 'P') return [...PITCHING_POSITIONS];
   return map[slotPos];
 }
 
@@ -56,6 +51,8 @@ export function isPlayerEligibleForSlot(
   const eligible = eligiblePositions ?? [];
   // No classification data — defer to the server (final gate).
   if (eligible.length === 0) return true;
+  // The bench takes any player.
+  if (slotPos === BENCH_SLOT) return true;
   const allowed = allowedPositionsForSlot(sport, slotPos);
   if (!allowed) return false;
   return eligible.some((p) => allowed.includes(p));

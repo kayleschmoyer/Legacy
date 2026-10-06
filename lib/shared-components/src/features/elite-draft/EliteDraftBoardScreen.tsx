@@ -1799,7 +1799,8 @@ export function EliteDraftBoardScreen({
           initDraftLoading={actions.initDraftLoading}
           autoPickDisabled={ui.autoPickDisabled}
           myTeam={playerData.myTeam}
-          positionCounts={playerData.positionCounts}
+          leaguePositions={queries.leaguePositions}
+          maxRosterSize={queries.maxRosterSize ?? null}
           sport={sport}
           pickHistory={queries.pickHistory}
           statsLookup={playerData.statsLookup}

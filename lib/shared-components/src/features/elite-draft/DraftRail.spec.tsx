@@ -1,13 +1,15 @@
 /**
- * Regression gate for LS-4663:
- * DraftRail must render sport-scoped depth-chart slots and roster-bar fills.
- *
- * - Baseball league (default): keeps today's C / 1B / 2B / 3B / SS / OF / P / UTIL layout.
- * - Football league: 1 QB / 2 RB / 3 WR / 1 TE / 1 K / 1 DEF / 1 FLEX,
- *   with fills sourced from the football position color map.
+ * Regression gate for LS-4663 / LS-10501:
+ * DraftRail's My Roster bars must follow the league's configured roster slots
+ * — the same `buildRosterSlotInstances` derivation the depth chart and the
+ * Positions Drafted strip use — never a hard-coded per-sport template. That
+ * covers bench, IDP and Superflex slots, and mock drafts (sport defaults from
+ * `draftRoom.rules`, since a mock draft has no `league_positions`).
  */
 import React from 'react';
+import { getDefaultRosterPositions } from '@legacy-sports/utils';
 import { DraftRail } from './DraftRail';
+import { buildRosterSlotInstances, rosterSlotTypeCounts } from './rosterSlots';
 import { POSITION_COLORS } from './constants';
 import type { DraftPlayer } from './types';
 import { fireEvent, render } from '../../test-utils';
@@ -42,8 +44,11 @@ const baseProps = {
   onlineTeamIds: new Set<string>(),
   initDraftLoading: false,
   autoPickDisabled: false,
-  myTeam: [],
-  positionCounts: {} as Record<string, number>,
+  myTeam: [] as DraftPlayer[],
+  leaguePositions: getDefaultRosterPositions('baseball').map(
+    (positionType) => ({ positionType }),
+  ),
+  maxRosterSize: 25 as number | null,
   pickHistory: [],
   statsLookup: new Map(),
   teamNameById: () => '',
@@ -58,27 +63,146 @@ const baseProps = {
 };
 
 describe('DraftRail roster depth chart', () => {
-  it('renders baseball slot layout by default', () => {
-    const { queryByLabelText } = render(<DraftRail {...baseProps} />);
+  const slots = (...types: string[]) =>
+    types.map((positionType) => ({ positionType }));
+
+  it('renders the baseball league config, with SP/RP collapsed into P and a bench', () => {
+    const { queryByLabelText, getByText } = render(
+      <DraftRail {...baseProps} />,
+    );
     expect(queryByLabelText('C: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('OF: 0 of 3')).toBeTruthy();
-    expect(queryByLabelText('P: 0 of 9')).toBeTruthy();
-    expect(queryByLabelText('UTIL: 0 of 2')).toBeTruthy();
+    expect(queryByLabelText('DH: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('P: 0 of 8')).toBeTruthy();
+    expect(queryByLabelText('BN: 0 of 8')).toBeTruthy();
+    expect(queryByLabelText('UTIL: 0 of 2')).toBeNull();
     expect(queryByLabelText('QB: 0 of 1')).toBeNull();
+    expect(getByText('0 / 25')).toBeTruthy();
   });
 
-  it('renders football slot layout when sport="football"', () => {
-    const { queryByLabelText } = render(
-      <DraftRail {...baseProps} sport="football" />,
+  it('follows a custom baseball roster instead of the old template', () => {
+    const { queryByLabelText, getByText } = render(
+      <DraftRail
+        {...baseProps}
+        leaguePositions={slots('C', 'C', 'SS', 'OF', 'SP', 'SP', 'RP')}
+        maxRosterSize={10}
+      />,
+    );
+    expect(queryByLabelText('C: 0 of 2')).toBeTruthy();
+    expect(queryByLabelText('OF: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('P: 0 of 3')).toBeTruthy();
+    expect(queryByLabelText('BN: 0 of 3')).toBeTruthy();
+    expect(queryByLabelText('1B: 0 of 1')).toBeNull();
+    expect(getByText('0 / 10')).toBeTruthy();
+  });
+
+  // The QA report: QB1 RB2 WR2 TE1 K1 DST1 FLEX1 + BN6 = 15, while the rail
+  // used to show the hard-coded "0/10, WR 0/3, DEF 0/1" with no bench.
+  it('renders the football league config (LS-10501 QA league), DST label and bench included', () => {
+    const { queryByLabelText, getByText } = render(
+      <DraftRail
+        {...baseProps}
+        sport="football"
+        leaguePositions={slots(
+          'QB',
+          'RB',
+          'RB',
+          'WR',
+          'WR',
+          'TE',
+          'K',
+          'DST',
+          'FLEX',
+        )}
+        maxRosterSize={15}
+      />,
     );
     expect(queryByLabelText('QB: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('RB: 0 of 2')).toBeTruthy();
-    expect(queryByLabelText('WR: 0 of 3')).toBeTruthy();
+    expect(queryByLabelText('WR: 0 of 2')).toBeTruthy();
     expect(queryByLabelText('TE: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('K: 0 of 1')).toBeTruthy();
-    expect(queryByLabelText('DEF: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('DST: 0 of 1')).toBeTruthy();
     expect(queryByLabelText('FLEX: 0 of 1')).toBeTruthy();
-    expect(queryByLabelText('C: 0 of 1')).toBeNull();
+    expect(queryByLabelText('BN: 0 of 6')).toBeTruthy();
+    expect(queryByLabelText('DEF: 0 of 1')).toBeNull();
+    expect(queryByLabelText('WR: 0 of 3')).toBeNull();
+    expect(getByText('0 / 15')).toBeTruthy();
+  });
+
+  it('renders IDP and Superflex slots from the league config', () => {
+    const { queryByLabelText } = render(
+      <DraftRail
+        {...baseProps}
+        sport="football"
+        leaguePositions={slots('QB', 'SFLEX', 'DL', 'DL', 'LB', 'DB')}
+        maxRosterSize={8}
+      />,
+    );
+    expect(queryByLabelText('SFLEX: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('DL: 0 of 2')).toBeTruthy();
+    expect(queryByLabelText('LB: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('DB: 0 of 1')).toBeTruthy();
+    expect(queryByLabelText('BN: 0 of 2')).toBeTruthy();
+    expect(queryByLabelText('DST: 0 of 1')).toBeNull();
+  });
+
+  // A mock draft has no league_positions; useDraftQueries hands the rail the
+  // sport defaults from draftRoom.rules instead (covered in
+  // useDraftQueries.spec.ts), and maxRosterSize may be null.
+  it.each(['baseball', 'football'] as const)(
+    'renders the %s sport defaults for a mock draft',
+    (sport) => {
+      const leaguePositions = getDefaultRosterPositions(sport).map(
+        (positionType) => ({ positionType }),
+      );
+      const { getAllByRole, getByText } = render(
+        <DraftRail
+          {...baseProps}
+          sport={sport}
+          leaguePositions={leaguePositions}
+          maxRosterSize={null}
+        />,
+      );
+      const expected = rosterSlotTypeCounts(
+        buildRosterSlotInstances(leaguePositions, [], sport, null),
+      );
+      const rows = getAllByRole('listitem').filter((el) =>
+        /: \d+ of \d+$/.test(el.getAttribute('aria-label') ?? ''),
+      );
+      expect(rows.map((el) => el.getAttribute('aria-label'))).toEqual(
+        expected.map(
+          (r) =>
+            `${r.positionType === 'BENCH' ? 'BN' : r.positionType}: 0 of ${r.total}`,
+        ),
+      );
+      const total = expected.reduce((sum, r) => sum + r.total, 0);
+      expect(getByText(`0 / ${total}`)).toBeTruthy();
+    },
+  );
+
+  it('fills bars from the same slot assignment as the depth chart', () => {
+    const team = [
+      { id: 1, name: 'WR A', position: 'WR', eligiblePositions: ['WR'] },
+      { id: 2, name: 'WR B', position: 'WR', eligiblePositions: ['WR'] },
+      { id: 3, name: 'WR C', position: 'WR', eligiblePositions: ['WR'] },
+      { id: 4, name: 'WR D', position: 'WR', eligiblePositions: ['WR'] },
+    ] as DraftPlayer[];
+    const { queryByLabelText, getByText } = render(
+      <DraftRail
+        {...baseProps}
+        sport="football"
+        myTeam={team}
+        leaguePositions={slots('QB', 'WR', 'WR', 'FLEX')}
+        maxRosterSize={6}
+      />,
+    );
+    // Two WR slots, the third WR spills into FLEX, the fourth onto the bench.
+    expect(queryByLabelText('WR: 2 of 2')).toBeTruthy();
+    expect(queryByLabelText('FLEX: 1 of 1')).toBeTruthy();
+    expect(queryByLabelText('BN: 1 of 2')).toBeTruthy();
+    expect(queryByLabelText('QB: 0 of 1')).toBeTruthy();
+    expect(getByText('4 / 6')).toBeTruthy();
   });
 
   // LS-4824: mobile-only collapse toggle. Default collapsed so the player
@@ -113,7 +237,7 @@ describe('DraftRail roster depth chart', () => {
       // to the mobile media query in styles.ts.
       const { queryByLabelText } = render(<DraftRail {...baseProps} />);
       expect(queryByLabelText('C: 0 of 1')).toBeTruthy();
-      expect(queryByLabelText('P: 0 of 9')).toBeTruthy();
+      expect(queryByLabelText('P: 0 of 8')).toBeTruthy();
     });
   });
 
@@ -193,7 +317,7 @@ describe('DraftRail roster depth chart', () => {
           onDraftPlayer={onDraftPlayer}
         />,
       );
-      fireEvent.drop(getByLabelText('P: 0 of 9'));
+      fireEvent.drop(getByLabelText('P: 0 of 8'));
       expect(onCommissionerPick).toHaveBeenCalledWith(42);
       expect(onDraftPlayer).not.toHaveBeenCalled();
     });
@@ -208,6 +332,30 @@ describe('DraftRail roster depth chart', () => {
       expect(getByLabelText('C: 0 of 1').getAttribute('data-drop-state')).toBe(
         'ineligible',
       );
+      // The bench takes anyone.
+      expect(getByLabelText('BN: 0 of 8').getAttribute('data-drop-state')).toBe(
+        'eligible',
+      );
+    });
+
+    it('drafts a team defense dropped on the football DST row', () => {
+      const onDraftPlayer = jest.fn();
+      const { getByLabelText } = render(
+        <DraftRail
+          {...baseProps}
+          sport="football"
+          leaguePositions={[{ positionType: 'QB' }, { positionType: 'DST' }]}
+          maxRosterSize={3}
+          isMyPick
+          draggedPlayer={player(['DST'])}
+          onDraftPlayer={onDraftPlayer}
+        />,
+      );
+      expect(getByLabelText('QB: 0 of 1').getAttribute('data-drop-state')).toBe(
+        'ineligible',
+      );
+      fireEvent.drop(getByLabelText('DST: 0 of 1'));
+      expect(onDraftPlayer).toHaveBeenCalledWith(42);
     });
   });
 
@@ -216,11 +364,14 @@ describe('DraftRail roster depth chart', () => {
       <DraftRail
         {...baseProps}
         sport="football"
-        myTeam={[
-          { id: 1, name: 'QB1', position: 'QB' } as never,
-          { id: 2, name: 'RB1', position: 'RB' } as never,
-        ]}
-        positionCounts={{ QB: 1, RB: 1 }}
+        myTeam={
+          [
+            { id: 1, name: 'QB1', position: 'QB' },
+            { id: 2, name: 'RB1', position: 'RB' },
+          ] as DraftPlayer[]
+        }
+        leaguePositions={[{ positionType: 'QB' }, { positionType: 'RB' }]}
+        maxRosterSize={2}
       />,
     );
     const fills = Array.from(

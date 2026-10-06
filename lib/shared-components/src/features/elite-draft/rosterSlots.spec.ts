@@ -4,6 +4,7 @@ import {
   buildRosterSlotInstances,
   nextPrioritySlotKey,
   rosterSlotFillCounts,
+  rosterSlotTypeCounts,
 } from './rosterSlots';
 import type { DraftPlayer } from './types';
 
@@ -272,5 +273,37 @@ describe('slot strip / depth chart parity', () => {
     );
 
     expect(slots.filter((s) => s.isBench)[0]?.positionType).toBe(BENCH_SLOT);
+  });
+});
+
+// LS-10501: the rail's My Roster bars collapse the per-slot expansion back to
+// one row per slot type, so they can never disagree with the depth chart.
+describe('rosterSlotTypeCounts', () => {
+  it('groups slots by type in lineup order with the bench last', () => {
+    const rows = rosterSlotTypeCounts(
+      buildRosterSlotInstances(
+        [
+          { positionType: 'QB' },
+          { positionType: 'WR' },
+          { positionType: 'WR' },
+          { positionType: 'DST' },
+        ],
+        [
+          { id: 1, name: 'A', position: 'WR', eligiblePositions: ['WR'] },
+        ] as DraftPlayer[],
+        'football',
+        6,
+      ),
+    );
+    expect(rows).toEqual([
+      { positionType: 'QB', filled: 0, total: 1 },
+      { positionType: 'WR', filled: 1, total: 2 },
+      { positionType: 'DST', filled: 0, total: 1 },
+      { positionType: 'BENCH', filled: 0, total: 2 },
+    ]);
+  });
+
+  it('is empty for an empty slot list', () => {
+    expect(rosterSlotTypeCounts([])).toEqual([]);
   });
 });
