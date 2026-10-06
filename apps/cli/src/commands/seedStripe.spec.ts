@@ -1,10 +1,13 @@
 import type Stripe from 'stripe';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { ENTITLEMENT_LABELS, ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   assertTestModeKey,
+  FEATURES,
   handleSeedStripe,
   PRICES,
   seedStripe,
+  STRIPE_FEATURE_NAME_MAX_LENGTH,
+  toStripeFeatureName,
 } from './seedStripe';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -188,5 +191,46 @@ describe('seedStripe idempotency', () => {
       monthlyPriceId: 'price_premium_monthly',
       annualPriceId: 'price_premium_annual',
     });
+  });
+});
+
+describe('toStripeFeatureName', () => {
+  it('leaves labels within the limit unchanged', () => {
+    expect(toStripeFeatureName('Trade analyzer')).toBe('Trade analyzer');
+  });
+
+  it('drops a trailing parenthetical when the label is too long', () => {
+    const label = `Dynasty leagues (${'x'.repeat(STRIPE_FEATURE_NAME_MAX_LENGTH)})`;
+    expect(toStripeFeatureName(label)).toBe('Dynasty leagues');
+  });
+
+  it('truncates with an ellipsis when there is no parenthetical to drop', () => {
+    const name = toStripeFeatureName(
+      'a'.repeat(STRIPE_FEATURE_NAME_MAX_LENGTH + 20),
+    );
+    expect(name).toHaveLength(STRIPE_FEATURE_NAME_MAX_LENGTH);
+    expect(name.endsWith('…')).toBe(true);
+  });
+
+  it('keeps every seeded feature name within the Stripe limit', () => {
+    for (const feature of FEATURES) {
+      expect(feature.name.length).toBeLessThanOrEqual(
+        STRIPE_FEATURE_NAME_MAX_LENGTH,
+      );
+    }
+  });
+
+  it('sends Stripe-safe names on create without altering the UI labels', async () => {
+    const { mock, features } = makeStripeMock(false);
+
+    await seedStripe(mock);
+
+    const dynasty = features.create.mock.calls
+      .map(([args]) => args as { lookup_key: string; name: string })
+      .find((args) => args.lookup_key === ENTITLEMENTS.dynasty_leagues);
+    expect(dynasty?.name).toBe('Dynasty leagues');
+    expect(
+      ENTITLEMENT_LABELS[ENTITLEMENTS.dynasty_leagues].length,
+    ).toBeGreaterThan(STRIPE_FEATURE_NAME_MAX_LENGTH);
   });
 });

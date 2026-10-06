@@ -39,14 +39,32 @@ interface FeatureSpec {
   name: string;
 }
 
+/** Stripe rejects Entitlements Feature names longer than this. */
+export const STRIPE_FEATURE_NAME_MAX_LENGTH = 80;
+
+/**
+ * Derive a Stripe-safe feature name from a user-facing entitlement label.
+ * Labels are UI copy and may carry a long trailing parenthetical; when the
+ * label exceeds Stripe's limit, drop that parenthetical, and if it is still
+ * too long, truncate with an ellipsis.
+ */
+export function toStripeFeatureName(label: string): string {
+  if (label.length <= STRIPE_FEATURE_NAME_MAX_LENGTH) return label;
+  const withoutParenthetical = label.replace(/\s*\([^)]*\)\s*$/, '');
+  if (withoutParenthetical.length <= STRIPE_FEATURE_NAME_MAX_LENGTH) {
+    return withoutParenthetical;
+  }
+  return `${withoutParenthetical.slice(0, STRIPE_FEATURE_NAME_MAX_LENGTH - 1).trimEnd()}…`;
+}
+
 // Derive the feature list from the single source of truth in
 // `lib/utils/src/lib/entitlements.ts` (`ENTITLEMENTS` in `@legacy-sports/utils`)
 // so gating code and Stripe provisioning cannot drift.
-const FEATURES: FeatureSpec[] = (
+export const FEATURES: FeatureSpec[] = (
   Object.values(ENTITLEMENTS) as EntitlementKey[]
 ).map((lookup_key) => ({
   lookup_key,
-  name: ENTITLEMENT_LABELS[lookup_key],
+  name: toStripeFeatureName(ENTITLEMENT_LABELS[lookup_key]),
 }));
 
 interface ProductSpec {
