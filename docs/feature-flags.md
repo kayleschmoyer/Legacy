@@ -30,12 +30,12 @@ The `GROWTHBOOK_CLIENT_KEY` repo secret value must be set by the repo owner (Gro
 
 ## Flag inventory (from code, 2026-07-02)
 
-| Flag                               | Read via                      | Fallback when SDK off | Call sites                                                                                                                                                                     |
-| ---------------------------------- | ----------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `football_enabled` (LS-4767)       | mixed — see warning below     | **mixed**             | Web: `app.tsx` `FootballGate`, `PlayerStatsPage.tsx`, `SportsDropdown.tsx`, `BaseballScreen.tsx`, `LeagueCreatePage.tsx`. Native: `(tabs)/players.tsx`, `football/players.tsx` |
-| `football-mock-players` (LS-4666)  | `useFeatureIsOn`              | `false` (hidden)      | Web: `MockDraftPage.tsx` (`FOOTBALL_MOCK_PLAYERS_FLAG`). Native: `baseball/mock-draft.tsx`                                                                                     |
-| `about-github-deeplinks` (LS-7741) | `useFeatureValue(..., true)`  | `true` (shown)        | Web: `AboutPage.tsx` — GitHub commit/repo deep links; disable in GrowthBook if the repo goes private                                                                           |
-| `iap_revenue_breakdown_enabled`    | `useFeatureValue(..., false)` | `false` (hidden)      | Web: `AdminRevenuePage.tsx` — IAP revenue breakdown section                                                                                                                    |
+| Flag                               | Read via                      | Fallback when SDK off | Call sites                                                                                                                                                                               |
+| ---------------------------------- | ----------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `football_enabled` (LS-4767)       | mixed — see warning below     | **mixed**             | Web: `app.tsx` `FootballGate`, `PlayerStatsPage.tsx`, `SportsDropdown.tsx`, `BaseballScreen.tsx`, `LeagueCreatePage.tsx`. Native: `(tabs)/(players)/players.tsx`, `football/players.tsx` |
+| `football-mock-players` (LS-4666)  | `useFeatureIsOn`              | `false` (hidden)      | Web: `MockDraftPage.tsx` (`FOOTBALL_MOCK_PLAYERS_FLAG`). Native: `baseball/mock-draft.tsx`                                                                                               |
+| `about-github-deeplinks` (LS-7741) | `useFeatureValue(..., true)`  | `true` (shown)        | Web: `AboutPage.tsx` — GitHub commit/repo deep links; disable in GrowthBook if the repo goes private                                                                                     |
+| `iap_revenue_breakdown_enabled`    | `useFeatureValue(..., false)` | `false` (hidden)      | Web: `AdminRevenuePage.tsx` — IAP revenue breakdown section                                                                                                                              |
 
 Phantoms: `new-pricing-page` and `premium-cta-text` appear only as doc-comment examples in `GrowthBookProvider.tsx` — they exist nowhere else. Do not chase them when auditing flags.
 

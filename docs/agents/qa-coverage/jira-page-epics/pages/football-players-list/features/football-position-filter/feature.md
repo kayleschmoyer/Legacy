@@ -118,7 +118,7 @@ and `allNodes` is cleared so the list replaces rather than appends.
 
 ### Mobile (Android / mobile-web)
 
-**File:** `apps/app/src/app/(app)/football/players.tsx`
+**File:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`
 
 Position pills are rendered with `testID="position-pill-<pos>"` for automation
 targeting (LS-6481). State is `useState<FootballPosition[]>([])` (empty = All).
@@ -160,7 +160,7 @@ export function getFootballPositionColor(
 
 ### Unit tests (mobile)
 
-**File:** `apps/app/src/app/(app)/football/players.spec.tsx`
+**File:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.spec.tsx`
 
 `describe('position filter')`:
 
@@ -220,7 +220,7 @@ export function getFootballPositionColor(
 - **Mobile testID:** LS-6481
 - **Web component:** `apps/web/src/components/football/FootballPositionFilter.tsx`
 - **Web page:** `apps/web/src/pages/football/FootballPlayersPage.tsx`
-- **Mobile screen:** `apps/app/src/app/(app)/football/players.tsx`
+- **Mobile screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`
 - **Color constants:** `apps/web/src/constants/colors.ts`
 - **NFL team filter:** LS-5443
 - **Player search:** LS-5442

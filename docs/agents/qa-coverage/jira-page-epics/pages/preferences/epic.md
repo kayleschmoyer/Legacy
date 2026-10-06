@@ -2,7 +2,7 @@
 
 **Jira:** LS-5290
 **Page slug:** `preferences`
-**Routes:** web `/preferences` (`apps/web/src/pages/preferences/PreferencesPage.tsx`), native `apps/app/src/app/(app)/preferences.tsx` (You tab → `you-preferences`)
+**Routes:** web `/preferences` (`apps/web/src/pages/preferences/PreferencesPage.tsx`), native `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.tsx` (You tab → `you-preferences`)
 **Reference:** `docs/agents/pages/preferences.md`
 
 The Preferences page is where a user manages account-wide settings: appearance (theme, animations), sports & stats display (default sport, stats format, season totals), and notifications (delivery channels, matchup alerts). Coverage here is **automated E2E only** (hermetic Playwright for web, Maestro for android) — see [`../../README.md`](../../README.md) and `.agents/skills/plan-ticket/references/qa-coverage-model.md`.
@@ -48,7 +48,7 @@ Existing E2E that touches the page: `preferences.spec.ts` (heading, section/opti
 - **Web specs are hermetic.** Override `getusernotificationpreferences` / `updatenotificationpreferences` / `getuserpreferences` / `updateuserpreferences` with `route.fulfill()` (defaults live in `apps/web-e2e/src/fixtures/shared-mocks.ts`; operation names come from `lib/graphql/src/notifications.graphql` and `user-preferences.graphql`). Never `route.continue()`.
 - **Element access goes through `settingsPage.preferences`** (`apps/web-e2e/src/pages/settings.page.ts`, ADR-0015). Add locators/assertions there, not in the specs.
 - **Storage keys:** `ls_user_preferences` (blob: `defaultSport`, `statsFormat`, `enableAnimations`, `showSeasonTotals`), `ls_theme_preference` (theme, owned by `ThemeContext`), `ls_prefs_sections_collapsed` (web only).
-- **Android flows are live** (Maestro against the dev build). Reach the screen via `launch-authenticated.yaml` → tap `You` → `you-preferences`. The native screen currently has **no page-level `testID`** and the chips/toggles have none; per the LS-8446 landing convention the first android chip should add `testID="preferences-page"` plus chip/toggle testIDs in `apps/app/src/app/(app)/preferences.tsx` (the only product edit the android chips may make, and only testIDs). Note native copy differs from web: `Enable animations` (web: `Animations`) and `Preferences saved` (web: `Saved`, `data-testid="prefs-save-banner"`).
+- **Android flows are live** (Maestro against the dev build). Reach the screen via `launch-authenticated.yaml` → tap `You` → `you-preferences`. The native screen currently has **no page-level `testID`** and the chips/toggles have none; per the LS-8446 landing convention the first android chip should add `testID="preferences-page"` plus chip/toggle testIDs in `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.tsx` (the only product edit the android chips may make, and only testIDs). Note native copy differs from web: `Enable animations` (web: `Animations`) and `Preferences saved` (web: `Saved`, `data-testid="prefs-save-banner"`).
 - **Notifications on android live on the Notifications screen**, not on the Preferences screen: You → `you-notifications` (`notifications-page`) → "Notification Preferences" panel (`NotificationSettings`, shared-components). The native Preferences screen has Appearance, Sports & Stats, and an admin-only Admin Tools section.
 
 ## Known defects (existing tickets — do not re-file)

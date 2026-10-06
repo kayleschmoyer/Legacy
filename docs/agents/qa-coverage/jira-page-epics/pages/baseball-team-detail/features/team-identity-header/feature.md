@@ -38,7 +38,7 @@ implementation.
 
 ### Android
 
-**File:** `apps/app/src/app/(app)/baseball/team/[teamId].tsx`
+**File:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/team/[teamId].tsx`
 
 The native app renders team identity only as a navigation header title:
 `TeamIdHeader()` fetches `useGetTeamByIdQuery` and renders a bare `<Text>{team.name}</Text>`,
@@ -82,7 +82,7 @@ confirmation dialog only.
 ### Android
 
 No automated coverage exists for `TeamIdHeader` beyond incidental exercise via
-`apps/app/src/app/(app)/baseball/team/[teamId].spec.tsx`, which mocks `useGetTeamByIdQuery`
+`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/team/[teamId].spec.tsx`, which mocks `useGetTeamByIdQuery`
 and asserts lineup-editor projection gating — it does not render or assert on `TeamIdHeader`
 itself. `apps/app/src/app/(app)/_layout.spec.tsx` mocks `TeamIdHeader` out entirely (returns
 the literal string `'Team'`), so it provides no coverage either.
@@ -92,6 +92,6 @@ the literal string `'Team'`), so it provides no coverage either.
 - **Epic:** LS-5261 — QA — Page: Baseball Team Detail
 - **Page doc:** `docs/agents/pages/baseball/teams/detail.md`
 - **Web component:** `apps/web/src/pages/baseball/TeamDetailPage.tsx`
-- **Android component:** `apps/app/src/app/(app)/baseball/team/[teamId].tsx` (`TeamIdHeader`)
+- **Android component:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/team/[teamId].tsx` (`TeamIdHeader`)
 - **Follow-up:** Android identity header parity gap (missing avatar/league ID/banner/visitor
   note) filed as a follow-up ticket under LS-5261 — see Jira for the tracking key.

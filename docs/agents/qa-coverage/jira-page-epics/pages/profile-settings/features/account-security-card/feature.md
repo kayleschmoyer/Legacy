@@ -11,7 +11,7 @@ Displays sign-in method (e.g., Google OAuth) and active session indicator.
 
 ## Implementation
 
-`apps/web/src/pages/profile/ProfileSettingsPage.tsx` (Account & Security card, `sessionStatus.ts`); native `apps/app/src/app/(app)/profile-settings.tsx` (`sign-in-method-value`).
+`apps/web/src/pages/profile/ProfileSettingsPage.tsx` (Account & Security card, `sessionStatus.ts`); native `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.tsx` (`sign-in-method-value`).
 
 ## Platform coverage
 
@@ -31,7 +31,7 @@ Displays sign-in method (e.g., Google OAuth) and active session indicator.
 
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "derives the sign-in method from linked identities", "renders Active as the session status"
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "derives the sign-in method from linked identities", "renders Active as the session status"
 
 ## Pending assertions
 

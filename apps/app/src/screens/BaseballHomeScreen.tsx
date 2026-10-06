@@ -20,7 +20,7 @@ const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
 
 type BaseballHomeScreenProps = {
   /**
-   * Switches to the football home. Owned by the host (`(tabs)/home.tsx`), which
+   * Switches to the football home. Owned by the host (`(tabs)/(home)/home.tsx`), which
    * flips its inline sport view rather than navigating — the screen must never
    * push `/football` itself, or the user ends up on a second home surface
    * outside the tab shell (LS-8823). Omitted → `MLBHome` hides the switcher.
@@ -28,7 +28,7 @@ type BaseballHomeScreenProps = {
   onSwitchSport?: (sport: 'football') => void;
   /**
    * Returns to the cross-sport sports dashboard (LS-6286 / FBH-032). Owned by
-   * the host (`(tabs)/home.tsx`), which wires this to the same dashboard-return
+   * the host (`(tabs)/(home)/home.tsx`), which wires this to the same dashboard-return
    * action already used by its system-back handler. Omitted → `MLBHome` hides
    * the "All Sports" option.
    */

@@ -70,7 +70,7 @@ Football-only additional sections (status-independent) in
 `apps/web/src/features/matchup/MatchupAdditionalSections.tsx`.
 
 **Native:** `apps/app/src/screens/leagues/football/FootballMatchupScreen.tsx`
-via `apps/app/src/app/(app)/football/matchup.tsx` — an independent native
+via `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/matchup.tsx` — an independent native
 implementation (own `useGetMatchupByIdQuery`), not the same component tree
 as web.
 

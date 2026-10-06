@@ -32,7 +32,7 @@ Destructive Sign Out button in Danger Zone card that clears session.
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
 - `apps/web/src/pages/profile/ProfileSettingsPage.render.spec.tsx` (LS-7221): asks for confirmation, signs out on confirm, stays signed in on cancel
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "sign out" describe incl. hardware back (LS-7223)
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "sign out" describe incl. hardware back (LS-7223)
 
 ## Pending assertions
 

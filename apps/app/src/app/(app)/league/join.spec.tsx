@@ -6,11 +6,16 @@ import JoinLeagueRoute from './join';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
 const mockBack = jest.fn();
 let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate, back: mockBack }),
+  useRouter: () => ({
+    dismissTo: mockDismissTo,
+    navigate: mockNavigate,
+    back: mockBack,
+  }),
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -184,7 +189,9 @@ describe('JoinLeagueRoute (two-tab Invite or Browse — LS-8812)', () => {
         variables: { inviteCode: 'ABC12XYZ', teamName: 'My Team' },
       });
       await waitFor(() =>
-        expect(mockNavigate).toHaveBeenCalledWith('/football/league/77'),
+        expect(mockDismissTo).toHaveBeenCalledWith(
+          '/(tabs)/(leagues)/football/league/77',
+        ),
       );
     });
   });
@@ -228,7 +235,9 @@ describe('JoinLeagueRoute (two-tab Invite or Browse — LS-8812)', () => {
       joinPublic({ id: 42, sport: 'football' }, 'My Team');
 
       await waitFor(() =>
-        expect(mockNavigate).toHaveBeenCalledWith('/football/league/42'),
+        expect(mockDismissTo).toHaveBeenCalledWith(
+          '/(tabs)/(leagues)/football/league/42',
+        ),
       );
     });
 

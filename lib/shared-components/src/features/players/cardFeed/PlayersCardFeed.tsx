@@ -77,7 +77,7 @@ export interface PlayersCardFeedProps {
  * rail, FPTS-first player cards, and an inline premium teaser. Purely
  * presentational: all data fetching, debouncing, sport-switch reset, and
  * expo-router param persistence stay in the screen wiring
- * (`apps/app/src/app/(app)/(tabs)/players.tsx`) per shared-components-first.
+ * (`apps/app/src/app/(app)/(tabs)/(players)/players.tsx`) per shared-components-first.
  */
 export function PlayersCardFeed({
   sport,

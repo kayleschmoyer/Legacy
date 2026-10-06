@@ -30,7 +30,11 @@ import {
 import type { DraftChatTabRenderProps } from '@legacy-sports/shared-components/elite-draft';
 
 import { config } from '@legacy-sports/app-config/native';
-import { closeToHomeTab, toIntId } from '../../../common/utilities/RouteUtils';
+import {
+  closeToHomeTab,
+  navigateFromModal,
+  toIntId,
+} from '../../../common/utilities/RouteUtils';
 import { useDraftChatUnread } from '../../../hooks/useDraftChatUnread';
 
 function DraftChatConnector({
@@ -145,7 +149,7 @@ export default function MockDraftRoomPage(): React.JSX.Element {
       <EliteDraftBoardScreen
         leagueId={null}
         draftId={draftId}
-        onNavigate={(path) => router.navigate(path)}
+        onNavigate={(path) => navigateFromModal(router, path)}
         websocketUrl={websocketUrl ?? ''}
         renderChatTab={renderChatTab}
         bottomInset={bottomInset}

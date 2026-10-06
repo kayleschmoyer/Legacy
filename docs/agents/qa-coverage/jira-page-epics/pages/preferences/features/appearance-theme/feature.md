@@ -26,7 +26,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 
 - `apps/web/src/context/ThemeContext.spec.tsx` — follows live OS changes when `system`, ignores them when pinned, persists to its own key, migrates a legacy blob theme
 - `apps/web/src/pages/preferences/PreferencesPage.spec.tsx` — `PreferencesPage theme ownership (LS-7078)`
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `renders all three theme chip options`; `calls setThemePreference with light/dark/system when … chip is pressed`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `renders all three theme chip options`; `calls setThemePreference with light/dark/system when … chip is pressed`
 
 ### E2E tests (hermetic)
 

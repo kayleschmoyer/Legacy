@@ -8,7 +8,7 @@
  * tab-addressed screens: web addresses a league tab by path segment
  * (`/football/league/1/roster`), while native selects the tab from an
  * `initialTab` query param on one screen route
- * (`apps/app/src/app/(app)/football/league/[leagueId].tsx`) — there is no
+ * (`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/league/[leagueId].tsx`) — there is no
  * `roster.tsx` file. League discovery has the same shape mismatch: web is
  * sport-scoped (`/football/leagues`), native is one sport-agnostic screen
  * (`apps/app/src/app/(app)/league-discovery.tsx`).
@@ -145,7 +145,7 @@ export function resolveNativeRoute(path: string): string {
     const [, sportSegment, teamId] = teamDetailMatch;
     // Two mismatches at once. The segment is PLURAL on web
     // (`apps/web/src/app/app.tsx`'s `/football/teams/:teamId`) and SINGULAR on
-    // native (`apps/app/src/app/(app)/football/team/[teamId].tsx`), and the
+    // native (`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx`), and the
     // football screen puts its `RosterBoard` lineup editor on a non-default
     // `Lineup` tab while web renders the board as the page itself. Baseball's
     // native team screen already opens on `Lineup` (its first tab), so only

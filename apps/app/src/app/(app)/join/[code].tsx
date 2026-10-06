@@ -5,6 +5,7 @@ import {
   JoinByCodeScreen,
   type JoinedTarget,
 } from '@legacy-sports/shared-components/draft';
+import { navigateFromModal } from '../../../common/utilities/RouteUtils';
 
 /**
  * The universal invite route on native, (app)/join/[code] (LS-10078). A
@@ -23,7 +24,10 @@ function navigateToJoinedTarget(
     });
     return;
   }
-  router.navigate(`/${target.sport}/league/${String(target.leagueId)}`);
+  navigateFromModal(
+    router,
+    `/${target.sport}/league/${String(target.leagueId)}`,
+  );
 }
 
 export default function JoinByCodeRoute(): React.JSX.Element {

@@ -1,7 +1,9 @@
 import {
   closeToHomeTab,
   HOME_TAB_HREF,
+  navigateFromModal,
   sanitizeSearchParam,
+  tabHrefFor,
   toIntId,
 } from './RouteUtils';
 
@@ -12,6 +14,7 @@ describe('closeToHomeTab', () => {
   const makeRouter = (canGoBack: boolean) => ({
     canGoBack: jest.fn(() => canGoBack),
     back: jest.fn(),
+    dismissTo: jest.fn(),
     navigate: jest.fn(),
   });
 
@@ -22,6 +25,7 @@ describe('closeToHomeTab', () => {
 
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(router.navigate).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it('falls back to the Home tab when there is nothing to pop', () => {
@@ -29,7 +33,10 @@ describe('closeToHomeTab', () => {
 
     closeToHomeTab(router);
 
-    expect(router.navigate).toHaveBeenCalledWith('/home');
+    // Group-qualified so the root Stack pops to the one tab shell instead of
+    // stacking a second copy of it (LS-10614).
+    expect(router.dismissTo).toHaveBeenCalledWith('/(tabs)/(home)/home');
+    expect(router.navigate).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });
 
@@ -40,6 +47,71 @@ describe('closeToHomeTab', () => {
 
     expect(router.navigate).not.toHaveBeenCalledWith('/baseball');
     expect(router.navigate).not.toHaveBeenCalledWith('/football');
+  });
+});
+
+// LS-10614 — drill-down routes live in every tab's stack; leaving a root-stack
+// modal must target one tab explicitly.
+describe('tabHrefFor', () => {
+  it.each([
+    ['/home', '/(tabs)/(home)/home'],
+    ['/leagues', '/(tabs)/(leagues)/leagues'],
+    ['/you', '/(tabs)/(you)/you'],
+    ['/', '/(tabs)/(home)/home'],
+    ['/baseball', '/(tabs)/(home)/home?sport=baseball'],
+    ['/football', '/(tabs)/(home)/home?sport=football'],
+    ['/football/league/42', '/(tabs)/(leagues)/football/league/42'],
+    [
+      '/baseball/league/7?tab=chat',
+      '/(tabs)/(leagues)/baseball/league/7?tab=chat',
+    ],
+    ['/baseball/team/3', '/(tabs)/(leagues)/baseball/team/3'],
+    ['/football/matchup', '/(tabs)/(leagues)/football/matchup'],
+    ['/FreeAgents', '/(tabs)/(leagues)/FreeAgents'],
+    ['/football/players/12', '/(tabs)/(players)/football/players/12'],
+    ['/PlayerDetail?id=5', '/(tabs)/(players)/PlayerDetail?id=5'],
+    ['/season-draft', '/(tabs)/(games)/season-draft'],
+    ['/notifications', '/(tabs)/(you)/notifications'],
+    ['/mock-drafts', '/(tabs)/(home)/mock-drafts'],
+  ])('routes %s into its host tab', (href, expected) => {
+    expect(tabHrefFor(href)).toBe(expected);
+  });
+
+  it.each([
+    '/football/league/create',
+    '/baseball/league/join',
+    '/league/create',
+    '/join',
+    '/mock-draft/9',
+    '/season-draft/abc',
+    '/DraftBoardPage',
+    '/subscription-settings',
+  ])('leaves root-stack route %s alone', (href) => {
+    expect(tabHrefFor(href)).toBeNull();
+  });
+});
+
+describe('navigateFromModal', () => {
+  const makeRouter = () => ({ dismissTo: jest.fn(), navigate: jest.fn() });
+
+  it('dismisses to the host tab for a tab-hosted destination', () => {
+    const router = makeRouter();
+
+    navigateFromModal(router, '/football/league/42');
+
+    expect(router.dismissTo).toHaveBeenCalledWith(
+      '/(tabs)/(leagues)/football/league/42',
+    );
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('navigates normally to another root-stack route', () => {
+    const router = makeRouter();
+
+    navigateFromModal(router, '/mock-draft/9');
+
+    expect(router.navigate).toHaveBeenCalledWith('/mock-draft/9');
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 });
 

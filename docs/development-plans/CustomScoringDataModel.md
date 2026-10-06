@@ -27,7 +27,7 @@ Branch: `LS-7/design-league-scoring-data-model`
 - CLI command `apps/cli/src/commands/computeScoring.ts` reads league-specific multipliers when a `--league` argument is supplied, falling back to database defaults.
 - GraphQL layer exposes scoring data via `leagueScoringProfile`, `defaultScoringProfile`, `scoringDefinitions`, and a `League.scoringProfile` field (`lambdas/db/src/schema/scoring.ts`).
 - Commissioners can persist multiplier overrides via the `updateLeagueScoringProfile` GraphQL mutation, which enforces role-based access control and stat validation triggers.
-- Mobile roster view (`apps/app/src/app/(app)/baseball/team/[teamId].tsx`) now loads `leagueScoringProfile` to apply league-configured multipliers in lineup projections and box scores.
+- Mobile roster view (`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/team/[teamId].tsx`) now loads `leagueScoringProfile` to apply league-configured multipliers in lineup projections and box scores.
 
 ## Current State Summary
 

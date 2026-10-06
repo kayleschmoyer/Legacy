@@ -5,7 +5,7 @@
 // package throws during module evaluation. BugReportModal imports it
 // statically (the convention for every other expo module in apps/app), so
 // every spec that renders that modal — directly, or transitively through
-// app/(app)/help.tsx — needs this stub.
+// app/(app)/(tabs)/(home,leagues,players,games,you)/help.tsx — needs this stub.
 //
 // __esModule: true is required for correct ES module interop; see the
 // expo-constants mock alongside this file for the full explanation.

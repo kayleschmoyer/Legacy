@@ -21,7 +21,10 @@ import {
   useSubscription,
 } from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
-import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
+import {
+  closeToHomeTab,
+  navigateFromModal,
+} from '../../../common/utilities/RouteUtils';
 
 /**
  * GrowthBook flag key that gates the football sport option (ADR 0011 §4,
@@ -338,7 +341,7 @@ export function MockDraftPage(): React.JSX.Element {
           usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
           onJoinInstead={() => router.navigate('/join')}
-          onBrowseMockDrafts={() => router.navigate('/mock-drafts')}
+          onBrowseMockDrafts={() => navigateFromModal(router, '/mock-drafts')}
           isControlAllTeamsEntitled={isControlAllTeamsEntitled}
           onControlAllTeamsUpgrade={handleControlAllTeamsUpgrade}
         />

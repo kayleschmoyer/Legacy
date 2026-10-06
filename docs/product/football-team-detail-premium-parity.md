@@ -8,7 +8,7 @@
 
 ## 1. What baseball's Team Detail page actually has today
 
-`apps/app/src/app/(app)/baseball/team/[teamId].tsx` has exactly **one**
+`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/team/[teamId].tsx` has exactly **one**
 premium-conditioned behavior, and it is not `TeamAssistantManagerSettings`:
 
 - **Projected stats on the Lineup/Rotation roster boards** — `getHitterStats`/
@@ -35,7 +35,7 @@ premium-conditioned behavior, and it is not `TeamAssistantManagerSettings`:
   So the ticket's implied ambiguity here is already resolved: it's free by a
   documented product decision, not an oversight. **No action needed.**
 
-Football's Team Detail page (`apps/app/src/app/(app)/football/team/[teamId].tsx`)
+Football's Team Detail page (`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx`)
 has **no premium-conditioned behavior at all** — `getPlayerStats` only ever
 returns `actual` (line ~613-620), and there is no `useSubscription`/
 `useHasEntitlement` import in the file. The real gap is the missing

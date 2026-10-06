@@ -7,7 +7,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
-import { toIntId } from '../../common/utilities/RouteUtils';
+import { navigateFromModal, toIntId } from '../../common/utilities/RouteUtils';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 
 // The `@legacy-sports/shared-components` barrel exports `SpectatorScreenProps`
@@ -68,7 +68,7 @@ export default function DraftWatchPage() {
   return (
     <NativeSpectatorScreen
       leagueId={leagueId}
-      onNavigate={(path) => router.navigate(path)}
+      onNavigate={(path) => navigateFromModal(router, path)}
       websocketUrl={websocketUrl ?? ''}
       websocketToken={wsToken}
     />

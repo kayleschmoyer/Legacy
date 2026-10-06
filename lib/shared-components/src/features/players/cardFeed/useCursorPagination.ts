@@ -5,7 +5,7 @@
  * fresh page whenever the query's filter/sort key changes.
  *
  * Extracted from the native card feed screen (LS-8832,
- * `apps/app/src/app/(app)/(tabs)/players.tsx`) so the web card presentation
+ * `apps/app/src/app/(app)/(tabs)/(players)/players.tsx`) so the web card presentation
  * (LS-9073, `PlayersGrid`'s cards view) can share the identical pagination
  * model instead of re-deriving it — the ticket's "keep cursor paging
  * underneath" direction for reconciling the card feed's infinite scroll with

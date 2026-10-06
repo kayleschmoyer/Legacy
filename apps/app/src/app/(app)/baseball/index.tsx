@@ -4,7 +4,7 @@ import { Redirect } from 'expo-router';
  * `/baseball` — a redirect into the Home tab, not a screen (LS-8823).
  *
  * The baseball home used to render here as well as inline inside
- * `(tabs)/home.tsx`, so anything that navigated to `/baseball` (the Create
+ * `(tabs)/(home)/home.tsx`, so anything that navigated to `/baseball` (the Create
  * League and mock-draft cancel handlers, the sport switcher) dropped the user
  * on a second, tab-bar-less copy of a screen they were already looking at. The
  * screen now has exactly one mount point — `screens/BaseballHomeScreen`, hosted
@@ -15,7 +15,7 @@ import { Redirect } from 'expo-router';
  * target: `app.json` verifies every path on `legacy-fantasy.com`, and the web
  * app really does serve `/baseball` (`apps/web` `app.tsx`), so shared links
  * would otherwise open the app on the unmatched-route screen. `?sport=` tells
- * the Home tab which sport to open — see `(tabs)/home.tsx`.
+ * the Home tab which sport to open — see `(tabs)/(home)/home.tsx`.
  *
  * In-app callers must not route here; they belong on `/home` (or
  * `closeToHomeTab` for a cancel/close action).

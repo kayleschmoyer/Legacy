@@ -30,7 +30,7 @@ Unit / component coverage (supporting evidence only — does not make a row `cov
 
 - `apps/web/src/hooks/useUnsavedChangesGuard.spec.ts`
 - `ProfileSettingsPage.avatarSave.spec.tsx` (LS-7236) and `ProfileSettingsPage.render.spec.tsx` (LS-7237 beforeunload while saving)
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "unsaved-changes guard (LS-7235)"
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "unsaved-changes guard (LS-7235)"
 
 ## Pending assertions
 

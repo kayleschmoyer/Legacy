@@ -29,7 +29,7 @@ Extracted from: `docs/agents/pages/teams/football-team-detail.md`
 
 ## Implementation
 
-**Component:** `apps/app/src/app/(app)/football/team/[teamId].tsx` renders
+**Component:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx` renders
 `FootballLeagueRosterScreen`
 (`apps/app/src/screens/leagues/football/FootballLeagueRosterScreen.tsx`) under
 the "Roster" tab. `getSlotOrder(defensiveFormat)`
@@ -50,7 +50,7 @@ reachable navigation path in the app — the only two links to it
 (`LeagueStandings.tsx`, and a `LeagueTeamsTab` inside an orphaned generic
 `league/[leagueId].tsx` route) were dead code and were deleted. The real entry
 point is now the football league page's **Overview** tab
-(`apps/app/src/app/(app)/football/league/[leagueId].tsx`) → Quick Standings
+(`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/league/[leagueId].tsx`) → Quick Standings
 row (`apps/app/src/features/leagues/LeagueOverviewTab.tsx`,
 `testID="overview-standings-row-<teamId>"`).
 
@@ -86,7 +86,7 @@ feature's scope): `maestro/flows/football-team-detail/lineup-tab.yaml`,
   `positionId`-based grouping (LS-6433), and the `<slot>-card` testIDs
 - `apps/app/src/features/leagues/LeagueOverviewTab.spec.tsx` — Quick Standings
   row `onTeamPress` wiring (LS-5446)
-- `apps/app/src/app/(app)/football/league/[leagueId].spec.tsx` — Overview tab
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/league/[leagueId].spec.tsx` — Overview tab
   Quick Standings row navigates to `/football/team/[teamId]` (LS-5446)
 
 ### Known gaps (out of scope for LS-5446)

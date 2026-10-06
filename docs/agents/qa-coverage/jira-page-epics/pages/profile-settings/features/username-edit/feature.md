@@ -35,7 +35,7 @@ Edit button toggles text input with Save/Cancel; validates 3-50 chars, alphanume
 
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "username editing" describe (validation, mutation, server error)
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "username editing" describe (validation, mutation, server error)
 - `ProfileSettingsPage.render.spec.tsx` (LS-7237 in-flight beforeunload)
 
 ## Pending assertions

@@ -2,7 +2,7 @@
 
 **Route**: `/mock-drafts` (signed in) · `?tab=mine` / `?tab=invites` opens a tab directly  
 **File**: `apps/web/src/pages/mock-drafts/MockDraftsHubPage.tsx` → `MockDraftsHub` (`lib/shared-components/src/features/draft/MockDraftsHub.tsx`)  
-**Native**: `apps/app/src/app/(app)/mock-drafts.tsx`, the same shared screen
+**Native**: `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/mock-drafts.tsx`, the same shared screen
 
 ---
 

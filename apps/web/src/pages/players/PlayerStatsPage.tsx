@@ -1257,7 +1257,7 @@ export function PlayerStatsRoute() {
   // 859 since LS-9898 aligned the token to the design scale, so the swap now
   // lands exactly on the mock's phone↔tablet seam (860) instead of 59px
   // early. The native mirror of this branch — `apps/app`'s
-  // `(tabs)/players.tsx` — reads the same `sm` predicate, so the two
+  // `(tabs)/(players)/players.tsx` — reads the same `sm` predicate, so the two
   // platforms switch presentation at the same width.
   // (This comment previously cited FootballPlayersPage.tsx as the peer; that
   // file no longer exists.)

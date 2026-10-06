@@ -28,7 +28,7 @@ No existing hermetic E2E coverage.
 
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "subscription grace state (LS-7228)", "navigation" (subscription-settings press)
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "subscription grace state (LS-7228)", "navigation" (subscription-settings press)
 
 ## Pending assertions
 

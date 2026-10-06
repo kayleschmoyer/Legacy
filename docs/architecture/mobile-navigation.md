@@ -111,7 +111,44 @@ These hold regardless of future tab changes:
 2. **Sport is an attribute, not a navigation level.** No screen exists solely to pick a sport; sport is a filter/badge on unified screens, and a picker on Create/Join.
 3. **The drawer is removed.** League onboarding (Browse/Join/Create) is an action on the Leagues tab.
 4. **`Games` is the data-driven tab.** It is justified on engagement and instrumented accordingly; the frequency-justified tabs (Leagues, Players) are not.
-5. **Every screen has exactly one mount point.** A screen the tab shell hosts is never also reachable as a standalone route — see [One home surface](#one-home-surface).
+5. **Every screen has exactly one mount point.** A screen the tab shell hosts is never also reachable as a standalone route — see [One home surface](#one-home-surface). (A drill-down route in the shared per-tab group is still one route file at one URL; each tab's stack gets its own instance of it — see [Tab bar persistence](#tab-bar-persistence).)
+6. **The tab bar persists on every drill-down screen.** Only modal / immersive tasks hide it. A new screen goes in the shared per-tab group unless it is a task the user finishes or cancels — see [Tab bar persistence](#tab-bar-persistence).
+
+## Tab bar persistence
+
+> **Decision (LS-10614):** stack-per-tab. Every drill-down screen opens _inside_ the current tab with the tab bar visible; only modal/immersive flows hide it.
+
+This is the platform convention: Apple's HIG keeps the tab bar visible through a tab's drill-down hierarchy and hides it only for modal tasks, each tab keeps its own history, and re-tapping the active tab pops it to its root. React Navigation's recommended structure (a stack inside each tab) and comparable fantasy apps (ESPN, Sleeper, Yahoo) behave the same way. Before LS-10614 every non-root screen was pushed on the root `(app)` Stack above the tab navigator, so league detail, team, player and settings pages all hid the bar — and, being headerless (LS-8766), had no on-screen way back either.
+
+### Route structure
+
+```
+app/(app)/
+  _layout.tsx                          root Stack — anchor (tabs) + modal routes
+  (tabs)/
+    _layout.tsx                        Tabs: (home) (leagues) (players) (games) (you)
+    (home)/home.tsx                    tab roots, one per group
+    (leagues)/leagues.tsx  …
+    (home,leagues,players,games,you)/  shared routes — drill-downs
+      _layout.tsx                      the per-tab Stack (one file, five instances)
+      football/league/[leagueId].tsx
+      PlayerDetail.tsx  notifications.tsx  …
+  league/create.tsx  DraftBoardPage.tsx  mock-draft/[draftId].tsx  …   modal routes
+```
+
+The `(home,leagues,players,games,you)` directory uses expo-router's **shared routes** (array-syntax groups): it expands into one copy per tab, so every drill-down route exists in all five stacks. Group segments never appear in the URL — `/football/league/42` is unchanged, so universal links, the post-login redirect and every existing `router.push` keep working. When a push matches several groups, expo-router prefers the currently focused one, so opening a league from Home stays in Home's stack and opening it from Leagues stays in Leagues'. A cold deep link (no focused group) resolves into Home.
+
+### Which side a screen goes on
+
+| Tab bar **visible** — shared per-tab group                                                                                                                                                                                          | Tab bar **hidden** — root `(app)` Stack                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| League detail, team, matchup, scoreboard, free agents, waivers, trades, players lists, player detail / stats / compare, messages, management, notifications, preferences, profile, help, about, mock-drafts hub, season-draft lobby | Draft board / watch, mock draft room + setup, create / join league (all variants), join-by-code, season-draft create / join / game, mini-games in play, subscription paywall |
+
+The route-placement spec in `(tabs)/(home,leagues,players,games,you)/_layout.spec.tsx` pins both lists. The paywall is modal because it is opened mid-flow from Create League and Mock Draft; keeping it on the root Stack preserves the in-progress flow underneath.
+
+### Leaving a modal
+
+A plain `router.navigate`/`replace` from a root-stack screen into a tab-hosted route pushes a **second** copy of the tab navigator onto the root Stack, and — within the same tick — resolves the shared route into Home regardless of where it belongs. Root-stack screens therefore leave through `navigateFromModal(router, href)` (`common/utilities/RouteUtils`), which `dismissTo`s a group-qualified href (`/(tabs)/(leagues)/football/league/42`): the root Stack pops back to the one tab shell and the destination opens in its host tab. `tabHrefFor` holds the destination → host-tab mapping (league-scoped → Leagues, player research → Players, account → You, season-draft lobby → Games, everything else → Home). `closeToHomeTab`'s no-history fallback goes through the same path.
 
 ## One home surface
 
@@ -129,6 +166,7 @@ Consequences for call sites:
 | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------- |
 | Cancel / close a pushed screen             | `closeToHomeTab(router)` (`common/utilities/RouteUtils`) | `router.navigate('/<sport>')`            |
 | Go to the home surface outright            | `router.navigate(HOME_TAB_HREF)` (`/home`)               | `router.navigate('/')` — only a redirect |
+| Leave a modal for a tab-hosted screen      | `navigateFromModal(router, href)` (`RouteUtils`)         | `router.navigate` / `router.replace`     |
 | Switch the active sport                    | the host's `onSwitchSport` (inline state)                | `router.navigate('/<sport>')`            |
 | Enter a deep screen from outside the shell | `router.replace(href, { withAnchor: true })`             | a bare `router.replace(href)`            |
 
@@ -150,7 +188,8 @@ Implementation is intentionally **out of scope for the doc PR** and is sliced in
 4. ✅ **Games tab** — minigames hub, Season Draft, "Who Am I?"; add engagement instrumentation.
 5. ✅ **You screen** — consolidate account items; notifications badge on the tab icon.
 6. ✅ **Unified Create / Join** — single sport-aware onboarding flow; remove the four duplicated entries.
-7. ✅ **Drawer removal** — the flat drawer is gone. `(app)/_layout.tsx` is now a `Stack` whose anchor is the `(tabs)` group; `(app)/index.tsx` redirects `/` → the Home tab so post-login `router.replace('/')` lands on the bar; the Home tab renders the shared cross-platform `HomeScreen` component (interim — the unified shared home/dashboard is tracked in LS-7791 under the shared-components-first principle, LS-7790); Messages/Management became **You** rows; Trade Center, Revenue Analytics, and the dev utilities were dropped from nav (see ²). All other destinations are pushed onto the Stack with a standard back affordance.
+7. ✅ **Drawer removal** — the flat drawer is gone. `(app)/_layout.tsx` is now a `Stack` whose anchor is the `(tabs)` group; `(app)/index.tsx` redirects `/` → the Home tab so post-login `router.replace('/')` lands on the bar; the Home tab renders the shared cross-platform `HomeScreen` component (interim — the unified shared home/dashboard is tracked in LS-7791 under the shared-components-first principle, LS-7790); Messages/Management became **You** rows; Trade Center, Revenue Analytics, and the dev utilities were dropped from nav (see ²). All other destinations were pushed onto the Stack above the tabs — superseded by slice 8.
+8. ✅ **Tab bar persistence (LS-10614)** — stack-per-tab via shared routes; drill-down screens keep the tab bar, modal flows hide it. See [Tab bar persistence](#tab-bar-persistence).
 
 > **Slices 1–6 shipped only the tab _files_ — the `(tabs)` navigator was never actually wired in as the landing surface, so the flat drawer remained the only live navigation until slice 7.** Slice 7 is the integration step that made the tabs reachable.
 

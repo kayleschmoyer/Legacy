@@ -17,16 +17,16 @@ GAP bugs into their own Feature Stories if they want to track future findings un
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                             | Platform     | Notes                                                                                                              |
-| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `apps/web/src/pages/players/PlayerStatsPage.tsx`                 | Web          | Route shell (`PlayerStatsRoute`) — share handler, export handler, URL param parsing, stats grid orchestration      |
-| `apps/web/src/pages/players/PlayerStatsPage.spec.ts`             | Web          | Page-level unit tests (route param validation, filter round-trip assertions)                                       |
-| `apps/web/src/pages/players/PlayerStatsRoute.spec.tsx`           | Web          | Route-level unit tests (export lifecycle, share callbacks, onExport prop wiring)                                   |
-| `lib/shared-components/src/features/players/PlayerStatsPage.tsx` | Web + Native | Cross-platform `PlayerStatsPage` component; implements `handleShare` (relative URL builder) and the stats grid     |
-| `apps/app/src/app/(app)/PlayerStats.tsx`                         | Native       | Mobile screen; delegates to the shared `PlayerStatsPage` component after mounting                                  |
-| `apps/app/src/app/(app)/PlayerStats.spec.tsx`                    | Native       | Unit tests (component mounting, filter state, navigation callbacks)                                                |
-| `apps/web-e2e/src/tests/player-stats.spec.ts`                    | Web          | Hermetic Playwright E2E coverage (filter application, view mode tabs, page size, column expand, row click, export) |
-| `apps/web-e2e/src/tests/player-stats-mocked.spec.ts`             | Web          | Mocked Playwright E2E coverage (search, slider interactions, share affordance, URL persistence)                    |
+| File                                                                                  | Platform     | Notes                                                                                                              |
+| ------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `apps/web/src/pages/players/PlayerStatsPage.tsx`                                      | Web          | Route shell (`PlayerStatsRoute`) — share handler, export handler, URL param parsing, stats grid orchestration      |
+| `apps/web/src/pages/players/PlayerStatsPage.spec.ts`                                  | Web          | Page-level unit tests (route param validation, filter round-trip assertions)                                       |
+| `apps/web/src/pages/players/PlayerStatsRoute.spec.tsx`                                | Web          | Route-level unit tests (export lifecycle, share callbacks, onExport prop wiring)                                   |
+| `lib/shared-components/src/features/players/PlayerStatsPage.tsx`                      | Web + Native | Cross-platform `PlayerStatsPage` component; implements `handleShare` (relative URL builder) and the stats grid     |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerStats.tsx`      | Native       | Mobile screen; delegates to the shared `PlayerStatsPage` component after mounting                                  |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerStats.spec.tsx` | Native       | Unit tests (component mounting, filter state, navigation callbacks)                                                |
+| `apps/web-e2e/src/tests/player-stats.spec.ts`                                         | Web          | Hermetic Playwright E2E coverage (filter application, view mode tabs, page size, column expand, row click, export) |
+| `apps/web-e2e/src/tests/player-stats-mocked.spec.ts`                                  | Web          | Mocked Playwright E2E coverage (search, slider interactions, share affordance, URL persistence)                    |
 
 ## Existing Feature Stories (already in QA inventory)
 

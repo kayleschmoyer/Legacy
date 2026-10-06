@@ -39,7 +39,7 @@ and the accumulated node list (`setAllNodes([])`).
 
 ### Android (React Native)
 
-**Component:** `apps/app/src/app/(app)/football/players.tsx`
+**Component:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`
 
 Uses the same `useFootballPlayersQuery` with the same 300 ms debounce and 2-character
 minimum. UI layer uses React Native `TextInput` instead of Tamagui `Input`.

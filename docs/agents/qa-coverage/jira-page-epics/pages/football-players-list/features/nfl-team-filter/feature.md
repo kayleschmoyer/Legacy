@@ -60,7 +60,7 @@ cleared so the paginated list replaces rather than appends.
 
 ### Mobile (Android / mobile-web)
 
-**File:** `apps/app/src/app/(app)/football/players.tsx`
+**File:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`
 
 Identical filtering logic: `useState('All')` → `isConference` check →
 `nflTeam` / `conference` query vars. The mobile `Select` component reuses the
@@ -77,7 +77,7 @@ exports `NFL_TEAMS` — all 32 teams keyed by abbreviation with `fullName`,
 
 ### Unit tests (mobile)
 
-File: `apps/app/src/app/(app)/football/players.spec.tsx`
+File: `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.spec.tsx`
 
 The existing `describe('FootballPlayers')` suite covers adjacent features (position
 filter, search, navigation) but does not yet have a dedicated `describe` block for
@@ -91,4 +91,4 @@ the GraphQL mock in every test.
 - **Player search:** LS-5442 — search input and debounce
 - **Gap audit:** LS-7599 — feature-discovery-gaps for this page
 - **Web component:** `apps/web/src/components/football/FootballTeamFilter.tsx`
-- **Mobile screen:** `apps/app/src/app/(app)/football/players.tsx`
+- **Mobile screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`

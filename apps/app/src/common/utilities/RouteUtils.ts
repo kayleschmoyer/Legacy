@@ -8,7 +8,85 @@ import type { ImperativeRouter } from 'expo-router';
 export const HOME_TAB_HREF = '/home';
 
 /** The slice of the expo-router router that {@link closeToHomeTab} needs. */
-type CloseNavigator = Pick<ImperativeRouter, 'back' | 'canGoBack' | 'navigate'>;
+type CloseNavigator = Pick<
+  ImperativeRouter,
+  'back' | 'canGoBack' | 'dismissTo' | 'navigate'
+>;
+
+/** The five tab groups under `(app)/(tabs)` (LS-10614). */
+export type TabGroup = 'home' | 'leagues' | 'players' | 'games' | 'you';
+
+const TAB_ROOTS: ReadonlySet<string> = new Set([
+  'home',
+  'leagues',
+  'players',
+  'games',
+  'you',
+]);
+
+/**
+ * Drill-down paths and the tab that hosts them when they are entered from
+ * outside the tab shell. Every drill-down route exists in all five tab stacks
+ * (expo-router shared routes), so this only decides which tab a modal hands
+ * the user back to. Unlisted drill-downs go to Home.
+ */
+const HOST_TAB_RULES: ReadonlyArray<readonly [RegExp, TabGroup]> = [
+  [/^\/(baseball|football)\/league\/(?!create$|join$)[^/]+$/, 'leagues'],
+  [/^\/(baseball|football)\/(team\/|matchup$|scoreboard$)/, 'leagues'],
+  [/^\/(FreeAgents|WaiversPage|TradeCenterPage)$/, 'leagues'],
+  [/^\/(baseball|football)\/players(\/|$)/, 'players'],
+  [/^\/(PlayerDetail|PlayerStats|PlayerComparison|ViewGameLogs)$/, 'players'],
+  [/^\/season-draft$/, 'games'],
+  [
+    /^\/(DirectMessages|management|notifications|preferences|profile-settings|help|about)$/,
+    'you',
+  ],
+  [/^\/mock-drafts$/, 'home'],
+];
+
+/**
+ * The group-qualified href that opens `href` inside its host tab's stack, or
+ * `null` when `href` is a root-stack (modal) route that the tab shell does not
+ * host. `/`, `/baseball` and `/football` are only redirects to the Home tab
+ * (LS-8823), so they resolve to it directly.
+ */
+export function tabHrefFor(href: string): string | null {
+  const [pathname, query] = href.split('?');
+  const withQuery = (path: string) => (query ? `${path}?${query}` : path);
+
+  if (pathname === '/') return withQuery('/(tabs)/(home)/home');
+  const sport = /^\/(baseball|football)\/?$/.exec(pathname)?.[1];
+  if (sport) return `/(tabs)/(home)/home?sport=${sport}`;
+
+  const tabRoot = pathname.slice(1);
+  if (TAB_ROOTS.has(tabRoot)) {
+    return withQuery(`/(tabs)/(${tabRoot})/${tabRoot}`);
+  }
+  for (const [pattern, tab] of HOST_TAB_RULES) {
+    if (pattern.test(pathname)) return withQuery(`/(tabs)/(${tab})${pathname}`);
+  }
+  return null;
+}
+
+/**
+ * Navigates from a root-stack screen — a modal/immersive flow that hides the
+ * tab bar (draft room, create/join, games in play) — to `href`.
+ *
+ * A plain `router.navigate`/`replace` from such a screen into a tab-hosted
+ * route pushes a *second* copy of the tab navigator onto the root Stack, and
+ * in the same tick resolves the shared route into the Home tab regardless of
+ * where it belongs. `dismissTo` with the group-qualified href instead pops the
+ * root Stack back to the one tab shell and opens `href` in its host tab's
+ * stack (LS-10614). Root-stack destinations navigate as usual.
+ */
+export function navigateFromModal(
+  router: Pick<ImperativeRouter, 'dismissTo' | 'navigate'>,
+  href: string,
+): void {
+  const tabHref = tabHrefFor(href);
+  if (tabHref) router.dismissTo(tabHref);
+  else router.navigate(href);
+}
 
 /**
  * Dismisses a pushed screen for a cancel/close action ("X", "Cancel",
@@ -29,7 +107,7 @@ export function closeToHomeTab(router: CloseNavigator): void {
     router.back();
     return;
   }
-  router.navigate(HOME_TAB_HREF);
+  navigateFromModal(router, HOME_TAB_HREF);
 }
 
 /**

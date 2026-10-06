@@ -12,7 +12,11 @@ import type { DraftChatTabRenderProps } from '@legacy-sports/shared-components/e
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
-import { closeToHomeTab, toIntId } from '../../common/utilities/RouteUtils';
+import {
+  closeToHomeTab,
+  navigateFromModal,
+  toIntId,
+} from '../../common/utilities/RouteUtils';
 import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
 import { useLeagueChat } from '../../features/leagues/hooks/useLeagueChat';
 import { useDraftChatUnread } from '../../hooks/useDraftChatUnread';
@@ -177,7 +181,7 @@ export default function DraftBoardPage() {
         )}
         <EliteDraftBoardScreen
           leagueId={leagueId}
-          onNavigate={(path) => router.navigate(path)}
+          onNavigate={(path) => navigateFromModal(router, path)}
           websocketUrl={websocketUrl ?? ''}
           renderChatTab={renderChatTab}
           bottomInset={bottomInset}

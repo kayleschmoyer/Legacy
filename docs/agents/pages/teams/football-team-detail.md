@@ -2,7 +2,7 @@
 
 **Route**: `/football/team/:teamId` (mobile native only — no web or mobile-web
 equivalent exists yet; tracked as [LS-6438](https://bkrupa.atlassian.net/browse/LS-6438))
-**File**: `apps/app/src/app/(app)/football/team/[teamId].tsx`
+**File**: `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx`
 
 ---
 
@@ -16,7 +16,7 @@ imported by anything a real user could reach. Both were deleted as part of
 LS-5446.
 
 The real entry point, added by LS-5446: from a football league's **Overview**
-tab (`apps/app/src/app/(app)/football/league/[leagueId].tsx`), tapping a row
+tab (`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/league/[leagueId].tsx`), tapping a row
 in the **Quick Standings** list (`apps/app/src/features/leagues/LeagueOverviewTab.tsx`,
 `testID="overview-standings-row-<teamId>"`) navigates to
 `/football/team/[teamId]` for that row's team.

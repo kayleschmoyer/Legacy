@@ -38,7 +38,7 @@ Renders user avatar (with initials fallback on image error), username, read-only
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
 - `ProfileSettingsPage.spec.ts` (`getAvatarInitial`), `ProfileSettingsPage.render.spec.tsx` (LS-7232 photo attrs, initial fallback on image error)
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "initial rendering"
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "initial rendering"
 
 ## Pending assertions
 

@@ -35,7 +35,7 @@ Web: the "Linked Identities" card in `ProfileSettingsPage.tsx` (`handleConnectDi
 
 Unit / component coverage (supporting evidence only — does not make a row `covered`):
 
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "connected accounts (LS-10410)" and "disconnect Discord (LS-10413)" describes
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "connected accounts (LS-10410)" and "disconnect Discord (LS-10413)" describes
 
 ## Pending assertions
 

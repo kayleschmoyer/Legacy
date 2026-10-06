@@ -11,7 +11,7 @@ Form inputs handle Android keyboard correctly with no overlap and proper focus.
 
 ## Implementation
 
-`apps/app/src/app/(app)/profile-settings.tsx`: `KeyboardAvoidingView` (`behavior="height"` on Android) wrapping a `ScrollView` with `keyboardShouldPersistTaps="handled"`; username input in the editing row.
+`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.tsx`: `KeyboardAvoidingView` (`behavior="height"` on Android) wrapping a `ScrollView` with `keyboardShouldPersistTaps="handled"`; username input in the editing row.
 
 ## Platform coverage
 

@@ -21,14 +21,14 @@ player-stats). This doc is the rollup that ties them together.
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                                  | Platform       | Notes                                                                                                                       |
-| --------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/pages/baseball/league-detail-v2/LeagueDetailPageV2.tsx` | Web            | Web route shell — wires `LeagueWebSocketContext`, `useLeagueWebSocket({ onDraftStarted })`, and the realtime lifecycle hook |
-| `apps/web/src/hooks/useLeagueWebSocketLifecycle.ts`                   | Web            | Creates/disposes the shared `WebSocketClient`; reconnect-on-token-refresh and empty-`websocketUrl` disabled paths           |
-| `apps/web/src/hooks/useLeagueWebSocket.ts`                            | Web            | `onDraftStarted` / `onReconnect` callback plumbing for the league realtime channel                                          |
-| `apps/app/src/app/(app)/baseball/league/[leagueId].tsx`               | Android Native | Mobile league detail screen — native Share sheet for the invite link and Keychain auth-token read                           |
-| `apps/app/src/common/auth/AuthHooks.ts`                               | Android Native | `readKeychainValue` — secure-storage read whose error path is swallowed to `null`                                           |
-| `lib/shared-components/src/utils/SecureStorage.native.ts`             | Android Native | `getItem` — swallows the underlying `expo-secure-store` error and falls back to the in-memory store                         |
+| File                                                                                            | Platform       | Notes                                                                                                                       |
+| ----------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/pages/baseball/league-detail-v2/LeagueDetailPageV2.tsx`                           | Web            | Web route shell — wires `LeagueWebSocketContext`, `useLeagueWebSocket({ onDraftStarted })`, and the realtime lifecycle hook |
+| `apps/web/src/hooks/useLeagueWebSocketLifecycle.ts`                                             | Web            | Creates/disposes the shared `WebSocketClient`; reconnect-on-token-refresh and empty-`websocketUrl` disabled paths           |
+| `apps/web/src/hooks/useLeagueWebSocket.ts`                                                      | Web            | `onDraftStarted` / `onReconnect` callback plumbing for the league realtime channel                                          |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/league/[leagueId].tsx` | Android Native | Mobile league detail screen — native Share sheet for the invite link and Keychain auth-token read                           |
+| `apps/app/src/common/auth/AuthHooks.ts`                                                         | Android Native | `readKeychainValue` — secure-storage read whose error path is swallowed to `null`                                           |
+| `lib/shared-components/src/utils/SecureStorage.native.ts`                                       | Android Native | `getItem` — swallows the underlying `expo-secure-store` error and falls back to the in-memory store                         |
 
 ## Existing Feature Stories (already in QA inventory)
 
@@ -63,11 +63,11 @@ Commissioner) but never called out three cross-cutting, code-only capabilities:
 - **GAP-002** — the mobile OS Share-sheet for the league invite link, including the
   `EXPO_PUBLIC_APP_BASE_URL ?? 'https://legacysports.app'` fallback that can leak
   production links into non-production builds. Discovered auditing
-  `apps/app/src/app/(app)/baseball/league/[leagueId].tsx:237`.
+  `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/league/[leagueId].tsx:237`.
 - **GAP-003** — mobile secure-storage (Keychain / Keystore) auth-token read via
   `readKeychainValue`, whose failure path is silently swallowed to `null` at three
   layers, making a genuine secure-storage failure indistinguishable from a logged-out
-  user. Discovered auditing `apps/app/src/app/(app)/baseball/league/[leagueId].tsx:56`.
+  user. Discovered auditing `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/league/[leagueId].tsx:56`.
 
 ## Related
 

@@ -5,10 +5,15 @@ import SeasonDraftJoinScreen from './join';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockBack = jest.fn();
 let mockSearchParams: Record<string, string | string[]> = {};
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack }),
+  useRouter: () => ({
+    dismissTo: mockDismissTo,
+    replace: mockReplace,
+    back: mockBack,
+  }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -107,6 +112,6 @@ describe('SeasonDraftJoinScreen', () => {
   it('navigates to the lobby on browse games', () => {
     render(<SeasonDraftJoinScreen />);
     fireEvent.press(screen.getByText('browse'));
-    expect(mockReplace).toHaveBeenCalledWith({ pathname: '/season-draft' });
+    expect(mockDismissTo).toHaveBeenCalledWith('/(tabs)/(games)/season-draft');
   });
 });

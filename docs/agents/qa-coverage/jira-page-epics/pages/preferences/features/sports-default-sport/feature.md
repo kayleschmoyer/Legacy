@@ -25,7 +25,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 ### Unit tests
 
 - `apps/app/src/common/utilities/useDefaultSport.spec.ts` — defaults, stored football, unrecognized value, corrupt JSON, storage throws, resolve on focus
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `renders both default sport chip options`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `renders both default sport chip options`
 
 ### E2E tests (hermetic)
 

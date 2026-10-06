@@ -17,7 +17,7 @@ import { sanitizeSearchParam } from './PlayerStatsPage';
 
 // Web card-feed presentation of /players/stats at phone width (LS-9075). This
 // mirrors the native card feed's data wiring almost verbatim
-// (apps/app/src/app/(app)/(tabs)/players.tsx, LS-8832/LS-9073) — same
+// (apps/app/src/app/(app)/(tabs)/(players)/players.tsx, LS-8832/LS-9073) — same
 // PlayersCardFeed component, same career-stats data source, same cursor
 // pagination — swapping only the router primitive (react-router's
 // useSearchParams instead of expo-router).

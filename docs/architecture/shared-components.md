@@ -14,7 +14,7 @@ Before the LS-7791 unification, the home screen existed in three divergent forms
 
 1. **`apps/web/src/pages/home/HomePage.tsx`** — a bespoke, web-only dashboard with 13+ responsive breakpoint blocks.
 2. **`lib/shared-components/src/features/home/HomeScreen.tsx`** — a shared Tamagui component that nothing consumed (orphaned).
-3. **`apps/app/src/app/(app)/(tabs)/home.tsx`** — a native-only sport-picker with zero sharing.
+3. **`apps/app/src/app/(app)/(tabs)/(home)/home.tsx`** — a native-only sport-picker with zero sharing.
 
 This pattern recurred across the codebase: MLBHome (LS-7799), MatchupCard (LS-7709), NotificationsScreen (LS-7801). Each time an agent built "the web version" without checking whether a shared version existed, a new divergence was created. The cost: repeated extraction work, lost responsive tokens, and visual inconsistency.
 

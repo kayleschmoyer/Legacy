@@ -44,7 +44,7 @@ Extracted from manual QA on Android emulator (2026-07-24).
 Wired into `LeagueDetailPageV2` at the `standings` tab slot; the tab key is
 defined in `apps/web/src/pages/baseball/league-detail-v2/tabConfig.ts`.
 
-**Native:** `apps/app/src/app/(app)/baseball/league/[leagueId].tsx` renders the
+**Native:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/baseball/league/[leagueId].tsx` renders the
 same `StandingsTable`, fed by `apps/app/src/features/matchup/hooks/useStandings.ts`.
 
 **GraphQL query:** `useGetLeagueStandingsQuery` (`lib/graphql/src/getLeagueStandings.query.graphql`)

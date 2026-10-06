@@ -17,15 +17,15 @@ GAP bugs into their own Feature Stories if they want to track future findings un
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                                   | Platform       | Notes                                                                                                                                              |
-| ---------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/pages/players/PlayerComparisonPage.tsx`                  | Web            | Route shell; wires the shared `PlayerComparison` to web auth, premium gating, navigation, meta                                                     |
-| `apps/web/src/pages/players/PlayerComparisonPage.spec.tsx`             | Web            | Page-level unit tests (auth gating, upgrade-modal wiring)                                                                                          |
-| `apps/app/src/app/(app)/PlayerComparison.tsx`                          | Android Native | Native screen; wires the shared `PlayerComparison` to mobile premium gating + navigation                                                           |
-| `apps/app/src/app/(app)/PlayerComparison.spec.tsx`                     | Android Native | Native screen unit tests (premium gating, loading state)                                                                                           |
-| `lib/shared-components/src/features/players/PlayerComparison.tsx`      | Web + Native   | Canonical comparison UI: search/slots, premium gate, scoring projections, career batting/pitching, achievements, season breakdowns, BEST indicator |
-| `lib/shared-components/src/features/players/PlayerComparison.spec.tsx` | Web + Native   | Unit tests for the pure stat helpers and leader-detection logic                                                                                    |
-| `apps/web-e2e/src/tests/player-comparison*.spec.ts`                    | Web            | Hermetic Playwright E2E coverage (best indicator, achievements, color chips, empty/minimum states, fantasy scoring, stats charts)                  |
+| File                                                                                       | Platform       | Notes                                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/pages/players/PlayerComparisonPage.tsx`                                      | Web            | Route shell; wires the shared `PlayerComparison` to web auth, premium gating, navigation, meta                                                     |
+| `apps/web/src/pages/players/PlayerComparisonPage.spec.tsx`                                 | Web            | Page-level unit tests (auth gating, upgrade-modal wiring)                                                                                          |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerComparison.tsx`      | Android Native | Native screen; wires the shared `PlayerComparison` to mobile premium gating + navigation                                                           |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerComparison.spec.tsx` | Android Native | Native screen unit tests (premium gating, loading state)                                                                                           |
+| `lib/shared-components/src/features/players/PlayerComparison.tsx`                          | Web + Native   | Canonical comparison UI: search/slots, premium gate, scoring projections, career batting/pitching, achievements, season breakdowns, BEST indicator |
+| `lib/shared-components/src/features/players/PlayerComparison.spec.tsx`                     | Web + Native   | Unit tests for the pure stat helpers and leader-detection logic                                                                                    |
+| `apps/web-e2e/src/tests/player-comparison*.spec.ts`                                        | Web            | Hermetic Playwright E2E coverage (best indicator, achievements, color chips, empty/minimum states, fantasy scoring, stats charts)                  |
 
 The comparison UI was consolidated into the cross-platform `PlayerComparison` feature in
 shared-components (LS-7804); the web and native entry points are now thin wrappers. The

@@ -12,10 +12,12 @@ import { MockDraftPage } from './mock-draft';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
 const mockBack = jest.fn();
 let mockCanGoBack = true;
 jest.mock('expo-router', () => ({
   useRouter: () => ({
+    dismissTo: mockDismissTo,
     navigate: mockNavigate,
     back: mockBack,
     canGoBack: () => mockCanGoBack,
@@ -421,7 +423,7 @@ describe('MockDraftPage', () => {
       mockCanGoBack = false;
       render(<MockDraftPage />);
       fireEvent.press(screen.getByText('Cancel'));
-      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockDismissTo).toHaveBeenCalledWith('/(tabs)/(home)/home');
       expect(mockBack).not.toHaveBeenCalled();
     });
   });

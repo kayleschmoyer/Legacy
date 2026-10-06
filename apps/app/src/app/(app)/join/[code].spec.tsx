@@ -6,10 +6,15 @@ import JoinByCodeRoute from './[code]';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
 const mockBack = jest.fn();
 let mockParams: { code?: string | string[] } = {};
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate, back: mockBack }),
+  useRouter: () => ({
+    dismissTo: mockDismissTo,
+    navigate: mockNavigate,
+    back: mockBack,
+  }),
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -67,6 +72,8 @@ describe('JoinByCodeRoute — /join/[code] (LS-10078)', () => {
     render(<JoinByCodeRoute />);
     expect(lastProps().initialCode).toBe('LEAG2345');
     lastProps().onJoined({ kind: 'league', leagueId: 55, sport: 'football' });
-    expect(mockNavigate).toHaveBeenCalledWith('/football/league/55');
+    expect(mockDismissTo).toHaveBeenCalledWith(
+      '/(tabs)/(leagues)/football/league/55',
+    );
   });
 });

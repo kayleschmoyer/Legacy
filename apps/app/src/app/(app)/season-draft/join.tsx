@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, YStack } from 'tamagui';
 import { SeasonDraftJoin } from '@legacy-sports/shared-components';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { navigateFromModal } from '../../../common/utilities/RouteUtils';
 
 /**
  * Mobile Season Draft Join (by invite code)
@@ -49,7 +50,7 @@ export default function SeasonDraftJoinScreen(): React.JSX.Element {
         })
       }
       onCancel={() => router.back()}
-      onBrowseGames={() => router.replace({ pathname: '/season-draft' })}
+      onBrowseGames={() => navigateFromModal(router, '/season-draft')}
     />
   );
 }

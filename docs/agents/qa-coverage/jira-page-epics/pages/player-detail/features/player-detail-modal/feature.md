@@ -13,7 +13,7 @@ on native the same journey is served by the cross-platform `PlayerDetailById` sh
 component.
 
 **Web entry point:** `apps/web/src/components/PlayerDetailModal.tsx`
-**Native entry point:** `apps/app/src/app/(app)/PlayerDetail.tsx` → `PlayerDetailById`
+**Native entry point:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.tsx` → `PlayerDetailById`
 **Shared component:** `lib/shared-components/src/features/players/PlayerDetail.tsx`
 
 ### Web — PlayerDetailModal
@@ -40,7 +40,7 @@ The web modal is a full editorial layout built on Tamagui + custom design tokens
 The native screen is a thin wrapper:
 
 ```tsx
-// apps/app/src/app/(app)/PlayerDetail.tsx
+// apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.tsx
 export default function PlayerDetailScreen() {
   const { playerId } = useLocalSearchParams();
   const id = toIntId(playerId) ?? 0;
@@ -85,7 +85,7 @@ verify both the web modal journey and the native `PlayerDetailById` render path.
 
 ### Unit tests
 
-**Native screen:** `apps/app/src/app/(app)/PlayerDetail.spec.tsx`
+**Native screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.spec.tsx`
 
 - `'renders without crashing'` — mounts `PlayerDetailById` with `playerId=1`
 - `'parses playerId string to number and passes it to PlayerDetailById'` — verifies
@@ -128,6 +128,6 @@ verify both the web modal journey and the native `PlayerDetailById` render path.
 - **GAP-002 (cross-platform parity):** LS-7658 —
   `docs/agents/qa-coverage/jira-page-epics/pages/player-detail/features/feature-discovery-gaps/variants/non-premium/findings/GAP-002.md`
 - **Web modal:** `apps/web/src/components/PlayerDetailModal.tsx`
-- **Native screen:** `apps/app/src/app/(app)/PlayerDetail.tsx`
+- **Native screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.tsx`
 - **Shared component:** `lib/shared-components/src/features/players/PlayerDetail.tsx`
 - **Web E2E tests:** `apps/web-e2e/src/tests/player-detail-modal.spec.ts`

@@ -36,7 +36,7 @@ import {
  *
  * Purely presentational and cross-platform: each app supplies the league
  * summaries and the navigation callbacks. Currently consumed by the mobile
- * Leagues tab (`apps/app/src/app/(app)/(tabs)/leagues.tsx`).
+ * Leagues tab (`apps/app/src/app/(app)/(tabs)/(leagues)/leagues.tsx`).
  */
 
 /* ─── Ledger metrics (from the design handoff) ─── */

@@ -8,6 +8,9 @@ import { useGetUnreadNotificationCountQuery } from '@legacy-sports/graphql';
 import { colors } from '@legacy-sports/design-tokens';
 import { useThemeContext } from '../../../context/ThemeContext';
 
+// Each tab is a route group with its own Stack — see
+// `(home,leagues,players,games,you)/_layout.tsx` — so drill-down screens push
+// inside the tab and keep this bar visible (LS-10614).
 export default function TabsLayout() {
   const { data: unreadData } = useGetUnreadNotificationCountQuery();
   const unreadCount = unreadData?.getUnreadNotificationCount ?? 0;
@@ -37,28 +40,28 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="(home)"
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="leagues"
+        name="(leagues)"
         options={{
           title: 'Leagues',
           tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="players"
+        name="(players)"
         options={{
           title: 'Players',
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="games"
+        name="(games)"
         options={{
           title: 'Games',
           tabBarIcon: ({ color, size }) => (
@@ -67,7 +70,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="you"
+        name="(you)"
         options={{
           title: 'You',
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,

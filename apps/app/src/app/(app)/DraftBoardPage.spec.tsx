@@ -13,6 +13,7 @@ jest.mock('@legacy-sports/app-config/native', () => ({
 }));
 
 const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
 const mockBack = jest.fn();
 let mockCanGoBack = true;
 
@@ -23,6 +24,7 @@ let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({
+    dismissTo: mockDismissTo,
     navigate: mockNavigate,
     back: mockBack,
     canGoBack: () => mockCanGoBack,
@@ -198,7 +200,7 @@ describe('DraftBoardPage', () => {
       onExitDraft();
 
       expect(mockBack).not.toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockDismissTo).toHaveBeenCalledWith('/(tabs)/(home)/home');
     });
   });
 

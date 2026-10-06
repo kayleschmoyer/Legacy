@@ -37,12 +37,14 @@ type WizardForm = ReturnType<typeof makeForm>;
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
 let mockCanGoBack = true;
 let mockSearchParams: { name?: string; sport?: string } = {};
 jest.mock('expo-router', () => ({
   useRouter: () => ({
+    dismissTo: mockDismissTo,
     push: mockPush,
     replace: mockReplace,
     navigate: mockNavigate,
@@ -580,7 +582,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       expect(manageButton).toBeDefined();
 
       manageButton?.onPress?.();
-      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockDismissTo).toHaveBeenCalledWith('/(tabs)/(home)/home');
     });
 
     it('does not offer Manage Leagues for a different PREMIUM_REQUIRED upsell', () => {
@@ -640,7 +642,9 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       await waitFor(() => expect(dialogProps?.open).toBe(true));
       await act(() => dialogProps?.onConfirm?.());
 
-      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
+      expect(mockDismissTo).toHaveBeenCalledWith(
+        '/(tabs)/(leagues)/baseball/league/42',
+      );
       expect(mockPush).not.toHaveBeenCalled();
     });
 
@@ -655,7 +659,9 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       await waitFor(() => expect(dialogProps?.open).toBe(true));
       await act(() => dialogProps?.onConfirm?.());
 
-      expect(mockReplace).toHaveBeenCalledWith('/football/league/42');
+      expect(mockDismissTo).toHaveBeenCalledWith(
+        '/(tabs)/(leagues)/football/league/42',
+      );
       expect(mockPush).not.toHaveBeenCalled();
     });
 
@@ -672,7 +678,9 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
 
       await act(() => dialogProps?.onCancel?.());
 
-      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
+      expect(mockDismissTo).toHaveBeenCalledWith(
+        '/(tabs)/(leagues)/baseball/league/42',
+      );
     });
 
     it('shows the invite code and share copy when the league has one', async () => {
@@ -693,7 +701,9 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       );
 
       await act(() => dialogProps?.onConfirm?.());
-      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/99');
+      expect(mockDismissTo).toHaveBeenCalledWith(
+        '/(tabs)/(leagues)/baseball/league/99',
+      );
     });
   });
 
@@ -735,7 +745,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     it('falls back to the Home tab when the wizard was the entry point', () => {
       mockCanGoBack = false;
       renderScreen().onClose(false);
-      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockDismissTo).toHaveBeenCalledWith('/(tabs)/(home)/home');
       expect(mockBack).not.toHaveBeenCalled();
     });
 

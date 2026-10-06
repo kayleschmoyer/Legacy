@@ -17,13 +17,13 @@ GAP bugs into their own Feature Stories if they want to track future findings un
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                               | Platform       | Notes                               |
-| ------------------------------------------------------------------ | -------------- | ----------------------------------- |
-| `apps/web/src/pages/trade-center/TradeCenterPage.tsx`              | Web            | League selector page                |
-| `apps/app/src/app/(app)/TradeCenterPage.tsx`                       | Android Native | Native league selector              |
-| `lib/shared-components/src/features/leagues/TradingCenter.tsx`     | Web + Native   | Shared trade management UI          |
-| `lib/shared-components/src/features/leagues/PremiumTradeTools.tsx` | Web + Native   | Premium-gated analyzer / calculator |
-| `lib/shared-components/src/features/matchup/LeagueTradeBlock.tsx`  | Web + Native   | Trade block widget                  |
+| File                                                                                 | Platform       | Notes                               |
+| ------------------------------------------------------------------------------------ | -------------- | ----------------------------------- |
+| `apps/web/src/pages/trade-center/TradeCenterPage.tsx`                                | Web            | League selector page                |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/TradeCenterPage.tsx` | Android Native | Native league selector              |
+| `lib/shared-components/src/features/leagues/TradingCenter.tsx`                       | Web + Native   | Shared trade management UI          |
+| `lib/shared-components/src/features/leagues/PremiumTradeTools.tsx`                   | Web + Native   | Premium-gated analyzer / calculator |
+| `lib/shared-components/src/features/matchup/LeagueTradeBlock.tsx`                    | Web + Native   | Trade block widget                  |
 
 ## Existing Feature Stories (already in QA inventory)
 

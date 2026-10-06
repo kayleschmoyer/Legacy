@@ -4,7 +4,7 @@
  * The second surface that renders the shared `RosterBoard` lineup editor
  * (`lib/shared-components/src/features/roster/**`): web's
  * `apps/web/src/pages/football/FootballTeamDetailPage.tsx` (LS-6438) and
- * native's `apps/app/src/app/(app)/football/team/[teamId].tsx` Lineup tab
+ * native's `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx` Lineup tab
  * (LS-9649). With both of those landed, the dual-mode pattern applies here
  * exactly as it does on the League Roster tab, so the SAME spec body runs
  * mocked on web (PR CI) and through a real Appium/UiAutomator2 session on

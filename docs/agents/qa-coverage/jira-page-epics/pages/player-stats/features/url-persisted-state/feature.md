@@ -101,7 +101,7 @@ the URL in sync with every committed filter change.
 
 ### Mobile (Android / iOS)
 
-**Screen:** `apps/app/src/app/(app)/PlayerStats.tsx`
+**Screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerStats.tsx`
 
 Uses `useLocalSearchParams` (expo-router) instead of React Router's
 `useSearchParams`. Key differences from the web host:
@@ -160,7 +160,7 @@ tests hermetic and deterministic across CI runs.
 - **Implementation ref:** `docs/agents/pages/players/stats.md` — URL-Persisted State section
 - **Web host:** `apps/web/src/pages/players/PlayerStatsPage.tsx`
   (`buildStatsSearchParams`, `parseStatsSearchParams`, `migrateStatsSearchParams`)
-- **Mobile screen:** `apps/app/src/app/(app)/PlayerStats.tsx`
+- **Mobile screen:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerStats.tsx`
   (`parseStatsParams`, `buildStatsParams`)
 - **Bug (roundtrip lossy):** LS-7120 — PST-040: URL roundtrip was asymmetric for pitcher filters
 - **Bug (migration):** LS-7141 — PST-101: old URLs broke silently without migration shim

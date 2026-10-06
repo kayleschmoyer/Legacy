@@ -52,7 +52,7 @@ specific player without relying on text position.
 
 ### Mobile (mobile-web / android)
 
-`apps/app/src/app/(app)/PlayerStats.tsx` — the `onPlayerDetails` callback
+`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerStats.tsx` — the `onPlayerDetails` callback
 navigates to `/PlayerDetail?playerId=<id>` via Expo Router, opening a full
 detail screen instead of a modal overlay.
 

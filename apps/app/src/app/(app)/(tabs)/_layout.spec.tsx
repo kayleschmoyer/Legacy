@@ -93,7 +93,13 @@ jest.mock('../../../context/ThemeContext', () => ({
  * they existed only as string matches against this file's source text.
  */
 describe('App (tabs) navigator', () => {
-  const EXPECTED_TABS = ['home', 'leagues', 'players', 'games', 'you'];
+  const EXPECTED_TABS = [
+    '(home)',
+    '(leagues)',
+    '(players)',
+    '(games)',
+    '(you)',
+  ];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -141,7 +147,7 @@ describe('App (tabs) navigator', () => {
     it('shows no badge on the You tab when nothing is unread', () => {
       render(<TabsLayout />);
 
-      expect(mockNav.screens['you']?.tabBarBadge).toBeUndefined();
+      expect(mockNav.screens['(you)']?.tabBarBadge).toBeUndefined();
     });
 
     it('badges the You tab with the unread count', () => {
@@ -151,7 +157,7 @@ describe('App (tabs) navigator', () => {
 
       render(<TabsLayout />);
 
-      expect(mockNav.screens['you']?.tabBarBadge).toBe(7);
+      expect(mockNav.screens['(you)']?.tabBarBadge).toBe(7);
     });
 
     it('shows no badge while the count query has no data yet', () => {
@@ -159,7 +165,7 @@ describe('App (tabs) navigator', () => {
 
       render(<TabsLayout />);
 
-      expect(mockNav.screens['you']?.tabBarBadge).toBeUndefined();
+      expect(mockNav.screens['(you)']?.tabBarBadge).toBeUndefined();
     });
 
     it('badges only the You tab', () => {
@@ -169,7 +175,7 @@ describe('App (tabs) navigator', () => {
 
       render(<TabsLayout />);
 
-      for (const name of EXPECTED_TABS.filter((tab) => tab !== 'you')) {
+      for (const name of EXPECTED_TABS.filter((tab) => tab !== '(you)')) {
         expect(mockNav.screens[name]?.tabBarBadge).toBeUndefined();
       }
     });

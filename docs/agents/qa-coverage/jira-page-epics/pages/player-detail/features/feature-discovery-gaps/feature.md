@@ -17,15 +17,15 @@ GAP bugs into their own Feature Stories if they want to track future findings un
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                          | Platform     | Notes                                                                                                                                          |
-| ------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/components/PlayerDetailModal.tsx`               | Web          | Full-featured editorial modal: masthead, hero stats, career grid, dynamic tabs (Career Arc / Batting / Pitching / Fielding)                    |
-| `apps/web/src/pages/players/PlayerStatsPage.tsx`              | Web          | Route shell (PlayerDetailPage) — param parsing, brefId resolution, LOGGER.warn telemetry for invalid IDs                                       |
-| `apps/web/src/pages/players/PlayerDetailPage.spec.tsx`        | Web          | Page-level unit tests (telemetry for invalid / boundary numeric IDs)                                                                           |
-| `apps/app/src/app/(app)/PlayerDetail.tsx`                     | Native       | Mobile screen; delegates to `PlayerDetailById` after `toIntId` parse of the route param                                                        |
-| `apps/app/src/app/(app)/PlayerDetail.spec.tsx`                | Native       | Unit tests (param parse, fallback to id=0, component mounting)                                                                                 |
-| `lib/shared-components/src/features/players/PlayerDetail.tsx` | Web + Native | Cross-platform `PlayerDetailById` component; used by native screen; also serves as the fallback for direct id-based renders                    |
-| `apps/web-e2e/src/tests/player-detail-modal.spec.ts`          | Web          | Hermetic Playwright E2E coverage (hero stats, career summary, position badges, batting/fielding tabs, close/ESC, back nav, error/empty states) |
+| File                                                                                   | Platform     | Notes                                                                                                                                          |
+| -------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/PlayerDetailModal.tsx`                                        | Web          | Full-featured editorial modal: masthead, hero stats, career grid, dynamic tabs (Career Arc / Batting / Pitching / Fielding)                    |
+| `apps/web/src/pages/players/PlayerStatsPage.tsx`                                       | Web          | Route shell (PlayerDetailPage) — param parsing, brefId resolution, LOGGER.warn telemetry for invalid IDs                                       |
+| `apps/web/src/pages/players/PlayerDetailPage.spec.tsx`                                 | Web          | Page-level unit tests (telemetry for invalid / boundary numeric IDs)                                                                           |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.tsx`      | Native       | Mobile screen; delegates to `PlayerDetailById` after `toIntId` parse of the route param                                                        |
+| `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.spec.tsx` | Native       | Unit tests (param parse, fallback to id=0, component mounting)                                                                                 |
+| `lib/shared-components/src/features/players/PlayerDetail.tsx`                          | Web + Native | Cross-platform `PlayerDetailById` component; used by native screen; also serves as the fallback for direct id-based renders                    |
+| `apps/web-e2e/src/tests/player-detail-modal.spec.ts`                                   | Web          | Hermetic Playwright E2E coverage (hero stats, career summary, position badges, batting/fielding tabs, close/ESC, back nav, error/empty states) |
 
 ## Existing Feature Stories (already in QA inventory)
 
@@ -56,7 +56,7 @@ The original page-doc-driven feature extraction (LS-5578..5589) enumerates the w
 directly to the cross-platform `PlayerDetailById` shared component, nor that a
 regression there silently affects the native player-detail surface without any web
 signal. GAP-001 and GAP-002 were discovered during the code audit of
-`apps/app/src/app/(app)/PlayerDetail.tsx` and
+`apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/PlayerDetail.tsx` and
 `lib/shared-components/src/features/players/PlayerDetail.tsx`.
 
 ## Related

@@ -31,6 +31,7 @@ import {
 import {
   closeToHomeTab,
   HOME_TAB_HREF,
+  navigateFromModal,
 } from '../../../common/utilities/RouteUtils';
 
 /**
@@ -185,7 +186,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
           { text: 'Not now', style: 'cancel' },
           {
             text: 'Manage Leagues',
-            onPress: () => router.navigate(HOME_TAB_HREF),
+            onPress: () => navigateFromModal(router, HOME_TAB_HREF),
           },
           {
             text: 'Upgrade',
@@ -231,12 +232,11 @@ export default function CreateLeagueScreen(): React.JSX.Element {
 
   const handleContinueToLeague = useCallback(() => {
     if (!createdLeague) return;
-    // Replace, not push: swaps the finished wizard for the league page
-    // instead of stacking on top of it, so back lands on whatever surface
-    // opened the wizard (the Home tab) rather than a completed,
-    // non-resubmittable "step 5" (LS-8844). Same reasoning as the cancel
-    // path's closeToHomeTab below.
-    router.replace(`/${sport}/league/${createdLeague.id}`);
+    // Dismiss, not push: the finished wizard leaves the stack instead of
+    // sitting under the league page, so back never lands on a completed,
+    // non-resubmittable "step 5" (LS-8844). The league opens in the Leagues
+    // tab's stack with the tab bar visible (LS-10614).
+    navigateFromModal(router, `/${sport}/league/${createdLeague.id}`);
     setCreatedLeague(null);
   }, [createdLeague, router, sport]);
 

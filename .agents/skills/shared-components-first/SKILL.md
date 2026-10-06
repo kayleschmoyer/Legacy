@@ -182,7 +182,7 @@ The platform never determines layout. A native tablet has a wide viewport; a mob
 
 ```
 apps/web/src/pages/home/HomePage.tsx   ← web-only dashboard, 400 lines
-apps/app/src/app/(app)/(tabs)/home.tsx ← native-only duplicate
+apps/app/src/app/(app)/(tabs)/(home)/home.tsx ← native-only duplicate
 lib/shared-components/src/features/home/HomeScreen.tsx ← orphaned, 0 consumers
 ```
 
@@ -246,7 +246,7 @@ If shared < original, the extraction dropped responsive behavior — treat this 
 
 ## Worked Example: Home Screen Unification (LS-7791, PR #4937)
 
-**Before**: Three divergent implementations — `apps/web/src/pages/home/HomePage.tsx` (web-only), `lib/shared-components/src/features/home/HomeScreen.tsx` (orphaned), `apps/app/src/app/(app)/(tabs)/home.tsx` (native sport-picker only).
+**Before**: Three divergent implementations — `apps/web/src/pages/home/HomePage.tsx` (web-only), `lib/shared-components/src/features/home/HomeScreen.tsx` (orphaned), `apps/app/src/app/(app)/(tabs)/(home)/home.tsx` (native sport-picker only).
 
 **After** (PR #4937): A single `HomeScreen` component in `lib/shared-components/src/features/home/` with:
 

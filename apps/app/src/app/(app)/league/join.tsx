@@ -18,6 +18,7 @@ import {
   useJoinPublicLeagueMutation,
   useValidateInviteCodeLazyQuery,
 } from '@legacy-sports/graphql';
+import { navigateFromModal } from '../../../common/utilities/RouteUtils';
 
 /** How many browse rows to pull per page. */
 const BROWSE_PAGE_SIZE = 50;
@@ -89,7 +90,7 @@ export default function JoinLeagueRoute(): React.JSX.Element {
           });
           const leagueId = result.data?.joinLeagueByCode?.leagueId;
           if (leagueId != null) {
-            router.navigate(leagueRoute(sport, leagueId));
+            navigateFromModal(router, leagueRoute(sport, leagueId));
           }
         } catch (err) {
           LOGGER.error(
@@ -163,7 +164,8 @@ export default function JoinLeagueRoute(): React.JSX.Element {
             await Promise.all([refetchBrowse(), refetchCount()]);
             // Route by the joined league's own sport, not a hard-coded
             // baseball path as the retired league-discovery screen did (AC8).
-            router.navigate(
+            navigateFromModal(
+              router,
               leagueRoute(league.sport ?? sport, payload.leagueId ?? leagueId),
             );
           } else {
@@ -203,7 +205,9 @@ export default function JoinLeagueRoute(): React.JSX.Element {
       onJoinByCode={handleJoinByCode}
       joiningByCode={joiningByCode}
       inviteError={inviteError}
-      onGoToLeague={(leagueId) => router.navigate(leagueRoute(sport, leagueId))}
+      onGoToLeague={(leagueId) =>
+        navigateFromModal(router, leagueRoute(sport, leagueId))
+      }
       onBrowseQueryChange={setBrowseQuery}
       browseLeagues={browseData?.publicLeagues ?? []}
       browseTotalCount={countData?.publicLeaguesCount}

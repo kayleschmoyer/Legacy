@@ -42,7 +42,7 @@ only through the player detail deep-link (e.g. `/football/players/:id`).
 
 ### Android (React Native)
 
-**Component:** `apps/app/src/app/(app)/football/players.tsx`
+**Component:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/football/players.tsx`
 
 Uses expo-router's `router.push` to navigate to the player detail screen when a
 player row is pressed.

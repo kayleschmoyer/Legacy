@@ -66,7 +66,7 @@ Uses `react-router-dom`'s `useNavigate` to push `/baseball`.
 
 ### Android (React Native / Expo Router)
 
-**File:** `apps/app/src/app/(app)/(tabs)/home.tsx`
+**File:** `apps/app/src/app/(app)/(tabs)/(home)/home.tsx`
 
 ```typescript
 onViewSport={(sport) =>
@@ -108,6 +108,6 @@ The following journeys are not yet covered by a hermetic E2E test:
 
 - **Epic:** LS-5258 — QA — Page: Baseball Home
 - **Implementation ref (web):** `apps/web/src/pages/home/HomePage.tsx`
-- **Implementation ref (android):** `apps/app/src/app/(app)/(tabs)/home.tsx`
+- **Implementation ref (android):** `apps/app/src/app/(app)/(tabs)/(home)/home.tsx`
 - **Shared component:** `lib/shared-components/src/features/home/HomeScreen.tsx`
 - **Home page reference:** `docs/agents/pages/home.md`

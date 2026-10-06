@@ -42,7 +42,7 @@ Unit / component coverage (supporting evidence only — does not make a row `cov
 
 - `lib/shared-components/src/components/AvatarPicker.spec.tsx` and `AvatarPicker.emit.spec.tsx`
 - `apps/web/src/pages/profile/ProfileSettingsPage.avatarSave.spec.tsx` (LS-7236: toast after save, no toast on error)
-- `apps/app/src/app/(app)/profile-settings.spec.tsx`: "avatar" describe
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.spec.tsx`: "avatar" describe
 
 ## Pending assertions
 

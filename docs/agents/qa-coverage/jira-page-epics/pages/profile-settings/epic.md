@@ -2,7 +2,7 @@
 
 **Jira:** LS-5293
 **Page slug:** `profile-settings`
-**Route:** `/profile/settings` (web), `apps/app/src/app/(app)/profile-settings.tsx` (native)
+**Route:** `/profile/settings` (web), `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/profile-settings.tsx` (native)
 
 The Profile Settings page is where a signed-in user manages their account: profile card, username edit, preset avatar, Account & Security, linked identities (Discord), subscription status (native), and sign-out. Coverage here means a passing hermetic automated E2E flow per declared platform — see [`../../README.md`](../../README.md).
 

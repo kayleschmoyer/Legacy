@@ -234,7 +234,7 @@ export function mockRosterTeam(
  * {@link MockRosterTeam} plus the remaining `Team` fragment fields and the
  * `managerId` that `GetTeamById` selects on top of it. Team Detail (web
  * `pages/football/FootballTeamDetailPage.tsx`, native
- * `app/(app)/football/team/[teamId].tsx`) is driven by that query rather than
+ * `app/(app)/(tabs)/(home,leagues,players,games,you)/football/team/[teamId].tsx`) is driven by that query rather than
  * by `GetLeagueTeams`, and native treats a null `team` as a hard "Could not
  * load team" — so the fixture has to answer it with a real row.
  */

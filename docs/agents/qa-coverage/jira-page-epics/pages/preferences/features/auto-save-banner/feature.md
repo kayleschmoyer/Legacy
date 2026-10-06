@@ -27,7 +27,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 - `apps/web/src/pages/preferences/SavedBannerContext.spec.tsx` — shows then hides after the duration; failed-save flag; overlapping saves restart the timer
 - `apps/web/src/pages/preferences/useRetryingSave.spec.ts`, `useCoalescedSave.spec.ts`, `savePrefs.spec.ts` — retry/backoff, coalescing, storage failure
 - `apps/web/src/pages/preferences/PreferencesPage.spec.tsx` — `PreferencesPage notification save failure (LS-7082)`
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `saves updated preferences through AsyncStorage`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `saves updated preferences through AsyncStorage`
 
 ### E2E tests (hermetic)
 

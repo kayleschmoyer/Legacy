@@ -1,0 +1,385 @@
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { View } from 'react-native';
+import type { ScrollView } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  computePrimarySport,
+  formatDisplayName,
+  type HomeLeagueSummary,
+  HomeScreen,
+  mergeLeagueStandings,
+} from '@legacy-sports/shared-components';
+import {
+  OnThisDayFeed,
+  type OnThisDayPlayerPress,
+} from '@legacy-sports/shared-components/leagues';
+import {
+  useGetArchivedUserLeagueSummariesLazyQuery,
+  useGetArchivedUserLeagueSummariesQuery,
+  useGetUserLeagueStandingsQuery,
+  useGetUserLeagueSummariesQuery,
+} from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar/native';
+import { useThemeContext } from '../../../../context/ThemeContext';
+import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
+import { usePullToRefresh } from '../../../../common/hooks/usePullToRefresh';
+import { useSystemBackAction } from '../../../../common/hooks/useSystemBackAction';
+import { toPlayerDetailIdParam } from '../../../../common/utilities/RouteUtils';
+import { useDefaultSport } from '../../../../common/utilities/useDefaultSport';
+import BaseballHomeScreen from '../../../../screens/BaseballHomeScreen';
+import FootballHomeScreen from '../../../../screens/FootballHomeScreen';
+
+type ActiveSport = 'baseball' | 'football';
+
+/** Reads the `?sport=` deep-link param; anything unrecognized means "no sport". */
+function parseActiveSport(value: string | undefined): ActiveSport | null {
+  return value === 'baseball' || value === 'football' ? value : null;
+}
+
+/**
+ * The Home tab renders `HomeScreen` from `lib/shared-components` — wired to
+ * mobile's GraphQL data layer and expo-router navigation. `HomeScreen` picks
+ * the compact "Scoreboard First" returning-user layout (originally LS-8794,
+ * folded back into `HomeScreen` as a `useMedia` breakpoint branch by LS-9055)
+ * at narrow viewport widths; loading, error and new-user states render
+ * identically to web at every width (shared-components-first, LS-7790).
+ *
+ * Sport switching uses local state rather than router.push so that the baseball
+ * and football home screens stay mounted once visited — preserving scroll
+ * position and component state when the user switches between sports or returns
+ * to a sport view (LS-5814). This tab is the *only* place those screens mount:
+ * `/baseball` and `/football` redirect here with `?sport=` rather than
+ * rendering their own copy, which used to read as a second home page
+ * (LS-8823).
+ *
+ * That preservation is scoped to sport switching *within* the tab. Leaving for
+ * another bottom tab and coming back resets the sports dashboard to the top
+ * (LS-9248) — the inline sport views keep their own scroll position, since
+ * they are a drill-down the user is still inside of.
+ */
+export default function HomeTab() {
+  const router = useRouter();
+  const { sport: sportParam } = useLocalSearchParams<{ sport?: string }>();
+  const { top: topInset } = useSafeAreaInsets();
+  const userInfo = useAuthorizedUserInfo();
+  const { resolvedTheme } = useThemeContext();
+  // Stored Default Sport (Preferences) — orders the sport sections and picks
+  // the Create League default, matching web (LS-10386).
+  const defaultSport = useDefaultSport();
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Active sport is tracked locally; no router navigation is used for sport
+  // switching so state and scroll position are preserved across visits.
+  const [activeSport, setActiveSport] = useState<ActiveSport | null>(null);
+  // Once a sport screen is mounted we keep it alive to preserve scroll position.
+  const [mountedSports, setMountedSports] = useState<Set<ActiveSport>>(
+    new Set(),
+  );
+
+  // The tab navigator keeps this screen mounted once visited, so the
+  // dashboard's scroll offset survives a switch to another tab and back —
+  // the user returned to Home mid-page instead of at the top (LS-9248).
+  // Reset it on focus rather than on blur: on blur the screen is still on
+  // screen during the transition, so the jump would be visible.
+  const dashboardScrollRef = useRef<ScrollView>(null);
+  useFocusEffect(
+    useCallback(() => {
+      // Tamagui's `ScrollView` doesn't always forward a ref exposing RN's
+      // imperative `scrollTo` (its shape varies by platform/wrapper), so a
+      // bare `?.scrollTo(...)` call can throw "undefined is not a function"
+      // when `current` is set but isn't that method (LS-9249). The `typeof`
+      // guard only rules out `scrollTo` being absent outright — Rollbar #225
+      // kept recurring after that fix because `scrollTo` can still exist as
+      // a function but throw the same "undefined is not a function" from
+      // *inside* Tamagui/RN's own implementation when it's invoked during an
+      // effect "reconnect" (tab refocus) before the underlying native view
+      // has finished attaching. The reset is cosmetic, so swallow that
+      // failure instead of crashing the whole screen (LS-9249 recurrence).
+      if (typeof dashboardScrollRef.current?.scrollTo === 'function') {
+        try {
+          dashboardScrollRef.current.scrollTo({ y: 0, animated: false });
+        } catch (error) {
+          captureError(
+            error instanceof Error ? error : new Error(String(error)),
+            { tag: 'home-dashboard-scroll-reset-failed' },
+          );
+        }
+      }
+    }, []),
+  );
+
+  const { data, loading, error, refetch } = useGetUserLeagueSummariesQuery({
+    fetchPolicy: 'cache-and-network',
+  });
+
+  // Standings ride a separate, parallel query so the league cards are not held
+  // behind the StandingsService fan-out (LS-9528). `loading` above deliberately
+  // ignores it — the dashboard renders as soon as the summaries land.
+  const { data: standingsData, refetch: refetchStandings } =
+    useGetUserLeagueStandingsQuery({
+      fetchPolicy: 'cache-and-network',
+    });
+
+  const [fetchArchived, { data: archivedData, loading: archivedLoading }] =
+    useGetArchivedUserLeagueSummariesLazyQuery({
+      fetchPolicy: 'cache-and-network',
+    });
+
+  const { data: archivedCachedData } = useGetArchivedUserLeagueSummariesQuery({
+    fetchPolicy: 'cache-only',
+  });
+  const archivedCount =
+    archivedCachedData?.getArchivedUserLeagueSummaries?.length ?? null;
+
+  const { refreshControl } = usePullToRefresh([
+    () => refetch(),
+    () => refetchStandings(),
+  ]);
+
+  const leagues = useMemo<HomeLeagueSummary[]>(
+    () =>
+      mergeLeagueStandings(
+        data?.getUserLeagueSummaries ?? [],
+        standingsData?.getUserLeagueStandings,
+      ),
+    [data?.getUserLeagueSummaries, standingsData?.getUserLeagueStandings],
+  );
+  const archivedLeagues = useMemo<HomeLeagueSummary[]>(
+    () => archivedData?.getArchivedUserLeagueSummaries ?? [],
+    [archivedData?.getArchivedUserLeagueSummaries],
+  );
+  const primarySport = useMemo(() => computePrimarySport(leagues), [leagues]);
+
+  const handleShowArchived = useCallback(() => {
+    setShowArchived(true);
+    void fetchArchived();
+  }, [fetchArchived]);
+
+  const handleHideArchived = useCallback(() => {
+    setShowArchived(false);
+  }, []);
+
+  const viewLeague = useCallback(
+    (s: HomeLeagueSummary) => {
+      const params = { leagueId: String(s.leagueId) };
+      if (s.sport === 'football') {
+        router.push({ pathname: '/football/league/[leagueId]', params });
+      } else {
+        router.push({ pathname: '/baseball/league/[leagueId]', params });
+      }
+    },
+    [router],
+  );
+
+  // "Set Lineup" must land directly on the Roster tab, not the league
+  // dashboard — a bare `viewLeague` push always opens on Overview, requiring
+  // an extra manual tap into Roster (LS-8838).
+  const setLineup = useCallback(
+    (s: HomeLeagueSummary) => {
+      const params = { leagueId: String(s.leagueId), initialTab: 'roster' };
+      if (s.sport === 'football') {
+        router.push({ pathname: '/football/league/[leagueId]', params });
+      } else {
+        router.push({ pathname: '/baseball/league/[leagueId]', params });
+      }
+    },
+    [router],
+  );
+
+  // Live draft room — same `/DraftBoardPage` route the league Overview's
+  // "Join draft" banner uses; it serves both sports (LS-10593).
+  const joinDraft = useCallback(
+    (s: HomeLeagueSummary) => {
+      router.navigate({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: String(s.leagueId) },
+      });
+    },
+    [router],
+  );
+
+  const handleViewSport = useCallback((sport: ActiveSport) => {
+    setMountedSports((prev) => {
+      if (prev.has(sport)) return prev;
+      const next = new Set(prev);
+      next.add(sport);
+      return next;
+    });
+    setActiveSport(sport);
+  }, []);
+
+  const handleBackFromSport = useCallback(() => {
+    setActiveSport(null);
+  }, []);
+
+  // Deep links to `/baseball` and `/football` redirect here carrying `?sport=`
+  // (LS-8823). Open that sport's inline view, then clear the param: leaving it
+  // set would make the effect a no-op the next time the same link arrives, and
+  // would re-open the view the user had just dismissed with system back.
+  const deepLinkSport = parseActiveSport(sportParam);
+  useEffect(() => {
+    if (deepLinkSport === null) return;
+    handleViewSport(deepLinkSport);
+    router.setParams({ sport: '' });
+  }, [deepLinkSport, handleViewSport, router]);
+
+  // System back (hardware button / edge-swipe): dismiss the inline sport view
+  // and return to the sports dashboard. Only registered when a sport view is
+  // active — this is the only way back now that the sport views no longer
+  // render their own back bar (LS-8766).
+  useSystemBackAction(activeSport !== null, handleBackFromSport);
+
+  const viewMatchup = useCallback(
+    (s: HomeLeagueSummary) => {
+      if (s.matchupId == null) {
+        viewLeague(s);
+        return;
+      }
+      const params = {
+        matchupId: String(s.matchupId),
+        leagueId: String(s.leagueId),
+      };
+      if (s.sport === 'football') {
+        router.push({ pathname: '/football/matchup', params });
+      } else {
+        router.push({ pathname: '/baseball/matchup', params });
+      }
+    },
+    [router, viewLeague],
+  );
+
+  const userName = formatDisplayName(userInfo.username || 'Manager');
+
+  const handlePlayerPress = useCallback(
+    // LS-10015 — deep-link straight to the game this entry is about, matching
+    // web's HomePage behavior (LS-9763), rather than the player's generic
+    // profile page. Falls back to the profile page when the identifier can't
+    // be resolved to a game date.
+    ({ playerId: id, brefId, gameDate }: OnThisDayPlayerPress) => {
+      if (brefId && gameDate) {
+        router.push({
+          pathname: '/ViewGameLogs',
+          params: { playerId: brefId, startDate: gameDate, endDate: gameDate },
+        });
+        return;
+      }
+
+      // Validate the id before navigating (LS-8627) — a blind String(id)
+      // coercion let a missing/invalid id reach PlayerDetail, which fails
+      // to parse it and always shows "Player Not Found".
+      const playerId = toPlayerDetailIdParam(id);
+      if (playerId === null) {
+        LOGGER.warn(
+          '[Home] skipping PlayerDetail navigation for invalid player id',
+          { id },
+        );
+        return;
+      }
+      router.push({
+        pathname: '/PlayerDetail',
+        params: { playerId, playerName: '' },
+      });
+    },
+    [router],
+  );
+
+  // Full feed — rendered by the delegated new-user / error states.
+  const onThisDay = <OnThisDayFeed onPlayerPress={handlePlayerPress} />;
+  // Condensed feed — a single top entry plus "More ›" — for the compact
+  // returning-user layout (LS-8794).
+  const onThisDayCondensed = (
+    <OnThisDayFeed condensed onPlayerPress={handlePlayerPress} />
+  );
+
+  return (
+    <>
+      {/* Main sports dashboard — hidden while a sport view is active */}
+      <View
+        style={{ display: activeSport !== null ? 'none' : 'flex', flex: 1 }}
+      >
+        <HomeScreen
+          scrollRef={dashboardScrollRef}
+          userName={userName}
+          isLight={resolvedTheme === 'light'}
+          topInset={topInset}
+          leagues={leagues}
+          archivedLeagues={archivedLeagues}
+          archivedCount={archivedCount}
+          primarySport={primarySport}
+          defaultSport={defaultSport}
+          showArchived={showArchived}
+          archivedLoading={archivedLoading}
+          loading={loading}
+          error={Boolean(error && !data?.getUserLeagueSummaries)}
+          onThisDay={onThisDay}
+          onThisDayCondensed={onThisDayCondensed}
+          onShowArchived={handleShowArchived}
+          onHideArchived={handleHideArchived}
+          onRetry={() => void refetch()}
+          onViewLeague={viewLeague}
+          onViewMatchup={viewMatchup}
+          onSetLineup={setLineup}
+          onJoinDraft={joinDraft}
+          onSeeAllLeagues={() => router.navigate('/leagues')}
+          onOpenProfile={() => router.navigate('/you')}
+          onMockDraft={() => router.push('/baseball/mock-draft')}
+          onCreateLeague={(sportKey) =>
+            router.navigate(`/${sportKey}/league/create`)
+          }
+          onJoinLeague={() => router.navigate('/baseball/league/join')}
+          onBrowseStats={() => router.navigate('/players')}
+          onViewSport={handleViewSport}
+          onStartMockDraft={() => router.push('/baseball/mock-draft')}
+          refreshControl={refreshControl}
+        />
+      </View>
+
+      {/* Sport home screens — lazily mounted, kept alive once visited so scroll
+          position and component state are preserved across sport switches. */}
+      {mountedSports.has('baseball') && (
+        <View
+          style={{
+            display: activeSport === 'baseball' ? 'flex' : 'none',
+            flex: 1,
+            // The sport views used to get their status-bar clearance from the
+            // back bar removed in LS-8766; pad the container instead.
+            paddingTop: topInset,
+          }}
+        >
+          {/* The switcher flips the inline view instead of pushing
+              `/football`, which would leave the tab shell (LS-8823). */}
+          <BaseballHomeScreen
+            onSwitchSport={handleViewSport}
+            onGoToAllSports={handleBackFromSport}
+          />
+        </View>
+      )}
+      {mountedSports.has('football') && (
+        <View
+          style={{
+            display: activeSport === 'football' ? 'flex' : 'none',
+            flex: 1,
+            paddingTop: topInset,
+          }}
+        >
+          {/* The switcher flips the inline view instead of pushing
+              `/baseball`, which would leave the tab shell (LS-8823). */}
+          <FootballHomeScreen
+            onSwitchSport={handleViewSport}
+            onGoToAllSports={handleBackFromSport}
+          />
+        </View>
+      )}
+    </>
+  );
+}
+
+export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

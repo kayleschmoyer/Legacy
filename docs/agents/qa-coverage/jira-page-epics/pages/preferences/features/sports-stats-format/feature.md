@@ -25,7 +25,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 ### Unit tests
 
 - `apps/app/src/common/utilities/useStatsFormat.spec.ts` — `readStatsFormat` defaults/expanded/standard/unrecognized/absent/corrupt; hook resolves on focus
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `renders both stats format chip options`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `renders both stats format chip options`
 
 ### E2E tests (hermetic)
 

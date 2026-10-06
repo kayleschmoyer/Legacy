@@ -10,9 +10,11 @@ import { usePushNotifications } from '../../features/notifications/hooks/usePush
 import { useThemeContext } from '../../context/ThemeContext';
 
 // The authenticated app lands on the five-tab shell. `/` redirects there via
-// `index`, so the tab group is the anchor of the navigation stack and every
-// other screen (league context, settings, detail screens) is pushed on top of
-// it. No screen renders a navigation header: back navigation is handled
+// `index`, so the tab group is the anchor of the navigation stack. Drill-down
+// screens (league context, team, player, settings) live inside the tabs, each
+// tab with its own Stack, so the tab bar stays visible (LS-10614). Only modal /
+// immersive flows (drafts, create/join, games in play) are routes of this
+// Stack, pushed over the tab bar. No screen renders a navigation header: back navigation is handled
 // entirely by Android's system back button / edge-swipe gesture (LS-8766). The
 // legacy flat drawer was removed — see docs/architecture/mobile-navigation.md.
 export const unstable_settings = {
@@ -57,8 +59,9 @@ export default function Layout() {
           }}
         >
           {/* The tab shell and the `/` redirect own their own safe-area
-              handling (each tab screen reads `useSafeAreaInsets` directly), so
-              they opt out of the scene-level top padding to avoid doubling it.
+              handling (each tab root reads `useSafeAreaInsets` directly, and
+              the per-tab Stacks pad their pushed screens), so they opt out of
+              the scene-level top padding to avoid doubling it.
               `contentStyle` is replaced wholesale rather than merged, so the
               background has to be restated here. */}
           <Stack.Screen

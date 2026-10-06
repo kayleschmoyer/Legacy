@@ -6,7 +6,7 @@ import { colors } from '@legacy-sports/design-tokens';
  * Small pill toggle used to switch between baseball/football sport scope.
  *
  * Lives outside `app/` (not a route) so both `football/players.tsx` and the
- * native Players tab (`(tabs)/players.tsx`) can import just this atom
+ * native Players tab (`(tabs)/(players)/players.tsx`) can import just this atom
  * without pulling in either screen's heavier transitive graph (LS-9079).
  */
 export function SportSwitcherPill({

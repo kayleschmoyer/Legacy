@@ -26,7 +26,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 
 - `apps/web/src/pages/preferences/defaultEnableAnimations.spec.ts` — defaults OFF under reduced motion, ON otherwise, ON without `matchMedia`
 - `lib/shared-components/src/hooks/useReducedMotion.spec.ts` — true when OS requests reduced motion or `enableAnimations` is stored false; reacts to same-tab changes
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `renders the Enable animations toggle label`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `renders the Enable animations toggle label`
 
 ### E2E tests (hermetic)
 

@@ -1,7 +1,7 @@
 // Players tab card feed (LS-8832) — mobile-first card feed replacing the
 // Stats/Compare segmented control + sport pills on the Android/mobile Players
 // screen. See docs/design/players-card-feed-2026-07-29/ for the design
-// handoff and apps/app/src/app/(app)/(tabs)/players.tsx for the screen wiring.
+// handoff and apps/app/src/app/(app)/(tabs)/(players)/players.tsx for the screen wiring.
 
 export { PlayersCardFeed } from './PlayersCardFeed';
 export type { PlayerFeedRow, PlayersCardFeedProps } from './PlayersCardFeed';

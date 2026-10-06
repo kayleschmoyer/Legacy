@@ -49,18 +49,18 @@ Extracted from: `docs/agents/pages/baseball/league/detail/tabs/free-agents.md`
 Wired into `LeagueDetailPageV2` at the `free-agents` tab slot; the tab key is
 defined in `apps/web/src/pages/baseball/league-detail-v2/tabConfig.ts`.
 
-**Native:** `apps/app/src/app/(app)/FreeAgents.tsx` wraps the shared component with
+**Native:** `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/FreeAgents.tsx` wraps the shared component with
 an inline FAAB claim cluster instead of a modal.
 
 **GraphQL query:** `useGetPlayersWithStatsQuery` (`lib/graphql/src/getPlayersWithStats.query.graphql`)
 
-| Component / hook            | File                                                                        | Purpose                                                         |
-| --------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `LeagueDetailFreeAgentsTab` | `lib/shared-components/src/features/baseball/LeagueDetailFreeAgentsTab.tsx` | Cross-platform canonical implementation                         |
-| `useLeagueTakenPlayers`     | same file                                                                   | Fetches all team rosters; excludes rostered players             |
-| `FreeAgentsTab` (web)       | `apps/web/src/pages/baseball/league-detail-v2/tabs/FreeAgents.tsx`          | Web wrapper supplying `WaiverClaimModal` as `renderClaimAction` |
-| `WaiverClaimModal`          | `apps/web/src/features/baseball/WaiverClaimModal.tsx`                       | Web claim modal (standard + FAAB waiver types)                  |
-| `FreeAgents` (native)       | `apps/app/src/app/(app)/FreeAgents.tsx`                                     | Native wrapper with inline FAAB cluster                         |
+| Component / hook            | File                                                                            | Purpose                                                         |
+| --------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `LeagueDetailFreeAgentsTab` | `lib/shared-components/src/features/baseball/LeagueDetailFreeAgentsTab.tsx`     | Cross-platform canonical implementation                         |
+| `useLeagueTakenPlayers`     | same file                                                                       | Fetches all team rosters; excludes rostered players             |
+| `FreeAgentsTab` (web)       | `apps/web/src/pages/baseball/league-detail-v2/tabs/FreeAgents.tsx`              | Web wrapper supplying `WaiverClaimModal` as `renderClaimAction` |
+| `WaiverClaimModal`          | `apps/web/src/features/baseball/WaiverClaimModal.tsx`                           | Web claim modal (standard + FAAB waiver types)                  |
+| `FreeAgents` (native)       | `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/FreeAgents.tsx` | Native wrapper with inline FAAB cluster                         |
 
 ## Test Coverage
 

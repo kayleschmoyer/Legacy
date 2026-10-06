@@ -24,7 +24,7 @@ Extracted from: `docs/agents/pages/preferences.md`
 
 ### Unit tests
 
-- `apps/app/src/app/(app)/preferences.spec.tsx` — `renders the Show season totals toggle label`
+- `apps/app/src/app/(app)/(tabs)/(home,leagues,players,games,you)/preferences.spec.tsx` — `renders the Show season totals toggle label`
 
 ### E2E tests (hermetic)
 
