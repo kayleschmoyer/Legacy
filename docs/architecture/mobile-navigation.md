@@ -150,6 +150,8 @@ The route-placement spec in `(tabs)/(home,leagues,players,games,you)/_layout.spe
 
 A plain `router.navigate`/`replace` from a root-stack screen into a tab-hosted route pushes a **second** copy of the tab navigator onto the root Stack, and — within the same tick — resolves the shared route into Home regardless of where it belongs. Root-stack screens therefore leave through `navigateFromModal(router, href)` (`common/utilities/RouteUtils`), which `dismissTo`s a group-qualified href (`/(tabs)/(leagues)/football/league/42`): the root Stack pops back to the one tab shell and the destination opens in its host tab. `tabHrefFor` holds the destination → host-tab mapping (league-scoped → Leagues, player research → Players, account → You, season-draft lobby → Games, everything else → Home). `closeToHomeTab`'s no-history fallback goes through the same path.
 
+These behaviors — per-tab pushes, cold deep links landing in Home, modal routes outside `(tabs)`, and `navigateFromModal` leaving exactly one tab shell — are pinned against expo-router's real resolution by `common/utilities/RouteUtils.routing.spec.tsx` (LS-10639), which mounts a minimal route map of the same shape through `renderRouter` from `expo-router/testing-library`. The app's Jest config loads jest-expo's setup so `renderRouter` works in any spec.
+
 ## One home surface
 
 > **Decision (LS-8823):** the sport home screens are **removed as standalone screens** in favour of the tab-hosted inline views. `/baseball` and `/football` survive only as **redirects into the Home tab**.

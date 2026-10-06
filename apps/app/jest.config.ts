@@ -1,4 +1,5 @@
 const rnPreset = require('react-native/jest-preset');
+const expoPreset = require('jest-expo/jest-preset');
 
 module.exports = {
   ...rnPreset,
@@ -40,7 +41,16 @@ module.exports = {
   globals: {
     __DEV__: true,
   },
-  setupFiles: [...(rnPreset.setupFiles || [])],
+  // LS-10639: jest-expo's preset setupFiles are the React Native setup plus
+  // jest-expo's own, which installs `globalThis.expo` (EventEmitter,
+  // NativeModule, …) and mocks the native Expo modules. Without it any spec
+  // that loads expo-modules-core at runtime — e.g. `renderRouter` from
+  // `expo-router/testing-library` — dies with "Cannot read properties of
+  // undefined (reading 'EventEmitter')".
+  setupFiles: [
+    ...(expoPreset.setupFiles || []),
+    '<rootDir>/jest.setup-expo-globals.js',
+  ],
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': [
@@ -50,7 +60,10 @@ module.exports = {
       },
     ],
   },
+  // `expo(-[^/]+)?` transforms every expo-* package (as jest-expo's preset
+  // does): expo-router's runtime pulls in ESM-only ones such as expo-linking
+  // and expo-glass-effect (LS-10639).
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo-router|expo-asset|expo-modules-core|expo-constants|expo-apple-authentication|expo-font|expo-splash-screen|expo|@expo|@unimodules|unimodules|react-clone-referenced-element|@react-native-community|react-navigation|@react-navigation|native-base|react-native-svg|react-native-screens|react-native-vector-icons)/)',
+    'node_modules/(?!(react-native|@react-native|expo(-[^/]+)?|@expo|@unimodules|unimodules|react-clone-referenced-element|@react-native-community|react-navigation|@react-navigation|native-base|react-native-svg|react-native-screens|react-native-vector-icons)/)',
   ],
 };
