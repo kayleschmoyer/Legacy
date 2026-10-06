@@ -477,6 +477,52 @@ describe('PricingPage — billing toggle for Premium subscribers (LS-7171)', () 
     expect(screen.getByText(/Billed annually \(\$99\.99\/yr\)/)).toBeVisible();
   });
 
+  it('shows "Your plan: Premium Annual" in the hero badge for an annual Premium user', () => {
+    setPremium('annual');
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('hero-plan-badge')).toHaveTextContent(
+      'Your plan: Premium Annual',
+    );
+    expect(
+      screen.queryByText('Simple, transparent pricing'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows "Your plan: Premium Monthly" in the hero badge for a monthly Premium user', () => {
+    setPremium('monthly');
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('hero-plan-badge')).toHaveTextContent(
+      'Your plan: Premium Monthly',
+    );
+  });
+
+  it('falls back to "Your plan: Premium" in the hero badge when the interval is unknown', () => {
+    setPremium(null);
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('hero-plan-badge')).toHaveTextContent(
+      'Your plan: Premium',
+    );
+  });
+
+  it('keeps the generic hero badge for a non-Premium user', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('hero-plan-badge')).toHaveTextContent(
+      'Simple, transparent pricing',
+    );
+  });
+
   it('keeps the toggle and savings badge for a monthly Premium user', () => {
     setPremium('monthly');
 

@@ -497,6 +497,15 @@ export default function PricingPage() {
     skip: !isPremium,
   });
   const isAnnualSubscriber = isPremium && billingInterval === 'annual';
+  // LS-7189: acknowledge the subscriber's plan in the hero badge. An unknown
+  // interval (null/loading) falls back to plain "Premium" rather than guessing.
+  const heroBadgeLabel = !isPremium
+    ? 'Simple, transparent pricing'
+    : billingInterval === 'annual'
+      ? 'Your plan: Premium Annual'
+      : billingInterval === 'monthly'
+        ? 'Your plan: Premium Monthly'
+        : 'Your plan: Premium';
   // While a Premium user's interval is still resolving, don't flash a savings
   // badge they may turn out to already be getting.
   const hideSavingsBadge = isPremium && intervalLoading;
@@ -585,15 +594,19 @@ export default function PricingPage() {
         <ContentContainer tag="main">
           {/* ── Hero ── */}
           <HeroSection>
-            <PlanBadge>
-              <Zap size={14} color={BRAND_GOLD_LIGHT} />
+            <PlanBadge data-testid="hero-plan-badge">
+              {isPremium ? (
+                <Star size={14} color={BRAND_GOLD_LIGHT} />
+              ) : (
+                <Zap size={14} color={BRAND_GOLD_LIGHT} />
+              )}
               <Paragraph
                 size="$2"
                 fontWeight="600"
                 color={BRAND_GOLD_LIGHT}
                 marginBottom={0}
               >
-                Simple, transparent pricing
+                {heroBadgeLabel}
               </Paragraph>
             </PlanBadge>
 
