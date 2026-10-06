@@ -308,6 +308,163 @@ describe('useDraftWebSocket — pick announcement fallback (LS-8845)', () => {
   });
 });
 
+// ── On-demand fetch of a player not loaded on this client (LS-10627) ───────
+
+describe('useDraftWebSocket — on-demand pick player fetch (LS-10627)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const pickEvent = {
+    draftId: 42,
+    pickId: 801,
+    teamId: 2,
+    playerId: 555,
+    round: 1,
+    pickNumber: 2,
+    overallPick: 2,
+    wasAutoPick: false,
+    autoPickReason: null,
+    currentPickDeadline: null,
+    nextPick: { teamId: 3, round: 1, pickNumber: 3, overallPick: 3 },
+  };
+
+  const fetchedPlayer = {
+    id: 555,
+    firstName: 'Bobby',
+    lastName: 'Witt Jr.',
+    brefId: '',
+    eligiblePositions: ['SS'],
+  };
+
+  it('announces the fetched player instead of "Unknown" when the local lookup misses', async () => {
+    const fetchPlayer = jest.fn().mockResolvedValue(fetchedPlayer);
+    const params = { ...makeDefaultParams(), fetchPlayer };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    await act(async () => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+      await Promise.resolve();
+    });
+
+    expect(fetchPlayer).toHaveBeenCalledWith(555);
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+    expect(params.showAnnouncement).toHaveBeenCalledWith(
+      fetchedPlayer,
+      2,
+      1,
+      2,
+      false,
+      false,
+      expect.any(String),
+    );
+    expect(params.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('Bobby Witt Jr. (SS)'),
+      'info',
+    );
+    expect(params.showToast).not.toHaveBeenCalledWith(
+      expect.stringContaining('Unknown'),
+      expect.anything(),
+    );
+  });
+
+  it('does not fetch when the player is already in the local lookup', () => {
+    const fetchPlayer = jest.fn();
+    const params = {
+      ...makeDefaultParams(),
+      fetchPlayer,
+      enrichedPlayers: [
+        { id: 555, name: 'Bobby Witt Jr.', position: 'SS' },
+      ] as never,
+    };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+    });
+
+    expect(fetchPlayer).not.toHaveBeenCalled();
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the placeholder announcement when the fetch fails', async () => {
+    const warnSpy = jest
+      .spyOn(LOGGER, 'warn')
+      .mockImplementation(() => undefined);
+    const fetchPlayer = jest.fn().mockRejectedValue(new Error('network'));
+    const params = { ...makeDefaultParams(), fetchPlayer };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    await act(async () => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+      await Promise.resolve();
+    });
+
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+    expect(params.showAnnouncement).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 555, firstName: 'Unknown' }),
+      2,
+      1,
+      2,
+      false,
+      false,
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('falls back to the placeholder announcement when the player does not exist', async () => {
+    const fetchPlayer = jest.fn().mockResolvedValue(null);
+    const params = { ...makeDefaultParams(), fetchPlayer };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    await act(async () => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+      await Promise.resolve();
+    });
+
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+    expect(params.showAnnouncement).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 555, firstName: 'Unknown' }),
+      2,
+      1,
+      2,
+      false,
+      false,
+      expect.any(String),
+    );
+  });
+
+  it('announces a replayed pick only once while its fetch is in flight', async () => {
+    let resolveFetch: (p: typeof fetchedPlayer) => void = () => undefined;
+    const fetchPlayer = jest.fn(
+      () =>
+        new Promise<typeof fetchedPlayer>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const params = { ...makeDefaultParams(), fetchPlayer };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent);
+    });
+    await act(async () => {
+      resolveFetch(fetchedPlayer);
+      await Promise.resolve();
+    });
+
+    expect(fetchPlayer).toHaveBeenCalledTimes(1);
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ── Draft Room v2 toast/splash queue wiring (LS-9402) ──────────────────────
 
 describe('useDraftWebSocket — pick toast/splash queue wiring (LS-9402)', () => {

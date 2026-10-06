@@ -54,6 +54,7 @@ import {
   useDraftUIState,
   useDraftViewportTier,
   useDraftWebSocket,
+  useFetchDraftPlayer,
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
@@ -1050,6 +1051,7 @@ export function EliteDraftBoardScreen({
     autoPickTeamIds: queries.autoPickTeamIds,
   });
 
+  const fetchDraftPlayer = useFetchDraftPlayer();
   const { connectionStatus, retryConnection } = useDraftWebSocket({
     leagueId,
     draftId: queries.draftId,
@@ -1084,6 +1086,7 @@ export function EliteDraftBoardScreen({
     // (e.g. a laptop while you pick on mobile) never receive live pick pushes
     // until a manual refetch. The prop still wins when provided.
     token: token ?? authToken ?? undefined,
+    fetchPlayer: fetchDraftPlayer,
     onPlayerDrafted,
   });
 

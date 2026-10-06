@@ -294,6 +294,19 @@ query GetDraftPicks($draftId: Int!) {
   }
 }
 
+# On-demand lookup for a pick announcement whose player is not yet loaded on
+# this client (LS-10627). Same player selection as GetDraftPicks.player.
+query GetDraftPickPlayer($playerId: Int!) {
+  player(id: $playerId) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    mlbPlayerId
+    club
+  }
+}
+
 query GetHighlightVideos($playerIds: [Int!]!) {
   highlightVideosByPlayerIds(playerIds: $playerIds) {
     playerId

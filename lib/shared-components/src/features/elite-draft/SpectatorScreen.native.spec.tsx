@@ -27,6 +27,9 @@ import { render } from '../../test-utils';
 // so its wiring is exercised end-to-end; only the lower-level hooks it
 // composes are mocked.
 jest.mock('./hooks/useDraftTimer', () => ({ useDraftTimer: jest.fn() }));
+jest.mock('./hooks/useFetchDraftPlayer', () => ({
+  useFetchDraftPlayer: () => jest.fn(),
+}));
 jest.mock('./hooks/useDraftWebSocket', () => ({
   useDraftWebSocket: jest.fn(),
 }));

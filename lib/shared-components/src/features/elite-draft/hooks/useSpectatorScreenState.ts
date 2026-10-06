@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useDraftTimer } from './useDraftTimer';
 import { useDraftWebSocket } from './useDraftWebSocket';
+import { useFetchDraftPlayer } from './useFetchDraftPlayer';
 import { useSpectatorDraftData } from './useSpectatorDraftData';
 import { useSplashQueue } from '../SplashQueue';
 import { DEFAULT_PICK_TIME } from '../constants';
@@ -82,6 +83,8 @@ export function useSpectatorScreenState({
   const noop = useCallback(() => undefined, []);
   const asyncNoop = useCallback(() => Promise.resolve(undefined), []);
 
+  const fetchDraftPlayer = useFetchDraftPlayer();
+
   useDraftWebSocket({
     leagueId,
     draftId: data.draftId,
@@ -109,6 +112,7 @@ export function useSpectatorScreenState({
     refetchAutoPickStatuses: asyncNoop,
     websocketUrl,
     token: token ?? authToken ?? undefined,
+    fetchPlayer: fetchDraftPlayer,
     onPickUndone: removePick,
   });
 

@@ -100,6 +100,23 @@ test.describe('Draft Spectator Watch page @critical', () => {
         }),
       getdraftpicks: (route) =>
         fulfillJson(route, { data: { getDraftPicks: [] } }),
+      // The pushed pick names a player this client never loaded, so the
+      // announcement fetches them on demand instead of showing a
+      // placeholder (LS-10627).
+      getdraftpickplayer: (route) =>
+        fulfillJson(route, {
+          data: {
+            player: {
+              __typename: 'Player',
+              id: 999,
+              firstName: 'Test',
+              lastName: 'Slugger',
+              eligiblePositions: ['OF'],
+              mlbPlayerId: null,
+              club: null,
+            },
+          },
+        }),
       // leagueTeamsResponse() (shared factory) omits leagueId, which
       // useSpectatorDraftData's leagueTeams filter requires (t.leagueId !=
       // null) — build the response directly so the mocked teams survive
@@ -192,6 +209,8 @@ test.describe('Draft Spectator Watch page @critical', () => {
     // land in the DOM, so assert on that instead.
     await expect(page.getByRole('alert')).toBeVisible();
     await expect(page.getByRole('alert')).toContainText('OPPONENT PICK');
+    // The unloaded player was resolved on demand, not shown as a placeholder.
+    await expect(page.getByRole('alert')).not.toContainText('Unknown');
 
     // 7. The spectator clock never nudges an expired pick (it holds at 0:00
     //    for the server) — assert no such mutation was ever issued.

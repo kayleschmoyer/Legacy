@@ -13853,6 +13853,23 @@ export type GetDraftPicksQuery = {
   }> | null;
 };
 
+export type GetDraftPickPlayerQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftPickPlayerQuery = {
+  __typename?: 'Query';
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    mlbPlayerId?: number | null;
+    club?: string | null;
+  } | null;
+};
+
 export type GetHighlightVideosQueryVariables = Exact<{
   playerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
 }>;
@@ -34627,6 +34644,101 @@ export type GetDraftPicksSuspenseQueryHookResult = ReturnType<
 export type GetDraftPicksQueryResult = Apollo.QueryResult<
   GetDraftPicksQuery,
   GetDraftPicksQueryVariables
+>;
+export const GetDraftPickPlayer = gql`
+  query GetDraftPickPlayer($playerId: Int!) {
+    player(id: $playerId) {
+      id
+      firstName
+      lastName
+      eligiblePositions
+      mlbPlayerId
+      club
+    }
+  }
+`;
+
+/**
+ * __useGetDraftPickPlayerQuery__
+ *
+ * To run a query within a React component, call `useGetDraftPickPlayerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftPickPlayerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftPickPlayerQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useGetDraftPickPlayerQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftPickPlayerQuery,
+    GetDraftPickPlayerQueryVariables
+  > &
+    (
+      | { variables: GetDraftPickPlayerQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftPickPlayerQuery,
+    GetDraftPickPlayerQueryVariables
+  >(GetDraftPickPlayer, options);
+}
+export function useGetDraftPickPlayerLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftPickPlayerQuery,
+    GetDraftPickPlayerQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftPickPlayerQuery,
+    GetDraftPickPlayerQueryVariables
+  >(GetDraftPickPlayer, options);
+}
+export function useGetDraftPickPlayerSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftPickPlayerQuery,
+        GetDraftPickPlayerQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftPickPlayerQuery,
+    GetDraftPickPlayerQueryVariables
+  >(
+    GetDraftPickPlayer,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftPickPlayerQuery,
+          GetDraftPickPlayerQueryVariables
+        >,
+  );
+}
+export type GetDraftPickPlayerQueryHookResult = ReturnType<
+  typeof useGetDraftPickPlayerQuery
+>;
+export type GetDraftPickPlayerLazyQueryHookResult = ReturnType<
+  typeof useGetDraftPickPlayerLazyQuery
+>;
+export type GetDraftPickPlayerSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftPickPlayerSuspenseQuery
+>;
+export type GetDraftPickPlayerQueryResult = Apollo.QueryResult<
+  GetDraftPickPlayerQuery,
+  GetDraftPickPlayerQueryVariables
 >;
 export const GetHighlightVideos = gql`
   query GetHighlightVideos($playerIds: [Int!]!) {

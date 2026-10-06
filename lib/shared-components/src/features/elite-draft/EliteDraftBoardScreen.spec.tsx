@@ -109,6 +109,7 @@ jest.mock('./hooks', () => ({
   useDraftTimer: jest.fn(),
   useDraftUIState: jest.fn(),
   useDraftWebSocket: jest.fn(),
+  useFetchDraftPlayer: jest.fn(),
   useDraftViewportTier: jest.fn(),
   usePlayerData: jest.fn(),
 }));

@@ -3,6 +3,7 @@ export { useDraftQueries } from './useDraftQueries';
 export { usePlayerData, isPitcherPosition } from './usePlayerData';
 export { useDraftActions } from './useDraftActions';
 export { useDraftWebSocket } from './useDraftWebSocket';
+export { useFetchDraftPlayer } from './useFetchDraftPlayer';
 export {
   useDraftConnectionStatus,
   DRAFT_CONNECTION_LOST_DELAY_MS,

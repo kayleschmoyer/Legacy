@@ -123,6 +123,14 @@ interface UseDraftWebSocketParams {
   websocketUrl: string;
   /** Auth token for WebSocket authentication. */
   token?: string;
+  /**
+   * Resolves a player the client has not loaded (LS-10627). A pick by another
+   * user routinely names a player outside the loaded available-players page
+   * and stats map; when the local lookup misses, the announcement waits for
+   * this fetch instead of showing a placeholder. Optional: without it (or if
+   * it fails / returns null) the placeholder fallback below still announces.
+   */
+  fetchPlayer?: (playerId: number) => Promise<AvailableDraftPlayer | null>;
   /** Optional callback fired when a pick is made (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
   /**
@@ -161,6 +169,7 @@ export function useDraftWebSocket({
   refetchAutoPickStatuses,
   websocketUrl,
   token,
+  fetchPlayer,
   onPlayerDrafted,
   onPickUndone,
 }: UseDraftWebSocketParams) {
@@ -203,73 +212,96 @@ export function useDraftWebSocket({
       if (!notifiedPicksRef.current.has(pickKey)) {
         notifiedPicksRef.current.add(pickKey);
 
-        const pickedPlayer =
-          enrichedPlayers.find((p) => p.id === notification.playerId) ??
-          statsLookup.get(notification.playerId);
-
-        const playerName =
-          pickedPlayer?.name ?? `Unknown (ID: ${notification.playerId})`;
-        const position = pickedPlayer?.position ?? '??';
         const teamName = teamNameById(pickTeamId);
+
+        const announcePick = (
+          pickedPlayer: DraftPlayer | AvailableDraftPlayer | undefined,
+        ) => {
+          const playerName = pickedPlayer
+            ? 'name' in pickedPlayer
+              ? pickedPlayer.name
+              : `${pickedPlayer.firstName} ${pickedPlayer.lastName}`.trim()
+            : `Unknown (ID: ${notification.playerId})`;
+          const position =
+            (pickedPlayer && 'position' in pickedPlayer
+              ? pickedPlayer.position
+              : pickedPlayer?.eligiblePositions?.[0]) ?? '??';
+
+          // Last resort when neither the local lookup nor the on-demand fetch
+          // resolved the player: a minimal shape built from the
+          // notification's own fields so the announcement still fires instead
+          // of being dropped (LS-8845).
+          const announcementPlayer: DraftPlayer | AvailableDraftPlayer =
+            pickedPlayer ?? {
+              id: notification.playerId,
+              firstName: 'Unknown',
+              lastName: `(ID: ${notification.playerId})`,
+              brefId: '',
+            };
+
+          showAnnouncement(
+            announcementPlayer,
+            notification.overallPick,
+            notification.round,
+            notification.pickNumber,
+            isMyTeamPick,
+            notification.wasAutoPick,
+            teamName,
+          );
+
+          // Draft Room v2 overlays (LS-9402): consume the same pick event to
+          // populate LS-9397's toast/splash queues — my own pick gets the
+          // full-screen splash, every other pick (human or auto) gets the
+          // toast.
+          if (isMyTeamPick) {
+            enqueuePickSplash?.({
+              id: String(notification.overallPick),
+              player: announcementPlayer,
+              pickNumber: notification.overallPick,
+              round: notification.round,
+              roundPickNumber: notification.pickNumber,
+            });
+          } else {
+            enqueuePickToast?.({
+              id: String(notification.overallPick),
+              player: announcementPlayer,
+              pickNumber: notification.overallPick,
+              round: notification.round,
+              roundPickNumber: notification.pickNumber,
+              teamName,
+              isAuto: notification.wasAutoPick,
+            });
+          }
+
+          if (pickedPlayer) {
+            onPlayerDrafted?.(notification.playerId, position);
+          }
+
+          showToast(
+            `Pick #${notification.overallPick}: ${playerName} (${position}) — ${teamName}`,
+            'info',
+          );
+        };
 
         // The lookup misses for most other-team picks: enrichedPlayers is only
         // the client's currently loaded available-players page and statsLookup
         // its stats map, neither of which is guaranteed to hold the drafted
-        // player. Fall back to a minimal shape built from the notification's
-        // own fields so the announcement still fires instead of being dropped
-        // (LS-8845).
-        const announcementPlayer: DraftPlayer | AvailableDraftPlayer =
-          pickedPlayer ?? {
-            id: notification.playerId,
-            firstName: 'Unknown',
-            lastName: `(ID: ${notification.playerId})`,
-            brefId: '',
-          };
+        // player. Fetch the missing player on demand so the announcement shows
+        // their name rather than a placeholder (LS-10627).
+        const localPlayer =
+          enrichedPlayers.find((p) => p.id === notification.playerId) ??
+          statsLookup.get(notification.playerId);
 
-        showAnnouncement(
-          announcementPlayer,
-          notification.overallPick,
-          notification.round,
-          notification.pickNumber,
-          isMyTeamPick,
-          notification.wasAutoPick,
-          teamName,
-        );
-
-        // Draft Room v2 overlays (LS-9402): consume the same pick event to
-        // populate LS-9397's toast/splash queues — my own pick gets the
-        // full-screen splash, every other pick (human or auto) gets the toast.
-        if (isMyTeamPick) {
-          enqueuePickSplash?.({
-            id: String(notification.overallPick),
-            player: announcementPlayer,
-            pickNumber: notification.overallPick,
-            round: notification.round,
-            roundPickNumber: notification.pickNumber,
-          });
+        if (localPlayer || !fetchPlayer) {
+          announcePick(localPlayer);
         } else {
-          enqueuePickToast?.({
-            id: String(notification.overallPick),
-            player: announcementPlayer,
-            pickNumber: notification.overallPick,
-            round: notification.round,
-            roundPickNumber: notification.pickNumber,
-            teamName,
-            isAuto: notification.wasAutoPick,
-          });
+          fetchPlayer(notification.playerId)
+            .then((fetched) => announcePick(fetched ?? undefined))
+            .catch((e: unknown) => {
+              LOGGER.warn('Pick player fetch failed:', String(e));
+              announcePick(undefined);
+            });
         }
-
-        if (pickedPlayer) {
-          onPlayerDrafted?.(
-            notification.playerId,
-            pickedPlayer.position ?? '??',
-          );
-        }
-
-        showToast(
-          `Pick #${notification.overallPick}: ${playerName} (${position}) — ${teamName}`,
-          'info',
-        );
       }
 
       setLiveMessage(
@@ -332,6 +364,7 @@ export function useDraftWebSocket({
       refetchAutoPickStatuses,
       refetchQueue,
       onPlayerDrafted,
+      fetchPlayer,
     ],
   );
 
