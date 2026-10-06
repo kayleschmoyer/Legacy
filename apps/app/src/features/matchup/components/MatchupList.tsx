@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList } from 'react-native';
+import React, { useMemo } from 'react';
+import { SectionList } from 'react-native';
 import { Text, YStack } from 'tamagui';
 import type { AppMatchupFragment } from '@legacy-sports/graphql';
 import { MatchupCard } from './MatchupCard';
@@ -21,6 +21,31 @@ export interface MatchupListProps {
    * performance on Android.
    */
   listHeaderComponent?: React.ComponentType | React.ReactElement | null;
+}
+
+interface WeekSection {
+  title: string;
+  data: AppMatchupFragment[];
+}
+
+/**
+ * Groups matchups into ascending week sections, preserving the incoming order
+ * within each week (callers sort the user's own matchup first).
+ */
+function groupMatchupsByWeek(matchups: AppMatchupFragment[]): WeekSection[] {
+  const byWeek = new Map<number | null, AppMatchupFragment[]>();
+  for (const matchup of matchups) {
+    const week = matchup.weekNumber ?? null;
+    const bucket = byWeek.get(week);
+    if (bucket) bucket.push(matchup);
+    else byWeek.set(week, [matchup]);
+  }
+  return [...byWeek.entries()]
+    .sort(([a], [b]) => (a ?? Infinity) - (b ?? Infinity))
+    .map(([week, data]) => ({
+      title: week == null ? 'Unscheduled' : `Week ${week}`,
+      data,
+    }));
 }
 
 /**
@@ -46,15 +71,33 @@ export function MatchupList({
   // ListEmptyComponent) so the tab's rendering strategy — and its
   // virtualization behavior — stays consistent across every state instead of
   // swapping between a plain YStack and a virtualized list (LS-6319).
+  const sections = useMemo(
+    () => (loading ? [] : groupMatchupsByWeek(matchups)),
+    [loading, matchups],
+  );
+
   return (
-    <FlatList
-      data={loading ? [] : matchups}
+    <SectionList
+      sections={sections}
       keyExtractor={(item) => item.id?.toString() ?? ''}
+      stickySectionHeadersEnabled={false}
+      renderSectionHeader={({ section }) => (
+        <Text
+          fontWeight="700"
+          fontSize="$5"
+          color="$gray12"
+          paddingTop="$3"
+          paddingBottom="$2"
+          paddingHorizontal="$1"
+        >
+          {section.title}
+        </Text>
+      )}
       renderItem={({ item }) => (
         <MatchupCard
           matchup={item}
           onPress={() => onMatchupPress?.(item)}
-          showWeek={true}
+          showWeek={false}
         />
       )}
       ListHeaderComponent={listHeaderComponent}

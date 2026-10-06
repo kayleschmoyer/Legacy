@@ -148,6 +148,19 @@ describe('MatchupList', () => {
     expect(screen.getByText('Week 2')).toBeTruthy();
   });
 
+  it('groups matchups under one ascending week header each', () => {
+    const week2 = { ...MOCK_MATCHUPS[1], id: '3', weekNumber: 2 };
+    render(
+      <MatchupList matchups={[MOCK_MATCHUPS[1], week2, MOCK_MATCHUPS[0]]} />,
+    );
+    // Exactly one header per week, ordered ascending despite input order.
+    expect(screen.getAllByText(/^Week \d+$/)).toHaveLength(2);
+    expect(screen.getAllByText(/^Week \d+$/)[0]).toBe(
+      screen.getByText('Week 1'),
+    );
+    expect(screen.getAllByTestId('matchup-card')).toHaveLength(3);
+  });
+
   it('displays scores for matchups', () => {
     render(<MatchupList matchups={MOCK_MATCHUPS} />);
     expect(screen.getByText('90.00')).toBeTruthy();
