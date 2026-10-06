@@ -1,7 +1,6 @@
 import {
   pgTable,
   unique,
-  uniqueIndex,
   serial,
   varchar,
   foreignKey,
@@ -617,9 +616,7 @@ export const draftQueue = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    /** The queue owner's seat (LS-10073). Every writer sets it since LS-10080,
-     *  which also stopped writing team_id; the follow-up contract migration
-     *  drops team_id and makes this column NOT NULL. */
+    /** The queue owner's seat (LS-10073). Replaced team_id (LS-10592). */
     participantId: integer('participant_id').notNull(),
     playerId: integer('player_id').notNull(),
     priority: integer('priority').notNull(),
@@ -650,19 +647,12 @@ export const draftQueue = pgTable(
       participantIdIdx: index('draft_queue_participant_id_idx').on(
         table.participantId,
       ),
-      // Seat-keyed uniques for rows written without a team_id (LS-10076):
-      // every row since LS-10080. The follow-up contract migration replaces
-      // them with plain constraints when it drops team_id.
-      draftQueueUkDraftParticipantPlayer: uniqueIndex(
+      draftQueueUkDraftParticipantPlayer: unique(
         'draft_queue_uk_draft_participant_player',
-      )
-        .on(table.draftId, table.participantId, table.playerId)
-        .where(sql`team_id IS NULL`),
-      draftQueueUkDraftParticipantPriority: uniqueIndex(
+      ).on(table.draftId, table.participantId, table.playerId),
+      draftQueueUkDraftParticipantPriority: unique(
         'draft_queue_uk_draft_participant_priority',
-      )
-        .on(table.draftId, table.participantId, table.priority)
-        .where(sql`team_id IS NULL`),
+      ).on(table.draftId, table.participantId, table.priority),
       draftQueuePlayerIdx: index('draft_queue_player_idx').on(table.playerId),
     };
   },

@@ -81,9 +81,9 @@ export const auctionState = pgTable(
     draftId: integer('draft_id').notNull(),
     nominatedPlayerId: integer('nominated_player_id'),
     currentBid: integer('current_bid'),
-    /** Seat ids for the nominator / current bidder (LS-10073). Writers set
-     *  these instead of the *_team_id columns since LS-10080. */
-    nominatorParticipantId: integer('nominator_participant_id'),
+    /** Seat ids for the nominator / current bidder (LS-10073); they replaced
+     *  the *_team_id columns (LS-10592). */
+    nominatorParticipantId: integer('nominator_participant_id').notNull(),
     currentBidderParticipantId: integer('current_bidder_participant_id'),
     nominationDeadline: timestamp('nomination_deadline', {
       withTimezone: true,
@@ -103,7 +103,7 @@ export const auctionState = pgTable(
         columns: [table.nominatorParticipantId],
         foreignColumns: [draftParticipants.id],
         name: 'auction_state_nominator_participant_id_fk',
-      }).onDelete('set null'),
+      }).onDelete('cascade'),
       auctionStateCurrentBidderParticipantIdFk: foreignKey({
         columns: [table.currentBidderParticipantId],
         foreignColumns: [draftParticipants.id],
@@ -125,9 +125,7 @@ export const auctionBudgets = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     draftId: integer('draft_id').notNull(),
-    /** The budget owner's seat (LS-10073). Every writer sets it since
-     *  LS-10080, which also stopped writing team_id; the follow-up contract
-     *  migration drops team_id and makes this column NOT NULL. */
+    /** The budget owner's seat (LS-10073). Replaced team_id (LS-10592). */
     participantId: integer('participant_id').notNull(),
     remainingBudget: integer('remaining_budget').notNull(),
     playersWon: integer('players_won').notNull().default(0),
