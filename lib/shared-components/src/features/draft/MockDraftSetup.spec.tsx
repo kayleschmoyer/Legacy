@@ -3,6 +3,10 @@
  * by both web and native. These tests cover the form's interactive behavior:
  * default settings payload, setting changes, cancel, error/usage surfaces, and
  * the sport-aware player pool (LS-9470).
+ *
+ * LS-7575: every setting is an OptionButton, so the form can never summon an
+ * on-screen keyboard that hides fields or the Start button on small phones
+ * (iPhone SE, 375x667). The no-text-entry test below guards that invariant.
  */
 import React from 'react';
 import { type MockDraftSettings, MockDraftSetup } from './MockDraftSetup';
@@ -374,5 +378,41 @@ describe('MockDraftSetup', () => {
     fireEvent.click(getByText('On'));
 
     expect(queryByText('Pick Timer')).toBeNull();
+  });
+
+  it('renders no text-entry controls in any mode, so no field can summon the on-screen keyboard (LS-7575)', () => {
+    // Every rendered input primitive (Tamagui Input, RN TextInput) maps to a
+    // DOM <input> under both the web and mobile jest setups.
+    const textEntrySelector = 'input, textarea, [contenteditable="true"]';
+    const { container, getByText, queryAllByRole } = render(
+      <MockDraftSetup
+        onStart={noop}
+        onCancel={noop}
+        footballMockEnabled
+        isControlAllTeamsEntitled
+        onJoinInstead={noop}
+        onBrowseMockDrafts={noop}
+        usageLabel="1 of 2 mock drafts used this week"
+        error="Something went wrong"
+      />,
+    );
+
+    const expectNoTextEntry = () => {
+      expect(container.querySelectorAll(textEntrySelector)).toHaveLength(0);
+      expect(queryAllByRole('textbox')).toHaveLength(0);
+      expect(queryAllByRole('spinbutton')).toHaveLength(0);
+    };
+
+    // Shared (default) mode shows the most fields: visibility + Pick Timer.
+    expectNoTextEntry();
+
+    fireEvent.click(getByText('🏈 Football'));
+    expectNoTextEntry();
+
+    fireEvent.click(getByText('Offline'));
+    expectNoTextEntry();
+
+    fireEvent.click(getByText('On'));
+    expectNoTextEntry();
   });
 });

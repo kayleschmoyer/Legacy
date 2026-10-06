@@ -427,6 +427,45 @@ test.describe('Mock Draft Simulator @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-7575 (MOB-011): on an iPhone SE-sized viewport (375x667) the settings
+// form is taller than the screen. Every setting is a button (no text field can
+// open an on-screen keyboard over the form), so the only requirement is that
+// the actions stay reachable by ordinary scrolling.
+// ---------------------------------------------------------------------------
+
+test.describe('Mock Draft setup on a 375x667 viewport (LS-7575) @regression', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('Start Mock Draft and Cancel are reachable by scrolling, and Start creates the draft', async ({
+    page,
+  }) => {
+    const capture: { createMockDraftVariables?: Record<string, unknown> } = {};
+    await setupGraphQL(page, capture);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(
+      page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+    ).toBeVisible();
+
+    const cancelBtn = page.getByRole('button', { name: /Cancel/i });
+    await cancelBtn.scrollIntoViewIfNeeded();
+    await expect(cancelBtn).toBeInViewport({ ratio: 1 });
+
+    const startBtn = page.getByRole('button', { name: /Start Mock Draft/i });
+    await startBtn.scrollIntoViewIfNeeded();
+    await expect(startBtn).toBeInViewport({ ratio: 1 });
+    await expect(startBtn).toBeEnabled();
+    await startBtn.click();
+
+    // Default settings: a Shared (online) 8-team draft.
+    await expect
+      .poll(() => capture.createMockDraftVariables)
+      .toMatchObject({ numTeams: 8, mode: 'ONLINE', controlAllTeams: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-3485: /baseball/mock-draft is a protected route. Unauthenticated users
 // visiting /baseball/mock-draft are intercepted by EnhancedAuthGuard and shown
 // PublicLandingPage with the "Build Your Dynasty" headline, "Season 2026"
