@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -70,6 +70,8 @@ import { useHasEntitlement } from '../../hooks/useEntitlement';
 import { useScreenWakeLock } from '../../hooks/useScreenWakeLock';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
+
+const CHAT_KEYBOARD_AVOIDING_STYLE = { flex: 1 } as const;
 
 export interface EliteDraftBoardScreenProps {
   /** League ID to load (replaces route param). Null in draft-room mode. */
@@ -745,15 +747,24 @@ function CompactLiveDraftBoard({
           </YStack>
         </XStack>
         {(leagueId !== null || chatDraftId != null) && renderChatTab ? (
-          <YStack flex={1} testID="draft-chat-tab-slot">
-            {renderChatTab({
-              leagueId,
-              draftId: chatDraftId ?? null,
-              userId,
-              onNewMessage: handleNewChatMessage,
-              chatOpen,
-            })}
-          </YStack>
+          // LS-10632: the panel is absolutely positioned over the whole screen,
+          // so the soft keyboard would cover the composer. Avoid it around the
+          // body only (the header stays put); 'height' on Android mirrors the
+          // other app screens' KeyboardAvoidingView usage.
+          <KeyboardAvoidingView
+            style={CHAT_KEYBOARD_AVOIDING_STYLE}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <YStack flex={1} testID="draft-chat-tab-slot">
+              {renderChatTab({
+                leagueId,
+                draftId: chatDraftId ?? null,
+                userId,
+                onNewMessage: handleNewChatMessage,
+                chatOpen,
+              })}
+            </YStack>
+          </KeyboardAvoidingView>
         ) : (
           <YStack
             flex={1}

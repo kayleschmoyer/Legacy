@@ -27,6 +27,21 @@ jest.mock('react-native', () => {
   /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
   return {
     StyleSheet: { create: (s: unknown) => s, flatten: (s: unknown) => s },
+    Platform: { OS: 'ios' },
+    // Surfaces `behavior` so the chat panel's keyboard avoidance (LS-10632)
+    // is assertable without a native keyboard.
+    KeyboardAvoidingView: ({
+      children,
+      behavior,
+    }: {
+      children?: React.ReactNode;
+      behavior?: string;
+    }) =>
+      ReactLocal.createElement(
+        'div',
+        { 'data-testid': 'keyboard-avoiding-view', 'data-behavior': behavior },
+        children,
+      ),
     // `accessibilityLabel` is remapped to `aria-label` so RTL's a11y queries
     // reach the same labels a screen reader would announce on device.
     Pressable: ({
@@ -2321,6 +2336,22 @@ describe('EliteDraftBoardScreen — Chat panel (LS-9401, LS-10165)', () => {
     expect(renderChatTab).toHaveBeenCalledWith(
       expect.objectContaining({ leagueId: 1, userId: 1 }),
     );
+  });
+
+  // LS-10632: the full-screen panel must lift the composer above the keyboard.
+  it('wraps the chat body in a KeyboardAvoidingView so the keyboard does not hide the input', () => {
+    setupCompactLiveDraft();
+    const renderChatTab = jest.fn(() => <div data-testid="chat-tab-body" />);
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
+    );
+    openChat();
+
+    const avoider = screen.getByTestId('keyboard-avoiding-view');
+    expect(chatPanel().contains(avoider)).toBe(true);
+    expect(avoider.contains(screen.getByTestId('chat-tab-body'))).toBe(true);
+    expect(avoider.getAttribute('data-behavior')).toBe('padding');
   });
 
   it('keeps the chat renderer mounted (display:none) while the panel is down', () => {
