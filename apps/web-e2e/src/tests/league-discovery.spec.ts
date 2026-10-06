@@ -611,10 +611,15 @@ test.describe('League Discovery — advanced filtering @regression', () => {
     await leaguePage.clickButton('Open (Not Started)', { exact: true });
     await leaguePage.clickButton('NL Only', { exact: true });
 
+    // Each click fires its own request, so the first click's request
+    // (draftStatus only) can be the latest one for a moment. Poll on both
+    // values together so they must arrive in a single request (LS-10541).
     await expect
-      .poll(() => capturedVariables.at(-1)?.draftStatus)
-      .toBe('not-started');
-    expect(capturedVariables.at(-1)?.playerPool).toBe('nl');
+      .poll(() => {
+        const v = capturedVariables.at(-1);
+        return [v?.draftStatus, v?.playerPool];
+      })
+      .toEqual(['not-started', 'nl']);
   });
 
   test('search combined with an active filter sends both variables together', async ({
@@ -631,9 +636,14 @@ test.describe('League Discovery — advanced filtering @regression', () => {
     await leaguePage.clickButton('Queued', { exact: true });
     await leaguePage.discoverySearch.fill('Alpha');
 
-    // Search is debounced (300ms) — poll until the debounced query fires.
-    await expect.poll(() => capturedVariables.at(-1)?.search).toBe('Alpha');
-    expect(capturedVariables.at(-1)?.draftStatus).toBe('queued');
+    // Search is debounced (300ms) — poll until the debounced query fires
+    // carrying both values in a single request (LS-10541).
+    await expect
+      .poll(() => {
+        const v = capturedVariables.at(-1);
+        return [v?.search, v?.draftStatus];
+      })
+      .toEqual(['Alpha', 'queued']);
   });
 
   test('result count updates after a filter narrows the results', async ({
