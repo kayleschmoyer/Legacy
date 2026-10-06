@@ -1165,13 +1165,18 @@ export default function PricingPage() {
               background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.15)} 0%, ${SURFACE_PANEL} 100%)`,
             }}
           >
+            {/* LS-7174: a Premium subscriber is already levelled up, so they
+                get an acknowledgement instead of the conversion headline. */}
             <H2
+              data-testid="bottom-cta-heading"
               textAlign="center"
               fontWeight="800"
               fontSize="$8"
               $sm={{ fontSize: '$7' }}
             >
-              Ready to level up your league?
+              {showManageCta
+                ? "You're all set with Premium"
+                : 'Ready to level up your league?'}
             </H2>
             <Paragraph
               textAlign="center"

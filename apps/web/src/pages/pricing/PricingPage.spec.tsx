@@ -672,6 +672,32 @@ describe('PricingPage — Free plan card CTA by viewer state (LS-7184, LS-7185)'
     ).not.toBeInTheDocument();
   });
 
+  it('swaps the bottom CTA headline for an acknowledgement for premium users (LS-7174)', () => {
+    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+
+    const { unmount } = render(<PricingPage />);
+
+    expect(screen.getByTestId('bottom-cta-heading')).toHaveTextContent(
+      "You're all set with Premium",
+    );
+    expect(screen.queryByText(/ready to level up/i)).not.toBeInTheDocument();
+    unmount();
+
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: false,
+    });
+    render(<PricingPage />);
+
+    expect(screen.getByTestId('bottom-cta-heading')).toHaveTextContent(
+      'Ready to level up your league?',
+    );
+  });
+
   it('labels the Premium card as the current plan for premium users only (LS-7199)', () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: true });
     mockUseIsPremiumStatus.mockReturnValue({

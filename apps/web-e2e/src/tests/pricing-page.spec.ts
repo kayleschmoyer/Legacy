@@ -77,6 +77,34 @@ test.describe('Pricing page – page load @regression', () => {
     ).toHaveCount(0);
   });
 
+  test('bottom CTA acknowledges premium users instead of pitching an upgrade (LS-7174)', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    const heading = page.getByTestId('bottom-cta-heading');
+    await expect(heading).toHaveText("You're all set with Premium", {
+      timeout: 15_000,
+    });
+    await expect(page.getByText(/ready to level up/i)).toHaveCount(0);
+    await expect(page.getByTestId('premium-bottom-manage')).toBeVisible();
+  });
+
+  test('bottom CTA keeps the upgrade pitch for free users (LS-7174)', async ({
+    page,
+  }) => {
+    await useTier(page, 'free');
+    await page.goto('/pricing');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByTestId('bottom-cta-heading')).toHaveText(
+      'Ready to level up your league?',
+      { timeout: 15_000 },
+    );
+  });
+
   test('marks the Premium card as the current plan for premium users (LS-7199)', async ({
     page,
   }) => {
