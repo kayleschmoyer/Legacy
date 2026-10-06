@@ -52,12 +52,14 @@ const idp = (row: FootballStatsRow) => row.careerStats?.idp;
 const defense = (row: FootballStatsRow) => row.careerStats?.defense;
 
 /**
- * Career games for the overview: the max `g` across whichever categories the
- * player has rows for (a QB's passing g, a DST's defense g, …). Games played
- * is the same season count regardless of category, so max-of-present is the
- * closest available proxy for total career games.
+ * Career games: the max `g` across whichever categories the player has rows
+ * for (a QB's passing g, a DST's defense g, …). Games played is the same
+ * season count regardless of category, so max-of-present is the closest
+ * available proxy for total career games. Mirrors the server's FP/G sort
+ * denominator (footballFantasyPointsPerGameExpr's GREATEST over every
+ * category's g), so the displayed FP/G and the 'fpg' sort order agree.
  */
-const overviewGames = (row: FootballStatsRow): number | null => {
+const careerGames = (row: FootballStatsRow): number | null => {
   const values = [
     passing(row)?.g,
     rushing(row)?.g,
@@ -74,11 +76,12 @@ const overviewGames = (row: FootballStatsRow): number | null => {
  * leads its stat columns with career FPTS and FP/G. Both sort via the
  * server's pool-wide fantasy-points sort ('fpts'/'fpg', no category required
  * — LS-9071), which sums across every stat category the player has rows in
- * rather than joining a single category table (LS-9504).
+ * rather than joining a single category table (LS-9504). FP/G therefore
+ * divides by career games on every view, never the viewed category's `g`:
+ * all-category FPTS over e.g. an RB's 3 passing games inflated FP/G on the
+ * Passing tab and broke the 'fpg' sort order (LS-10733).
  */
-const fantasyColumns = (
-  games: (row: FootballStatsRow) => number | null | undefined,
-): FootballGridColumn[] => [
+const fantasyColumns = (): FootballGridColumn[] => [
   {
     key: 'fantasyPoints',
     label: 'FPTS',
@@ -93,7 +96,7 @@ const fantasyColumns = (
     width: 74,
     format: (row) => {
       const fantasyPoints = row.careerStats?.fantasyPoints;
-      const g = games(row);
+      const g = careerGames(row);
       return fantasyPoints != null && g != null && g > 0
         ? fmtFloat(fantasyPoints / g, 1)
         : '—';
@@ -106,7 +109,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
   readonly FootballGridColumn[]
 > = {
   overview: [
-    ...fantasyColumns(overviewGames),
+    ...fantasyColumns(),
     {
       key: 'keyStat',
       label: 'Career Stats',
@@ -120,7 +123,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   passing: [
-    ...fantasyColumns((r) => passing(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'passing.g',
       label: 'G',
@@ -165,7 +168,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   rushing: [
-    ...fantasyColumns((r) => rushing(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'rushing.g',
       label: 'G',
@@ -204,7 +207,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   receiving: [
-    ...fantasyColumns((r) => receiving(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'receiving.g',
       label: 'G',
@@ -243,7 +246,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   kicking: [
-    ...fantasyColumns((r) => kicking(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'kicking.g',
       label: 'G',
@@ -288,7 +291,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   idp: [
-    ...fantasyColumns((r) => idp(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'idp.g',
       label: 'G',
@@ -351,7 +354,7 @@ export const FOOTBALL_STAT_COLUMNS_BY_VIEW: Record<
     },
   ],
   defense: [
-    ...fantasyColumns((r) => defense(r)?.g),
+    ...fantasyColumns(),
     {
       key: 'defense.g',
       label: 'G',

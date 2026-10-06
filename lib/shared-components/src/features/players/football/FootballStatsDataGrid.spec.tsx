@@ -1,7 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { buildColumns, FootballStatsDataGrid } from './FootballStatsDataGrid';
-import { FOOTBALL_STAT_COLUMNS_BY_VIEW } from './footballStatsColumns';
+import {
+  FOOTBALL_STAT_COLUMNS_BY_VIEW,
+  type FootballStatsRow,
+} from './footballStatsColumns';
 import type { FootballQueryVars } from './footballStatsHelpers';
 
 // Capture the variables each render passes so pagination/sort wiring can be
@@ -207,6 +210,36 @@ describe('FootballStatsDataGrid (LS-8566)', () => {
     const { onPageSizeChange } = renderGrid();
     fireEvent.click(screen.getByText('50'));
     expect(onPageSizeChange).toHaveBeenCalledWith(50);
+  });
+
+  describe('FP/G uses career games on every view (LS-10733)', () => {
+    // Before the fix, each category view divided the all-category career FPTS
+    // by its own category's `g`, so an RB with 3 passing games showed a huge
+    // FP/G on the Passing tab while the server's 'fpg' sort used career games.
+    const row = makePlayer(1, {
+      position: 'RB',
+      careerStats: {
+        fantasyPoints: 2210,
+        passing: { g: 3 },
+        rushing: { g: 100 },
+        receiving: { g: 98 },
+        kicking: null,
+        defense: null,
+        idp: null,
+      },
+    }) as unknown as FootballStatsRow;
+
+    it('shows the same FP/G as the overview on every category view', () => {
+      for (const [view, columns] of Object.entries(
+        FOOTBALL_STAT_COLUMNS_BY_VIEW,
+      )) {
+        const fpg = columns.find((c) => c.key === 'fantasyPointsPerGame');
+        expect({ view, value: fpg?.format(row) }).toEqual({
+          view,
+          value: '22.1',
+        });
+      }
+    });
   });
 
   describe('column widths (LS-9503)', () => {
