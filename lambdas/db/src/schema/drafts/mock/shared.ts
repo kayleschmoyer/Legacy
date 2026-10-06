@@ -39,10 +39,6 @@ export const DEFAULT_ONLINE_PICK_TIME_LIMIT_SECONDS = 30;
 export const MIN_PICK_TIME_LIMIT_SECONDS = 10;
 export const MAX_PICK_TIME_LIMIT_SECONDS = 300;
 
-/** Seat-count bounds, matching the legacy mock-draft form. */
-export const MIN_MOCK_DRAFT_SEATS = 2;
-export const MAX_MOCK_DRAFT_SEATS = 12;
-
 export const VALID_DRAFT_ORDERS = ['snake', 'linear'] as const;
 export const VALID_PLAYER_POOLS = [
   'all',

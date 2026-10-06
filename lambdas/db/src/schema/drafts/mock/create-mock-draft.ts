@@ -20,7 +20,12 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/utils';
+import {
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+  getPickPositionError,
+  MAX_MOCK_DRAFT_TEAMS,
+  MIN_MOCK_DRAFT_TEAMS,
+} from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 
 import {
@@ -31,8 +36,6 @@ import {
   generateUnusedInviteCode,
   isValidDraftOrder,
   isValidPlayerPool,
-  MAX_MOCK_DRAFT_SEATS,
-  MIN_MOCK_DRAFT_SEATS,
   MOCK_DRAFT_LOBBY_TTL_MS,
   type MockDraftSport,
   OFFLINE_PICK_TIME_LIMIT_SECONDS,
@@ -92,7 +95,7 @@ builder.mutationField('createMockDraft', (t) =>
       sport: t.arg({ type: SportKindEnum, required: false }),
       numTeams: t.arg.int({
         required: true,
-        description: 'Total number of seats (2–12).',
+        description: `Total number of seats (${MIN_MOCK_DRAFT_TEAMS}–${MAX_MOCK_DRAFT_TEAMS}).`,
       }),
       rosterSize: t.arg.int({
         required: false,
@@ -160,13 +163,14 @@ builder.mutationField('createMockDraft', (t) =>
       const playerPool = args.playerPool ?? 'all';
       const isPublic = !isOffline && (args.isPublic ?? false);
 
-      if (numTeams < MIN_MOCK_DRAFT_SEATS || numTeams > MAX_MOCK_DRAFT_SEATS) {
+      if (numTeams < MIN_MOCK_DRAFT_TEAMS || numTeams > MAX_MOCK_DRAFT_TEAMS) {
         throw UserInputError(
-          `numTeams must be between ${MIN_MOCK_DRAFT_SEATS} and ${MAX_MOCK_DRAFT_SEATS}`,
+          `numTeams must be between ${MIN_MOCK_DRAFT_TEAMS} and ${MAX_MOCK_DRAFT_TEAMS}`,
         );
       }
-      if (pickPosition < 1 || pickPosition > numTeams) {
-        throw UserInputError(`pickPosition must be between 1 and ${numTeams}`);
+      const pickPositionError = getPickPositionError(pickPosition, numTeams);
+      if (pickPositionError) {
+        throw UserInputError(pickPositionError);
       }
       if (!isValidDraftOrder(draftOrder)) {
         throw UserInputError('draftOrder must be "snake" or "linear"');

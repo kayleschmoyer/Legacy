@@ -8,8 +8,13 @@
  * on-screen keyboard that hides fields or the Start button on small phones
  * (iPhone SE, 375x667). The no-text-entry test below guards that invariant.
  */
+import { MAX_MOCK_DRAFT_TEAMS } from '@legacy-sports/utils';
 import React from 'react';
-import { type MockDraftSettings, MockDraftSetup } from './MockDraftSetup';
+import {
+  MOCK_DRAFT_TEAM_OPTIONS,
+  type MockDraftSettings,
+  MockDraftSetup,
+} from './MockDraftSetup';
 import { fireEvent, render } from '../../test-utils';
 
 const noop = () => undefined;
@@ -148,6 +153,35 @@ describe('MockDraftSetup', () => {
         draftOrder: 'linear',
         playerPool: 'nl',
       }),
+    );
+  });
+
+  it('offers team counts up to the shared MAX_MOCK_DRAFT_TEAMS (LS-6963)', () => {
+    expect(MOCK_DRAFT_TEAM_OPTIONS[MOCK_DRAFT_TEAM_OPTIONS.length - 1]).toBe(
+      MAX_MOCK_DRAFT_TEAMS,
+    );
+    expect(
+      MOCK_DRAFT_TEAM_OPTIONS.every((n) => n <= MAX_MOCK_DRAFT_TEAMS),
+    ).toBe(true);
+  });
+
+  it('clamps the draft position when the team count shrinks (LS-6961)', () => {
+    const onStart = jest.fn();
+    const { getByText, getAllByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} />,
+    );
+
+    // 12 teams, then pick position 10 (only the position button reads "10"
+    // once the team button is excluded).
+    fireEvent.click(getByText('12'));
+    const tens = getAllByText('10');
+    fireEvent.click(tens[tens.length - 1]);
+    // Shrink to 4 teams: position 10 no longer exists.
+    fireEvent.click(getAllByText('4')[0]);
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ numTeams: 4, userPickPosition: 4 }),
     );
   });
 

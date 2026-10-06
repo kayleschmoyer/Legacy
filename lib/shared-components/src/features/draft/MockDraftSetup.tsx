@@ -15,6 +15,10 @@
  * / `onCancel`, keeping this component purely presentational and platform-safe
  * (Tamagui primitives only — no DOM-only constructs).
  */
+import {
+  clampUserPickPosition,
+  MAX_MOCK_DRAFT_TEAMS,
+} from '@legacy-sports/utils';
 import React from 'react';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
 import {
@@ -122,7 +126,15 @@ export interface MockDraftSetupProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TEAM_OPTIONS = [4, 6, 8, 10, 12] as const;
+/**
+ * Even seat counts from 4 up to the shared server cap (LS-6963), so raising
+ * `MAX_MOCK_DRAFT_TEAMS` widens the form without a second edit here.
+ */
+const MIN_TEAM_OPTION = 4;
+export const MOCK_DRAFT_TEAM_OPTIONS: readonly number[] = Array.from(
+  { length: Math.floor((MAX_MOCK_DRAFT_TEAMS - MIN_TEAM_OPTION) / 2) + 1 },
+  (_, i) => MIN_TEAM_OPTION + i * 2,
+);
 
 const DRAFT_ORDER_OPTIONS: { label: string; value: MockDraftOrder }[] = [
   { label: 'Snake', value: 'snake' },
@@ -214,7 +226,7 @@ const PLAYER_POOL_HELPER_BY_SPORT: Record<MockDraftSport, string> = {
 // Snap an arbitrary prefilled team count to the closest supported option so the
 // selector buttons stay in sync with the seed value.
 function clampToTeamOption(n: number): number {
-  return TEAM_OPTIONS.reduce((best, opt) =>
+  return MOCK_DRAFT_TEAM_OPTIONS.reduce((best, opt) =>
     Math.abs(opt - n) < Math.abs(best - n) ? opt : best,
   );
 }
@@ -602,7 +614,7 @@ export function MockDraftSetup({
       {/* Number of Teams */}
       <FieldSection label="Number of Teams" labelId="teams-label">
         <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-          {TEAM_OPTIONS.map((n) => (
+          {MOCK_DRAFT_TEAM_OPTIONS.map((n) => (
             <OptionButton
               key={n}
               label={String(n)}
@@ -610,7 +622,7 @@ export function MockDraftSetup({
               accent={BRAND_SEAM_RED}
               onPress={() => {
                 setNumTeams(n);
-                if (userPickPosition > n) setUserPickPosition(n);
+                setUserPickPosition((p) => clampUserPickPosition(p, n));
               }}
             />
           ))}
