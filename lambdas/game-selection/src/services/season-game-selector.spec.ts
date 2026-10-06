@@ -1,4 +1,4 @@
-import type { PublicDb } from '@legacy-sports/db-client';
+import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { notInArray } from 'drizzle-orm';
 import {
   selectGamesForMatchup,
@@ -31,48 +31,6 @@ jest.mock('@legacy-sports/utils', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema: {
-    gameBatting: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gamePitching: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-      gs: 'gs',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchupPlayerId',
-      gameIdentifier: 'gameIdentifier',
-      gameNum: 'gameNum',
-    },
-    seasonFielding: {
-      playerId: 'playerId',
-      season: 'season',
-      pos: 'pos',
-      g: 'g',
-    },
-    leagues: { id: 'id', sport: 'sport' },
-    matchups: { id: 'id', leagueId: 'leagueId', weekNumber: 'weekNumber' },
-    matchupPlayers: { matchupId: 'matchupId', id: 'id', playerId: 'playerId' },
-    leagueWeekPlayerSeasons: {
-      leagueId: 'leagueId',
-      weekNumber: 'weekNumber',
-      playerId: 'playerId',
-      season: 'season',
-    },
-    teamMembers: {
-      playerId: 'playerId',
-      positionId: 'positionId',
-      leagueId: 'leagueId',
-    },
-    leaguePosition: { id: 'id', positionType: 'positionType' },
-  },
-}));
-
 // Scoring itself lives in one shared function that resolves the league's own
 // multipliers internally (LS-9532); this module's remaining responsibility is
 // to invoke it with the right matchup and league, and to do so *before*
@@ -94,18 +52,16 @@ jest.mock('@legacy-sports/scoring-utils', () => ({
   scoreMatchup: (...args: unknown[]) => mockScoreMatchup(...args) as unknown,
 }));
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => args),
-  eq: jest.fn((a: unknown, b: unknown) => [a, b]),
-  exists: jest.fn((subquery: unknown) => subquery),
-  inArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
-  isNotNull: jest.fn((col: unknown) => col),
-  isNull: jest.fn((col: unknown) => col),
-  ne: jest.fn((col: unknown, val: unknown) => ({ col, val })),
-  notInArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
-  or: jest.fn((...args: unknown[]) => args),
-  sql: jest.fn(),
-}));
+// The real notInArray, spied: the used-games test asserts the exclusion list
+// is pushed into the query.
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    notInArray: jest.fn(
+      jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm')
+        .notInArray,
+    ),
+  }),
+);
 
 describe('season-game-selector', () => {
   beforeEach(() => {
@@ -383,10 +339,10 @@ describe('season-game-selector', () => {
       expect(result.gameIdentifier).toBe('game-1925-003');
       // The already-used identifiers are pushed into the query, not filtered
       // after the fact — that is what keeps the slots distinct.
-      expect(notInArray).toHaveBeenCalledWith('gameIdentifier', [
-        'game-1925-001',
-        'game-1925-002',
-      ]);
+      expect(notInArray).toHaveBeenCalledWith(
+        PublicSchema.gameBatting.gameIdentifier,
+        ['game-1925-001', 'game-1925-002'],
+      );
       // No recycle warning: the pool was not exhausted.
       expect(mockLoggerWarn).not.toHaveBeenCalled();
     });

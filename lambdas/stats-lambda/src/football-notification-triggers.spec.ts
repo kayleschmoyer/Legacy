@@ -23,12 +23,14 @@ const InternalSchema = {
 
 const mockGetMatchupFootballPlayerGameStats = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  PublicSchema,
-  InternalSchema,
-  getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
-    mockGetMatchupFootballPlayerGameStats(...args),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    PublicSchema,
+    InternalSchema,
+    getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
+      mockGetMatchupFootballPlayerGameStats(...args),
+  }),
+);
 
 // ── Import under test ───────────────────────────────────────────────────────
 

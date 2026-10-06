@@ -65,35 +65,37 @@ jest.mock('../football-notification-triggers', () => ({
   publishFootballGameAlerts: jest.fn(),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(),
-  updateMatchupScore: (...args: unknown[]): unknown =>
-    mockUpdateMatchupScore(...args),
-  getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
-    mockGetMatchupFootballPlayerGameStats(...args),
-  getActiveScoringProfileForLeague: (...args: unknown[]): unknown =>
-    mockGetActiveScoringProfileForLeague(...args),
-  getScoringStatDefinitions: (...args: unknown[]): unknown =>
-    mockGetScoringStatDefinitions(...args),
-  getScoringProfileEntriesForProfile: (...args: unknown[]): unknown =>
-    mockGetScoringProfileEntriesForProfile(...args),
-  getScoringPositionBonusesForProfile: (...args: unknown[]): unknown =>
-    mockGetScoringPositionBonusesForProfile(...args),
-  normalizeNumeric: (value: unknown): number | null => {
-    if (value === null || value === undefined) return null;
-    const parsed = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  },
-  PublicSchema: {
-    matchupPlayers: {
-      id: 'id',
-      matchupId: 'matchupId',
-      teamId: 'teamId',
-      positionId: 'positionId',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(),
+    updateMatchupScore: (...args: unknown[]): unknown =>
+      mockUpdateMatchupScore(...args),
+    getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
+      mockGetMatchupFootballPlayerGameStats(...args),
+    getActiveScoringProfileForLeague: (...args: unknown[]): unknown =>
+      mockGetActiveScoringProfileForLeague(...args),
+    getScoringStatDefinitions: (...args: unknown[]): unknown =>
+      mockGetScoringStatDefinitions(...args),
+    getScoringProfileEntriesForProfile: (...args: unknown[]): unknown =>
+      mockGetScoringProfileEntriesForProfile(...args),
+    getScoringPositionBonusesForProfile: (...args: unknown[]): unknown =>
+      mockGetScoringPositionBonusesForProfile(...args),
+    normalizeNumeric: (value: unknown): number | null => {
+      if (value === null || value === undefined) return null;
+      const parsed = typeof value === 'number' ? value : Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
     },
-    leaguePosition: { id: 'id', positionType: 'positionType' },
-  },
-}));
+    PublicSchema: {
+      matchupPlayers: {
+        id: 'id',
+        matchupId: 'matchupId',
+        teamId: 'teamId',
+        positionId: 'positionId',
+      },
+      leaguePosition: { id: 'id', positionType: 'positionType' },
+    },
+  }),
+);
 
 import { calculateAndUpdateFootballMatchupScores } from './calculate-football-matchup-scores';
 

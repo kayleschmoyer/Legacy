@@ -29,7 +29,7 @@ jest.mock('@legacy-sports/aws-utils', () => ({
   SqsService: jest.fn().mockImplementation(() => ({})),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({}));
+jest.mock('@legacy-sports/db-client', () => mockDbClientModule());
 
 // The shared resolver and link core are unit-tested in their own specs; mock
 // them here so the Google handler tests focus on token verification,

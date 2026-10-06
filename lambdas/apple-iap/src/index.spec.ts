@@ -83,22 +83,24 @@ describe('apple-iap handler', () => {
       retrieveSecretParameterValue: jest.fn(),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      runWithInternalClient: mockRunWithInternalClient,
-      clearLeagueTierFreezes: jest.fn(),
-      handleSubscriptionDowngrade: jest.fn(),
-      InternalSchema: {
-        appleEvents: { eventId: 'eventId' },
-        subscriptions: {
-          appleOriginalTransactionId: 'appleOriginalTransactionId',
-          appleLastNotificationType: 'appleLastNotificationType',
-          tier: 'tier',
-          status: 'status',
-          userId: 'userId',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        runWithInternalClient: mockRunWithInternalClient,
+        clearLeagueTierFreezes: jest.fn(),
+        handleSubscriptionDowngrade: jest.fn(),
+        InternalSchema: {
+          appleEvents: { eventId: 'eventId' },
+          subscriptions: {
+            appleOriginalTransactionId: 'appleOriginalTransactionId',
+            appleLastNotificationType: 'appleLastNotificationType',
+            tier: 'tier',
+            status: 'status',
+            userId: 'userId',
+          },
+          usersInAppInternal: { id: 'id' },
         },
-        usersInAppInternal: { id: 'id' },
-      },
-    }));
+      }),
+    );
 
     jest.doMock('./jws', () => ({
       decodeAndVerifyJws: mockDecodeAndVerifyJws,

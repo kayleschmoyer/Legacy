@@ -10,10 +10,12 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  linkIdentity: jest.fn(),
-  unlinkIdentity: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    linkIdentity: jest.fn(),
+    unlinkIdentity: jest.fn(),
+  }),
+);
 
 const mockLinkIdentity = linkIdentity as jest.Mock;
 const mockUnlinkIdentity = unlinkIdentity as jest.Mock;

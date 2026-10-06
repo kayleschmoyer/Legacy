@@ -34,18 +34,20 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createIdentity: jest.fn(),
-  createUser: jest.fn(),
-  getIdentityByProviderAccount: jest.fn(),
-  getIdentityByUserProvider: jest.fn(),
-  getUserByCanonicalEmailOrIdentityEmail: jest.fn(),
-  getUserByEmail: jest.fn(),
-  getUserById: jest.fn(),
-  linkIdentity: jest.fn(),
-  setCanonicalEmail: jest.fn(),
-  touchIdentityOnLogin: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createIdentity: jest.fn(),
+    createUser: jest.fn(),
+    getIdentityByProviderAccount: jest.fn(),
+    getIdentityByUserProvider: jest.fn(),
+    getUserByCanonicalEmailOrIdentityEmail: jest.fn(),
+    getUserByEmail: jest.fn(),
+    getUserById: jest.fn(),
+    linkIdentity: jest.fn(),
+    setCanonicalEmail: jest.fn(),
+    touchIdentityOnLogin: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 const mockGetIdentity = getIdentityByProviderAccount as jest.Mock;
 const mockGetIdentityByUserProvider = getIdentityByUserProvider as jest.Mock;

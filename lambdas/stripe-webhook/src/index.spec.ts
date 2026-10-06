@@ -68,22 +68,24 @@ describe('stripe-webhook handler', () => {
       retrieveSecretParameterValue: jest.fn(),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      runWithInternalClient: mockRunWithInternalClient,
-      clearLeagueTierFreezes: jest.fn(),
-      handleSubscriptionDowngrade: jest.fn(),
-      InternalSchema: {
-        stripeEvents: { eventId: 'eventId' },
-        subscriptions: {
-          stripeSubscriptionId: 'stripeSubscriptionId',
-          tier: 'tier',
-          status: 'status',
-          userId: 'userId',
-          lastEventTimestamp: 'lastEventTimestamp',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        runWithInternalClient: mockRunWithInternalClient,
+        clearLeagueTierFreezes: jest.fn(),
+        handleSubscriptionDowngrade: jest.fn(),
+        InternalSchema: {
+          stripeEvents: { eventId: 'eventId' },
+          subscriptions: {
+            stripeSubscriptionId: 'stripeSubscriptionId',
+            tier: 'tier',
+            status: 'status',
+            userId: 'userId',
+            lastEventTimestamp: 'lastEventTimestamp',
+          },
+          usersInAppInternal: { id: 'id' },
         },
-        usersInAppInternal: { id: 'id' },
-      },
-    }));
+      }),
+    );
 
     // Mock the Stripe constructor so constructEvent works without real signatures
     const mockStripeInstance = {

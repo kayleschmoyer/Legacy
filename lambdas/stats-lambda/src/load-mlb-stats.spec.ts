@@ -29,11 +29,13 @@ const mockWhere = jest.fn();
 const mockSet = jest.fn(() => ({ where: mockWhere }));
 const mockUpdate = jest.fn(() => ({ set: mockSet }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  PublicSchema: { players: { mlbPlayerId: 'mlb_player_id' } },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    PublicSchema: { players: { mlbPlayerId: 'mlb_player_id' } },
+  }),
+);
 
 const mockGetPlayerInfo = jest.fn();
 const mockCreateMlbDataProvider = jest.fn();

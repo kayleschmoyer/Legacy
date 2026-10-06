@@ -24,23 +24,25 @@ const mockRunWithPublicClient = jest.fn();
 const mockGetMatchupFootballPlayerGameStats = jest.fn();
 const mockUpdateMatchupScore = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
-    mockGetMatchupFootballPlayerGameStats(...args),
-  updateMatchupScore: (...args: unknown[]): unknown =>
-    mockUpdateMatchupScore(...args),
-  PublicSchema: {
-    matchupPlayers: {
-      id: 'id',
-      matchupId: 'matchupId',
-      teamId: 'teamId',
-      positionId: 'positionId',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    getMatchupFootballPlayerGameStats: (...args: unknown[]): unknown =>
+      mockGetMatchupFootballPlayerGameStats(...args),
+    updateMatchupScore: (...args: unknown[]): unknown =>
+      mockUpdateMatchupScore(...args),
+    PublicSchema: {
+      matchupPlayers: {
+        id: 'id',
+        matchupId: 'matchupId',
+        teamId: 'teamId',
+        positionId: 'positionId',
+      },
+      leaguePosition: { id: 'id', positionType: 'positionType' },
     },
-    leaguePosition: { id: 'id', positionType: 'positionType' },
-  },
-}));
+  }),
+);
 
 // Scoring itself is exercised by calculate-football-matchup-scores.scoring.spec.ts
 // against the real implementations; this suite is about SQS plumbing.

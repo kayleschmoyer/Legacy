@@ -17,24 +17,17 @@ const mockRunWithInternalClient = jest.fn(
   (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(fakeDb),
 );
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithInternalClient: (
-    opts: unknown,
-    cb: (db: unknown) => Promise<unknown>,
-  ): unknown => mockRunWithInternalClient(opts, cb),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithInternalClient: (
+      opts: unknown,
+      cb: (db: unknown) => Promise<unknown>,
+    ): unknown => mockRunWithInternalClient(opts, cb),
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({ host: 'localhost' })),
-}));
-
-jest.mock('drizzle-orm', () => ({
-  sql: Object.assign(
-    (strings: TemplateStringsArray, ..._vals: unknown[]) => ({
-      __sql: strings.join('?'),
-    }),
-    { raw: (s: string) => s },
-  ),
 }));
 
 describe('handleFindDuplicateAccounts', () => {

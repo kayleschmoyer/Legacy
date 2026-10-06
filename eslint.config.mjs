@@ -13,6 +13,7 @@ const repoRoot = dirname(fileURLToPath(import.meta.url));
 // `typescript-eslint`'s own `recommendedTypeChecked` config here keeps both
 // on the identical plugin instance.
 import tseslint from 'typescript-eslint';
+import dbClientMockRule from './lib/db-client/eslint-rules/db-client-mock.cjs';
 
 export default [
   ...nx.configs['flat/base'],
@@ -176,6 +177,19 @@ export default [
         },
       ],
     },
+  },
+  {
+    // LS-10079 / LS-10498: a partial @legacy-sports/db-client (or drizzle-orm)
+    // jest mock crashes every module that reads what it left out, at import
+    // time. Repo-wide, so a spec in any package must build those mocks with
+    // mockDbClientModule() / mockDrizzleOrm() (@legacy-sports/db-client/testing).
+    // Its own rule name (not a no-restricted-syntax selector) so it can't
+    // clobber, or be clobbered by, the no-restricted-syntax blocks here.
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: {
+      'legacy-sports-db': { rules: { 'db-client-mock': dbClientMockRule } },
+    },
+    rules: { 'legacy-sports-db/db-client-mock': 'error' },
   },
   {
     // LS-8614: flag *.spec.ts files with no import/export (i.e. files that

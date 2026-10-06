@@ -1,9 +1,5 @@
 import { runWithClient, withPoolTimeoutRetry } from './Helpers';
 
-jest.mock('drizzle-orm', () => ({
-  sql: jest.fn().mockReturnValue({}),
-}));
-
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     debug: jest.fn(),

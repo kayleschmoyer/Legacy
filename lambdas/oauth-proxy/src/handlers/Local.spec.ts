@@ -33,13 +33,15 @@ jest.mock('@legacy-sports/logging', () => ({
 const { LOGGER: mockLogger }: { LOGGER: { info: jest.Mock; warn: jest.Mock } } =
   jest.requireMock('@legacy-sports/logging');
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createUser: jest.fn(),
-  getUserByEmail: jest.fn(),
-  getUserMfa: jest.fn(),
-  getSubscriptionByUserId: jest.fn(),
-  updateLastLoginAt: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createUser: jest.fn(),
+    getUserByEmail: jest.fn(),
+    getUserMfa: jest.fn(),
+    getSubscriptionByUserId: jest.fn(),
+    updateLastLoginAt: jest.fn(),
+  }),
+);
 
 jest.mock('otplib', () => ({
   authenticator: { verify: jest.fn() },

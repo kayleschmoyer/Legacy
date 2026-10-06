@@ -29,6 +29,9 @@
       "@legacy-sports/design-tokens": ["lib/design-tokens/src/index.ts"],
       "@legacy-sports/db-client": ["lib/db-client/src/index.ts"],
       "@legacy-sports/db-client/src/*": ["lib/db-client/src/*"],
+      "@legacy-sports/db-client/testing": [
+        "lib/db-client/src/testing/index.ts"
+      ],
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/football-game-stats-provider": [
         "lib/football-game-stats-provider/src/index.ts"

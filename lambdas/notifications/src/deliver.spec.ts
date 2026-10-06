@@ -8,16 +8,18 @@ const mockLogNotificationHistory = jest.fn();
 const mockDisableDeviceToken = jest.fn();
 const mockNotifyNotificationReceived = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createDatabaseService: jest.fn(() => ({
-    notifications: {
-      getUserNotificationPreferences: mockGetUserNotificationPreferences,
-      getUserDeviceTokens: mockGetUserDeviceTokens,
-      logNotificationHistory: mockLogNotificationHistory,
-      disableDeviceToken: mockDisableDeviceToken,
-    },
-  })),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createDatabaseService: jest.fn(() => ({
+      notifications: {
+        getUserNotificationPreferences: mockGetUserNotificationPreferences,
+        getUserDeviceTokens: mockGetUserDeviceTokens,
+        logNotificationHistory: mockLogNotificationHistory,
+        disableDeviceToken: mockDisableDeviceToken,
+      },
+    })),
+  }),
+);
 
 jest.mock('@legacy-sports/aws-utils', () => ({
   createNotificationService: jest.fn(() => ({

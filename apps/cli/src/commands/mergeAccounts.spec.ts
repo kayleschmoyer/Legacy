@@ -60,55 +60,53 @@ const mockRunWithInternalClient = jest.fn(
   (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => cb(fakeDb),
 );
 
-jest.mock('@legacy-sports/db-client', () => ({
-  InternalSchema: {
-    usersInAppInternal: {
-      id: 'users.id',
-      canonicalEmail: 'users.canonical_email',
-      username: 'users.username',
-      createdAt: 'users.created_at',
-      passwordHash: 'users.password_hash',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    InternalSchema: {
+      usersInAppInternal: {
+        id: 'users.id',
+        canonicalEmail: 'users.canonical_email',
+        username: 'users.username',
+        createdAt: 'users.created_at',
+        passwordHash: 'users.password_hash',
+      },
+      userIdentities: {
+        id: 'ui.id',
+        userId: 'ui.user_id',
+        provider: 'ui.provider',
+        providerAccountId: 'ui.provider_account_id',
+        providerEmail: 'ui.provider_email',
+        providerEmailVerified: 'ui.provider_email_verified',
+        linkedAt: 'ui.linked_at',
+      },
+      subscriptions: {
+        id: 'sub.id',
+        userId: 'sub.user_id',
+        status: 'sub.status',
+        tier: 'sub.tier',
+        stripeCustomerId: 'sub.stripe_customer_id',
+        appleOriginalTransactionId: 'sub.apple_original_transaction_id',
+        googlePurchaseToken: 'sub.google_purchase_token',
+        currentPeriodEnd: 'sub.current_period_end',
+      },
     },
-    userIdentities: {
-      id: 'ui.id',
-      userId: 'ui.user_id',
-      provider: 'ui.provider',
-      providerAccountId: 'ui.provider_account_id',
-      providerEmail: 'ui.provider_email',
-      providerEmailVerified: 'ui.provider_email_verified',
-      linkedAt: 'ui.linked_at',
-    },
-    subscriptions: {
-      id: 'sub.id',
-      userId: 'sub.user_id',
-      status: 'sub.status',
-      tier: 'sub.tier',
-      stripeCustomerId: 'sub.stripe_customer_id',
-      appleOriginalTransactionId: 'sub.apple_original_transaction_id',
-      googlePurchaseToken: 'sub.google_purchase_token',
-      currentPeriodEnd: 'sub.current_period_end',
-    },
-  },
-  runWithInternalClient: (
-    opts: unknown,
-    cb: (db: unknown) => Promise<unknown>,
-  ): unknown => mockRunWithInternalClient(opts, cb),
-}));
+    runWithInternalClient: (
+      opts: unknown,
+      cb: (db: unknown) => Promise<unknown>,
+    ): unknown => mockRunWithInternalClient(opts, cb),
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({ host: 'localhost' })),
 }));
 
-jest.mock('drizzle-orm', () => ({
-  desc: jest.fn((col: unknown) => ({ desc: col })),
-  eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
-  sql: Object.assign(
-    (strings: TemplateStringsArray, ..._vals: unknown[]) => ({
-      __sql: strings.join('?'),
-    }),
-    { raw: (s: string) => s },
-  ),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    desc: jest.fn((col: unknown) => ({ desc: col })),
+    eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
+  }),
+);
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

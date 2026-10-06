@@ -76,40 +76,42 @@ const matchups = {
   gamesPerMatchup: 'm.gamesPerMatchup',
 };
 
-jest.mock('@legacy-sports/db-client', () => ({
-  minResolvedCountPerMatchup: (
-    matchupIds: number[],
-    rows: { matchupId: number; count: number | string }[],
-  ) => {
-    const minByMatchup = new Map<number, number>();
-    for (const row of rows) {
-      const rowCount = Number(row.count);
-      const current = minByMatchup.get(row.matchupId);
-      minByMatchup.set(
-        row.matchupId,
-        current === undefined ? rowCount : Math.min(current, rowCount),
-      );
-    }
-    const result = new Map<number, number>();
-    for (const id of matchupIds) {
-      result.set(id, minByMatchup.get(id) ?? 0);
-    }
-    return result;
-  },
-  PublicSchema: {
-    gameBatting,
-    gamePitching,
-    gameFootballDefense,
-    gameFootballDefenseIdp,
-    gameFootballPassing,
-    gameFootballRushing,
-    gameFootballReceiving,
-    gameFootballKicking,
-    matchupPlayerGames,
-    matchupPlayers,
-    matchups,
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    minResolvedCountPerMatchup: (
+      matchupIds: number[],
+      rows: { matchupId: number; count: number | string }[],
+    ) => {
+      const minByMatchup = new Map<number, number>();
+      for (const row of rows) {
+        const rowCount = Number(row.count);
+        const current = minByMatchup.get(row.matchupId);
+        minByMatchup.set(
+          row.matchupId,
+          current === undefined ? rowCount : Math.min(current, rowCount),
+        );
+      }
+      const result = new Map<number, number>();
+      for (const id of matchupIds) {
+        result.set(id, minByMatchup.get(id) ?? 0);
+      }
+      return result;
+    },
+    PublicSchema: {
+      gameBatting,
+      gamePitching,
+      gameFootballDefense,
+      gameFootballDefenseIdp,
+      gameFootballPassing,
+      gameFootballRushing,
+      gameFootballReceiving,
+      gameFootballKicking,
+      matchupPlayerGames,
+      matchupPlayers,
+      matchups,
+    },
+  }),
+);
 
 import {
   checkMatchupCompletion,

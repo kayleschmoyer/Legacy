@@ -20,12 +20,14 @@ const mockRunWithPublicClient = jest.fn(
   },
 );
 
-jest.mock('@legacy-sports/db-client', () => ({
-  createAllMatchupsForLeague: (db: unknown, leagueId: number) =>
-    mockCreateAllMatchupsForLeague(db, leagueId),
-  runWithPublicClient: (opts: unknown, cb: (db: unknown) => Promise<void>) =>
-    mockRunWithPublicClient(opts, cb),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createAllMatchupsForLeague: (db: unknown, leagueId: number) =>
+      mockCreateAllMatchupsForLeague(db, leagueId),
+    runWithPublicClient: (opts: unknown, cb: (db: unknown) => Promise<void>) =>
+      mockRunWithPublicClient(opts, cb),
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({})),

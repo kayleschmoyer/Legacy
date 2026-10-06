@@ -22,13 +22,15 @@ jest.mock('@legacy-sports/utils/node', () => ({
 
 const mockRunWithPublicClient = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  PublicSchema: {
-    footballSeasonDefenseIdp: {},
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    PublicSchema: {
+      footballSeasonDefenseIdp: {},
+    },
+  }),
+);
 
 jest.mock('@legacy-sports/pfr-client', () => ({
   IDPStats: { getSeasonTotals: jest.fn() },

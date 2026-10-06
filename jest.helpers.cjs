@@ -6,6 +6,8 @@
  *   module.exports = createNodeJestConfig({ displayName: 'utils', projectPath: 'lib/utils' });
  */
 
+const path = require('path');
+
 /**
  * @swc/jest options shared by every project's transform. swc does NOT
  * type-check (unlike ts-jest) — a type error inside a `*.spec.ts` file will
@@ -43,9 +45,20 @@ function createSwcTransform(pattern = '^.+\\.[tj]s$') {
 }
 
 /**
+ * Installs the `mockDbClientModule` / `mockDrizzleOrm` globals — the only
+ * sanctioned `@legacy-sports/db-client` and `drizzle-orm` jest mock factories
+ * (the repo-wide `legacy-sports-db/db-client-mock` lint rule, LS-10498).
+ */
+const DB_CLIENT_MOCK_SETUP = path.join(
+  __dirname,
+  'lib/db-client/src/testing/setup.ts',
+);
+
+/**
  * @param {{ displayName: string, projectPath: string, overrides?: Record<string, unknown> }} options
  */
 function createNodeJestConfig({ displayName, projectPath, overrides = {} }) {
+  const { setupFiles = [], ...rest } = overrides;
   return {
     displayName,
     preset: '../../jest.preset.js',
@@ -53,7 +66,8 @@ function createNodeJestConfig({ displayName, projectPath, overrides = {} }) {
     transform: createSwcTransform(),
     moduleFileExtensions: ['ts', 'js', 'html'],
     coverageDirectory: `../../coverage/${projectPath}`,
-    ...overrides,
+    ...rest,
+    setupFiles: [DB_CLIENT_MOCK_SETUP, ...setupFiles],
   };
 }
 

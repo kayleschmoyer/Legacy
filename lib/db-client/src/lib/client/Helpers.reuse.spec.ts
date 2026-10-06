@@ -20,10 +20,6 @@ const mockInvalidateSecretCache = jest.fn();
 let mockIsInitialized = false;
 let constructedConnections = 0;
 
-jest.mock('drizzle-orm', () => ({
-  sql: jest.fn().mockReturnValue({}),
-}));
-
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     debug: jest.fn(),

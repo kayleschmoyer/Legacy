@@ -2,35 +2,6 @@ import type { SQSEvent, SQSRecord } from 'aws-lambda';
 
 // ── Mocks (must precede module import) ──────────────────────────────────────
 
-// Stub drizzle-orm so that eq/and/etc. don't throw when passed mock string
-// columns (PublicSchema fields are strings in tests, not real Drizzle columns).
-jest.mock('drizzle-orm', () => ({
-  and: (...args: unknown[]) => ({ _type: 'and', args }),
-  eq: (l: unknown, r: unknown) => ({ _type: 'eq', l, r }),
-  gte: (l: unknown, r: unknown) => ({ _type: 'gte', l, r }),
-  inArray: (col: unknown, vals: unknown) => ({ _type: 'inArray', col, vals }),
-  isNull: (col: unknown) => ({ _type: 'isNull', col }),
-  notInArray: (col: unknown, vals: unknown) => ({
-    _type: 'notInArray',
-    col,
-    vals,
-  }),
-  or: (...args: unknown[]) => ({ _type: 'or', args }),
-  sum: (col: unknown) => ({
-    _type: 'sum',
-    col,
-    mapWith: () => ({ _type: 'sum', col }),
-  }),
-  sql: Object.assign(
-    (strings: TemplateStringsArray, ...vals: unknown[]) => ({
-      _type: 'sql',
-      strings,
-      vals,
-    }),
-    { param: (v: unknown) => v },
-  ),
-}));
-
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -96,89 +67,26 @@ const mockValidateDraftMode = jest.fn();
 const mockValidateSelectionMethod = jest.fn();
 const mockValidateUserAccess = jest.fn();
 
-// jest.requireActual cannot be used here: db-client's module-level code
-// (materialized view in Players.ts) calls drizzle-orm's sql tag and expects
-// a full Drizzle SQL object with inlineParams. Since drizzle-orm is mocked
-// in this file, requireActual would fail with "query.inlineParams is not a
-// function". The manual mock is therefore required, not a style preference.
-jest.mock('@legacy-sports/db-client', () => ({
-  createAllMatchupsForLeague: (...args: unknown[]): unknown =>
-    mockCreateAllMatchupsForLeague(...args),
-  filterPlayerIdsByLeagueEligibility: (...args: unknown[]): unknown =>
-    mockFilterPlayerIdsByLeagueEligibility(...args),
-  inArrayAny: (col: unknown, vals: unknown) => ({
-    _type: 'inArrayAny',
-    col,
-    vals,
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    createAllMatchupsForLeague: (...args: unknown[]): unknown =>
+      mockCreateAllMatchupsForLeague(...args),
+    filterPlayerIdsByLeagueEligibility: (...args: unknown[]): unknown =>
+      mockFilterPlayerIdsByLeagueEligibility(...args),
+    finalizeDraftCompletion: (...args: unknown[]): unknown =>
+      mockFinalizeDraftCompletion(...args),
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    updateLeagueDraftStatus: (...args: unknown[]): unknown =>
+      mockUpdateLeagueDraftStatus(...args),
+    validateDraftMode: (...args: unknown[]): unknown =>
+      mockValidateDraftMode(...args),
+    validateSelectionMethod: (...args: unknown[]): unknown =>
+      mockValidateSelectionMethod(...args),
+    validateUserAccess: (...args: unknown[]): unknown =>
+      mockValidateUserAccess(...args),
   }),
-  finalizeDraftCompletion: (...args: unknown[]): unknown =>
-    mockFinalizeDraftCompletion(...args),
-  PublicDb: {},
-  PublicSchema: {
-    players: {
-      id: 'id',
-      firstName: 'firstName',
-      lastName: 'lastName',
-      brefId: 'brefId',
-      statsLastFetchedAt: 'statsLastFetchedAt',
-      sport: 'sport',
-    },
-    teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
-    teamMembers: { leagueId: 'leagueId' },
-    leaguePosition: {
-      leagueId: 'leagueId',
-      positionType: 'positionType',
-      id: 'id',
-    },
-    leaguePositions: {
-      leagueId: 'leagueId',
-      positionType: 'positionType',
-      id: 'id',
-    },
-    leagues: {
-      id: 'id',
-      sport: 'sport',
-      gamesPerMatchup: 'gamesPerMatchup',
-      playerPool: 'playerPool',
-      minCareerGames: 'minCareerGames',
-      minCareerSeasons: 'minCareerSeasons',
-      baseballHofOnly: 'baseballHofOnly',
-      baseballEraFilter: 'baseballEraFilter',
-      customEraStartYear: 'customEraStartYear',
-      customEraEndYear: 'customEraEndYear',
-      maxRosterSize: 'maxRosterSize',
-    },
-    seasonBatting: {
-      playerId: 'playerId',
-      g: 'g',
-      season: 'season',
-      lgId: 'lgId',
-    },
-    seasonPitching: {
-      playerId: 'playerId',
-      g: 'g',
-      season: 'season',
-      lgId: 'lgId',
-    },
-    seasonFielding: {
-      playerId: 'playerId',
-      g: 'g',
-      season: 'season',
-      lgId: 'lgId',
-    },
-    playerEligiblePositions: { playerId: 'playerId', position: 'position' },
-  },
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  updateLeagueDraftStatus: (...args: unknown[]): unknown =>
-    mockUpdateLeagueDraftStatus(...args),
-  validateDraftMode: (...args: unknown[]): unknown =>
-    mockValidateDraftMode(...args),
-  validateSelectionMethod: (...args: unknown[]): unknown =>
-    mockValidateSelectionMethod(...args),
-  validateUserAccess: (...args: unknown[]): unknown =>
-    mockValidateUserAccess(...args),
-}));
+);
 
 const mockNotifyDraftCompleted = jest.fn();
 const mockPublish = jest.fn();

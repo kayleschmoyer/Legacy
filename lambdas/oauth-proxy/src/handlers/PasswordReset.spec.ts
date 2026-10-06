@@ -31,13 +31,15 @@ import { sendPasswordResetEmail } from '../util/email';
 import { hashPassword } from '../Users';
 import { hashResetToken } from '../util/password-reset';
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getUserByEmail: jest.fn(),
-  createPasswordResetToken: jest.fn(),
-  consumePasswordResetToken: jest.fn(),
-  deletePasswordResetTokensForUser: jest.fn(),
-  updateUserPassword: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getUserByEmail: jest.fn(),
+    createPasswordResetToken: jest.fn(),
+    consumePasswordResetToken: jest.fn(),
+    deletePasswordResetTokensForUser: jest.fn(),
+    updateUserPassword: jest.fn(),
+  }),
+);
 
 jest.mock('../util/db', () => ({
   withDbClient: jest.fn((cb: (db: unknown) => Promise<unknown>) => cb({})),

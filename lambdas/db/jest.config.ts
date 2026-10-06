@@ -5,7 +5,10 @@ const config: Config = {
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   coverageDirectory: '../../coverage/lambdas/db',
-  setupFiles: ['<rootDir>/test-setup.ts'],
+  setupFiles: [
+    '<rootDir>/../../lib/db-client/src/testing/setup.ts',
+    '<rootDir>/test-setup.ts',
+  ],
   // Unit suite only: *.db.spec.ts files need a live PostgreSQL instance and run
   // via the `db:test:db` target (jest.db.config.ts) in run-db-tests.yml.
   testPathIgnorePatterns: ['/node_modules/', '\\.db\\.spec\\.ts$'],

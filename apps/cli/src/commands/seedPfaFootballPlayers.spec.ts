@@ -17,11 +17,12 @@ import {
   summarizePfaUsage,
 } from './seedPfaFootballPlayers';
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(),
-  refreshFootballPlayerEligiblePositions: jest.fn(),
-  PublicSchema: {},
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(),
+    refreshFootballPlayerEligiblePositions: jest.fn(),
+  }),
+);
 
 // Real PFA pages captured for lib/pfa-client's own parser tests — the site is
 // unreachable from cloud agent sessions, so these are the only live shapes.

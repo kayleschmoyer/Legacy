@@ -2,10 +2,6 @@
 // module load, so this lives in its own file and imports Helpers after setting the env.
 import type * as HelpersModule from './Helpers';
 
-jest.mock('drizzle-orm', () => ({
-  sql: jest.fn().mockReturnValue({}),
-}));
-
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     debug: jest.fn(),

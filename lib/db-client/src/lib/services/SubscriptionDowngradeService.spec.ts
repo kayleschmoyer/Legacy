@@ -49,16 +49,6 @@ jest.mock('../client/PublicDbClient', () => ({
   },
 }));
 
-// ── Mock Drizzle ORM helpers ──────────────────────────────────────────────────
-
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => ({ __and: args })),
-  asc: jest.fn((col: unknown) => ({ __asc: col })),
-  eq: jest.fn((col: unknown, val: unknown) => ({ __eq: [col, val] })),
-  isNull: jest.fn((col: unknown) => ({ __isNull: col })),
-  not: jest.fn((expr: unknown) => ({ __not: expr })),
-}));
-
 // ── Import after mocks are set up ─────────────────────────────────────────────
 
 import {

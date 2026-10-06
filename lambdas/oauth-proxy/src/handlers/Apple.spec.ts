@@ -22,7 +22,7 @@ jest.mock('crypto', () => ({
   createPublicKey: jest.fn(() => ({ type: 'public' })),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({}));
+jest.mock('@legacy-sports/db-client', () => mockDbClientModule());
 
 // The shared resolver and link core are unit-tested separately; mock them here
 // so the Apple handler tests focus on token verification and result mapping.

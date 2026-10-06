@@ -31,10 +31,12 @@ jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest.fn(),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  isEmailAllowlisted: jest.fn(),
-  recordDownloadAttempt: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    isEmailAllowlisted: jest.fn(),
+    recordDownloadAttempt: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 jest.mock('../util/authenticated-request', () => ({
   getNavigationUser: jest.fn(),

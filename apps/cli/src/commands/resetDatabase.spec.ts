@@ -17,10 +17,12 @@ jest.mock('@legacy-sports/logging', () => ({
 const mockGetDatabaseConfig = jest.fn<Promise<unknown>, []>();
 const mockResetDatabase = jest.fn<Promise<void>, []>();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getDatabaseConfig: (): Promise<unknown> => mockGetDatabaseConfig(),
-  resetDatabase: (): Promise<void> => mockResetDatabase(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getDatabaseConfig: (): Promise<unknown> => mockGetDatabaseConfig(),
+    resetDatabase: (): Promise<void> => mockResetDatabase(),
+  }),
+);
 
 describe('assertEnvNotProduction', () => {
   it('throws when NODE_ENV=production', () => {

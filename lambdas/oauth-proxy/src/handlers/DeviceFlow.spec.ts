@@ -19,9 +19,11 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getUserByEmail: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getUserByEmail: jest.fn(),
+  }),
+);
 
 jest.mock('../Users', () => ({
   testPassword: jest.fn(),

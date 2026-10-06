@@ -30,82 +30,17 @@ jest.mock('@legacy-sports/scoring/server', () => ({
     mockGetFootballScoringSettingsForLeague(...args) as unknown,
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getMatchupFootballPlayerGameStats: (...args: unknown[]) =>
-    mockGetMatchupFootballPlayerGameStats(...args) as unknown,
-  updateMatchupScore: (...args: unknown[]) =>
-    mockUpdateMatchupScore(...args) as unknown,
-  PublicSchema: {
-    gameFootballPassing: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gameFootballRushing: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gameFootballReceiving: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gameFootballKicking: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gameFootballDefense: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    gameFootballDefenseIdp: {
-      playerId: 'playerId',
-      season: 'season',
-      gameIdentifier: 'gameIdentifier',
-    },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchupPlayerId',
-      gameIdentifier: 'gameIdentifier',
-      gameNum: 'gameNum',
-    },
-    matchups: { id: 'id', leagueId: 'leagueId', weekNumber: 'weekNumber' },
-    matchupPlayers: {
-      matchupId: 'matchupId',
-      id: 'id',
-      playerId: 'playerId',
-      teamId: 'teamId',
-      positionId: 'positionId',
-    },
-    leagueWeekPlayerSeasons: {
-      leagueId: 'leagueId',
-      weekNumber: 'weekNumber',
-      playerId: 'playerId',
-      season: 'season',
-    },
-    players: {
-      id: 'id',
-      pfrId: 'pfrId',
-      isDst: 'isDst',
-      position: 'position',
-      nflTeam: 'nflTeam',
-    },
-    leaguePosition: { id: 'id', positionType: 'positionType' },
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getMatchupFootballPlayerGameStats: (...args: unknown[]) =>
+      mockGetMatchupFootballPlayerGameStats(...args) as unknown,
+    updateMatchupScore: (...args: unknown[]) =>
+      mockUpdateMatchupScore(...args) as unknown,
+  }),
+);
 
 jest.mock('@legacy-sports/scoring', () => ({
   computeFootballPlayerGamePoints: jest.fn().mockReturnValue(0),
-}));
-
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => args),
-  eq: jest.fn((a: unknown, b: unknown) => [a, b]),
-  inArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
-  isNotNull: jest.fn((col: unknown) => col),
-  notInArray: jest.fn((col: unknown, vals: unknown) => ({ col, vals })),
 }));
 
 // Mirrors the chain-mocking pattern in season-game-selector.spec.ts: each

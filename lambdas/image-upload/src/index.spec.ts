@@ -25,19 +25,19 @@ jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn().mockReturnValue({}),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(),
-  PublicSchema: {
-    leagueMembers: {
-      teamId: 'teamId',
-      permissionLevel: 'permissionLevel',
-      userId: 'userId',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(),
+    PublicSchema: {
+      leagueMembers: {
+        teamId: 'teamId',
+        permissionLevel: 'permissionLevel',
+        userId: 'userId',
+      },
+      teams: { id: 'id' },
     },
-    teams: { id: 'id' },
-  },
-  eq: jest.fn(),
-  and: jest.fn(),
-}));
+  }),
+);
 
 jest.mock('./cloudflare', () => ({
   classifyImageForNsfw: jest.fn(),

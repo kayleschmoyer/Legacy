@@ -19,12 +19,14 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getSeasonBattingStatsForPlayer: jest.fn(),
-  getSeasonBattingStatsForPlayerSeason: jest.fn(),
-  getSeasonPitchingStatsForPlayerSeason: jest.fn(),
-  getSeasonFieldingStatsForPlayerSeason: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getSeasonBattingStatsForPlayer: jest.fn(),
+    getSeasonBattingStatsForPlayerSeason: jest.fn(),
+    getSeasonPitchingStatsForPlayerSeason: jest.fn(),
+    getSeasonFieldingStatsForPlayerSeason: jest.fn(),
+  }),
+);
 
 // Cast to jest.Mock to allow partial mock data without full type matching
 const mockedGetSeasonBattingStatsForPlayer =

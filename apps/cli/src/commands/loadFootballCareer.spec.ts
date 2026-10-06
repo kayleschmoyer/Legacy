@@ -21,12 +21,13 @@ jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({ host: 'localhost' })),
 }));
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => ({ and: args })),
-  eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
-  isNotNull: jest.fn((col: unknown) => ({ isNotNull: col })),
-  sql: Object.assign(jest.fn(), { raw: jest.fn() }),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn((...args: unknown[]) => ({ and: args })),
+    eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
+    isNotNull: jest.fn((col: unknown) => ({ isNotNull: col })),
+  }),
+);
 
 jest.mock('@legacy-sports/data-loaders', () => ({
   loadFootballCareerStats: jest.fn(),
@@ -70,19 +71,21 @@ function makeFakeDb(players: FakePlayer[]) {
   return { select: selectMock };
 }
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(
-    (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
-      cb(currentFakeDb),
-  ),
-  refreshFootballPlayerEligiblePositions: jest.fn(),
-  PublicSchema: {
-    players: {
-      sport: 'players.sport',
-      pfrId: 'players.pfr_id',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(
+      (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
+        cb(currentFakeDb),
+    ),
+    refreshFootballPlayerEligiblePositions: jest.fn(),
+    PublicSchema: {
+      players: {
+        sport: 'players.sport',
+        pfrId: 'players.pfr_id',
+      },
     },
-  },
-}));
+  }),
+);
 
 // Mutable binding read by the runWithPublicClient mock above — set per-test
 // before calling handleLoadFootballCareer.

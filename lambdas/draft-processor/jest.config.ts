@@ -5,6 +5,8 @@ export default {
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../../coverage/lambdas/draft-processor',
   coverageReporters: ['text', 'lcov'],
+  // mockDbClientModule / mockDrizzleOrm globals (LS-10498).
+  setupFiles: ['<rootDir>/../../lib/db-client/src/testing/setup.ts'],
   setupFilesAfterEnv: [],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   transform: {

@@ -22,24 +22,28 @@ jest.mock('@legacy-sports/utils/node', () => ({
 
 const mockRunWithPublicClient = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  PublicSchema: {
-    gameFootballPassing: { name: 'game_football_passing' },
-    gameFootballRushing: { name: 'game_football_rushing' },
-    gameFootballReceiving: { name: 'game_football_receiving' },
-    gameFootballKicking: { name: 'game_football_kicking' },
-    gameFootballDefense: { name: 'game_football_defense' },
-    gameFootballDefenseIdp: { name: 'game_football_defense_idp' },
-    matchupPlayerGames: { name: 'matchup_player_games' },
-  },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    PublicSchema: {
+      gameFootballPassing: { name: 'game_football_passing' },
+      gameFootballRushing: { name: 'game_football_rushing' },
+      gameFootballReceiving: { name: 'game_football_receiving' },
+      gameFootballKicking: { name: 'game_football_kicking' },
+      gameFootballDefense: { name: 'game_football_defense' },
+      gameFootballDefenseIdp: { name: 'game_football_defense_idp' },
+      matchupPlayerGames: { name: 'matchup_player_games' },
+    },
+  }),
+);
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn(() => 'and'),
-  eq: jest.fn(() => 'eq'),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn(() => 'and'),
+    eq: jest.fn(() => 'eq'),
+  }),
+);
 
 const mockGetCareerGameLog = jest.fn();
 const mockGetIdpGameLog = jest.fn();

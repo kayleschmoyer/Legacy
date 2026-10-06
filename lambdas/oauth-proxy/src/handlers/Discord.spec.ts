@@ -40,9 +40,11 @@ jest.mock('@legacy-sports/aws-utils', () => ({
 // The shared resolver and the provider-agnostic link core are unit-tested in
 // their own specs; here we mock them so the handler tests focus on token
 // exchange, OAuth-state handling, cookies, and result mapping.
-jest.mock('@legacy-sports/db-client', () => ({
-  setInitialAvatarUrl: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    setInitialAvatarUrl: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 jest.mock('./resolveOrCreateUser', () => ({
   resolveOrCreateUser: jest.fn(),

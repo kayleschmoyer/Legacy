@@ -371,16 +371,20 @@ const mockRunWithPublicClient = jest.fn(
   },
 );
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]) =>
-    mockRunWithPublicClient(...(args as [unknown, (db: unknown) => unknown])),
-  PublicSchema: mockPublicSchema,
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]) =>
+      mockRunWithPublicClient(...(args as [unknown, (db: unknown) => unknown])),
+    PublicSchema: mockPublicSchema,
+  }),
+);
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => args),
-  eq: jest.fn((a: unknown, b: unknown) => [a, b]),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn((...args: unknown[]) => args),
+    eq: jest.fn((a: unknown, b: unknown) => [a, b]),
+  }),
+);
 
 process.env['CONNECTIONS_TABLE_NAME'] = 'test-connections';
 process.env['JWT_SECRET_NAME'] = 'test-jwt-secret-name';

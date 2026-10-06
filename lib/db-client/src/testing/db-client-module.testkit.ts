@@ -1,6 +1,6 @@
 /**
- * The one sanctioned way to mock `@legacy-sports/db-client` in this project's
- * specs.
+ * The one sanctioned way to mock `@legacy-sports/db-client` in a spec, in any
+ * package.
  *
  * A hand-written `jest.doMock('@legacy-sports/db-client', () => ({ ... }))`
  * factory replaces the WHOLE module with whatever the spec happened to list.
@@ -15,8 +15,14 @@
  * sees is never missing an export. Override keys are checked against the real
  * module: a renamed export or table is a type error, not a silent `undefined`.
  *
- * The `db-client-mock` lint rule (lambdas/db/eslint.config.mjs) rejects any
+ * The repo-wide `legacy-sports-db/db-client-mock` lint rule (root
+ * eslint.config.mjs; lib/db-client/eslint-rules/db-client-mock.cjs) rejects any
  * other factory for the module, so the partial shape can't come back.
+ *
+ * Both helpers are installed as globals by ./setup.ts (wired into every
+ * project's jest `setupFiles`), so a hoisted `jest.mock` factory can call them
+ * whatever the import order. Their types come from ./globals.d.ts, which each
+ * project's tsconfig.spec.json includes (LS-10498).
  *
  * @example
  * jest.doMock('@legacy-sports/db-client', () =>
@@ -113,17 +119,4 @@ export function mockDrizzleOrm(
     jest.requireActual<DrizzleOrmModule>('drizzle-orm'),
   );
   return { ...actual, ...overrides } as DrizzleOrmModule;
-}
-
-declare global {
-  /**
-   * Installed by test-setup.ts for every unit spec, so a hoisted `jest.mock`
-   * factory can call it without depending on import order.
-   */
-  var mockDbClientModule: (
-    overrides?: DbClientModuleOverrides,
-  ) => DbClientModule;
-  var mockDrizzleOrm: (overrides?: {
-    [K in keyof DrizzleOrmModule]?: unknown;
-  }) => DrizzleOrmModule;
 }

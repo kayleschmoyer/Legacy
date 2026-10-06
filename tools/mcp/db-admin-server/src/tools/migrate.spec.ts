@@ -26,9 +26,9 @@ jest.mock('../invoke-worker.js');
 jest.mock('@legacy-sports/db-client/src/scripts/migration-runner.js', () => ({
   applyMigrationModule: jest.fn(),
 }));
-// Keep the drizzle imports (used only to populate the require-shim allowlist)
-// hermetic so no real driver is loaded.
-jest.mock('drizzle-orm', () => ({ sql: jest.fn() }));
+// Keep the drizzle driver imports (used only to populate the require-shim
+// allowlist) hermetic so no real driver is loaded. drizzle-orm itself stays
+// real: it loads no driver, and the shim test only checks it resolves.
 jest.mock('drizzle-orm/pg-core', () => ({}));
 jest.mock('drizzle-orm/postgres-js', () => ({ drizzle: jest.fn() }));
 

@@ -1,9 +1,10 @@
 import { RuleTester } from 'eslint';
 
-// eslint-rules/*.cjs is plain CommonJS so eslint.config.mjs can load it.
-const rule = require('./db-client-mock.cjs') as Parameters<
-  RuleTester['run']
->[1];
+// eslint-rules/*.cjs is plain CommonJS so the root eslint.config.mjs can load
+// it, which a TS `import` can't type.
+const rule = jest.requireActual<Parameters<RuleTester['run']>[1]>(
+  './db-client-mock.cjs',
+);
 
 const ruleTester = new RuleTester({
   languageOptions: { ecmaVersion: 2022, sourceType: 'module' },

@@ -212,32 +212,34 @@ describe('stripe-webhook event handlers', () => {
       retrieveSecretParameterValue: jest.fn(),
     }));
 
-    jest.doMock('@legacy-sports/db-client', () => ({
-      runWithInternalClient: (
-        opts: unknown,
-        cb: (db: unknown) => unknown,
-      ): unknown =>
-        mockRunWithInternalClient(opts, (db: unknown) =>
-          cb(withLedgerAndTransaction(db)),
-        ),
-      clearLeagueTierFreezes: mockClearLeagueTierFreezes,
-      handleSubscriptionDowngrade: mockHandleSubscriptionDowngrade,
-      InternalSchema: {
-        stripeEvents: { eventId: 'eventId' },
-        subscriptionTransactions: LEDGER_TABLE,
-        subscriptions: {
-          id: 'id',
-          stripeSubscriptionId: 'stripeSubscriptionId',
-          stripeCustomerId: 'stripeCustomerId',
-          tier: 'tier',
-          status: 'status',
-          userId: 'userId',
-          gracePeriodEndsAt: 'gracePeriodEndsAt',
-          lastEventTimestamp: 'lastEventTimestamp',
+    jest.doMock('@legacy-sports/db-client', () =>
+      mockDbClientModule({
+        runWithInternalClient: (
+          opts: unknown,
+          cb: (db: unknown) => unknown,
+        ): unknown =>
+          mockRunWithInternalClient(opts, (db: unknown) =>
+            cb(withLedgerAndTransaction(db)),
+          ),
+        clearLeagueTierFreezes: mockClearLeagueTierFreezes,
+        handleSubscriptionDowngrade: mockHandleSubscriptionDowngrade,
+        InternalSchema: {
+          stripeEvents: { eventId: 'eventId' },
+          subscriptionTransactions: LEDGER_TABLE,
+          subscriptions: {
+            id: 'id',
+            stripeSubscriptionId: 'stripeSubscriptionId',
+            stripeCustomerId: 'stripeCustomerId',
+            tier: 'tier',
+            status: 'status',
+            userId: 'userId',
+            gracePeriodEndsAt: 'gracePeriodEndsAt',
+            lastEventTimestamp: 'lastEventTimestamp',
+          },
+          usersInAppInternal: { id: 'id' },
         },
-        usersInAppInternal: { id: 'id' },
-      },
-    }));
+      }),
+    );
 
     const mockStripeInstance = {
       webhooks: { constructEvent: mockConstructEvent },

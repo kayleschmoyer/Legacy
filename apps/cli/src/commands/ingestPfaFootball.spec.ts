@@ -1,10 +1,9 @@
 import type { PfaCrosswalkRow } from '@legacy-sports/pfa-client';
 import { resolvePfaIngestIdentities } from './ingestPfaFootball';
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(),
-  PublicSchema: {},
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({ runWithPublicClient: jest.fn() }),
+);
 
 function crosswalkRow(
   overrides: Partial<PfaCrosswalkRow> & Pick<PfaCrosswalkRow, 'pfaId'>,

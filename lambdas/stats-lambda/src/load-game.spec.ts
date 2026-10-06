@@ -74,18 +74,20 @@ const mockDb = {
   }),
 };
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  PublicSchema: {
-    matchups: { id: 'matchups.id', leagueId: 'matchups.league_id' },
-    matchupPlayers: { matchupId: 'matchup_players.matchup_id' },
-    matchupPlayerGames: {
-      matchupPlayerId: 'matchup_player_games.matchup_player_id',
-      gameNum: 'matchup_player_games.game_num',
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    PublicSchema: {
+      matchups: { id: 'matchups.id', leagueId: 'matchups.league_id' },
+      matchupPlayers: { matchupId: 'matchup_players.matchup_id' },
+      matchupPlayerGames: {
+        matchupPlayerId: 'matchup_player_games.matchup_player_id',
+        gameNum: 'matchup_player_games.game_num',
+      },
     },
-  },
-}));
+  }),
+);
 
 const mockLoadPlayerGameStats = jest.fn().mockResolvedValue(undefined);
 

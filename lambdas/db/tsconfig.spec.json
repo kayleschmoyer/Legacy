@@ -13,7 +13,7 @@
     "jest.config.ts",
     "jest.db.config.ts",
     "src/**/*.ts",
-    "eslint-rules/**/*.ts",
+    "../../lib/db-client/src/testing/globals.d.ts",
     "integration-test-setup.ts",
     "integration-test-global-setup.ts",
     "integration-test-global-teardown.ts"

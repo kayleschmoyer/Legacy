@@ -84,15 +84,20 @@ const mockPublicSchemaTables = {
   matchups: { id: 'id', leagueId: 'leagueId' },
   leagues: { id: 'id', isPublic: 'isPublic' },
 };
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]) => mockRunWithPublicClient(...args),
-  PublicSchema: mockPublicSchemaTables,
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    PublicSchema: mockPublicSchemaTables,
+  }),
+);
 
-jest.mock('drizzle-orm', () => ({
-  and: jest.fn((...args: unknown[]) => args),
-  eq: jest.fn((a: unknown, b: unknown) => [a, b]),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    and: jest.fn((...args: unknown[]) => args),
+    eq: jest.fn((a: unknown, b: unknown) => [a, b]),
+  }),
+);
 
 import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';

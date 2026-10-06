@@ -25,18 +25,20 @@ const mockRefreshCareerStats = jest.fn();
 const mockRefreshPlayerEligiblePositions = jest.fn();
 const mockRefreshPlayerScoringCache = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getPlayerByBrefId: (...args: unknown[]): unknown =>
-    mockGetPlayerByBrefId(...args),
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
-  refreshCareerStats: (...args: unknown[]): unknown =>
-    mockRefreshCareerStats(...args),
-  refreshPlayerEligiblePositions: (...args: unknown[]): unknown =>
-    mockRefreshPlayerEligiblePositions(...args),
-  refreshPlayerScoringCache: (...args: unknown[]): unknown =>
-    mockRefreshPlayerScoringCache(...args),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getPlayerByBrefId: (...args: unknown[]): unknown =>
+      mockGetPlayerByBrefId(...args),
+    runWithPublicClient: (...args: unknown[]): unknown =>
+      mockRunWithPublicClient(...args),
+    refreshCareerStats: (...args: unknown[]): unknown =>
+      mockRefreshCareerStats(...args),
+    refreshPlayerEligiblePositions: (...args: unknown[]): unknown =>
+      mockRefreshPlayerEligiblePositions(...args),
+    refreshPlayerScoringCache: (...args: unknown[]): unknown =>
+      mockRefreshPlayerScoringCache(...args),
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({})),

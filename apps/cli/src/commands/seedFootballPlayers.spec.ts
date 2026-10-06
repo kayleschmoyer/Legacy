@@ -8,11 +8,12 @@ import {
   selectSeedCandidates,
 } from './seedFootballPlayers';
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(),
-  refreshFootballPlayerEligiblePositions: jest.fn(),
-  PublicSchema: {},
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(),
+    refreshFootballPlayerEligiblePositions: jest.fn(),
+  }),
+);
 
 const TEAMS = new Set(['SF', 'LAR', 'IND', 'DEN']);
 

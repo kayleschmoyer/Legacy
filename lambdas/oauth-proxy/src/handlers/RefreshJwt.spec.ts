@@ -19,9 +19,9 @@ jest.mock('@legacy-sports/aws-utils', () => ({
   readSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
 }));
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getUserById: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({ getUserById: jest.fn() }),
+);
 
 jest.mock('../util/db', () => ({
   withDbClient: jest.fn((cb: (db: object) => Promise<unknown>) => cb({})),

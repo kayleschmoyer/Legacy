@@ -33,13 +33,15 @@ jest.mock('@legacy-sports/logging', () => ({
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: () => ({}),
 }));
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: jest.fn(
-    (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
-      cb({ execute: jest.fn().mockResolvedValue({ rows: [] }) }),
-  ),
-  refreshFootballPlayerEligiblePositions: jest.fn(),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: jest.fn(
+      (_opts: unknown, cb: (db: unknown) => Promise<unknown>) =>
+        cb({ execute: jest.fn().mockResolvedValue({ rows: [] }) }),
+    ),
+    refreshFootballPlayerEligiblePositions: jest.fn(),
+  }),
+);
 jest.mock('@legacy-sports/pfr-client', () => ({
   getPlayersByLetter: jest.fn(),
   mapPfrPosition: jest.fn(),

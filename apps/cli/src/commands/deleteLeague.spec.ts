@@ -27,21 +27,25 @@ const mockRunWithPublicClient = jest.fn(
   (_opts: unknown, cb: (client: unknown) => Promise<unknown>) => cb(fakeClient),
 );
 
-jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (
-    opts: unknown,
-    cb: (client: unknown) => Promise<unknown>,
-  ): unknown => mockRunWithPublicClient(opts, cb),
-  PublicSchema: { leagues: { id: 'leagues.id' } },
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    runWithPublicClient: (
+      opts: unknown,
+      cb: (client: unknown) => Promise<unknown>,
+    ): unknown => mockRunWithPublicClient(opts, cb),
+    PublicSchema: { leagues: { id: 'leagues.id' } },
+  }),
+);
 
 jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({ host: 'localhost' })),
 }));
 
-jest.mock('drizzle-orm', () => ({
-  eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
-}));
+jest.mock('drizzle-orm', () =>
+  mockDrizzleOrm({
+    eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
+  }),
+);
 
 describe('parseLeagueId', () => {
   it('returns the id for a positive integer', () => {

@@ -5,16 +5,18 @@ const mockGetScoringMultipliersForLeague = jest.fn();
 const mockGetMatchupPlayerGameStats = jest.fn();
 const mockUpdateMatchupScore = jest.fn();
 
-jest.mock('@legacy-sports/db-client', () => ({
-  getCamelCaseScoringMultipliersForLeague: (...args: unknown[]): unknown =>
-    mockGetCamelCaseScoringMultipliersForLeague(...args),
-  getScoringMultipliersForLeague: (...args: unknown[]): unknown =>
-    mockGetScoringMultipliersForLeague(...args),
-  getMatchupPlayerGameStats: (...args: unknown[]): unknown =>
-    mockGetMatchupPlayerGameStats(...args),
-  updateMatchupScore: (...args: unknown[]): unknown =>
-    mockUpdateMatchupScore(...args),
-}));
+jest.mock('@legacy-sports/db-client', () =>
+  mockDbClientModule({
+    getCamelCaseScoringMultipliersForLeague: (...args: unknown[]): unknown =>
+      mockGetCamelCaseScoringMultipliersForLeague(...args),
+    getScoringMultipliersForLeague: (...args: unknown[]): unknown =>
+      mockGetScoringMultipliersForLeague(...args),
+    getMatchupPlayerGameStats: (...args: unknown[]): unknown =>
+      mockGetMatchupPlayerGameStats(...args),
+    updateMatchupScore: (...args: unknown[]): unknown =>
+      mockUpdateMatchupScore(...args),
+  }),
+);
 
 // The scoring engine itself is real — these tests exist to prove the numbers
 // that come out of the shared function are right, which a mocked engine cannot
