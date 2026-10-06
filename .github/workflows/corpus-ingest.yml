@@ -12,10 +12,9 @@
 # proxy blocks, so it can only run from Actions. It differs from the other two:
 #   - Its name crosswalk SELECTs football rows from public.players, so it needs
 #     the dev RDS. RDS is private (publicly_accessible=false), so the job runs
-#     on the self-hosted runner pool (vars.CI_RUNNER_LABEL), and it needs a
-#     read-only DB secret: vars.CORPUS_INGEST_DB_SECRET_NAME, which the
-#     corpus-ingest role must be able to read. Neither is provisioned by this
-#     workflow; the preflight step fails with the runbook link until both are.
+#     on the self-hosted runner pool (vars.CI_RUNNER_LABEL). It connects as
+#     corpus_ingest_readonly (SELECT on players only, LS-10605), whose secret
+#     name it reads from SSM; the corpus-ingest role can read both.
 #   - The crawl is rate-limited (>= 3s per request, ~7,000 box scores for
 #     1960-1998), so it gets a 12h timeout. Split it into season ranges with
 #     from/to; a re-run of a range skips objects already written.
@@ -84,9 +83,9 @@ concurrency:
 env:
   AWS_REGION: us-east-1
   CORPUS_ROLE_ARN: arn:aws:iam::176661590736:role/legacy-sports-dev-corpus-ingest
-  # pfa only: Secrets Manager secret holding read-only DB credentials for the
-  # crosswalk. Unset until the gap in the runbook is closed.
-  CROSSWALK_DB_SECRET_NAME: ${{ vars.CORPUS_INGEST_DB_SECRET_NAME }}
+  # pfa only: SSM parameter naming the corpus_ingest_readonly DB secret
+  # (terraform/main/github-actions-corpus-ingest.tf).
+  CROSSWALK_DB_SECRET_PARAM: /legacy-sports/dev/corpus-ingest/db-creds-secret-name
 
 jobs:
   ingest:
@@ -138,24 +137,18 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Will run: ls-cli.sh $command $args"
 
-      # Fail before any setup when the pfa prerequisites are missing, so the
-      # run says what to fix instead of timing out on a DB connection.
-      - name: Check PFA crosswalk prerequisites
+      # Fail before any setup when the pfa runner is wrong, so the run says
+      # what to fix instead of timing out on a DB connection.
+      - name: Check PFA runner
         if: inputs.source == 'pfa'
         env:
           RUNNER_ENV: ${{ runner.environment }}
         run: |
-          runbook=".agents/skills/dev-environment/references/cli-commands.md#pfa-corpus-ingest"
-          ok=true
           if [ "$RUNNER_ENV" != "self-hosted" ]; then
+            runbook=".agents/skills/dev-environment/references/cli-commands.md#pfa-corpus-ingest"
             echo "::error::source=pfa needs a self-hosted runner (vars.CI_RUNNER_LABEL) to reach the private dev RDS; got a $RUNNER_ENV runner. See $runbook"
-            ok=false
+            exit 1
           fi
-          if [ -z "$CROSSWALK_DB_SECRET_NAME" ]; then
-            echo "::error::source=pfa needs vars.CORPUS_INGEST_DB_SECRET_NAME (a read-only DB secret the corpus-ingest role can read) for its players crosswalk. See $runbook"
-            ok=false
-          fi
-          [ "$ok" = "true" ]
 
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -191,6 +184,17 @@ jobs:
             echo "Bucket is empty; skipped the object read probe"
           fi
 
+      # pfa only: the CLI resolves its DB credentials from Secrets Manager via
+      # DB_SECRET_NAME. Only the secret's name passes through the workflow.
+      - name: Resolve crosswalk DB secret name
+        id: db-secret
+        if: inputs.source == 'pfa'
+        run: |
+          name=$(aws ssm get-parameter --name "$CROSSWALK_DB_SECRET_PARAM" \
+            --query Parameter.Value --output text)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Crosswalk DB secret: $name"
+
       # pfa only: the CLI validates the RDS certificate (rejectUnauthorized),
       # and the RDS CA chain is not in Node's built-in store.
       - name: Install AWS RDS CA bundle
@@ -206,7 +210,7 @@ jobs:
           COMMAND: ${{ steps.args.outputs.command }}
           ARGS: ${{ steps.args.outputs.args }}
           # Empty for nflverse/retrosheet, which never touch the DB.
-          DB_SECRET_NAME: ${{ inputs.source == 'pfa' && env.CROSSWALK_DB_SECRET_NAME || '' }}
+          DB_SECRET_NAME: ${{ steps.db-secret.outputs.name }}
           NODE_EXTRA_CA_CERTS: ${{ steps.rds-ca.outputs.ca_bundle }}
         run: |
           set -o pipefail

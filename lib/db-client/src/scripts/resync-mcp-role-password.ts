@@ -59,7 +59,13 @@ import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { getMigrationDatabaseConfig } from '../config/database';
 
-const ALLOWED_ROLES = new Set(['mcp_write', 'mcp_readonly']);
+// corpus_ingest_readonly (LS-10605) is created without a password; this
+// script is how it first gets the one Terraform stored in its secret.
+const ALLOWED_ROLES = new Set([
+  'mcp_write',
+  'mcp_readonly',
+  'corpus_ingest_readonly',
+]);
 
 interface RoleSecret {
   username?: string;

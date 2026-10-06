@@ -14,6 +14,10 @@
 #      s3:DeleteObject: the ingest only ever writes (or overwrites, with
 #      --force), and bucket versioning keeps the previous revision of anything
 #      it overwrites.
+#
+# LS-10605 adds read access to the corpus_ingest_readonly DB credentials
+# (SELECT on public.players only; secrets.tf) for the `pfa` source's name
+# crosswalk, and the SSM parameter the workflow reads the secret name from.
 resource "aws_iam_role" "corpus_ingest" {
   name        = "${local.name_prefix}-corpus-ingest"
   description = "OIDC role for the corpus-ingest workflow - corpus S3 buckets only, corpus-ingest environment only"
@@ -45,7 +49,7 @@ resource "aws_iam_policy" "corpus_ingest" {
   # aws_iam_policy, and a fixed-name create-before-destroy replacement aborts
   # the apply on 409 EntityAlreadyExists (LS-9876, LS-10209).
   name_prefix = "${local.name_prefix}-corpus-ingest-"
-  description = "Read/write (no delete) on the football and Retrosheet corpus buckets for the corpus-ingest workflow"
+  description = "Read/write (no delete) on the football and Retrosheet corpus buckets, plus the read-only PFA crosswalk DB credentials, for the corpus-ingest workflow"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -70,6 +74,20 @@ resource "aws_iam_policy" "corpus_ingest" {
           aws_s3_bucket.retrosheet_corpus.arn,
         ]
       },
+      {
+        # `pfa` source only: the workflow resolves the secret name from SSM and
+        # the CLI reads the credentials through DB_SECRET_NAME.
+        Sid      = "CrosswalkDbSecretNameRead"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = [aws_ssm_parameter.corpus_ingest_db_creds_secret_name.arn]
+      },
+      {
+        Sid      = "CrosswalkDbCredentialsRead"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.corpus_ingest_readonly_db_credentials.arn]
+      },
     ]
   })
 
@@ -89,6 +107,20 @@ resource "aws_iam_role_policy_attachment" "corpus_ingest" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# The secret has a generated suffix (name_prefix), so the workflow looks its
+# name up here instead of hardcoding it.
+resource "aws_ssm_parameter" "corpus_ingest_db_creds_secret_name" {
+  name        = "/legacy-sports/${var.environment}/corpus-ingest/db-creds-secret-name"
+  description = "Secrets Manager secret name holding the corpus_ingest_readonly DB credentials"
+  type        = "String"
+  value       = aws_secretsmanager_secret.corpus_ingest_readonly_db_credentials.name
+
+  tags = merge(local.common_tags, {
+    Component = "ci"
+    Purpose   = "corpus-ingest"
+  })
 }
 
 output "corpus_ingest_role_arn" {

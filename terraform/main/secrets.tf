@@ -636,6 +636,47 @@ resource "aws_secretsmanager_secret_version" "ci_readonly_db_credentials" {
 }
 
 # =============================================================================
+# CORPUS INGEST READONLY DATABASE CREDENTIALS
+# =============================================================================
+# Read-only PostgreSQL user for the `pfa` source of the Corpus Ingest workflow
+# (.github/workflows/corpus-ingest.yml, LS-10605): SELECT on public.players
+# only, for ingest-pfa-football's name crosswalk. The role is created, with no
+# password, by migration 20261005_160000_add_corpus_ingest_readonly_role.ts;
+# `db:resync-role` sets its password from this secret. The workflow finds the
+# secret through the SSM parameter in github-actions-corpus-ingest.tf.
+
+resource "random_password" "corpus_ingest_readonly_db_password" {
+  length  = 32
+  special = false # Avoid special chars that can break PostgreSQL connection strings
+}
+
+resource "aws_secretsmanager_secret" "corpus_ingest_readonly_db_credentials" {
+  name_prefix = "${local.name_prefix}-corpus-ingest-readonly-db-creds-"
+  description = "Read-only DB credentials (SELECT on players) for the corpus-ingest workflow's PFA crosswalk"
+
+  # No rotation Lambda (LS-784). Re-sync the role after regenerating the
+  # password: pnpm --prefix lib/db-client run db:resync-role.
+
+  tags = merge(local.common_tags, {
+    Component = "ci"
+    Purpose   = "corpus-ingest"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "corpus_ingest_readonly_db_credentials" {
+  secret_id = aws_secretsmanager_secret.corpus_ingest_readonly_db_credentials.id
+  secret_string = jsonencode({
+    username = "corpus_ingest_readonly"
+    password = random_password.corpus_ingest_readonly_db_password.result
+    host     = aws_db_instance.postgres.address
+    port     = 5432
+    database = var.database_name
+    # lib/db-client's resolveAwsSecretCredentials reads `dbname`.
+    dbname = var.database_name
+  })
+}
+
+# =============================================================================
 # MCP READONLY DATABASE CREDENTIALS
 # =============================================================================
 # A broad read-only PostgreSQL user used by the hosted DB-admin MCP server

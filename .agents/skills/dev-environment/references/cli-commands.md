@@ -104,17 +104,27 @@ Unlike Retrosheet, nflverse publishes the **current** season's weekly stats whil
 - **Runtime and splitting:** `PfaRateLimiter` spaces requests at least 3s apart. The full range is about 7,000 regular-season box scores plus the 78-page player index and kicker game logs, so a single 1960-1998 run takes around 6-7 hours. The job timeout for `pfa` is 12h, but the self-hosted pool runs on spot instances, so split the run into season ranges with `from`/`to`, for example `1960`-`1972`, `1973`-`1985`, `1986`-`1998`. Each run crawls the player index again (about 4 minutes). Objects are per season, so the ranges are independent. To resume after a failed or interrupted range, dispatch the same range again: objects already written are skipped unless `force=true`. The crawl is repeated, though, because the crawl itself is not resumable.
 - **Verify:** the run summary shows the `PFA ingest: crosswalk resolved N/M` line, then `Season <year>: ...` per season, then `Ingest complete: ...`. A run for newly seeded players should show a higher resolved count than the previous ingest.
 
-#### Prerequisites: the DB access gap (open)
+#### Prerequisites: DB access
 
-Unlike `nflverse` and `retrosheet`, the `pfa` job needs DB read access. The workflow's `Check PFA crosswalk prerequisites` step fails fast until both of these are true:
+Unlike `nflverse` and `retrosheet`, the `pfa` job reads the dev RDS (LS-10605):
 
-1. **Network:** the job runs on `vars.CI_RUNNER_LABEL` (the self-hosted pool inside the VPC), because the dev RDS is private. `check-migrations-applied.yml` relies on the same path. If that variable is unset, the job falls back to `ubuntu-latest` and the preflight fails.
-2. **Credentials (not provisioned yet):** the CLI resolves DB credentials from Secrets Manager via `DB_SECRET_NAME`. The workflow passes it `vars.CORPUS_INGEST_DB_SECRET_NAME`. The secret JSON needs `host`, `port`, `username` and `password`, and the role only needs `SELECT` on `public.players`. Closing this gap is an owner decision, because it grants the `corpus-ingest` OIDC role read access to DB credentials:
-   - Pick the DB role. The narrowest option is a dedicated read-only Postgres role with `SELECT` on `public.players`, created by a migration, plus its own Secrets Manager secret (modelled on `ci_readonly` in `terraform/main/secrets.tf`). The existing `mcp_readonly` secret (SELECT on all of `public`) also works.
-   - Grant `secretsmanager:GetSecretValue` on that secret's ARN in `aws_iam_policy.corpus_ingest` (`terraform/main/github-actions-corpus-ingest.tf`), and apply.
-   - Set the `CORPUS_INGEST_DB_SECRET_NAME` variable (the secret's full name) on the repo or the `corpus-ingest` environment.
+1. **Network:** the job runs on `vars.CI_RUNNER_LABEL` (the self-hosted pool inside the VPC), because the dev RDS is private. `check-migrations-applied.yml` relies on the same path. If that variable is unset, the job falls back to `ubuntu-latest` and the `Check PFA runner` step fails.
+2. **Credentials:** the job connects as `corpus_ingest_readonly`, a Postgres role with `SELECT` on `public.players` only. It reads the secret name from the SSM parameter `/legacy-sports/<env>/corpus-ingest/db-creds-secret-name` and passes it to the CLI as `DB_SECRET_NAME`. The `corpus-ingest` OIDC role can read that parameter and that secret, nothing else in SSM or Secrets Manager (`terraform/main/github-actions-corpus-ingest.tf`; the secret is in `terraform/main/secrets.tf`).
 
-   Then dispatch a `source=pfa` dry run to confirm.
+**One-time setup** (in this order):
+
+1. `terraform apply` creates the password, the secret, the SSM parameter and the IAM grant.
+2. Apply migration `20261005_160000_add_corpus_ingest_readonly_role.ts` (`db_migrate`). It creates the role **without a password**, so it cannot log in yet. A migration-time password env var can silently fall back to a placeholder ([password drift](../../database/references/mcp-role-password-drift.md)), so the migration doesn't set one.
+3. A maintainer with AWS credentials sets the role's password from the secret:
+
+   ```bash
+   secret=$(aws ssm get-parameter --name /legacy-sports/dev/corpus-ingest/db-creds-secret-name --query Parameter.Value --output text)
+   pnpm --prefix lib/db-client run db:resync-role -- --role corpus_ingest_readonly --secret-name "$secret"
+   ```
+
+   Re-run it after any regeneration of `random_password.corpus_ingest_readonly_db_password`.
+
+4. Dispatch a short `source=pfa` dry run (for example `from=1998`, `to=1998`) to confirm the runner reaches both profootballarchives.com and RDS.
 
 - **Local fallback** (a maintainer with AWS credentials and a DB connection; agents cannot do either):
 
