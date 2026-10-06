@@ -87,6 +87,14 @@ export interface DraftPausedNotification {
   pausedAt: string;
 }
 
+export interface LeagueDeletedNotification {
+  type: typeof WireNotificationType.LEAGUE_DELETED;
+  leagueId: number;
+  /** The league's draft rooms, so draft-channel clients can match it. */
+  draftIds: number[];
+  deletedAt: string;
+}
+
 export interface DraftPickUndoneNotification {
   type: typeof WireNotificationType.DRAFT_PICK_UNDONE;
   leagueId: number | null;
@@ -913,6 +921,36 @@ export class WebSocketNotificationService {
       { type: 'notification', data: notification },
       draftId,
     );
+  }
+
+  /**
+   * Tell every client on the league channel and on each of the league's draft
+   * channels that the league was deleted, so draft rooms don't sit stranded on
+   * a draft that no longer exists. Call after the delete commits (the draft
+   * ids must be read beforehand — they cascade away with the league).
+   */
+  async notifyLeagueDeleted(
+    leagueId: number,
+    draftIds: number[],
+  ): Promise<void> {
+    const notification: LeagueDeletedNotification = {
+      type: WireNotificationType.LEAGUE_DELETED,
+      leagueId,
+      draftIds,
+      deletedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending league deleted notification', { leagueId, draftIds });
+
+    const message = { type: 'notification' as const, data: notification };
+    if (draftIds.length === 0) {
+      await this.broadcastToDraft(message, null, leagueId);
+      return;
+    }
+    // League channel once (first draft); later drafts only need their own room.
+    for (const [i, draftId] of draftIds.entries()) {
+      await this.broadcastToDraft(message, draftId, i === 0 ? leagueId : null);
+    }
   }
 
   /**

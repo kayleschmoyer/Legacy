@@ -25,6 +25,8 @@ export const WireNotificationType = {
   DRAFT_PICK_UNDONE: 'DRAFT_PICK_UNDONE',
   DRAFT_PAUSED: 'DRAFT_PAUSED',
   DRAFT_RESUMED: 'DRAFT_RESUMED',
+  /** The league (and its draft) was deleted; draft-room clients must leave. */
+  LEAGUE_DELETED: 'LEAGUE_DELETED',
   /** A mock draft's lobby changed: a seat was claimed, freed, kicked, or its settings/host changed (LS-10076). */
   DRAFT_LOBBY_UPDATED: 'DRAFT_LOBBY_UPDATED',
   /** A chat message posted in a mock draft's own chat (`draft_messages`, LS-10076). */
@@ -73,6 +75,7 @@ export const ClientNotificationType = {
   DRAFT_PICK_UNDONE: 'draft-pick-undone',
   DRAFT_PAUSED: 'draft-paused',
   DRAFT_RESUMED: 'draft-resumed',
+  LEAGUE_DELETED: 'league-deleted',
   DRAFT_LOBBY_UPDATED: 'draft-lobby-updated',
   DRAFT_CHAT_MESSAGE: 'draft-chat-message',
   PLAYER_STATS_LOADING: 'player-stats-loading',

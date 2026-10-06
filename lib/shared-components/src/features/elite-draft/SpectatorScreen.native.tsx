@@ -126,6 +126,7 @@ export function SpectatorScreen({
     websocketUrl,
     token: websocketToken,
     minSplashMs,
+    onLeagueDeleted: () => onNavigate('/'),
   });
 
   const boardTeams =

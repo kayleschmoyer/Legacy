@@ -196,6 +196,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1, name: 'My League' }]);
 
       // Mock delete operations
@@ -244,6 +248,11 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 admin check, #3 the league's draft ids
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       // 1) league lookup, 2) checkAdminInDb's accessLevel lookup
       mockDb.limit
         .mockResolvedValueOnce([
@@ -301,6 +310,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1, name: 'My League' }]);
       mockDb.delete.mockReturnValue(mockDb);
 
@@ -356,6 +369,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([]);
 
       const mutationType = schema.getMutationType();
@@ -379,6 +396,11 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 admin check, #3 the league's draft ids
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 999 }]);
 
       const mutationType = schema.getMutationType();
@@ -404,6 +426,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
 
       const deleteCallOrder: string[] = [];
@@ -442,6 +468,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
 
       // The DB handles SET NULL on previous_league_id for leagues that referenced
@@ -472,6 +502,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
+      // where() #1 league lookup, #2 the league's draft ids (owner skips the admin query)
+      mockDb.where
+        .mockReturnValueOnce(mockDb)
+        .mockResolvedValueOnce([{ id: 7 }]);
       mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
 
       // Mock delete operation throwing error

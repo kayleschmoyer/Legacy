@@ -11153,6 +11153,13 @@
       "lib/tamagui-config/src/lib/**",
       "lib/utils/src/lib/**",
       "lib/shared-components/src/features/auth/**"
+    ],
+    "apps/web-e2e/src/tests/draft-league-deleted.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
+      "lib/shared-components/src/features/elite-draft/**",
+      "lib/shared-components/src/hooks/useWebSocket.ts",
+      "lib/websocket-client/src/**",
+      "lib/utils/src/lib/notification-types.ts"
     ]
   }
 }

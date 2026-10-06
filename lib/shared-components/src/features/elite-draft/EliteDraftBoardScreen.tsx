@@ -1052,6 +1052,12 @@ export function EliteDraftBoardScreen({
   });
 
   const fetchDraftPlayer = useFetchDraftPlayer();
+  // The league was deleted under an open draft room: leave rather than sit on
+  // a board whose draft no longer exists.
+  const handleLeagueDeleted = useCallback(() => {
+    if (onExitDraft) onExitDraft();
+    else onNavigate(`/${sport}`);
+  }, [onExitDraft, onNavigate, sport]);
   const { connectionStatus, retryConnection } = useDraftWebSocket({
     leagueId,
     draftId: queries.draftId,
@@ -1088,6 +1094,7 @@ export function EliteDraftBoardScreen({
     token: token ?? authToken ?? undefined,
     fetchPlayer: fetchDraftPlayer,
     onPlayerDrafted,
+    onLeagueDeleted: handleLeagueDeleted,
   });
 
   // Offline mock draft mode (LS-9144): no pick-clock pressure on the human's

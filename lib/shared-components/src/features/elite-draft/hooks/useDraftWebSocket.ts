@@ -19,6 +19,7 @@ import {
   type DraftPickUndoneNotification,
   type DraftResumedNotification,
   type DraftStartedNotification,
+  type LeagueDeletedNotification,
   type UserJoinedNotification,
   type UserLeftNotification,
   type UserListNotification,
@@ -139,6 +140,11 @@ interface UseDraftWebSocketParams {
    * its splash queue (LS-8942).
    */
   onPickUndone?: (overallPick: number) => void;
+  /**
+   * Fired when the league (and so this draft) is deleted while the room is
+   * open. The room has nothing left to show, so the screen should leave.
+   */
+  onLeagueDeleted?: () => void;
 }
 
 export function useDraftWebSocket({
@@ -172,6 +178,7 @@ export function useDraftWebSocket({
   fetchPlayer,
   onPlayerDrafted,
   onPickUndone,
+  onLeagueDeleted,
 }: UseDraftWebSocketParams) {
   // Holds the latest pick notification while debouncing refetches for batch auto-picks.
   const pendingRefetchNotifRef = useRef<DraftPickNotification | null>(null);
@@ -485,6 +492,17 @@ export function useDraftWebSocket({
     ],
   );
 
+  const handleLeagueDeleted = useCallback(
+    (notification: LeagueDeletedNotification) => {
+      // Ignore a stale event for another draft room on a shared connection.
+      if (draftId !== null && !notification.draftIds.includes(draftId)) return;
+      setLiveMessage('This league was deleted.');
+      showToast('This league was deleted.', 'warning');
+      onLeagueDeleted?.();
+    },
+    [draftId, setLiveMessage, showToast, onLeagueDeleted],
+  );
+
   // Presence handlers
   const handleUserJoined = useCallback(
     (notification: UserJoinedNotification) => {
@@ -545,6 +563,7 @@ export function useDraftWebSocket({
     onDraftCompleted: handleDraftCompleted,
     onDraftPaused: handleDraftPaused,
     onDraftResumed: handleDraftResumed,
+    onLeagueDeleted: handleLeagueDeleted,
     onUserJoined: handleUserJoined,
     onUserLeft: handleUserLeft,
     onUserList: handleUserList,

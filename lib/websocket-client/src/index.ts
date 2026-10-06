@@ -22,6 +22,7 @@ export type {
   DraftPickNotification,
   DraftPickUndoneNotification,
   DraftPausedNotification,
+  LeagueDeletedNotification,
   DraftResumedNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,

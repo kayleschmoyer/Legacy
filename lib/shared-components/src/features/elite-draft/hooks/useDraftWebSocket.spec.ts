@@ -259,6 +259,50 @@ describe('useDraftWebSocket — paused draft resets stale completion state (LS-8
   });
 });
 
+describe('useDraftWebSocket — league deleted mid-draft', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("toasts and calls onLeagueDeleted when this draft's league is deleted", () => {
+    const onLeagueDeleted = jest.fn();
+    const params = { ...makeDefaultParams(), onLeagueDeleted };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.LEAGUE_DELETED, {
+        leagueId: 1,
+        draftIds: [params.draftId],
+        deletedAt: '2026-10-06T00:00:00.000Z',
+      });
+    });
+
+    expect(params.showToast).toHaveBeenCalledWith(
+      'This league was deleted.',
+      'warning',
+    );
+    expect(onLeagueDeleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a deletion for a different draft', () => {
+    const onLeagueDeleted = jest.fn();
+    const params = { ...makeDefaultParams(), onLeagueDeleted };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.LEAGUE_DELETED, {
+        leagueId: 2,
+        draftIds: [99999],
+        deletedAt: '2026-10-06T00:00:00.000Z',
+      });
+    });
+
+    expect(onLeagueDeleted).not.toHaveBeenCalled();
+  });
+});
+
 // ── Pick announcements for players outside the local lookup (LS-8845) ──────
 
 describe('useDraftWebSocket — pick announcement fallback (LS-8845)', () => {

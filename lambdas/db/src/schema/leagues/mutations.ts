@@ -2338,6 +2338,14 @@ builder.mutationField('deleteLeague', (t) =>
         // transaction closure below, so alias it to a const here.
         const deleterId = context.user.id;
 
+        // Draft ids cascade away with the league, so read them now to tell the
+        // draft room(s) where to look once the delete commits.
+        const draftRows = await context.db
+          .select({ id: PublicSchema.drafts.id })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, args.leagueId));
+        const draftIds = draftRows.map((d) => d.id);
+
         // Audit-log the delete and perform it in the same transaction so the
         // trail can never lie: if the delete fails, the audit entry is rolled
         // back with it (LS-6308). CASCADE DELETE constraints handle the rest
@@ -2367,6 +2375,25 @@ builder.mutationField('deleteLeague', (t) =>
               }),
           },
         );
+
+        // Best-effort: the delete has committed, so a failed push must not
+        // turn into a failed mutation.
+        if (context.notificationService) {
+          try {
+            await context.notificationService.notifyLeagueDeleted(
+              args.leagueId,
+              draftIds,
+            );
+          } catch (notifyError) {
+            LOGGER.warn('Failed to broadcast league deletion', {
+              leagueId: args.leagueId,
+              error:
+                notifyError instanceof Error
+                  ? notifyError.message
+                  : String(notifyError),
+            });
+          }
+        }
 
         return `Successfully deleted league ${args.leagueId} and all associated data`;
       } catch (error) {

@@ -8,6 +8,7 @@ import {
   type DraftResumedNotification,
   type DraftStartedNotification,
   type LeagueChatMessageNotification,
+  type LeagueDeletedNotification,
   type MatchupStatsCompleteNotification,
   type NotificationData,
   type NotificationReceivedNotification,
@@ -68,6 +69,7 @@ export type {
   DraftResumedNotification,
   DraftStartedNotification,
   LeagueChatMessageNotification,
+  LeagueDeletedNotification,
   NotificationReceivedNotification,
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
@@ -105,6 +107,7 @@ interface UseWebSocketOptions {
   onDraftPickUndone?: (notification: DraftPickUndoneNotification) => void;
   onDraftPaused?: (notification: DraftPausedNotification) => void;
   onDraftResumed?: (notification: DraftResumedNotification) => void;
+  onLeagueDeleted?: (notification: LeagueDeletedNotification) => void;
   onPlayerStatsLoading?: (notification: PlayerStatsLoadingNotification) => void;
   onPlayerStatsUpdated?: (notification: PlayerStatsUpdatedNotification) => void;
   onMatchupStatsComplete?: (
@@ -165,6 +168,7 @@ export function useWebSocket({
   onDraftPickUndone,
   onDraftPaused,
   onDraftResumed,
+  onLeagueDeleted,
   onPlayerStatsLoading,
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
@@ -194,6 +198,7 @@ export function useWebSocket({
   const onDraftPickUndoneRef = useLatestRef(onDraftPickUndone);
   const onDraftPausedRef = useLatestRef(onDraftPaused);
   const onDraftResumedRef = useLatestRef(onDraftResumed);
+  const onLeagueDeletedRef = useLatestRef(onLeagueDeleted);
   const onPlayerStatsLoadingRef = useLatestRef(onPlayerStatsLoading);
   const onPlayerStatsUpdatedRef = useLatestRef(onPlayerStatsUpdated);
   const onMatchupStatsCompleteRef = useLatestRef(onMatchupStatsComplete);
@@ -505,6 +510,12 @@ export function useWebSocket({
         onDraftResumedRef.current?.(n as DraftResumedNotification);
       }),
       client.on(
+        ClientNotificationType.LEAGUE_DELETED,
+        (n: NotificationData) => {
+          onLeagueDeletedRef.current?.(n as LeagueDeletedNotification);
+        },
+      ),
+      client.on(
         ClientNotificationType.PLAYER_STATS_LOADING,
         (n: NotificationData) => {
           onPlayerStatsLoadingRef.current?.(
@@ -624,6 +635,7 @@ export function useWebSocket({
     onDraftPickUndoneRef,
     onDraftPausedRef,
     onDraftResumedRef,
+    onLeagueDeletedRef,
     onPlayerStatsLoadingRef,
     onPlayerStatsUpdatedRef,
     onMatchupStatsCompleteRef,

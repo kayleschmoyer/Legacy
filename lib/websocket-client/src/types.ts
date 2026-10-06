@@ -68,6 +68,13 @@ export interface DraftPausedNotification {
   pausedAt: string;
 }
 
+export interface LeagueDeletedNotification {
+  type: typeof ClientNotificationType.LEAGUE_DELETED;
+  leagueId: number;
+  draftIds: number[];
+  deletedAt: string;
+}
+
 export interface DraftPickUndoneNotification {
   type: typeof ClientNotificationType.DRAFT_PICK_UNDONE;
   /** `null` for a mock draft, which has no league (LS-10076). */
@@ -318,6 +325,7 @@ export type NotificationData =
   | DraftPickUndoneNotification
   | DraftPausedNotification
   | DraftResumedNotification
+  | LeagueDeletedNotification
   | DraftLobbyUpdatedNotification
   | DraftChatMessageNotification
   | PlayerStatsLoadingNotification

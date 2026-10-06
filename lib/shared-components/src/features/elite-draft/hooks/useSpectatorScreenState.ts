@@ -15,6 +15,8 @@ interface UseSpectatorScreenStateParams {
   token?: string;
   /** Hold duration per pick splash — prop-tunable, defaults to ~8s. */
   minSplashMs?: number;
+  /** Fired when the league is deleted while spectating; the screen should leave. */
+  onLeagueDeleted?: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function useSpectatorScreenState({
   websocketUrl,
   token,
   minSplashMs,
+  onLeagueDeleted,
 }: UseSpectatorScreenStateParams) {
   const { user, token: authToken } = useAuth();
   const isAuthenticated = !!user;
@@ -114,6 +117,7 @@ export function useSpectatorScreenState({
     token: token ?? authToken ?? undefined,
     fetchPlayer: fetchDraftPlayer,
     onPickUndone: removePick,
+    onLeagueDeleted,
   });
 
   const { timeRemaining } = useDraftTimer({

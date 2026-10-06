@@ -116,7 +116,13 @@ export function SpectatorScreen({
     onClockTeamName,
     recentPicks,
     pickTimeLimitSeconds,
-  } = useSpectatorScreenState({ leagueId, websocketUrl, token, minSplashMs });
+  } = useSpectatorScreenState({
+    leagueId,
+    websocketUrl,
+    token,
+    minSplashMs,
+    onLeagueDeleted: () => onNavigate('/'),
+  });
 
   useEffect(() => {
     preloadYouTubeIframeApi();
