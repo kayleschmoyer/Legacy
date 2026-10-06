@@ -179,6 +179,8 @@ export type AutoAdvanceMatchupsResult = {
   leaguesAdvanced?: Maybe<Scalars['Int']['output']>;
   leaguesProcessed?: Maybe<Scalars['Int']['output']>;
   leaguesSkipped?: Maybe<Scalars['Int']['output']>;
+  /** User-facing reason a single-league advance (leagueId provided) did nothing. Null when the league advanced or the call covered all leagues. */
+  skipReason?: Maybe<Scalars['String']['output']>;
 };
 
 /** Result of the automated draft pick processing for expired deadlines */
@@ -10525,6 +10527,7 @@ export type AutoAdvanceMatchupsMutation = {
     leaguesAdvanced?: number | null;
     leaguesSkipped?: number | null;
     errors?: Array<string> | null;
+    skipReason?: string | null;
   } | null;
 };
 
@@ -26937,6 +26940,7 @@ export const AutoAdvanceMatchups = gql`
       leaguesAdvanced
       leaguesSkipped
       errors
+      skipReason
     }
   }
 `;

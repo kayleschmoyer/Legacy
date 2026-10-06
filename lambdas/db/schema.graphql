@@ -169,6 +169,11 @@ type AutoAdvanceMatchupsResult {
   leaguesAdvanced: Int
   leaguesProcessed: Int
   leaguesSkipped: Int
+
+  """
+  User-facing reason a single-league advance (leagueId provided) did nothing. Null when the league advanced or the call covered all leagues.
+  """
+  skipReason: String
 }
 
 """

@@ -6,10 +6,12 @@
  */
 import React from 'react';
 import { NextStepControl } from './NextStepControl';
-import { fireEvent, render, screen } from '../../test-utils';
+import { fireEvent, render, screen, waitFor } from '../../test-utils';
 
 // Capture the draftMode the test wants to inject
 let mockDraftMode = 'automated';
+const mockAutoAdvanceMatchups = jest.fn();
+let mockMatchups: Array<{ weekNumber: number; gamesPerMatchup: number }> = [];
 
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: { Completed: 'COMPLETED' },
@@ -19,7 +21,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     Loading: 'LOADING',
     Completed: 'COMPLETED',
   },
-  useAutoAdvanceMatchupsMutation: () => [jest.fn(), { loading: false }],
+  useAutoAdvanceMatchupsMutation: () => [
+    mockAutoAdvanceMatchups,
+    { loading: false },
+  ],
   useAutoSelectGamesMutation: () => [jest.fn(), { loading: false }],
   useGetLeagueDraftQuery: () => ({
     data: {
@@ -32,7 +37,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     loading: false,
   }),
   useGetMatchupsForLeagueQuery: () => ({
-    data: { getMatchupsForLeague: [] },
+    data: { getMatchupsForLeague: mockMatchups },
     loading: false,
   }),
   useInitializeDraftMutation: () => [jest.fn(), { loading: false }],
@@ -180,5 +185,73 @@ describe('NextStepControl — paused draft status (LS-8849)', () => {
     const button = screen.getByTestId('start-draft-button');
     expect(button).toBeDisabled();
     expect(screen.getByText('Draft Paused')).toBeInTheDocument();
+  });
+});
+
+describe('NextStepControl — advance reports why nothing happened (LS-10804)', () => {
+  const playoffMatchup = {
+    id: 42,
+    weekNumber: 2,
+    status: 'IN_PROGRESS',
+    selectedGamesCount: 1,
+  } as unknown as React.ComponentProps<
+    typeof NextStepControl
+  >['currentMatchup'];
+
+  beforeEach(() => {
+    mockDraftMode = 'automated';
+    mockMatchups = [{ weekNumber: 2, gamesPerMatchup: 1 }];
+    mockAutoAdvanceMatchups.mockReset();
+  });
+
+  afterEach(() => {
+    mockMatchups = [];
+  });
+
+  function confirmAdvance(
+    onError: jest.Mock<void, [Error]> | jest.Mock,
+    onSuccess: jest.Mock,
+  ) {
+    render(
+      <NextStepControl
+        {...defaultProps}
+        draftStatus="completed"
+        totalMatchups={1}
+        currentMatchup={playoffMatchup}
+        onError={onError}
+        onSuccess={onSuccess}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('start-draft-button'));
+    fireEvent.click(screen.getByTestId('confirm-next-step'));
+  }
+
+  it('surfaces the backend reason via onError instead of reporting success', async () => {
+    const reason =
+      'Playoff week 2 is already underway. Advancing to the next playoff round is not supported yet.';
+    mockAutoAdvanceMatchups.mockResolvedValue({
+      data: { autoAdvanceMatchups: { errors: [], skipReason: reason } },
+    });
+    const onError = jest.fn<void, [Error]>();
+    const onSuccess = jest.fn();
+
+    confirmAdvance(onError, onSuccess);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onError.mock.calls[0][0].message).toBe(reason);
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('reports success when the advance returns no skip reason', async () => {
+    mockAutoAdvanceMatchups.mockResolvedValue({
+      data: { autoAdvanceMatchups: { errors: [], skipReason: null } },
+    });
+    const onError = jest.fn();
+    const onSuccess = jest.fn();
+
+    confirmAdvance(onError, onSuccess);
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('advance'));
+    expect(onError).not.toHaveBeenCalled();
   });
 });

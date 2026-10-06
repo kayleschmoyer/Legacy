@@ -4,5 +4,6 @@ mutation AutoAdvanceMatchups($leagueId: Int) {
     leaguesAdvanced
     leaguesSkipped
     errors
+    skipReason
   }
 }

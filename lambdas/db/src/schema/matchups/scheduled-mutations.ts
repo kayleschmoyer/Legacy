@@ -53,6 +53,7 @@ interface AutoAdvanceMatchupsResultShape {
   leaguesAdvanced: number;
   leaguesSkipped: number;
   errors: string[];
+  skipReason: string | null;
 }
 
 const AutoAdvanceMatchupsResult =
@@ -68,6 +69,11 @@ builder.objectType(AutoAdvanceMatchupsResult, {
     leaguesAdvanced: t.exposeInt('leaguesAdvanced'),
     leaguesSkipped: t.exposeInt('leaguesSkipped'),
     errors: t.exposeStringList('errors'),
+    skipReason: t.exposeString('skipReason', {
+      nullable: true,
+      description:
+        'User-facing reason a single-league advance (leagueId provided) did nothing. Null when the league advanced or the call covered all leagues.',
+    }),
   }),
 });
 
@@ -393,6 +399,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
         leaguesAdvanced: 0,
         leaguesSkipped: 0,
         errors: [],
+        skipReason: null,
       };
 
       try {
@@ -540,7 +547,10 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 
               // Check whether a bracket already exists for this season
               const existingBracket = await context.db
-                .select({ id: PublicSchema.playoffBrackets.id })
+                .select({
+                  id: PublicSchema.playoffBrackets.id,
+                  startWeek: PublicSchema.playoffBrackets.startWeek,
+                })
                 .from(PublicSchema.playoffBrackets)
                 .where(
                   and(
@@ -554,9 +564,35 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 .limit(1);
 
               if (existingBracket.length > 0) {
+                const { startWeek } = existingBracket[0];
+
+                // LS-10804: leagues whose bracket was created before
+                // currentWeek was advanced are stranded on the final
+                // regular-season week with round-1 matchups still
+                // 'scheduled'. Repeating Advance must start the playoffs.
+                if (
+                  currentWeek < startWeek &&
+                  (await activatePlayoffWeek(context.db, league.id, startWeek))
+                ) {
+                  result.leaguesAdvanced++;
+                  LOGGER.info(
+                    `[autoAdvanceMatchups] League ${league.id} (${league.name}) playoff bracket already existed, started playoff week ${startWeek}`,
+                  );
+                  continue;
+                }
+
+                // Never a silent no-op for a commissioner advancing a single
+                // league: say why nothing happened so the UI can show it.
+                const reason =
+                  currentWeek < startWeek
+                    ? `The playoff bracket exists but has no matchups for week ${startWeek}, so the playoffs cannot start.`
+                    : `Playoff week ${currentWeek} is already underway. Advancing to the next playoff round is not supported yet.`;
                 LOGGER.info(
-                  `[autoAdvanceMatchups] League ${league.id} (${league.name}) playoff bracket already exists, skipping`,
+                  `[autoAdvanceMatchups] League ${league.id} (${league.name}) playoff bracket already exists, skipping: ${reason}`,
                 );
+                if (leagueId) {
+                  result.skipReason = reason;
+                }
                 result.leaguesSkipped++;
                 continue;
               }
@@ -744,14 +780,24 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 }
               }
 
-              // Update league current matchup
-              await context.db
-                .update(PublicSchema.leagues)
-                .set({
-                  currentMatchup: firstMatchupId,
-                  weekAdvanceStatus: 'idle',
-                })
-                .where(eq(PublicSchema.leagues.id, league.id));
+              // Start the playoffs: activate round 1 and move the league's
+              // currentWeek onto it (LS-10804). Without the currentWeek bump
+              // autoSelectGames never activates the playoff matchups and the
+              // next Advance re-enters this branch and skips.
+              const playoffsStarted = await activatePlayoffWeek(
+                context.db,
+                league.id,
+                playoffStartWeek,
+              );
+              if (!playoffsStarted) {
+                await context.db
+                  .update(PublicSchema.leagues)
+                  .set({
+                    currentMatchup: firstMatchupId,
+                    weekAdvanceStatus: 'idle',
+                  })
+                  .where(eq(PublicSchema.leagues.id, league.id));
+              }
 
               // Notify league members via WebSocket
               const { notificationService } = context;
@@ -867,6 +913,45 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
     },
   }),
 );
+
+// ── Playoff start ────────────────────────────────────────────────────────────
+// Activates the round-1 playoff matchups (scheduled → in_progress) at
+// `playoffStartWeek` and points leagues.currentWeek / currentMatchup at them,
+// mirroring what advanceLeagueWeekInternal does for a regular-season week.
+// Returns false (and changes nothing) when no scheduled matchups exist there.
+
+async function activatePlayoffWeek(
+  db: Db,
+  leagueId: number,
+  playoffStartWeek: number,
+): Promise<boolean> {
+  const activated = await db
+    .update(PublicSchema.matchups)
+    .set({ status: 'in_progress' })
+    .where(
+      and(
+        eq(PublicSchema.matchups.leagueId, leagueId),
+        eq(PublicSchema.matchups.weekNumber, playoffStartWeek),
+        eq(PublicSchema.matchups.status, 'scheduled'),
+      ),
+    )
+    .returning({ id: PublicSchema.matchups.id });
+
+  if (activated.length === 0) {
+    return false;
+  }
+
+  await db
+    .update(PublicSchema.leagues)
+    .set({
+      currentMatchup: Math.min(...activated.map((m) => m.id)),
+      currentWeek: playoffStartWeek,
+      weekAdvanceStatus: 'idle',
+    })
+    .where(eq(PublicSchema.leagues.id, leagueId));
+
+  return true;
+}
 
 // ── Internal advance logic ───────────────────────────────────────────────────
 // Advances a league from `currentWeek` to `currentWeek + 1`.

@@ -273,9 +273,16 @@ export function NextStepControl({
         onSuccess?.('selectGame');
       } else {
         // Advance to next week
-        await autoAdvanceMatchups({
+        const result = await autoAdvanceMatchups({
           variables: { leagueId },
         });
+
+        // LS-10804: the backend reports why a single-league advance did
+        // nothing; surface it instead of silently succeeding.
+        const skipReason = result.data?.autoAdvanceMatchups?.skipReason;
+        if (skipReason) {
+          throw new Error(skipReason);
+        }
 
         setLoading(false);
         onSuccess?.('advance');
