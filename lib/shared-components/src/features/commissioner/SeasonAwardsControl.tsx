@@ -317,6 +317,7 @@ function AwardRow({
 
   return (
     <Card
+      data-testid={`award-row-${meta.key}`}
       backgroundColor={existing ? withAlpha(BRAND_GOLD, 0.04) : '$surfaceCard'}
       borderColor={
         existing ? withAlpha(BRAND_GOLD, 0.3) : '$surfacePanelBorder'
@@ -478,6 +479,7 @@ export function SeasonAwardsControl({
   );
   const [openingVote, setOpeningVote] = useState(false);
   const [closingVote, setClosingVote] = useState(false);
+  const closingVoteRef = useRef(false);
 
   const [openVoting] = useOpenAwardVotingMutation({
     refetchQueries: [
@@ -513,6 +515,8 @@ export function SeasonAwardsControl({
   }, [selectedAwardTypes, leagueId, season, openVoting, onSuccess, onError]);
 
   const handleCloseVoting = useCallback(async () => {
+    if (closingVoteRef.current) return;
+    closingVoteRef.current = true;
     setClosingVote(true);
     try {
       await closeVoting({ variables: { leagueId, season } });
@@ -520,6 +524,7 @@ export function SeasonAwardsControl({
     } catch (err) {
       onError?.(err instanceof Error ? err : new Error(String(err)));
     } finally {
+      closingVoteRef.current = false;
       setClosingVote(false);
     }
   }, [leagueId, season, closeVoting, onSuccess, onError]);
@@ -584,6 +589,7 @@ export function SeasonAwardsControl({
 
   return (
     <Card
+      data-testid="season-awards-panel"
       backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       padding="$5"
@@ -613,6 +619,7 @@ export function SeasonAwardsControl({
               label: `${y} Season`,
             }))}
             placeholder="Select season"
+            aria-label="Select season"
           />
         </XStack>
 

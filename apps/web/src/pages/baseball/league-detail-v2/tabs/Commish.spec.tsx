@@ -108,7 +108,7 @@ jest.mock(
     ),
   }),
 );
-jest.mock('../../../../components/commissioner/SeasonAwardsControl', () => ({
+jest.mock('@legacy-sports/shared-components/commissioner', () => ({
   SeasonAwardsControl: () => <div data-testid="season-awards-control" />,
 }));
 jest.mock('../../../../features/baseball/LeagueScoringEditor', () => ({

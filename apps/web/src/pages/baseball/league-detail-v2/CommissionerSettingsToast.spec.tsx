@@ -83,7 +83,7 @@ jest.mock('../../../components/commissioner/LeagueDuesStatusDashboard', () => ({
   LeagueDuesStatusDashboard: () => <div data-testid="dues-dashboard" />,
 }));
 
-jest.mock('../../../components/commissioner/SeasonAwardsControl', () => ({
+jest.mock('@legacy-sports/shared-components/commissioner', () => ({
   SeasonAwardsControl: () => <div data-testid="awards" />,
 }));
 

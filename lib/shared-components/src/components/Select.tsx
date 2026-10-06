@@ -28,6 +28,13 @@ export interface SelectProps {
   disabled?: boolean;
   /** Show a small leading dot indicator (used by era pickers). */
   leading?: React.ReactNode;
+  /**
+   * Accessible name for the trigger (the visible `label` is not associated
+   * with it). A labelled trigger is also exposed as a `combobox` on every
+   * platform: Tamagui only adds that role on pointer devices, so on touch
+   * (where it adapts to a Sheet) the trigger would otherwise be a plain button.
+   */
+  'aria-label'?: string;
 }
 
 // The Tamagui media-query typing ('sm') is unavailable in this project, so the
@@ -50,6 +57,7 @@ export function Select({
   label,
   disabled = false,
   leading,
+  'aria-label': ariaLabel,
 }: SelectProps): React.JSX.Element {
   return (
     <YStack gap="$1" minWidth={200}>
@@ -71,6 +79,8 @@ export function Select({
         disablePreventBodyScroll
       >
         <TamaguiSelect.Trigger
+          aria-label={ariaLabel}
+          role={ariaLabel ? 'combobox' : undefined}
           width="100%"
           borderRadius={6}
           borderWidth={1}

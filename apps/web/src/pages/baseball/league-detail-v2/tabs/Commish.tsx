@@ -8,6 +8,7 @@ import {
   type TeamFragment,
   useGetCommissionerAuditLogsQuery,
 } from '@legacy-sports/graphql';
+import { SeasonAwardsControl } from '@legacy-sports/shared-components/commissioner';
 import {
   useCurrentWeek,
   useMatchupsForLeague,
@@ -20,7 +21,6 @@ import { DraftSettingsControl } from '../../../../components/commissioner/DraftS
 import { NextStepControl } from '../../../../features/commissioner';
 import { LeagueDuesControl } from '../../../../components/commissioner/LeagueDuesControl';
 import { LeagueDuesStatusDashboard } from '../../../../components/commissioner/LeagueDuesStatusDashboard';
-import { SeasonAwardsControl } from '../../../../components/commissioner/SeasonAwardsControl';
 import { LeagueScoringEditor } from '../../../../features/baseball/LeagueScoringEditor';
 import { ScoringSettingsEditor } from '../../../../components/leagues/ScoringSettingsEditor';
 import { DeleteLeagueControl } from '../../../../features/commissioner/DeleteLeagueControl';
