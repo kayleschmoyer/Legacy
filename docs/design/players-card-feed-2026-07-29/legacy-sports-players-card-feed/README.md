@@ -89,7 +89,7 @@ Unchanged from `apps/app/src/app/(app)/(tabs)/_layout.tsx` (expo-router Tabs, lu
 
 ## Design Tokens (all pre-existing in the repo)
 Colors (dark): bg `#0A0F1A` · panel `#111B2F` · card `#16223A` · STATS_BORDER `#1E2D45` · outlineSubtle `#1C2740` · outlineDefault `#2F3B53` · panelBorder `#1F2D48` · fg1 `#F8FAFC` · high-contrast `#F5F7FA` · fg3 `#9CAAC5` · fg4 `#6C80BA` · navy `#1B3A5C` · navyLight `#2C4A7C` · gold `#C5A55A` · goldLight `#D4BB78` · seamRed `#C41E3A` · successFg `#6FD39A` · loss `#E07A8C`.
-Position badges: P/SP `#4A708B`, RP `#2E7D6E`, C `#C41E3A`, 1B `#B5651D`, 2B `#C5A55A`, 3B `#2D6A4F`, SS `#2C4A7C`, OF `#64748B`, DH `#8B2635`; QB `#C41E3A`, RB `#8B6F47`, WR `#2D6A4F`, TE `#7C8794`, K `#C5A55A`.
+Position badges: P/SP `#7B5EA7`, RP `#2E7D6E`, C `#C41E3A`, 1B `#B5651D`, 2B `#C5A55A`, 3B `#2D6A4F`, SS `#2C4A7C`, OF `#64748B`, DH `#8B2635`; QB `#C41E3A`, RB `#8B6F47`, WR `#2D6A4F`, TE `#7C8794`, K `#C5A55A`.
 Typography: Big Shoulders Display 700/800 (display/labels, uppercase + tracking), Literata 400/600 (body/names), JetBrains Mono 400–700 (stats). Sizes used: 26 title / 15 name / 14 input / 12.5 body / 11–12 labels / 16 FPTS / 11.5 mono sub.
 Spacing: 16 screen gutter · 12 card padding · 10 header gap · 8 list gap · 6 chip gap.
 Radii: 12 cards · 10 search · 9 position tile · 9999 pills/chips · 8 sort control.

@@ -107,7 +107,7 @@ a{color:#D4BB78;text-decoration:none}a:hover{color:#C5A55A}
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
   renderVals() {
-    const POS = {P:'#4A708B',C:'#C41E3A','1B':'#B5651D','2B':'#C5A55A','3B':'#2D6A4F',SS:'#2C4A7C',OF:'#64748B',DH:'#8B2635',RP:'#2E7D6E',SP:'#4A708B'};
+    const POS = {P:'#7B5EA7',C:'#C41E3A','1B':'#B5651D','2B':'#C5A55A','3B':'#2D6A4F',SS:'#2C4A7C',OF:'#64748B',DH:'#8B2635',RP:'#2E7D6E',SP:'#7B5EA7'};
     const wa=(h,a)=>{const n=h.replace('#','');return `rgba(${parseInt(n.slice(0,2),16)}, ${parseInt(n.slice(2,4),16)}, ${parseInt(n.slice(4,6),16)}, ${a})`};
     const teams=[{n:'Bronx Bombers',mine:false},{n:'Dinger Dynasty',mine:false},{n:'The Sandlot',mine:true},{n:'Moonshots',mine:false},{n:'Rally Caps',mine:false},{n:'Heaters',mine:false},{n:'Warning Track',mine:false},{n:'Cycle Chasers',mine:false}];
     const initials=n=>{const w=n.trim().split(/\s+/);const f=w.map(x=>x[0]).join('');return (f.length>1?f:w[0]).slice(0,2).toUpperCase()};

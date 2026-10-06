@@ -128,7 +128,7 @@ export const positions = {
 // LS-8526: unified here as the single source — web, shared-components, and
 // native all previously carried independently-drifted copies of this table.
 export const baseballPositionBadges = {
-  P: '#4A708B', // steel blue
+  P: '#7B5EA7', // violet — was steel blue #4A708B, too close to the dark-mode blues
   C: '#C41E3A', // seam red
   '1B': '#B5651D', // warm amber
   '2B': '#C5A55A', // heritage gold
@@ -137,7 +137,7 @@ export const baseballPositionBadges = {
   OF: '#64748B', // slate
   DH: '#8B2635', // burgundy
   RP: '#2E7D6E', // forest teal
-  SP: '#4A708B', // steel blue
+  SP: '#7B5EA7', // violet (same as P)
 } as const;
 
 export const footballPositionBadges = {
