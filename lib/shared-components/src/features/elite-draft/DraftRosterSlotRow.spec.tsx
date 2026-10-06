@@ -55,7 +55,7 @@ describe('DraftRosterSlotRow', () => {
   });
 
   it('renders italic "Empty" for an unfilled slot', () => {
-    const { getByText } = render(
+    const { getByText, queryByText } = render(
       <DraftRosterSlotRow
         slotPositionType="QB"
         sport="football"
@@ -65,6 +65,7 @@ describe('DraftRosterSlotRow', () => {
 
     expect(getByText('Empty')).toBeTruthy();
     expect(getByText('QB')).toBeTruthy();
+    expect(queryByText('PROJ')).toBeNull();
   });
 
   it('renders the BN badge label for the synthetic BENCH bucket', () => {
@@ -91,6 +92,32 @@ describe('DraftRosterSlotRow', () => {
 
     expect(getByText('Patrick Mahomes')).toBeTruthy();
     expect(getByText('QB · Pick 2.5')).toBeTruthy();
+    expect(getByText('PROJ')).toBeTruthy();
     expect(getByText('24.5')).toBeTruthy();
+  });
+
+  it('exposes the PROJ label and numeral as one accessible unit (LS-10634)', () => {
+    const { getByLabelText } = render(
+      <DraftRosterSlotRow
+        slotPositionType="QB"
+        sport="football"
+        player={makePlayer()}
+      />,
+    );
+
+    expect(getByLabelText('Projected points 24.5')).toBeTruthy();
+  });
+
+  it('renders no PROJ label or numeral when the player has no ppg (LS-10634)', () => {
+    const { queryByText, queryByTestId } = render(
+      <DraftRosterSlotRow
+        slotPositionType="QB"
+        sport="football"
+        player={makePlayer({ ppg: undefined })}
+      />,
+    );
+
+    expect(queryByText('PROJ')).toBeNull();
+    expect(queryByTestId('draft-roster-slot-row-proj')).toBeNull();
   });
 });

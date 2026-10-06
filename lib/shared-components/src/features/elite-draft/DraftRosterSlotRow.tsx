@@ -18,6 +18,9 @@ import {
 } from '../../utils/colors';
 import type { Sport } from '../../utils/colors';
 
+/** README "Team tab" label for the projected-points numeral (LS-10634). */
+const PROJ_LABEL = 'PROJ';
+
 /** README slot-label abbreviation — the synthetic overflow bucket displays as "BN". */
 function slotLabel(positionType: string): string {
   return positionType === 'BENCH' ? 'BN' : positionType;
@@ -55,6 +58,11 @@ export function DraftRosterSlotRow({
     if (byeWeek != null) metaParts.push(`Bye ${byeWeek}`);
     if (pick) metaParts.push(`Pick ${pick.round}.${pick.pickNumber}`);
   }
+
+  const projA11yLabel =
+    player?.ppg != null
+      ? `Projected points ${player.ppg.toFixed(1)}`
+      : undefined;
 
   return (
     <XStack
@@ -98,14 +106,31 @@ export function DraftRosterSlotRow({
         )}
       </YStack>
       {player && player.ppg != null && (
-        <Text
-          fontFamily="$heading"
-          fontSize={16}
-          fontWeight="700"
-          color="$brandGold"
+        <YStack
+          testID="draft-roster-slot-row-proj"
+          alignItems="flex-end"
+          aria-label={projA11yLabel}
+          accessibilityLabel={projA11yLabel}
         >
-          {player.ppg.toFixed(1)}
-        </Text>
+          <Text
+            fontFamily="$heading"
+            fontSize={9.5}
+            fontWeight="700"
+            letterSpacing={1}
+            textTransform="uppercase"
+            color="$fg3"
+          >
+            {PROJ_LABEL}
+          </Text>
+          <Text
+            fontFamily="$heading"
+            fontSize={16}
+            fontWeight="700"
+            color="$brandGold"
+          >
+            {player.ppg.toFixed(1)}
+          </Text>
+        </YStack>
       )}
     </XStack>
   );
