@@ -42,6 +42,20 @@ const META_START = '<!-- mq-batch-meta ';
 const META_END = ' -->';
 const MERGE_LABEL = 'merge-when-ready';
 
+// LS-10620: informational commit status on each queued PR's head SHA saying
+// whether the PR is in the queue's current run, linking to that run. It is
+// never a required check, and merge-queue-processor.js ignores it when
+// deciding readiness (a `pending` here must not block the PR it describes).
+const MERGE_QUEUE_STATUS_CONTEXT = 'merge-queue';
+// GitHub rejects status descriptions longer than 140 characters.
+const STATUS_DESCRIPTION_MAX = 140;
+
+function clipDescription(text) {
+  return text.length <= STATUS_DESCRIPTION_MAX
+    ? text
+    : `${text.slice(0, STATUS_DESCRIPTION_MAX - 1)}…`;
+}
+
 function encodeBatchMeta(meta) {
   const prs = meta.prs.map((p) => `#${p.number}`).join(', ');
   return (
@@ -234,6 +248,129 @@ function decideBatchActions({
   return actions;
 }
 
+const VERDICT_PHRASE = {
+  pending: 'CI running',
+  green: 'CI passed, landing',
+  red: 'CI failed, bisecting',
+  infra: 'retrying after a runner failure',
+  lost: 'CI dispatch lost, requeueing',
+};
+
+/**
+ * Pure: decides the `merge-queue` status for every candidate PR.
+ *
+ *   outcome (landed / ejected this pass)  → terminal state, wins over all else
+ *   member of an in-flight set            → pending, links to the set's run
+ *   ready but not in a set                → pending "Queued – position N of M"
+ *   labeled but not ready for a batch     → pending "Waiting"
+ *
+ * @param {object} args
+ * @param {Array<{name:string, meta:object, verdict:string, run:object|null}>} args.sets
+ *   in-flight sets as they stand AFTER this pass's actions
+ * @param {Array<{number:number, sha:string, ready:boolean}>} args.candidates
+ *   every merge-when-ready PR targeting main, with its current head SHA
+ * @param {Map<number,{sha:string,state:string,description:string,targetUrl?:string}>} args.outcomes
+ * @param {string} [args.queueRunUrl] the queue workflow run doing this pass
+ * @returns {Array<{number:number, sha:string, state:string, description:string, targetUrl?:string}>}
+ */
+function planQueueStatuses({
+  sets,
+  candidates,
+  outcomes = new Map(),
+  queueRunUrl,
+}) {
+  const setOf = new Map();
+  for (const set of sets) {
+    for (const p of set.meta.prs) setOf.set(p.number, set);
+  }
+  const waiting = candidates
+    .filter((c) => c.ready && !setOf.has(c.number) && !outcomes.has(c.number))
+    .sort((a, b) => a.number - b.number);
+  const position = new Map(waiting.map((c, i) => [c.number, i + 1]));
+
+  return candidates.map((c) => {
+    const outcome = outcomes.get(c.number);
+    if (outcome) {
+      return {
+        number: c.number,
+        sha: outcome.sha ?? c.sha,
+        state: outcome.state,
+        description: clipDescription(outcome.description),
+        targetUrl: outcome.targetUrl ?? queueRunUrl,
+      };
+    }
+    const set = setOf.get(c.number);
+    if (set) {
+      const n = set.meta.prs.length;
+      return {
+        number: c.number,
+        sha: c.sha,
+        state: 'pending',
+        description: clipDescription(
+          `In batch ${set.meta.id} (${n} PR${n === 1 ? '' : 's'}) – ${VERDICT_PHRASE[set.verdict] ?? VERDICT_PHRASE.pending}`,
+        ),
+        targetUrl: set.run?.html_url ?? queueRunUrl,
+      };
+    }
+    if (position.has(c.number)) {
+      return {
+        number: c.number,
+        sha: c.sha,
+        state: 'pending',
+        description: clipDescription(
+          `Queued – position ${position.get(c.number)} of ${waiting.length} for the next batch`,
+        ),
+        targetUrl: queueRunUrl,
+      };
+    }
+    return {
+      number: c.number,
+      sha: c.sha,
+      state: 'pending',
+      description: clipDescription(
+        'Waiting – not yet ready for a batch (checks, review or conflicts)',
+      ),
+      targetUrl: queueRunUrl,
+    };
+  });
+}
+
+/**
+ * Best-effort publisher: a failed status write is logged and never fails or
+ * aborts the queue pass.
+ */
+async function publishQueueStatuses({
+  client,
+  owner,
+  repo,
+  plan,
+  isDryRun = false,
+}) {
+  for (const s of plan) {
+    if (isDryRun) {
+      console.log(
+        `🏃 DRY RUN: would set ${MERGE_QUEUE_STATUS_CONTEXT} on #${s.number}: ${s.state} – ${s.description}`,
+      );
+      continue;
+    }
+    try {
+      await client.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha: s.sha,
+        state: s.state,
+        context: MERGE_QUEUE_STATUS_CONTEXT,
+        description: s.description,
+        ...(s.targetUrl ? { target_url: s.targetUrl } : {}),
+      });
+    } catch (error) {
+      console.warn(
+        `⚠️ Could not set ${MERGE_QUEUE_STATUS_CONTEXT} status on #${s.number}: ${error.message}`,
+      );
+    }
+  }
+}
+
 /**
  * Gathers batch state from GitHub, decides, and executes.
  *
@@ -247,6 +384,13 @@ function decideBatchActions({
  * @param {boolean} [deps.isDryRun]
  * @param {() => number} [deps.now]
  * @param {number} [deps.maxBatchSize]
+ * @param {Array<object>} [deps.candidatePRs] every merge-when-ready PR
+ *   targeting main (pulls.get shape), ready or not — the PRs that get a
+ *   `merge-queue` status (LS-10620). Defaults to readyPRs.
+ * @param {object} [deps.statusClient] Octokit allowed to write commit statuses
+ *   (the CI app — the Merge Queue app cannot, LS-9773). Defaults to github.
+ * @param {string} [deps.queueRunUrl] URL of the queue workflow run doing this
+ *   pass, used as the status link when a PR has no batch run yet
  */
 async function runBatchQueue({
   github,
@@ -257,9 +401,14 @@ async function runBatchQueue({
   isDryRun = false,
   now = () => Date.now(),
   maxBatchSize = MAX_BATCH_SIZE,
+  candidatePRs = readyPRs,
+  statusClient = github,
+  queueRunUrl,
 }) {
   const ready = new Map(readyPRs.map((pr) => [pr.number, pr.head.sha]));
   const readyByNumber = new Map(readyPRs.map((pr) => [pr.number, pr]));
+  // PRs landed or ejected during this pass → their terminal merge-queue status.
+  const outcomes = new Map();
   const mainSha = await getMainSha();
   const sets = await listSets();
 
@@ -275,6 +424,9 @@ async function runBatchQueue({
   const actions = decideBatchActions({ mainSha, sets, ready, maxBatchSize });
   if (actions.length === 0) {
     console.log('🧺 Batch queue: nothing to do');
+    // The sets are unchanged, but membership/queue position still needs
+    // refreshing on the PRs.
+    await syncStatuses(sets);
     return { actions };
   }
   if (isDryRun) {
@@ -283,6 +435,7 @@ async function runBatchQueue({
         `🏃 DRY RUN: would ${a.type} ${a.set ? a.set.name : a.prs.map((p) => '#' + p.number).join(',')}`,
       );
     }
+    await syncStatuses(sets);
     return { actions };
   }
 
@@ -318,9 +471,39 @@ async function runBatchQueue({
       console.error(`💥 Batch action ${action.type} failed: ${error.message}`);
     }
   }
+
+  // Re-read the sets so statuses describe what is actually in flight now
+  // (new/split sets, discarded ones), not what the plan intended.
+  try {
+    await syncStatuses(await listSets());
+  } catch (error) {
+    console.warn(
+      `⚠️ Skipping ${MERGE_QUEUE_STATUS_CONTEXT} status sync: ${error.message}`,
+    );
+  }
   return { actions };
 
   // ── I/O helpers ──────────────────────────────────────────────────────────
+
+  async function syncStatuses(currentSets) {
+    const plan = planQueueStatuses({
+      sets: currentSets,
+      candidates: candidatePRs.map((pr) => ({
+        number: pr.number,
+        sha: pr.head.sha,
+        ready: ready.get(pr.number) === pr.head.sha,
+      })),
+      outcomes,
+      queueRunUrl,
+    });
+    await publishQueueStatuses({
+      client: statusClient,
+      owner,
+      repo,
+      plan,
+      isDryRun,
+    });
+  }
 
   function newBatchId() {
     return now().toString(36);
@@ -472,6 +655,7 @@ async function runBatchQueue({
             await eject(
               prs[0].number,
               `it conflicts with \`main\` at \`${baseSha.slice(0, 7)}\``,
+              { short: 'conflicts with main' },
             );
           } else {
             const [a, b] = splitInHalves(prs);
@@ -534,11 +718,18 @@ async function runBatchQueue({
         (set.meta.parent
           ? ` — bisected out of batch \`${set.meta.parent.split('.')[0]}\``
           : ''),
+      { short: 'batch CI failed with this PR', targetUrl: set.run?.html_url },
     );
   }
 
-  async function eject(number, why) {
+  async function eject(number, why, { short, targetUrl } = {}) {
     console.log(`⏏️ Ejecting #${number} from the merge queue: ${why}`);
+    outcomes.set(number, {
+      sha: ready.get(number),
+      state: 'failure',
+      description: `Ejected from merge queue – ${short ?? 'see PR comment'}`,
+      targetUrl,
+    });
     try {
       await github.rest.issues.removeLabel({
         owner,
@@ -590,6 +781,12 @@ async function runBatchQueue({
         break;
       }
       expected = result.sha;
+      outcomes.set(p.number, {
+        sha: p.head,
+        state: 'success',
+        description: `Merged in batch ${set.meta.id}`,
+        targetUrl: set.run?.html_url,
+      });
     }
     await deleteRef(set.name);
 
@@ -618,6 +815,9 @@ module.exports = {
   MAX_BATCH_SIZE,
   MAX_BATCH_RUN_ATTEMPTS,
   DISPATCH_GRACE_MS,
+  MERGE_QUEUE_STATUS_CONTEXT,
+  planQueueStatuses,
+  publishQueueStatuses,
   encodeBatchMeta,
   parseBatchMeta,
   compareBatchIds,

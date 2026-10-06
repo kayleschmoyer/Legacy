@@ -19,7 +19,10 @@ const { pathToFileURL } = require('url');
 // staleness guard's pointer to the run that validated the head SHA (LS-9662).
 const { CI_GATE_CONTEXT, runIdFromTargetUrl } = require('./ci-gate.js');
 // LS-10571: batched merging with bisection on failure.
-const { runBatchQueue } = require('./merge-queue-batch.js');
+const {
+  runBatchQueue,
+  MERGE_QUEUE_STATUS_CONTEXT,
+} = require('./merge-queue-batch.js');
 
 // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
 // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
@@ -354,6 +357,33 @@ module.exports = async ({
     }
   });
 
+  // LS-10620: a commit status cannot be deleted, so a PR that leaves the queue
+  // by losing its label would keep showing "Queued" / "In batch". Overwrite it
+  // when the label is removed. Best-effort, like every merge-queue status write.
+  if (
+    batchMode &&
+    !isDryRun &&
+    context.eventName === 'pull_request' &&
+    context.payload?.action === 'unlabeled' &&
+    context.payload?.label?.name === 'merge-when-ready' &&
+    context.payload?.pull_request?.base?.ref === 'main'
+  ) {
+    try {
+      await statusGithub.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha: context.payload.pull_request.head.sha,
+        state: 'success',
+        context: MERGE_QUEUE_STATUS_CONTEXT,
+        description: 'Not in the merge queue (merge-when-ready removed)',
+      });
+    } catch (statusError) {
+      console.warn(
+        `⚠️ PR #${context.payload.pull_request.number}: could not clear ${MERGE_QUEUE_STATUS_CONTEXT} status: ${statusError.message}`,
+      );
+    }
+  }
+
   // Cache of required check names per base branch, populated lazily.
   // null means branch protection is absent or has no required checks — fall back to evaluating all.
   const requiredChecksCache = Object.create(null);
@@ -410,6 +440,9 @@ module.exports = async ({
   // LS-10571: PRs that passed every gate and target main, collected for the
   // batch queue instead of being merged inline.
   const batchReadyPRs = [];
+  // LS-10620: every labeled PR the batch queue is responsible for, ready or
+  // not — each gets a `merge-queue` status.
+  const batchCandidatePRs = [];
 
   for (const pr of mergeReadyPRs) {
     processedPRNumbers.add(pr.number);
@@ -427,6 +460,15 @@ module.exports = async ({
       // performMerge always uses the same data that was validated, including
       // the head SHA that will be pinned in the merge API call.
       const validationResult = await validatePRForMerge(prDetails.data);
+
+      // forceCheck also walks unlabeled PRs, which are not in the queue.
+      if (
+        batchMode &&
+        isBatchable(prDetails.data) &&
+        (prDetails.data.labels || []).some((l) => l.name === 'merge-when-ready')
+      ) {
+        batchCandidatePRs.push(validationResult.pr ?? prDetails.data);
+      }
 
       if (
         validationResult.canMerge &&
@@ -469,6 +511,11 @@ module.exports = async ({
         owner,
         repo,
         readyPRs: batchReadyPRs,
+        candidatePRs: batchCandidatePRs,
+        statusClient: statusGithub,
+        queueRunUrl: context.runId
+          ? `${context.serverUrl || 'https://github.com'}/${owner}/${repo}/actions/runs/${context.runId}`
+          : undefined,
         isDryRun,
         mergePR: performMerge,
       });
@@ -996,6 +1043,10 @@ module.exports = async ({
     }
 
     for (const [ctx, status] of Object.entries(statusesByContext)) {
+      // LS-10620: our own informational status (pending while queued, failure
+      // when ejected) must never gate the PR it describes — even when the
+      // required-checks lookup failed and every context would otherwise count.
+      if (ctx === MERGE_QUEUE_STATUS_CONTEXT) continue;
       if (requiredCheckNames !== null && !requiredCheckNames.has(ctx)) continue;
       if (status.state === 'failure' || status.state === 'error') {
         failingChecks.push(ctx + ' (' + status.state + ')');

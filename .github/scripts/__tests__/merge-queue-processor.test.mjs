@@ -4433,4 +4433,216 @@ describe('merge-queue-processor — batch mode (LS-10571)', () => {
     assert.strictEqual(calls.merges.length, 1, 'should merge inline');
     assert.strictEqual(calls.batchRefs.length, 0, 'should not batch');
   });
+
+  // ── LS-10620: merge-queue commit status ────────────────────────────────────
+
+  const queueStatuses = (calls) =>
+    calls.statuses.filter((s) => s.context === 'merge-queue');
+
+  it('LS-10620: posts a merge-queue status on a queued PR, linking to the queue run', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context: { ...context, runId: 4242, serverUrl: 'https://github.test' },
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    const [status, ...rest] = queueStatuses(calls);
+    assert.strictEqual(rest.length, 0, 'exactly one status for the one PR');
+    assert.strictEqual(status.sha, HEAD_SHA);
+    assert.strictEqual(status.state, 'pending');
+    assert.match(status.description, /Queued|In batch/);
+    assert.strictEqual(
+      status.target_url,
+      'https://github.test/test-owner/test-repo/actions/runs/4242',
+    );
+  });
+
+  it('LS-10620: marks a labeled-but-blocked PR as waiting, not in a batch', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      pr: makePR({ mergeable_state: 'blocked' }),
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    const [status] = queueStatuses(calls);
+    assert.strictEqual(status.state, 'pending');
+    assert.match(status.description, /^Waiting/);
+  });
+
+  it('LS-10620: posts no merge-queue status for PRs that bypass the batch queue', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      pr: makePR({
+        base: { ref: 'feature/parent' },
+        labels: [{ name: 'merge-when-ready' }, { name: 'merge-to-parent' }],
+      }),
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(queueStatuses(calls).length, 0);
+  });
+
+  it('LS-10620: writes the status without throwing when the status API fails', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    withBatchApi(github, calls);
+    github.rest.repos.createCommitStatus = async () => {
+      throw Object.assign(new Error('Resource not accessible'), {
+        status: 403,
+      });
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(calls.batchRefs.length, 1, 'the pass still completes');
+  });
+
+  it('LS-10620: does not write statuses in dry-run mode', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context,
+      isDryRun: true,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    assert.strictEqual(queueStatuses(calls).length, 0);
+  });
+
+  it('LS-10620: overwrites the status when merge-when-ready is removed', async () => {
+    const { github, calls } = makeGithub({ mergeReadyItems: [] });
+    withBatchApi(github, calls);
+
+    await processor({
+      github,
+      context: {
+        ...context,
+        eventName: 'pull_request',
+        payload: {
+          action: 'unlabeled',
+          label: { name: 'merge-when-ready' },
+          pull_request: {
+            number: 1,
+            base: { ref: 'main' },
+            head: { sha: 'sha1' },
+          },
+        },
+      },
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      batchMode: true,
+    });
+
+    const [status] = queueStatuses(calls);
+    assert.strictEqual(status.sha, 'sha1');
+    assert.strictEqual(status.state, 'success');
+    assert.match(status.description, /^Not in the merge queue/);
+  });
+
+  it('LS-10620: a failing merge-queue status never blocks the PR (required-checks lookup unavailable)', async () => {
+    // branchRules [] → requiredCheckNames is null → every status context
+    // counts, so only the explicit exclusion keeps our own status from gating.
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      commitStatuses: [
+        {
+          context: 'merge-queue',
+          state: 'failure',
+          created_at: '2026-01-01T00:03:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 1, 'PR should still merge');
+  });
+
+  it('LS-10620: control — another failing status context still blocks the PR', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      commitStatuses: [
+        {
+          context: 'some-other-check',
+          state: 'failure',
+          created_at: '2026-01-01T00:03:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      0,
+      'other failures must still gate',
+    );
+  });
 });

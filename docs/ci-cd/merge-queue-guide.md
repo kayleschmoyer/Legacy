@@ -58,6 +58,29 @@ The rules that keep this safe:
 - A PR that GitHub reports as `blocked` even though every queue gate passes stays out of batches until it unblocks. This is usually a path-scoped CODEOWNER approval, and it keeps one PR from stalling every batch behind it.
 - The batch CI validates every PR against the current `main`, so it replaces the per-PR staleness guard (LS-9662).
 
+#### The `merge-queue` status on your PR (LS-10620)
+
+Every open PR with `merge-when-ready` that targets `main` gets a `merge-queue` commit status on its head SHA. Open the PR's checks list and follow **Details** to reach the run that is processing it. The queue refreshes the status on every pass.
+
+| Status                                                   | Meaning                                                     | Details link                                                                |
+| -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `pending` — `In batch <id> (N PRs) – CI running`         | The PR is in the queue's current run                        | The batch's CI Orchestrator run (the queue run until the batch run appears) |
+| `pending` — `In batch <id> (N PRs) – CI passed, landing` | The batch is green and about to land                        | The batch run                                                               |
+| `pending` — `Queued – position N of M`                   | Ready, waiting for the current batch to finish              | The queue run                                                               |
+| `pending` — `Waiting – not yet ready for a batch`        | Labeled, but checks, review or a conflict still block it    | The queue run                                                               |
+| `success` — `Merged in batch <id>`                       | The batch landed this PR                                    | The batch run                                                               |
+| `failure` — `Ejected from merge queue – …`               | The queue removed the PR; see the PR comment for the reason | The failed batch run, or the queue run when the PR conflicted with `main`   |
+| `success` — `Not in the merge queue`                     | `merge-when-ready` was removed                              | none                                                                        |
+
+A PR that moves between sets (a bisect, or a requeue after a push to another PR) shows its new set on the next pass.
+
+Notes:
+
+- The status is informational. Don't add it to branch protection or the ruleset; the processor also ignores it when deciding readiness, so even a `pending` or `failure` here never blocks a merge.
+- Commit statuses can't be deleted, so a status always reflects the last write. A PR that leaves the queue without the label being removed through the normal path (for example, it is closed) keeps its last status.
+- Writes use the CI app token, because the Merge Queue app can't write commit statuses (LS-9773). They are best-effort: a failed write is logged and never fails the pass.
+- A PR targeting a parent branch (`merge-to-parent`) bypasses the batch queue and gets no status. Neither does any PR in serial mode (`MERGE_QUEUE_MODE=serial`).
+
 **Rollback.** Set the repository variable `MERGE_QUEUE_MODE=serial` to return to one-at-a-time merging. You can delete any leftover `mq/test/*` branches; the queue ignores them in serial mode.
 
 ## Conditions for a Successful Merge

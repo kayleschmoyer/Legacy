@@ -16,6 +16,9 @@ const {
   classifyBatchRun,
   decideBatchActions,
   runBatchQueue,
+  planQueueStatuses,
+  publishQueueStatuses,
+  MERGE_QUEUE_STATUS_CONTEXT,
   MAX_BATCH_SIZE,
   DISPATCH_GRACE_MS,
 } = require('../merge-queue-batch.js');
@@ -274,6 +277,7 @@ function makeFakeGithub({
     comments: [],
     removedLabels: [],
     prMerges: [],
+    statuses: [],
   };
   let n = 0;
   const notFound = () => Object.assign(new Error('Not Found'), { status: 404 });
@@ -336,6 +340,10 @@ function makeFakeGithub({
               : [],
           },
         }),
+        createCommitStatus: async (params) => {
+          calls.statuses.push(params);
+          return { data: {} };
+        },
       },
       actions: {
         createWorkflowDispatch: async (params) => {
@@ -514,5 +522,470 @@ describe('runBatchQueue', () => {
     assert.deepEqual(types(actions), ['start:1']);
     assert.equal(calls.merges.length, 0);
     assert.equal(calls.dispatches.length, 0);
+  });
+});
+
+// ── LS-10620: merge-queue commit status ────────────────────────────────────
+
+const QUEUE_RUN = 'https://github.test/o/r/actions/runs/1';
+const BATCH_RUN = 'https://github.test/o/r/actions/runs/2';
+
+const cand = (n, ready = true) => ({ number: n, sha: head(n), ready });
+const byNumber = (plan) => Object.fromEntries(plan.map((s) => [s.number, s]));
+
+describe('planQueueStatuses', () => {
+  it('marks members of an in-flight set pending and links the set run', () => {
+    const plan = byNumber(
+      planQueueStatuses({
+        sets: [set('abc', [1, 2], 'pending', { run: { html_url: BATCH_RUN } })],
+        candidates: [cand(1), cand(2)],
+        queueRunUrl: QUEUE_RUN,
+      }),
+    );
+    for (const n of [1, 2]) {
+      assert.equal(plan[n].state, 'pending');
+      assert.equal(plan[n].sha, head(n));
+      assert.equal(plan[n].targetUrl, BATCH_RUN);
+      assert.match(plan[n].description, /In batch abc \(2 PRs\) – CI running/);
+    }
+  });
+
+  it('falls back to the queue run before the batch run exists', () => {
+    const [s] = planQueueStatuses({
+      sets: [set('abc', [1], 'pending')],
+      candidates: [cand(1)],
+      queueRunUrl: QUEUE_RUN,
+    });
+    assert.equal(s.targetUrl, QUEUE_RUN);
+    assert.match(s.description, /In batch abc \(1 PR\)/);
+  });
+
+  it('numbers ready PRs outside any set by queue order', () => {
+    const plan = byNumber(
+      planQueueStatuses({
+        sets: [set('abc', [1], 'pending')],
+        candidates: [cand(5), cand(1), cand(3)],
+        queueRunUrl: QUEUE_RUN,
+      }),
+    );
+    assert.match(plan[3].description, /^Queued – position 1 of 2/);
+    assert.match(plan[5].description, /^Queued – position 2 of 2/);
+    assert.equal(plan[3].targetUrl, QUEUE_RUN);
+    assert.match(plan[1].description, /^In batch abc/);
+  });
+
+  it('marks labeled PRs that are not ready as waiting, outside the queue order', () => {
+    const plan = byNumber(
+      planQueueStatuses({
+        sets: [],
+        candidates: [cand(1, false), cand(2)],
+        queueRunUrl: QUEUE_RUN,
+      }),
+    );
+    assert.match(plan[1].description, /^Waiting/);
+    assert.equal(plan[1].state, 'pending');
+    assert.match(plan[2].description, /^Queued – position 1 of 1/);
+  });
+
+  it('describes each verdict', () => {
+    const phrases = {
+      pending: /CI running/,
+      green: /CI passed, landing/,
+      red: /CI failed, bisecting/,
+      infra: /retrying after a runner failure/,
+    };
+    for (const [verdict, re] of Object.entries(phrases)) {
+      const [s] = planQueueStatuses({
+        sets: [set('abc', [1], verdict)],
+        candidates: [cand(1)],
+      });
+      assert.match(s.description, re, verdict);
+    }
+  });
+
+  it('lets a terminal outcome win over set membership', () => {
+    const outcomes = new Map([
+      [
+        1,
+        {
+          sha: head(1),
+          state: 'success',
+          description: 'Merged in batch abc',
+          targetUrl: BATCH_RUN,
+        },
+      ],
+      [
+        2,
+        {
+          sha: head(2),
+          state: 'failure',
+          description:
+            'Ejected from merge queue – batch CI failed with this PR',
+        },
+      ],
+    ]);
+    const plan = byNumber(
+      planQueueStatuses({
+        sets: [set('abc', [1, 2], 'green')],
+        candidates: [cand(1), cand(2)],
+        outcomes,
+        queueRunUrl: QUEUE_RUN,
+      }),
+    );
+    assert.equal(plan[1].state, 'success');
+    assert.equal(plan[1].targetUrl, BATCH_RUN);
+    assert.equal(plan[2].state, 'failure');
+    assert.equal(plan[2].targetUrl, QUEUE_RUN);
+  });
+
+  it('excludes finished PRs from queue positions', () => {
+    const outcomes = new Map([
+      [1, { sha: head(1), state: 'failure', description: 'Ejected' }],
+    ]);
+    const plan = byNumber(
+      planQueueStatuses({
+        sets: [],
+        candidates: [cand(1), cand(2)],
+        outcomes,
+      }),
+    );
+    assert.match(plan[2].description, /position 1 of 1/);
+  });
+
+  it('shows a PR that moved between sets under its new set only', () => {
+    // #3 was bisected out of `abc`; only `abc.2` still exists.
+    const [s] = planQueueStatuses({
+      sets: [set('abc.2', [3, 4], 'pending', { run: { html_url: BATCH_RUN } })],
+      candidates: [cand(3)],
+    });
+    assert.match(s.description, /In batch abc\.2 \(2 PRs\)/);
+  });
+
+  it('keeps descriptions within the 140-character API limit', () => {
+    const outcomes = new Map([
+      [1, { sha: head(1), state: 'failure', description: 'x'.repeat(300) }],
+    ]);
+    const [s] = planQueueStatuses({
+      sets: [],
+      candidates: [cand(1)],
+      outcomes,
+    });
+    assert.equal(s.description.length, 140);
+  });
+});
+
+describe('publishQueueStatuses', () => {
+  const plan = [
+    {
+      number: 1,
+      sha: head(1),
+      state: 'pending',
+      description: 'Queued – position 1 of 1 for the next batch',
+      targetUrl: QUEUE_RUN,
+    },
+    { number: 2, sha: head(2), state: 'pending', description: 'Waiting' },
+  ];
+
+  it('posts the merge-queue context with description and target_url', async () => {
+    const { github, calls } = makeFakeGithub();
+    await publishQueueStatuses({ client: github, owner: 'o', repo: 'r', plan });
+    assert.equal(calls.statuses.length, 2);
+    assert.deepEqual(calls.statuses[0], {
+      owner: 'o',
+      repo: 'r',
+      sha: head(1),
+      state: 'pending',
+      context: MERGE_QUEUE_STATUS_CONTEXT,
+      description: 'Queued – position 1 of 1 for the next batch',
+      target_url: QUEUE_RUN,
+    });
+    assert.ok(!('target_url' in calls.statuses[1]));
+  });
+
+  it('keeps going when a write fails', async () => {
+    const written = [];
+    const client = {
+      rest: {
+        repos: {
+          createCommitStatus: async (p) => {
+            if (p.sha === head(1)) throw new Error('403');
+            written.push(p.sha);
+          },
+        },
+      },
+    };
+    await publishQueueStatuses({ client, owner: 'o', repo: 'r', plan });
+    assert.deepEqual(written, [head(2)]);
+  });
+
+  it('writes nothing in dry-run mode', async () => {
+    const { github, calls } = makeFakeGithub();
+    await publishQueueStatuses({
+      client: github,
+      owner: 'o',
+      repo: 'r',
+      plan,
+      isDryRun: true,
+    });
+    assert.equal(calls.statuses.length, 0);
+  });
+});
+
+describe('runBatchQueue merge-queue statuses', () => {
+  const statusOf = (calls, n) =>
+    calls.statuses.filter((s) => s.sha === head(n)).at(-1);
+
+  // A completed/in-progress orchestrator run on the batch tip.
+  const runOn = (tip, status = 'in_progress') => ({
+    data: {
+      workflow_runs: [
+        {
+          id: 2,
+          head_sha: tip,
+          status,
+          created_at: new Date(1000).toISOString(),
+          html_url: BATCH_RUN,
+        },
+      ],
+    },
+  });
+  const gateOn =
+    (tip, state) =>
+    async ({ ref }) => ({
+      data: {
+        statuses: ref === tip ? [{ context: 'CI Gate', state }] : [],
+      },
+    });
+
+  it('reports a freshly started batch as in-flight, linked to the queue run', async () => {
+    const { github, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    const id = (1000).toString(36);
+    for (const n of [1, 2]) {
+      const s = statusOf(calls, n);
+      assert.equal(s.context, MERGE_QUEUE_STATUS_CONTEXT);
+      assert.equal(s.state, 'pending');
+      assert.match(s.description, new RegExp(`In batch ${id} \\(2 PRs\\)`));
+      assert.equal(s.target_url, QUEUE_RUN);
+    }
+  });
+
+  it('links an in-flight batch to its CI Orchestrator run on later passes', async () => {
+    const { github, refs, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+    });
+    const tip = refs.get(`heads/mq/test/${(1000).toString(36)}`);
+    github.rest.actions.listWorkflowRuns = async () => runOn(tip);
+    calls.statuses.length = 0;
+    // Nothing to decide (pending set, nothing else ready) — statuses must
+    // still refresh so the link appears once the run exists.
+    const { actions } = await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1500,
+      queueRunUrl: QUEUE_RUN,
+    });
+    assert.deepEqual(actions, []);
+    const s = statusOf(calls, 1);
+    assert.equal(s.target_url, BATCH_RUN);
+    assert.match(s.description, /CI running/);
+  });
+
+  it('marks PRs landed by a green batch as merged, linked to the batch run', async () => {
+    const { github, refs, commits, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge yet'),
+      now: () => 1000,
+    });
+    const id = (1000).toString(36);
+    const tip = refs.get(`heads/mq/test/${id}`);
+    github.rest.repos.getCombinedStatusForRef = gateOn(tip, 'success');
+    github.rest.actions.listWorkflowRuns = async () => runOn(tip, 'completed');
+    const testedTree = commits.get(tip).tree.sha;
+    let merged = 0;
+    const mergePR = async (pr) => {
+      merged += 1;
+      const sha = `squash${pr.number}`;
+      commits.set(sha, {
+        message: '',
+        tree: { sha: merged === 2 ? testedTree : `partial${pr.number}` },
+        parents: [],
+      });
+      refs.set('heads/main', sha);
+      return { merged: true, sha };
+    };
+    calls.statuses.length = 0;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR,
+      now: () => 2000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    for (const n of [1, 2]) {
+      const s = statusOf(calls, n);
+      assert.equal(s.state, 'success');
+      assert.equal(s.description, `Merged in batch ${id}`);
+      assert.equal(s.target_url, BATCH_RUN);
+    }
+  });
+
+  it('marks a PR that conflicts with main as ejected', async () => {
+    const { github, calls } = makeFakeGithub({ conflicts: [head(1)] });
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    const s = statusOf(calls, 1);
+    assert.equal(s.state, 'failure');
+    assert.match(
+      s.description,
+      /^Ejected from merge queue – conflicts with main/,
+    );
+    assert.equal(s.target_url, QUEUE_RUN);
+  });
+
+  it('marks a PR ejected by a failed single-PR batch, linked to the failing run', async () => {
+    const { github, refs, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+    });
+    const tip = refs.get(`heads/mq/test/${(1000).toString(36)}`);
+    github.rest.repos.getCombinedStatusForRef = gateOn(tip, 'failure');
+    github.rest.actions.listWorkflowRuns = async () => runOn(tip, 'completed');
+    calls.statuses.length = 0;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 2000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    const s = statusOf(calls, 1);
+    assert.equal(s.state, 'failure');
+    assert.match(s.description, /batch CI failed with this PR/);
+    assert.equal(s.target_url, BATCH_RUN);
+  });
+
+  it('shows bisected PRs under their new half, not the failed parent batch', async () => {
+    const { github, refs, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+    });
+    const id = (1000).toString(36);
+    const tip = refs.get(`heads/mq/test/${id}`);
+    github.rest.repos.getCombinedStatusForRef = gateOn(tip, 'failure');
+    calls.statuses.length = 0;
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1), readyPR(2)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 2000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    assert.match(
+      statusOf(calls, 1).description,
+      new RegExp(`In batch ${id}\\.1 \\(1 PR\\)`),
+    );
+    assert.match(
+      statusOf(calls, 2).description,
+      new RegExp(`In batch ${id}\\.2 \\(1 PR\\)`),
+    );
+  });
+
+  it('posts statuses for labeled PRs that are not ready, using candidatePRs', async () => {
+    const { github, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      candidatePRs: [readyPR(1), readyPR(9)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+      queueRunUrl: QUEUE_RUN,
+    });
+    assert.match(statusOf(calls, 9).description, /^Waiting/);
+    assert.match(statusOf(calls, 1).description, /In batch/);
+  });
+
+  it('uses the dedicated statusClient and tolerates it failing', async () => {
+    const { github, calls } = makeFakeGithub();
+    const statusClient = {
+      rest: {
+        repos: {
+          createCommitStatus: async () => {
+            throw Object.assign(new Error('403'), { status: 403 });
+          },
+        },
+      },
+    };
+    const { actions } = await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('nothing should merge'),
+      now: () => 1000,
+      statusClient,
+    });
+    assert.deepEqual(types(actions), ['start:1']);
+    assert.equal(calls.dispatches.length, 1, 'the batch still dispatched');
+    assert.equal(calls.statuses.length, 0, 'nothing went through `github`');
+  });
+
+  it('writes no statuses in dry-run mode', async () => {
+    const { github, calls } = makeFakeGithub();
+    await runBatchQueue({
+      github,
+      owner: 'o',
+      repo: 'r',
+      readyPRs: [readyPR(1)],
+      mergePR: async () => assert.fail('dry run'),
+      isDryRun: true,
+    });
+    assert.equal(calls.statuses.length, 0);
   });
 });
