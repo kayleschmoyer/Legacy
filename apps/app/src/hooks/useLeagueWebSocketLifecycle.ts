@@ -20,6 +20,8 @@ export interface UseLeagueWebSocketLifecycleOptions {
   leagueId: number | undefined;
   url: string | undefined;
   token: string | undefined;
+  /** Heartbeat cadence override for long-lived rooms such as the live draft (LS-10630). */
+  heartbeatMs?: number;
 }
 
 export interface UseLeagueWebSocketLifecycleResult {
@@ -40,6 +42,7 @@ export function useLeagueWebSocketLifecycle({
   leagueId,
   url,
   token,
+  heartbeatMs,
 }: UseLeagueWebSocketLifecycleOptions): UseLeagueWebSocketLifecycleResult {
   const [client, setClient] = useState<WebSocketClient | null>(null);
   const [connected, setConnected] = useState(false);
@@ -77,6 +80,7 @@ export function useLeagueWebSocketLifecycle({
         );
       }
     });
+    if (heartbeatMs) wsClient.setHeartbeatInterval(heartbeatMs);
     wsClient.connect();
 
     return () => {
@@ -85,7 +89,7 @@ export function useLeagueWebSocketLifecycle({
       setClient(null);
       setConnected(false);
     };
-  }, [leagueId, url, token, isFocused]);
+  }, [leagueId, url, token, isFocused, heartbeatMs]);
 
   // A stretch of flaky mobile network (subway, elevator, wifi/cellular
   // handoff) can burn through the client's bounded reconnect budget and it

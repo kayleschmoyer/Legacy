@@ -23,6 +23,13 @@ import { useDraftChatUnread } from '../../hooks/useDraftChatUnread';
 import { useLeagueWebSocketLifecycle } from '../../hooks/useLeagueWebSocketLifecycle';
 
 /**
+ * Heartbeat cadence for the draft room's league socket — matches the draft
+ * socket's 15s (DRAFT_HEARTBEAT_MS, LS-8880) so a zombie league socket stops
+ * silently swallowing chat for minutes (LS-10630).
+ */
+const DRAFT_LEAGUE_SOCKET_HEARTBEAT_MS = 15 * 1000;
+
+/**
  * Chat tab data connector (LS-9401) — same `useLeagueChat` data source
  * `LeagueChatTab` uses elsewhere in the app, feeding the v2-styled
  * `DraftChatTab` presentational component. Kept mounted by the caller
@@ -133,6 +140,7 @@ export default function DraftBoardPage() {
       leagueId: leagueId ?? undefined,
       url: websocketUrl,
       token: wsToken,
+      heartbeatMs: DRAFT_LEAGUE_SOCKET_HEARTBEAT_MS,
     });
 
   useEffect(() => {

@@ -59,6 +59,7 @@ function makeMockClient() {
     connect: jest.fn(),
     dispose: jest.fn(),
     reconnectNow: jest.fn(),
+    setHeartbeatInterval: jest.fn(),
     suspend: jest.fn(),
     resume: jest.fn(),
     _emit(event: string, ...args: unknown[]) {
@@ -109,6 +110,20 @@ describe('useLeagueWebSocketLifecycle', () => {
     );
     expect(result.current.client).toBe(mockClient);
     expect(mockClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the heartbeat override before connecting (LS-10630)', () => {
+    renderHook(() =>
+      useLeagueWebSocketLifecycle({ ...defaultOptions, heartbeatMs: 15000 }),
+    );
+
+    expect(mockClient.setHeartbeatInterval).toHaveBeenCalledWith(15000);
+  });
+
+  it('keeps the default heartbeat when no override is given', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    expect(mockClient.setHeartbeatInterval).not.toHaveBeenCalled();
   });
 
   it('does not create a client when the screen is not focused', () => {

@@ -25,6 +25,13 @@ import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';
 import { downloadCsvFile } from '../utils/draftPacketDownload';
 
+/**
+ * Heartbeat cadence for the draft room's league socket — matches the draft
+ * socket's 15s (DRAFT_HEARTBEAT_MS, LS-8880) so a zombie league socket stops
+ * silently swallowing chat for minutes (LS-10630).
+ */
+const DRAFT_LEAGUE_SOCKET_HEARTBEAT_MS = 15 * 1000;
+
 function renderChat({ leagueId, userId, mentionableTeams }: DraftChatProps) {
   return (
     <LeagueChatTab
@@ -124,6 +131,7 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
       leagueId: leagueId ?? NaN,
       isAuthenticated: !authLoading && !!user,
       authToken,
+      heartbeatMs: DRAFT_LEAGUE_SOCKET_HEARTBEAT_MS,
     });
 
   // Warn before leaving an active draft (LS-4986).

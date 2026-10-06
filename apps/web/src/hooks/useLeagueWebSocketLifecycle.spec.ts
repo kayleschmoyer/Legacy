@@ -43,6 +43,8 @@ function makeMockClient() {
     connect: jest.fn(),
     dispose: jest.fn(),
     updateToken: jest.fn(),
+    reconnectNow: jest.fn(),
+    setHeartbeatInterval: jest.fn(),
     _emit(event: string, ...args: unknown[]) {
       (handlers[event] ?? []).forEach((h) => h(...args));
     },
@@ -233,5 +235,61 @@ describe('useLeagueWebSocketLifecycle', () => {
     expect(WebSocketClient).not.toHaveBeenCalled();
     expect(result.current.client).toBeNull();
     expect(result.current.connected).toBe(false);
+  });
+
+  // LS-10630: a multi-hour draft room's league socket (the only one that
+  // carries league chat) must recover like the draft socket does.
+  it('applies the heartbeat override before connecting', () => {
+    renderHook(() =>
+      useLeagueWebSocketLifecycle({ ...defaultOptions, heartbeatMs: 15000 }),
+    );
+
+    expect(mockClient.setHeartbeatInterval).toHaveBeenCalledWith(15000);
+  });
+
+  it('keeps the default heartbeat when no override is given', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    expect(mockClient.setHeartbeatInterval).not.toHaveBeenCalled();
+  });
+
+  it('reconnects when the browser comes back online', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(mockClient.reconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconnects when the tab becomes visible, but not when it is hidden', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+    const visibility = jest.spyOn(document, 'visibilityState', 'get');
+
+    visibility.mockReturnValue('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(mockClient.reconnectNow).not.toHaveBeenCalled();
+
+    visibility.mockReturnValue('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(mockClient.reconnectNow).toHaveBeenCalledTimes(1);
+
+    visibility.mockRestore();
+  });
+
+  it('stops listening for online/visibility signals after unmount', () => {
+    const { unmount } = renderHook(() =>
+      useLeagueWebSocketLifecycle(defaultOptions),
+    );
+    unmount();
+
+    window.dispatchEvent(new Event('online'));
+
+    expect(mockClient.reconnectNow).not.toHaveBeenCalled();
   });
 });

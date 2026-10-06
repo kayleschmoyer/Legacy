@@ -219,6 +219,7 @@ describe('DraftBoardPage', () => {
           leagueId: 12,
           url: 'wss://example.com/ws',
           token: 'jwt-token',
+          heartbeatMs: 15000,
         }),
       );
       expect(mockBoardSocketContext).toHaveBeenLastCalledWith({

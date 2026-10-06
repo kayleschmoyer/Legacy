@@ -119,6 +119,7 @@ describe('EliteDraftBoardScreen (web wrapper) — chat', () => {
       leagueId: 12,
       isAuthenticated: true,
       authToken: 'jwt-token',
+      heartbeatMs: 15000,
     });
     expect(mockBoardSocketContext).toHaveBeenLastCalledWith({
       client: mockSocketClient,

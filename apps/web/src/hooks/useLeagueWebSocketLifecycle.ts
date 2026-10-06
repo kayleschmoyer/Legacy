@@ -15,6 +15,12 @@ export interface UseLeagueWebSocketLifecycleOptions {
   leagueId: number;
   isAuthenticated: boolean;
   authToken: string | null | undefined;
+  /**
+   * Heartbeat cadence override. Long-lived rooms (the live draft) pass a
+   * tight value so a zombie socket is detected and replaced in seconds
+   * instead of the client's 5-minute default (LS-10630).
+   */
+  heartbeatMs?: number;
 }
 
 export interface UseLeagueWebSocketLifecycleResult {
@@ -35,6 +41,7 @@ export function useLeagueWebSocketLifecycle({
   leagueId,
   isAuthenticated,
   authToken,
+  heartbeatMs,
 }: UseLeagueWebSocketLifecycleOptions): UseLeagueWebSocketLifecycleResult {
   const [client, setClient] = useState<WebSocketClient | null>(null);
   const [connected, setConnected] = useState(false);
@@ -85,14 +92,30 @@ export function useLeagueWebSocketLifecycle({
         );
       }
     });
+    if (heartbeatMs) wsClient.setHeartbeatInterval(heartbeatMs);
     wsClient.connect();
+
+    // The client gives up for good once its bounded reconnect budget is spent
+    // (LS-8881), and a hidden tab is throttled so it may never get there. A
+    // multi-hour draft room hits both, which silently ended league-chat
+    // delivery while picks (on the draft socket, which already does this in
+    // useWebSocket) kept flowing (LS-10630). `reconnectNow` is a no-op while
+    // connected/connecting, so firing on every signal is safe.
+    const handleOnline = () => wsClient.reconnectNow();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') wsClient.reconnectNow();
+    };
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       active = false;
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       wsClient.dispose();
       setClient(null);
       setConnected(false);
     };
-  }, [leagueId, isAuthenticated]);
+  }, [leagueId, isAuthenticated, heartbeatMs]);
 
   // Keep the client's token current for future (re)connects — e.g. once the
   // async JWT refresh resolves, or if the token rotates later — without
