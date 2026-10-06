@@ -50,6 +50,7 @@ jest.mock('../../components/Popover', () => ({
 describe('ConceptTooltip', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -163,5 +164,58 @@ describe('ConceptTooltip', () => {
       jest.advanceTimersByTime(1000);
     });
     expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  describe('seen-state persistence (LS-6886)', () => {
+    it('opens on hover while the term has not been acknowledged', () => {
+      renderTooltip();
+      fireEvent.mouseEnter(getAnchor());
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+    });
+
+    it('"Got it" persists the per-term flag and closes the card', () => {
+      renderTooltip();
+      fireEvent.click(getAnchor());
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+
+      expect(localStorage.getItem('ls_tooltip_seen_war')).toBe('1');
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+
+    it('no longer opens on hover once acknowledged, across remounts', () => {
+      const { unmount } = renderTooltip();
+      fireEvent.click(getAnchor());
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      unmount();
+
+      renderTooltip();
+      fireEvent.mouseEnter(getAnchor());
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+
+    it('still opens on press when acknowledged, without the "Got it" control', () => {
+      localStorage.setItem('ls_tooltip_seen_war', '1');
+      renderTooltip();
+      fireEvent.click(getAnchor());
+
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    });
+
+    it('acknowledges with the keyboard', () => {
+      renderTooltip();
+      fireEvent.click(getAnchor());
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Got it' }), {
+        key: 'Enter',
+      });
+      expect(localStorage.getItem('ls_tooltip_seen_war')).toBe('1');
+    });
+
+    it('tracks each term independently', () => {
+      localStorage.setItem('ls_tooltip_seen_war', '1');
+      render(<ConceptTooltip term="OPS" explanation="On-base plus slugging" />);
+      fireEvent.mouseEnter(screen.getByRole('button', { name: 'OPS' }));
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+    });
   });
 });

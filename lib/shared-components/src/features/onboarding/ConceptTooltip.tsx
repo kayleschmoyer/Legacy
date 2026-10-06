@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import {
+  readConceptTooltipSeen,
+  writeConceptTooltipSeen,
+} from './conceptTooltipSeen';
 import { Popover } from '../../components/Popover';
 import { BRAND_GOLD_LIGHT } from '../../utils/colors';
 
@@ -32,12 +36,16 @@ const PRESS_GRACE_MS = 400;
  * card; hover and focus also open it on web.  Positioning, collision flipping
  * and reposition-on-scroll/resize come from the shared Tamagui `Popover`, so
  * there are no document/window/portal APIs here (LS-10380).
+ *
+ * The card's "Got it" control persists a per-term seen flag; once set, hover
+ * no longer opens the card, while press/focus/keyboard still do (LS-6886).
  */
 export function ConceptTooltip({
   term,
   explanation,
 }: ConceptTooltipProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(() => readConceptTooltipSeen(term));
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerOverCardRef = useRef(false);
   const autoOpenedAtRef = useRef(0);
@@ -70,6 +78,15 @@ export function ConceptTooltip({
     if (!next && Date.now() - autoOpenedAtRef.current < PRESS_GRACE_MS) return;
     cancelHide();
     setOpen(next);
+  };
+
+  const acknowledge = () => {
+    writeConceptTooltipSeen(term);
+    setSeen(true);
+    // The card unmounts under the pointer, so no hover-out will clear this.
+    pointerOverCardRef.current = false;
+    cancelHide();
+    setOpen(false);
   };
 
   const tooltipId = `tooltip-${term.replace(/\s+/g, '-')}`;
@@ -113,8 +130,12 @@ export function ConceptTooltip({
           borderStyle="dashed"
           borderBottomColor={BRAND_GOLD_LIGHT}
           onPress={() => requestOpen(!open)}
-          onHoverIn={show}
-          onHoverOut={scheduleHide}
+          // Tamagui `Text` forwards `onHoverIn`/`onHoverOut` to the DOM
+          // unmapped (React drops them), so hover uses the mouse events
+          // directly. Hover only auto-opens until the term is acknowledged
+          // (LS-6886).
+          onMouseEnter={seen ? undefined : show}
+          onMouseLeave={scheduleHide}
           onFocus={show}
           onBlur={() => {
             // Pressing the mouse on the card (to select its text) blurs a
@@ -155,6 +176,29 @@ export function ConceptTooltip({
         <Text fontSize="$3" color="$colorPress" lineHeight={20}>
           {explanation}
         </Text>
+        {!seen && (
+          <Text
+            role="button"
+            tabIndex={0}
+            alignSelf="flex-end"
+            marginTop="$2"
+            fontSize="$2"
+            fontWeight="600"
+            color="$colorPress"
+            opacity={0.75}
+            cursor="pointer"
+            hoverStyle={{ opacity: 1 }}
+            onPress={acknowledge}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                acknowledge();
+              }
+            }}
+          >
+            Got it
+          </Text>
+        )}
       </YStack>
     </Popover>
   );
