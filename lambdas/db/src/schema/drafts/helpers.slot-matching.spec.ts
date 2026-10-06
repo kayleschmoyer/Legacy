@@ -10,7 +10,14 @@
  * exists — regardless of draft order.
  */
 
-import { computeUnfilledSlotTypes } from './helpers';
+import type { PublicDb } from '@legacy-sports/db-client';
+import {
+  computeUnfilledSlotCounts,
+  computeUnfilledSlotTypes,
+  getOpenSlotFilterTypes,
+  getUnfilledPositionTypes,
+  hasSpareRosterCapacity,
+} from './helpers';
 
 describe('computeUnfilledSlotTypes (LS-9123)', () => {
   it('fills every slot when a valid assignment exists, even if an early multi-eligible pick could starve a later single-eligible one', () => {
@@ -93,5 +100,103 @@ describe('computeUnfilledSlotTypes (LS-9123)', () => {
     expect(
       computeUnfilledSlotTypes(slotsNeeded, playerSlotMap, [1, 2]),
     ).toEqual([]);
+  });
+});
+
+describe('computeUnfilledSlotCounts (LS-10636)', () => {
+  it('reports how many slots of each uncovered type remain open', () => {
+    const slotsNeeded = new Map([
+      ['SS', 1],
+      ['OF', 3],
+    ]);
+    const playerSlotMap = new Map([
+      [1, new Set(['SS'])],
+      [2, new Set(['OF'])],
+    ]);
+
+    const counts = computeUnfilledSlotCounts(
+      slotsNeeded,
+      playerSlotMap,
+      [1, 2],
+    );
+
+    expect([...counts]).toEqual([['OF', 2]]);
+  });
+});
+
+describe('hasSpareRosterCapacity (LS-10636)', () => {
+  it('is true when more roster spots remain than starter slots to fill', () => {
+    expect(
+      hasSpareRosterCapacity({
+        maxRosterSize: 25,
+        pickCount: 1,
+        unfilledSlotCount: 14,
+      }),
+    ).toBe(true);
+  });
+
+  it('is false when every remaining pick is forced into an open starter slot', () => {
+    expect(
+      hasSpareRosterCapacity({
+        maxRosterSize: 25,
+        pickCount: 11,
+        unfilledSlotCount: 14,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('getOpenSlotFilterTypes (LS-10636)', () => {
+  /**
+   * Fake tx: `execute` serves the seat's pick ids, the select chain serves
+   * their eligible stat positions.
+   */
+  function makeTx(pickIds: number[], eligible: Record<number, string[]>) {
+    const rows = pickIds.flatMap((playerId) =>
+      (eligible[playerId] ?? []).map((position) => ({ playerId, position })),
+    );
+    const chain: Record<string, unknown> = {};
+    chain.select = jest.fn(() => chain);
+    chain.from = jest.fn(() => chain);
+    chain.where = jest.fn(() => Promise.resolve(rows));
+    chain.execute = jest.fn(() =>
+      Promise.resolve({ rows: pickIds.map((id) => ({ player_id: id })) }),
+    );
+    return chain as unknown as PublicDb;
+  }
+
+  // Starters: SS, C, SP. Roster of 5 leaves two bench spots.
+  const rules = {
+    sport: 'baseball' as const,
+    rosterPositions: ['SS', 'C', 'SP'] as ('SS' | 'C' | 'SP')[],
+    maxRosterSize: 5,
+  };
+
+  it('does not hide shortstops after one is drafted while bench spots are open', async () => {
+    const tx = makeTx([1], { 1: ['SS'] });
+
+    // SS is occupied, yet C and SP are still open AND two bench spots remain,
+    // so nothing is filtered.
+    expect(await getUnfilledPositionTypes(tx, 100, 900, rules)).toEqual([
+      'C',
+      'SP',
+    ]);
+    expect(await getOpenSlotFilterTypes(tx, 100, 900, rules)).toEqual([]);
+  });
+
+  it('narrows to the open starter slots once no spare spot is left', async () => {
+    // Four picks (SS plus three bench-type fillers) leave one roster spot and
+    // two open starter slots, so that spot must fill a starter slot.
+    const tx = makeTx([1, 2, 3, 4], {
+      1: ['SS'],
+      2: ['1B'],
+      3: ['1B'],
+      4: ['1B'],
+    });
+
+    expect(await getOpenSlotFilterTypes(tx, 100, 900, rules)).toEqual([
+      'C',
+      'SP',
+    ]);
   });
 });

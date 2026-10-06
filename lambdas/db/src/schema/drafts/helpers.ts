@@ -194,11 +194,36 @@ export async function getUnfilledPositionTypes(
   participantId: number,
   rules: DraftPositionRules,
 ): Promise<string[]> {
+  const { unfilledTypes } = await loadSeatSlotState(
+    tx,
+    draftId,
+    participantId,
+    rules,
+  );
+  return unfilledTypes;
+}
+
+/** What a seat's picks leave open: which slot types, how many slot instances,
+ *  and how many players the seat has drafted. */
+interface SeatSlotState {
+  unfilledTypes: string[];
+  unfilledSlotCount: number;
+  pickCount: number;
+}
+
+async function loadSeatSlotState(
+  tx: PublicDb,
+  draftId: number,
+  participantId: number,
+  rules: DraftPositionRules,
+): Promise<SeatSlotState> {
   // 1. The draft's roster slot requirements
   const rosterPositions = rules.rosterPositions;
   const sport: SportKind = rules.sport;
 
-  if (rosterPositions.length === 0) return [];
+  if (rosterPositions.length === 0) {
+    return { unfilledTypes: [], unfilledSlotCount: 0, pickCount: 0 };
+  }
 
   // Count slots needed per position type
   const slotsNeeded = new Map<string, number>();
@@ -214,7 +239,11 @@ export async function getUnfilledPositionTypes(
 
   if (teamPlayerIds.length === 0) {
     // No picks yet — all position types are still needed
-    return [...new Set(rosterPositions)];
+    return {
+      unfilledTypes: [...new Set(rosterPositions)],
+      unfilledSlotCount: rosterPositions.length,
+      pickCount: 0,
+    };
   }
 
   // 3. Position eligibility for already-drafted players from the mat view
@@ -264,12 +293,59 @@ export async function getUnfilledPositionTypes(
 
   // 4-5. Maximum bipartite matching between drafted players and slot
   // instances determines which slot types remain genuinely unfilled.
-  return computeUnfilledSlotTypes(
+  const unfilledCounts = computeUnfilledSlotCounts(
     slotsNeeded,
     playerSlotMap,
     teamPlayerIds,
     allowedPositions,
   );
+  return {
+    unfilledTypes: [...unfilledCounts.keys()],
+    unfilledSlotCount: [...unfilledCounts.values()].reduce((a, b) => a + b, 0),
+    pickCount: teamPlayerIds.length,
+  };
+}
+
+/**
+ * Whether a seat can still draft a player who fills none of its open starter
+ * slots: it has more roster spots left than starter slots left to fill, so the
+ * surplus is bench, and a bench slot takes any position (LS-10636).
+ *
+ * League settings have no "max players at a position" limit, so a position
+ * being occupied never makes a player undraftable on its own. Only a roster
+ * with no spare spot — every remaining pick is forced into an open starter
+ * slot — narrows the pool.
+ */
+export function hasSpareRosterCapacity(params: {
+  maxRosterSize: number;
+  pickCount: number;
+  unfilledSlotCount: number;
+}): boolean {
+  const { maxRosterSize, pickCount, unfilledSlotCount } = params;
+  return maxRosterSize - pickCount > unfilledSlotCount;
+}
+
+/**
+ * The slot types the draft board narrows a seat's available pool to — empty
+ * (no filter) whenever the seat still has a spare bench spot (LS-10636). The
+ * board and `getDraftOpenSlotPositions` both read this. Auto-pick keeps using
+ * {@link getUnfilledPositionTypes} directly: it prefers filling starters but
+ * never refuses a bench pick.
+ */
+export async function getOpenSlotFilterTypes(
+  tx: PublicDb,
+  draftId: number,
+  participantId: number,
+  rules: DraftPositionRules & Pick<DraftRules, 'maxRosterSize'>,
+): Promise<string[]> {
+  const state = await loadSeatSlotState(tx, draftId, participantId, rules);
+  return hasSpareRosterCapacity({
+    maxRosterSize: rules.maxRosterSize,
+    pickCount: state.pickCount,
+    unfilledSlotCount: state.unfilledSlotCount,
+  })
+    ? []
+    : state.unfilledTypes;
 }
 
 /**
@@ -296,6 +372,26 @@ export function computeUnfilledSlotTypes(
     Record<string, readonly string[]>
   > = ALLOWED_POSITIONS,
 ): string[] {
+  return [
+    ...computeUnfilledSlotCounts(
+      slotsNeeded,
+      playerSlotMap,
+      teamPlayerIds,
+      allowedPositions,
+    ).keys(),
+  ];
+}
+
+/** Same matching as {@link computeUnfilledSlotTypes}, but reports how many
+ *  slots of each uncovered type are still open (LS-10636). */
+export function computeUnfilledSlotCounts(
+  slotsNeeded: Map<string, number>,
+  playerSlotMap: Map<number, Set<string>>,
+  teamPlayerIds: number[],
+  allowedPositions: Readonly<
+    Record<string, readonly string[]>
+  > = ALLOWED_POSITIONS,
+): Map<string, number> {
   const orderedSlotTypes = [...slotsNeeded.keys()].sort(
     (a, b) =>
       (allowedPositions[a]?.length ?? 1) - (allowedPositions[b]?.length ?? 1),
@@ -347,10 +443,13 @@ export function computeUnfilledSlotTypes(
     }
   });
 
-  return orderedSlotTypes.filter(
-    (slotType) =>
-      (slotsCovered.get(slotType) ?? 0) < (slotsNeeded.get(slotType) ?? 0),
-  );
+  const unfilled = new Map<string, number>();
+  for (const slotType of orderedSlotTypes) {
+    const open =
+      (slotsNeeded.get(slotType) ?? 0) - (slotsCovered.get(slotType) ?? 0);
+    if (open > 0) unfilled.set(slotType, open);
+  }
+  return unfilled;
 }
 
 /**

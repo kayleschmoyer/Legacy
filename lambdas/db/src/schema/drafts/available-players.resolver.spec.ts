@@ -5,7 +5,7 @@
  * Bug: during the draft the board showed players who don't meet any still-open
  * roster requirement for the caller's team (e.g. hitters when only a pitcher
  * slot remained), so they appeared pickable. Auto-pick already refuses such
- * players via getUnfilledPositionTypes; these tests assert the board query now
+ * players via getOpenSlotFilterTypes; these tests assert the board query now
  * mirrors that constraint.
  *
  * Strategy: capture the real resolver with real drizzle (so `sql` composition
@@ -16,7 +16,7 @@
 
 import { PgDialect } from 'drizzle-orm/pg-core';
 
-const getUnfilledPositionTypes = jest.fn();
+const getOpenSlotFilterTypes = jest.fn();
 const eligibleStatPositionsForUnfilledSlots = jest.fn();
 const verifyLeagueMembership = jest.fn();
 // No extra league-static predicates so the only player_eligible_positions
@@ -92,7 +92,7 @@ async function captureResolver(
   jest.doMock('./helpers', () => ({
     countRecentMockDrafts: jest.fn(),
     getCurrentDraftPickInfo: jest.fn(),
-    getUnfilledPositionTypes,
+    getOpenSlotFilterTypes,
     eligibleStatPositionsForUnfilledSlots,
     MOCK_DRAFT_FREE_WEEKLY_LIMIT: 2,
   }));
@@ -222,7 +222,7 @@ function serializeExecutedQuery(db: { _executed: unknown[] }) {
 
 describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', () => {
   beforeEach(() => {
-    getUnfilledPositionTypes.mockReset();
+    getOpenSlotFilterTypes.mockReset();
     eligibleStatPositionsForUnfilledSlots.mockReset();
     verifyLeagueMembership.mockReset();
     buildEligibilityConditions.mockClear();
@@ -231,7 +231,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
   it('restricts the board to players eligible for an unfilled slot', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['SP']);
+    getOpenSlotFilterTypes.mockResolvedValue(['SP']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue(['SP', 'P']);
     const db = makeDb();
 
@@ -242,7 +242,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     // keys a draft's picks since LS-10076.
     // Positional requirements route through DraftRules since LS-10074 /
     // LS-10086 — the rules carry both the roster and the sport.
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+    expect(getOpenSlotFilterTypes).toHaveBeenCalledWith(
       db,
       100,
       SEAT_ID,
@@ -266,7 +266,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
     // No team ⇒ no seat ⇒ never compute requirements, never add the predicate.
-    expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
+    expect(getOpenSlotFilterTypes).not.toHaveBeenCalled();
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
   });
@@ -274,7 +274,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
   it('excludes players already rostered in the league (LS-8674 kept players)', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue([]);
+    getOpenSlotFilterTypes.mockResolvedValue([]);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
     const db = makeDb();
 
@@ -289,7 +289,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
     // Roster full / no league position requirements ⇒ empty list ⇒ no predicate.
-    getUnfilledPositionTypes.mockResolvedValue([]);
+    getOpenSlotFilterTypes.mockResolvedValue([]);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
     const db = makeDb();
 
@@ -297,12 +297,29 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     // Positional requirements route through DraftRules since LS-10074 /
     // LS-10086 — the rules carry both the roster and the sport.
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+    expect(getOpenSlotFilterTypes).toHaveBeenCalledWith(
       db,
       100,
       SEAT_ID,
       expect.objectContaining({ sport: 'baseball', rosterPositions: ['C'] }),
     );
+    const { sql: text } = serializeExecutedQuery(db);
+    expect(text).not.toContain('player_eligible_positions');
+  });
+
+  // LS-10636: after drafting a shortstop the board hid every other shortstop
+  // even with bench spots open. getOpenSlotFilterTypes reports no narrowing
+  // while a spare bench spot remains, so the board must add no positional
+  // predicate — and must not even bind the drafted position.
+  it('adds no positional predicate while a spare bench spot remains (LS-10636)', async () => {
+    const resolve = await captureResolver();
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getOpenSlotFilterTypes.mockResolvedValue([]);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
+    const db = makeDb();
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
   });
@@ -313,14 +330,14 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
   it('restricts a football board to players eligible for an unfilled slot, using the football relation', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['QB']);
+    getOpenSlotFilterTypes.mockResolvedValue(['QB']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue(['QB']);
     const db = makeDb({ ...LEAGUE_ROW, sport: 'football' });
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
     // Sport threaded through to both helpers.
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+    expect(getOpenSlotFilterTypes).toHaveBeenCalledWith(
       db,
       100,
       SEAT_ID,
@@ -348,7 +365,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
  */
 describe('open-slots filter is optional and explainable (LS-10593)', () => {
   beforeEach(() => {
-    getUnfilledPositionTypes.mockReset();
+    getOpenSlotFilterTypes.mockReset();
     eligibleStatPositionsForUnfilledSlots.mockReset();
     verifyLeagueMembership.mockReset();
   });
@@ -356,7 +373,7 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
   it('skips the open-slot filter when openSlotsOnly is false', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['SP']);
+    getOpenSlotFilterTypes.mockResolvedValue(['SP']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue(['SP', 'P']);
     const db = makeDb();
 
@@ -366,7 +383,7 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
       { user: { id: 7 }, db },
     );
 
-    expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
+    expect(getOpenSlotFilterTypes).not.toHaveBeenCalled();
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
   });
@@ -374,7 +391,7 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
   it('still applies the filter when openSlotsOnly is true', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['SP']);
+    getOpenSlotFilterTypes.mockResolvedValue(['SP']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue(['SP', 'P']);
     const db = makeDb();
 
@@ -391,14 +408,14 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
   it("getDraftOpenSlotPositions reports the caller's open slot types", async () => {
     const resolve = await captureResolver('getDraftOpenSlotPositions');
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['C', 'SP']);
+    getOpenSlotFilterTypes.mockResolvedValue(['C', 'SP']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue(['C', 'SP', 'P']);
     const db = makeDb();
 
     await expect(
       resolve({}, { draftId: 100 }, { user: { id: 7 }, db }),
     ).resolves.toEqual(['C', 'SP']);
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+    expect(getOpenSlotFilterTypes).toHaveBeenCalledWith(
       db,
       100,
       SEAT_ID,
@@ -409,7 +426,7 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
   it('getDraftOpenSlotPositions is empty when no filter applies', async () => {
     const resolve = await captureResolver('getDraftOpenSlotPositions');
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
-    getUnfilledPositionTypes.mockResolvedValue(['XX']);
+    getOpenSlotFilterTypes.mockResolvedValue(['XX']);
     eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
     const db = makeDb();
 
@@ -426,7 +443,7 @@ describe('open-slots filter is optional and explainable (LS-10593)', () => {
     await expect(
       resolve({}, { draftId: 100 }, { user: { id: 7 }, db }),
     ).resolves.toEqual([]);
-    expect(getUnfilledPositionTypes).not.toHaveBeenCalled();
+    expect(getOpenSlotFilterTypes).not.toHaveBeenCalled();
   });
 });
 
@@ -434,7 +451,7 @@ describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () =
   const FOOTBALL_LEAGUE = { ...LEAGUE_ROW, sport: 'football' };
 
   beforeEach(() => {
-    getUnfilledPositionTypes.mockReset();
+    getOpenSlotFilterTypes.mockReset();
     eligibleStatPositionsForUnfilledSlots.mockReset();
     verifyLeagueMembership.mockReset();
     buildEligibilityConditions.mockClear();

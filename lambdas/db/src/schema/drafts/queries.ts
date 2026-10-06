@@ -24,7 +24,7 @@ import {
   eligibleStatPositionsForUnfilledSlots,
   getCurrentDraftPickInfo,
   getNextMockDraftSlotAt,
-  getUnfilledPositionTypes,
+  getOpenSlotFilterTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
 import { getSeatForTeam, getSeatForUser } from './participants';
@@ -373,7 +373,8 @@ builder.queryField('getDraftPicks', (t) =>
  * The caller's open-roster-slot board filter (LS-8065): the slot types their
  * seat still has to fill, and the stat positions that can fill them. An empty
  * `eligibleStatPositions` means no filter applies (all slots filled, no slot
- * requirements, or only unrecognized slot types — the safe failure mode).
+ * requirements, a spare bench spot remains — LS-10636 — or only unrecognized
+ * slot types — the safe failure mode).
  */
 async function resolveOpenSlotFilter(
   db: PublicDb,
@@ -384,7 +385,10 @@ async function resolveOpenSlotFilter(
   unfilledPositionTypes: string[];
   eligibleStatPositions: string[];
 }> {
-  const unfilledPositionTypes = await getUnfilledPositionTypes(
+  // Empty while the seat has a spare bench spot (LS-10636): a bench slot takes
+  // any position and leagues have no per-position max, so an occupied position
+  // must not hide players.
+  const unfilledPositionTypes = await getOpenSlotFilterTypes(
     db,
     draftId,
     participantId,
@@ -577,8 +581,11 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // constraint here so the board can only ever narrow the pool.
       //
       // When the caller has no team (spectator/commissioner without a roster),
-      // the league defines no position requirements, or every slot is already
-      // filled, getUnfilledPositionTypes returns an empty list, the eligible
+      // the league defines no position requirements, every slot is already
+      // filled, or a spare bench spot remains (LS-10636 — a bench slot takes
+      // any position, and leagues have no per-position max, so a drafted
+      // shortstop must not hide the other shortstops), getOpenSlotFilterTypes
+      // returns an empty list, the eligible
       // stat-position set is empty, and no positional predicate is added —
       // preserving the prior unfiltered behaviour (the safe failure mode).
       // Both helpers are sport-aware (LS-9479) — football reads
