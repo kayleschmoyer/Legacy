@@ -61,6 +61,63 @@ describe('matchTitle', () => {
     );
   });
 
+  // LS-10819 — real false positives from the first dev run.
+  it('flags an award-namesake full-name hit as ambiguous (Cy Young)', () => {
+    expect(
+      matchTitle(
+        "BACK-TO-BACK AL CY YOUNG AWARD WINNER Tarik Skubal's FULL 2025 highlights ⭐️",
+        'Cy',
+        'Young',
+      ),
+    ).toBe('full_name_ambiguous');
+  });
+
+  it('flags a full-name hit where the player is the object as ambiguous (Walter Johnson)', () => {
+    expect(
+      matchTitle(
+        'Max Scherzer is now TENTH all-time in strikeouts 🙌 (He passed the LEGENDARY Walter Johnson)',
+        'Walter',
+        'Johnson',
+      ),
+    ).toBe('full_name_ambiguous');
+  });
+
+  it('flags award and record usages after the name as ambiguous', () => {
+    expect(
+      matchTitle('Hank Aaron Award winners announced', 'Hank', 'Aaron'),
+    ).toBe('full_name_ambiguous');
+    expect(
+      matchTitle("Aaron Judge breaks Roger Maris's record", 'Roger', 'Maris'),
+    ).toBe('full_name_ambiguous');
+    expect(
+      matchTitle(
+        'Shohei Ohtani does what no one has since Babe Ruth',
+        'Babe',
+        'Ruth',
+      ),
+    ).toBe('full_name_ambiguous');
+  });
+
+  it('keeps auto-accepting subject titles that do not lead with the name', () => {
+    for (const [title, first, last] of [
+      ['101, 100, 101. Winner this round: Paul Skenes.', 'Paul', 'Skenes'],
+      [
+        '"The Big Unit" Randy Johnson strikes FEAR into the heart of John Kruk!',
+        'Randy',
+        'Johnson',
+      ],
+      ['Past Meets Present: J.R. Richard and Wesley Wright', 'J.R.', 'Richard'],
+      ["CLE@NYY: Yankees retire Babe Ruth's iconic No. 3", 'Babe', 'Ruth'],
+      [
+        'Max Scherzer becomes the 11th pitcher EVER to reach 3,500 strikeouts!',
+        'Max',
+        'Scherzer',
+      ],
+    ]) {
+      expect(matchTitle(title, first, last)).toBe('full_name');
+    }
+  });
+
   it('returns none when neither name appears', () => {
     expect(
       matchTitle('Top 10 catches of the 2026 season', 'Burleigh', 'Grimes'),

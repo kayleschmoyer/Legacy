@@ -697,8 +697,8 @@ resource "aws_lambda_permission" "notable_plays_refresh_eventbridge" {
 
 # ── Baseball: Nightly Highlight-Video Resolution (LS-9113) ─────────────
 # Resolves players to validated MLB-official-YouTube-channel highlight
-# videos for the pick-splash video tier. Budget-aware: at most 95
-# search.list calls per run against the API's dedicated 100/day bucket,
+# videos for the pick-splash video tier. Budget-aware: at most 75
+# search.list calls per run (100 units each of the 10k/day quota; LS-10819),
 # prioritizing upcoming/active draft pools, then recently drafted players.
 # Fires nightly at 09:30 UTC (after the notable-plays refresh). No-ops
 # gracefully (triggered:false) when no YouTube API key is configured.

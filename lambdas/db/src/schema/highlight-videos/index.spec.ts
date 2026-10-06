@@ -217,6 +217,74 @@ describe('resolveResolveHighlightVideos', () => {
     ]);
   });
 
+  it.each([
+    {
+      playerId: 33687,
+      firstName: 'Cy',
+      lastName: 'Young',
+      title:
+        "BACK-TO-BACK AL CY YOUNG AWARD WINNER Tarik Skubal's FULL 2025 highlights",
+    },
+    {
+      playerId: 20910,
+      firstName: 'Walter',
+      lastName: 'Johnson',
+      title:
+        'Max Scherzer is now TENTH all-time in strikeouts (He passed the LEGENDARY Walter Johnson)',
+    },
+  ])(
+    'routes an ambiguous full-name hit ($firstName $lastName) through the judge instead of auto-accepting (LS-10819)',
+    async ({ playerId, firstName, lastName, title }) => {
+      mockGetCandidates.mockResolvedValue([
+        makeCandidate({ playerId, firstName, lastName }),
+      ]);
+      mockSearch.mockResolvedValue([{ videoId: 'vidX', title }]);
+      mockGetVideoStatuses.mockResolvedValue(
+        statusMap([{ videoId: 'vidX', title }]),
+      );
+      mockJudgeRelevance.mockResolvedValue(false);
+
+      const result = await resolveResolveHighlightVideos(systemContext, null);
+
+      expect(mockJudgeRelevance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playerName: `${firstName} ${lastName}`,
+          videoTitle: title,
+        }),
+      );
+      expect(result.playersResolved).toBe(0);
+      expect(mockUpsertResolutions).toHaveBeenCalledWith([
+        expect.objectContaining({
+          playerId,
+          youtubeVideoId: null,
+          matchMethod: null,
+        }),
+      ]);
+    },
+  );
+
+  it('caches an ambiguous full-name hit as a judge match when the judge approves', async () => {
+    const title = 'Hank Aaron hits his 715th career home run';
+    mockGetCandidates.mockResolvedValue([
+      makeCandidate({ playerId: 1, firstName: 'Hank', lastName: 'Aaron' }),
+    ]);
+    mockSearch.mockResolvedValue([{ videoId: 'vidH', title }]);
+    mockGetVideoStatuses.mockResolvedValue(
+      statusMap([{ videoId: 'vidH', title }]),
+    );
+    mockJudgeRelevance.mockResolvedValue(true);
+
+    await resolveResolveHighlightVideos(systemContext, null);
+
+    expect(mockUpsertResolutions).toHaveBeenCalledWith([
+      expect.objectContaining({
+        playerId: 1,
+        youtubeVideoId: 'vidH',
+        matchMethod: 'judge',
+      }),
+    ]);
+  });
+
   it('marks the player unresolved when the judge rejects the match', async () => {
     mockGetCandidates.mockResolvedValue([
       makeCandidate({ playerId: 9, firstName: 'Bill', lastName: 'Byrd' }),

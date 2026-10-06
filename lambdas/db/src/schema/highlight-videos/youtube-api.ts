@@ -3,7 +3,7 @@
  *
  * Two endpoints only:
  *  - search.list restricted to MLB's official channel — the quota-scarce call
- *    (its own 100-calls/day bucket post-2025), budgeted by the resolver.
+ *    (100 units of the 10k/day quota per call), budgeted by the resolver.
  *  - videos.list — 1 unit per call of up to 50 ids, used for the mandatory
  *    status checks (embeddable, madeForKids per DP III.E.4.j) and the weekly
  *    re-verify pass.

@@ -6,7 +6,11 @@
  * Byrd, Rip Russell → Addison Russell). Validation before caching is the
  * load-bearing requirement:
  *
- *  - Full "First Last" in the normalized title → auto-accept.
+ *  - Full "First Last" in the normalized title, with the player as the
+ *    title's subject → auto-accept.
+ *  - Full-name match where the player is likely not the subject (LS-10819:
+ *    "AL CY YOUNG AWARD WINNER Tarik Skubal", "Max Scherzer ... passed the
+ *    LEGENDARY Walter Johnson") → routed through the relevance judge.
  *  - Last-name-only match (archival titles like "1952WS GM7: Mize gives
  *    Yankees lead") → only accepted when the relevance judge confirms the
  *    title fits the player's era/team; otherwise the player is marked
@@ -38,25 +42,133 @@ export function normalizeForTitleMatch(value: string): string {
     .trim();
 }
 
-export type TitleMatch = 'full_name' | 'last_name' | 'none';
+export type TitleMatch =
+  | 'full_name'
+  | 'full_name_ambiguous'
+  | 'last_name'
+  | 'none';
 
-/** Whole-word containment on normalized text. */
-function containsPhrase(haystack: string, phrase: string): boolean {
-  if (phrase === '') return false;
-  return ` ${haystack} `.includes(` ${phrase} `);
+/**
+ * Players whose full name is also an MLB award name — on the MLB channel a
+ * "Cy Young" title is almost always about the award, so these hits always
+ * go to the judge.
+ */
+const AWARD_NAMESAKES = new Set([
+  'cy young',
+  'hank aaron',
+  'roberto clemente',
+  'jackie robinson',
+  'willie mays',
+  'ted williams',
+  'lou gehrig',
+  'mariano rivera',
+  'trevor hoffman',
+  'edgar martinez',
+]);
+
+/**
+ * Words shortly before the name that make the player the object of the
+ * title rather than its subject ("passed the LEGENDARY Walter Johnson",
+ * "first since Babe Ruth").
+ */
+const OBJECT_CUES_BEFORE = new Set([
+  'pass',
+  'passed',
+  'passes',
+  'passing',
+  'surpass',
+  'surpassed',
+  'surpasses',
+  'surpassing',
+  'overtake',
+  'overtakes',
+  'overtook',
+  'tie',
+  'ties',
+  'tied',
+  'tying',
+  'join',
+  'joins',
+  'joined',
+  'joining',
+  'than',
+  'since',
+  'like',
+]);
+/** How many tokens before the name are checked for object cues. */
+const OBJECT_CUE_WINDOW = 3;
+
+/**
+ * Words right after the name (or its possessive) that mark it as an award
+ * or a record rather than the player ("Cy Young Award", "Babe Ruth's record").
+ */
+const NON_SUBJECT_CUES_AFTER = new Set([
+  'award',
+  'awards',
+  'winner',
+  'winners',
+  'race',
+  'vote',
+  'voting',
+  'finalist',
+  'finalists',
+  'trophy',
+  'record',
+  'records',
+]);
+
+/** Start indexes of every whole-word occurrence of `phrase` in `tokens`. */
+function phraseIndexes(tokens: string[], phrase: string[]): number[] {
+  const indexes: number[] = [];
+  if (phrase.length === 0) return indexes;
+  for (let i = 0; i + phrase.length <= tokens.length; i++) {
+    if (phrase.every((word, k) => tokens[i + k] === word)) indexes.push(i);
+  }
+  return indexes;
 }
 
-/** Classify how strongly a video title matches a player's name. */
+/** True when the name occurrence at `start` reads as the title's subject. */
+function isSubjectOccurrence(
+  tokens: string[],
+  start: number,
+  nameLength: number,
+): boolean {
+  const before = tokens.slice(Math.max(0, start - OBJECT_CUE_WINDOW), start);
+  if (before.some((word) => OBJECT_CUES_BEFORE.has(word))) return false;
+  let next = start + nameLength;
+  // Skip the possessive normalization leaves behind ("ruth s record").
+  if (tokens[next] === 's') next++;
+  const after = tokens[next];
+  return after === undefined || !NON_SUBJECT_CUES_AFTER.has(after);
+}
+
+/**
+ * Classify how strongly a video title matches a player's name. A full-name
+ * hit is only 'full_name' (auto-accept) when the player reads as the
+ * title's subject; otherwise it is 'full_name_ambiguous' and must pass the
+ * judge.
+ */
 export function matchTitle(
   title: string,
   firstName: string,
   lastName: string,
 ): TitleMatch {
-  const normalizedTitle = normalizeForTitleMatch(title);
+  const tokens = normalizeForTitleMatch(title).split(' ');
   const fullName = normalizeForTitleMatch(`${firstName} ${lastName}`);
+  const nameTokens = fullName === '' ? [] : fullName.split(' ');
+  const fullNameHits = phraseIndexes(tokens, nameTokens);
+  if (fullNameHits.length > 0) {
+    if (AWARD_NAMESAKES.has(fullName)) return 'full_name_ambiguous';
+    return fullNameHits.some((start) =>
+      isSubjectOccurrence(tokens, start, nameTokens.length),
+    )
+      ? 'full_name'
+      : 'full_name_ambiguous';
+  }
   const last = normalizeForTitleMatch(lastName);
-  if (containsPhrase(normalizedTitle, fullName)) return 'full_name';
-  if (containsPhrase(normalizedTitle, last)) return 'last_name';
+  if (last !== '' && phraseIndexes(tokens, last.split(' ')).length > 0) {
+    return 'last_name';
+  }
   return 'none';
 }
 
@@ -106,7 +218,8 @@ interface CfChatResponse {
 }
 
 /**
- * Judge whether a last-name-only title match really is this player.
+ * Judge whether an ambiguous title match (last-name-only, or a full-name hit
+ * where the player may not be the subject) really is about this player.
  * Fail-closed: any API failure, parse ambiguity, or non-YES answer returns
  * false and the player stays unresolved (graphic fallback).
  */
@@ -141,7 +254,10 @@ export async function judgeRelevance(
                 'baseball player. Video titles that share only a surname with the ' +
                 'player often belong to a different, more recent player — when the ' +
                 "title's game era, teams, or first name do not fit the player, the " +
-                'answer is NO. Answer with exactly YES or NO.',
+                'answer is NO. The player must be the subject of the video: a ' +
+                'title that only mentions the player — another player passing ' +
+                'their record, or an award named after them such as the Cy Young ' +
+                'Award — is NO. Answer with exactly YES or NO.',
             },
             {
               role: 'user',

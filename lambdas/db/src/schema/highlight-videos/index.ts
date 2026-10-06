@@ -12,10 +12,13 @@
  *    Only resolved, embeddable, non-Made-for-Kids rows are served.
  *  - Mutation resolveHighlightVideos — system-only (EventBridge, nightly).
  *    Budget-aware: at most RESOLVE_SEARCH_BUDGET search.list calls per run
- *    (the API's dedicated 100/day bucket), prioritizing upcoming/active
+ *    (100 quota units each), prioritizing upcoming/active
  *    draft pools, then recently drafted players. Validation before caching:
- *    full-"First Last" title match auto-accepts; a last-name-only match must
- *    pass the LLM relevance judge; otherwise the player is marked unresolved.
+ *    a full-"First Last" title match with the player as the subject
+ *    auto-accepts; a last-name-only match, or a full-name hit where the
+ *    player may not be the subject (award namesakes, "passed Walter
+ *    Johnson"), must pass the LLM relevance judge; otherwise the player is
+ *    marked unresolved.
  *  - Mutation verifyHighlightVideos — system-only (EventBridge, weekly).
  *    Batched videos.list (1 unit / 50 ids) re-confirms embeddable +
  *    madeForKids, refreshes titles, purges rows for deleted/private/
@@ -56,10 +59,14 @@ const dbService = createDatabaseService(getDbOptions());
 /** Max ids per batch query — the splash never needs more than a draft board. */
 const MAX_QUERY_IDS = 500;
 /**
- * Per-run search.list ceiling. The bucket allows 100/day; 95 leaves headroom
- * for ad-hoc manual runs without tripping quota errors mid-job.
+ * Per-run search.list ceiling. Each search.list costs 100 units of the
+ * project's 10k/day quota (plus 1 unit per videos.list status check). The
+ * first dev run (2026-10-06, budget 95) stopped on a quota/403 error at
+ * search #80, so
+ * the practical ceiling is below the theoretical ~98; 75 leaves headroom for
+ * the weekly verify pass and ad-hoc manual searches (LS-10819).
  */
-export const RESOLVE_SEARCH_BUDGET = 95;
+export const RESOLVE_SEARCH_BUDGET = 75;
 /** Cache rows must be re-verified or purged within this window (DP III.E.4.d/e). */
 const CACHE_MAX_AGE_DAYS = 30;
 
@@ -182,7 +189,7 @@ async function pickValidatedVideo(
     if (match === 'full_name') {
       return { videoId: hit.videoId, title, matchMethod: 'full_name' };
     }
-    if (match === 'last_name') {
+    if (match === 'last_name' || match === 'full_name_ambiguous') {
       const relevant = await judgeRelevance({
         videoTitle: title,
         playerName: `${candidate.firstName} ${candidate.lastName}`,
@@ -307,6 +314,7 @@ export async function resolveResolveHighlightVideos(
     playersUnresolved,
     upserted,
     errorCount: errors.length,
+    errors,
   });
 
   return {

@@ -2452,7 +2452,7 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
-  /** Resolve players to validated MLB-channel highlight videos, budgeted to at most 95 search.list calls per run. Triggered nightly by EventBridge; system-only. */
+  /** Resolve players to validated MLB-channel highlight videos, budgeted to at most 75 search.list calls per run. Triggered nightly by EventBridge; system-only. */
   resolveHighlightVideos?: Maybe<HighlightVideoResolveResult>;
   /** Accept or decline a proposed draft slot trade, as the counterpart team. */
   respondDraftSlotTrade?: Maybe<DraftSlotTrade>;

@@ -3411,11 +3411,11 @@ type Mutation {
   requestDataExport: DataRequest
 
   """
-  Resolve players to validated MLB-channel highlight videos, budgeted to at most 95 search.list calls per run. Triggered nightly by EventBridge; system-only.
+  Resolve players to validated MLB-channel highlight videos, budgeted to at most 75 search.list calls per run. Triggered nightly by EventBridge; system-only.
   """
   resolveHighlightVideos(
     """
-    search.list calls to spend (default and max 95)
+    search.list calls to spend (default and max 75)
     """
     searchBudget: Int
   ): HighlightVideoResolveResult
