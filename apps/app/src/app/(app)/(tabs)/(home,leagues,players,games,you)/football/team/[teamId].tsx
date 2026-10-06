@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Separator, Spinner, Tabs, Text, YStack } from 'tamagui';
+import { Button, Input, Separator, Spinner, Tabs, Text, YStack } from 'tamagui';
 import { Alert, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -35,6 +35,7 @@ import {
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
   useMatchupScoresQuery,
+  useRenameTeamMutation,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
@@ -138,6 +139,7 @@ function buildActualScores(
 interface BrandingSettingsProps {
   teamId: number;
   leagueId: number;
+  currentName: string | null | undefined;
   currentAvatarUrl: string | null | undefined;
   currentBannerUrl: string | null | undefined;
 }
@@ -201,8 +203,25 @@ function BrandingImageField({
  * rather than trusted by URL alone.
  */
 function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
-  const { teamId, leagueId, currentAvatarUrl, currentBannerUrl } = props;
+  const { teamId, leagueId, currentName, currentAvatarUrl, currentBannerUrl } =
+    props;
   const [updateTeamBranding] = useUpdateTeamBrandingMutation();
+  const [renameTeam, { loading: renaming }] = useRenameTeamMutation();
+  const [name, setName] = useState(currentName ?? '');
+  useEffect(() => {
+    setName(currentName ?? '');
+  }, [currentName]);
+  const trimmedName = name.trim();
+  const nameDirty =
+    trimmedName.length > 0 && trimmedName !== (currentName ?? '');
+
+  const saveName = () => {
+    renameTeam({ variables: { teamId, leagueId, newName: trimmedName } })
+      .then(() => {
+        Alert.alert('Saved', 'Team name updated successfully.');
+      })
+      .catch(handleError);
+  };
 
   const persistImage = (imageType: 'avatar' | 'banner') => (url: string) => {
     updateTeamBranding({
@@ -238,6 +257,31 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
 
   return (
     <YStack padding="$4" gap="$4">
+      <YStack gap="$2">
+        <Text fontSize="$5" fontWeight="600">
+          Team Name
+        </Text>
+        <Input
+          testID="team-name-input"
+          value={name}
+          onChangeText={setName}
+          placeholder="Enter a memorable name"
+          maxLength={40}
+        />
+        <Text fontSize="$2" color="$gray10">
+          Up to 40 characters · visible to your league.
+        </Text>
+        <Button
+          theme="active"
+          disabled={!nameDirty || renaming}
+          opacity={nameDirty ? 1 : 0.5}
+          icon={renaming ? <Spinner size="small" /> : undefined}
+          onPress={saveName}
+        >
+          {renaming ? 'Saving…' : 'Save Name'}
+        </Button>
+      </YStack>
+      <Separator />
       <Text fontSize="$5" fontWeight="600">
         Team Branding
       </Text>
@@ -466,6 +510,7 @@ interface TabContentProps {
   isOwner: boolean;
   teamId: number;
   leagueId: number;
+  teamName: string | null | undefined;
   avatarUrl: string | null | undefined;
   bannerUrl: string | null | undefined;
   scoringFormat: FootballScoringFormat | undefined;
@@ -490,6 +535,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     isOwner,
     teamId,
     leagueId,
+    teamName,
     avatarUrl,
     bannerUrl,
     scoringFormat,
@@ -560,6 +606,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         <BrandingSettings
           teamId={teamId}
           leagueId={leagueId}
+          currentName={teamName}
           currentAvatarUrl={avatarUrl}
           currentBannerUrl={bannerUrl}
         />
@@ -943,6 +990,7 @@ export default function FootballTeam(): React.JSX.Element {
             isOwner={isOwner}
             teamId={numTeamId ?? 0}
             leagueId={team.team.leagueId ?? 0}
+            teamName={team.team.name}
             avatarUrl={team.team.avatarUrl}
             bannerUrl={team.team.bannerUrl}
             defensiveFormat={leagueData?.league?.defensiveFormat}

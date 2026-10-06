@@ -556,6 +556,11 @@ const mockUseUpdateTeamMemberPositionMutation = jest.fn(() => [
 const mockUseSwapTeamMemberPositionsMutation = jest.fn(() => [
   mockSwapTeamMemberPositions,
 ]);
+const mockRenameTeam = jest.fn(() => Promise.resolve({ data: {} }));
+const mockUseRenameTeamMutation = jest.fn(() => [
+  mockRenameTeam,
+  { loading: false },
+]);
 const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
   jest.fn(),
   { loading: false },
@@ -640,6 +645,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseUpdateTeamMemberPositionMutation(...args),
   useSwapTeamMemberPositionsMutation: (...args: unknown[]) =>
     mockUseSwapTeamMemberPositionsMutation(...args),
+  useRenameTeamMutation: (...args: unknown[]) =>
+    mockUseRenameTeamMutation(...args),
   useUpdateTeamBrandingMutation: (...args: unknown[]) =>
     mockUseUpdateTeamBrandingMutation(...args),
 }));
@@ -1265,6 +1272,10 @@ describe('FootballTeam route — Settings tab branding upload (LS-6434)', () => 
       mockUpdateTeamBranding,
       { loading: false },
     ]);
+    mockUseRenameTeamMutation.mockReturnValue([
+      mockRenameTeam,
+      { loading: false },
+    ]);
     mockUseMatchupScoresQuery.mockReturnValue({
       loading: false,
       data: undefined,
@@ -1329,6 +1340,21 @@ describe('FootballTeam route — Settings tab branding upload (LS-6434)', () => 
         leagueId: 10,
         bannerUrl: 'https://cdn.example.com/scanned-banner.png',
       },
+    });
+  });
+
+  it('lets the owner rename the team from the Settings tab', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Enter a memorable name'),
+      '  Gridiron Ghosts  ',
+    );
+    fireEvent.press(screen.getByText('Save Name'));
+
+    expect(mockRenameTeam).toHaveBeenCalledWith({
+      variables: { teamId: 42, leagueId: 10, newName: 'Gridiron Ghosts' },
     });
   });
 
