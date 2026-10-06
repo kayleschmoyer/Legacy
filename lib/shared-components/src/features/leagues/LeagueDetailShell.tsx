@@ -757,11 +757,13 @@ function TabButton({
   label,
   active,
   badge,
+  buttonRef,
   onPress,
 }: {
   label: string;
   active: boolean;
   badge?: number;
+  buttonRef: (el: HTMLElement | null) => void;
   onPress: () => void;
 }): React.JSX.Element {
   return (
@@ -769,7 +771,10 @@ function TabButton({
       <XStack
         tag="button"
         role="tab"
+        ref={buttonRef}
         aria-selected={active}
+        // Roving tabindex: only the selected tab is in the Tab order; the
+        // others are reached with the tablist's arrow/Home/End handler.
         tabIndex={active ? 0 : -1}
         alignItems="center"
         gap={8}
@@ -872,6 +877,53 @@ export function LeagueTabBar({
   // rendered list is reordered, and the entry stays a role="tab" in the tablist.
   const ordered =
     isCommissioner && media.xs ? hoistCommissionerTab(visible) : visible;
+
+  // Web-only roving focus targets, indexed like `ordered`; unused on native.
+  const tabRefs = React.useRef<(HTMLElement | null)[]>([]);
+
+  // WAI-ARIA tabs pattern with automatic activation (LS-10752): inactive tabs
+  // are tabIndex=-1, so without this handler a keyboard user could never leave
+  // the selected tab. ArrowLeft/Right wrap, Home/End jump to the ends, and
+  // preventDefault stops End/Home from scrolling the page. The current index
+  // comes from the focused tab rather than `activeTab`, so repeated presses
+  // keep moving while the route change behind onTabChange is still pending.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const count = ordered.length;
+    // Leave modified keys (e.g. Alt+ArrowLeft = browser Back) to the browser.
+    if (count === 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+    const focusedIdx = tabRefs.current.findIndex(
+      (el) => el != null && el.contains(e.target as Node),
+    );
+    const idx =
+      focusedIdx >= 0
+        ? focusedIdx
+        : Math.max(
+            0,
+            ordered.findIndex((t) => t.id === activeTab),
+          );
+    let nextIdx: number;
+    switch (e.key) {
+      case 'ArrowRight':
+        nextIdx = (idx + 1) % count;
+        break;
+      case 'ArrowLeft':
+        nextIdx = (idx - 1 + count) % count;
+        break;
+      case 'Home':
+        nextIdx = 0;
+        break;
+      case 'End':
+        nextIdx = count - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    tabRefs.current[nextIdx]?.focus();
+    const next = ordered[nextIdx];
+    if (next.id !== activeTab) onTabChange(next.id);
+  };
+
   return (
     <YStack
       marginVertical={24}
@@ -884,13 +936,21 @@ export function LeagueTabBar({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ minWidth: '100%' }}
         >
-          <XStack gap={2} role="tablist" aria-label="League sections">
-            {ordered.map((t) => (
+          <XStack
+            gap={2}
+            role="tablist"
+            aria-label="League sections"
+            onKeyDown={onKeyDown}
+          >
+            {ordered.map((t, i) => (
               <TabButton
                 key={t.id}
                 label={t.label}
                 active={activeTab === t.id}
                 badge={t.id === 'trades' ? pendingTradeCount : undefined}
+                buttonRef={(el) => {
+                  tabRefs.current[i] = el;
+                }}
                 onPress={() => onTabChange(t.id)}
               />
             ))}

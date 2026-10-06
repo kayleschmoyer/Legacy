@@ -240,6 +240,94 @@ describe('LeagueDetailShell', () => {
     expect(onTabChange).toHaveBeenCalledWith('trades');
   });
 
+  // LS-10752: the tab bar uses a roving tabindex (only the selected tab is
+  // tabIndex=0), so arrow/Home/End keys must move focus + selection, or every
+  // other tab is unreachable by keyboard.
+  describe('keyboard navigation (LS-10752)', () => {
+    function getTab(
+      getByRole: ReturnType<typeof renderShell>['getByRole'],
+      name: string,
+    ) {
+      return getByRole('tab', { name });
+    }
+
+    it('keeps a single Tab stop: only the selected tab is tabbable', () => {
+      const { getAllByRole } = renderShell({ activeTab: 'trades' });
+      const tabbable = getAllByRole('tab').filter(
+        (el) => el.getAttribute('tabindex') === '0',
+      );
+      expect(tabbable.map((el) => el.textContent)).toEqual(['Trades']);
+    });
+
+    it('ArrowRight focuses and selects the next tab', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange });
+      const overview = getTab(getByRole, 'Overview');
+      overview.focus();
+      fireEvent.keyDown(overview, { key: 'ArrowRight' });
+      expect(onTabChange).toHaveBeenCalledWith('roster');
+      expect(document.activeElement).toBe(getTab(getByRole, 'Roster'));
+    });
+
+    it('keeps moving from the focused tab before the selection re-renders', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange });
+      const overview = getTab(getByRole, 'Overview');
+      overview.focus();
+      fireEvent.keyDown(overview, { key: 'ArrowRight' });
+      fireEvent.keyDown(document.activeElement as Element, {
+        key: 'ArrowRight',
+      });
+      expect(onTabChange).toHaveBeenLastCalledWith('trades');
+      expect(document.activeElement).toBe(getTab(getByRole, 'Trades'));
+    });
+
+    it('End selects the last tab and does not scroll the page', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange });
+      const overview = getTab(getByRole, 'Overview');
+      overview.focus();
+      // fireEvent returns false when the handler called preventDefault.
+      expect(fireEvent.keyDown(overview, { key: 'End' })).toBe(false);
+      expect(onTabChange).toHaveBeenCalledWith('commish');
+      expect(document.activeElement).toBe(getTab(getByRole, 'Settings'));
+    });
+
+    it('Home returns to the first tab and does not scroll the page', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange, activeTab: 'trades' });
+      const trades = getTab(getByRole, 'Trades');
+      trades.focus();
+      expect(fireEvent.keyDown(trades, { key: 'Home' })).toBe(false);
+      expect(onTabChange).toHaveBeenCalledWith('overview');
+      expect(document.activeElement).toBe(getTab(getByRole, 'Overview'));
+    });
+
+    it('ArrowLeft from the first tab wraps to the last', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange });
+      const overview = getTab(getByRole, 'Overview');
+      overview.focus();
+      fireEvent.keyDown(overview, { key: 'ArrowLeft' });
+      expect(onTabChange).toHaveBeenCalledWith('commish');
+      expect(document.activeElement).toBe(getTab(getByRole, 'Settings'));
+    });
+
+    it('leaves Tab and other keys to the browser', () => {
+      const onTabChange = jest.fn();
+      const { getByRole } = renderShell({ onTabChange });
+      const overview = getTab(getByRole, 'Overview');
+      overview.focus();
+      expect(fireEvent.keyDown(overview, { key: 'Tab' })).toBe(true);
+      expect(fireEvent.keyDown(overview, { key: 'a' })).toBe(true);
+      // Alt+ArrowLeft is the browser Back shortcut.
+      expect(
+        fireEvent.keyDown(overview, { key: 'ArrowLeft', altKey: true }),
+      ).toBe(true);
+      expect(onTabChange).not.toHaveBeenCalled();
+    });
+  });
+
   it('renders no back link in the hero (LS-8766)', () => {
     const { queryByText } = renderShell({});
     expect(queryByText('Leagues')).toBeNull();
