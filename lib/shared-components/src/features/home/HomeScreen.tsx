@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { TamaguiElement } from 'tamagui';
 import {
   H1,
   H2,
@@ -148,6 +149,13 @@ export interface HomeScreenProps {
   mockDraftResetsAt?: string | null;
   onPlayerPress?: (playerId: number) => void;
   onHowItWorks?: () => void;
+  /**
+   * Bump to move keyboard focus to the new-user empty state's primary
+   * "Create League" CTA (LS-6918). Used after the onboarding tutorial closes
+   * so keyboard users land on the next action. A no-op when that CTA is not
+   * rendered, or when focus already sits on a real control.
+   */
+  focusCtaRequest?: number;
   /** Navigate to create a salary cap league. Shown only when isPremium is true. */
   onCreateSalaryCapLeague?: () => void;
   /** Navigate to create an auction draft league. Shown only when isPremium is true. */
@@ -268,12 +276,15 @@ function ActionButton({
   variant = 'navy',
   disabled,
   testID,
+  focusRef,
 }: {
   label: string;
   onPress?: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
   testID?: string;
+  /** Makes the button keyboard-focusable and exposes its node for programmatic focus. */
+  focusRef?: React.RefObject<TamaguiElement | null>;
 }) {
   const styles: Record<
     ButtonVariant,
@@ -290,6 +301,8 @@ function ActionButton({
   const s = styles[variant];
   return (
     <XStack
+      ref={focusRef}
+      focusable={focusRef ? true : undefined}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -2944,7 +2957,19 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onThisDayCondensed,
     refreshControl,
     scrollRef,
+    focusCtaRequest = 0,
   } = props;
+
+  const emptyCreateRef = useRef<TamaguiElement | null>(null);
+  useEffect(() => {
+    if (focusCtaRequest === 0) return;
+    // Closing the tutorial restores focus to whatever opened it; only step in
+    // when focus was lost (the auto-opened tutorial leaves it on <body>).
+    const active =
+      typeof document === 'undefined' ? null : document.activeElement;
+    if (active && active !== document.body) return;
+    (emptyCreateRef.current as { focus?: () => void } | null)?.focus?.();
+  }, [focusCtaRequest]);
 
   const sortedSummaries = useMemo(() => sortByUrgency(leagues), [leagues]);
   const hasLeagues = sortedSummaries.length > 0;
@@ -3570,6 +3595,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
               variant="gold"
               onPress={() => onCreateLeague(createSport)}
               testID="home-empty-create"
+              focusRef={emptyCreateRef}
             />
             <ActionButton
               label="Join League"

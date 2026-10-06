@@ -120,6 +120,7 @@ export function HomePage(): React.JSX.Element {
   const auth = useAuth();
   const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [ctaFocusRequest, setCtaFocusRequest] = useState(0);
   const [tutorialInitialStep, setTutorialInitialStep] = useState(0);
   const [showArchived, setShowArchived] = useState(false);
   const { resolvedTheme } = useThemeContext();
@@ -240,6 +241,8 @@ export function HomePage(): React.JSX.Element {
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
+    // Hand keyboard focus to the empty-state CTA once the modal is gone (LS-6918).
+    setCtaFocusRequest((n) => n + 1);
     if (userId) {
       try {
         window.localStorage.setItem(
@@ -364,6 +367,7 @@ export function HomePage(): React.JSX.Element {
           mockDraftAtCap={mockDraftAtCap}
           mockDraftResetsAt={mockDraftUsage?.resetsAt ?? null}
           onHowItWorks={() => setTutorialOpen(true)}
+          focusCtaRequest={ctaFocusRequest}
           onCreateSalaryCapLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
           onCreateAuctionLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
         />

@@ -75,6 +75,8 @@ module.exports = {
     // resolvable under the RN mobile jest environment. Belongs to
     // shared-components:web only.
     '/src/components/DateTimePicker\\.navigateMonth\\.spec\\.tsx$',
+    // Web-only (LS-6918): asserts DOM focus on the empty-state CTA.
+    '/src/features/home/HomeScreen\\.focus\\.web\\.spec\\.tsx$',
     // Web-only specs for components that still have a dedicated `.native.tsx`
     // fork (LS-9180): now that this project's moduleFileExtensions actually
     // prefers the native barrel, these generic specs resolve to the native
