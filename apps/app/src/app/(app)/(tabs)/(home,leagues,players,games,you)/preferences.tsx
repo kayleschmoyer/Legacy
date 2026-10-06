@@ -45,7 +45,7 @@ const DEFAULT_COLLAPSED: CollapsedSections = {
 /* ─── Types ─── */
 
 type ThemePreference = 'system' | 'light' | 'dark';
-type DefaultSportView = 'baseball' | 'football';
+type DefaultSportView = 'baseball' | 'football' | 'both';
 type StatsFormat = 'standard' | 'expanded';
 
 interface UserPreferences {
@@ -602,6 +602,7 @@ export default function PreferencesScreen(): React.JSX.Element {
               options={[
                 { value: 'baseball', label: 'Baseball' },
                 { value: 'football', label: 'Football' },
+                { value: 'both', label: 'Both' },
               ]}
               onChange={(v) => update('defaultSport', v)}
             />

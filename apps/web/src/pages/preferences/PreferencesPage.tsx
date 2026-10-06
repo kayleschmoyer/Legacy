@@ -76,7 +76,7 @@ const COLLAPSED_SECTIONS_KEY = 'ls_prefs_sections_collapsed';
 /* ─── Types ─── */
 
 type ThemePreference = 'system' | 'light' | 'dark';
-type DefaultSportView = 'baseball' | 'football';
+type DefaultSportView = 'baseball' | 'football' | 'both';
 type StatsFormat = 'standard' | 'expanded';
 
 // `theme` is deliberately absent: ThemeContext is its sole owner (LS-7078),
@@ -1628,6 +1628,7 @@ const PreferencesPage: React.FC = () => {
                     options={[
                       { value: 'baseball', label: 'Baseball' },
                       { value: 'football', label: 'Football' },
+                      { value: 'both', label: 'Both' },
                     ]}
                     onChange={(v) => update('defaultSport', v)}
                     ariaLabel="Default sport"

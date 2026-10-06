@@ -7,6 +7,12 @@ describe('parseDefaultSport', () => {
     ).toBe('football');
   });
 
+  it("returns 'both' when stored (LS-7100)", () => {
+    expect(parseDefaultSport(JSON.stringify({ defaultSport: 'both' }))).toBe(
+      'both',
+    );
+  });
+
   it("returns 'baseball' when stored", () => {
     expect(
       parseDefaultSport(JSON.stringify({ defaultSport: 'baseball' })),

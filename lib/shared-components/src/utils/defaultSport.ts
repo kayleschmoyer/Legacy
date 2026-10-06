@@ -10,8 +10,11 @@
  * identical (LS-10386, sliced from LS-7099).
  */
 
-/** The sports a user can pick as their default. */
-export type DefaultSport = 'baseball' | 'football';
+/**
+ * The sports a user can pick as their default. `'both'` means no single
+ * default (LS-7100): Home keeps its neutral multi-sport ordering.
+ */
+export type DefaultSport = 'baseball' | 'football' | 'both';
 
 /** Storage key the Preferences screens write the serialized preferences object under. */
 export const USER_PREFERENCES_STORAGE_KEY = 'ls_user_preferences';
@@ -21,8 +24,8 @@ export const DEFAULT_SPORT_FALLBACK: DefaultSport = 'baseball';
 
 /**
  * Extract a validated `defaultSport` from the raw stored preferences string.
- * Anything missing, unparseable, or not exactly `'football'` resolves to
- * baseball so a corrupt blob can never produce an unsupported sport.
+ * Anything missing, unparseable, or not exactly `'football'` / `'both'`
+ * resolves to baseball so a corrupt blob can never produce an unsupported sport.
  */
 export function parseDefaultSport(
   raw: string | null | undefined,
@@ -30,8 +33,9 @@ export function parseDefaultSport(
   if (!raw) return DEFAULT_SPORT_FALLBACK;
   try {
     const parsed = JSON.parse(raw) as { defaultSport?: unknown } | null;
-    return parsed?.defaultSport === 'football'
-      ? 'football'
+    return parsed?.defaultSport === 'football' ||
+      parsed?.defaultSport === 'both'
+      ? parsed.defaultSport
       : DEFAULT_SPORT_FALLBACK;
   } catch {
     return DEFAULT_SPORT_FALLBACK;

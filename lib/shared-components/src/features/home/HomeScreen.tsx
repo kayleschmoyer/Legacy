@@ -71,6 +71,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { isDraftPaused, isDraftRoomReachable } from '../../utils/draftStatus';
+import type { DefaultSport } from '../../utils/defaultSport';
 
 // Re-export the shared display-name formatter so app wrappers can reuse it.
 export { formatDisplayName } from './homeSummaryFormatters';
@@ -104,7 +105,7 @@ export interface HomeScreenProps {
   /** On This Day feed node — each app supplies its own (self-fetching) feed. */
   onThisDay?: React.ReactNode;
   /** Default sport, controls ordering + On This Day visibility for new users. */
-  defaultSport?: 'baseball' | 'football';
+  defaultSport?: DefaultSport;
   /** Sport the user is most engaged in (most leagues), used to badge the returning-user "Pick your sport" cards. `null`/absent when tied or no leagues yet. */
   primarySport?: 'baseball' | 'football' | null;
   /** Light theme variant for sport-card backgrounds. */
@@ -2966,7 +2967,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
 
   const orderedSports = useMemo(
     () =>
-      defaultSport === 'baseball'
+      defaultSport === 'baseball' || defaultSport === 'both'
         ? SPORTS
         : [...SPORTS].sort((a, b) => {
             if (a.key === defaultSport) return -1;
@@ -2975,6 +2976,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
           }),
     [defaultSport],
   );
+
+  // 'both' has no single sport to create in; use the first-listed one.
+  const createSport = defaultSport === 'football' ? 'football' : 'baseball';
 
   const derivedStats = useMemo<HomeUserStats>(
     () => userStats ?? deriveHomeUserStats(sortedSummaries),
@@ -3167,7 +3171,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
                   label="Create League"
                   gold
-                  onPress={() => onCreateLeague(defaultSport)}
+                  onPress={() => onCreateLeague(createSport)}
                 />
                 <QuickActionPill
                   testID="home-quick-join-league"
@@ -3426,7 +3430,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
                     label="Create League"
                     gold
-                    onPress={() => onCreateLeague(defaultSport)}
+                    onPress={() => onCreateLeague(createSport)}
                   />
                   <QuickActionPill
                     testID="home-quick-join-league"
@@ -3564,7 +3568,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             <ActionButton
               label="Create League"
               variant="gold"
-              onPress={() => onCreateLeague(defaultSport)}
+              onPress={() => onCreateLeague(createSport)}
               testID="home-empty-create"
             />
             <ActionButton
@@ -3605,7 +3609,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
           </YStack>
         </YStack>
 
-        {defaultSport === 'baseball' && onThisDay ? (
+        {defaultSport !== 'football' && onThisDay ? (
           <YStack gap="$5">
             <SectionHead
               eyebrow="Try the archive"
