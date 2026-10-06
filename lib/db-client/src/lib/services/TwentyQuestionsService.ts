@@ -90,6 +90,15 @@ const VALID_BATTING_STATS = new Set([
 ]);
 const VALID_PITCHING_STATS = new Set(['w', 'so', 'sv', 'sho', 'cg', 'g', 'gs']);
 
+// Career-games cutoffs for the medium (>= mediumMin) and hard (1..mediumMin-1)
+// pools. Baseball keeps its original 100-game split. Football careers run ~17
+// games/season, so its split is two seasons (34 games). Dev DB (LS-10647,
+// 2026-10-06): football 8,383 medium / 6,783 hard vs baseball 10,495 / 9,928.
+export const TOTAL_GAMES_MEDIUM_MIN: Record<'baseball' | 'football', number> = {
+  baseball: 100,
+  football: 34,
+};
+
 export class TwentyQuestionsService {
   static async startGame(
     db: PublicDb,
@@ -456,7 +465,12 @@ export class TwentyQuestionsService {
       rows = await db
         .select({ id: PublicSchema.players.id })
         .from(PublicSchema.players)
-        .where(and(sportCondition, gte(PublicSchema.players.totalGames, 100)));
+        .where(
+          and(
+            sportCondition,
+            gte(PublicSchema.players.totalGames, TOTAL_GAMES_MEDIUM_MIN[sport]),
+          ),
+        );
     } else {
       rows = await db
         .select({ id: PublicSchema.players.id })
@@ -464,7 +478,10 @@ export class TwentyQuestionsService {
         .where(
           and(
             sportCondition,
-            lte(PublicSchema.players.totalGames, 99),
+            lte(
+              PublicSchema.players.totalGames,
+              TOTAL_GAMES_MEDIUM_MIN[sport] - 1,
+            ),
             gte(PublicSchema.players.totalGames, 1),
           ),
         );

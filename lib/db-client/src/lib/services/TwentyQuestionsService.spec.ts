@@ -6,11 +6,23 @@
  *   - startGame: stores the provided sport in the inserted game row
  */
 
+import { gte, lte } from 'drizzle-orm';
 import {
   readNumberList,
   readStringList,
   TwentyQuestionsService,
 } from './TwentyQuestionsService';
+
+jest.mock('drizzle-orm', () => {
+  const actual = jest.requireActual<
+    Record<string, unknown> & { gte: typeof gte; lte: typeof lte }
+  >('drizzle-orm');
+  return {
+    ...actual,
+    gte: jest.fn(actual.gte),
+    lte: jest.fn(actual.lte),
+  };
+});
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { info: jest.fn(), error: jest.fn(), warn: jest.fn() },
@@ -119,6 +131,41 @@ describe('TwentyQuestionsService — getPlayerPool', () => {
     );
 
     expect(result).toEqual([99]);
+  });
+
+  // LS-10647: football careers are ~17 games/season, so football uses a
+  // 34-game split instead of baseball's 100.
+  it.each([
+    ['baseball', 'medium', gte, 100],
+    ['baseball', 'hard', lte, 99],
+    ['football', 'medium', gte, 34],
+    ['football', 'hard', lte, 33],
+  ] as const)(
+    'uses the %s total_games cutoff for the %s pool',
+    async (sport, difficulty, op, cutoff) => {
+      jest.mocked(gte).mockClear();
+      jest.mocked(lte).mockClear();
+      const db = makeMockDb();
+      db.where.mockReturnValue(chainResult([{ id: 7 }]));
+
+      await TwentyQuestionsService.getPlayerPool(
+        db as never,
+        difficulty,
+        sport,
+      );
+
+      expect(op).toHaveBeenCalledWith('total_games', cutoff);
+    },
+  );
+
+  it('keeps the hard pool at a 1-game floor for football', async () => {
+    jest.mocked(gte).mockClear();
+    const db = makeMockDb();
+    db.where.mockReturnValue(chainResult([{ id: 7 }]));
+
+    await TwentyQuestionsService.getPlayerPool(db as never, 'hard', 'football');
+
+    expect(gte).toHaveBeenCalledWith('total_games', 1);
   });
 
   it('returns an empty array when no players match', async () => {

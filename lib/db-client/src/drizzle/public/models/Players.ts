@@ -36,8 +36,10 @@ export const players = pgTable(
     worldSeriesRings: integer('world_series_rings').notNull().default(0),
     hallOfFame: boolean('hall_of_fame').notNull().default(false),
     rookieOfTheYear: boolean('rookie_of_the_year').notNull().default(false),
-    // Precomputed sum of career batting + pitching games; maintained by the
-    // data loader so eligibility filters can avoid correlated subqueries.
+    // Precomputed career games; maintained by the data loaders so eligibility
+    // filters can avoid correlated subqueries. Baseball: career batting +
+    // pitching games. Football: max career games across the career_football_*
+    // tables (LS-10647).
     totalGames: integer('total_games').notNull().default(0),
     // MLB Stats API player ID for cross-referencing with the external data
     // provider. Nullable — historical players may not have a mapping yet.

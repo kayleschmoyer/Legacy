@@ -1,5 +1,6 @@
 import type { PublicDb } from '@legacy-sports/db-client';
-import { getTableName, type Table } from 'drizzle-orm';
+import { getTableName, type SQL, type Table } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { loadFootballCareerStats } from './load-football-career-stats';
 
 // Mock pfr-client at the package level
@@ -186,6 +187,34 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     // The stamp (db.execute UPDATE ... stats_last_fetched_at) runs exactly once.
     expect(mockDbExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('sets total_games to the max career games across football tables (LS-10647)', async () => {
+    const db = makeDb({
+      id: 7,
+      pfrId: 'TestQb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'QB',
+      sport: 'football',
+    });
+
+    await loadFootballCareerStats(db, 7);
+
+    const [stamp] = mockDbExecute.mock.calls[0] as [SQL];
+    const { sql: text, params } = new PgDialect().sqlToQuery(stamp);
+    expect(text).toMatch(/total_games\s*=\s*GREATEST\(/);
+    for (const table of [
+      'career_football_passing',
+      'career_football_rushing',
+      'career_football_receiving',
+      'career_football_kicking',
+      'career_football_defense',
+      'career_football_defense_idp',
+    ]) {
+      expect(text).toContain(`FROM ${table} `);
+    }
+    expect(params.every((p) => p === 7)).toBe(true);
   });
 
   it('routes DST player to TeamDefense only', async () => {

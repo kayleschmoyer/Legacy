@@ -543,9 +543,22 @@ export async function loadFootballCareerStats(
     playerId,
     startSeasonOverride,
   );
-  await db.execute(
-    sql`UPDATE players SET stats_last_fetched_at = NOW() WHERE id = ${playerId}`,
-  );
+  // total_games = career games played. A player's rushing/receiving/etc.
+  // rows describe the same games, so take the max across tables, not the sum
+  // (LS-10647 — 20 Questions medium/hard pools filter on it).
+  await db.execute(sql`
+    UPDATE players
+    SET stats_last_fetched_at = NOW(),
+        total_games = GREATEST(
+          COALESCE((SELECT g FROM career_football_passing   WHERE player_id = ${playerId}), 0),
+          COALESCE((SELECT g FROM career_football_rushing   WHERE player_id = ${playerId}), 0),
+          COALESCE((SELECT g FROM career_football_receiving WHERE player_id = ${playerId}), 0),
+          COALESCE((SELECT g FROM career_football_kicking   WHERE player_id = ${playerId}), 0),
+          COALESCE((SELECT g FROM career_football_defense   WHERE player_id = ${playerId}), 0),
+          COALESCE((SELECT MAX(g) FROM career_football_defense_idp WHERE player_id = ${playerId}), 0)
+        )
+    WHERE id = ${playerId}
+  `);
   return result;
 }
 

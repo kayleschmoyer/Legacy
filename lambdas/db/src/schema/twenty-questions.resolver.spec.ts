@@ -2,6 +2,7 @@
  * Unit tests for the twenty-questions GraphQL resolvers (LS-4411).
  *
  * Covers:
+ *   - twentyQuestionsStart: empty difficulty pool → UserInputError (LS-10647)
  *   - twentyQuestionsAsk: UserInputError when getGameState returns null
  *   - twentyQuestionsGuess: UserInputError when getGameState returns null
  *   - twentyQuestionsAbandon: UserInputError when getGameState returns null
@@ -262,6 +263,40 @@ describe('twenty-questions resolvers', () => {
         'hard',
         'football',
       );
+    });
+
+    it('classifies an empty difficulty pool as a readable UserInputError (LS-10647)', async () => {
+      mockTwentyQuestionsService.startGame.mockRejectedValueOnce(
+        new Error('No eligible players found for difficulty: medium'),
+      );
+      const resolver = getMutation('twentyQuestionsStart');
+      await expect(
+        resolver(
+          {},
+          { difficulty: 'medium', sport: 'football' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message:
+          'No players are available for this difficulty right now. Try a different difficulty or sport.',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('rethrows unexpected startGame errors unchanged', async () => {
+      mockTwentyQuestionsService.startGame.mockRejectedValueOnce(
+        new Error('connection reset'),
+      );
+      const resolver = getMutation('twentyQuestionsStart');
+      await expect(
+        resolver(
+          {},
+          { difficulty: 'medium', sport: 'football' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('connection reset');
     });
   });
 

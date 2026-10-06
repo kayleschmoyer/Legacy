@@ -146,6 +146,27 @@ async function withGameStateErrorClassification<T>(
   }
 }
 
+// An empty difficulty pool is a data gap, not a server fault: surface a
+// readable BAD_USER_INPUT instead of an INTERNAL_SERVER_ERROR that reports to
+// Rollbar (LS-10647).
+async function withEmptyPoolErrorClassification<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.startsWith('No eligible players found')
+    ) {
+      throw UserInputError(
+        'No players are available for this difficulty right now. Try a different difficulty or sport.',
+      );
+    }
+    throw err;
+  }
+}
+
 // --- Input types ---
 
 const TwentyQuestionsAskInput = builder.inputType('TwentyQuestionsAskInput', {
@@ -265,11 +286,14 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, { difficulty, sport }, context) => {
       if (!context.user?.id) throw AuthenticationError();
-      const game = await TwentyQuestionsService.startGame(
-        context.db,
-        context.user.id,
-        difficulty ?? 'medium',
-        sport ?? 'baseball',
+      const userId = context.user.id;
+      const game = await withEmptyPoolErrorClassification(() =>
+        TwentyQuestionsService.startGame(
+          context.db,
+          userId,
+          difficulty ?? 'medium',
+          sport ?? 'baseball',
+        ),
       );
       return { ...game, questions: [] };
     },
