@@ -3,6 +3,8 @@
  * steps, and contact options used by both the web and mobile help screens.
  */
 
+import { waiverProcessingScheduleCopy } from './waiver-schedule';
+
 /* ─── Types ─── */
 
 export interface HelpFaqItem {
@@ -54,8 +56,7 @@ export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
   },
   {
     question: 'How do I add or drop players?',
-    answer:
-      'Go to your team page and click Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) queue your claim for nightly processing at 2 AM EST, so your pickup may be delayed up to 24 hours.',
+    answer: `Go to your team page and click Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) queue your claim — claims are ${waiverProcessingScheduleCopy()} — so your pickup may be delayed up to 24 hours.`,
   },
   {
     question: 'How do I view matchup results?',

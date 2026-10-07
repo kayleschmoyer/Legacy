@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Card, Dialog, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useProcessWaiverClaimsMutation } from '@legacy-sports/graphql';
+import { waiverProcessingScheduleCopy } from '@legacy-sports/utils';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 export interface WaiverProcessControlProps {
@@ -13,7 +14,7 @@ export interface WaiverProcessControlProps {
  * WaiverProcessControl — Commissioner control for manually triggering
  * waiver claim processing for a specific league.
  *
- * Waivers are automatically processed nightly at 2am EST via EventBridge,
+ * Waivers are automatically processed daily (07:00 UTC) via EventBridge,
  * but commissioners can trigger processing early for their league.
  */
 export function WaiverProcessControl({
@@ -64,7 +65,7 @@ export function WaiverProcessControl({
       >
         <YStack gap="$3">
           <Text color="$textMuted" fontSize="$3">
-            Waivers are automatically processed nightly at 2am EST. Use this
+            Waivers are automatically {waiverProcessingScheduleCopy()}. Use this
             button to process pending waiver claims for your league immediately.
           </Text>
           <Button

@@ -684,7 +684,7 @@ test.describe
       // WaiverProcessControl renders the success message inside a
       // role="status" card (LeagueDetailPage.tsx). The previous
       // /processed/i text match was a false positive: the WaiverProcessControl
-      // description "automatically processed nightly at 2am EST" is already
+      // description "automatically processed daily at <h>am ET" is already
       // visible before the Lambda completes, causing the follow-up GQL call
       // to race with the in-flight Lambda and award the player to the wrong team
       // (LS-3809). Waiting for role="status" ensures the card only appears

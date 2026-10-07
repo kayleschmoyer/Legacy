@@ -396,7 +396,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     }
   });
 
-  test('footer shows singular "1 pending claim — processed hourly" on desktop; compact pill shows singular copy on narrow viewports', async ({
+  test('footer shows singular "1 pending claim — processed daily at <h>am ET" on desktop; compact pill shows singular copy on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -412,7 +412,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     }
   });
 
-  test('footer shows plural "N pending claims — processed hourly" on desktop; compact pill shows plural copy on narrow viewports', async ({
+  test('footer shows plural "N pending claims — processed daily at <h>am ET" on desktop; compact pill shows plural copy on narrow viewports', async ({
     page,
     waiversPage,
   }) => {

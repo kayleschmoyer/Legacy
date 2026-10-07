@@ -86,13 +86,16 @@ export class WaiversPage extends BaseScreen {
 
   /**
    * The footer summary line for `count` pending claims
-   * ("N pending claim(s) — processed hourly"), pluralised to match the
+   * ("N pending claim(s) — processed daily at 3am ET"), pluralised to match the
    * component so a spec asserts the exact singular/plural copy.
    */
   footerSummary(count: number): UIElement {
     const noun = count === 1 ? 'claim' : 'claims';
     return this.driver.byText(
-      new RegExp(`${count} pending ${noun} — processed hourly`, 'i'),
+      new RegExp(
+        `${count} pending ${noun} — processed daily at \\d{1,2}am ET`,
+        'i',
+      ),
     );
   }
 

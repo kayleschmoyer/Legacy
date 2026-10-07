@@ -6,6 +6,7 @@ import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
 import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
+import { waiverProcessingScheduleCopy } from '@legacy-sports/utils';
 import {
   useCancelWaiverClaimMutation,
   useGetTeamWaiverClaimsQuery,
@@ -251,8 +252,8 @@ export function PendingWaiverClaims({
             justifyContent="center"
           >
             <Text fontSize="$1" color="$textMuted" textAlign="center">
-              {claims.length} pending claim{claims.length !== 1 ? 's' : ''} —
-              processed hourly
+              {claims.length} pending claim{claims.length !== 1 ? 's' : ''} —{' '}
+              {waiverProcessingScheduleCopy()}
             </Text>
           </XStack>
         )}
