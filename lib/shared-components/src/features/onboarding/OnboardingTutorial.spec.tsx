@@ -500,3 +500,29 @@ describe('OnboardingTutorial — final-step links and slots', () => {
     expect(screen.queryByText(/Week 7 Game Slots/)).toBeNull();
   });
 });
+
+describe('OnboardingTutorial — copy (LS-10774)', () => {
+  it('starts the Game Selection step with a capitalized term', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={2} />);
+
+    expect(screen.getByText('Game selection')).toBeInTheDocument();
+    expect(screen.queryByText('game selection')).toBeNull();
+  });
+
+  it('labels the earned-run row ER and uses US spelling', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={3} />);
+
+    expect(screen.getByText('Earned Run Allowed (ER)')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'League commissioners can customize scoring weights in league settings.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('spans the sample week label across every sample game date', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} initialStep={4} />);
+
+    expect(screen.getByText('Week 7 · Aug 5–14, 2019')).toBeInTheDocument();
+  });
+});

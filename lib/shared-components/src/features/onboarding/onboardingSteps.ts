@@ -93,7 +93,7 @@ export const ONBOARDING_SAMPLE_GAME_SLOTS = [
     date: `Aug 14, ${ONBOARDING_SAMPLE_SEASON}`,
   },
 ];
-export const ONBOARDING_SAMPLE_WEEK_LABEL = `Week 7 · Aug 5–7, ${ONBOARDING_SAMPLE_SEASON}`;
+export const ONBOARDING_SAMPLE_WEEK_LABEL = `Week 7 · Aug 5–14, ${ONBOARDING_SAMPLE_SEASON}`;
 export const ONBOARDING_SAMPLE_TOP_PERFORMERS = [
   { name: 'Mike Trout', stats: '2 HR, 1 SB, 5 R', pts: '+18' },
   { name: 'Gerrit Cole', stats: 'W, 8 K, 1 ER', pts: '+14' },
@@ -190,7 +190,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       para(
         'lg',
         tooltip(
-          'game selection',
+          'Game selection',
           'The automatic process of picking which games from the assigned MLB season are used to score each weekly matchup. Each matchup has a configured number of game slots, and one random game is chosen per slot.',
         ),
         text(
@@ -235,13 +235,13 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
           { stat: 'Stolen Base (SB)', pts: '+2' },
           { stat: 'Strikeout (Batter)', pts: '−1' },
           { stat: 'Win (Pitcher)', pts: '+7' },
-          { stat: 'Earned Run Allowed (ERA)', pts: '−1 per run' },
+          { stat: 'Earned Run Allowed (ER)', pts: '−1 per run' },
         ],
       },
       para(
         'md',
         text(
-          'League commissioners can customise scoring weights in league settings.',
+          'League commissioners can customize scoring weights in league settings.',
         ),
       ),
     ],
