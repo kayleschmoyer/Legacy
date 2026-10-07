@@ -1365,12 +1365,11 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
       await expect(profileButton).toBeVisible({ timeout: 15000 });
       await profileButton.click();
 
-      // The Sign Out menu item should now be visible inside the dropdown.
-      await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible(
-        {
-          timeout: 10000,
-        },
-      );
+      // The Sign Out menu item should now be visible inside the dropdown
+      // (role="menuitem" since LS-10706).
+      await expect(
+        page.getByRole('menuitem', { name: /sign out/i }),
+      ).toBeVisible({ timeout: 10000 });
     },
   );
 
@@ -1395,7 +1394,7 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
       await profileButton.click();
 
       // Click Sign Out.
-      const signOutButton = page.getByRole('button', { name: /sign out/i });
+      const signOutButton = page.getByRole('menuitem', { name: /sign out/i });
       await expect(signOutButton).toBeVisible({ timeout: 10000 });
       await signOutButton.click();
 

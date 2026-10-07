@@ -82,6 +82,11 @@ export const Bug = () => 'Bug';
 export const ListOrdered = () => 'ListOrdered';
 export const Shuffle = () => 'Shuffle';
 export const SlidersHorizontal = () => 'SlidersHorizontal';
+export const MessageSquare = () => 'MessageSquare';
+export const CreditCard = () => 'CreditCard';
+export const Monitor = () => 'Monitor';
+export const Moon = () => 'Moon';
+export const Sun = () => 'Sun';
 
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';

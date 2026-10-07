@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { HelpCircle } from '@tamagui/lucide-icons/icons/HelpCircle';
@@ -20,6 +20,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
+import { useMenuKeyboard } from '../../hooks/useMenuKeyboard';
 
 interface Props {
   /** Receives this menu's trigger button so the caller can return focus to
@@ -78,14 +79,13 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isOpen]);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+  useMenuKeyboard({
+    isOpen,
+    onClose: closeMenu,
+    containerRef: ref,
+    triggerRef,
+  });
 
   const btnStyle: React.CSSProperties = {
     ...ICON_BTN_STYLE,

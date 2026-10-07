@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Paragraph,
@@ -34,6 +34,7 @@ import {
   useThemeContext,
 } from '../../context/ThemeContext';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
+import { useMenuKeyboard } from '../../hooks/useMenuKeyboard';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -173,6 +174,7 @@ export const UserProfileDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const isAdmin = auth?.user?.accessLevel === 'admin';
 
   // Click outside handler
@@ -193,6 +195,14 @@ export const UserProfileDropdown: React.FC = () => {
       };
     }
   }, [isOpen]);
+
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+  useMenuKeyboard({
+    isOpen,
+    onClose: closeMenu,
+    containerRef: dropdownRef,
+    triggerRef,
+  });
 
   const userName = formatDisplayName(auth?.user?.username || '');
   const userEmail = auth?.user?.email || '';
@@ -228,9 +238,11 @@ export const UserProfileDropdown: React.FC = () => {
   return (
     <YStack position="relative" ref={dropdownRef}>
       <UserMenuButton
+        ref={triggerRef}
         onPress={() => setIsOpen(!isOpen)}
         data-testid="user-profile-trigger"
         aria-label="User profile menu"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
       >
         <XStack alignItems="center" gap="$2">
@@ -313,8 +325,9 @@ export const UserProfileDropdown: React.FC = () => {
           <Separator />
 
           {/* Account items */}
-          <YStack gap="$1" paddingTop="$2">
+          <YStack gap="$1" paddingTop="$2" role="menu" aria-label="Account">
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-settings"
               onPress={() => {
                 void navigate('/profile/settings');
@@ -340,6 +353,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-preferences"
               onPress={() => {
                 void navigate('/preferences');
@@ -365,6 +379,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-subscription"
               onPress={() => {
                 void navigate('/profile/subscription');
@@ -390,6 +405,7 @@ export const UserProfileDropdown: React.FC = () => {
             </MenuItem>
 
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-help"
               onPress={() => {
                 void navigate('/help');
@@ -417,6 +433,7 @@ export const UserProfileDropdown: React.FC = () => {
             <Separator marginVertical="$2" />
 
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-management"
               onPress={() => {
                 void navigate('/management');
@@ -443,6 +460,7 @@ export const UserProfileDropdown: React.FC = () => {
 
             {isAdmin && (
               <MenuItem
+                role="menuitem"
                 data-testid="user-profile-menu-admin"
                 onPress={() => {
                   void navigate('/admin');
@@ -471,6 +489,7 @@ export const UserProfileDropdown: React.FC = () => {
             <Separator marginVertical="$2" />
 
             <MenuItem
+              role="menuitem"
               data-testid="user-profile-menu-signout"
               onPress={handleLogout}
             >
