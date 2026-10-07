@@ -110,9 +110,25 @@ export function ColumnPickerPanel({
             <Pressable
               key={col.key}
               onPress={() => onToggle(col.key)}
-              accessibilityRole="checkbox"
+              // react-native-web 0.21 drops accessibilityState, so the checked
+              // state must be passed as aria-checked for it to reach the DOM.
+              role="checkbox"
+              aria-checked={checked}
+              aria-label={`${col.label} column`}
               accessibilityState={{ checked }}
-              accessibilityLabel={`${col.label} column`}
+              // RNW activates onPress on Enter for any role but on Space only
+              // for button roles, so a checkbox needs its own Space handler
+              // (LS-10734). preventDefault stops Space scrolling the page.
+              // Spread because RN's PressableProps doesn't type the web-only
+              // onKeyDown that RNW forwards; native ignores it.
+              {...{
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === ' ' && !e.repeat) {
+                    e.preventDefault();
+                    onToggle(col.key);
+                  }
+                },
+              }}
               testID={`column-toggle-${col.key}`}
               style={csp({
                 flexDirection: 'row',
