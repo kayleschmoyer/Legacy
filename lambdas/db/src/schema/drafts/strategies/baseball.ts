@@ -1,9 +1,15 @@
 /**
  * Baseball auto-pick strategy — projected FPG × positional scarcity multiplier.
  *
- * Lifted verbatim from the pre-LS-4665 scoreByPositionalScarcity in
- * auto-pick-scorer.ts. The numeric output (player id and score ordering) MUST
- * stay bit-identical; baseball.spec.ts pins it with a snapshot.
+ * Lifted from the pre-LS-4665 scoreByPositionalScarcity in auto-pick-scorer.ts;
+ * baseball.spec.ts pins the scoring output with snapshots.
+ *
+ * Only players who fit an unfilled slot compete (LS-10802). A non-matching
+ * player used to stay in the race at 0.25× fpg, and because pitcher fpg can
+ * dwarf hitter fpg that bench score beat every hitter's scarcity-boosted score:
+ * auto-pick drafted pitchers all draft and left hitter slots unfillable. When no
+ * player fits an open slot the strategy returns no pick, and
+ * selectAutoPickPlayer falls through to its bench pick.
  */
 
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
@@ -40,8 +46,7 @@ function scoreForUnfilledPositions(
   let bestReason = '';
 
   for (const [id, info] of playerDraftInfo) {
-    let scarcityMultiplier = 0.25;
-    let matchesUnfilled = false;
+    let scarcityMultiplier = 0;
     let bestPosition = '';
 
     for (const posType of unfilledPositionTypes) {
@@ -49,7 +54,6 @@ function scoreForUnfilledPositions(
         posType,
       ];
       if (allowedStatPositions.some((sp) => info.positions.includes(sp))) {
-        matchesUnfilled = true;
         const posCount = positionCandidateCounts.get(posType) ?? totalEligible;
         const posScarcity = Math.min(Math.sqrt(totalEligible / posCount), 5.0);
         if (posScarcity > scarcityMultiplier) {
@@ -59,13 +63,13 @@ function scoreForUnfilledPositions(
       }
     }
 
+    if (bestPosition === '') continue;
+
     const draftScore = info.fpg * scarcityMultiplier;
     if (draftScore > bestScore) {
       bestScore = draftScore;
       bestPlayerId = id;
-      bestReason = matchesUnfilled
-        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
+      bestReason = `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`;
     }
   }
 
