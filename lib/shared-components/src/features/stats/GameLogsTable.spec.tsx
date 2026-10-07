@@ -783,3 +783,90 @@ webDescribe('GameLogsTable column customizer (LS-7464)', () => {
     expect(queryByTestId('game-logs-header-AB')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LS-10661 — the On This Day deep link (player + single-day range) must show
+// the game without further input and without exposing the raw bref id.
+// ---------------------------------------------------------------------------
+
+describe('GameLogsTable deep link (LS-10661)', () => {
+  it('auto-fetches once on mount when a player and both dates are pre-seeded', () => {
+    const fetchMock = mockFetchOnce(makePaginated(1, 1, 1));
+
+    render(
+      <GameLogsTable
+        isPremium
+        initialPlayerId="fosteru01"
+        initialStartDate="1914-10-06"
+        initialEndDate="1914-10-06"
+      />,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      player_id: string;
+      start_date: string;
+      end_date: string;
+    };
+    expect(body.player_id).toBe('fosteru01');
+    expect(body.start_date).toBe('1914-10-06');
+    expect(body.end_date).toBe('1914-10-06');
+  });
+
+  it('does not auto-fetch when only the player is pre-seeded', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    render(<GameLogsTable isPremium initialPlayerId="fosteru01" />);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-fetch for a free viewer (table sits behind PremiumGate)', () => {
+    const fetchMock = global.fetch as jest.Mock;
+    render(
+      <GameLogsTable
+        isPremium={false}
+        initialPlayerId="fosteru01"
+        initialStartDate="1914-10-06"
+        initialEndDate="1914-10-06"
+      />,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('auto-fetches once premium resolves after mount', () => {
+    const fetchMock = mockFetchOnce(makePaginated(1, 1, 1));
+    const props = {
+      initialPlayerId: 'fosteru01',
+      initialStartDate: '1914-10-06',
+      initialEndDate: '1914-10-06',
+    };
+    const { rerender } = render(<GameLogsTable {...props} isPremium={false} />);
+    expect(fetchMock).not.toHaveBeenCalled();
+    rerender(<GameLogsTable {...props} isPremium />);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the player name instead of the raw Player ID input when playerName is set', () => {
+    mockFetchOnce(makePaginated(1, 1, 1));
+    const { queryByPlaceholderText, queryByText, getByText } = render(
+      <GameLogsTable
+        isPremium
+        initialPlayerId="fosteru01"
+        initialStartDate="1914-10-06"
+        initialEndDate="1914-10-06"
+        playerName="Rube Foster"
+      />,
+    );
+    expect(queryByPlaceholderText('Enter player ID')).toBeNull();
+    expect(queryByText('Player ID:')).toBeNull();
+    expect(queryByText('Retrieve stats for a player')).toBeNull();
+    expect(getByText('Rube Foster')).toBeTruthy();
+  });
+
+  it('keeps the editable Player ID input when no playerName is given', () => {
+    const { getByPlaceholderText } = render(
+      <GameLogsTable initialPlayerId="fosteru01" />,
+    );
+    expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
+  });
+});

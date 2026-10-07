@@ -1,6 +1,9 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { GameLogsTable } from '@legacy-sports/shared-components/stats';
+import {
+  GameLogsTable,
+  useGameLogsPlayerName,
+} from '@legacy-sports/shared-components/stats';
 import { config } from '@legacy-sports/app-config/native';
 import { PremiumGate } from '../../../../features/subscription/PremiumGate';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
@@ -19,7 +22,9 @@ const GAME_LOGS_ENDPOINT = STATS_API_BASE
  *
  * Accepts optional `playerId` / `startDate` / `endDate` route params to
  * deep-link straight to a specific player + date range — e.g. from the On
- * This Day widget's game-specific navigation (LS-9763 / LS-10015).
+ * This Day widget's game-specific navigation (LS-9763 / LS-10015). A
+ * deep-linked player is shown by name rather than the raw bref id, and a
+ * player + date range fetches on arrival (LS-10661).
  *
  * This screen is `PremiumGate`d, but the On This Day widget that links here is
  * shown to free users too (mobile's `(app)` group requires sign-in, so a
@@ -35,6 +40,7 @@ export default function ViewGameLogsScreen() {
     startDate?: string;
     endDate?: string;
   }>();
+  const playerName = useGameLogsPlayerName(playerId);
 
   return (
     <PremiumGate isPremium={isPremium} featureName="Game Logs" fill>
@@ -45,6 +51,7 @@ export default function ViewGameLogsScreen() {
         initialPlayerId={playerId}
         initialStartDate={startDate}
         initialEndDate={endDate}
+        playerName={playerName}
       />
     </PremiumGate>
   );

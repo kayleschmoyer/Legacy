@@ -8,3 +8,4 @@ export * from '../features/stats/FieldingStatsTable';
 export * from '../features/stats/UsefulTables';
 export * from '../features/stats/GameLogsTable';
 export * from '../features/stats/CareerStatsViewer';
+export * from '../features/stats/useGameLogsPlayerName';

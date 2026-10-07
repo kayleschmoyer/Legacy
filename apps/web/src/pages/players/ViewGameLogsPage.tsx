@@ -1,6 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { GameLogsTable } from '@legacy-sports/shared-components/stats';
+import {
+  GameLogsTable,
+  useGameLogsPlayerName,
+} from '@legacy-sports/shared-components/stats';
 import { config } from '@legacy-sports/app-config/web';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
@@ -20,7 +23,9 @@ import { BG_DARK, TEXT_HIGH_CONTRAST } from '../../constants/colors';
  *
  * Accepts optional `playerId` / `startDate` / `endDate` query params to
  * deep-link straight to a specific player + date range — e.g. from the On
- * This Day widget's game-specific navigation (LS-9763).
+ * This Day widget's game-specific navigation (LS-9763). A deep-linked player
+ * is shown by name rather than the raw bref id, and a player + date range
+ * fetches on arrival (LS-10661).
  *
  * This page is `PremiumGate`d, but the On This Day widget that links here is
  * shown to free and logged-out users too. Deliberately no special-casing for
@@ -40,6 +45,7 @@ export function ViewGameLogsPage() {
   const initialPlayerId = searchParams.get('playerId') ?? undefined;
   const initialStartDate = searchParams.get('startDate') ?? undefined;
   const initialEndDate = searchParams.get('endDate') ?? undefined;
+  const playerName = useGameLogsPlayerName(initialPlayerId);
   return (
     <div
       style={{
@@ -60,6 +66,7 @@ export function ViewGameLogsPage() {
           initialPlayerId={initialPlayerId}
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
+          playerName={playerName}
         />
       </PremiumGate>
     </div>

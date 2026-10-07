@@ -37,6 +37,8 @@ jest.mock('@legacy-sports/shared-components/stats', () => {
       capturedGameLogsProps = props;
       return <View testID="game-logs-table" />;
     },
+    useGameLogsPlayerName: (brefId: string | undefined) =>
+      brefId === 'ramirjo01' ? 'Jose Ramirez' : brefId ? '' : undefined,
   };
 });
 
@@ -88,6 +90,16 @@ describe('ViewGameLogsScreen', () => {
       initialStartDate: '2024-05-01',
       initialEndDate: '2024-05-01',
     });
+  });
+
+  it('passes the resolved player name so the raw bref id is not shown (LS-10661)', () => {
+    mockSearchParams = {
+      playerId: 'ramirjo01',
+      startDate: '2024-05-01',
+      endDate: '2024-05-01',
+    };
+    render(<ViewGameLogsScreen />);
+    expect(capturedGameLogsProps).toMatchObject({ playerName: 'Jose Ramirez' });
   });
 
   it('renders no route params as undefined initial* props when absent', () => {

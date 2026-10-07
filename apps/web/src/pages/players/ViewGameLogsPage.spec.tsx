@@ -31,6 +31,8 @@ jest.mock('@legacy-sports/shared-components/stats', () => ({
     capturedGameLogsTableProps = props;
     return null;
   },
+  useGameLogsPlayerName: (brefId: string | undefined) =>
+    brefId === 'fosteru01' ? 'Rube Foster' : brefId ? '' : undefined,
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -92,5 +94,34 @@ describe('ViewGameLogsPage — query param deep-link (LS-9763)', () => {
     expect(capturedGameLogsTableProps.initialPlayerId).toBeUndefined();
     expect(capturedGameLogsTableProps.initialStartDate).toBeUndefined();
     expect(capturedGameLogsTableProps.initialEndDate).toBeUndefined();
+  });
+});
+
+describe('ViewGameLogsPage — deep-linked player name (LS-10661)', () => {
+  beforeEach(() => {
+    capturedGameLogsTableProps = {};
+    jest.clearAllMocks();
+  });
+
+  it('passes the resolved player name so the raw bref id is not shown', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          '/players/view-game-logs?playerId=fosteru01&startDate=1914-10-06&endDate=1914-10-06',
+        ]}
+      >
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
+    expect(capturedGameLogsTableProps.playerName).toBe('Rube Foster');
+  });
+
+  it('leaves playerName undefined without a playerId param', () => {
+    render(
+      <MemoryRouter>
+        <ViewGameLogsPage />
+      </MemoryRouter>,
+    );
+    expect(capturedGameLogsTableProps.playerName).toBeUndefined();
   });
 });

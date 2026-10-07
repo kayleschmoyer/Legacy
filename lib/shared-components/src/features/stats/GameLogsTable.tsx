@@ -343,11 +343,21 @@ export interface GameLogsTableProps {
   /**
    * Pre-seed the date-range filter on mount (ISO `YYYY-MM-DD`). Used to
    * deep-link straight to a specific game — e.g. from the On This Day widget
-   * (LS-9763). Both fields remain editable.
+   * (LS-9763). Both fields remain editable. When a player and both dates are
+   * pre-seeded and `isPremium` is true, the table fetches on mount, so a deep
+   * link lands on the game rather than an unsubmitted form (LS-10661).
    */
   initialStartDate?: string;
   /** @see initialStartDate */
   initialEndDate?: string;
+  /**
+   * Display name for the pre-seeded player. When set, the table is pinned to
+   * `initialPlayerId` and shows this name as its heading in place of the raw,
+   * editable Player ID input — end users should never see a bref id like
+   * `fosteru01` (LS-10661). Pass an empty string while the name is still
+   * resolving to keep the input hidden without a heading.
+   */
+  playerName?: string;
   /** Page size hint for the server. */
   pageSize?: number;
 }
@@ -452,12 +462,17 @@ const DateField: React.FC<DateFieldProps> = ({
           min={min}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
+          // Theme vars rather than a hard-coded white field, which clashed
+          // with the dark theme and could leave the seeded dates illegible
+          // (LS-10661).
           style={{
             padding: 12,
             fontSize: 16,
-            border: '1px solid #999',
+            border: '1px solid var(--borderColor)',
             borderRadius: 6,
-            backgroundColor: disabled ? '#f0f0f0' : '#fff',
+            backgroundColor: 'var(--background)',
+            color: 'var(--color)',
+            opacity: disabled ? 0.6 : 1,
             width: '100%',
             boxSizing: 'border-box',
           }}
@@ -472,11 +487,12 @@ const DateField: React.FC<DateFieldProps> = ({
       </Text>
       <Input
         borderWidth={1}
-        borderColor="$gray8"
+        borderColor="$borderColor"
         borderRadius="$3"
         padding="$3"
         fontSize="$4"
-        backgroundColor="$white"
+        backgroundColor="$background"
+        color="$color"
         value={value}
         onChangeText={onChange}
         placeholder="YYYY-MM-DD"
@@ -831,8 +847,10 @@ function GameLogsTable({
   initialPlayerId = '',
   initialStartDate = '',
   initialEndDate = '',
+  playerName,
   pageSize = DEFAULT_PAGE_SIZE,
 }: GameLogsTableProps) {
+  const playerPinned = playerName !== undefined && initialPlayerId !== '';
   const [filters, dispatch] = useReducer(filterReducer, {
     ...INITIAL_FILTERS,
     player: initialPlayerId,
@@ -1054,6 +1072,26 @@ function GameLogsTable({
     await fetchPage(0, false);
   }, [filters.player, validation.ready, fetchPage]);
 
+  // LS-10661 — a deep link carrying a player and a full date range (e.g. On
+  // This Day) fetches on mount instead of waiting for a submit. Premium only:
+  // free viewers see this table blurred behind a PremiumGate, so fetching for
+  // them would only render real data under the lock. Waiting on `isPremium`
+  // also covers the entitlement resolving after mount. Runs once: the ref
+  // keeps later filter edits on the explicit submit path.
+  const autoFetchedRef = useRef(false);
+  useEffect(() => {
+    if (autoFetchedRef.current || !isPremium) return;
+    if (!initialPlayerId || !initialStartDate || !initialEndDate) return;
+    autoFetchedRef.current = true;
+    void getGameLog();
+  }, [
+    isPremium,
+    initialPlayerId,
+    initialStartDate,
+    initialEndDate,
+    getGameLog,
+  ]);
+
   const handleEndReached = useCallback(() => {
     if (!hasMore || loadingMore || loading) return;
     void fetchPage(offset, true);
@@ -1127,34 +1165,51 @@ function GameLogsTable({
     // LS-7471 — outer ScrollView removed. Form is non-scrolling; the
     // virtualized table body is the only scroll container.
     <YStack flex={1} padding="$4">
-      <Text
-        fontSize="$5"
-        fontWeight="bold"
-        marginBottom="$4"
-        textAlign="center"
-      >
-        Retrieve stats for a player
-      </Text>
+      {playerPinned ? (
+        playerName ? (
+          <Text
+            fontSize="$5"
+            fontWeight="bold"
+            marginBottom="$4"
+            textAlign="center"
+            testID="game-logs-player-name"
+          >
+            {playerName}
+          </Text>
+        ) : null
+      ) : (
+        <>
+          <Text
+            fontSize="$5"
+            fontWeight="bold"
+            marginBottom="$4"
+            textAlign="center"
+          >
+            Retrieve stats for a player
+          </Text>
 
-      <YStack marginBottom="$4">
-        <Text fontSize="$4" fontWeight="600" marginBottom="$2">
-          Player ID:
-        </Text>
-        <Input
-          borderWidth={1}
-          borderColor="$gray8"
-          borderRadius="$3"
-          padding="$3"
-          fontSize="$4"
-          backgroundColor="$white"
-          value={filters.player}
-          onChangeText={(v: string) =>
-            dispatch({ type: 'setPlayer', value: v })
-          }
-          placeholder="Enter player ID"
-          editable={!loading}
-        />
-      </YStack>
+          <YStack marginBottom="$4">
+            <Text fontSize="$4" fontWeight="600" marginBottom="$2">
+              Player ID:
+            </Text>
+            <Input
+              borderWidth={1}
+              borderColor="$borderColor"
+              borderRadius="$3"
+              padding="$3"
+              fontSize="$4"
+              backgroundColor="$background"
+              color="$color"
+              value={filters.player}
+              onChangeText={(v: string) =>
+                dispatch({ type: 'setPlayer', value: v })
+              }
+              placeholder="Enter player ID"
+              editable={!loading}
+            />
+          </YStack>
+        </>
+      )}
 
       <YStack marginBottom="$2">
         <Text fontSize="$4" fontWeight="600" marginBottom="$2">
