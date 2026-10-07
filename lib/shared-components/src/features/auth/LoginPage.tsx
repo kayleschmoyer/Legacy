@@ -195,6 +195,7 @@ function EmailPasswordForm({
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="email"
+          id="login-email"
           textContentType="emailAddress"
           placeholder="you@example.com"
           placeholderTextColor={palette.placeholder}
@@ -227,7 +228,13 @@ function EmailPasswordForm({
           disabled={anyLoading}
           secureTextEntry
           autoCapitalize="none"
-          autoComplete="password"
+          // "current-password" is valid on web, iOS and Android alike;
+          // "password" is Android-only and react-native-web forwards it to
+          // the DOM as an invalid autofill token (LS-10769). `id` (not
+          // `name`, which react-native-web drops) lets password managers
+          // pair this field with the email input.
+          autoComplete="current-password"
+          id="login-password"
           textContentType="password"
           placeholder="Enter your password"
           placeholderTextColor={palette.placeholder}

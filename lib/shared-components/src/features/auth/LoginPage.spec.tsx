@@ -24,6 +24,8 @@ type InputProps = {
   testID?: string;
   placeholder?: string;
   secureTextEntry?: boolean;
+  autoComplete?: string;
+  id?: string;
   ['aria-label']?: string;
 };
 
@@ -57,10 +59,14 @@ jest.mock('tamagui', () => {
     testID,
     placeholder,
     secureTextEntry,
+    autoComplete,
+    id,
     'aria-label': ariaLabel,
   }: InputProps) => (
     <input
       data-testid={testID}
+      autoComplete={autoComplete}
+      id={id}
       aria-label={ariaLabel}
       placeholder={placeholder}
       disabled={!!disabled}
@@ -108,6 +114,27 @@ describe('LoginPage email/password form (LGN-017)', () => {
     expect(screen.getByTestId('login-email-input')).toBeTruthy();
     expect(screen.getByTestId('login-password-input')).toBeTruthy();
     expect(screen.getByTestId('login-email-password-submit')).toBeTruthy();
+  });
+
+  // LS-10769: react-native-web forwards autoComplete verbatim to the DOM, and
+  // "password" is not a valid HTML autofill token — the field must use
+  // "current-password" (also valid on iOS/Android) and carry an id so
+  // password managers can pair it with the email field.
+  it('marks the password field as current-password with an id for autofill', () => {
+    render(
+      <LoginPage
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+      />,
+    );
+
+    const password = screen.getByTestId('login-password-input');
+    expect(password.getAttribute('autocomplete')).toBe('current-password');
+    expect(password.getAttribute('id')).toBe('login-password');
+
+    const email = screen.getByTestId('login-email-input');
+    expect(email.getAttribute('autocomplete')).toBe('email');
+    expect(email.getAttribute('id')).toBe('login-email');
   });
 
   it('does not render the form when onEmailPasswordSignIn is omitted', () => {
