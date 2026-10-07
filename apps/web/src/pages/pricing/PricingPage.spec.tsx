@@ -606,6 +606,49 @@ describe('PricingPage — feature comparison table semantics (LS-7180)', () => {
       expect(within(row).getAllByRole('cell')).toHaveLength(3);
     });
   });
+
+  // LS-10770: below $sm the table scrolls sideways; the scroller must be a
+  // keyboard-reachable named region wrapping the table (axe
+  // scrollable-region-focusable), not the <table> itself.
+  it('wraps the table in a keyboard-focusable named scroll region', async () => {
+    const user = userEvent.setup();
+    render(<PricingPage />);
+
+    const region = screen.getByRole('region', { name: 'Plan comparison' });
+    const table = screen.getByRole('table', { name: /feature comparison/i });
+    expect(region).toContainElement(table);
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(table).not.toHaveAttribute('tabindex');
+
+    // Reachable with Tab: tabbing forward eventually lands on the region.
+    let reached = false;
+    for (let i = 0; i < 50 && !reached; i++) {
+      await user.tab();
+      reached = document.activeElement === region;
+    }
+    expect(reached).toBe(true);
+  });
+});
+
+// LS-10771: the app shell already renders <main id="main-content">; the page
+// must not add a nested/duplicate main landmark.
+describe('PricingPage — landmarks (LS-10771)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPrice: 4.99,
+      annualTotal: 39.99,
+      annualSavingsPct: '33%',
+      trialPeriodDays: 0,
+      loading: false,
+    });
+  });
+
+  it('renders no main landmark of its own', () => {
+    const { container } = render(<PricingPage />);
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
+    expect(container.querySelector('main')).toBeNull();
+  });
 });
 
 // LS-7184 / LS-7185: the Free plan card CTA depends on who is viewing the page.

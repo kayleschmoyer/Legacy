@@ -208,16 +208,33 @@ const SectionHeader = styled(YStack, {
   marginBottom: '$2',
 });
 
-const ComparisonTable = styled(YStack, {
+// LS-10770: the scroller is a wrapper around the <table>, not the table
+// itself, so it can be a keyboard-focusable named region (axe
+// scrollable-region-focusable) — Safari and older browsers don't auto-focus
+// scrollers, and overflow on a display:table element is fragile anyway.
+const ComparisonScroller = styled(YStack, {
   borderRadius: '$6',
   borderWidth: 1,
   borderColor: '$borderColor',
   overflow: 'hidden',
   width: '100%',
+  focusVisibleStyle: {
+    outlineWidth: 2,
+    outlineColor: '$color',
+    outlineStyle: 'solid',
+    outlineOffset: 2,
+  },
   // Below $sm the 25/50/25 columns get too narrow for values like
-  // 'Standard + FAAB', so rows keep a minimum width and the table scrolls.
+  // 'Standard + FAAB', so the table keeps a minimum width and this scrolls.
   $sm: {
     overflowX: 'auto',
+  },
+});
+
+const ComparisonTable = styled(YStack, {
+  width: '100%',
+  $sm: {
+    minWidth: 560,
   },
 });
 
@@ -228,9 +245,6 @@ const TableRow = styled(XStack, {
   paddingHorizontal: '$5',
   alignItems: 'center',
   width: '100%',
-  $sm: {
-    minWidth: 560,
-  },
   variants: {
     header: {
       true: {
@@ -591,7 +605,10 @@ export default function PricingPage() {
         description="Choose the Legacy Sports plan that fits your fantasy baseball ambitions. Free forever or upgrade to Premium for unlimited leagues, AI recaps, salary cap leagues, draft recommendations, and more."
       />
       <ScrollView>
-        <ContentContainer tag="main">
+        {/* LS-10771: no tag="main" — the app shell already renders the page
+            inside <main id="main-content">, so a second one nests a duplicate
+            main landmark. */}
+        <ContentContainer>
           {/* ── Hero ── */}
           <HeroSection>
             <PlanBadge data-testid="hero-plan-badge">
@@ -932,101 +949,115 @@ export default function PricingPage() {
                 keep `role` for native/assistive tech (same pattern as the shared
                 Table component). Layout is unchanged — `tag` only sets the DOM
                 element name. */}
-            <ComparisonTable
-              tag="table"
-              role="table"
-              aria-label="Free versus Premium feature comparison"
+            <ComparisonScroller
+              role="region"
+              aria-label="Plan comparison"
+              tabIndex={0}
             >
-              {/* Header */}
-              <YStack tag="thead" role="rowgroup" width="100%">
-                <TableRow header tag="tr" role="row">
-                  <TableFeatureCell
-                    tag="th"
-                    role="columnheader"
-                    {...{ scope: 'col' }}
-                  >
-                    <Paragraph size="$3" fontWeight="700" marginBottom={0}>
-                      Feature
-                    </Paragraph>
-                  </TableFeatureCell>
-                  <TableCell tag="th" role="columnheader" {...{ scope: 'col' }}>
-                    <Paragraph
-                      size="$3"
-                      fontWeight="700"
-                      textAlign="center"
-                      marginBottom={0}
+              <ComparisonTable
+                tag="table"
+                role="table"
+                aria-label="Free versus Premium feature comparison"
+              >
+                {/* Header */}
+                <YStack tag="thead" role="rowgroup" width="100%">
+                  <TableRow header tag="tr" role="row">
+                    <TableFeatureCell
+                      tag="th"
+                      role="columnheader"
+                      {...{ scope: 'col' }}
                     >
-                      Free
-                    </Paragraph>
-                  </TableCell>
-                  <TableCell tag="th" role="columnheader" {...{ scope: 'col' }}>
-                    <Paragraph
-                      size="$3"
-                      fontWeight="700"
-                      color={BRAND_GOLD_LIGHT}
-                      textAlign="center"
-                      marginBottom={0}
-                    >
-                      Premium
-                    </Paragraph>
-                  </TableCell>
-                </TableRow>
-              </YStack>
-
-              <YStack tag="tbody" role="rowgroup" width="100%">
-                {COMPARISON_ROWS.map((row, i) => (
-                  <TableRow
-                    key={row.feature}
-                    tag="tr"
-                    role="row"
-                    even={i % 2 === 0}
-                    last={i === COMPARISON_ROWS.length - 1}
-                  >
-                    <TableFeatureCell tag="td" role="cell">
-                      <Paragraph size="$3" marginBottom={0}>
-                        {row.feature}
+                      <Paragraph size="$3" fontWeight="700" marginBottom={0}>
+                        Feature
                       </Paragraph>
                     </TableFeatureCell>
-                    <TableCell tag="td" role="cell">
-                      {typeof row.free === 'boolean' ? (
-                        row.free ? (
-                          <Check size={16} color={BRAND_GOLD_LIGHT} />
-                        ) : (
-                          <X size={16} color="$gray9" />
-                        )
-                      ) : (
-                        <Paragraph
-                          size="$3"
-                          textAlign="center"
-                          marginBottom={0}
-                        >
-                          {row.free}
-                        </Paragraph>
-                      )}
+                    <TableCell
+                      tag="th"
+                      role="columnheader"
+                      {...{ scope: 'col' }}
+                    >
+                      <Paragraph
+                        size="$3"
+                        fontWeight="700"
+                        textAlign="center"
+                        marginBottom={0}
+                      >
+                        Free
+                      </Paragraph>
                     </TableCell>
-                    <TableCell tag="td" role="cell">
-                      {typeof row.premium === 'boolean' ? (
-                        row.premium ? (
-                          <Check size={16} color={BRAND_GOLD_LIGHT} />
-                        ) : (
-                          <X size={16} color="$gray9" />
-                        )
-                      ) : (
-                        <Paragraph
-                          size="$3"
-                          textAlign="center"
-                          fontWeight="600"
-                          color={BRAND_GOLD_LIGHT}
-                          marginBottom={0}
-                        >
-                          {row.premium}
-                        </Paragraph>
-                      )}
+                    <TableCell
+                      tag="th"
+                      role="columnheader"
+                      {...{ scope: 'col' }}
+                    >
+                      <Paragraph
+                        size="$3"
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                        textAlign="center"
+                        marginBottom={0}
+                      >
+                        Premium
+                      </Paragraph>
                     </TableCell>
                   </TableRow>
-                ))}
-              </YStack>
-            </ComparisonTable>
+                </YStack>
+
+                <YStack tag="tbody" role="rowgroup" width="100%">
+                  {COMPARISON_ROWS.map((row, i) => (
+                    <TableRow
+                      key={row.feature}
+                      tag="tr"
+                      role="row"
+                      even={i % 2 === 0}
+                      last={i === COMPARISON_ROWS.length - 1}
+                    >
+                      <TableFeatureCell tag="td" role="cell">
+                        <Paragraph size="$3" marginBottom={0}>
+                          {row.feature}
+                        </Paragraph>
+                      </TableFeatureCell>
+                      <TableCell tag="td" role="cell">
+                        {typeof row.free === 'boolean' ? (
+                          row.free ? (
+                            <Check size={16} color={BRAND_GOLD_LIGHT} />
+                          ) : (
+                            <X size={16} color="$gray9" />
+                          )
+                        ) : (
+                          <Paragraph
+                            size="$3"
+                            textAlign="center"
+                            marginBottom={0}
+                          >
+                            {row.free}
+                          </Paragraph>
+                        )}
+                      </TableCell>
+                      <TableCell tag="td" role="cell">
+                        {typeof row.premium === 'boolean' ? (
+                          row.premium ? (
+                            <Check size={16} color={BRAND_GOLD_LIGHT} />
+                          ) : (
+                            <X size={16} color="$gray9" />
+                          )
+                        ) : (
+                          <Paragraph
+                            size="$3"
+                            textAlign="center"
+                            fontWeight="600"
+                            color={BRAND_GOLD_LIGHT}
+                            marginBottom={0}
+                          >
+                            {row.premium}
+                          </Paragraph>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </YStack>
+              </ComparisonTable>
+            </ComparisonScroller>
           </YStack>
 
           {/* ── Testimonials ── */}
