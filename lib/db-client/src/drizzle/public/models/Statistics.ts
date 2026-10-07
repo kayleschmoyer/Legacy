@@ -263,6 +263,8 @@ export const careerBatting = pgView('career_batting', {
   sh: bigint('sh', { mode: 'number' }),
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   ibb: bigint('ibb', { mode: 'number' }),
+  // Sacrifice flies — the OBP denominator term (LS-10846).
+  sf: bigint('sf', { mode: 'number' }),
   offensiveWar: doublePrecision('offensive_war'),
   defensiveWar: doublePrecision('defensive_war'),
   totalWar: doublePrecision('total_war'),

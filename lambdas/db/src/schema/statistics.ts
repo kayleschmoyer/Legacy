@@ -1,4 +1,7 @@
-import { createDatabaseService } from '@legacy-sports/db-client';
+import {
+  computeOnBasePercentage,
+  createDatabaseService,
+} from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
@@ -342,6 +345,7 @@ export const CareerBattingRef = builder.objectRef<{
   hbp: number | null;
   sh: number | null;
   ibb: number | null;
+  sf: number | null;
   offensiveWar: number | null;
   defensiveWar: number | null;
   totalWar: number | null;
@@ -380,13 +384,8 @@ CareerBattingRef.implement({
     onBasePercentage: t.field({
       type: 'Float',
       nullable: true,
-      resolve: (stats) => {
-        if (!stats.h || !stats.bb || !stats.hbp || !stats.ab || !stats.sh)
-          return null;
-        const numerator = stats.h + stats.bb + stats.hbp;
-        const denominator = stats.ab + stats.bb + stats.hbp + (stats.sh || 0);
-        return denominator === 0 ? null : numerator / denominator;
-      },
+      // Same formula the OBP/OPS sort uses (LS-10846).
+      resolve: (stats) => computeOnBasePercentage(stats),
     }),
     sluggingPercentage: t.field({
       type: 'Float',
@@ -864,13 +863,8 @@ SeasonBattingRef.implement({
     onBasePercentage: t.field({
       type: 'Float',
       nullable: true,
-      resolve: (stats) => {
-        if (!stats.h || !stats.bb || !stats.hbp || !stats.ab || !stats.sh)
-          return null;
-        const numerator = stats.h + stats.bb + stats.hbp;
-        const denominator = stats.ab + stats.bb + stats.hbp + (stats.sh || 0);
-        return denominator === 0 ? null : numerator / denominator;
-      },
+      // Same formula the OBP/OPS sort uses (LS-10846).
+      resolve: (stats) => computeOnBasePercentage(stats),
     }),
     sluggingPercentage: t.field({
       type: 'Float',

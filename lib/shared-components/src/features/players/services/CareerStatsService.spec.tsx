@@ -189,11 +189,44 @@ describe('CareerStatsService - Data Transformation', () => {
         ops: 0,
       });
 
-      // Test formatted null values
+      // Test formatted null values. OBP/OPS have no value when the API's
+      // OBP is null (AB+BB+HBP+SF = 0) — the server sorts those rows
+      // NULLS LAST, so they render as a placeholder, not .000 (LS-10846).
       expect(result.formattedBattingAverage).toBe('0.000');
-      expect(result.formattedOnBasePercentage).toBe('0.000');
+      expect(result.formattedOnBasePercentage).toBe('--');
       expect(result.formattedSluggingPercentage).toBe('0.000');
-      expect(result.formattedOPS).toBe('0.000');
+      expect(result.formattedOPS).toBe('--');
+    });
+
+    // LS-10846: the grid used to show (H+BB+HBP)/PA whenever the resolver
+    // returned null, a different formula from the server's OBP sort.
+    test('does not compute its own OBP fallback when the API value is null', () => {
+      const result = transformCareerStats({
+        ...mockEmptyPlayerStats,
+        plateAppearances: 10,
+        atBats: 6,
+        hits: 4,
+        baseOnBalls: 1,
+        hitByPitch: 0,
+        totalBases: 5,
+        onBasePercentage: null,
+      });
+      expect(result.onBasePercentage).toBe(0);
+      expect(result.formattedOnBasePercentage).toBe('--');
+      expect(result.formattedOPS).toBe('--');
+    });
+
+    test('displays the API OBP verbatim', () => {
+      const result = transformCareerStats({
+        ...mockEmptyPlayerStats,
+        plateAppearances: 10,
+        atBats: 6,
+        hits: 4,
+        baseOnBalls: 1,
+        totalBases: 5,
+        onBasePercentage: 5 / 7,
+      });
+      expect(result.formattedOnBasePercentage).toBe('0.714');
     });
 
     test('should calculate OPS correctly', () => {

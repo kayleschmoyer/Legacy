@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm';
 import { PublicSchema } from '../client/PublicDbClient';
 import type { PublicDb } from '../client/PublicDbClient';
+import { onBasePercentageSql } from '../stats/on-base-percentage';
 
 /**
  * Build a name-search OR condition that matches first name, last name, or the
@@ -221,11 +222,11 @@ export function getCareerBattingOrderByClause(
     case 'battingAverage':
       return sql`(${PublicSchema.careerBatting.h}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
     case 'onBasePercentage':
-      return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0)) ${sql.raw(dir)} NULLS LAST`;
+      return sql`${onBasePercentageSql(PublicSchema.careerBatting)} ${sql.raw(dir)} NULLS LAST`;
     case 'sluggingPercentage':
       return sql`(${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
     case 'ops':
-      return sql`((${PublicSchema.careerBatting.h} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp})::numeric / NULLIF(${PublicSchema.careerBatting.ab} + ${PublicSchema.careerBatting.bb} + ${PublicSchema.careerBatting.hbp} + ${PublicSchema.careerBatting.sh}, 0) + ${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
+      return sql`(${onBasePercentageSql(PublicSchema.careerBatting)} + ${PublicSchema.careerBatting.tb}::numeric / NULLIF(${PublicSchema.careerBatting.ab}, 0)) ${sql.raw(dir)} NULLS LAST`;
 
     case 'totalScore':
       return sql`(COALESCE(${PublicSchema.careerBatting.h}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.doubles}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.triples}, 0) * 3 + COALESCE(${PublicSchema.careerBatting.hr}, 0) * 4 + COALESCE(${PublicSchema.careerBatting.r}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.rbi}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.sb}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.cs}, 0) * -1 + COALESCE(${PublicSchema.careerBatting.hbp}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.so}, 0) * -0.5) ${sql.raw(dir)} NULLS LAST`;

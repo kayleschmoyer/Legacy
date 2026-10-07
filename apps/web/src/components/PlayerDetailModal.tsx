@@ -919,12 +919,10 @@ export function PlayerDetailModal({
         const triples = b.triples ?? 0;
         const so = b.strikeouts ?? 0;
         const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
+        // OBP comes only from the API's canonical formula (LS-10846, LS-10671);
+        // it is null only when AB+BB+HBP+SF is 0.
         const obp =
-          b.onBasePercentage != null
-            ? b.onBasePercentage.toFixed(3)
-            : pa > 0
-              ? ((h + bb) / pa).toFixed(3)
-              : '.000';
+          b.onBasePercentage != null ? b.onBasePercentage.toFixed(3) : '.000';
         const slg =
           b.sluggingPercentage != null
             ? b.sluggingPercentage.toFixed(3)

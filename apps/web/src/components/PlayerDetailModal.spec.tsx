@@ -620,8 +620,10 @@ describe('PlayerDetailModal — OBP/SLG calculation (LS-6970)', () => {
     expect(screen.queryByText('0.460')).not.toBeInTheDocument();
   });
 
-  it('computes correct OBP fallback as (H+BB)/PA when server value is absent', () => {
-    // H=150, BB=50, PA=550 → (150+50)/550 = 200/550 ≈ 0.364
+  // LS-10846 / LS-10671: OBP comes only from the API's canonical formula. The
+  // old client (H+BB)/PA fallback disagreed with the server and is gone.
+  it('does not compute a client OBP fallback when the server value is absent', () => {
+    // H=150, BB=50, PA=550 — the removed fallback would have shown 0.364
     mockUseAllPlayerSeasonStats.mockReturnValue({
       ...EMPTY_SEASON,
       data: {
@@ -646,7 +648,7 @@ describe('PlayerDetailModal — OBP/SLG calculation (LS-6970)', () => {
 
     renderModal();
 
-    expect(screen.getByText('0.364')).toBeInTheDocument();
+    expect(screen.queryByText('0.364')).not.toBeInTheDocument();
   });
 });
 

@@ -68,6 +68,33 @@ describe('getCareerBattingOrderByClause', () => {
     });
   });
 
+  describe('OBP / OPS share the canonical OBP expression (LS-10846)', () => {
+    const OBP =
+      '((COALESCE("career_batting"."h", 0) + COALESCE("career_batting"."bb", 0) + COALESCE("career_batting"."hbp", 0))::numeric / NULLIF(COALESCE("career_batting"."ab", 0) + COALESCE("career_batting"."bb", 0) + COALESCE("career_batting"."hbp", 0) + COALESCE("career_batting"."sf", 0), 0))';
+
+    it.each(['desc', 'asc'] as const)(
+      'sorts onBasePercentage %s by the NULL-safe SF-based formula',
+      (dir) => {
+        const sql = renderOrderBy({
+          orderBy: 'onBasePercentage',
+          orderDirection: dir,
+        });
+        expect(sql).toBe(`${OBP} ${dir.toUpperCase()} NULLS LAST`);
+        expect(sql).not.toMatch(/"career_batting"\."sh"/);
+      },
+    );
+
+    it.each(['desc', 'asc'] as const)(
+      'sorts ops %s by the same OBP expression plus SLG',
+      (dir) => {
+        const sql = renderOrderBy({ orderBy: 'ops', orderDirection: dir });
+        expect(sql).toBe(
+          `(${OBP} + "career_batting"."tb"::numeric / NULLIF("career_batting"."ab", 0)) ${dir.toUpperCase()} NULLS LAST`,
+        );
+      },
+    );
+  });
+
   describe('FPTS per game (avgPointsPerGame)', () => {
     it('divides the weighted sum by career_batting.g', () => {
       const sql = renderOrderBy({

@@ -828,6 +828,84 @@ describe('Statistics Resolver', () => {
 
   // ── CareerPitching.whip field resolver ────────────────────────────────────
 
+  // ── CareerBatting / SeasonBatting.onBasePercentage (LS-10846, LS-10671) ──
+
+  describe.each(['CareerBatting', 'SeasonBatting'])(
+    '%s.onBasePercentage field resolver',
+    (typeName) => {
+      function getObpResolver() {
+        const type = schema.getType(typeName) as GraphQLObjectType;
+        if (!type) throw new Error(`${typeName} type not found`);
+        const resolve = type.getFields()['onBasePercentage']?.resolve;
+        if (!resolve)
+          throw new Error(`${typeName}.onBasePercentage resolver not found`);
+        return (stats: Record<string, number | null>) =>
+          resolve(stats, {}, emptyCtx, undefined as never);
+      }
+
+      const full = { h: 150, bb: 60, hbp: 5, ab: 500, sh: 4, sf: 6 };
+
+      it('uses (H+BB+HBP)/(AB+BB+HBP+SF) and ignores SH', () => {
+        // 215 / 571
+        expect(getObpResolver()(full)).toBeCloseTo(215 / 571, 10);
+        expect(getObpResolver()({ ...full, sh: 40 })).toBeCloseTo(
+          215 / 571,
+          10,
+        );
+      });
+
+      it.each([
+        ['BB', { bb: 0 }, 155 / 511],
+        ['HBP', { hbp: 0 }, 210 / 566],
+        ['SH', { sh: 0 }, 215 / 571],
+        ['SF', { sf: 0 }, 215 / 565],
+      ])('returns a number when %s is 0', (_label, patch, expected) => {
+        expect(getObpResolver()({ ...full, ...patch })).toBeCloseTo(
+          expected,
+          10,
+        );
+      });
+
+      it('counts NULL components as 0 (Babe Ruth 1931: SF untracked)', () => {
+        const obp = getObpResolver()({
+          h: 199,
+          bb: 128,
+          hbp: 1,
+          ab: 534,
+          sh: 0,
+          sf: null,
+        });
+        expect(obp).toBeCloseTo(0.495, 3);
+        expect(getObpResolver()({ ...full, hbp: null, sf: null })).toBeCloseTo(
+          210 / 560,
+          10,
+        );
+      });
+
+      it('returns null only when the denominator is 0', () => {
+        expect(
+          getObpResolver()({ h: 0, bb: 0, hbp: 0, ab: 0, sh: 3, sf: 0 }),
+        ).toBeNull();
+        expect(
+          getObpResolver()({ h: 0, bb: 2, hbp: 0, ab: 0, sh: 0, sf: 0 }),
+        ).toBe(1);
+      });
+
+      it('matches the shared computeOnBasePercentage helper', () => {
+        const { computeOnBasePercentage } = jest.requireActual(
+          '@legacy-sports/db-client',
+        );
+        for (const stats of [
+          full,
+          { ...full, bb: 0, hbp: null },
+          { h: 3, bb: 1, hbp: 0, ab: 4, sh: 0, sf: 0 },
+        ]) {
+          expect(getObpResolver()(stats)).toBe(computeOnBasePercentage(stats));
+        }
+      });
+    },
+  );
+
   describe('CareerPitching.whip field resolver', () => {
     function getWhipResolver() {
       const type = schema.getType('CareerPitching') as GraphQLObjectType;

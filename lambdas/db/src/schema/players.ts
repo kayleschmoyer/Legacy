@@ -1,4 +1,5 @@
 import {
+  computeOnBasePercentage,
   createDatabaseService,
   type PlayerCareerScore,
 } from '@legacy-sports/db-client';
@@ -271,11 +272,8 @@ PlayerRef.implement({
           stolenBases: avg(career.sb),
           // Rate stats are calculated over career totals, which represents the weighted average
           battingAverage: rate(career.h, career.ab),
-          onBasePercentage:
-            career.pa && career.pa > 0
-              ? ((career.h || 0) + (career.bb || 0) + (career.hbp || 0)) /
-                (career.pa - (career.sh || 0))
-              : 0,
+          // Same formula the OBP sort and CareerBatting resolver use (LS-10846).
+          onBasePercentage: computeOnBasePercentage(career) ?? 0,
           sluggingPercentage: rate(career.tb, career.ab),
         };
       },

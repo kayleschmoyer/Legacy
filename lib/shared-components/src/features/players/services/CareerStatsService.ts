@@ -270,16 +270,23 @@ export function transformCareerStats(
   // Use calculated statistics from schema when available, or calculate if needed
   const battingAverage =
     rawStats.battingAverage ?? (atBats > 0 ? hits / atBats : 0);
-  const onBasePercentage =
-    rawStats.onBasePercentage ??
-    (plateAppearances > 0
-      ? (hits + baseOnBalls + hitByPitch) / plateAppearances
-      : 0);
+  // OBP comes only from the API (LS-10846): the server sorts OBP/OPS by the
+  // same canonical formula the resolver returns, so a client-side fallback
+  // would display values the grid was not ordered by. The API returns null
+  // only when AB+BB+HBP+SF is 0; the server sorts those rows NULLS LAST and
+  // they render as the '--' placeholder here.
+  const rawOnBasePercentage = rawStats.onBasePercentage ?? null;
+  const onBasePercentage = rawOnBasePercentage ?? 0;
   const sluggingPercentage =
     rawStats.sluggingPercentage ?? (atBats > 0 ? totalBases / atBats : 0);
 
   // Compute OPS (On-base Plus Slugging)
   const ops = onBasePercentage + sluggingPercentage;
+  // The server's OPS sort is NULL whenever OBP or SLG (TB / NULLIF(AB, 0)) is.
+  const hasSluggingPercentage =
+    rawStats.sluggingPercentage != null ||
+    (atBats > 0 && rawStats.totalBases != null);
+  const hasOps = rawOnBasePercentage !== null && hasSluggingPercentage;
 
   // Generate display information using player data from GraphQL response or fallback
   const playerData = rawStats.player ?? player; // CareerBattingFragment now includes player relation
@@ -319,9 +326,9 @@ export function transformCareerStats(
     sluggingPercentage,
     ops,
     formattedBattingAverage: formatStatistic(battingAverage),
-    formattedOnBasePercentage: formatStatistic(onBasePercentage),
+    formattedOnBasePercentage: formatStatistic(rawOnBasePercentage),
     formattedSluggingPercentage: formatStatistic(sluggingPercentage),
-    formattedOPS: formatStatistic(ops),
+    formattedOPS: formatStatistic(hasOps ? ops : null),
     offensiveWAR: rawStats.offensiveWAR ?? null,
     fantasyPoints: rawStats.fantasyPoints ?? 0,
     fantasyPointsPerGame: rawStats.fantasyPointsPerGame ?? 0,
