@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
 import {
@@ -235,6 +235,8 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const inviteLinkLabelId = useId();
+  const inviteCodeLabelId = useId();
   const inviteUrl = league.inviteCode
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${league.inviteCode}`
     : '';
@@ -273,6 +275,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div>
           <div
+            id={inviteLinkLabelId}
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 700,
@@ -286,7 +289,11 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             Invite Link
           </div>
           <div className="ls-invite-link">
-            <input readOnly value={inviteUrl} />
+            <input
+              readOnly
+              aria-labelledby={inviteLinkLabelId}
+              value={inviteUrl}
+            />
             <button
               type="button"
               aria-label="Copy invite link"
@@ -309,6 +316,7 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
         </div>
         <div>
           <div
+            id={inviteCodeLabelId}
             style={{
               fontFamily: 'var(--font-display)',
               fontWeight: 700,
@@ -322,7 +330,11 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             Invite Code
           </div>
           <div className="ls-invite-link">
-            <input readOnly value={league.inviteCode ?? ''} />
+            <input
+              readOnly
+              aria-labelledby={inviteCodeLabelId}
+              value={league.inviteCode ?? ''}
+            />
             <button
               type="button"
               aria-label="Copy invite code"

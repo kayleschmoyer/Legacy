@@ -212,6 +212,30 @@ describe('OverviewTab — Invite section anchor (LS-7968)', () => {
     );
     expect(container.querySelector('#invite-section')).not.toBeInTheDocument();
   });
+
+  it('names the invite link and invite code fields from their captions (LS-10708)', () => {
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={true}
+        isMember={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.getByRole('textbox', { name: /invite link/i }),
+    ).toHaveAttribute('readonly');
+    expect(screen.getByRole('textbox', { name: /invite code/i })).toHaveValue(
+      'XYZ789',
+    );
+  });
 });
 
 describe('OverviewTab — Join Draft Room (LS-4916)', () => {
