@@ -365,7 +365,7 @@ describe('useLeagueChat — send errors (LS-10468)', () => {
     useQuery.mockReturnValue({
       loading: false,
       data: { getLeagueMessages: [] },
-      refetch: jest.fn(),
+      refetch: jest.fn().mockResolvedValue({}),
     });
     sendMutation = jest.fn();
     useSendLeagueChatMessageMutation.mockReturnValue([
@@ -426,5 +426,129 @@ describe('useLeagueChat — send errors (LS-10468)', () => {
       'Failed to send message. Please try again.',
     );
     expect(logError).toHaveBeenCalled();
+  });
+});
+
+describe('useLeagueChat — failed-send recovery (LS-10718)', () => {
+  const FAILED = 'Failed to send message. Please try again.';
+  let sendMutation: jest.Mock;
+  let refetch: jest.Mock;
+  let onReconnect: (() => void) | null;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    jest.spyOn(LOGGER, 'error').mockReturnValue(undefined);
+    jest.spyOn(LOGGER, 'warn').mockReturnValue(undefined);
+    onReconnect = null;
+    useLeagueWebSocket.mockImplementation(
+      (opts: { onReconnect: () => void }) => {
+        onReconnect = opts.onReconnect;
+      },
+    );
+    refetch = jest.fn().mockResolvedValue({});
+    useQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: [] },
+      refetch,
+    });
+    sendMutation = jest.fn();
+    useSendLeagueChatMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function failedSend(result: {
+    current: ReturnType<typeof useLeagueChat>;
+  }): Promise<boolean> {
+    sendMutation.mockRejectedValueOnce(new Error('Failed to fetch'));
+    let sent = true;
+    await act(async () => {
+      sent = await result.current.sendMessage('QA_offline');
+    });
+    return sent;
+  }
+
+  it('returns false when the mutation fails', async () => {
+    const { result } = renderHook(() => useLeagueChat(1));
+    expect(await failedSend(result)).toBe(false);
+    expect(result.current.sendError).toBe(FAILED);
+  });
+
+  it('returns false when the send is rate limited', async () => {
+    sendMutation.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [
+          { message: 'slow down', extensions: { code: 'RATE_LIMITED' } },
+        ],
+      }),
+    );
+    const { result } = renderHook(() => useLeagueChat(1));
+    let sent = true;
+    await act(async () => {
+      sent = await result.current.sendMessage('hello');
+    });
+    expect(sent).toBe(false);
+  });
+
+  it('returns true and clears a previous error when the send succeeds', async () => {
+    const { result } = renderHook(() => useLeagueChat(1));
+    await failedSend(result);
+
+    sendMutation.mockResolvedValueOnce({});
+    let sent = false;
+    await act(async () => {
+      sent = await result.current.sendMessage('QA_offline');
+    });
+
+    expect(sent).toBe(true);
+    expect(result.current.sendError).toBeNull();
+  });
+
+  it('reports success when the message was stored but the history refetch fails', async () => {
+    // A send the server accepted must never look failed — the composer would
+    // restore the text and a retry would double-post.
+    sendMutation.mockResolvedValueOnce({});
+    refetch.mockRejectedValueOnce(new Error('Failed to fetch'));
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    let sent = false;
+    await act(async () => {
+      sent = await result.current.sendMessage('hello');
+    });
+
+    expect(sent).toBe(true);
+    expect(result.current.sendError).toBeNull();
+    expect(sendMutation).toHaveBeenCalledWith(
+      expect.not.objectContaining({ refetchQueries: expect.anything() }),
+    );
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('clears the send error when the socket reconnects', async () => {
+    const { result } = renderHook(() => useLeagueChat(1));
+    await failedSend(result);
+    expect(result.current.sendError).toBe(FAILED);
+
+    act(() => {
+      onReconnect?.();
+    });
+
+    expect(result.current.sendError).toBeNull();
+  });
+
+  it('clears the send error via clearSendError', async () => {
+    const { result } = renderHook(() => useLeagueChat(1));
+    await failedSend(result);
+
+    act(() => {
+      result.current.clearSendError();
+    });
+
+    expect(result.current.sendError).toBeNull();
   });
 });

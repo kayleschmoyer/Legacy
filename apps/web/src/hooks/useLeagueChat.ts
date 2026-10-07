@@ -43,7 +43,9 @@ export function useLeagueChat(leagueId: number): {
   loading: boolean;
   sending: boolean;
   sendError: string | null;
-  sendMessage: (text: string, gifUrl?: string) => Promise<void>;
+  /** Resolves true once the server has stored the message, false on failure. */
+  sendMessage: (text: string, gifUrl?: string) => Promise<boolean>;
+  clearSendError: () => void;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export function useLeagueChat(leagueId: number): {
   const sendMessage = useCallback(
     async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
-      if (!trimmed && !gifUrl) return;
+      if (!trimmed && !gifUrl) return false;
       setSendError(null);
       try {
         await sendMutation({
@@ -126,13 +128,6 @@ export function useLeagueChat(leagueId: number): {
           // the server message as a second, blocking-looking toast
           // (LS-10468).
           context: { suppressGlobalError: true },
-          awaitRefetchQueries: true,
-          refetchQueries: [
-            {
-              query: GetLeagueChatMessages,
-              variables: { leagueId, limit: 50 },
-            },
-          ],
           onCompleted: (data) => {
             const raw = data.sendLeagueMessage;
             if (!raw) return;
@@ -161,17 +156,31 @@ export function useLeagueChat(leagueId: number): {
         // an error — show a short notice and don't report it (LS-10468).
         if (isRateLimitedError(err)) {
           setSendError(CHAT_RATE_LIMITED_MESSAGE);
-          return;
+          return false;
         }
         LOGGER.error(
           'useLeagueChat: sendMessage failed',
           err instanceof Error ? err : new Error(String(err)),
         );
         setSendError('Failed to send message. Please try again.');
+        return false;
       }
+      // Refresh history only after the message is stored, outside the
+      // mutation: with `awaitRefetchQueries` a failed refetch rejected the
+      // whole send, so a delivered message looked failed and the restored
+      // composer text would double-post on retry (LS-10718).
+      refetchRef.current().catch((err: unknown) => {
+        LOGGER.warn(
+          'useLeagueChat: history refetch after send failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      });
+      return true;
     },
     [sendMutation, leagueId],
   );
+
+  const clearSendError = useCallback(() => setSendError(null), []);
 
   // Subscribe to chat messages and reconnect events via the shared socket.
   useLeagueWebSocket({
@@ -203,6 +212,9 @@ export function useLeagueChat(leagueId: number): {
       });
     },
     onReconnect: () => {
+      // Back online — a send error from while the socket was down is stale
+      // (LS-10718).
+      setSendError(null);
       // Refetch history to catch any messages that arrived while the socket
       // was down.
       void refetchRef.current();
@@ -231,5 +243,12 @@ export function useLeagueChat(leagueId: number): {
     return [...messages].sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
   }, [messages]);
 
-  return { messages: sortedMessages, loading, sending, sendError, sendMessage };
+  return {
+    messages: sortedMessages,
+    loading,
+    sending,
+    sendError,
+    sendMessage,
+    clearSendError,
+  };
 }

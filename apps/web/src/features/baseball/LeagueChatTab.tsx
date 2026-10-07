@@ -139,7 +139,7 @@ export function LeagueChatTab({
   mentionableTeams,
   onNavigate,
 }: LeagueChatTabProps): React.JSX.Element {
-  const { messages, loading, sending, sendError, sendMessage } =
+  const { messages, loading, sending, sendError, sendMessage, clearSendError } =
     useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
   const [showGifPicker, setShowGifPicker] = useState(false);
@@ -208,13 +208,19 @@ export function LeagueChatTab({
   }, []);
 
   const handleSend = useCallback(async () => {
-    const text = inputText.trim();
+    const draft = inputText;
+    const text = draft.trim();
     if (!text || sending) return;
     setInputText('');
     setMentionInfo(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    await sendMessage(text);
-  }, [inputText, sending, sendMessage]);
+    const sent = await sendMessage(text);
+    if (sent) return;
+    // Put the unsent message back so it isn't lost — unless the user has
+    // already started typing something new (LS-10718).
+    setInputText((current) => (current === '' ? draft : current));
+    setTimeout(resizeTextarea, 0);
+  }, [inputText, sending, sendMessage, resizeTextarea]);
 
   const handleSendGif = useCallback(
     async (gifUrl: string) => {
@@ -260,6 +266,7 @@ export function LeagueChatTab({
       const cursorPos = e.target.selectionStart ?? value.length;
       setInputText(value);
       resizeTextarea();
+      clearSendError();
 
       if (!mentionableTeams?.length) return;
 
@@ -277,7 +284,7 @@ export function LeagueChatTab({
       }
       setMentionInfo(null);
     },
-    [mentionableTeams, resizeTextarea],
+    [mentionableTeams, resizeTextarea, clearSendError],
   );
 
   const handleKeyDown = useCallback(
