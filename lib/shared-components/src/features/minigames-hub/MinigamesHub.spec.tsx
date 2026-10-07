@@ -240,6 +240,26 @@ describe('MinigamesHub', () => {
     );
   });
 
+  // LS-10710: the hero title and card titles were plain Text, so /games had
+  // no headings for assistive-tech heading navigation.
+  it('exposes one h1 and an h2 per game card plus Coming Soon', () => {
+    const { getAllByRole } = render(
+      <MinigamesHub onNavigate={jest.fn()} isNarrow={false} />,
+    );
+
+    const h1s = getAllByRole('heading', { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0].textContent).toContain("The game doesn't stop");
+
+    const h2Names = getAllByRole('heading', { level: 2 }).map(
+      (h) => h.textContent,
+    );
+    expect(h2Names).toEqual([
+      ...GAME_TEMPLATES.map((t) => t.title),
+      'Coming Soon',
+    ]);
+  });
+
   it('renders the optional banner slot (LS-10465)', () => {
     const { getByText } = render(
       <MinigamesHub

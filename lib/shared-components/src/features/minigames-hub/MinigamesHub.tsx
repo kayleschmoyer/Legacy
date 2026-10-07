@@ -192,6 +192,8 @@ const GameCard: React.FC<{
         lineHeight={isNarrow ? 36 : 42}
         letterSpacing={isNarrow ? -0.68 : -0.88}
         color="$fg1"
+        role="heading"
+        aria-level={2}
       >
         {game.title}
       </Text>
@@ -454,6 +456,8 @@ export function MinigamesHub({
               color="$fg1"
               marginTop={16}
               marginBottom={18}
+              role="heading"
+              aria-level={1}
             >
               The game doesn&apos;t stop{'\n'}
               <Text
@@ -568,6 +572,8 @@ export function MinigamesHub({
               letterSpacing={1.68}
               textTransform="uppercase"
               color="$textMuted"
+              role="heading"
+              aria-level={2}
             >
               Coming Soon
             </Text>
