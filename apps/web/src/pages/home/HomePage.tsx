@@ -34,6 +34,7 @@ import {
   serializeOnboardingComplete,
 } from '@legacy-sports/shared-components/utils';
 import { getOnboardingStepKey, readOnboardingStep } from './onboardingStorage';
+import { leagueDetailRoute, leagueRosterRoute } from './homeRoutes';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { PageMeta } from '../../components/PageMeta';
 import {
@@ -54,13 +55,6 @@ import { useIsPremium } from '../../hooks/useIsPremium';
 const CREATE_BASEBALL_LEAGUE_ROUTE = '/baseball/league/create';
 const JOIN_BASEBALL_LEAGUE_ROUTE = '/baseball/league/join';
 const MOCK_DRAFT_ROUTE = '/baseball/mock-draft';
-
-function leagueDetailRoute(
-  summary: Pick<UserLeagueSummaryFragment, 'leagueId' | 'sport'>,
-): string {
-  const sportPrefix = summary.sport === 'football' ? 'football' : 'baseball';
-  return `/${sportPrefix}/league/${summary.leagueId}`;
-}
 
 /** Live draft room for a league (`/:sport/league/:id/draft`, app.tsx). */
 function leagueDraftRoomRoute(
@@ -352,7 +346,7 @@ export function HomePage(): React.JSX.Element {
           onHideArchived={handleHideArchived}
           onRetry={() => void refetchSummaries()}
           onViewLeague={(s) => navigate(leagueDetailRoute(s))}
-          onSetLineup={(s) => navigate(leagueDetailRoute(s))}
+          onSetLineup={(s) => navigate(leagueRosterRoute(s))}
           onMockDraft={(s) => navigate(leagueMockDraftRoute(s))}
           onJoinDraft={(s) => navigate(leagueDraftRoomRoute(s))}
           onCreateLeague={(sportKey) => navigate(`/${sportKey}/league/create`)}
