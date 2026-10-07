@@ -87,6 +87,38 @@ describe('StatsDataGrid', () => {
     expect(onRowClick).toHaveBeenCalledWith(ROWS[0]);
   });
 
+  test('rows are keyboard-focusable and Enter/Space fire onRowClick (LS-10665)', () => {
+    const onRowClick = jest.fn();
+    render(
+      <StatsDataGrid
+        {...makeProps({ onRowClick, getRowTestId: (row) => `row-${row.id}` })}
+      />,
+    );
+
+    const row = screen.getByTestId('row-2');
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowClick).toHaveBeenLastCalledWith(ROWS[1]);
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onRowClick).toHaveBeenCalledTimes(2);
+
+    fireEvent.keyDown(row, { key: 'a' });
+    expect(onRowClick).toHaveBeenCalledTimes(2);
+  });
+
+  test('rows are not focusable when onRowClick is not provided', () => {
+    render(
+      <StatsDataGrid
+        {...makeProps({ getRowTestId: (row) => `row-${row.id}` })}
+      />,
+    );
+
+    expect(screen.getByTestId('row-1')).not.toHaveAttribute('tabindex');
+  });
+
   test('honors a custom sortKey and defaultDirection when sorting a column', () => {
     const onSortChange = jest.fn();
     const columns: StatsDataGridColumn<TestRow>[] = [

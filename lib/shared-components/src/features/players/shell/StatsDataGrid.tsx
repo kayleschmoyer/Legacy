@@ -20,6 +20,7 @@ import { EmptyCard, ErrorCard, LoadingSkeleton } from './StateCards';
 import { StatsGridHeaderCell } from './StatsGridHeaderCell';
 import { StatsGridPagination } from './StatsGridPagination';
 import {
+  BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
@@ -138,6 +139,34 @@ function GridRow<TRow>({
       hoverStyle={onSelect ? { backgroundColor: SURFACE_HOVER } : undefined}
       pressStyle={onSelect ? { opacity: 0.85 } : undefined}
       onPress={onSelect ? () => onSelect(row) : undefined}
+      // Keyboard access (LS-10665): a clickable row must also be reachable
+      // with Tab and activatable with Enter/Space, like the pointer path.
+      // Only the row's own key events count, so a key press inside an
+      // interactive cell (renderCell) doesn't also open the row.
+      tabIndex={onSelect ? 0 : undefined}
+      onKeyDown={
+        onSelect
+          ? (e: React.KeyboardEvent<HTMLElement>) => {
+              if (
+                e.target === e.currentTarget &&
+                (e.key === 'Enter' || e.key === ' ')
+              ) {
+                e.preventDefault();
+                onSelect(row);
+              }
+            }
+          : undefined
+      }
+      focusVisibleStyle={
+        onSelect
+          ? {
+              outlineColor: BRAND_GOLD_LIGHT,
+              outlineStyle: 'solid',
+              outlineWidth: 2,
+              outlineOffset: -2,
+            }
+          : undefined
+      }
     >
       {columns.map((column) => (
         <XStack

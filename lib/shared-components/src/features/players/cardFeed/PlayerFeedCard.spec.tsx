@@ -38,6 +38,32 @@ describe('PlayerFeedCard', () => {
     expect(props.onPress).toHaveBeenCalledTimes(1);
   });
 
+  test.each([
+    ['Enter', 'Enter'],
+    ['Space', ' '],
+  ])(
+    'calls onPress when %s is pressed on the focused card (LS-10665)',
+    (_, key) => {
+      const props = makeProps();
+      render(<PlayerFeedCard {...props} />);
+
+      const card = screen.getByTestId('player-feed-card');
+      expect(card).toHaveAttribute('tabindex', '0');
+      fireEvent.keyDown(card, { key });
+
+      expect(props.onPress).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('ignores other keys', () => {
+    const props = makeProps();
+    render(<PlayerFeedCard {...props} />);
+
+    fireEvent.keyDown(screen.getByTestId('player-feed-card'), { key: 'a' });
+
+    expect(props.onPress).not.toHaveBeenCalled();
+  });
+
   test('does not render a projection line when omitted', () => {
     render(<PlayerFeedCard {...makeProps()} />);
 

@@ -72,6 +72,21 @@ export function PlayerFeedCard({
       pressStyle={{ opacity: 0.85 }}
       accessibilityRole="button"
       accessibilityLabel={`View details for ${name}`}
+      // A div[role=button] doesn't synthesize a click on Enter/Space, so
+      // keyboard activation has to be wired explicitly (LS-10665).
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
+      focusVisibleStyle={{
+        outlineColor: BRAND_GOLD_LIGHT,
+        outlineStyle: 'solid',
+        outlineWidth: 2,
+        outlineOffset: 2,
+      }}
     >
       <PositionBadge
         position={position}
