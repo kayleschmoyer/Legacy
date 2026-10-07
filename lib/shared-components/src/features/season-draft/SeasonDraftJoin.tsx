@@ -186,7 +186,12 @@ export const SeasonDraftJoin: React.FC<SeasonDraftJoinProps> = ({
                     {sportChrome.strapline}
                   </Text>
                 </XStack>
-                <H1 color="$color" fontSize={26} fontWeight="800">
+                <H1
+                  color="$color"
+                  fontSize={26}
+                  fontWeight="800"
+                  numberOfLines={2}
+                >
                   {game.name}
                 </H1>
                 <Text color="$textMuted">

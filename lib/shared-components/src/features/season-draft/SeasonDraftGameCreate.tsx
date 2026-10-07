@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  getSeasonDraftNameError,
+  SEASON_DRAFT_NAME_MAX_LENGTH,
+} from '@legacy-sports/utils';
 import { Alert } from 'react-native';
 import {
   Button,
@@ -80,10 +85,12 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
 
   const stats = playerType === 'pitcher' ? PITCHER_STATS : HITTER_STATS;
   const currentStat = stats.find((s) => s.key === statKey) ?? stats[0];
+  const nameError = getSeasonDraftNameError(name);
+  const nameCharsLeft = SEASON_DRAFT_NAME_MAX_LENGTH - name.length;
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a game name.');
+    if (nameError) {
+      Alert.alert('Error', nameError);
       return;
     }
     try {
@@ -100,6 +107,16 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
       const id = result.data?.createSeasonDraftGame;
       if (id) onCreated(id);
     } catch (error) {
+      // Server-side validation rejections are expected user input, not
+      // system errors — show the server's message and keep them out of
+      // Rollbar (LS-10675).
+      const userInputError = CombinedGraphQLErrors.is(error)
+        ? error.errors.find((e) => e.extensions?.['code'] === 'BAD_USER_INPUT')
+        : undefined;
+      if (userInputError) {
+        Alert.alert('Error', userInputError.message);
+        return;
+      }
       const err = error instanceof Error ? error : new Error(String(error));
       LOGGER.error('Failed to create game', err);
       Alert.alert('Error', 'Failed to create game. Please try again.');
@@ -172,7 +189,13 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
                   {sportChrome.strapline}
                 </Text>
               </XStack>
-              <Text fontSize={22} fontWeight="800" color="$color">
+              <Text
+                testID="season-draft-preview-title"
+                fontSize={22}
+                fontWeight="800"
+                color="$color"
+                numberOfLines={2}
+              >
                 {name.trim() || 'Untitled Game'}
               </Text>
               <XStack alignItems="center" gap="$3">
@@ -255,13 +278,24 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
 
             <Field label="Game Name" required helper="Required">
               <Input
+                testID="season-draft-name-input"
                 value={name}
                 onChangeText={setName}
+                maxLength={SEASON_DRAFT_NAME_MAX_LENGTH}
                 placeholder="e.g., HR Challenge 2025"
                 size="$4"
                 backgroundColor="$background"
                 borderColor="$surfacePanelBorder"
               />
+              <Text
+                testID="season-draft-name-counter"
+                fontSize={11}
+                color="$textMuted"
+                alignSelf="flex-end"
+              >
+                {nameCharsLeft}{' '}
+                {nameCharsLeft === 1 ? 'character' : 'characters'} left
+              </Text>
             </Field>
 
             <YStack gap="$2">
@@ -361,7 +395,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
                 color="$brandNavy"
                 fontWeight="800"
                 onPress={() => void handleCreate()}
-                disabled={!name.trim() || submitting}
+                disabled={nameError !== null || submitting}
                 pressStyle={{ backgroundColor: '$brandGoldDark' }}
               >
                 {submitting ? (

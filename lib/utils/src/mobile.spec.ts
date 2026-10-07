@@ -4,6 +4,8 @@ import {
   DEFAULT_FOOTBALL_ROSTER_POSITIONS,
   extractPlayerNameFromDescription,
   formatDraftDate,
+  getSeasonDraftNameError,
+  SEASON_DRAFT_NAME_MAX_LENGTH,
   stripDiacritics,
 } from './mobile';
 
@@ -66,5 +68,18 @@ describe('mobile entry point (LS-8755)', () => {
     expect(DEFAULT_BASEBALL_ROSTER_POSITIONS.length).toBeGreaterThan(0);
     expect(Array.isArray(DEFAULT_FOOTBALL_ROSTER_POSITIONS)).toBe(true);
     expect(DEFAULT_FOOTBALL_ROSTER_POSITIONS.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * `SeasonDraftGameCreate` (shared-components) calls `getSeasonDraftNameError`
+ * during render to cap the game name (LS-10675). Missing from this barrel it
+ * would be `undefined` on device and crash the mobile create screen.
+ */
+describe('mobile entry point (LS-10675)', () => {
+  it('re-exports the Season Draft name rule', () => {
+    expect(typeof getSeasonDraftNameError).toBe('function');
+    expect(getSeasonDraftNameError('HR Challenge')).toBeNull();
+    expect(SEASON_DRAFT_NAME_MAX_LENGTH).toBe(60);
   });
 });

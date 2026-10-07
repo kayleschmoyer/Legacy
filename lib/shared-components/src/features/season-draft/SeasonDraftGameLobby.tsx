@@ -342,7 +342,13 @@ function LobbyCard({
       )}
 
       <XStack alignItems="flex-start" justifyContent="space-between" gap="$3">
-        <Text fontSize={20} fontWeight="800" color="$color" flex={1}>
+        <Text
+          fontSize={20}
+          fontWeight="800"
+          color="$color"
+          flex={1}
+          numberOfLines={2}
+        >
           {game.name}
         </Text>
         <XStack

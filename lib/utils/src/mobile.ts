@@ -34,6 +34,7 @@ export * from './lib/sport-defaults';
 // Shared username rule consumed by the native profile-settings editor (LS-7671);
 // missing here it is `undefined` on device.
 export * from './lib/mock-draft-limits';
+export * from './lib/season-draft-name';
 export * from './lib/username-validation';
 // Pure, Hermes-safe string helpers consumed by shared-components (OnThisDayFeed).
 // These must be re-exported here — Metro resolves '@legacy-sports/utils' to this

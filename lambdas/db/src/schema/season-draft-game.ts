@@ -8,6 +8,7 @@ import {
 import { GraphQLError } from 'graphql';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
 import { getDbOptions } from '@legacy-sports/utils/node';
+import { getSeasonDraftNameError } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
@@ -560,11 +561,19 @@ builder.mutationFields((t) => ({
         throw AuthenticationError();
       }
 
+      // Reject blank/over-long names as user input before the insert — an
+      // over-long name otherwise fails the varchar(255) column and surfaces
+      // as "Internal server error" (LS-10675, LS-10803).
+      const nameError = getSeasonDraftNameError(args.name);
+      if (nameError) {
+        throw UserInputError(nameError);
+      }
+
       const creatorName =
         context.user.username ?? context.user.email ?? 'Player 1';
 
       const gameId = await SeasonDraftGameService.createGame(context.db, {
-        name: args.name,
+        name: args.name.trim(),
         createdBy: context.user.id,
         numPlayers: 1,
         playerNames: [creatorName],

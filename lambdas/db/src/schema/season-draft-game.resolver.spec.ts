@@ -443,6 +443,44 @@ describe('Season Draft Game Resolver', () => {
       const callArgs = mockSeasonDraftGameService.createGame.mock.calls[0][1];
       expect(callArgs.sport).toBeUndefined();
     });
+
+    // LS-10675 / LS-10803 (Rollbar #307): an over-long name used to reach the
+    // varchar(255) insert and surface as "Internal server error".
+    it.each([
+      [
+        'the Rollbar #307 payload (>255 chars)',
+        `QADOT20261006${'A'.repeat(250)}`,
+      ],
+      ['one character over the max', 'A'.repeat(61)],
+      ['a blank name', '   '],
+    ])(
+      'rejects %s with BAD_USER_INPUT before reaching the service',
+      async (_label, name) => {
+        const resolver = getMutation('createSeasonDraftGame');
+        const result = resolver({}, { name }, mockContext, undefined as never);
+
+        await expect(result).rejects.toMatchObject({
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+        expect(mockSeasonDraftGameService.createGame).not.toHaveBeenCalled();
+      },
+    );
+
+    it('accepts a name at the max length and trims surrounding whitespace', async () => {
+      const name = 'A'.repeat(60);
+      const resolver = getMutation('createSeasonDraftGame');
+      await resolver(
+        {},
+        { name: `  ${name}  ` },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockSeasonDraftGameService.createGame).toHaveBeenCalledWith(
+        mockDb,
+        expect.objectContaining({ name }),
+      );
+    });
   });
 
   // ── joinSeasonDraftGame mutation ──────────────────────────────────────────

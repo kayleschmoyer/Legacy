@@ -795,6 +795,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               lineHeight={36}
               fontWeight="800"
               letterSpacing={-1}
+              numberOfLines={2}
             >
               {gameState.name}
             </H1>
