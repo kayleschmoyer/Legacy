@@ -799,7 +799,7 @@ const ProfileSettingsPage: React.FC = () => {
             </SectionBody>
           </SectionCard>
 
-          {/* ── Linked Identities ── */}
+          {/* ── Connected Accounts ── */}
           <SectionCard
             data-testid="profile-linked-identities-section"
             style={sectionCardGradientStyle}
@@ -814,7 +814,7 @@ const ProfileSettingsPage: React.FC = () => {
               </SectionIconBox>
               <YStack flex={1}>
                 <Paragraph size="$4" color="$color" fontWeight="600">
-                  Linked Identities
+                  Connected Accounts
                 </Paragraph>
                 <Paragraph size="$2" color="$colorPress">
                   Manage your connected sign-in providers and canonical email

@@ -542,10 +542,12 @@ class ProfileSurface {
 
   // ── Assertions: Linked Identities (LS-7825) ───────────────────────
 
-  /** Assert the Linked Identities section (container + heading) is visible. */
+  /** Assert the Connected Accounts section (container + heading) is visible. */
   async expectLinkedIdentitiesSection(): Promise<void> {
     await this.#linkedIdentities.expectVisible();
-    await this.#driver.byText('Linked Identities').expectVisible();
+    await this.#linkedIdentities
+      .byText('Connected Accounts', { exact: true })
+      .expectVisible();
   }
 
   /** Assert the "Primary email" badge is visible. */

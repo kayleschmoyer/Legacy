@@ -462,7 +462,7 @@ async function setupProfileGraphQLWithIdentities(
 }
 
 test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression', () => {
-  test('renders the Linked Identities section', async ({
+  test('renders the Connected Accounts section', async ({
     page,
     settingsPage,
   }) => {
