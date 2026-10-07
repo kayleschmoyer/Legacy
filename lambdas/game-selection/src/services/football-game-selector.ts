@@ -50,7 +50,7 @@ export interface FootballPlayerNeedingStats {
  * statsLoadingStatus flips to 'completed' (same ordering guarantee as
  * LS-3817's baseball fix).
  */
-async function computeAndPersistFootballMatchupScores(
+export async function computeAndPersistFootballMatchupScores(
   db: PublicDb,
   matchupId: number,
   leagueId: number,
@@ -101,8 +101,14 @@ async function computeAndPersistFootballMatchupScores(
       const teamId = matchupPlayerToTeam.get(stat.matchupPlayerId);
       if (teamId === undefined) continue;
 
+      // Bench players do not score (LS-10948) — same rule as the stats
+      // lambda's calculateAndUpdateFootballMatchupScores and the matchupScores
+      // resolver, which this persisted score must agree with.
+      const position = matchupPlayerToPosition.get(stat.matchupPlayerId);
+      if (position === undefined) continue;
+
       const score = computeFootballPlayerGamePoints(stat, scoringSettings, {
-        position: matchupPlayerToPosition.get(stat.matchupPlayerId),
+        position,
       });
 
       if (teamId === team1Id) {

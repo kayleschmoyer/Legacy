@@ -127,8 +127,15 @@ export async function calculateAndUpdateFootballMatchupScores(
     const teamId = matchupPlayerToTeam.get(stat.matchupPlayerId);
     if (teamId === undefined) continue;
 
+    // Bench players do not score (LS-10948). matchup_players holds the whole
+    // roster and game selection picks games for bench rows too, so without
+    // this skip the persisted score summed starters AND bench while the
+    // matchupScores resolver counts starters only.
+    const position = matchupPlayerToPosition.get(stat.matchupPlayerId);
+    if (position === undefined) continue;
+
     const score = computeFootballPlayerGamePoints(stat, scoringSettings, {
-      position: matchupPlayerToPosition.get(stat.matchupPlayerId),
+      position,
     });
 
     if (teamId === team1Id) {

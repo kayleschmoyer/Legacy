@@ -391,4 +391,36 @@ describe('calculateAndUpdateFootballMatchupScores — league scoring settings', 
     expect(result.team1Score).toBeCloseTo(18, 5);
     expect(result.team2Score).toBeCloseTo(15, 5);
   });
+
+  it('does not count a bench player who has a selected game (LS-10948)', async () => {
+    withDefaultProfile();
+    // Game selection picks games for every matchup_players row, bench
+    // included, so getMatchupFootballPlayerGameStats returns the bench QB's
+    // game alongside the starter's. Before LS-10948 both were summed into the
+    // persisted score (36) while the matchupScores resolver showed 18.
+    mockGetMatchupFootballPlayerGameStats.mockResolvedValue([
+      quarterbackGame(10),
+      quarterbackGame(11),
+      dstGame(20),
+      dstGame(21),
+    ]);
+
+    const result = await scoreMatchup(
+      makeDb([
+        { matchupPlayerId: 10, teamId: TEAM_1, positionType: 'QB' },
+        { matchupPlayerId: 11, teamId: TEAM_1, positionType: null },
+        { matchupPlayerId: 20, teamId: TEAM_2, positionType: 'DST' },
+        { matchupPlayerId: 21, teamId: TEAM_2, positionType: null },
+      ]),
+    );
+
+    expect(result.team1Score).toBeCloseTo(18, 5);
+    expect(result.team2Score).toBeCloseTo(15, 5);
+    expect(mockUpdateMatchupScore).toHaveBeenCalledWith(
+      expect.anything(),
+      MATCHUP_ID,
+      18,
+      15,
+    );
+  });
 });

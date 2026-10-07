@@ -524,6 +524,86 @@ describe('resolveFootballMatchupScores', () => {
       expect(r.players).toEqual([]);
     });
   });
+
+  it('leaves a bench player with a selected game out of the team total (LS-10948)', async () => {
+    // Same rule the persisted-score writers apply (stats-lambda
+    // calculateAndUpdateFootballMatchupScores and game-selection
+    // computeAndPersistFootballMatchupScores), so all three agree.
+    const db = buildMockDb([
+      [{ id: 100, team1Id: 10, team2Id: 20 }],
+      [
+        { id: 10, name: 'Eagles' },
+        { id: 20, name: 'Bears' },
+      ],
+      [
+        {
+          matchupPlayerId: 1,
+          matchupId: 100,
+          teamId: 10,
+          playerId: 5,
+          positionType: 'QB',
+        },
+        {
+          matchupPlayerId: 2,
+          matchupId: 100,
+          teamId: 10,
+          playerId: 6,
+          positionType: null,
+        },
+      ],
+      [
+        {
+          id: 5,
+          firstName: 'Patrick',
+          lastName: 'Mahomes',
+          isDst: false,
+          nflTeam: 'KC',
+        },
+        {
+          id: 6,
+          firstName: 'Josh',
+          lastName: 'Allen',
+          isDst: false,
+          nflTeam: 'BUF',
+        },
+      ],
+    ]);
+
+    // 300 passing yds × 0.04 + 2 TDs × 4 = 20 pts per game.
+    const qbGame = (playerId: number, matchupPlayerId: number) => ({
+      playerId,
+      matchupPlayerId,
+      gameNum: 1,
+      gameIdentifier: `g-${playerId}`,
+      offense: {
+        passYds: 300,
+        passTd: 2,
+        interceptions: 0,
+        sacked: 0,
+        rushYds: 0,
+        rushTd: 0,
+        rushFumbles: 0,
+        rec: 0,
+        recYds: 0,
+        recTd: 0,
+        recFumbles: 0,
+        fgm: 0,
+        fg50m: 0,
+        xpm: 0,
+      },
+      defense: null,
+      idpDefense: null,
+      dataQuality: 'ok',
+    });
+    mockGetFootballStats.mockResolvedValueOnce([qbGame(5, 1), qbGame(6, 2)]);
+
+    const result = await resolveFootballMatchupScores(db as never, 1, 1);
+
+    const eagles = result.find((r) => r.teamId === 10);
+    expect(eagles?.players.map((p) => p.playerId)).toEqual([5]);
+    expect(eagles?.totalPoints).toBeCloseTo(20);
+    expect(eagles?.projectedPoints).toBeCloseTo(20);
+  });
 });
 
 // ---------------------------------------------------------------------------

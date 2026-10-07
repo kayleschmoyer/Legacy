@@ -1,5 +1,7 @@
 import type { PublicDb } from '@legacy-sports/db-client';
+import { computeFootballPlayerGamePoints } from '@legacy-sports/scoring';
 import {
+  computeAndPersistFootballMatchupScores,
   selectGamesForMatchupFootball,
   selectGamesForMatchupFootballPlayer,
 } from './football-game-selector';
@@ -197,6 +199,38 @@ describe('football-game-selector', () => {
 
       const result = await selectGamesForMatchupFootball(mockDb, 999, 1);
       expect(result).toEqual({ playersNeedingStatsLoading: [] });
+    });
+  });
+
+  describe('computeAndPersistFootballMatchupScores', () => {
+    it('does not count a bench player who has a selected game (LS-10948)', async () => {
+      const matchupPlayers = [
+        { matchupPlayerId: 10, teamId: 1, positionType: 'QB' },
+        { matchupPlayerId: 11, teamId: 1, positionType: null },
+        { matchupPlayerId: 20, teamId: 2, positionType: 'RB' },
+      ];
+      const mockDb = {
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            leftJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(matchupPlayers),
+            }),
+          }),
+        }),
+      } as unknown as PublicDb;
+      // Game selection picks games for bench rows too, so the bench QB (11)
+      // comes back with a game like every starter.
+      mockGetMatchupFootballPlayerGameStats.mockResolvedValueOnce([
+        { matchupPlayerId: 10 },
+        { matchupPlayerId: 11 },
+        { matchupPlayerId: 20 },
+      ]);
+      jest.mocked(computeFootballPlayerGamePoints).mockReturnValue(10);
+
+      await computeAndPersistFootballMatchupScores(mockDb, 500, 42, 1, 2);
+
+      expect(computeFootballPlayerGamePoints).toHaveBeenCalledTimes(2);
+      expect(mockUpdateMatchupScore).toHaveBeenCalledWith(mockDb, 500, 10, 10);
     });
   });
 });
