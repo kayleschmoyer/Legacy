@@ -168,13 +168,10 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   });
   const myRoster = teamMembersData?.teamMembers ?? [];
 
-  // Hero "scoring" label is the active league scoring profile's name,
-  // surfaced via useLeagueScoringSettings. The hook already defaults to
-  // 'Default' when no profile is loaded, so we surface that string as-is
-  // rather than masking it with a hardcoded fallback.
-  const { profileName: scoringProfileName } = useLeagueScoringSettings(
-    league?.id ?? undefined,
-  );
+  // Hero "scoring" label (header + eyebrow): "Custom" once any stat is
+  // overridden, otherwise the active profile's name. The hook defaults to
+  // 'Default' when no profile is loaded (LS-10744).
+  const { scoringLabel } = useLeagueScoringSettings(league?.id ?? undefined);
 
   // Commissioner-settings toast state lives at the page level — not inside
   // CommishTab — so a transient CommishTab unmount (e.g. isCommissioner briefly
@@ -416,7 +413,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           pageClassName="ls-page"
           league={{
             name: league.name ?? 'League',
-            scoringLabel: scoringProfileName,
+            scoringLabel,
             era:
               league.minCareerSeasons || league.minCareerGames
                 ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`

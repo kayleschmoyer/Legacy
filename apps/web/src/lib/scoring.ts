@@ -64,12 +64,22 @@ export function useLeagueScoringSettings(leagueId?: number) {
   );
 
   const profile = query.data?.leagueScoringProfile ?? null;
+  const profileName = profile?.profileName ?? 'Default';
+
+  // Saving custom multipliers updates the profile's entries, never its name,
+  // so the name stays "Default". The server sets isOverride only when a stat
+  // differs from its default, so reverting every value restores the profile
+  // name (LS-10744).
+  const scoringLabel = profile?.stats?.some((stat) => stat.isOverride)
+    ? 'Custom'
+    : profileName;
 
   return {
     loading: query.loading,
     error: query.error,
     settings,
-    profileName: profile?.profileName ?? 'Default',
+    profileName,
+    scoringLabel,
     profile,
     refetch: query.refetch,
   } as const;

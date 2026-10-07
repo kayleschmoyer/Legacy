@@ -211,3 +211,55 @@ describe('useLeagueScoringSettings — visibility refetch (LS-4039)', () => {
     expect(refetch).not.toHaveBeenCalled();
   });
 });
+
+describe('useLeagueScoringSettings — scoringLabel (LS-10744)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  const mockProfile = (isOverrideFlags: boolean[]) => {
+    useGetLeagueScoringProfileQuery.mockReturnValue({
+      data: {
+        leagueScoringProfile: {
+          profileId: 1,
+          profileName: 'Default',
+          stats: isOverrideFlags.map((isOverride) => ({ isOverride })),
+          multiplierGroups: [],
+        },
+      },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({ data: undefined }),
+    });
+  };
+
+  it('labels the profile "Custom" when any stat is overridden', () => {
+    mockProfile([false, true, false]);
+
+    const { result } = renderHook(() => useLeagueScoringSettings(42));
+
+    expect(result.current.scoringLabel).toBe('Custom');
+    expect(result.current.profileName).toBe('Default');
+  });
+
+  it('falls back to the profile name when no stat is overridden', () => {
+    mockProfile([false, false]);
+
+    const { result } = renderHook(() => useLeagueScoringSettings(42));
+
+    expect(result.current.scoringLabel).toBe('Default');
+  });
+
+  it('labels "Default" while no profile is loaded', () => {
+    useGetLeagueScoringProfileQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({ data: undefined }),
+    });
+
+    const { result } = renderHook(() => useLeagueScoringSettings(42));
+
+    expect(result.current.scoringLabel).toBe('Default');
+  });
+});
