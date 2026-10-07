@@ -82,12 +82,13 @@ test.describe('Sport-aware player list — football context @regression', () => 
     await expect(group.getByRole('button', { name: 'TE' })).toBeVisible();
   });
 
-  test('position filter shows kicker and defensive positions (K, DST, DL, LB, DB)', async ({
+  test('position filter shows kicker and IDP positions (K, DL, LB, DB) but not DST', async ({
     page,
   }) => {
     const group = page.getByRole('group', { name: 'Filter by position' });
     await expect(group.getByRole('button', { name: 'K' })).toBeVisible();
-    await expect(group.getByRole('button', { name: 'DST' })).toBeVisible();
+    // DST is hidden while no team-defense players exist (LS-10727).
+    await expect(group.getByRole('button', { name: 'DST' })).toHaveCount(0);
     await expect(group.getByRole('button', { name: 'DL' })).toBeVisible();
     await expect(group.getByRole('button', { name: 'LB' })).toBeVisible();
     await expect(group.getByRole('button', { name: 'DB' })).toBeVisible();

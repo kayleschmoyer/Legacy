@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
 import { LOGGER } from '@legacy-sports/logging';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import { Dialog } from '@legacy-sports/shared-components/ui';
 import {
   GetUserLeagues,
@@ -98,9 +99,23 @@ export type WizardAction =
   | { type: 'SET_SCORING_FORMAT'; format: ScoringFormat }
   | { type: 'SET_ROSTER_SLOTS'; slots: Record<string, number> };
 
+// D/ST is not offered while no team-defense players exist (LS-10727): its
+// required DST slot could never be filled, and the server rejects it.
+const DEFAULT_DEFENSIVE_FORMAT: DefensiveFormat = FOOTBALL_DST_DATA_AVAILABLE
+  ? 'dst'
+  : 'idp';
+
+function defaultRosterSlotsFor(
+  format: DefensiveFormat,
+): Record<string, number> {
+  return format === 'idp'
+    ? { ...IDP_ROSTER_DEFAULTS }
+    : { ...DST_ROSTER_DEFAULTS };
+}
+
 export const INITIAL_STATE: WizardState = {
   sport: 'BASEBALL',
-  defensiveFormat: 'dst',
+  defensiveFormat: DEFAULT_DEFENSIVE_FORMAT,
   scoringFormat: 'ppr',
   name: '',
   numTeams: 10,
@@ -112,7 +127,7 @@ export const INITIAL_STATE: WizardState = {
   salaryCapEnabled: false,
   auctionBudget: DEFAULT_AUCTION_BUDGET,
   auctionMinBid: DEFAULT_AUCTION_MIN_BID,
-  rosterSlots: { ...DST_ROSTER_DEFAULTS },
+  rosterSlots: defaultRosterSlotsFor(DEFAULT_DEFENSIVE_FORMAT),
   rosterCustomized: false,
   rosterSlotsByFormat: {},
 };
@@ -127,8 +142,8 @@ export function wizardReducer(
         action.sport === 'FOOTBALL'
           ? {
               numTeams: 12,
-              defensiveFormat: 'dst' as const,
-              rosterSlots: { ...DST_ROSTER_DEFAULTS },
+              defensiveFormat: DEFAULT_DEFENSIVE_FORMAT,
+              rosterSlots: defaultRosterSlotsFor(DEFAULT_DEFENSIVE_FORMAT),
             }
           : { numTeams: 10, rosterSlots: {} };
       return {

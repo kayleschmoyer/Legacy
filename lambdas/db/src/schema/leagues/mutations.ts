@@ -47,6 +47,7 @@ import {
   DEFAULT_ROSTER_SIZE_BY_SPORT,
   GAMES_PER_MATCHUP_RANGE_BY_SPORT,
   isCustomEraYearValidForSport,
+  isDefensiveFormatAvailable,
   isEraFreeForSport,
   isEraValidForSport,
   isGamesPerMatchupValidForSport,
@@ -711,6 +712,12 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       // football's "Spread Offense" (2011 – Now) is the free counterpart to
       // baseball's "Modern (2006+)".
       const resolvedSport = normalizeSport(inputSport);
+
+      if (!isDefensiveFormatAvailable(resolvedSport, inputDefensiveFormat)) {
+        throw UserInputError(
+          'Team D/ST leagues are not available yet: team defense data is still being loaded. Choose IDP (individual defensive players) instead.',
+        );
+      }
 
       if (
         inputEraFilter &&

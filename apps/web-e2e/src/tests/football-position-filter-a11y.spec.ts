@@ -20,7 +20,8 @@ import { test } from '../fixtures/pages';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
-// Selectable position pills, excluding the leading "All" pill.
+// Selectable position pills, excluding the leading "All" pill. DST is hidden
+// while no team-defense players exist (LS-10727).
 const POSITIONS = [
   'QB',
   'RB',
@@ -28,7 +29,6 @@ const POSITIONS = [
   'TE',
   'FLEX',
   'K',
-  'DST',
   'DL',
   'LB',
   'DB',

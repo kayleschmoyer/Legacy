@@ -2,6 +2,7 @@ import { and, countDistinct, eq, sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import {
   DEFAULT_ROSTER_SIZE_BY_SPORT,
+  FOOTBALL_DST_DATA_AVAILABLE,
   getDefaultRosterPositions,
 } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
@@ -62,7 +63,8 @@ export interface CreateLeagueOptions {
   sport?: SportKind;
   /** Defensive scoring format for football leagues (LS-246).
    *  'dst' = team defense; 'idp' = individual defensive players.
-   *  Ignored for baseball leagues. Defaults to 'dst'. */
+   *  Ignored for baseball leagues. Defaults to 'idp' while no team-defense
+   *  players exist (FOOTBALL_DST_DATA_AVAILABLE, LS-10727), else 'dst'. */
   defensiveFormat?: 'dst' | 'idp';
   maxRosterSize?: number;
   /**
@@ -235,7 +237,7 @@ export class LeagueService {
       isPublic = false,
       rosterContinuity = 'redraft',
       keeperSettings = null,
-      defensiveFormat = 'dst',
+      defensiveFormat = FOOTBALL_DST_DATA_AVAILABLE ? 'dst' : 'idp',
       salaryCapEnabled = false,
       salaryCap = null,
       salaryFloor = null,

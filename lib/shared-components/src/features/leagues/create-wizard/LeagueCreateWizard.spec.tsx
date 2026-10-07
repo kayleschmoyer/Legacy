@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import {
   LeagueCreateWizard,
   type LeagueCreateWizardProps,
@@ -366,7 +367,18 @@ describe('LeagueCreateWizard — rules step', () => {
     });
     pressNext(getByTestId, 3);
     expect(getByTestId('chip-scoringFormat-ppr')).toBeTruthy();
-    expect(getByTestId('chip-defensiveFormat-dst')).toBeTruthy();
+    expect(getByTestId('chip-defensiveFormat-idp')).toBeTruthy();
+  });
+
+  it('offers D/ST only once team-defense data exists (LS-10727)', () => {
+    const { getByTestId, queryByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId, 3);
+    expect(queryByTestId('chip-defensiveFormat-dst') !== null).toBe(
+      FOOTBALL_DST_DATA_AVAILABLE,
+    );
   });
 
   it('also exposes the premium era/HOF/waiver/salary-cap fields for football (LS-6138)', () => {

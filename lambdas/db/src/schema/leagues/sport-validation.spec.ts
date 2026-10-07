@@ -14,6 +14,7 @@ import {
   FREE_ERA_IDS_BY_SPORT,
   GAMES_PER_MATCHUP_RANGE_BY_SPORT,
   isCustomEraYearValidForSport,
+  isDefensiveFormatAvailable,
   isEraFreeForSport,
   isEraValidForSport,
   isGamesPerMatchupValidForSport,
@@ -322,5 +323,33 @@ describe('VALID_ERAS_BY_SPORT pins the era_filter Postgres enum (LS-9914)', () =
         expect(VALID_ERAS_BY_SPORT[sport].has(era)).toBe(true);
       }
     }
+  });
+});
+
+describe('isDefensiveFormatAvailable (LS-10727)', () => {
+  it('rejects a D/ST football league while no team-defense data exists', () => {
+    expect(isDefensiveFormatAvailable('football', 'dst', false)).toBe(false);
+  });
+
+  it('allows a D/ST football league once team-defense data exists', () => {
+    expect(isDefensiveFormatAvailable('football', 'dst', true)).toBe(true);
+  });
+
+  it('always allows IDP or an unspecified format (server defaults to IDP)', () => {
+    for (const dstAvailable of [true, false]) {
+      expect(isDefensiveFormatAvailable('football', 'idp', dstAvailable)).toBe(
+        true,
+      );
+      expect(isDefensiveFormatAvailable('football', null, dstAvailable)).toBe(
+        true,
+      );
+      expect(
+        isDefensiveFormatAvailable('football', undefined, dstAvailable),
+      ).toBe(true);
+    }
+  });
+
+  it('ignores the defensive format for baseball leagues', () => {
+    expect(isDefensiveFormatAvailable('baseball', 'dst', false)).toBe(true);
   });
 });

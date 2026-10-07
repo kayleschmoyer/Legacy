@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 
 export type DefensiveFormat = 'dst' | 'idp';
 export type ScoringFormat = 'standard' | 'half_ppr' | 'ppr';
@@ -37,7 +38,7 @@ const SCORING_FORMAT_OPTIONS: Array<{
   },
 ];
 
-const FORMAT_OPTIONS: Array<{
+const ALL_FORMAT_OPTIONS: Array<{
   id: DefensiveFormat;
   label: string;
   subtitle: string;
@@ -61,6 +62,12 @@ const FORMAT_OPTIONS: Array<{
     slots: ['DL', 'LB', 'DB'],
   },
 ];
+
+// Team D/ST is hidden while no team-defense players exist (LS-10727): its
+// required DST slot could never be filled, and the server rejects it.
+const FORMAT_OPTIONS = ALL_FORMAT_OPTIONS.filter(
+  (option) => option.id !== 'dst' || FOOTBALL_DST_DATA_AVAILABLE,
+);
 
 export function StepDefensiveFormat({
   defensiveFormat,
@@ -150,6 +157,16 @@ export function StepDefensiveFormat({
           Choose how your league handles defensive players. Changing this will
           update your roster slot defaults.
         </Text>
+        {!FOOTBALL_DST_DATA_AVAILABLE && (
+          <Text
+            testID="defensive-format-dst-unavailable"
+            fontSize={13}
+            color="$textMuted"
+          >
+            Team D/ST leagues are coming soon — team defense data is still being
+            loaded.
+          </Text>
+        )}
       </YStack>
 
       <YStack gap="$3">

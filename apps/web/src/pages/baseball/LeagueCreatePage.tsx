@@ -34,7 +34,10 @@ import {
   StatusBadge,
 } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
-import { stripInvisibleAndControlChars } from '@legacy-sports/utils';
+import {
+  FOOTBALL_DST_DATA_AVAILABLE,
+  stripInvisibleAndControlChars,
+} from '@legacy-sports/utils';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   GAMES_PER_MATCHUP_BY_SPORT,
@@ -359,6 +362,18 @@ function defaultsForSport(sport: SportId): {
   };
 }
 
+// D/ST is not offered while no team-defense players exist (LS-10727): its
+// required DST slot could never be filled, and the server rejects it.
+function defaultDefensiveFormat(): DefensiveFormat {
+  return FOOTBALL_DST_DATA_AVAILABLE ? 'dst' : 'idp';
+}
+
+function defaultFootballRosterSlots(): Record<string, number> {
+  return defaultDefensiveFormat() === 'idp'
+    ? { ...IDP_ROSTER_DEFAULTS }
+    : { ...DST_ROSTER_DEFAULTS };
+}
+
 function applySportSwitch(
   f: CreateLeagueFormData,
   nextSport: SportId,
@@ -366,7 +381,7 @@ function applySportSwitch(
   const fresh = defaultsForSport(nextSport);
   // Football's roster size is derived from its per-slot config (LS-6147);
   // baseball has no roster-slot concept and keeps the flat default.
-  const freshRosterSlots = { ...DST_ROSTER_DEFAULTS };
+  const freshRosterSlots = defaultFootballRosterSlots();
   return {
     ...f,
     sport: nextSport,
@@ -383,7 +398,7 @@ function applySportSwitch(
     customEraEndYear: undefined,
     // Reset football-specific fields on sport switch
     scoringFormat: 'ppr',
-    defensiveFormat: 'dst',
+    defensiveFormat: defaultDefensiveFormat(),
     rosterSlots: freshRosterSlots,
   };
 }
@@ -611,7 +626,8 @@ export function applyImportedSettings(
     apply(
       'defensiveFormat',
       s.defensiveFormat as CreateLeagueFormData['defensiveFormat'],
-      s.defensiveFormat === 'dst' || s.defensiveFormat === 'idp',
+      s.defensiveFormat === 'idp' ||
+        (s.defensiveFormat === 'dst' && FOOTBALL_DST_DATA_AVAILABLE),
     );
   }
 
@@ -942,7 +958,8 @@ export function mapLeagueToPrefillData(
     defensiveFormat:
       league.defensiveFormat === GqlDefensiveFormat.Idp
         ? 'idp'
-        : league.defensiveFormat === GqlDefensiveFormat.Dst
+        : league.defensiveFormat === GqlDefensiveFormat.Dst &&
+            FOOTBALL_DST_DATA_AVAILABLE
           ? 'dst'
           : undefined,
     numberOfDivisions: league.numberOfDivisions ?? undefined,
@@ -1859,7 +1876,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         ? (scoringFormatParam as ScoringFormat)
         : 'ppr';
 
-    const initialRosterSlots = { ...DST_ROSTER_DEFAULTS };
+    const initialRosterSlots = defaultFootballRosterSlots();
 
     return {
       sport: selectedSport,
@@ -1899,7 +1916,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       maxConsecutiveKeeps: undefined,
       rookieExempt: false,
       scoringFormat: initialScoringFormat,
-      defensiveFormat: 'dst',
+      defensiveFormat: defaultDefensiveFormat(),
       rosterSlots: initialRosterSlots,
     };
   });
@@ -4369,7 +4386,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Defensive format */}
                   <FieldRow
                     label="Defensive Format"
-                    hint="D/ST uses team defense scoring with points-allowed bands. IDP uses individual defensive player stats."
+                    hint={
+                      FOOTBALL_DST_DATA_AVAILABLE
+                        ? 'D/ST uses team defense scoring with points-allowed bands. IDP uses individual defensive player stats.'
+                        : 'IDP uses individual defensive player stats. Team D/ST is coming soon — team defense data is still being loaded.'
+                    }
                   >
                     <XStack gap="$2">
                       {(
@@ -4385,51 +4406,56 @@ export function LeagueCreatePage(): React.JSX.Element {
                             sub: 'Individual Players',
                           },
                         ] as const
-                      ).map((opt) => {
-                        const selected = formData.defensiveFormat === opt.id;
-                        return (
-                          <Button
-                            key={opt.id}
-                            size="$3"
-                            flex={1}
-                            onPress={() =>
-                              !isFormDisabled &&
-                              handleInputChange('defensiveFormat', opt.id)
-                            }
-                            disabled={isFormDisabled}
-                            backgroundColor={
-                              selected ? withAlpha(AMBER, 0.18) : '$color2'
-                            }
-                            borderColor={selected ? AMBER : '$borderColor'}
-                            borderWidth={selected ? 2 : 1}
-                            hoverStyle={{
-                              backgroundColor: selected
-                                ? withAlpha(AMBER, 0.26)
-                                : '$color3',
-                            }}
-                            pressStyle={{ scale: 0.97 }}
-                            data-testid={`defensive-format-${opt.id}`}
-                          >
-                            <YStack alignItems="center" gap={2}>
-                              <Text
-                                fontFamily="$display"
-                                fontWeight="800"
-                                fontSize={15}
-                                color={selected ? AMBER : '$color'}
-                              >
-                                {opt.label}
-                              </Text>
-                              <Text
-                                fontFamily="$body"
-                                fontSize={11}
-                                color={selected ? '$color11' : '$gray9'}
-                              >
-                                {opt.sub}
-                              </Text>
-                            </YStack>
-                          </Button>
-                        );
-                      })}
+                      )
+                        .filter(
+                          (opt) =>
+                            opt.id !== 'dst' || FOOTBALL_DST_DATA_AVAILABLE,
+                        )
+                        .map((opt) => {
+                          const selected = formData.defensiveFormat === opt.id;
+                          return (
+                            <Button
+                              key={opt.id}
+                              size="$3"
+                              flex={1}
+                              onPress={() =>
+                                !isFormDisabled &&
+                                handleInputChange('defensiveFormat', opt.id)
+                              }
+                              disabled={isFormDisabled}
+                              backgroundColor={
+                                selected ? withAlpha(AMBER, 0.18) : '$color2'
+                              }
+                              borderColor={selected ? AMBER : '$borderColor'}
+                              borderWidth={selected ? 2 : 1}
+                              hoverStyle={{
+                                backgroundColor: selected
+                                  ? withAlpha(AMBER, 0.26)
+                                  : '$color3',
+                              }}
+                              pressStyle={{ scale: 0.97 }}
+                              data-testid={`defensive-format-${opt.id}`}
+                            >
+                              <YStack alignItems="center" gap={2}>
+                                <Text
+                                  fontFamily="$display"
+                                  fontWeight="800"
+                                  fontSize={15}
+                                  color={selected ? AMBER : '$color'}
+                                >
+                                  {opt.label}
+                                </Text>
+                                <Text
+                                  fontFamily="$body"
+                                  fontSize={11}
+                                  color={selected ? '$color11' : '$gray9'}
+                                >
+                                  {opt.sub}
+                                </Text>
+                              </YStack>
+                            </Button>
+                          );
+                        })}
                     </XStack>
                   </FieldRow>
 

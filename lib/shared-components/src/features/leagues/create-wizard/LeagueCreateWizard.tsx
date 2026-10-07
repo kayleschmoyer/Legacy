@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, YStack } from 'tamagui';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import {
   WizardBottomBar,
   WizardChipGroup,
@@ -784,7 +785,11 @@ function RulesStep({
           <WizardFieldRow
             label="Defensive Format"
             testID="field-defensiveFormat"
-            hint="D/ST uses one team defense slot. IDP uses individual defensive players."
+            hint={
+              FOOTBALL_DST_DATA_AVAILABLE
+                ? 'D/ST uses one team defense slot. IDP uses individual defensive players.'
+                : 'IDP uses individual defensive players. Team D/ST is coming soon — team defense data is still being loaded.'
+            }
           >
             <WizardChipGroup
               testIDPrefix="chip-defensiveFormat"

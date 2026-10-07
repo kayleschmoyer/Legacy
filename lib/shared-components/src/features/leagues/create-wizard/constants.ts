@@ -2,6 +2,7 @@
 // flow (LS-8809). Kept separate from the components so the per-step validation
 // rules in `validation.ts` can be unit-tested without rendering anything.
 
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import type { WaiverType } from '../premium/constants';
 
 /** Two-sport discriminator for the wizard. Mirrors `LeagueSport`. */
@@ -278,10 +279,16 @@ export const SCORING_FORMAT_OPTIONS: ReadonlyArray<{
 export const DEFENSIVE_FORMAT_OPTIONS: ReadonlyArray<{
   label: string;
   value: DefensiveFormatChoice;
-}> = [
-  { label: 'D/ST', value: 'dst' },
-  { label: 'IDP', value: 'idp' },
-];
+}> = (
+  [
+    { label: 'D/ST', value: 'dst' },
+    { label: 'IDP', value: 'idp' },
+  ] as const
+).filter(
+  // D/ST is hidden while no team-defense players exist (LS-10727): its
+  // required DST slot could never be filled, and the server rejects it.
+  (option) => option.value !== 'dst' || FOOTBALL_DST_DATA_AVAILABLE,
+);
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -331,8 +338,8 @@ export function createInitialWizardForm(
     salaryCapEnabled: false,
     scoringFormat: 'ppr',
     // 'idp' rather than 'dst' (LS-9475): career_football_defense is empty,
-    // so a 'dst' league's DST roster slot could never be filled. A
-    // commissioner can still switch to 'dst' via the wizard step.
+    // so a 'dst' league's DST roster slot could never be filled. 'dst' is
+    // only offered once FOOTBALL_DST_DATA_AVAILABLE is on (LS-10727).
     defensiveFormat: 'idp',
   };
 }

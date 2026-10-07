@@ -19,7 +19,10 @@ import {
   TEAM_FILTER_OPTIONS_BY_SPORT,
 } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
+import {
+  ENTITLEMENTS,
+  FOOTBALL_DST_DATA_AVAILABLE,
+} from '@legacy-sports/utils';
 import { colors, footballPositionBadges } from '@legacy-sports/design-tokens';
 import type { FootballPlayersQuery } from '@legacy-sports/graphql';
 import {
@@ -53,19 +56,11 @@ type FootballPosition =
   | 'SUPERFLEX'
   | 'IDP';
 
-const BASE_POSITIONS: FootballPosition[] = [
-  'All',
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DST',
-  'DL',
-  'LB',
-  'DB',
-];
+// DST is hidden while no team-defense data exists (LS-10727) — its chip
+// could only return zero players.
+const BASE_POSITIONS: FootballPosition[] = (
+  ['All', 'QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'DL', 'LB', 'DB'] as const
+).filter((p) => FOOTBALL_DST_DATA_AVAILABLE || p !== 'DST');
 
 const PREMIUM_POSITIONS: FootballPosition[] = ['SUPERFLEX', 'IDP'];
 
@@ -425,19 +420,8 @@ function PositionPill({
 const PLAYERS_FILTER_KEY = '@football_players_filter';
 
 const FOOTBALL_POSITIONS = new Set<string>([
-  'All',
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'K',
-  'DST',
-  'DL',
-  'LB',
-  'DB',
-  'SUPERFLEX',
-  'IDP',
+  ...BASE_POSITIONS,
+  ...PREMIUM_POSITIONS,
 ]);
 
 interface PersistedPlayerFilters {

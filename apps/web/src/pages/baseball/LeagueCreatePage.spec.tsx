@@ -69,6 +69,23 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Team D/ST availability (LS-10727). Defaults to true so the D/ST-era suites
+// below keep covering that path for when the team-defense ingest lands; the
+// LS-10727 suite flips it off. The page reads the flag at call time; other
+// modules read it once while this file's imports load, before the binding
+// below is initialised (jest hoists jest.mock), so fall back to true then.
+let mockDstDataAvailable = true;
+jest.mock('@legacy-sports/utils', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@legacy-sports/utils'),
+  get FOOTBALL_DST_DATA_AVAILABLE() {
+    try {
+      return mockDstDataAvailable;
+    } catch {
+      return true;
+    }
+  },
+}));
+
 // Default football_enabled = true so both sport tabs are enabled in tests.
 // useFeatureValue (what LeagueCreatePage actually reads, LS-9130) mirrors the
 // real hook's contract of falling back to the caller-supplied default when a
@@ -846,6 +863,54 @@ describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
 
     const input = mockCreateLeague.mock.calls[0][0].variables.input;
     expect(input.rosterSlots).toBeUndefined();
+  });
+});
+
+describe('LeagueCreatePage — D/ST hidden until team-defense data exists (LS-10727)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+    mockDstDataAvailable = false;
+  });
+
+  afterEach(() => {
+    mockDstDataAvailable = true;
+  });
+
+  it('offers only IDP, explains why, and defaults to the IDP slot set', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+
+    expect(
+      screen.queryByTestId('defensive-format-dst'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('defensive-format-idp')).toBeInTheDocument();
+    expect(screen.getByText(/Team D\/ST is coming soon/)).toBeInTheDocument();
+    const config = screen.getByTestId('roster-positions-config');
+    expect(config).not.toHaveTextContent('DST');
+    expect(config).toHaveTextContent('DL');
+  });
+
+  it('submits an IDP league with no DST slot', async () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test Football League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.defensiveFormat).toBe('idp');
+    expect(
+      input.rosterSlots.some(
+        (slot: { positionType: string }) => slot.positionType === 'DST',
+      ),
+    ).toBe(false);
   });
 });
 

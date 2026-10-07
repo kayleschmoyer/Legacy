@@ -116,6 +116,16 @@ export const DEFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
 );
 
 /**
+ * Whether team-defense (DST) players and stats exist to show or draft
+ * (LS-10727). The synthetic DST rows were removed (LS-5080) and the
+ * team-defense ingest has not shipped yet, so every DST surface would return
+ * zero players. While false: the Players page hides its DST tab and position
+ * chips, and new football leagues cannot pick the D/ST defensive format.
+ * Flip to true in the PR that loads the 32 team defenses.
+ */
+export const FOOTBALL_DST_DATA_AVAILABLE = false;
+
+/**
  * Canonical starting-slot display order for football, spanning every slot
  * type a league might configure — DST-format or IDP-format, Superflex or
  * not. A given league only ever has a subset of these types configured as

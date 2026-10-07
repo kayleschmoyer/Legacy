@@ -1,5 +1,6 @@
 import type { DbOptions } from '@legacy-sports/utils/node';
 import { LeagueService } from './LeagueService';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 
 interface MockTx {
   execute: jest.Mock;
@@ -213,7 +214,7 @@ describe('LeagueService.createLeague — roster slots seeding (LS-6145)', () => 
       .mockResolvedValueOnce([{ id: 200 }])
       .mockResolvedValueOnce([{ id: 300 }]);
 
-    await service.createLeague(baseInput);
+    await service.createLeague({ ...baseInput, defensiveFormat: 'dst' });
 
     const positionValues = seededPositionValues();
     expect(positionValues).toEqual(
@@ -223,6 +224,20 @@ describe('LeagueService.createLeague — roster slots seeding (LS-6145)', () => 
     );
     // Default football shape: QB, RB, RB, WR, WR, TE, FLEX, K, DST (9 starters).
     expect(positionValues).toHaveLength(9);
+  });
+
+  it('defaults to IDP (no DST slot) while no team-defense players exist (LS-10727)', async () => {
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 100 }])
+      .mockResolvedValueOnce([{ id: 200 }])
+      .mockResolvedValueOnce([{ id: 300 }]);
+
+    await service.createLeague(baseInput);
+
+    const hasDst = seededPositionValues().some(
+      (row) => row.positionType === 'DST',
+    );
+    expect(hasDst).toBe(FOOTBALL_DST_DATA_AVAILABLE);
   });
 
   it('seeds league_positions from the caller-supplied rosterSlots, expanding each count into that many rows', async () => {
@@ -259,7 +274,11 @@ describe('LeagueService.createLeague — roster slots seeding (LS-6145)', () => 
       .mockResolvedValueOnce([{ id: 200 }])
       .mockResolvedValueOnce([{ id: 300 }]);
 
-    await service.createLeague({ ...baseInput, rosterSlots: [] });
+    await service.createLeague({
+      ...baseInput,
+      defensiveFormat: 'dst',
+      rosterSlots: [],
+    });
 
     const positionValues = seededPositionValues();
     expect(positionValues).toHaveLength(9);

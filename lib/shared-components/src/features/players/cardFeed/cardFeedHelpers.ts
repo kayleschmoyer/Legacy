@@ -7,6 +7,7 @@
  * stat-formatting rules.
  */
 
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import type { Sport } from '../../../utils/colors';
 
 // ── Position chip rail ──────────────────────────────────────────────────────
@@ -44,10 +45,18 @@ export const FOOTBALL_CARD_POSITIONS = [
   'DST',
 ] as const;
 
-export function cardPositionsForSport(sport: Sport): readonly string[] {
-  return sport === 'baseball'
-    ? BASEBALL_CARD_POSITIONS
-    : FOOTBALL_CARD_POSITIONS;
+/**
+ * The chips to render for a sport. The football DST chip is dropped while no
+ * team-defense data exists (LS-10727) — it could only return zero players.
+ */
+export function cardPositionsForSport(
+  sport: Sport,
+  dstAvailable: boolean = FOOTBALL_DST_DATA_AVAILABLE,
+): readonly string[] {
+  if (sport === 'baseball') return BASEBALL_CARD_POSITIONS;
+  return dstAvailable
+    ? FOOTBALL_CARD_POSITIONS
+    : FOOTBALL_CARD_POSITIONS.filter((p) => p !== 'DST');
 }
 
 /** GraphQL `position` filter value for a chip selection — `'ALL'` clears it. */

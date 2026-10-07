@@ -12,8 +12,9 @@
  *      headers (YDS/TD/INT/RTG) render.
  *   3. Header sort — clicking "Sort by TD" on the Passing tab issues a request
  *      with sortBy 'passing.td' desc and persists sortBy=passing.td to the URL.
- *   4. DST tab — request with category 'defense' (the Defense tab maps to
- *      'idp'; DST maps to 'defense').
+ *   4. DST tab hidden (LS-10727) — the Defense tab still maps to 'idp', the
+ *      team-defense DST tab is not offered, and a view=defense deep link
+ *      lands on Overview.
  *   5. Pagination — totalCount 60 @ pageSize 25 → 'Next →' issues a request
  *      with the offset cursor after: '25'.
  *   6. Sport switch regression (LS-8566) — from the NFL view the MLB control
@@ -447,10 +448,10 @@ test.describe('NFL stats — Passing tab (LS-8566) @regression', () => {
   });
 });
 
-// ── 4. DST tab ────────────────────────────────────────────────────────────────
+// ── 4. DST tab hidden (LS-10727) ─────────────────────────────────────────────
 
-test.describe('NFL stats — DST tab (LS-8566) @regression', () => {
-  test('DST tab requests category defense (Defense tab maps to idp)', async ({
+test.describe('NFL stats — DST tab hidden until team-defense data exists (LS-10727) @regression', () => {
+  test('Defense tab requests category idp and no DST tab is offered', async ({
     page,
   }) => {
     await mockStatsGrids(page);
@@ -468,17 +469,19 @@ test.describe('NFL stats — DST tab (LS-8566) @regression', () => {
       page.getByTestId('player-list-table').getByText('Micah Parsons'),
     ).toBeVisible();
 
-    // …while the DST tab sends category 'defense'.
-    const dstRequest = waitForGridRequest(
-      page,
-      (v) => v.category === 'defense',
-    );
-    await statsTab(page, 'DST').click();
-    const dstVariables = await dstRequest;
-    expect(dstVariables.sortBy).toBe('defense.sacks');
-    expect(dstVariables.sortDir).toBe('desc');
+    // …and the team-defense DST tab is not offered while it has no data.
+    await expect(statsTab(page, 'DST')).toHaveCount(0);
+  });
+
+  test('a view=defense deep link lands on Overview instead of an empty DST grid', async ({
+    page,
+  }) => {
+    await mockStatsGrids(page);
+    const overviewRequest = waitForGridRequest(page, (v) => v.category == null);
+    await page.goto(`${PAGE_URL}&view=defense`);
+    await overviewRequest;
     await expect(
-      page.getByTestId('player-list-table').getByText('San Francisco 49ers'),
+      page.getByTestId('player-list-table').getByText('Patrick Mahomes'),
     ).toBeVisible();
   });
 });

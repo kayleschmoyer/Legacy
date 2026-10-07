@@ -12,7 +12,9 @@
  * Roster positions are football-only (`StepRosterSettings`, LS-6147) and
  * live in the Roster & Schedule section of the sport-aware
  * `LeagueCreatePage`; the defensive format (D/ST vs IDP) that determines
- * which slots exist lives in the separate Scoring Format section.
+ * which slots exist lives in the separate Scoring Format section. D/ST is
+ * hidden while no team-defense players exist (LS-10727), so leagues default
+ * to the IDP slot set.
  *
  * All GraphQL responses are mocked (hermetic) — no live backend required.
  */
@@ -85,10 +87,11 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
     await leaguePage.rosterPositionsConfig.expectVisible();
   });
 
-  test('displays the default D/ST roster slots with correct labels and totals', async ({
+  test('displays the default IDP roster slots with correct labels and totals', async ({
     leaguePage,
   }) => {
-    // Default (D/ST) slot set and counts, from DST_ROSTER_DEFAULTS.
+    // Default (IDP) slot set and counts, from IDP_ROSTER_DEFAULTS. D/ST is not
+    // offered while no team-defense players exist (LS-10727).
     const expectedDefaults: Record<string, number> = {
       QB: 1,
       RB: 2,
@@ -96,7 +99,9 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
       TE: 1,
       FLEX: 1,
       K: 1,
-      DST: 1,
+      DL: 2,
+      LB: 2,
+      DB: 2,
       BN: 6,
     };
 
@@ -105,10 +110,8 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
       expect(await leaguePage.rosterSlotCount(slot)).toBe(count);
     }
 
-    // IDP-only slots are absent by default.
-    await leaguePage.rosterSlotRow('DL').expectHidden();
-    await leaguePage.rosterSlotRow('LB').expectHidden();
-    await leaguePage.rosterSlotRow('DB').expectHidden();
+    // The team-defense slot is absent.
+    await leaguePage.rosterSlotRow('DST').expectHidden();
 
     await leaguePage.rosterPositionsTotals.expectVisible();
     const starters = await leaguePage
@@ -120,9 +123,9 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
     const total = await leaguePage
       .testId('roster-positions-totals-total')
       .text();
-    expect(Number(starters)).toBe(9); // QB+RB+WR+TE+FLEX+K+DST
+    expect(Number(starters)).toBe(14); // QB+RB+WR+TE+FLEX+K+DL+LB+DB
     expect(Number(bench)).toBe(6);
-    expect(Number(total)).toBe(15);
+    expect(Number(total)).toBe(20);
   });
 
   test('adjusting a slot count updates the row and the Starters/Total summary live', async ({
@@ -135,40 +138,24 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
 
     await leaguePage
       .testId('roster-positions-totals-starters')
-      .expectContainsText('11');
+      .expectContainsText('16');
     await leaguePage
       .testId('roster-positions-totals-total')
-      .expectContainsText('17');
+      .expectContainsText('22');
 
     await leaguePage.decrementRosterSlot('WR', 1);
     expect(await leaguePage.rosterSlotCount('WR')).toBe(3);
     await leaguePage
       .testId('roster-positions-totals-total')
-      .expectContainsText('16');
+      .expectContainsText('21');
   });
 
-  test("switching to IDP swaps the DST slot for DL/LB/DB and resets to that format's defaults", async ({
+  test('D/ST is not offered while no team-defense players exist (LS-10727)', async ({
     leaguePage,
   }) => {
     await leaguePage.expandSection('football-scoring');
-    await leaguePage.selectDefensiveFormat('idp');
-
-    await leaguePage.rosterSlotRow('DST').expectHidden();
-    const idpDefaults: Record<string, number> = { DL: 2, LB: 2, DB: 2 };
-    for (const [slot, count] of Object.entries(idpDefaults)) {
-      await leaguePage.rosterSlotRow(slot).expectVisible();
-      expect(await leaguePage.rosterSlotCount(slot)).toBe(count);
-    }
-
-    await leaguePage
-      .testId('roster-positions-totals-total')
-      .expectContainsText('20');
-
-    // Switching back to D/ST restores the DST slot and its defaults.
-    await leaguePage.selectDefensiveFormat('dst');
-    await leaguePage.rosterSlotRow('DST').expectVisible();
-    expect(await leaguePage.rosterSlotCount('DST')).toBe(1);
-    await leaguePage.rosterSlotRow('DL').expectHidden();
+    await leaguePage.testId('defensive-format-idp').expectVisible();
+    await leaguePage.testId('defensive-format-dst').expectHidden();
   });
 
   test('creating the league submits the adjusted per-slot roster configuration', async ({
@@ -198,13 +185,15 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
       WR: 2,
       TE: 2,
       FLEX: 1,
-      DST: 1,
+      DL: 2,
+      LB: 2,
+      DB: 2,
     });
     // Bench never appears as its own position_slot entry — it is folded
     // into maxRosterSize instead (LS-6147).
     expect(bySlot.BN).toBeUndefined();
     expect(bySlot.K).toBeUndefined();
-    expect(captured[0].maxRosterSize).toBe(15);
+    expect(captured[0].maxRosterSize).toBe(20);
   });
 });
 
@@ -239,7 +228,7 @@ test.describe('Create League (Football) – Custom Roster Positions @regression'
     expect(await leaguePage.rosterPremiumSlotCount('SFLEX')).toBe(1);
     await leaguePage
       .testId('roster-positions-totals-total')
-      .expectContainsText('16');
+      .expectContainsText('21');
 
     await leaguePage.fillLeagueName('Superflex League');
     await leaguePage.submitCreate();

@@ -9,6 +9,14 @@ import {
 } from '@testing-library/react';
 import { CreateLeagueWizard } from './CreateLeagueWizard';
 
+// These suites cover the D/ST-enabled wizard (LS-6146/LS-6154), which returns
+// once team-defense data lands; the hidden-D/ST state (LS-10727) is covered in
+// CreateLeagueWizard.dstGate.spec.ts and wizard/StepDefensiveFormat.spec.tsx.
+jest.mock('@legacy-sports/utils', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@legacy-sports/utils'),
+  FOOTBALL_DST_DATA_AVAILABLE: true,
+}));
+
 const mockNavigate = jest.fn();
 const mockCreateLeague = jest.fn();
 const mockUseCreateLeagueAndTeamsMutation = jest.fn(() => [

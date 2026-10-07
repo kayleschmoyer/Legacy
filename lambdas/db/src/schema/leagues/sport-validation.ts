@@ -66,7 +66,10 @@ export const ROSTER_RANGE_BY_SPORT: Record<SportKind, RosterRange> = {
   football: { min: 10, max: 25 },
 };
 
-import { GAMES_PER_MATCHUP_BY_SPORT } from '@legacy-sports/utils';
+import {
+  FOOTBALL_DST_DATA_AVAILABLE,
+  GAMES_PER_MATCHUP_BY_SPORT,
+} from '@legacy-sports/utils';
 
 /** True when gamesPerMatchup is within the sport's allowed range. */
 export function isGamesPerMatchupValidForSport(
@@ -122,4 +125,20 @@ export function isCustomEraYearValidForSport(
   currentYear: number = new Date().getFullYear(),
 ): boolean {
   return year >= CUSTOM_ERA_MIN_YEAR_BY_SPORT[sport] && year <= currentYear;
+}
+
+/**
+ * False when a new league asks for a defensive format whose players don't
+ * exist yet (LS-10727). A D/ST football league has a required DST roster
+ * slot, and no team-defense players exist until the ingest ships, so the
+ * slot could never be filled. Only creation is gated: existing D/ST leagues
+ * keep their format, and auto-pick already falls back to a bench pick when
+ * no DST candidate exists.
+ */
+export function isDefensiveFormatAvailable(
+  sport: SportKind,
+  defensiveFormat: string | null | undefined,
+  dstAvailable: boolean = FOOTBALL_DST_DATA_AVAILABLE,
+): boolean {
+  return sport !== 'football' || defensiveFormat !== 'dst' || dstAvailable;
 }

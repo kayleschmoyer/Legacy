@@ -1,22 +1,27 @@
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import {
   buildFootballQueryVars,
   buildFootballStatsQuery,
   DEFAULT_SORT_BY_VIEW,
   FOOTBALL_POOL_SORT_FIELDS,
+  FOOTBALL_POSITIONS,
   FOOTBALL_STAT_SORT_FIELDS,
   FOOTBALL_STATS_VIEWS,
   FOOTBALL_VIEW_TABS,
+  footballPositions,
+  footballViewTabs,
   isFootballSortField,
   isSortFieldValidForView,
   normalizeFootballView,
+  parseFootballPositions,
   resolveSortForView,
   TEAM_ALL,
 } from './footballStatsHelpers';
 
 describe('normalizeFootballView', () => {
-  it('passes through every canonical view', () => {
-    for (const view of FOOTBALL_STATS_VIEWS) {
-      expect(normalizeFootballView(view)).toBe(view);
+  it('passes through every offered view', () => {
+    for (const { key } of FOOTBALL_VIEW_TABS) {
+      expect(normalizeFootballView(key)).toBe(key);
     }
   });
 
@@ -28,19 +33,61 @@ describe('normalizeFootballView', () => {
   );
 });
 
-describe('FOOTBALL_VIEW_TABS', () => {
-  it('covers every view once, in display order', () => {
-    expect(FOOTBALL_VIEW_TABS.map((t) => t.key)).toEqual([
+describe('footballViewTabs', () => {
+  it('covers every view once, in display order, once DST data exists', () => {
+    expect(footballViewTabs(true).map((t) => t.key)).toEqual([
       ...FOOTBALL_STATS_VIEWS,
     ]);
   });
 
   it('labels the IDP view "Defense" and the DST view "DST"', () => {
-    expect(FOOTBALL_VIEW_TABS.find((t) => t.key === 'idp')?.label).toBe(
-      'Defense',
+    const tabs = footballViewTabs(true);
+    expect(tabs.find((t) => t.key === 'idp')?.label).toBe('Defense');
+    expect(tabs.find((t) => t.key === 'defense')?.label).toBe('DST');
+  });
+
+  it('hides the DST tab while no team-defense data exists (LS-10727)', () => {
+    expect(footballViewTabs(false).map((t) => t.key)).toEqual(
+      FOOTBALL_STATS_VIEWS.filter((v) => v !== 'defense'),
     );
-    expect(FOOTBALL_VIEW_TABS.find((t) => t.key === 'defense')?.label).toBe(
-      'DST',
+  });
+
+  it('gates the exported tabs on FOOTBALL_DST_DATA_AVAILABLE', () => {
+    expect(FOOTBALL_VIEW_TABS).toEqual(
+      footballViewTabs(FOOTBALL_DST_DATA_AVAILABLE),
+    );
+  });
+});
+
+describe('footballPositions', () => {
+  it('offers the DST pill once DST data exists', () => {
+    expect(footballPositions(true)).toContain('DST');
+  });
+
+  it('hides the DST pill while no team-defense data exists (LS-10727)', () => {
+    expect(footballPositions(false)).not.toContain('DST');
+    expect(footballPositions(false)).toEqual(
+      footballPositions(true).filter((p) => p !== 'DST'),
+    );
+  });
+
+  it('gates the exported pills on FOOTBALL_DST_DATA_AVAILABLE', () => {
+    expect(FOOTBALL_POSITIONS).toEqual(
+      footballPositions(FOOTBALL_DST_DATA_AVAILABLE),
+    );
+  });
+});
+
+describe('DST deep links (LS-10727)', () => {
+  it('keeps view=defense only while the DST tab is offered', () => {
+    expect(normalizeFootballView('defense')).toBe(
+      FOOTBALL_DST_DATA_AVAILABLE ? 'defense' : 'overview',
+    );
+  });
+
+  it('keeps DST in a position=… param only while the DST pill is offered', () => {
+    expect(parseFootballPositions('QB,DST,K')).toEqual(
+      FOOTBALL_DST_DATA_AVAILABLE ? ['QB', 'DST', 'K'] : ['QB', 'K'],
     );
   });
 });

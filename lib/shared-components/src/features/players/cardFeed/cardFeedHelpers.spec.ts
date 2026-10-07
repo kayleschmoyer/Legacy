@@ -14,8 +14,21 @@ describe('cardPositionsForSport', () => {
     expect(cardPositionsForSport('baseball')).toBe(BASEBALL_CARD_POSITIONS);
   });
 
-  test('returns the football chip set for football', () => {
-    expect(cardPositionsForSport('football')).toBe(FOOTBALL_CARD_POSITIONS);
+  test('returns the full football chip set once DST data exists', () => {
+    expect(cardPositionsForSport('football', true)).toBe(
+      FOOTBALL_CARD_POSITIONS,
+    );
+  });
+
+  test('drops the DST chip while no team-defense data exists (LS-10727)', () => {
+    expect(cardPositionsForSport('football', false)).toEqual([
+      'ALL',
+      'QB',
+      'RB',
+      'WR',
+      'TE',
+      'K',
+    ]);
   });
 
   test('baseball chip set matches the design handoff exactly', () => {

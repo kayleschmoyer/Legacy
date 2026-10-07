@@ -4,11 +4,12 @@
 // (LS-8442) so both the toolbar controller and the grid draw the same
 // key-stat, formatting, and filter logic from one place.
 
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import type { FootballPlayerCardStats } from '../../football';
 import { NFL_TEAMS } from '../../../constants/nflTeams';
 
-/** Selectable football positions, in display order. */
-export const FOOTBALL_POSITIONS = [
+/** Every football position the stats page knows, in display order. */
+const ALL_FOOTBALL_POSITIONS = [
   'QB',
   'RB',
   'WR',
@@ -21,7 +22,22 @@ export const FOOTBALL_POSITIONS = [
   'DB',
 ] as const;
 
-export type FootballPosition = (typeof FOOTBALL_POSITIONS)[number];
+export type FootballPosition = (typeof ALL_FOOTBALL_POSITIONS)[number];
+
+/**
+ * Selectable position pills. DST is left out while no team-defense data
+ * exists (LS-10727): its chip could only ever return zero players.
+ */
+export function footballPositions(
+  dstAvailable: boolean = FOOTBALL_DST_DATA_AVAILABLE,
+): readonly FootballPosition[] {
+  return dstAvailable
+    ? ALL_FOOTBALL_POSITIONS
+    : ALL_FOOTBALL_POSITIONS.filter((p) => p !== 'DST');
+}
+
+/** Selectable football positions, in display order. */
+export const FOOTBALL_POSITIONS = footballPositions();
 
 const VALID_POSITIONS = new Set<string>(FOOTBALL_POSITIONS);
 
@@ -79,10 +95,8 @@ export const FOOTBALL_STATS_VIEWS = [
 
 export type FootballStatsView = (typeof FOOTBALL_STATS_VIEWS)[number];
 
-const VALID_VIEWS = new Set<string>(FOOTBALL_STATS_VIEWS);
-
 /** Tab labels, keyed by view. `idp` reads "Defense"; `defense` reads "DST". */
-export const FOOTBALL_VIEW_TABS: readonly {
+const ALL_FOOTBALL_VIEW_TABS: readonly {
   key: FootballStatsView;
   label: string;
 }[] = [
@@ -94,6 +108,24 @@ export const FOOTBALL_VIEW_TABS: readonly {
   { key: 'idp', label: 'Defense' },
   { key: 'defense', label: 'DST' },
 ];
+
+/**
+ * The tabs to offer. The DST tab is hidden while no team-defense data exists
+ * (LS-10727) rather than rendering a silent "0 players".
+ */
+export function footballViewTabs(
+  dstAvailable: boolean = FOOTBALL_DST_DATA_AVAILABLE,
+): readonly { key: FootballStatsView; label: string }[] {
+  return dstAvailable
+    ? ALL_FOOTBALL_VIEW_TABS
+    : ALL_FOOTBALL_VIEW_TABS.filter((t) => t.key !== 'defense');
+}
+
+export const FOOTBALL_VIEW_TABS = footballViewTabs();
+
+// Only offered tabs are valid, so a stale `view=defense` deep link lands on
+// the overview instead of an empty DST grid.
+const VALID_VIEWS = new Set<string>(FOOTBALL_VIEW_TABS.map((t) => t.key));
 
 /**
  * Normalize an untrusted `view` value (URL param) to a canonical view,

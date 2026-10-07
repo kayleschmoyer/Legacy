@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
+import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
 import {
   type FootballStatsPageProps,
   useFootballController,
@@ -45,7 +46,7 @@ describe('useFootballController tabs + sort (LS-8566)', () => {
     jest.useRealTimers();
   });
 
-  it('surfaces the seven stats-grid tabs in display order', () => {
+  it('surfaces the stats-grid tabs in display order, DST only when its data exists (LS-10727)', () => {
     render(<Harness isPremium />);
     expect(controllerRef.current?.tabs).toEqual([
       { id: 'overview', label: 'Overview' },
@@ -54,7 +55,7 @@ describe('useFootballController tabs + sort (LS-8566)', () => {
       { id: 'receiving', label: 'Receiving' },
       { id: 'kicking', label: 'Kicking' },
       { id: 'idp', label: 'Defense' },
-      { id: 'defense', label: 'DST' },
+      ...(FOOTBALL_DST_DATA_AVAILABLE ? [{ id: 'defense', label: 'DST' }] : []),
     ]);
     expect(controllerRef.current?.activeTab).toBe('overview');
   });
@@ -149,9 +150,9 @@ describe('useFootballController tabs + sort (LS-8566)', () => {
       };
       const onFiltersChange = jest.fn((state: FiltersState) => state);
       render(<Harness isPremium onFiltersChange={onFiltersChange} />);
-      act(() => controllerRef.current?.onTabChange('defense'));
+      act(() => controllerRef.current?.onTabChange('idp'));
       expect(onFiltersChange).toHaveBeenLastCalledWith(
-        expect.objectContaining({ view: 'defense' }),
+        expect.objectContaining({ view: 'idp' }),
       );
       const calls = onFiltersChange.mock.calls;
       const lastState = calls[calls.length - 1][0];
