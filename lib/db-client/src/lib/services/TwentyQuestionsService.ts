@@ -75,8 +75,8 @@ export function readNumberList(
   return typeof single === 'number' && Number.isFinite(single) ? [single] : [];
 }
 
-// Whitelisted stat column names for stat_threshold queries (prevents SQL injection)
-const VALID_BATTING_STATS = new Set([
+// Whitelisted stat columns for stat_threshold queries
+const VALID_BATTING_STATS = [
   'hr',
   'h',
   'rbi',
@@ -87,8 +87,21 @@ const VALID_BATTING_STATS = new Set([
   'bb',
   'tb',
   'g',
-]);
-const VALID_PITCHING_STATS = new Set(['w', 'so', 'sv', 'sho', 'cg', 'g', 'gs']);
+] as const;
+const VALID_PITCHING_STATS = ['w', 'so', 'sv', 'sho', 'cg', 'g', 'gs'] as const;
+
+function isOneOf<T extends string>(
+  list: readonly T[],
+  value: string,
+): value is T {
+  return (list as readonly string[]).includes(value);
+}
+
+// A player traded mid-season has one row per team plus a combined summary row
+// (team '2TM'/'3TM'/..., lg_id '2LG' when the teams span leagues). Summing all
+// rows double-counts that season, so career totals skip the summary rows
+// (LS-10724).
+const MULTI_TEAM_SUMMARY_PATTERN = '^[0-9]+TM$';
 
 // Career-games cutoffs for the medium (>= mediumMin) and hard (1..mediumMin-1)
 // pools. Baseball keeps its original 100-game split. Football careers run ~17
@@ -617,30 +630,47 @@ export class TwentyQuestionsService {
         const threshold = parameter['threshold'] as number;
         const playerType = parameter['playerType'] as string;
 
+        // Typed select, not db.execute: the node-postgres driver returns a
+        // QueryResult ({ rows }) from execute, so indexing it as an array read
+        // undefined and every threshold above 0 answered NO (LS-10724).
         if (playerType === 'pitcher') {
-          if (!VALID_PITCHING_STATS.has(statRaw)) {
+          if (!isOneOf(VALID_PITCHING_STATS, statRaw)) {
             throw new Error(`Invalid pitching stat: ${statRaw}`);
           }
-          const result = await db.execute(
-            sql`SELECT COALESCE(SUM(${sql.raw(statRaw)}), 0)::int AS total
-                FROM season_pitching
-                WHERE player_id = ${playerId}`,
-          );
-          const total =
-            (result as unknown as Array<{ total: number }>)[0]?.total ?? 0;
-          return total >= threshold;
+          const table = PublicSchema.seasonPitching;
+          const [row] = await db
+            .select({
+              total: sql<number>`COALESCE(SUM(${table[statRaw]}), 0)`.mapWith(
+                Number,
+              ),
+            })
+            .from(table)
+            .where(
+              and(
+                eq(table.playerId, playerId),
+                sql`${table.team} !~ ${MULTI_TEAM_SUMMARY_PATTERN}`,
+              ),
+            );
+          return (row?.total ?? 0) >= threshold;
         } else {
-          if (!VALID_BATTING_STATS.has(statRaw)) {
+          if (!isOneOf(VALID_BATTING_STATS, statRaw)) {
             throw new Error(`Invalid batting stat: ${statRaw}`);
           }
-          const result = await db.execute(
-            sql`SELECT COALESCE(SUM(${sql.raw(statRaw)}), 0)::int AS total
-                FROM season_batting
-                WHERE player_id = ${playerId}`,
-          );
-          const total =
-            (result as unknown as Array<{ total: number }>)[0]?.total ?? 0;
-          return total >= threshold;
+          const table = PublicSchema.seasonBatting;
+          const [row] = await db
+            .select({
+              total: sql<number>`COALESCE(SUM(${table[statRaw]}), 0)`.mapWith(
+                Number,
+              ),
+            })
+            .from(table)
+            .where(
+              and(
+                eq(table.playerId, playerId),
+                sql`${table.team} !~ ${MULTI_TEAM_SUMMARY_PATTERN}`,
+              ),
+            );
+          return (row?.total ?? 0) >= threshold;
         }
       }
 

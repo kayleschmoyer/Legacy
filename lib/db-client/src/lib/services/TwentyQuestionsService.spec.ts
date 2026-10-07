@@ -4,9 +4,11 @@
  * Covers:
  *   - getPlayerPool: returns player IDs filtered by sport for each difficulty
  *   - startGame: stores the provided sport in the inserted game row
+ *   - askQuestion stat_threshold: career sums answer correctly (LS-10724)
  */
 
-import { gte, lte } from 'drizzle-orm';
+import { gte, lte, type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   readNumberList,
   readStringList,
@@ -51,6 +53,8 @@ jest.mock('../../drizzle/public/schema', () => ({
     gameId: 'game_id',
     questionNumber: 'question_number',
   },
+  seasonPitching: { playerId: 'player_id', team: 'team', so: 'so', w: 'w' },
+  seasonBatting: { playerId: 'player_id', team: 'team', h: 'h', hr: 'hr' },
 }));
 
 /**
@@ -84,11 +88,16 @@ function makeMockDb() {
     insert: jest.fn(),
     values: jest.fn(),
     returning: jest.fn(),
+    update: jest.fn(),
+    set: jest.fn(),
+    execute: jest.fn(),
   };
   db.select.mockReturnValue(db);
   db.from.mockReturnValue(db);
   db.insert.mockReturnValue(db);
   db.values.mockReturnValue(db);
+  db.update.mockReturnValue(db);
+  db.set.mockReturnValue(db);
   return db;
 }
 
@@ -381,5 +390,93 @@ describe('TwentyQuestionsService — readNumberList (multi-select decade reader)
 
   it('returns empty for an empty plural array', () => {
     expect(readNumberList({ decades: [] }, 'decades', 'decade')).toEqual([]);
+  });
+});
+
+describe('TwentyQuestionsService — askQuestion stat_threshold (LS-10724)', () => {
+  const activeGame = {
+    id: 'game-uuid',
+    userId: 7,
+    targetPlayerId: 4342,
+    status: 'active',
+    questionsUsed: 0,
+    maxQuestions: 20,
+  };
+
+  /**
+   * Wires the mock db for one askQuestion call: the ownership lookup returns
+   * the active game and the stat-sum select returns `sumRows`. `execute`
+   * mimics node-postgres (QueryResult with `rows`), so a regression back to
+   * `db.execute` indexed as an array would read 0 and answer NO.
+   */
+  function setup(sumRows: Array<{ total: number }>) {
+    const db = makeMockDb();
+    db.where
+      .mockReturnValueOnce(chainResult([], [activeGame]))
+      .mockReturnValueOnce(chainResult(sumRows))
+      .mockReturnValueOnce(chainResult([]));
+    db.execute.mockResolvedValue({ rows: sumRows });
+    return db;
+  }
+
+  async function ask(
+    db: ReturnType<typeof makeMockDb>,
+    parameter: Record<string, unknown>,
+  ) {
+    const { answer } = await TwentyQuestionsService.askQuestion(
+      db as never,
+      'game-uuid',
+      7,
+      'stat_threshold',
+      parameter,
+    );
+    return answer;
+  }
+
+  it('answers YES when the career pitching total meets the threshold', async () => {
+    const db = setup([{ total: 906 }]);
+    await expect(
+      ask(db, { stat: 'so', threshold: 1, playerType: 'pitcher' }),
+    ).resolves.toBe(true);
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('answers YES when the career batting total meets the threshold', async () => {
+    const db = setup([{ total: 36 }]);
+    await expect(
+      ask(db, { stat: 'h', threshold: 36, playerType: 'batter' }),
+    ).resolves.toBe(true);
+  });
+
+  it('answers NO when the career total is below the threshold', async () => {
+    const db = setup([{ total: 87 }]);
+    await expect(
+      ask(db, { stat: 'w', threshold: 100, playerType: 'pitcher' }),
+    ).resolves.toBe(false);
+  });
+
+  it('records the answer it computed', async () => {
+    const db = setup([{ total: 1152 }]);
+    await ask(db, { stat: 'so', threshold: 500, playerType: 'pitcher' });
+    expect(db.values).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'stat_threshold', answer: true }),
+    );
+  });
+
+  it('excludes multi-team summary rows so traded seasons are not double-counted', async () => {
+    const db = setup([{ total: 906 }]);
+    await ask(db, { stat: 'so', threshold: 1, playerType: 'pitcher' });
+    const whereCalls = db.where.mock.calls as unknown[][];
+    const sumWhere = whereCalls[1][0] as SQL;
+    const { sql: text, params } = new PgDialect().sqlToQuery(sumWhere);
+    expect(text).toContain('!~');
+    expect(params).toEqual(expect.arrayContaining([4342, '^[0-9]+TM$']));
+  });
+
+  it('rejects a stat outside the whitelist', async () => {
+    const db = setup([]);
+    await expect(
+      ask(db, { stat: 'era', threshold: 3, playerType: 'pitcher' }),
+    ).rejects.toThrow('Invalid pitching stat: era');
   });
 });
