@@ -14,3 +14,10 @@ query GetLeagueActivity(
     occurredAt
   }
 }
+
+query GetLeagueActivityCounts($leagueId: Int!) {
+  leagueActivityCounts(leagueId: $leagueId) {
+    eventType
+    count
+  }
+}

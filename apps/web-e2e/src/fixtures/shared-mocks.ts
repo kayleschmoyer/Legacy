@@ -286,6 +286,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   matchupscores: { data: { matchupScores: [] } },
   getleaguescoringprofile: leagueScoringProfileResponse(),
   getleagueactivity: { data: { leagueActivity: [] } },
+  // LeagueActivityFeed's filter-chip totals (LS-10686). Empty, matching the
+  // empty getleagueactivity baseline, so only the "All" chip renders — a
+  // null (totals unavailable) baseline would render every category chip,
+  // and the "Commissioner" chip then matches specs' commissioner-tab locators.
+  getleagueactivitycounts: { data: { leagueActivityCounts: [] } },
   getleaguechatmessages: { data: { leagueChatMessages: [] } },
   getleagueannouncements: { data: { leagueAnnouncements: [] } },
   // AwardVotingPanel fires this on the overview tab — null means no active voting period

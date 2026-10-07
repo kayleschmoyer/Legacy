@@ -1835,6 +1835,13 @@ export enum LeagueActivityEventType {
   WaiverClaimed = 'waiver_claimed',
 }
 
+/** Total number of activity events of one type in a league */
+export type LeagueActivityTypeCount = {
+  __typename?: 'LeagueActivityTypeCount';
+  count?: Maybe<Scalars['Int']['output']>;
+  eventType?: Maybe<LeagueActivityEventType>;
+};
+
 /** Comprehensive analytics for a league */
 export type LeagueAnalytics = {
   __typename?: 'LeagueAnalytics';
@@ -3946,6 +3953,8 @@ export type Query = {
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
+  /** Total number of activity events per event type for a league. Types with no events are omitted. */
+  leagueActivityCounts?: Maybe<Array<LeagueActivityTypeCount>>;
   leagueDraftSlotTrades?: Maybe<Array<DraftSlotTrade>>;
   /** Get dues settings for a league. Requires league membership. */
   leagueDuesSettings?: Maybe<LeagueDuesSettings>;
@@ -4436,6 +4445,10 @@ export type QueryLeagueActivityArgs = {
   eventTypes?: InputMaybe<Array<LeagueActivityEventType>>;
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryLeagueActivityCountsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueDraftSlotTradesArgs = {

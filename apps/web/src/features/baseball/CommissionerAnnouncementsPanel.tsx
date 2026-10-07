@@ -143,6 +143,7 @@ export function CommissionerAnnouncementsPanel({
             variables: { leagueId },
           },
           'GetLeagueActivity',
+          'GetLeagueActivityCounts',
         ],
       });
     } catch (err: unknown) {

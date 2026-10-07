@@ -74,6 +74,7 @@ jest.mock('@legacy-sports/graphql', () => ({
       error: undefined,
     }),
   ),
+  useGetLeagueActivityCountsQuery: jest.fn(() => ({ data: undefined })),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({

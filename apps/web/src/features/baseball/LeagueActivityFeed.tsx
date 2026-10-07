@@ -20,6 +20,7 @@ import { UserMinus } from '@tamagui/lucide-icons/icons/UserMinus';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   LeagueActivityEventType,
+  useGetLeagueActivityCountsQuery,
   useGetLeagueActivityQuery,
 } from '@legacy-sports/graphql';
 import {
@@ -291,7 +292,35 @@ const TYPE_LABELS: Record<Exclude<ActivityType, 'all'>, string> = {
   matchup: 'Matchups',
 };
 
-const FILTER_TABS: { type: ActivityType; label: string }[] = [
+type FilterableType = 'trade' | 'waiver' | 'draft_pick' | 'commissioner';
+
+/**
+ * Server event types behind each filter chip. Filtering and chip counts are
+ * resolved server-side from these so a category whose events are older than
+ * the loaded page still shows its true total and its events (LS-10686).
+ * Only types `eventToActivityItem` renders are listed.
+ */
+const FILTER_EVENT_TYPES: Record<FilterableType, LeagueActivityEventType[]> = {
+  trade: [
+    LeagueActivityEventType.TradeProposed,
+    LeagueActivityEventType.TradeAccepted,
+    LeagueActivityEventType.TradeRejected,
+    LeagueActivityEventType.TradeCancelled,
+    LeagueActivityEventType.TradeVetoed,
+  ],
+  waiver: [
+    LeagueActivityEventType.WaiverClaimed,
+    LeagueActivityEventType.WaiverCancelled,
+  ],
+  draft_pick: [LeagueActivityEventType.DraftPickMade],
+  commissioner: [LeagueActivityEventType.LeagueAnnouncement],
+};
+
+const ALL_RENDERED_EVENT_TYPES = Object.values(FILTER_EVENT_TYPES).flat();
+
+type FilterType = 'all' | FilterableType;
+
+const FILTER_TABS: { type: FilterType; label: string }[] = [
   { type: 'all', label: 'All' },
   { type: 'trade', label: 'Trades' },
   { type: 'waiver', label: 'Waivers' },
@@ -314,11 +343,21 @@ const PAGE_SIZE = 20;
 export function LeagueActivityFeed({
   leagueId,
 }: LeagueActivityFeedProps): React.JSX.Element {
-  const [activeFilter, setActiveFilter] = useState<ActivityType>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [fetchLimit, setFetchLimit] = useState(PAGE_SIZE);
 
+  // Category filters are applied server-side so selecting a chip fetches that
+  // category's events even when they are older than the unfiltered page
+  // (LS-10686).
   const { data, loading, error } = useGetLeagueActivityQuery({
-    variables: { leagueId, limit: fetchLimit },
+    variables: {
+      leagueId,
+      limit: fetchLimit,
+      eventTypes:
+        activeFilter === 'all'
+          ? ALL_RENDERED_EVENT_TYPES
+          : FILTER_EVENT_TYPES[activeFilter],
+    },
     errorPolicy: 'all',
     // The feed aggregates events produced by many different mutations
     // (trades, waivers, announcements, draft picks) across multiple users'
@@ -330,7 +369,33 @@ export function LeagueActivityFeed({
     fetchPolicy: 'cache-and-network',
   });
 
-  const activities: ActivityItem[] = useMemo(
+  // League-wide per-type totals for the chip counts (LS-10686). While these
+  // are unavailable the chips render without counts rather than falling back
+  // to page-local counts, which read as totals but are not.
+  const { data: countsData } = useGetLeagueActivityCountsQuery({
+    variables: { leagueId },
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const totals: Record<FilterType, number> | null = useMemo(() => {
+    if (!countsData?.leagueActivityCounts) return null;
+    const byType = new Map<LeagueActivityEventType, number>();
+    for (const row of countsData.leagueActivityCounts) {
+      if (row.eventType) byType.set(row.eventType, row.count ?? 0);
+    }
+    const sum = (types: LeagueActivityEventType[]): number =>
+      types.reduce((acc, t) => acc + (byType.get(t) ?? 0), 0);
+    return {
+      all: sum(ALL_RENDERED_EVENT_TYPES),
+      trade: sum(FILTER_EVENT_TYPES.trade),
+      waiver: sum(FILTER_EVENT_TYPES.waiver),
+      draft_pick: sum(FILTER_EVENT_TYPES.draft_pick),
+      commissioner: sum(FILTER_EVENT_TYPES.commissioner),
+    };
+  }, [countsData?.leagueActivityCounts]);
+
+  const filtered: ActivityItem[] = useMemo(
     () =>
       (data?.leagueActivity ?? [])
         .map(eventToActivityItem)
@@ -338,19 +403,11 @@ export function LeagueActivityFeed({
     [data?.leagueActivity],
   );
 
-  const filtered = useMemo(
-    () =>
-      activeFilter === 'all'
-        ? activities
-        : activities.filter((a) => a.type === activeFilter),
-    [activities, activeFilter],
-  );
-
   // When the server returns exactly `fetchLimit` items there may be more to load.
   const hasMore =
     data?.leagueActivity != null && data.leagueActivity.length >= fetchLimit;
 
-  const selectFilter = (type: ActivityType): void => {
+  const selectFilter = (type: FilterType): void => {
     setActiveFilter(type);
     setFetchLimit(PAGE_SIZE);
   };
@@ -381,11 +438,11 @@ export function LeagueActivityFeed({
         <XStack gap="$2" paddingBottom="$1">
           {FILTER_TABS.map(({ type, label }) => {
             const isActive = activeFilter === type;
-            const count =
-              type === 'all'
-                ? activities.length
-                : activities.filter((a) => a.type === type).length;
-            if (count === 0 && type !== 'all') return null;
+            const count = totals?.[type] ?? 0;
+            // Hide a category only when the league truly has none of it.
+            if (totals && count === 0 && type !== 'all' && !isActive) {
+              return null;
+            }
             return (
               <Button
                 key={type}

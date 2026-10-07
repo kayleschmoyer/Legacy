@@ -190,7 +190,11 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
         // refetches run in the background so setSuccess(true) fires as
         // soon as the mutation resolves, not after the refetches complete
         // (LS-4213).
-        refetchQueries: ['GetTeamWaiverClaims', 'GetLeagueActivity'],
+        refetchQueries: [
+          'GetTeamWaiverClaims',
+          'GetLeagueActivity',
+          'GetLeagueActivityCounts',
+        ],
       });
       setSuccess(true);
     } catch (err) {

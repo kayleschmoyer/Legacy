@@ -7,6 +7,7 @@
  *   - Returns paginated activity feed for a league member
  *   - Default limit and cap at 100
  *   - Optional eventTypes filter
+ *   - leagueActivityCounts per-type totals (LS-10686)
  */
 
 import type { GraphQLSchema } from 'graphql';
@@ -19,6 +20,7 @@ describe('leagueActivity resolver', () => {
     where: jest.Mock;
     orderBy: jest.Mock;
     limit: jest.Mock;
+    groupBy: jest.Mock;
     then: jest.Mock;
   };
   let mockContext: {
@@ -36,6 +38,7 @@ describe('leagueActivity resolver', () => {
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
       then: jest.fn((resolve) => resolve([])),
     };
 
@@ -393,5 +396,63 @@ describe('leagueActivity resolver', () => {
 
     const { inArray } = require('drizzle-orm') as { inArray: jest.Mock };
     expect(inArray).not.toHaveBeenCalled();
+  });
+
+  describe('leagueActivityCounts', () => {
+    function getCountsResolver() {
+      const field = schema.getQueryType()?.getFields().leagueActivityCounts;
+      if (!field?.resolve) {
+        throw new Error('leagueActivityCounts resolver not found');
+      }
+      return field.resolve.bind(field);
+    }
+
+    it('throws UNAUTHENTICATED when no user is in context', async () => {
+      mockContext.user = null;
+
+      await expect(
+        getCountsResolver()(
+          {},
+          { leagueId: 1 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+    });
+
+    it('throws FORBIDDEN when the user is not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      await expect(
+        getCountsResolver()(
+          {},
+          { leagueId: 1 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('returns per-type totals grouped by event type', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]);
+      // Postgres count() can surface as a string; the resolver coerces it.
+      mockDb.groupBy.mockResolvedValueOnce([
+        { eventType: 'trade_proposed', count: 12 },
+        { eventType: 'draft_pick_made', count: '4' },
+      ]);
+
+      const result = await getCountsResolver()(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.groupBy).toHaveBeenCalledWith('eventType');
+      expect(result).toEqual([
+        { eventType: 'trade_proposed', count: 12 },
+        { eventType: 'draft_pick_made', count: 4 },
+      ]);
+    });
   });
 });

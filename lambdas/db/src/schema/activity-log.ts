@@ -1,16 +1,16 @@
 /**
  * League Activity Log — Query resolvers (LS-356)
  *
- * Queries: leagueActivity
+ * Queries: leagueActivity, leagueActivityCounts
  *
  * Returns a chronological feed of league events (trades, waiver claims,
  * draft picks, announcements) from the `league_activity_log` table.
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 
-import { builder } from './builder';
+import { builder, type Context } from './builder';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // ── GraphQL enum ───────────────────────────────────────────────────────────
@@ -75,6 +75,49 @@ builder.objectType(LeagueActivityEvent, {
   }),
 });
 
+const LeagueActivityTypeCount = builder.objectRef<{
+  eventType: (typeof PublicSchema.leagueActivityEventType.enumValues)[number];
+  count: number;
+}>('LeagueActivityTypeCount');
+
+builder.objectType(LeagueActivityTypeCount, {
+  description: 'Total number of activity events of one type in a league',
+  fields: (t) => ({
+    eventType: t.field({
+      type: LeagueActivityEventTypeEnum,
+      resolve: (c) => c.eventType,
+    }),
+    count: t.exposeInt('count'),
+  }),
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Throws unless the caller is signed in and a member of the league. */
+async function assertLeagueMember(
+  context: Context,
+  leagueId: number,
+): Promise<void> {
+  if (!context.user) {
+    throw AuthenticationError();
+  }
+
+  const membership = await context.db
+    .select({ id: PublicSchema.leagueMembers.leagueId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, context.user.id),
+      ),
+    )
+    .limit(1);
+
+  if (membership.length === 0) {
+    throw ForbiddenError('Not a member of this league');
+  }
+}
+
 // ── Query ──────────────────────────────────────────────────────────────────
 
 builder.queryField('leagueActivity', (t) =>
@@ -92,28 +135,10 @@ builder.queryField('leagueActivity', (t) =>
       }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
-
       const { leagueId } = args;
       const limit = Math.min(args.limit ?? 20, 100);
 
-      // Verify the caller is a member of the league
-      const membership = await context.db
-        .select({ id: PublicSchema.leagueMembers.leagueId })
-        .from(PublicSchema.leagueMembers)
-        .where(
-          and(
-            eq(PublicSchema.leagueMembers.leagueId, leagueId),
-            eq(PublicSchema.leagueMembers.userId, context.user.id),
-          ),
-        )
-        .limit(1);
-
-      if (membership.length === 0) {
-        throw ForbiddenError('Not a member of this league');
-      }
+      await assertLeagueMember(context, leagueId);
 
       try {
         const whereClause =
@@ -152,6 +177,46 @@ builder.queryField('leagueActivity', (t) =>
           err: err instanceof Error ? err.message : String(err),
         });
         throw new Error('Failed to fetch league activity');
+      }
+    },
+  }),
+);
+
+// Per-type totals so the feed's filter chips reflect the whole league history,
+// not just the loaded page (LS-10686).
+builder.queryField('leagueActivityCounts', (t) =>
+  t.field({
+    type: [LeagueActivityTypeCount],
+    description:
+      'Total number of activity events per event type for a league. ' +
+      'Types with no events are omitted.',
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      const { leagueId } = args;
+      await assertLeagueMember(context, leagueId);
+
+      try {
+        const rows = await context.db
+          .select({
+            eventType: PublicSchema.leagueActivityLog.eventType,
+            count: count(),
+          })
+          .from(PublicSchema.leagueActivityLog)
+          .where(eq(PublicSchema.leagueActivityLog.leagueId, leagueId))
+          .groupBy(PublicSchema.leagueActivityLog.eventType);
+
+        return rows.map((row) => ({
+          eventType: row.eventType,
+          count: Number(row.count),
+        }));
+      } catch (err) {
+        LOGGER.error('Error fetching league activity counts', {
+          leagueId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+        throw new Error('Failed to fetch league activity counts');
       }
     },
   }),
