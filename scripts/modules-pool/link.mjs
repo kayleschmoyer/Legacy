@@ -57,9 +57,11 @@
  *               sibling `<repo>.worktrees/<name>` layouts, or the main repo itself).
  * --no-salt     Hash the lockfile only (omit the pnpm version salt).
  * --print-hash  Print the resolved hash and exit (no filesystem changes).
- * --check       Doctor mode: run the deep health check on this lockfile's slot,
- *               print every finding, and exit 0 (healthy) / 1 (unhealthy or
- *               missing). No filesystem changes.
+ * --check       Doctor mode: run the deep health check on this lockfile's slot
+ *               AND verify the worktree's node_modules is a symlink resolving to
+ *               that slot, print every finding, and exit 0 (both healthy) / 1
+ *               (slot unhealthy or missing, or the worktree link missing/broken/
+ *               pointing elsewhere — LS-10941). No filesystem changes.
  * --rebuild     Quarantine this lockfile's slot (rename to <hash>.corrupt-<ts>)
  *               even if it passes the health check, then re-materialise. Use to
  *               force recovery from corruption the health check cannot see.
@@ -231,16 +233,29 @@ if (args['check']) {
   // Read-only diagnostic — no mutation, so no lock needed. A concurrent
   // materialise could make this report transiently stale, but --check never
   // acts on what it sees.
+  //
+  // A healthy slot alone is not enough: if the worktree's node_modules link
+  // was never created (e.g. mklink failed for lack of Developer Mode) every
+  // downstream nx/make call fails with "'nx' is not recognized" while the
+  // slot itself looks fine (LS-10941). Check both.
   const slotState = assessSlot(slotNm);
+  const linkFindings = assessWorktreeLink(slotNm);
   if (slotState.healthy) {
     console.log('[check] slot is healthy.');
-    process.exit(0);
+  } else {
+    console.log('[check] slot is UNHEALTHY:');
+    for (const f of slotState.findings) console.log(`  - ${f}`);
   }
-  console.log('[check] slot is UNHEALTHY:');
-  for (const f of slotState.findings) console.log(`  - ${f}`);
+  if (linkFindings.length === 0) {
+    console.log('[check] worktree node_modules link is healthy.');
+  } else {
+    console.log('[check] worktree node_modules link is UNHEALTHY:');
+    for (const f of linkFindings) console.log(`  - ${f}`);
+  }
+  if (slotState.healthy && linkFindings.length === 0) process.exit(0);
   console.log('');
   console.log(
-    'Re-run without --check to quarantine and rebuild it automatically.',
+    'Re-run without --check to quarantine/rebuild the slot and (re)link node_modules automatically.',
   );
   process.exit(1);
 }
@@ -281,6 +296,12 @@ linkNestedWorkspaceModules(slotDir);
 // resolve DB_CERT_PATH for SSL connections. Failures here are non-fatal: node_modules —
 // the primary mission — is already linked.
 linkSecretEnvFiles();
+
+// Final invariant before a success exit: never exit 0 with the worktree's
+// node_modules missing or not resolving to the slot (LS-10941) — callers
+// treat exit 0 as "nx is resolvable" and otherwise fail much later with
+// "'nx' is not recognized".
+verifyWorktreeLinkOrFail(slotNm);
 
 releaseWorktreeLock();
 
@@ -373,6 +394,51 @@ function linkWorktreeToSlot(target) {
     removeEmptyDir(nmPath);
     fail(String(err.message ?? err));
   }
+  // ensureDirSymlink returning is not proof the link exists and resolves —
+  // verify it before reporting success (LS-10941).
+  verifyWorktreeLinkOrFail(target);
+}
+
+/**
+ * Inspect the worktree's node_modules entry against the slot it should link
+ * to. Returns a list of findings — empty means it is a symlink that resolves
+ * to `target`. Read-only; shared by --check and the post-link verification.
+ */
+function assessWorktreeLink(target) {
+  const st = safeLstat(nmPath);
+  if (!st) {
+    return [`${nmPath} does not exist (node_modules was never linked)`];
+  }
+  if (!st.isSymbolicLink()) {
+    return [
+      `${nmPath} is a real ${st.isDirectory() ? 'directory' : 'file'}, not a symlink into the pool slot`,
+    ];
+  }
+  const resolved = safeRealpath(nmPath);
+  if (!resolved) {
+    return [
+      `${nmPath} is a broken symlink (-> ${safeReadlink(nmPath) ?? '?'})`,
+    ];
+  }
+  if (normalize(resolved) !== normalize(target)) {
+    return [`${nmPath} resolves to ${resolved}, expected ${target}`];
+  }
+  return [];
+}
+
+/** fail() unless the worktree's node_modules is a symlink resolving to `target`. */
+function verifyWorktreeLinkOrFail(target) {
+  const findings = assessWorktreeLink(target);
+  if (findings.length === 0) return;
+  removeEmptyDir(nmPath);
+  fail(
+    'node_modules link verification failed:\n  - ' +
+      findings.join('\n  - ') +
+      (process.platform === 'win32'
+        ? '\n\nDirectory symlinks require Windows Developer Mode.\n' +
+          'Enable it: Settings > System > For Developers > Developer Mode'
+        : ''),
+  );
 }
 
 /**

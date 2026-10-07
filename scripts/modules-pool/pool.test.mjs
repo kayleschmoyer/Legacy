@@ -833,18 +833,29 @@ function makeDirSymlink(linkPath, target) {
   }
 }
 
-test('--check exits 0 on a healthy slot', () => {
-  // --check never links, so this needs no symlink capability.
-  const root = freshMainRepo();
-  try {
-    const wt = makeWorktree(root, 'wt1');
-    prebuildSlot(root, wt);
-    const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`, '--check']);
-    assert.match(out, /slot is healthy/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
+test(
+  '--check exits 0 on a healthy, linked slot',
+  // --check also verifies the worktree's node_modules link (LS-10941), so the
+  // worktree must be linked first — which needs symlink capability.
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      prebuildSlot(root, wt);
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      const out = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--check',
+      ]);
+      assert.match(out, /slot is healthy/);
+      assert.match(out, /worktree node_modules link is healthy/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test('--check exits 1 and names each finding on a corrupt slot', () => {
   const root = freshMainRepo();
