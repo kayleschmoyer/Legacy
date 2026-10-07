@@ -15,6 +15,7 @@ import { render, screen } from '@testing-library/react';
 import { BugReportButton } from './BugReportButton';
 
 type Children = { children?: React.ReactNode };
+type AriaLabel = { 'aria-label'?: string };
 
 jest.mock('../../config/environment', () => ({
   env: {
@@ -45,17 +46,21 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
     children,
     tag,
     htmlFor,
-  }: Children & { tag?: string; htmlFor?: string }) =>
+    id,
+  }: Children & { tag?: string; htmlFor?: string; id?: string }) =>
     tag === 'label' ? (
-      <label htmlFor={htmlFor}>{children}</label>
+      <label htmlFor={htmlFor} id={id}>
+        {children}
+      </label>
     ) : (
-      <p>{children}</p>
+      <p id={id}>{children}</p>
     );
   const Button = ({
     children,
     onPress,
-  }: Children & { onPress?: () => void }) => (
-    <button type="button" onClick={onPress}>
+    'aria-label': ariaLabel,
+  }: Children & { onPress?: () => void; 'aria-label'?: string }) => (
+    <button type="button" onClick={onPress} aria-label={ariaLabel}>
       {children}
     </button>
   );
@@ -68,10 +73,27 @@ jest.mock('tamagui', () => {
     open ? <div>{children}</div> : null;
   const Dialog = Object.assign(DialogRoot, {
     Trigger: PassThrough,
-    Portal: PassThrough,
+    // Mirrors Tamagui's DialogPortalFrame: the portal frame, not
+    // Dialog.Content, is the element exposed as the modal dialog (LS-10709).
+    Portal: ({
+      children,
+      ...aria
+    }: Children & {
+      'aria-labelledby'?: string;
+      'aria-describedby'?: string;
+    }) => (
+      <div role="dialog" aria-modal="true" {...aria}>
+        {children}
+      </div>
+    ),
     Overlay: () => null,
     Content: PassThrough,
-    Close: PassThrough,
+    // Tamagui's Dialog.Close injects accessibilityLabel="Dialog Close" into
+    // its asChild child unless the child sets its own aria-label.
+    Close: ({ children }: { children: React.ReactElement<AriaLabel> }) =>
+      jest.requireActual<typeof React>('react').cloneElement(children, {
+        'aria-label': children.props['aria-label'] ?? 'Dialog Close',
+      }),
   });
   return { Dialog, ScrollView: PassThrough };
 });
@@ -120,5 +142,25 @@ describe('BugReportButton description label (LS-10700)', () => {
     expect(
       screen.getByRole('textbox', { name: "What's your idea?" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('BugReportButton dialog accessible names (LS-10709)', () => {
+  it.each([
+    ['bug', 'Report a Bug'],
+    ['feature', 'Suggest a Feature'],
+  ] as const)('names the %s dialog "%s"', (kind, title) => {
+    renderDialog(kind);
+
+    expect(screen.getByRole('dialog', { name: title })).toBeInTheDocument();
+  });
+
+  it('names the footer Cancel button "Cancel", not "Dialog Close"', () => {
+    renderDialog('bug');
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Dialog Close' }),
+    ).not.toBeInTheDocument();
   });
 });

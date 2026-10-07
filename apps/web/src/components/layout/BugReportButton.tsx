@@ -443,7 +443,14 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
         </Dialog.Trigger>
       )}
 
-      <Dialog.Portal>
+      {/* Tamagui renders the portal frame, not Dialog.Content, as the element
+          carrying the dialog role and aria-modal, so the accessible name and
+          description must live here or the dialog is announced unnamed
+          (LS-10709). */}
+      <Dialog.Portal
+        aria-labelledby="bug-report-title"
+        aria-describedby="bug-report-desc"
+      >
         <Dialog.Overlay
           animation="medium"
           enterStyle={{ opacity: 0 }}
@@ -466,8 +473,6 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
           animation="quick"
           enterStyle={{ opacity: 0, y: -16, scale: 0.97 }}
           exitStyle={{ opacity: 0, y: 8, scale: 0.98 }}
-          aria-labelledby="bug-report-title"
-          aria-describedby="bug-report-desc"
           onCloseAutoFocus={(event: Event) => {
             const target = returnFocusRef?.current;
             if (target?.isConnected) {
@@ -865,6 +870,9 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                 <Dialog.Close asChild>
                   <Button
                     data-testid="bug-report-dialog-cancel"
+                    // Without this, Dialog.Close asChild names the button
+                    // "Dialog Close" instead of its visible text (LS-10709).
+                    aria-label="Cancel"
                     size="$3"
                     backgroundColor="transparent"
                     borderWidth={1}

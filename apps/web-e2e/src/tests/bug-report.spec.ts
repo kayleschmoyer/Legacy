@@ -62,6 +62,14 @@ test.describe('Bug Report Button @smoke', () => {
     await expect(page.getByText(/describe what happened/i)).toBeVisible();
   });
 
+  test('dialog is named by its title (LS-10709)', async ({ page }) => {
+    await openBugReportViaHelpMenu(page);
+
+    await expect(
+      page.getByRole('dialog', { name: 'Report a Bug' }),
+    ).toBeVisible();
+  });
+
   test('dialog contains the description textarea and action buttons', async ({
     page,
   }) => {
@@ -77,11 +85,10 @@ test.describe('Bug Report Button @smoke', () => {
     await expect(
       dialog.getByRole('button', { name: /submit report/i }),
     ).toBeVisible();
-    // Cancel is inside Dialog.Close asChild — use text-based locator
+    // Dialog.Close asChild would name this "Dialog Close" without its own
+    // aria-label (LS-10709).
     await expect(
-      dialog
-        .locator('button, [role="button"]')
-        .filter({ hasText: /^Cancel$/i }),
+      dialog.getByRole('button', { name: 'Cancel', exact: true }),
     ).toBeVisible();
   });
 });
