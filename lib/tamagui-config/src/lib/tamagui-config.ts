@@ -588,6 +588,26 @@ const media = {
   short: { maxHeight: 800 },
 };
 
+// Stock colour palettes no code ever activates as a theme (LS-10784).
+// `TamaguiProvider` injects CSS for EVERY theme in the config as one inline
+// `<style>` on every page, and each palette carries a full light/dark ×
+// alt1/alt2/active × component sub-theme tree (176 themes, ~1.1 MB of CSS
+// apiece). No `theme=`/`<Theme name=>` in apps/web, apps/app or
+// lib/shared-components — nor any Tamagui component internally — names
+// these palettes, so dropping their subtrees changes no rendered style.
+// Note this only removes *themes*: `$orange9`-style colour tokens are
+// unaffected. Before using one of these palettes as a theme, remove it here.
+export const UNUSED_STOCK_THEME_PALETTES = ['orange', 'purple', 'pink'];
+
+export const stockThemes = Object.fromEntries(
+  Object.entries(config.themes).filter(
+    ([name]) =>
+      !name
+        .split('_')
+        .some((segment) => UNUSED_STOCK_THEME_PALETTES.includes(segment)),
+  ),
+) as typeof config.themes;
+
 const customConfig = {
   ...config,
   tokens,
@@ -598,7 +618,7 @@ const customConfig = {
     body: bodyFont,
   },
   themes: {
-    ...config.themes,
+    ...stockThemes,
     // Branded themes
     dark: brandDark,
     light: brandLight,

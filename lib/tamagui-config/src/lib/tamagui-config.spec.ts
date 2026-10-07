@@ -1,7 +1,22 @@
 // Mock tamagui dependencies that have react-native-web issues in Jest
 jest.mock('@tamagui/config', () => ({
   config: {
-    themes: {},
+    // A representative slice of the stock theme names (LS-10784): base,
+    // component sub-themes, alt/active variants, and kept vs. dropped palettes.
+    themes: {
+      light: {},
+      dark: {},
+      light_Button: {},
+      dark_alt1_Card: {},
+      light_active: {},
+      light_red: {},
+      dark_green_alt2_Button: {},
+      light_blue_SheetOverlay: {},
+      dark_yellow: {},
+      light_orange: {},
+      dark_purple_Button: {},
+      light_pink_alt1: {},
+    },
     tokens: {},
     // The real stock media scale, copied from
     // node_modules/@tamagui/config/dist/cjs/media.js. Since LS-9898 the
@@ -52,13 +67,57 @@ jest.mock('tamagui', () => ({
 
 import { breakpoints } from '@legacy-sports/design-tokens';
 
-import { foundationTokens, tamaguiConfig } from './tamagui-config';
+import {
+  foundationTokens,
+  stockThemes,
+  tamaguiConfig,
+  UNUSED_STOCK_THEME_PALETTES,
+} from './tamagui-config';
 
 describe('tamaguiConfig', () => {
   it('should be defined and have required properties', () => {
     expect(tamaguiConfig).toBeDefined();
     expect(tamaguiConfig).toHaveProperty('themes');
     expect(tamaguiConfig).toHaveProperty('tokens');
+  });
+});
+
+describe('stock theme pruning (LS-10784)', () => {
+  it('drops every theme in an unused palette subtree', () => {
+    expect(Object.keys(stockThemes).sort()).toEqual(
+      [
+        'dark',
+        'dark_alt1_Card',
+        'dark_green_alt2_Button',
+        'dark_yellow',
+        'light',
+        'light_Button',
+        'light_active',
+        'light_blue_SheetOverlay',
+        'light_red',
+      ].sort(),
+    );
+  });
+
+  it('prunes only palettes, never the variants or colours the UI uses', () => {
+    // `theme="red|green|blue|yellow|active|alt1|alt2"` are all in use across
+    // apps/web, apps/app and lib/shared-components; Tamagui's Switch, Tabs
+    // and Toggle set `active` internally.
+    expect([...UNUSED_STOCK_THEME_PALETTES].sort()).toEqual([
+      'orange',
+      'pink',
+      'purple',
+    ]);
+  });
+
+  it('keeps the pruned palettes out of the final config themes', () => {
+    const names = Object.keys(tamaguiConfig.themes);
+    for (const palette of UNUSED_STOCK_THEME_PALETTES) {
+      expect(names.filter((n) => n.split('_').includes(palette))).toEqual([]);
+    }
+    expect(names).toEqual(
+      expect.arrayContaining(['light', 'dark', 'legacy', 'legacy_dark']),
+    );
   });
 });
 
