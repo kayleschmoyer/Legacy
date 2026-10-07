@@ -10,6 +10,7 @@ import {
 import type { GetProps } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
 import { Minus } from '@tamagui/lucide-icons/icons/Minus';
+import { handleKeyActivate } from '../utils/keyboardActivation';
 
 // ─── Switch ──────────────────────────────────────────────────────────────────
 export interface SwitchProps extends GetProps<typeof TamaguiSwitch> {
@@ -207,6 +208,10 @@ export interface SegmentedControlProps {
 /**
  * Pill-segmented control. Used for sub-nav (e.g. era picker) and
  * AM/PM toggles in DateTimePicker.
+ *
+ * Exposed as a WAI-ARIA radio group (LS-10696): the active option is the
+ * group's single tab stop (roving tabindex), Left/Right/Up/Down/Home/End move
+ * focus and selection together, and Enter/Space activate the focused option.
  */
 export function SegmentedControl({
   options,
@@ -223,8 +228,13 @@ export function SegmentedControl({
   const containerRadius = isBox ? 6 : 9999;
   const itemRadius = isBox ? 4 : 9999;
   const letterSpacing = isBox ? 1 : 0.6;
+  // When `value` matches no option, the first option keeps the group
+  // reachable by Tab (a radio group with no tab stop is skipped entirely).
+  const hasActive = options.some((opt) => opt.value === value);
   return (
     <XStack
+      role="radiogroup"
+      accessibilityRole="radiogroup"
       backgroundColor={isBox ? '$surfaceCard' : '$surfaceSubtle'}
       borderRadius={containerRadius}
       borderWidth={1}
@@ -233,20 +243,34 @@ export function SegmentedControl({
       gap={2}
       alignSelf={fullWidth ? 'stretch' : 'flex-start'}
     >
-      {options.map((opt) => {
+      {options.map((opt, index) => {
         const active = opt.value === value;
+        const isTabStop = active || (!hasActive && index === 0);
+        const select = () => onValueChange(opt.value);
         return (
           <XStack
             key={opt.value}
+            role="radio"
+            accessibilityRole="radio"
+            aria-checked={active}
+            accessibilityState={{ checked: active }}
+            tabIndex={isTabStop ? 0 : -1}
             paddingHorizontal={padX}
             paddingVertical={padY}
             borderRadius={itemRadius}
             backgroundColor={active ? '$brandNavy' : 'transparent'}
             cursor="pointer"
-            onPress={() => onValueChange(opt.value)}
+            onPress={select}
+            onKeyDown={handleSegmentKeyDown(select)}
             hoverStyle={
               !active ? { backgroundColor: '$surfaceInteractive' } : undefined
             }
+            focusVisibleStyle={{
+              outlineWidth: 2,
+              outlineColor: '$focusRing',
+              outlineStyle: 'solid',
+              outlineOffset: 1,
+            }}
             animation="quick"
             flex={fullWidth ? 1 : undefined}
             justifyContent="center"
@@ -267,3 +291,43 @@ export function SegmentedControl({
     </XStack>
   );
 }
+
+const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown']);
+const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp']);
+
+/**
+ * Radio-group keyboard handling for one SegmentedControl option (web only —
+ * native never fires `onKeyDown`). Arrow/Home/End resolve the target among
+ * the option's sibling radios in the DOM, then focus and click it so
+ * selection runs through the same press path a pointer uses.
+ */
+const handleSegmentKeyDown =
+  (select: () => void) => (e: React.KeyboardEvent<HTMLElement>) => {
+    const { key } = e;
+    if (key === 'Enter' || key === ' ') {
+      handleKeyActivate(select)(e);
+      return;
+    }
+    const isNext = NEXT_KEYS.has(key);
+    const isPrev = PREV_KEYS.has(key);
+    if (!isNext && !isPrev && key !== 'Home' && key !== 'End') return;
+    const radios = Array.from(
+      e.currentTarget.parentElement?.querySelectorAll<HTMLElement>(
+        ':scope > [role="radio"]',
+      ) ?? [],
+    );
+    const count = radios.length;
+    if (count === 0) return;
+    e.preventDefault();
+    const current = radios.indexOf(e.currentTarget);
+    const nextIndex =
+      key === 'Home'
+        ? 0
+        : key === 'End'
+          ? count - 1
+          : (current + (isNext ? 1 : -1) + count) % count;
+    const target = radios[nextIndex];
+    if (target == null || target === e.currentTarget) return;
+    target.focus();
+    target.click();
+  };
