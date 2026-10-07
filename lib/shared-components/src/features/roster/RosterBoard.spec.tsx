@@ -451,6 +451,123 @@ describe('RosterBoard', () => {
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
   });
 
+  // ── Row-menu keyboard activation (LS-10719) ────────────────────────────────
+
+  describe.each([
+    ['Enter', 'Enter'],
+    ['Space', ' '],
+  ])('row-menu items activate on %s (LS-10719)', (_name, key) => {
+    it('quick-swap assigns into an empty slot', () => {
+      const onPlayerAssign = jest.fn<
+        void,
+        [RosterBoardPlayer, RosterBoardPosition]
+      >();
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={onPlayerAssign}
+          onPlayerRemove={noop}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Quick swap SP' }));
+      fireEvent.keyDown(
+        screen.getByRole('button', { name: 'Assign Nolan Ryan to SP' }),
+        { key },
+      );
+      expect(onPlayerAssign).toHaveBeenCalledTimes(1);
+      expect(onPlayerAssign.mock.calls[0]?.[0].id).toBe(103);
+      expect(onPlayerAssign.mock.calls[0]?.[1].id).toBe(3);
+    });
+
+    it('quick-swap swaps into an occupied slot', () => {
+      const onPlayerSwap = jest.fn<
+        void,
+        [RosterBoardPlayer, RosterBoardPosition, RosterBoardPlayer]
+      >();
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={[
+            mk(101, 'Mike', 'Johnson', ['C'], 1),
+            mk(102, 'Wade', 'Boggs', ['C', '1B'], null),
+          ]}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          onPlayerSwap={onPlayerSwap}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Quick swap C' }));
+      fireEvent.keyDown(
+        screen.getByRole('button', { name: 'Swap in Wade Boggs at C' }),
+        { key },
+      );
+      expect(onPlayerSwap).toHaveBeenCalledTimes(1);
+      expect(onPlayerSwap.mock.calls[0]?.[0].id).toBe(102);
+    });
+
+    it('overflow menu moves a starter to the bench', () => {
+      const onPlayerRemove = jest.fn<void, [RosterBoardPosition]>();
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={onPlayerRemove}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'More actions for Mike Johnson' }),
+      );
+      fireEvent.keyDown(
+        screen.getByRole('button', { name: 'Move Mike Johnson to bench' }),
+        { key },
+      );
+      expect(onPlayerRemove).toHaveBeenCalledTimes(1);
+      expect(onPlayerRemove.mock.calls[0]?.[0].id).toBe(1);
+    });
+
+    it('overflow menu opens player details', () => {
+      const onPlayerPress = jest.fn<void, [RosterBoardPlayer]>();
+      render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          onPlayerPress={onPlayerPress}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'More actions for Mike Johnson' }),
+      );
+      fireEvent.keyDown(
+        screen.getByRole('button', { name: 'View Mike Johnson details' }),
+        { key },
+      );
+      expect(onPlayerPress).toHaveBeenCalledTimes(1);
+      expect(onPlayerPress.mock.calls[0]?.[0].id).toBe(101);
+    });
+  });
+
+  it('row-menu items ignore unrelated keys (LS-10719)', () => {
+    const onPlayerAssign = jest.fn();
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={onPlayerAssign}
+        onPlayerRemove={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Quick swap SP' }));
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Assign Nolan Ryan to SP' }),
+      { key: 'a' },
+    );
+    expect(onPlayerAssign).not.toHaveBeenCalled();
+  });
+
   // ── Salary cap column (LS-6338) ──────────────────────────────────────────
 
   it('renders each player salary when salaryCapEnabled is true', () => {

@@ -394,6 +394,14 @@ function RowMenuItem({
       hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.06) }}
       pressStyle={{ backgroundColor: withAlpha(WHITE, 0.09) }}
       onPress={onPress}
+      // A non-<button> role="button" gets no native key activation on web,
+      // so Enter/Space must be wired explicitly (LS-10719).
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
     >
       <Text fontFamily={FONT_BODY} fontSize={13} color={TEXT_PRIMARY}>
         {label}
