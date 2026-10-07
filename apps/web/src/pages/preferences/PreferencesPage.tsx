@@ -134,10 +134,18 @@ function loadPrefs(): UserPreferences {
   }
 }
 
-/** Persists prefs locally; returns false when storage rejects the write (private mode, quota). */
-export function savePrefs(prefs: UserPreferences): boolean {
+/**
+ * Persists the changed prefs locally; returns false when storage rejects the
+ * write (private mode, quota). The patch is merged onto what is stored now,
+ * not this tab's in-memory copy, so a stale tab never reverts a value another
+ * tab saved (LS-10782).
+ */
+export function savePrefs(patch: Partial<UserPreferences>): boolean {
   try {
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ ...loadPrefs(), ...patch }),
+    );
     // Same-tab consumers (useReducedMotion, LS-7073) don't get a `storage` event.
     window.dispatchEvent(new Event(USER_PREFERENCES_CHANGED_EVENT));
     return true;
@@ -1386,7 +1394,9 @@ const PreferencesPage: React.FC = () => {
   const cardStyleAlt = useMemo(() => getCardStyle(isDark, 80), [isDark]);
   const [prefs, setPrefs] = useState<UserPreferences>(loadPrefs);
   const { saved, saveFailed, triggerSave } = useSavedBanner();
-  const isInitialRender = useRef(true);
+  // What this tab believes is in storage; auto-save writes only the fields
+  // that differ from it (LS-10782).
+  const persistedPrefs = useRef<UserPreferences>(prefs);
 
   // Stats-format preference is persisted server-side so it syncs across devices
   // (LS-7138). Hydrate the control from the server when signed in, and write
@@ -1453,14 +1463,35 @@ const PreferencesPage: React.FC = () => {
     [isAuthenticated, updateUserPreferences],
   );
 
-  // Auto-save on changes (skip the initial render).
+  // Auto-save only the fields that changed, so a stale tab can't overwrite
+  // values another tab saved since this one loaded (LS-10782).
   useEffect(() => {
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      return;
-    }
-    triggerSave(savePrefs(prefs));
+    const persisted = persistedPrefs.current;
+    const changed = (Object.keys(prefs) as (keyof UserPreferences)[]).filter(
+      (key) => prefs[key] !== persisted[key],
+    );
+    if (changed.length === 0) return;
+    const patch = Object.fromEntries(
+      changed.map((key) => [key, prefs[key]]),
+    ) as Partial<UserPreferences>;
+    const ok = savePrefs(patch);
+    if (ok) persistedPrefs.current = { ...persisted, ...patch };
+    triggerSave(ok);
   }, [prefs, triggerSave]);
+
+  // Adopt prefs another tab saved so these controls stay current without a
+  // reload (LS-10782). `key` is null when the other tab cleared storage.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== PREFS_STORAGE_KEY) return;
+      const next = loadPrefs();
+      persistedPrefs.current = next;
+      setPrefs(next);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const SaveBannerIcon = saveFailed ? X : Check;
 

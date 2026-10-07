@@ -392,3 +392,58 @@ describe('PreferencesPage theme ownership (LS-7078)', () => {
     expect(saved.statsFormat).toBe('expanded');
   });
 });
+
+describe('PreferencesPage cross-tab prefs (LS-10782)', () => {
+  const KEY = 'ls_user_preferences';
+  const readStored = (): Record<string, unknown> =>
+    JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, unknown>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      error: undefined,
+      loading: false,
+      networkStatus: NetworkStatus.ready,
+      refetch: jest.fn(),
+    });
+  });
+
+  it("does not overwrite another tab's Default sport when a stale tab auto-saves", () => {
+    render(<PreferencesPage />);
+    // Another tab saves Football; this tab never re-reads storage.
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ ...readStored(), defaultSport: 'football' }),
+    );
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Animations' }));
+
+    expect(readStored().defaultSport).toBe('football');
+  });
+
+  it("updates this tab's controls when another tab saves prefs", () => {
+    render(<PreferencesPage />);
+    const toggle = screen.getByRole('switch', { name: 'Show season totals' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    const newValue = JSON.stringify({
+      ...readStored(),
+      showSeasonTotals: false,
+    });
+    localStorage.setItem(KEY, newValue);
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: KEY,
+          newValue,
+          storageArea: localStorage,
+        }),
+      );
+    });
+
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    // Adopting another tab's save is not a local edit: nothing is re-written.
+    expect(readStored().showSeasonTotals).toBe(false);
+  });
+});
