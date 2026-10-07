@@ -8,6 +8,7 @@
  */
 
 import type { GraphQLSchema } from 'graphql';
+import { inspect } from 'node:util';
 
 describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
   let schema: GraphQLSchema;
@@ -264,7 +265,11 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
       );
 
       expect(result).toEqual(queueRows);
-      const queueFilter = JSON.stringify(mockDb.where.mock.lastCall?.[0]);
+      // The filter holds real table refs (the LS-10680 drafted-player
+      // subquery), which are circular — inspect rather than JSON.stringify.
+      const queueFilter = inspect(mockDb.where.mock.lastCall?.[0], {
+        depth: null,
+      });
       expect(queueFilter).toContain('draftQueue.participantId');
     });
 

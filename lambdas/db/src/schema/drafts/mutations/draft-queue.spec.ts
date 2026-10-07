@@ -107,6 +107,12 @@ function captureDraftQueueResolvers(): Record<string, Resolver> {
     }),
   );
 
+  // Drafted-player pruning is a real-SQL subquery; covered by
+  // draft-queue-drafted.db.spec.ts (LS-10680).
+  jest.doMock('../queue-entries', () => ({
+    pruneDraftedQueueEntries: jest.fn(),
+  }));
+
   require('./draft-queue');
 
   return captured;

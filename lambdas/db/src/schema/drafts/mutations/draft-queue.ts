@@ -11,6 +11,9 @@
  *   addToDraftQueue   — append a single player to the queue
  *   removeFromDraftQueue — remove a single player from the queue and compact priorities
  *   reorderDraftQueue — replace priority ordering (same player set, new order)
+ *
+ * add / remove / reorder first prune the seat's drafted players, which
+ * getMyDraftQueue no longer returns (LS-10680).
  */
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
@@ -21,6 +24,7 @@ import { DraftQueueEntry } from '../types';
 import { builder } from '../../builder';
 import { requireLeagueId } from '../league-draft';
 import { getSeatForTeam, getSeatForUser } from '../participants';
+import { pruneDraftedQueueEntries } from '../queue-entries';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -218,6 +222,8 @@ builder.mutationField('addToDraftQueue', (t) =>
           .limit(1);
         if (!draftRow) throw UserInputError('Draft not found');
 
+        await pruneDraftedQueueEntries(tx, draftId, participantId);
+
         // Check if already queued
         const [existing] = await tx
           .select({ id: PublicSchema.draftQueue.id })
@@ -312,6 +318,8 @@ builder.mutationField('removeFromDraftQueue', (t) =>
       );
 
       const rows = await context.db.transaction(async (tx) => {
+        await pruneDraftedQueueEntries(tx, draftId, participantId);
+
         // Remove the entry
         await tx
           .delete(PublicSchema.draftQueue)
@@ -392,6 +400,10 @@ builder.mutationField('reorderDraftQueue', (t) =>
       );
 
       const rows = await context.db.transaction(async (tx) => {
+        // The client only shows undrafted players, so drop drafted rows before
+        // matching its playerIds against the stored queue (LS-10680).
+        await pruneDraftedQueueEntries(tx, draftId, participantId);
+
         // Fetch current queue
         const current = await tx
           .select()
