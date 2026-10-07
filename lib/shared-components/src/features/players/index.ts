@@ -35,6 +35,10 @@ export {
   DEFAULT_BATTING_SORT_DIR,
 } from './PlayerStatsPage';
 export type { ExportFormat, PlayerStatsExportData } from './PlayerStatsPage';
+export type { ExportCellValue, ExportColumn } from './exportColumns';
+export { EXPORT_ROW_CAP } from './exportColumns';
+export { buildBattingExportColumns } from './PlayerStatsDataGrid';
+export { buildPitchingExportColumns } from './PitchingStatsDataGrid';
 
 // NFL player statistics — sport-agnostic shell binding (LS-8442)
 export { FootballStatsPage } from './FootballStatsPage';

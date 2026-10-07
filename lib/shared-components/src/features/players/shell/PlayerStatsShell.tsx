@@ -67,6 +67,8 @@ export function PlayerStatsShell({
               canExport={c.canExport}
               exportFormats={c.exportFormats}
               onExport={c.onExport}
+              exportBusy={c.exportBusy}
+              exportScopeLabel={c.exportScopeLabel}
             />
           }
         />

@@ -48,6 +48,17 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 // drive callbacks (e.g. onExport) directly. Prefixed with `mock` so the hoisted
 // jest.mock factory is allowed to reference it.
 let mockStatsPageProps: Record<string, unknown> = {};
+// The full result set the shared controller hands onExport since LS-10731
+// (`exportFullResultSet`) — empty here; the builders have their own specs.
+const mockExportData = {
+  batting: [],
+  pitching: [],
+  battingColumns: [],
+  pitchingColumns: [],
+  battingMatched: 0,
+  pitchingMatched: 0,
+  rowCap: 5000,
+};
 let mockFootballStatsPageProps: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/players', () => ({
   // Capture the props the host passes (so onExport can be driven directly) and
@@ -68,7 +79,12 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
-    onExport?: (filters: unknown, viewMode: string, format?: string) => void;
+    onExport?: (
+      filters: unknown,
+      viewMode: string,
+      format: string,
+      data?: typeof mockExportData,
+    ) => void;
     canExport?: boolean;
     canCustomizeColumns?: boolean;
     exportFormats?: readonly string[];
@@ -96,21 +112,27 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
         <button
           type="button"
           data-testid="export-button"
-          onClick={() => props.onExport?.({}, 'combined')}
+          onClick={() =>
+            props.onExport?.({}, 'combined', 'json', mockExportData)
+          }
         >
           Export JSON
         </button>
         <button
           type="button"
           data-testid="export-csv-button"
-          onClick={() => props.onExport?.({}, 'combined', 'csv')}
+          onClick={() =>
+            props.onExport?.({}, 'combined', 'csv', mockExportData)
+          }
         >
           Export CSV
         </button>
         <button
           type="button"
           data-testid="export-xlsx-button"
-          onClick={() => props.onExport?.({}, 'combined', 'xlsx')}
+          onClick={() =>
+            props.onExport?.({}, 'combined', 'xlsx', mockExportData)
+          }
         >
           Export XLSX
         </button>
@@ -1396,9 +1418,14 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
     const onExport = mockStatsPageProps.onExport as (
       filters: unknown,
       viewMode: string,
+      format: string,
+      data: typeof mockExportData,
     ) => void;
     expect(typeof onExport).toBe('function');
-    return onExport;
+    // Asks the shared controller for the full filtered result set (LS-10731).
+    expect(mockStatsPageProps.exportFullResultSet).toBe(true);
+    return (filters, viewMode) =>
+      onExport(filters, viewMode, 'json', mockExportData);
   }
 
   it('revokes the object URL on a successful export', () => {

@@ -1,11 +1,17 @@
 import { LOGGER } from '@legacy-sports/logging';
-import type { PlayerStatsExportData } from '@legacy-sports/shared-components/players';
+import {
+  buildBattingExportColumns,
+  buildPitchingExportColumns,
+  EXPORT_ROW_CAP,
+  type PlayerStatsExportData,
+} from '@legacy-sports/shared-components/players';
 import {
   applyParamRenames,
   buildCsvExport,
   buildExportPayload,
   buildStatsSearchParams,
   buildXlsxExport,
+  exportCapNote,
   MAX_EXPORT_BYTES,
   migrateStatsSearchParams,
   parseClampedInt,
@@ -22,6 +28,28 @@ import {
 } from './PlayerStatsPage';
 
 const MAX_GRAPHQL_INT = 2147483647;
+
+/**
+ * Full export data as the shared controller hands it to the host (LS-10731):
+ * rows plus the grids' columns (expanded preset unless overridden), with the
+ * matched totals defaulting to the row counts (i.e. nothing capped).
+ */
+function exportData(
+  overrides: Partial<PlayerStatsExportData> = {},
+): PlayerStatsExportData {
+  const batting = overrides.batting ?? [];
+  const pitching = overrides.pitching ?? [];
+  return {
+    batting,
+    pitching,
+    battingColumns: buildBattingExportColumns('expanded', undefined),
+    pitchingColumns: buildPitchingExportColumns('expanded', undefined),
+    battingMatched: batting.length,
+    pitchingMatched: pitching.length,
+    rowCap: EXPORT_ROW_CAP,
+    ...overrides,
+  };
+}
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
 describe('parseClampedInt', () => {
@@ -580,7 +608,7 @@ describe('utf8ByteLength', () => {
 
 describe('buildExportPayload', () => {
   const FIXED_TS = '2026-06-21T00:00:00.000Z';
-  const EMPTY_DATA: PlayerStatsExportData = { batting: [], pitching: [] };
+  const EMPTY_DATA = exportData();
 
   // AC3: within-cap exports serialize correctly and round-trip.
   it('serializes the export payload with filters, viewMode and metadata', () => {
@@ -968,9 +996,13 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     exportedAt: string;
     totalFilters: number;
     rowCount: number;
+    rowCap: number;
+    matched: { batting: number; pitching: number };
+    truncated: boolean;
+    note?: string;
     players: {
-      batting: { playerId: number; displayName?: string }[];
-      pitching: { playerId: number }[];
+      batting: Record<string, string | number>[];
+      pitching: Record<string, string | number>[];
     };
   }
 
@@ -980,11 +1012,12 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     const { json } = buildExportPayload(
       { position: 'SP', team: 'NYY' },
       'pitchers',
-      { batting: [], pitching: pitchingRows },
+      exportData({ batting: [], pitching: pitchingRows }),
       FIXED_AT,
     );
     const parsed = JSON.parse(json) as ParsedPayload;
-    expect(parsed.players.pitching).toEqual(pitchingRows);
+    expect(parsed.players.pitching).toHaveLength(1);
+    expect(parsed.players.pitching[0].Name).toBe('Player 3');
     expect(parsed.rowCount).toBe(1);
   });
 
@@ -993,7 +1026,7 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     const { json } = buildExportPayload(
       filters,
       'combined',
-      { batting: battingRows, pitching: pitchingRows },
+      exportData({ batting: battingRows, pitching: pitchingRows }),
       FIXED_AT,
     );
     const parsed = JSON.parse(json) as ParsedPayload;
@@ -1007,20 +1040,24 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     const { json } = buildExportPayload(
       {},
       'combined',
-      { batting: battingRows, pitching: pitchingRows },
+      exportData({ batting: battingRows, pitching: pitchingRows }),
       FIXED_AT,
     );
     const parsed = JSON.parse(json) as ParsedPayload;
-    expect(parsed.players.batting).toEqual(battingRows);
-    expect(parsed.players.pitching).toEqual(pitchingRows);
+    expect(parsed.players.batting.map((r) => r.Name)).toEqual([
+      'Gerrit Cole',
+      'Aaron Judge',
+    ]);
+    expect(parsed.players.pitching).toHaveLength(1);
     expect(parsed.rowCount).toBe(3);
   });
 
   it('defaults exportedAt to an ISO timestamp when omitted', () => {
-    const { json } = buildExportPayload({}, 'hitters', {
-      batting: battingRows,
-      pitching: [],
-    });
+    const { json } = buildExportPayload(
+      {},
+      'hitters',
+      exportData({ batting: battingRows }),
+    );
     const parsed = JSON.parse(json) as ParsedPayload;
     expect(parsed.exportedAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
@@ -1031,12 +1068,12 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     const { json } = buildExportPayload(
       { team: 'NYY' },
       'hitters',
-      { batting: battingRows, pitching: [] },
+      exportData({ batting: battingRows, pitching: [] }),
       FIXED_AT,
     );
     const parsed = JSON.parse(json) as ParsedPayload;
     expect(parsed.players.batting).toHaveLength(2);
-    expect(parsed.players.batting[0].displayName).toBe('Gerrit Cole');
+    expect(parsed.players.batting[0].Name).toBe('Gerrit Cole');
     expect(parsed.rowCount).toBe(2);
   });
 });
@@ -1115,68 +1152,73 @@ const PITCHING_ROW = {
 } as const;
 
 describe('buildCsvExport (PST-014 / LS-7112)', () => {
-  const DATA: PlayerStatsExportData = {
+  const DATA = exportData({
     batting: [BATTING_ROW],
     pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
-  };
+  });
 
   it('includes batting header row', () => {
     const csv = buildCsvExport(DATA);
-    expect(csv).toContain('Name,Position,Games');
+    expect(csv).toContain('Name,Position,FPTS,FPTS/G,G,PA');
   });
 
   it('includes pitching header row', () => {
     const csv = buildCsvExport(DATA);
-    expect(csv).toContain('W,L,Games');
+    expect(csv).toContain('Name,Pos,FPTS,FPTS/G,G,GS,W,L');
   });
 
   it('includes player name in batting section', () => {
-    const csv = buildCsvExport({
-      batting: [BATTING_ROW],
-      pitching: [],
-    });
+    const csv = buildCsvExport(
+      exportData({
+        batting: [BATTING_ROW],
+        pitching: [],
+      }),
+    );
     expect(csv).toContain('Aaron Judge');
   });
 
   it('includes pitcher name in pitching section', () => {
-    const csv = buildCsvExport({
-      batting: [],
-      pitching: [
-        PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
-      ],
-    });
+    const csv = buildCsvExport(
+      exportData({
+        pitching: [
+          PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
+        ],
+      }),
+    );
     expect(csv).toContain('Gerrit Cole');
   });
 
   it('exports K/9 from strikeoutsPerNine rounded to 2 decimals (LS-10810)', () => {
-    const csv = buildCsvExport({
-      batting: [],
-      pitching: [
-        PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
-      ],
-    });
+    const csv = buildCsvExport(
+      exportData({
+        pitching: [
+          PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
+        ],
+      }),
+    );
     const [header, row] = csv.split('\r\n');
     const k9Index = header.split(',').indexOf('K/9');
     expect(row.split(',')[k9Index]).toBe('3.43');
   });
 
   it('exports an empty K/9 cell when strikeoutsPerNine is null (LS-10810)', () => {
-    const csv = buildCsvExport({
-      batting: [],
-      pitching: [
-        {
-          ...PITCHING_ROW,
-          strikeoutsPerNine: null,
-        } as unknown as PlayerStatsExportData['pitching'][0],
-      ],
-    });
+    const csv = buildCsvExport(
+      exportData({
+        pitching: [
+          {
+            ...PITCHING_ROW,
+            strikeoutsPerNine: null,
+          } as unknown as PlayerStatsExportData['pitching'][0],
+        ],
+      }),
+    );
     const [header, row] = csv.split('\r\n');
     const k9Index = header.split(',').indexOf('K/9');
     expect(row.split(',')[k9Index]).toBe('');
   });
 
   it('returns empty string for empty data', () => {
-    const csv = buildCsvExport({ batting: [], pitching: [] });
+    const csv = buildCsvExport(exportData({ batting: [], pitching: [] }));
     expect(csv).toBe('');
   });
 
@@ -1185,10 +1227,12 @@ describe('buildCsvExport (PST-014 / LS-7112)', () => {
       ...BATTING_ROW,
       displayName: 'Judge, Aaron',
     };
-    const csv = buildCsvExport({
-      batting: [rowWithComma],
-      pitching: [],
-    });
+    const csv = buildCsvExport(
+      exportData({
+        batting: [rowWithComma],
+        pitching: [],
+      }),
+    );
     expect(csv).toContain('"Judge, Aaron"');
   });
 });
@@ -1218,10 +1262,10 @@ function parseZipEntries(bytes: Uint8Array): Map<string, string> {
 }
 
 describe('buildXlsxExport (PST-014 / LS-7112)', () => {
-  const DATA: PlayerStatsExportData = {
+  const DATA = exportData({
     batting: [BATTING_ROW],
     pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
-  };
+  });
 
   it('returns a non-empty Uint8Array', () => {
     const result = buildXlsxExport(DATA);
@@ -1239,7 +1283,7 @@ describe('buildXlsxExport (PST-014 / LS-7112)', () => {
   });
 
   it('returns a non-empty result for empty data', () => {
-    const result = buildXlsxExport({ batting: [], pitching: [] });
+    const result = buildXlsxExport(exportData({ batting: [], pitching: [] }));
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result.length).toBeGreaterThan(0);
   });
@@ -1290,8 +1334,159 @@ describe('buildXlsxExport (PST-014 / LS-7112)', () => {
     const result = buildXlsxExport(DATA);
     const entries = parseZipEntries(result);
     const sheet2 = entries.get('xl/worksheets/sheet2.xml') ?? '';
-    // K/9 is the 14th pitching column (N); row 2 is the first data row.
-    expect(sheet2).toContain('<c r="N1" t="inlineStr"><is><t>K/9</t></is></c>');
-    expect(sheet2).toContain('<c r="N2"><v>3.43</v></c>');
+    // Locate the K/9 header's column letter (it follows the grid's column
+    // order since LS-10731); row 2 is the first data row.
+    const col = /<c r="([A-Z]+)1" t="inlineStr"><is><t>K\/9<\/t>/.exec(
+      sheet2,
+    )?.[1];
+    expect(col).toBeDefined();
+    expect(sheet2).toContain(`<c r="${col}2"><v>3.43</v></c>`);
+  });
+});
+
+// LS-10731: export columns follow the grid, rows are the full filtered set, and
+// a capped export says so in the file.
+describe('player-stats export columns and cap (LS-10731)', () => {
+  const pitcher =
+    PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0];
+
+  it('exports FPTS, FPTS/G and oWAR with the grid formatting (CSV)', () => {
+    const csv = buildCsvExport(exportData({ batting: [BATTING_ROW] }));
+    const [header, row] = csv.split('\r\n');
+    const headers = header.split(',');
+    const cells = row.split(',');
+    expect(cells[headers.indexOf('FPTS')]).toBe('320');
+    expect(cells[headers.indexOf('FPTS/G')]).toBe('2.1');
+    expect(cells[headers.indexOf('oWAR')]).toBe('6.2');
+  });
+
+  it('exports exactly the visible columns when the user customized them', () => {
+    const csv = buildCsvExport(
+      exportData({
+        batting: [BATTING_ROW],
+        pitching: [pitcher],
+        battingColumns: buildBattingExportColumns('expanded', [
+          'fantasyPoints',
+          'offensiveWAR',
+        ]),
+        pitchingColumns: buildPitchingExportColumns('expanded', [
+          'fantasyPoints',
+          'pitchingWAR',
+        ]),
+      }),
+    );
+    const [batting, pitching] = csv.split('\r\n\r\n');
+    expect(batting).toBe('Name,Position,FPTS,oWAR\r\nAaron Judge,RF,320,6.2');
+    expect(pitching.split('\r\n')[0]).toBe('Name,FPTS,WAR');
+  });
+
+  it('follows the standard preset (high-priority columns only)', () => {
+    const csv = buildCsvExport(
+      exportData({
+        batting: [BATTING_ROW],
+        battingColumns: buildBattingExportColumns('standard', undefined),
+      }),
+    );
+    const header = csv.split('\r\n')[0].split(',');
+    expect(header).toEqual(expect.arrayContaining(['FPTS', 'FPTS/G', 'oWAR']));
+  });
+
+  it('keys JSON rows by the same headers as CSV', () => {
+    const { json } = buildExportPayload(
+      {},
+      'hitters',
+      exportData({ batting: [BATTING_ROW] }),
+    );
+    const parsed = JSON.parse(json) as {
+      players: { batting: Record<string, unknown>[] };
+      truncated: boolean;
+    };
+    const row = parsed.players.batting[0];
+    expect(row.FPTS).toBe(320);
+    expect(row['FPTS/G']).toBe(2.1);
+    expect(row.oWAR).toBe(6.2);
+    expect(parsed.truncated).toBe(false);
+  });
+
+  it('writes XLSX headers and numeric cells from the grid columns', () => {
+    const entries = parseZipEntries(
+      buildXlsxExport(exportData({ batting: [BATTING_ROW] })),
+    );
+    const sheet = entries.get('xl/worksheets/sheet1.xml') ?? '';
+    expect(sheet).toContain('<t>FPTS</t>');
+    expect(sheet).toContain('<t>oWAR</t>');
+    expect(sheet).toContain('<v>320</v>');
+    expect(sheet).toContain('<v>6.2</v>');
+  });
+
+  it('returns no cap note when every table fits under the cap', () => {
+    expect(exportCapNote(exportData({ batting: [BATTING_ROW] }))).toBeNull();
+  });
+
+  describe('when a table matched more rows than the cap', () => {
+    const capped = exportData({
+      batting: [BATTING_ROW],
+      battingMatched: 12_345,
+      rowCap: 1,
+    });
+
+    it('states the cap and the matched total', () => {
+      expect(exportCapNote(capped)).toBe(
+        'Export capped at 1 rows per table: 12,345 hitters matched your filters. Narrow your filters to export the rest.',
+      );
+    });
+
+    it('appends the note to the CSV', () => {
+      const csv = buildCsvExport(capped);
+      expect(csv.endsWith(`"${exportCapNote(capped)}"`)).toBe(true);
+    });
+
+    it('flags the JSON payload', () => {
+      const parsed = JSON.parse(
+        buildExportPayload({}, 'hitters', capped).json,
+      ) as { truncated: boolean; note: string; matched: { batting: number } };
+      expect(parsed.truncated).toBe(true);
+      expect(parsed.matched.batting).toBe(12_345);
+      expect(parsed.note).toBe(exportCapNote(capped));
+    });
+
+    it('adds the note to the XLSX sheet', () => {
+      const entries = parseZipEntries(buildXlsxExport(capped));
+      expect(entries.get('xl/worksheets/sheet1.xml')).toContain(
+        '12,345 hitters matched your filters',
+      );
+    });
+  });
+});
+
+describe('worst-case export size (LS-10731)', () => {
+  // Both tables at the row cap with every column visible — the largest export
+  // the controller can hand the host. Every format must stay downloadable.
+  const data = exportData({
+    batting: Array.from({ length: EXPORT_ROW_CAP }, (_, i) => ({
+      ...BATTING_ROW,
+      playerId: i,
+      displayName: `Christopher Longname-Example ${i}`,
+    })),
+    pitching: Array.from(
+      { length: EXPORT_ROW_CAP },
+      (_, i) =>
+        ({
+          ...PITCHING_ROW,
+          playerId: i,
+          fantasyPoints: 1234.5,
+          fantasyPointsPerGame: 12.34,
+          positionsPlayed: [{ position: 'SP', games: 300 }],
+        }) as unknown as PlayerStatsExportData['pitching'][0],
+    ),
+  });
+
+  it('fits JSON, CSV and XLSX under MAX_EXPORT_BYTES', () => {
+    const json = buildExportPayload({}, 'combined', data);
+    const csvBytes = utf8ByteLength(buildCsvExport(data));
+    const xlsxBytes = buildXlsxExport(data).byteLength;
+    expect(json.ok).toBe(true);
+    expect(csvBytes).toBeLessThanOrEqual(MAX_EXPORT_BYTES);
+    expect(xlsxBytes).toBeLessThanOrEqual(MAX_EXPORT_BYTES);
   });
 });

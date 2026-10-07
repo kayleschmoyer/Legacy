@@ -20,6 +20,8 @@ import {
   STATS_TOGGLEABLE_COLUMN_KEYS,
 } from '@legacy-sports/shared-components/players';
 import type {
+  ExportCellValue,
+  ExportColumn,
   ExportFormat,
   FootballStatsFilters,
   FootballStatsView,
@@ -490,10 +492,12 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
  * With no upper bound, a large export (e.g. once row data is included per
  * PST-011) could freeze the tab or exhaust memory (PST-012 / LS-7110). Past this
  * cap the client refuses the download and asks the user to narrow filters
- * instead of locking up. 5 MB is comfortably larger than any realistic filtered
- * export today while still bounding the worst case.
+ * instead of locking up. Since LS-10731 the export is the full filtered result
+ * set, already bounded at EXPORT_ROW_CAP rows per table; the largest such file
+ * (both tables at the cap, every column, XLSX) measures ~6.5 MB, so 16 MB keeps
+ * every capped export downloadable while still bounding the worst case.
  */
-export const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
+export const MAX_EXPORT_BYTES = 16 * 1024 * 1024;
 
 export interface ExportPayloadResult {
   /** Whether the serialized payload is within MAX_EXPORT_BYTES. */
@@ -537,9 +541,11 @@ export function utf8ByteLength(str: string): number {
  *
  * Carries the filter context the original stub exported (`viewMode`, `filters`,
  * `exportedAt`, `totalFilters`) so the file stays self-describing, plus the
- * actual player rows the user is looking at under `players` — the original stub
- * exported only the filter spec, which made the feature useless (PST-011 /
- * LS-7109). `rowCount` is the total number of exported rows across both grids.
+ * player rows under `players` (PST-011 / LS-7109). Since LS-10731 the rows are
+ * the full filtered result set (up to `rowCap` per table), each keyed by the
+ * same column headers the table shows — so JSON matches CSV/XLSX — and
+ * `matched` / `truncated` / `note` say when the cap cut the export short.
+ * `rowCount` is the total number of exported rows across both grids.
  */
 export interface PlayerStatsExportPayload {
   viewMode: PlayerStatsViewMode;
@@ -547,9 +553,13 @@ export interface PlayerStatsExportPayload {
   exportedAt: string;
   totalFilters: number;
   rowCount: number;
+  rowCap: number;
+  matched: { batting: number; pitching: number };
+  truncated: boolean;
+  note?: string;
   players: {
-    batting: readonly unknown[];
-    pitching: readonly unknown[];
+    batting: readonly Record<string, ExportCellValue>[];
+    pitching: readonly Record<string, ExportCellValue>[];
   };
 }
 
@@ -573,15 +583,22 @@ export function buildExportPayload(
 ): ExportPayloadResult {
   const batting = data.batting ?? [];
   const pitching = data.pitching ?? [];
+  const note = exportCapNote(data);
   const payload: PlayerStatsExportPayload = {
     viewMode,
     filters,
     exportedAt,
     totalFilters: Object.keys(filters).length,
     rowCount: batting.length + pitching.length,
+    rowCap: data.rowCap,
+    matched: { batting: data.battingMatched, pitching: data.pitchingMatched },
+    truncated: note !== null,
+    ...(note !== null ? { note } : {}),
     players: {
-      batting,
-      pitching,
+      batting: batting.map((row) => toExportRecord(data.battingColumns, row)),
+      pitching: pitching.map((row) =>
+        toExportRecord(data.pitchingColumns, row),
+      ),
     },
   };
   const json = JSON.stringify(payload, null, 2);
@@ -589,52 +606,45 @@ export function buildExportPayload(
   return { ok: bytes <= MAX_EXPORT_BYTES, json, bytes };
 }
 
-// ── CSV export ────────────────────────────────────────────────────────────────
+// ── Column-driven rows (LS-10731) ────────────────────────────────────────────
 
-const BATTING_CSV_HEADERS = [
-  'Name',
-  'Position',
-  'Games',
-  'PA',
-  'AB',
-  'Hits',
-  'HR',
-  'RBI',
-  'SB',
-  'Runs',
-  '2B',
-  '3B',
-  'BB',
-  'SO',
-  'AVG',
-  'OBP',
-  'SLG',
-  'OPS',
-] as const;
-
-const PITCHING_CSV_HEADERS = [
-  'Name',
-  'Position',
-  'W',
-  'L',
-  'Games',
-  'GS',
-  'SV',
-  'IP (outs)',
-  'ERA',
-  'WHIP',
-  'SO',
-  'BB',
-  'HR',
-  'K/9',
-] as const;
-
-/** K/9 rounded to 2 decimals to match the stats table; empty when unknown. */
-function strikeoutsPerNineCell(value: number | null | undefined): number | '' {
-  return value === null || value === undefined
-    ? ''
-    : Math.round(value * 100) / 100;
+/**
+ * The cap note written into every export format when a table matched more rows
+ * than the per-table cap, or null when nothing was cut. The product decision on
+ * LS-10731 requires a capped export to say so in the file, not just the UI.
+ */
+export function exportCapNote(data: PlayerStatsExportData): string | null {
+  const cut: string[] = [];
+  if (data.battingMatched > data.rowCap) {
+    cut.push(`${data.battingMatched.toLocaleString()} hitters`);
+  }
+  if (data.pitchingMatched > data.rowCap) {
+    cut.push(`${data.pitchingMatched.toLocaleString()} pitchers`);
+  }
+  if (cut.length === 0) return null;
+  return (
+    `Export capped at ${data.rowCap.toLocaleString()} rows per table: ` +
+    `${cut.join(' and ')} matched your filters. Narrow your filters to export the rest.`
+  );
 }
+
+function toExportCells<Row>(
+  columns: readonly ExportColumn<Row>[],
+  row: Row,
+): ExportCellValue[] {
+  return columns.map((column) => column.value(row));
+}
+
+function toExportRecord<Row>(
+  columns: readonly ExportColumn<Row>[],
+  row: Row,
+): Record<string, ExportCellValue> {
+  return Object.fromEntries(
+    columns.map((column) => [column.header, column.value(row)]),
+  );
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
 
 function csvCell(value: string | number | null | undefined): string {
   const s = value === null || value === undefined ? '' : String(value);
@@ -643,76 +653,36 @@ function csvCell(value: string | number | null | undefined): string {
     : s;
 }
 
+function csvSection<Row>(
+  columns: readonly ExportColumn<Row>[],
+  rows: readonly Row[],
+): string {
+  return [
+    columns.map((column) => csvCell(column.header)).join(','),
+    ...rows.map((row) => toExportCells(columns, row).map(csvCell).join(',')),
+  ].join('\r\n');
+}
+
 /**
  * Convert player-stats export data to CSV. Batting and pitching rows are
  * separated by a blank line and their own header row so a single file is
- * self-contained. Exported for unit testing.
+ * self-contained. Headers and cells follow the grids' visible columns
+ * (LS-10731); a trailing note records a capped export. Exported for unit
+ * testing.
  */
 export function buildCsvExport(data: PlayerStatsExportData): string {
   const batting = data.batting ?? [];
   const pitching = data.pitching ?? [];
 
-  const battingRows = [
-    BATTING_CSV_HEADERS.join(','),
-    ...batting.map((r) =>
-      [
-        r.displayName,
-        r.primaryPosition ?? '',
-        r.games,
-        r.plateAppearances,
-        r.atBats,
-        r.hits,
-        r.homeRuns,
-        r.rbi,
-        r.stolenBases,
-        r.runs,
-        r.doubles,
-        r.triples,
-        r.baseOnBalls,
-        r.strikeouts,
-        r.formattedBattingAverage,
-        r.formattedOnBasePercentage,
-        r.formattedSluggingPercentage,
-        r.formattedOPS,
-      ]
-        .map(csvCell)
-        .join(','),
-    ),
-  ];
-
-  const pitchingRows = [
-    PITCHING_CSV_HEADERS.join(','),
-    ...pitching.map((r) => {
-      const firstName = r.player?.firstName ?? '';
-      const lastName = r.player?.lastName ?? '';
-      const name =
-        firstName && lastName
-          ? `${firstName} ${lastName}`
-          : lastName || firstName;
-      return [
-        name,
-        r.primaryPosition ?? '',
-        r.wins,
-        r.losses,
-        r.games,
-        r.gamesStarted,
-        r.saves,
-        r.outsRecorded,
-        r.era,
-        r.whip,
-        r.strikeouts,
-        r.baseOnBalls,
-        r.homeRuns,
-        strikeoutsPerNineCell(r.strikeoutsPerNine),
-      ]
-        .map(csvCell)
-        .join(',');
-    }),
-  ];
-
   const sections: string[] = [];
-  if (batting.length > 0) sections.push(battingRows.join('\r\n'));
-  if (pitching.length > 0) sections.push(pitchingRows.join('\r\n'));
+  if (batting.length > 0) {
+    sections.push(csvSection(data.battingColumns, batting));
+  }
+  if (pitching.length > 0) {
+    sections.push(csvSection(data.pitchingColumns, pitching));
+  }
+  const note = exportCapNote(data);
+  if (note !== null) sections.push(csvCell(note));
   return sections.join('\r\n\r\n');
 }
 
@@ -860,55 +830,18 @@ function buildSheetXml(headers: string[], rows: (string | number)[][]): string {
 export function buildXlsxExport(data: PlayerStatsExportData): Uint8Array {
   const batting = data.batting ?? [];
   const pitching = data.pitching ?? [];
+  const note = exportCapNote(data);
+  // A capped export says so on each sheet, after a blank row (LS-10731).
+  const noteRows: ExportCellValue[][] = note !== null ? [[], [note]] : [];
 
-  const battingRows = batting.map(
-    (r) =>
-      [
-        r.displayName,
-        r.primaryPosition ?? '',
-        r.games,
-        r.plateAppearances,
-        r.atBats,
-        r.hits,
-        r.homeRuns,
-        r.rbi,
-        r.stolenBases,
-        r.runs,
-        r.doubles,
-        r.triples,
-        r.baseOnBalls,
-        r.strikeouts,
-        r.formattedBattingAverage,
-        r.formattedOnBasePercentage,
-        r.formattedSluggingPercentage,
-        r.formattedOPS,
-      ] as (string | number)[],
-  );
-
-  const pitchingRows = pitching.map((r) => {
-    const firstName = r.player?.firstName ?? '';
-    const lastName = r.player?.lastName ?? '';
-    const name =
-      firstName && lastName
-        ? `${firstName} ${lastName}`
-        : lastName || firstName;
-    return [
-      name,
-      r.primaryPosition ?? '',
-      r.wins,
-      r.losses,
-      r.games,
-      r.gamesStarted,
-      r.saves,
-      r.outsRecorded,
-      r.era,
-      r.whip,
-      r.strikeouts,
-      r.baseOnBalls,
-      r.homeRuns,
-      strikeoutsPerNineCell(r.strikeoutsPerNine),
-    ] as (string | number)[];
-  });
+  const battingRows = [
+    ...batting.map((row) => toExportCells(data.battingColumns, row)),
+    ...noteRows,
+  ];
+  const pitchingRows = [
+    ...pitching.map((row) => toExportCells(data.pitchingColumns, row)),
+    ...noteRows,
+  ];
 
   const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
 
@@ -925,11 +858,21 @@ export function buildXlsxExport(data: PlayerStatsExportData): Uint8Array {
     { name: 'xl/_rels/workbook.xml.rels', data: strToBytes(workbookRels) },
     {
       name: 'xl/worksheets/sheet1.xml',
-      data: strToBytes(buildSheetXml([...BATTING_CSV_HEADERS], battingRows)),
+      data: strToBytes(
+        buildSheetXml(
+          data.battingColumns.map((column) => column.header),
+          battingRows,
+        ),
+      ),
     },
     {
       name: 'xl/worksheets/sheet2.xml',
-      data: strToBytes(buildSheetXml([...PITCHING_CSV_HEADERS], pitchingRows)),
+      data: strToBytes(
+        buildSheetXml(
+          data.pitchingColumns.map((column) => column.header),
+          pitchingRows,
+        ),
+      ),
     },
   ]);
 }
@@ -1462,31 +1405,21 @@ export function PlayerStatsRoute() {
     if (selectedPlayerId !== null) navigate(`/players/${selectedPlayerId}`);
   }, [navigate, selectedPlayerId]);
 
-  // Latest visible rows surfaced by the shared PlayerStatsPage via
-  // onVisibleRowsChange — read at export time so the download contains the
-  // actual rows the user is looking at (PST-011 / LS-7109). Held in a ref so
-  // grid fetches don't re-render this route, and so onExport keeps its original
-  // (filters, viewMode) signature instead of growing a data parameter.
-  const exportDataRef = React.useRef<PlayerStatsExportData>({
-    batting: [],
-    pitching: [],
-  });
-  const handleVisibleRowsChange = useCallback((data: PlayerStatsExportData) => {
-    exportDataRef.current = data;
-  }, []);
-
   // Handle export functionality (LS-9140: all export formats, including JSON,
   // are premium-only)
   const handleExport = useCallback(
     (
       filters: PlayerStatsFilters,
       viewMode: PlayerStatsViewMode,
-      format: ExportFormat = 'json',
+      format: ExportFormat,
+      // The full filtered result set, fetched by the shared controller
+      // (LS-10731, `exportFullResultSet`) — not just the page on screen.
+      exportData?: PlayerStatsExportData,
     ) => {
       // Export (any format) is premium-only (LS-9140). Guard the handler so
       // export can never run for a free user even if triggered
       // programmatically.
-      if (!isPremium) return;
+      if (!isPremium || !exportData) return;
 
       let dataBlob: Blob;
       let filename: string;
@@ -1494,7 +1427,7 @@ export function PlayerStatsRoute() {
       const viewSegment = sanitizeFilenameSegment(viewMode);
 
       if (format === 'csv') {
-        const csv = buildCsvExport(exportDataRef.current);
+        const csv = buildCsvExport(exportData);
         const csvBytes = utf8ByteLength(csv);
         if (csvBytes > MAX_EXPORT_BYTES) {
           LOGGER.warn(
@@ -1509,7 +1442,7 @@ export function PlayerStatsRoute() {
         dataBlob = new Blob([csv], { type: 'text/csv' });
         filename = `player-stats-${viewSegment}-${dateSuffix}.csv`;
       } else if (format === 'xlsx') {
-        const xlsxBytes = buildXlsxExport(exportDataRef.current);
+        const xlsxBytes = buildXlsxExport(exportData);
         if (xlsxBytes.byteLength > MAX_EXPORT_BYTES) {
           LOGGER.warn(
             'Player statistics XLSX export exceeded size cap; refusing download',
@@ -1530,7 +1463,7 @@ export function PlayerStatsRoute() {
         const { ok, json, bytes } = buildExportPayload(
           filters,
           viewMode,
-          exportDataRef.current,
+          exportData,
         );
         if (!ok) {
           LOGGER.warn(
@@ -1568,7 +1501,12 @@ export function PlayerStatsRoute() {
       if (format !== 'json') {
         LOGGER.info('Exported player statistics', { format });
       }
-      setLiveMsg('Player statistics exported. Download started.');
+      const rowCount = exportData.batting.length + exportData.pitching.length;
+      const capNote = exportCapNote(exportData);
+      setLiveMsg(
+        `Exported ${rowCount.toLocaleString()} players. Download started.` +
+          (capNote !== null ? ` ${capNote}` : ''),
+      );
     },
     [isPremium],
   );
@@ -2059,7 +1997,7 @@ export function PlayerStatsRoute() {
           onVisibleColumnsChange={handleVisibleColumnsChange}
           onPlayerDetails={handlePlayerDetails}
           onExport={handleExport}
-          onVisibleRowsChange={handleVisibleRowsChange}
+          exportFullResultSet
           onShare={handleShare}
           onFiltersChange={handleFiltersChange}
           showAvailabilityFilter={showBaseballAvailabilityFilter}

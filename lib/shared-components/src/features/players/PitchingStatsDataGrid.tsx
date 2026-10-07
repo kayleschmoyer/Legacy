@@ -17,6 +17,7 @@ import {
   useGetCareerPitchingStatsQuery,
 } from '@legacy-sports/graphql';
 import { resolveVisibleColumns } from './columnVisibility';
+import { type ExportColumn, toExportCell } from './exportColumns';
 import { formatPositionsPlayed } from './services/CareerStatsService';
 import { StatsDataGrid, type StatsDataGridColumn } from './shell/StatsDataGrid';
 import { FONT_BODY } from './shell/tokens';
@@ -59,7 +60,10 @@ export interface PitchingStatsDataGridProps {
    * e.g. so an Export action serializes the actual pitching rows the user is
    * looking at rather than just the filter spec (PST-011 / LS-7109).
    */
-  onDataLoaded?: (rows: readonly CareerPitchingFragment[]) => void;
+  onDataLoaded?: (
+    rows: readonly CareerPitchingFragment[],
+    totalCount: number,
+  ) => void;
 }
 
 /** Key of the always-visible player-name column (never hidden by the picker). */
@@ -330,6 +334,33 @@ function cellValueFor(
   return stringifyPrimitive(rawVal);
 }
 
+/**
+ * Export columns for the pitching table (LS-10731): the same columns the grid
+ * renders for this `statsFormat` / per-column selection, with the grid's
+ * formatting, so the file matches the visible table.
+ */
+export function buildPitchingExportColumns(
+  statsFormat: 'standard' | 'expanded',
+  visibleColumns: readonly string[] | undefined,
+): readonly ExportColumn<CareerPitchingFragment>[] {
+  return resolveVisibleColumns(
+    PITCHING_STATS_COLUMNS,
+    statsFormat,
+    visibleColumns,
+    PITCHING_NAME_COLUMN_KEY,
+  ).map((column): ExportColumn<CareerPitchingFragment> => {
+    const isNameCol = column.key === PITCHING_NAME_COLUMN_KEY;
+    return {
+      key: column.key,
+      header: isNameCol ? 'Name' : column.label,
+      value: (row) =>
+        isNameCol
+          ? cellValueFor(column, row)
+          : toExportCell(cellValueFor(column, row)),
+    };
+  });
+}
+
 /** Stringifies only primitives with a safe default toString; anything else (object, undefined) falls back to an em dash. */
 function stringifyPrimitive(val: unknown): string {
   switch (typeof val) {
@@ -445,14 +476,6 @@ export function PitchingStatsDataGrid({
     return withoutNulls.filter((p) => rosteredPlayerIds.has(p.playerId ?? -1));
   }, [pitchingData, availabilityFilter, rosteredPlayerIds]);
 
-  // Surface the currently displayed rows to the host so an Export action can
-  // serialize the actual result set instead of only the filter spec
-  // (PST-011 / LS-7109). Fires on every change to the visible rows; callers
-  // pass a stable (memoized) handler to avoid redundant invocations.
-  useEffect(() => {
-    onDataLoaded?.(displayPitchingData);
-  }, [displayPitchingData, onDataLoaded]);
-
   const { data: countData } = useGetCareerPitchingStatsCountQuery({
     variables: {
       minGames: queryParams.minGames,
@@ -470,6 +493,15 @@ export function PitchingStatsDataGrid({
     fetchPolicy: 'cache-and-network',
   });
   const totalCount = countData?.careerPitchingStatsCount ?? pitchingData.length;
+
+  // Surface the displayed rows and the filtered total to the host
+  // (PST-011 / LS-7109) so it can state the export's row scope (LS-10731).
+  // Callers pass a stable (memoized) handler to avoid redundant invocations.
+  useEffect(() => {
+    // Wait for the count so a host never sees the page length as the total.
+    if (loading || countData === undefined) return;
+    onDataLoaded?.(displayPitchingData, totalCount);
+  }, [displayPitchingData, totalCount, loading, countData, onDataLoaded]);
 
   const updateQueryParams = useCallback(
     (updates: Partial<GetCareerPitchingStatsQueryVariables>) => {

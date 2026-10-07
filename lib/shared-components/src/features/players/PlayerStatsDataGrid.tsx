@@ -20,6 +20,7 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 import { resolveVisibleColumns } from './columnVisibility';
+import { type ExportColumn, toExportCell } from './exportColumns';
 import { StatsDataGrid, type StatsDataGridColumn } from './shell/StatsDataGrid';
 import { FONT_BODY, FONT_DISPLAY } from './shell/tokens';
 import {
@@ -87,9 +88,14 @@ export interface PlayerStatsDataGridProps {
    * Fired with the rows currently displayed (after the availability filter is
    * applied) whenever they change. Lets a host surface the loaded result set —
    * e.g. so an Export action serializes the actual player rows the user is
-   * looking at rather than just the filter spec (PST-011 / LS-7109).
+   * looking at rather than just the filter spec (PST-011 / LS-7109). Also
+   * reports the server-side filtered total so the host can state the export's
+   * row scope (LS-10731).
    */
-  onDataLoaded?: (rows: readonly PlayerCareerStats[]) => void;
+  onDataLoaded?: (
+    rows: readonly PlayerCareerStats[],
+    totalCount: number,
+  ) => void;
 }
 
 // =============================================================================
@@ -366,6 +372,53 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
 // Component Implementation
 // =============================================================================
 
+/** A batting cell's display string — shared by the grid and the export. */
+function formatBattingCell(
+  column: GridColumn,
+  player: PlayerCareerStats,
+): string {
+  const raw = player[column.key];
+  if (column.formatter) return column.formatter(raw);
+  if (raw == null) return '—';
+  return typeof raw === 'string' ||
+    typeof raw === 'number' ||
+    typeof raw === 'boolean'
+    ? String(raw)
+    : '—';
+}
+
+/**
+ * Export columns for the batting table (LS-10731): Name + Position (both shown
+ * in the grid's Player cell) followed by the same stat columns the grid renders
+ * for this `statsFormat` / per-column selection, with the grid's formatting.
+ */
+export function buildBattingExportColumns(
+  statsFormat: 'standard' | 'expanded',
+  visibleColumns: readonly string[] | undefined,
+): readonly ExportColumn<PlayerCareerStats>[] {
+  const statColumns = resolveVisibleColumns(
+    CAREER_STATS_COLUMNS,
+    statsFormat,
+    visibleColumns,
+    BATTING_NAME_COLUMN_KEY,
+  ).filter((column) => column.key !== BATTING_NAME_COLUMN_KEY);
+  return [
+    { key: 'name', header: 'Name', value: (row) => row.displayName },
+    {
+      key: 'position',
+      header: 'Position',
+      value: (row) => row.primaryPosition ?? '',
+    },
+    ...statColumns.map(
+      (column): ExportColumn<PlayerCareerStats> => ({
+        key: column.key,
+        header: column.label,
+        value: (row) => toExportCell(formatBattingCell(column, row)),
+      }),
+    ),
+  ];
+}
+
 /**
  * Builds the {@link StatsDataGrid} column set from the batting `GridColumn`
  * config. The Player column renders a rich cell (position badge + name); every
@@ -389,16 +442,7 @@ function toGridColumns(
         ? `Sort by ${column.label}`
         : undefined,
       renderCell: (player: PlayerCareerStats) => {
-        const raw = player[column.key];
-        const cellValue = column.formatter
-          ? column.formatter(raw)
-          : raw == null
-            ? '—'
-            : typeof raw === 'string' ||
-                typeof raw === 'number' ||
-                typeof raw === 'boolean'
-              ? String(raw)
-              : '—';
+        const cellValue = formatBattingCell(column, player);
 
         if (isNameCol) {
           const posKey = player.primaryPosition;
@@ -677,8 +721,10 @@ export function PlayerStatsDataGrid({
   // (PST-011 / LS-7109). Fires on every change to the visible rows; callers
   // pass a stable (memoized) handler to avoid redundant invocations.
   useEffect(() => {
-    onDataLoaded?.(displayData);
-  }, [displayData, onDataLoaded]);
+    // Skip in-flight renders so a host never sees a transient zero total.
+    if (loading) return;
+    onDataLoaded?.(displayData, totalCount);
+  }, [displayData, totalCount, loading, onDataLoaded]);
 
   return (
     <StatsDataGrid

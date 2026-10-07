@@ -24,6 +24,13 @@ export interface SportStatsController {
   canExport: boolean;
   exportFormats: readonly string[];
   onExport: (format: string) => void;
+  /** An export is being prepared (e.g. fetching the full result set). */
+  exportBusy?: boolean;
+  /**
+   * Row scope of the next export, shown beside the export buttons
+   * (e.g. "Export includes all 1,096 hitters"). Null/omitted shows nothing.
+   */
+  exportScopeLabel?: string | null;
 
   // ── View tabs ───────────────────────────────────────────────────────
   /** `[]` or a single tab hides the tab strip (football). */

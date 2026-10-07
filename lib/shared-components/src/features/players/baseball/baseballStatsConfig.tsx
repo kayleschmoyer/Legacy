@@ -6,6 +6,8 @@ import React, {
   useState,
 } from 'react';
 import { Pressable, TextInput } from 'react-native';
+import { useApolloClient } from '@apollo/client/react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Text, YStack } from 'tamagui';
 import type { CareerPitchingFragment } from '@legacy-sports/graphql';
 import {
@@ -37,6 +39,8 @@ import {
   WINS_MAX,
   WINS_STEP,
 } from './baseballStatsHelpers';
+import { fetchAllBattingRows, fetchAllPitchingRows } from './fetchExportData';
+import { describeExportScope, filterByAvailability } from './exportScope';
 import { Platform } from '../../../platform-components';
 import { BG_DARK, TEXT_PRIMARY, withAlpha } from '../../../utils/colors';
 import {
@@ -59,11 +63,13 @@ import type {
 import type { PlayerStatsShellState } from '../shell/StateCards';
 import {
   BATTING_NAME_COLUMN_KEY,
+  buildBattingExportColumns,
   CAREER_STATS_COLUMNS,
   isValidBattingSortField,
   PlayerStatsDataGrid,
 } from '../PlayerStatsDataGrid';
 import {
+  buildPitchingExportColumns,
   PITCHING_NAME_COLUMN_KEY,
   PITCHING_STATS_COLUMNS,
   PitchingStatsDataGrid,
@@ -82,17 +88,28 @@ import type {
 } from '../PlayerStatsTypes';
 import type { PlayerCareerStats } from '../services/CareerStatsService';
 import { csp } from '../crossPlatformStyle';
+import { EXPORT_ROW_CAP, type ExportColumn } from '../exportColumns';
 
 /** Export file format options for the player-stats download (PST-014 / LS-7112). */
 export type ExportFormat = 'json' | 'csv' | 'xlsx';
 
 /**
- * The currently displayed result set, surfaced to a host so it can serialize the
- * actual player rows the user is looking at — not just the filter spec (PST-011).
+ * The full filtered result set handed to the host's export (LS-10731): every
+ * row matching the applied filters, up to `rowCap` per table — not just the
+ * page on screen (PST-011 / LS-7109) — plus the columns the grids are showing,
+ * so the file matches the visible table.
  */
 export interface PlayerStatsExportData {
   batting: readonly PlayerCareerStats[];
   pitching: readonly CareerPitchingFragment[];
+  battingColumns: readonly ExportColumn<PlayerCareerStats>[];
+  pitchingColumns: readonly ExportColumn<CareerPitchingFragment>[];
+  /** Hitters matching the filters server-side, before the cap. */
+  battingMatched: number;
+  /** Pitchers matching the filters server-side, before the cap. */
+  pitchingMatched: number;
+  /** Rows exported per table at most. */
+  rowCap: number;
 }
 
 export interface PlayerStatsPageProps {
@@ -113,12 +130,23 @@ export interface PlayerStatsPageProps {
   onClearFilters?: () => void;
   onPlayerDetails?: (player: PlayerWithStats) => void;
   exportFormats?: readonly ExportFormat[];
+  /**
+   * Export handler. With `exportFullResultSet`, it is called with the full
+   * filtered result set once fetched (LS-10731) and the host serializes `data`;
+   * otherwise `data` is omitted (filter-spec-only exports, e.g. mobile).
+   */
   onExport?: (
     filters: PlayerStatsFilters,
     viewMode: PlayerStatsViewMode,
-    format?: ExportFormat,
+    format: ExportFormat,
+    data?: PlayerStatsExportData,
   ) => void;
-  onVisibleRowsChange?: (data: PlayerStatsExportData) => void;
+  /**
+   * Fetch every filtered row (up to EXPORT_ROW_CAP per table) before calling
+   * `onExport`, and show the export's row scope beside the buttons (LS-10731).
+   * Off by default so hosts that ignore the rows don't pay for the fetch.
+   */
+  exportFullResultSet?: boolean;
   onShare?: (url: string) => void;
   onFiltersChange?: (state: {
     viewMode: 'combined' | 'hitters' | 'pitchers';
@@ -212,7 +240,7 @@ export function useBaseballController(
     onClearFilters,
     onPlayerDetails,
     onExport,
-    onVisibleRowsChange,
+    exportFullResultSet = false,
     onShare,
     onFiltersChange,
     showAvailabilityFilter = false,
@@ -503,42 +531,32 @@ export function useBaseballController(
   );
 
   // ── Export / share ─────────────────────────────────────────────
-  const battingRowsRef = useRef<readonly PlayerCareerStats[]>([]);
-  const pitchingRowsRef = useRef<readonly CareerPitchingFragment[]>([]);
-
-  const emitVisibleRows = useCallback(() => {
-    if (!onVisibleRowsChange) return;
-    const isBattingVisible = viewMode === 'combined' || viewMode === 'hitters';
-    const isPitchingVisible =
-      viewMode === 'combined' || viewMode === 'pitchers';
-    onVisibleRowsChange({
-      batting: isBattingVisible ? battingRowsRef.current : [],
-      pitching: isPitchingVisible ? pitchingRowsRef.current : [],
-    });
-  }, [onVisibleRowsChange, viewMode]);
-
+  // The grids report their server-side filtered totals so the export can state
+  // its row scope before the user clicks (LS-10731).
+  const [battingTotal, setBattingTotal] = useState<number | null>(null);
+  const [pitchingTotal, setPitchingTotal] = useState<number | null>(null);
   const handleBattingDataLoaded = useCallback(
-    (rows: readonly PlayerCareerStats[]) => {
-      battingRowsRef.current = rows;
-      emitVisibleRows();
+    (_rows: readonly PlayerCareerStats[], totalCount: number) => {
+      setBattingTotal(totalCount);
     },
-    [emitVisibleRows],
+    [],
   );
   const handlePitchingDataLoaded = useCallback(
-    (rows: readonly CareerPitchingFragment[]) => {
-      pitchingRowsRef.current = rows;
-      emitVisibleRows();
+    (_rows: readonly CareerPitchingFragment[], totalCount: number) => {
+      setPitchingTotal(totalCount);
     },
-    [emitVisibleRows],
+    [],
   );
 
-  useEffect(() => {
-    emitVisibleRows();
-  }, [emitVisibleRows]);
+  const apolloClient = useApolloClient();
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  // Ref guard so a double-click can't start two concurrent full fetches.
+  const exportInFlightRef = useRef(false);
 
   const handleExportFormat = useCallback(
-    (format: ExportFormat) => {
-      if (!onExport || !canExport) return;
+    async (format: ExportFormat) => {
+      if (!onExport || !canExport || exportInFlightRef.current) return;
       const filters: PlayerStatsFilters = {
         searchTerm: search || undefined,
         position: position !== 'All Positions' ? position : undefined,
@@ -556,11 +574,80 @@ export function useBaseballController(
         minStrikeouts: minSO > 0 ? minSO : undefined,
         maxStrikeouts: maxSO < SO_MAX ? maxSO : undefined,
       };
-      onExport(filters, viewMode, format);
+      if (!exportFullResultSet) {
+        onExport(filters, viewMode, format);
+        return;
+      }
+      exportInFlightRef.current = true;
+      setExportBusy(true);
+      setExportError(null);
+      try {
+        const includeBatting = viewMode !== 'pitchers';
+        const includePitching = viewMode !== 'hitters';
+        const availability = showAvailabilityFilter
+          ? availabilityFilter
+          : undefined;
+        const [batting, pitching] = await Promise.all([
+          includeBatting
+            ? fetchAllBattingRows(apolloClient, battingParams, EXPORT_ROW_CAP)
+            : null,
+          includePitching
+            ? fetchAllPitchingRows(apolloClient, pitchingParams, EXPORT_ROW_CAP)
+            : null,
+        ]);
+        onExport(filters, viewMode, format, {
+          batting: filterByAvailability(
+            batting?.rows ?? [],
+            (row) => row.playerId,
+            availability,
+            rosteredPlayerIds,
+          ),
+          pitching: filterByAvailability(
+            pitching?.rows ?? [],
+            (row) => row.playerId,
+            availability,
+            rosteredPlayerIds,
+          ),
+          battingColumns: includeBatting
+            ? buildBattingExportColumns(
+                statsFormat,
+                visibleColumns ?? undefined,
+              )
+            : [],
+          pitchingColumns: includePitching
+            ? buildPitchingExportColumns(
+                statsFormat,
+                visibleColumns ?? undefined,
+              )
+            : [],
+          battingMatched: batting?.matched ?? 0,
+          pitchingMatched: pitching?.matched ?? 0,
+          rowCap: EXPORT_ROW_CAP,
+        });
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        LOGGER.error('Player statistics export fetch failed', error, {
+          viewMode,
+          format,
+        });
+        setExportError('Export failed. Please try again.');
+      } finally {
+        exportInFlightRef.current = false;
+        setExportBusy(false);
+      }
     },
     [
       onExport,
       canExport,
+      exportFullResultSet,
+      apolloClient,
+      battingParams,
+      pitchingParams,
+      showAvailabilityFilter,
+      availabilityFilter,
+      rosteredPlayerIds,
+      statsFormat,
+      visibleColumns,
       search,
       position,
       team,
@@ -577,6 +664,25 @@ export function useBaseballController(
       minSO,
       maxSO,
       viewMode,
+    ],
+  );
+
+  const exportScopeLabel = useMemo(
+    () =>
+      describeExportScope({
+        viewMode,
+        battingTotal,
+        pitchingTotal,
+        cap: EXPORT_ROW_CAP,
+        availabilityActive:
+          showAvailabilityFilter && availabilityFilter !== 'all',
+      }),
+    [
+      viewMode,
+      battingTotal,
+      pitchingTotal,
+      showAvailabilityFilter,
+      availabilityFilter,
     ],
   );
 
@@ -1141,7 +1247,14 @@ export function useBaseballController(
     onShare: handleShare,
     canExport,
     exportFormats,
-    onExport: (format: string) => handleExportFormat(format as ExportFormat),
+    onExport: (format: string) => {
+      void handleExportFormat(format as ExportFormat);
+    },
+    exportBusy,
+    exportScopeLabel:
+      canExport && exportFullResultSet
+        ? (exportError ?? exportScopeLabel)
+        : null,
     tabs: BASEBALL_TABS,
     activeTab: viewMode,
     onTabChange: (id) =>
