@@ -185,6 +185,14 @@ const HTTP_MCP_SERVERS = [
     // then re-run with --force to pull the real URL from SSM.
     fallbackUrl: null,
   },
+  {
+    name: 'legacy-sports-discord',
+    envKey: 'MCP_DISCORD_URL',
+    // No hardcoded fallback — the invoke URL is unstable across initial
+    // deploys. Run `terraform apply` then re-run with --force to pull the
+    // real URL from SSM.
+    fallbackUrl: null,
+  },
 ];
 
 // Local LOGGER stub. The project rule (AGENTS.md) is to use LOGGER from
@@ -544,6 +552,7 @@ async function main() {
     ['ci', 'MCP_CI_URL'],
     ['db', 'MCP_DB_URL'],
     ['rollbar', 'MCP_ROLLBAR_URL'],
+    ['discord', 'MCP_DISCORD_URL'],
   ]) {
     if (!env[envKey] || FORCE_MODE) {
       const url = readApiUrlFromSsm(name, tfEnv);
@@ -583,6 +592,8 @@ async function main() {
     // mirror it into ~/.claude.json when present.
     // MCP_ROLLBAR_URL is likewise optional — added in LS-8142 alongside the
     // stdio-to-hosted migration of legacy-sports-rollbar.
+    // MCP_DISCORD_URL is likewise optional — legacy-sports-discord is hosted
+    // from day one and its SSM param only exists after its first apply.
   ];
   const finalEnv = readEnvLocal();
   const missing = REQUIRED_VARS.filter((k) => !finalEnv[k]);
@@ -671,7 +682,7 @@ async function main() {
     `.claude/settings.local.json#/env mirrors the same vars (project-local; transitional safety net for Claude Desktop).`,
   );
   LOGGER.info(
-    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci,db-admin,rollbar} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround). db-admin and rollbar are mirrored only when their MCP_*_URL was resolved.`,
+    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci,db-admin,rollbar,discord} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround). db-admin, rollbar and discord are mirrored only when their MCP_*_URL was resolved.`,
   );
   LOGGER.info(
     'Done. Restart Claude Code for the refreshed machine credential to take effect.',

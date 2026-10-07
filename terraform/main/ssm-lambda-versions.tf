@@ -222,6 +222,22 @@ resource "aws_ssm_parameter" "mcp_rollbar_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "mcp_discord_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-discord/version"
+  description = "Current version of the MCP Discord server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-discord"
+  })
+}
+
 resource "aws_ssm_parameter" "apple_iap_lambda_version" {
   name        = "/legacy-sports/${var.environment}/lambda/apple-iap/version"
   description = "Current version of the Apple IAP Lambda function"
@@ -289,6 +305,7 @@ output "lambda_version_parameters" {
     mcp_ci          = aws_ssm_parameter.mcp_ci_lambda_version.name
     mcp_db          = aws_ssm_parameter.mcp_db_lambda_version.name
     mcp_rollbar     = aws_ssm_parameter.mcp_rollbar_lambda_version.name
+    mcp_discord     = aws_ssm_parameter.mcp_discord_lambda_version.name
     apple_iap       = aws_ssm_parameter.apple_iap_lambda_version.name
   }
 }

@@ -174,6 +174,7 @@ Per-server tool lists, server IDs, and stdio-vs-hosted transport live in `tools/
 | `tools/mcp/jira-server/`        | Jira ticket CRUD/transitions with guardrails                                               |
 | `tools/mcp/db-admin-server/`    | Hosted `db_query` / `db_migration_status` / `db_migrate` (dev RDS over HTTPS, tunnel-free) |
 | `tools/mcp/rollbar-server/`     | Rollbar item/occurrence triage (`rollbar_*` tools)                                         |
+| `tools/mcp/discord-server/`     | Hosted read-only Discord notes-channel reader (`discord_*` tools)                          |
 | `tools/mcp/worktree-server/`    | Worktree-aware git operations                                                              |
 | `tools/mcp/make-server/`        | `make_run` and Make target wrappers                                                        |
 | `tools/mcp/nx-server/`          | `nx_run`, `nx_run_affected`, `nx_run_pc_chunk`, …                                          |

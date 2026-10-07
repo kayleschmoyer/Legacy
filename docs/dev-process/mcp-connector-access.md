@@ -1,6 +1,6 @@
 # MCP Connector Access Guide
 
-How a new developer gets access to the five hosted MCP servers: `legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`, the DB server (LS-8117/LS-8139 — displayed as `legacy-sports-db` in connector sessions; repo-side alias `legacy-sports-db-admin`), and `legacy-sports-rollbar` (LS-8142). Two paths exist depending on how you run Claude Code.
+How a new developer gets access to the six hosted MCP servers: `legacy-sports-jira`, `legacy-sports-github`, `legacy-sports-ci`, the DB server (LS-8117/LS-8139 — displayed as `legacy-sports-db` in connector sessions; repo-side alias `legacy-sports-db-admin`), `legacy-sports-rollbar` (LS-8142), and `legacy-sports-discord` (LS-10640). Two paths exist depending on how you run Claude Code.
 
 ## Which path applies to you?
 
@@ -67,7 +67,7 @@ https://legacy-sports-dev-mcp.auth.us-east-1.amazoncognito.com/login?client_id=4
 After setting their password, the browser will redirect back to claude.ai. The password is now set and they can proceed to Step 2.
 
 > **What permissions does the new user get?**  
-> Pool membership equals full MCP access. The `mcp_connector` app client grants scopes `mcp/jira`, `mcp/github`, `mcp/ci`, `mcp/db`, and `mcp/rollbar` — all five servers — to every user in the pool (see `terraform/main/lambda-mcp-api-gateway.tf` `mcp_servers_map`). There is no per-user scope restriction.
+> Pool membership equals full MCP access. The `mcp_connector` app client grants scopes `mcp/jira`, `mcp/github`, `mcp/ci`, `mcp/db`, `mcp/rollbar`, and `mcp/discord` — all six servers — to every user in the pool (see `terraform/main/lambda-mcp-api-gateway.tf` `mcp_servers_map`). There is no per-user scope restriction — so everyone in the pool can read the admin notes channel through `legacy-sports-discord`.
 
 ### Step 2 — Connect in Claude Code (local or web)
 
@@ -80,6 +80,7 @@ Once your Cognito account exists:
    - `legacy-sports-ci`
    - `legacy-sports-db` (LS-8117/LS-8139)
    - `legacy-sports-rollbar` (LS-8142)
+   - `legacy-sports-discord` (LS-10640)
 3. Click **Connect** on each and complete the Cognito OAuth consent flow that opens.
 4. After they are connected, the `mcp__legacy-sports-*` tools appear automatically in your Claude Code sessions — both local (desktop app, CLI, IDE extensions) and web.
 
@@ -129,6 +130,7 @@ The values below are for the `dev` environment. They are written to `.env.local`
 | `MCP_CI_URL`                                           | `https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com`                    |
 | `MCP_DB_URL` (LS-8117)                                 | written by `mcp-auth.mjs` from SSM `/legacy-sports-dev/mcp/db/api-url`      |
 | `MCP_ROLLBAR_URL` (LS-8142)                            | written by `mcp-auth.mjs` from SSM `/legacy-sports-dev/mcp/rollbar/api-url` |
+| `MCP_DISCORD_URL` (LS-10640)                           | written by `mcp-auth.mjs` from SSM `/legacy-sports-dev/mcp/discord/api-url` |
 
 The token endpoint is `${MCP_AUTH_COGNITO_DOMAIN}/oauth2/token`. The machine client secret (`MCP_MACHINE_CLIENT_SECRET`) is fetched from Secrets Manager by `mcp-auth.mjs` and is not listed here — see [`docs/authentication/mcp-machine-credential-lifecycle.md`](../authentication/mcp-machine-credential-lifecycle.md) for secret management.
 

@@ -73,6 +73,17 @@ variable "lambda_mcp_db_timeout" {
   default     = 900
 }
 
+variable "mcp_discord_channel_id" {
+  description = "Numeric id of the one admin-only Discord channel the hosted MCP Discord server (LS-10640) may read. Not a secret — a channel id is useless without the bot token. Set it in infra.auto.tfvars; while empty, discord_auth_status reports the channel as unconfigured and the read tools fail closed."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.mcp_discord_channel_id == "" || can(regex("^[0-9]{15,25}$", var.mcp_discord_channel_id))
+    error_message = "mcp_discord_channel_id must be empty or a numeric Discord snowflake (15-25 digits)."
+  }
+}
+
 variable "google_oauth_client_id" {
   description = "Google OAuth Client ID"
   type        = string

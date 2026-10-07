@@ -170,6 +170,16 @@
     "driftMonitored": true
   },
   {
+    "project": "mcp-discord-server",
+    "dir": "tools/mcp/discord-server",
+    "s3Prefix": "mcp-discord",
+    "ssmName": "mcp-discord",
+    "badgeName": "Upload MCP Discord Lambda",
+    "distPath": "tools/mcp/discord-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
     "project": "apple-iap",
     "dir": "apple-iap",
     "s3Prefix": "apple-iap",

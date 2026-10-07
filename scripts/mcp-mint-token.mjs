@@ -77,6 +77,7 @@ export const SERVER_SCOPES = Object.freeze({
   'legacy-sports-ci': 'mcp/ci',
   'legacy-sports-db-admin': 'mcp/db',
   'legacy-sports-rollbar': 'mcp/rollbar',
+  'legacy-sports-discord': 'mcp/discord',
 });
 
 // stderr-only diagnostics. stdout is reserved exclusively for the header JSON,

@@ -65,6 +65,7 @@ on:
           - mcp-ci-server
           - mcp-db-admin-server
           - mcp-rollbar-server
+          - mcp-discord-server
       force-all:
         description: "Force build and deploy all lambdas, bypassing nx affected detection"
         required: false

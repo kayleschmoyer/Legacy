@@ -80,6 +80,13 @@ const SERVERS = [
       'Production error triage: list and inspect items and occurrences, and set item status.',
   },
   {
+    dir: 'discord-server',
+    id: 'legacy-sports-discord',
+    label: 'Discord',
+    summary:
+      'Read-only access to the one admin notes channel: list recent messages and fetch one by id.',
+  },
+  {
     dir: 'browser-server',
     id: 'legacy-sports-browser',
     label: 'Browser',

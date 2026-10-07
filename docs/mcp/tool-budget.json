@@ -49,6 +49,10 @@
     "worktree": {
       "tools": 63,
       "tokens": 20091
+    },
+    "legacy-sports-discord": {
+      "tools": 3,
+      "tokens": 482
     }
   }
 }

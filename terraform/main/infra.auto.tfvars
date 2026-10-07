@@ -78,6 +78,14 @@ discord_native_redirect_uris = "legacysports://auth/discord/callback"
 # check in.
 mcp_ic_saml_metadata_url = ""
 
+# ── MCP Discord notes channel (LS-10640) ──────────────────────────────────────
+# Numeric id of the one admin-only Discord channel the hosted MCP Discord
+# server may read (Discord → Developer Mode → right-click channel → Copy
+# Channel ID). A channel id is not a secret — it is useless without the bot
+# token, which lives in Secrets Manager (<env>/discord-mcp-bot-token). While
+# empty the read tools fail closed.
+mcp_discord_channel_id = ""
+
 # ── Stripe Price IDs ──────────────────────────────────────────────────────────
 # Stripe Price IDs for the subscription plans exposed by the GraphQL `stripePrices`
 # query. These are NOT secrets — they are public identifiers that begin with

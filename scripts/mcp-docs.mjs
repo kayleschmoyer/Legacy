@@ -9,7 +9,7 @@
  * so it can be opened like any other file.
  *
  * Usage:
- *   node scripts/mcp-docs.mjs <server>     # ci | github | jira | db-admin | rollbar
+ *   node scripts/mcp-docs.mjs <server>     # ci | github | jira | db-admin | rollbar | discord
  *   make mcp-docs SERVER=ci
  *
  * For the offline copy covering every server (hosted and local), open
@@ -34,6 +34,7 @@ const SERVERS = {
   jira: { name: 'legacy-sports-jira', urlVar: 'MCP_JIRA_URL' },
   'db-admin': { name: 'legacy-sports-db-admin', urlVar: 'MCP_DB_URL' },
   rollbar: { name: 'legacy-sports-rollbar', urlVar: 'MCP_ROLLBAR_URL' },
+  discord: { name: 'legacy-sports-discord', urlVar: 'MCP_DISCORD_URL' },
 };
 
 const FETCH_TIMEOUT_MS = 15_000;

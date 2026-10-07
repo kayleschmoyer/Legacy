@@ -49,6 +49,7 @@ export const MCP_SCOPE = {
   ci: 'mcp/ci',
   db: 'mcp/db',
   rollbar: 'mcp/rollbar',
+  discord: 'mcp/discord',
 } as const;
 
 const RECOVERY_HINT =

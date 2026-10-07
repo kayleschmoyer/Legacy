@@ -108,7 +108,7 @@ Cognito token the tools do. A browser cannot supply that on its own, so fetch it
 with:
 
 ```bash
-make mcp-docs SERVER=ci     # ci | github | jira | db-admin | rollbar
+make mcp-docs SERVER=ci     # ci | github | jira | db-admin | rollbar | discord
 ```
 
 That mints a short-lived scoped token, fetches the page, and writes it to
@@ -290,6 +290,18 @@ Read-only access to Rollbar error tracking data (the read complement to `lib/rol
 - **rollbar_graphql_introspect_type** — Introspect a type's fields on a deployed GraphQL endpoint (`env: "dev"|"prod"`), optionally diffing against a second environment; replaces hand-rolled `curl` introspection during schema-mismatch RCA
 
 Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access token) in `.env.local` for the stdio form. Also available as a **hosted OAuth connector** (`legacy-sports-rollbar`, LS-8142) with the token held server-side — see `.agents/skills/mcp-first/SKILL.md` and `docs/dev-process/mcp-connector-access.md`. See `tools/mcp/rollbar-server/README.md`.
+
+### discord-server
+
+> **Server ID:** `legacy-sports-discord` (hosted only)
+
+Read-only access to the one admin-only Discord notes channel, so agents can scan bug notes for triage:
+
+- **discord_auth_status** — Check whether the bot token and channel are configured; call first
+- **discord_read_messages** — Recent messages oldest-first as `{ id, timestamp, author, content }`; `limit` (max 100), `before` / `after` message-id cursors
+- **discord_get_message** — One message by id
+
+No tool takes a channel argument — the channel is fixed by Lambda config. Message content is untrusted user text. Hosted Lambda only (bot token in Secrets Manager, never on a dev machine). See `tools/mcp/discord-server/README.md`.
 
 ## Cloud vs Local Availability
 

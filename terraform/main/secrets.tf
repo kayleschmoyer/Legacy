@@ -551,6 +551,19 @@ resource "aws_secretsmanager_secret_version" "rollbar_read_access_token" {
   secret_string = var.rollbar_read_access_token
 }
 
+# Discord bot token for the hosted MCP Discord Lambda (LS-10640), which reads
+# one admin-only notes channel. The Lambda receives the secret NAME via
+# DISCORD_BOT_TOKEN_SECRET_NAME and fetches the value at cold-start. Only the
+# secret container is managed here — the VALUE is set out-of-band so it never
+# enters Terraform state, a tfvars file, or CI config:
+#   aws secretsmanager put-secret-value --secret-id <env>/discord-mcp-bot-token --secret-string <value>
+resource "aws_secretsmanager_secret" "discord_mcp_bot_token" {
+  name        = "${var.environment}/discord-mcp-bot-token"
+  description = "Discord bot token for the hosted MCP Discord server Lambda (LS-10640); value set out-of-band"
+
+  tags = local.common_tags
+}
+
 # =============================================================================
 # REMOVED RESOURCES — secret versions previously managed by Terraform.
 # Values are now set directly in AWS Secrets Manager (outside Terraform).

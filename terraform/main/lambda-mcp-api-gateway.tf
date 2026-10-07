@@ -57,6 +57,7 @@ locals {
     ci      = "${local.name_prefix}-mcp-ci"
     db      = "${local.name_prefix}-mcp-db"
     rollbar = "${local.name_prefix}-mcp-rollbar"
+    discord = "${local.name_prefix}-mcp-discord"
   }
 
   # Maps each MCP server key to its Lambda invoke ARN and function name.
@@ -68,6 +69,7 @@ locals {
     ci      = aws_lambda_function.mcp_ci.invoke_arn
     db      = aws_lambda_function.mcp_db.invoke_arn
     rollbar = aws_lambda_function.mcp_rollbar.invoke_arn
+    discord = aws_lambda_function.mcp_discord.invoke_arn
   }
   mcp_lambda_function_names = {
     jira    = aws_lambda_function.mcp_jira.function_name
@@ -75,6 +77,7 @@ locals {
     ci      = aws_lambda_function.mcp_ci.function_name
     db      = aws_lambda_function.mcp_db.function_name
     rollbar = aws_lambda_function.mcp_rollbar.function_name
+    discord = aws_lambda_function.mcp_discord.function_name
   }
 
   # Cognito OIDC issuer URL (well-known shape — JWKS lives at /.well-known/jwks.json).
@@ -275,7 +278,7 @@ resource "aws_cognito_resource_server" "mcp" {
   name         = "${local.name_prefix}-mcp"
 
   # The full scope string a client requests is "<identifier>/<scope_name>" →
-  # "mcp/jira", "mcp/github", "mcp/ci", "mcp/db".
+  # "mcp/jira", "mcp/github", "mcp/ci", "mcp/db", "mcp/rollbar", "mcp/discord".
   scope {
     scope_name        = "jira"
     scope_description = "Invoke the Jira MCP server"
@@ -295,6 +298,10 @@ resource "aws_cognito_resource_server" "mcp" {
   scope {
     scope_name        = "rollbar"
     scope_description = "Invoke the Rollbar MCP server"
+  }
+  scope {
+    scope_name        = "discord"
+    scope_description = "Invoke the Discord MCP server"
   }
 }
 
