@@ -1557,6 +1557,75 @@ describe('football resolvers', () => {
       });
     });
 
+    // LS-10683: the Free Agents tab sorts the whole pool by projection
+    // server-side, so rostered players must be excluded in SQL — before
+    // LIMIT/OFFSET — or each sorted page would be thinned client-side.
+    describe('excludeRostered (LS-10683)', () => {
+      function compileWhere(): { sql: string; params: unknown[] } {
+        return new PgDialect().sqlToQuery(mockDb.where.mock.calls[0][0]);
+      }
+
+      it('excludes players rostered in leagueId alongside the fpg pool sort', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            positions: ['QB', 'RB', 'WR', 'TE', 'K', 'DST'],
+            search: null,
+            after: '50',
+            sortBy: 'fpg',
+            sortDir: 'desc',
+            leagueId: 14111,
+            excludeRostered: true,
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql: whereSql, params } = compileWhere();
+        expect(whereSql).toContain(
+          'NOT EXISTS (SELECT 1 FROM public.team_members',
+        );
+        expect(params).toContain(14111);
+        const { sql: orderSql } = new PgDialect().sqlToQuery(
+          mockDb.orderBy.mock.calls[0][0],
+        );
+        expect(orderSql).toContain('DESC NULLS LAST');
+        // Paging keeps the sort: the offset cursor advances past page 1.
+        expect(mockDb.offset).toHaveBeenCalledWith(50);
+      });
+
+      it('does not filter rostered players when excludeRostered is unset', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null, leagueId: 14111 },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(compileWhere().sql).not.toContain('team_members');
+      });
+
+      it('throws BAD_USER_INPUT when excludeRostered is set without leagueId', async () => {
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              excludeRostered: true,
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+    });
+
     it('resolves successfully with freeAgent:true (no nflTeam validation triggered)', async () => {
       mockDb.then.mockImplementationOnce((resolve) => resolve([]));
 

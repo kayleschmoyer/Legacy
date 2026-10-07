@@ -4193,8 +4193,10 @@ export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   category?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;

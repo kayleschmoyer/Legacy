@@ -4616,8 +4616,10 @@ type Query {
     after: String
     category: String
     conference: String
+    excludeRostered: Boolean
     first: Int
     freeAgent: Boolean
+    leagueId: Int
     maxAdpRank: Int
     minProjectedPoints: Float
     nflTeam: String

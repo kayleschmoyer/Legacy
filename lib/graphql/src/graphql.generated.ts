@@ -4199,8 +4199,10 @@ export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   category?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
@@ -6778,6 +6780,8 @@ export type FootballPlayersQueryVariables = Exact<{
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   sortBy?: InputMaybe<Scalars['String']['input']>;
   sortDir?: InputMaybe<Scalars['String']['input']>;
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type FootballPlayersQuery = {
@@ -20154,6 +20158,8 @@ export const FootballPlayers = gql`
     $maxAdpRank: Int
     $sortBy: String
     $sortDir: String
+    $leagueId: Int
+    $excludeRostered: Boolean
   ) {
     footballPlayers(
       positions: $positions
@@ -20167,6 +20173,8 @@ export const FootballPlayers = gql`
       maxAdpRank: $maxAdpRank
       sortBy: $sortBy
       sortDir: $sortDir
+      leagueId: $leagueId
+      excludeRostered: $excludeRostered
     ) {
       nodes {
         ...FootballPlayerHeader
@@ -20203,6 +20211,8 @@ export const FootballPlayers = gql`
  *      maxAdpRank: // value for 'maxAdpRank'
  *      sortBy: // value for 'sortBy'
  *      sortDir: // value for 'sortDir'
+ *      leagueId: // value for 'leagueId'
+ *      excludeRostered: // value for 'excludeRostered'
  *   },
  * });
  */

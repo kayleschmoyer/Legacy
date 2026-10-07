@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { useFootballPlayersQuery } from '@legacy-sports/graphql';
 import {
   type FreeAgentsTabLeague,
   LeagueDetailFreeAgentsTab,
@@ -17,6 +18,7 @@ import { fireEvent, render, screen } from '../../test-utils';
 let mockPlayers: ReadonlyArray<Record<string, unknown>> = [];
 let mockFootballPlayers: ReadonlyArray<Record<string, unknown>> = [];
 let mockFootballHasNextPage = false;
+let mockFootballEndCursor: string | null = null;
 let mockLeagueTeams: ReadonlyArray<Record<string, unknown>> | null = null;
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -28,7 +30,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     data: {
       footballPlayers: {
         nodes: mockFootballPlayers,
-        pageInfo: { hasNextPage: mockFootballHasNextPage, endCursor: null },
+        pageInfo: {
+          hasNextPage: mockFootballHasNextPage,
+          endCursor: mockFootballEndCursor,
+        },
       },
     },
     loading: false,
@@ -164,6 +169,7 @@ beforeEach(() => {
   mockPlayers = [];
   mockFootballPlayers = [];
   mockFootballHasNextPage = false;
+  mockFootballEndCursor = null;
   mockLeagueTeams = null;
 });
 
@@ -309,47 +315,129 @@ describe('LeagueDetailFreeAgentsTab', () => {
     expect(screen.getByTestId('sort-by-projection')).toBeInTheDocument();
   });
 
-  it('reorders football players when the projection sort control is pressed', () => {
-    mockFootballPlayers = [
-      makeFootballPlayer({
-        id: 1,
-        lastName: 'LowProj',
-        careerStats: {
-          fantasyPoints: 85,
-          passing: { g: 17, yds: null, td: null, int: null, rating: null },
-          rushing: null,
-          receiving: null,
-          kicking: null,
-          defense: null,
-          idp: null,
-        },
-      }),
-      makeFootballPlayer({
-        id: 2,
-        lastName: 'HighProj',
-        careerStats: {
-          fantasyPoints: 510,
-          passing: { g: 17, yds: null, td: null, int: null, rating: null },
-          rushing: null,
-          receiving: null,
-          kicking: null,
-          defense: null,
-          idp: null,
-        },
-      }),
-    ];
-    render(
-      <LeagueDetailFreeAgentsTab
-        league={{ ...league, sport: 'football' }}
-        isMember
-        myTeamId={42}
-      />,
-    );
-    fireEvent.click(screen.getByTestId('sort-by-projection'));
-    const names = screen
-      .getAllByText(/Patrick (HighProj|LowProj)/)
-      .map((el) => el.textContent);
-    expect(names).toEqual(['Patrick HighProj', 'Patrick LowProj']);
+  describe('server-side football query (LS-10683)', () => {
+    const lastFootballVariables = () => {
+      const calls = jest.mocked(useFootballPlayersQuery).mock.calls;
+      return calls[calls.length - 1]?.[0]?.variables;
+    };
+
+    it('sends no sort until the projection control is pressed, then sorts the whole pool by fpg server-side', () => {
+      mockFootballPlayers = [makeFootballPlayer()];
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...league, id: 14111, sport: 'football' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(lastFootballVariables()).toMatchObject({
+        sortBy: undefined,
+        sortDir: undefined,
+        leagueId: 14111,
+        excludeRostered: true,
+      });
+
+      fireEvent.click(screen.getByTestId('sort-by-projection'));
+      expect(lastFootballVariables()).toMatchObject({
+        sortBy: 'fpg',
+        sortDir: 'desc',
+        leagueId: 14111,
+        excludeRostered: true,
+        after: undefined,
+      });
+    });
+
+    it('keeps the projection sort when paging and resets to page 1 when the sort changes', () => {
+      mockFootballPlayers = [makeFootballPlayer()];
+      mockFootballHasNextPage = true;
+      mockFootballEndCursor = '50';
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...league, sport: 'football' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('sort-by-projection'));
+      fireEvent.click(screen.getByTestId('football-next-page'));
+      expect(lastFootballVariables()).toMatchObject({
+        sortBy: 'fpg',
+        sortDir: 'desc',
+        after: '50',
+      });
+
+      fireEvent.click(screen.getByTestId('sort-by-projection'));
+      expect(lastFootballVariables()).toMatchObject({
+        sortBy: 'fpg',
+        sortDir: 'asc',
+        after: undefined,
+      });
+    });
+
+    it('sends only offensive positions under ALL for a non-IDP league', () => {
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...league, sport: 'football', defensiveFormat: 'dst' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(lastFootballVariables()?.positions).toEqual([
+        'QB',
+        'RB',
+        'WR',
+        'TE',
+        'K',
+        'DST',
+      ]);
+    });
+
+    it('includes the IDP positions under ALL for an IDP league', () => {
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...league, sport: 'football', defensiveFormat: 'idp' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(lastFootballVariables()?.positions).toEqual([
+        'QB',
+        'RB',
+        'WR',
+        'TE',
+        'K',
+        'DST',
+        'DL',
+        'LB',
+        'DB',
+      ]);
+    });
+
+    it('derives PROJ from the most games across categories, matching the server fpg divisor', () => {
+      mockFootballPlayers = [
+        makeFootballPlayer({
+          careerStats: {
+            fantasyPoints: 400,
+            // A one-game trick-play pass must not shrink the divisor.
+            passing: { g: 1, yds: 20, td: 0, int: 0, rating: null },
+            rushing: { g: 20, yds: 1500, td: 10 },
+            receiving: null,
+            kicking: null,
+            defense: null,
+            idp: null,
+          },
+        }),
+      ];
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...league, sport: 'football' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      // 400 career fantasy points / 20 games * 5 games-per-matchup = 100.0
+      expect(screen.getByText('100.0')).toBeInTheDocument();
+    });
   });
 
   it('renders passing stat columns with real values from careerStats for the QB filter (LS-9772)', () => {

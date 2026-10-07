@@ -139,6 +139,8 @@ query FootballPlayers(
   $maxAdpRank: Int
   $sortBy: String
   $sortDir: String
+  $leagueId: Int
+  $excludeRostered: Boolean
 ) {
   footballPlayers(
     positions: $positions
@@ -152,6 +154,8 @@ query FootballPlayers(
     maxAdpRank: $maxAdpRank
     sortBy: $sortBy
     sortDir: $sortDir
+    leagueId: $leagueId
+    excludeRostered: $excludeRostered
   ) {
     nodes {
       ...FootballPlayerHeader

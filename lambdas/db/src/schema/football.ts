@@ -2206,6 +2206,12 @@ builder.queryField('footballPlayers', (t) =>
       // restricting rows to players with stats in that category — the leader-
       // board semantics of the stats-grid tabs. Required for stat sortBy keys.
       category: t.arg.string({ required: false }),
+      // Free-agent pools (LS-10683): exclude players already rostered on any
+      // team in `leagueId`, before LIMIT/OFFSET, so a sorted page is never
+      // thinned out client-side — mirrors baseball's `players` excludeRostered
+      // (LS-9118). Requires leagueId.
+      leagueId: t.arg.int({ required: false }),
+      excludeRostered: t.arg.boolean({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -2354,6 +2360,15 @@ builder.queryField('footballPlayers', (t) =>
             PublicSchema.players.nflTeam,
             CONFERENCE_TEAMS[args.conference],
           ),
+        );
+      }
+
+      if (args.excludeRostered) {
+        if (args.leagueId == null) {
+          throw UserInputError('excludeRostered requires leagueId');
+        }
+        conditions.push(
+          sql<boolean>`NOT EXISTS (SELECT 1 FROM public.team_members tm WHERE tm.player_id = ${PublicSchema.players.id} AND tm.league_id = ${args.leagueId})`,
         );
       }
 
