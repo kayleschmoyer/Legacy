@@ -267,6 +267,66 @@ describe('LeagueSettingsControl — bounded numeric inputs (LS-8660)', () => {
 });
 
 /**
+ * Regression guard for LS-10692: SP Starts only updated its numeric state when
+ * parseInt() succeeded, so "abc"/blank kept the previous value and "3.9" was
+ * truncated to 3 — Save stayed enabled and silently submitted the wrong value.
+ */
+describe('LeagueSettingsControl — SP starts must be a whole number (LS-10692)', () => {
+  const renderWithGamesChanged = () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        sport="baseball"
+        currentGamesPerMatchup={5}
+        currentSpStartsPerMatchup={3}
+      />,
+    );
+    // A pending change elsewhere means Save would otherwise be enabled.
+    fireEvent.change(screen.getByLabelText('Games per matchup'), {
+      target: { value: '6' },
+    });
+  };
+
+  it.each(['abc', '3.9', '2.5', ''])(
+    'shows an inline error and disables Save for %p',
+    (value) => {
+      renderWithGamesChanged();
+
+      fireEvent.change(screen.getByLabelText('SP starts per matchup'), {
+        target: { value },
+      });
+
+      expect(screen.getByLabelText('SP starts per matchup')).toHaveValue(value);
+      expect(
+        screen.getByText('SP starts must be a whole number'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Save Settings' }),
+      ).toBeDisabled();
+    },
+  );
+
+  it('saves exactly the whole number entered', async () => {
+    mockUpdateLeagueSettings.mockClear();
+    renderWithGamesChanged();
+
+    fireEvent.change(screen.getByLabelText('SP starts per matchup'), {
+      target: { value: '4' },
+    });
+
+    expect(
+      screen.queryByText('SP starts must be a whole number'),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+
+    await screen.findByRole('button', { name: 'Save Settings' });
+    const call = mockUpdateLeagueSettings.mock.calls[0][0];
+    expect(call.variables.input.gamesPerMatchup).toBe(6);
+    expect(call.variables.input.pitcherStartsPerMatchup).toBe(4);
+  });
+});
+
+/**
  * Regression guard for LS-8656: tapping the Settings tab crashed with
  * "TypeError: Cannot convert undefined value to object" because
  * currentGamesPerMatchup/currentSpStartsPerMatchup had no defaults, unlike

@@ -51,6 +51,10 @@ export interface LeagueSettingsControlProps {
   onError?: (error: Error) => void;
 }
 
+// Digits only: rejects signs, decimals and blanks in the numeric text
+// inputs.
+const WHOLE_NUMBER_PATTERN = /^\d+$/;
+
 const MIN_CAREER_GAMES_OPTIONS = [
   { label: 'Off', value: 0 },
   { label: '25', value: 25 },
@@ -512,11 +516,13 @@ export function LeagueSettingsControl({
   const validationError =
     gamesPerMatchup < sportBounds.min || gamesPerMatchup > sportBounds.max
       ? `Games per matchup must be between ${sportBounds.min} and ${sportBounds.max}`
-      : spStarts < 1
-        ? 'SP starts must be at least 1'
-        : spStarts > gamesPerMatchup
-          ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
-          : null;
+      : !WHOLE_NUMBER_PATTERN.test(spStartsText)
+        ? 'SP starts must be a whole number'
+        : spStarts < 1
+          ? 'SP starts must be at least 1'
+          : spStarts > gamesPerMatchup
+            ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
+            : null;
 
   const handleSave = async () => {
     if (validationError) return;
@@ -661,9 +667,11 @@ export function LeagueSettingsControl({
               value={spStartsText}
               onChangeText={(text: string) => {
                 setSpStartsText(text);
-                const parsed = parseInt(text, 10);
-                if (!isNaN(parsed)) {
-                  handleSpStartsChange(parsed);
+                // Only commit whole numbers; anything else ("abc", "3.9",
+                // blank) stays in the text buffer and blocks Save via
+                // validationError instead of being truncated (LS-10692).
+                if (WHOLE_NUMBER_PATTERN.test(text)) {
+                  handleSpStartsChange(parseInt(text, 10));
                 }
               }}
               placeholder="e.g. 1"
