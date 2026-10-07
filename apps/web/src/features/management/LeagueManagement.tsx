@@ -999,6 +999,14 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
     return () => document.removeEventListener('keydown', onKey);
   }, [isDeleting, onCancel]);
 
+  // Default focus to the safe action on each confirm step so Enter can never
+  // trigger the destructive one (LS-10745). Cancel is the same element across
+  // both steps, so autoFocus (mount-only) would not re-apply on confirm2.
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    if (step === 'confirm1' || step === 'confirm2') cancelRef.current?.focus();
+  }, [step]);
+
   const title =
     step === 'confirm1'
       ? 'Are you sure?'
@@ -1155,6 +1163,7 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
         >
           <button
             type="button"
+            ref={cancelRef}
             className="lm-btn lm-btn-ghost"
             onClick={onCancel}
             disabled={isDeleting}
@@ -1166,7 +1175,6 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
               type="button"
               className="lm-btn lm-btn-danger"
               onClick={onContinue}
-              autoFocus
             >
               Continue
             </button>
@@ -1176,7 +1184,6 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
               type="button"
               className="lm-btn lm-btn-danger"
               onClick={onConfirm}
-              autoFocus
             >
               <TrashIcon size={16} />
               Yes, Delete Selected

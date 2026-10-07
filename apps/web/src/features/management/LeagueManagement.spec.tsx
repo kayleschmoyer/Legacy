@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { LeagueManagement } from './LeagueManagement';
 
 // ── Auth mock — exercises both unauthenticated and authenticated paths ────────
@@ -295,6 +296,61 @@ describe('LeagueManagement', () => {
       expect(
         screen.queryAllByText(/Deletion timed out — please try again\./i),
       ).toHaveLength(0);
+    });
+  });
+  // LS-10745: destructive confirmations must default focus to the safe
+  // action so a stray Enter (or Enter, Enter) can never delete a league.
+  describe('keyboard safety', () => {
+    const openDialog = () => {
+      mockUseAuth.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        user: { id: 1, accessLevel: 'none' } as any,
+      });
+      render(<LeagueManagement />);
+      fireEvent.click(
+        screen.getByRole('checkbox', {
+          name: /select owned league for deletion/i,
+        }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Delete Selected/i }));
+    };
+
+    it('focuses Cancel when the first confirm step opens', () => {
+      openDialog();
+      const dialog = screen.getByRole('alertdialog');
+      expect(
+        within(dialog).getByRole('button', { name: /^Cancel$/ }),
+      ).toHaveFocus();
+    });
+
+    it('focuses Cancel when the second confirm step opens', () => {
+      openDialog();
+      fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+      const dialog = screen.getByRole('alertdialog');
+      expect(
+        within(dialog).getByRole('button', { name: /Yes, Delete Selected/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole('button', { name: /^Cancel$/ }),
+      ).toHaveFocus();
+    });
+
+    it('pressing Enter twice after opening never deletes', async () => {
+      const user = userEvent.setup();
+      openDialog();
+      await user.keyboard('{Enter}');
+      await user.keyboard('{Enter}');
+      expect(mockMutation).not.toHaveBeenCalled();
+    });
+
+    it('pressing Enter immediately on the second step never deletes', async () => {
+      const user = userEvent.setup();
+      openDialog();
+      fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+      await user.keyboard('{Enter}');
+      expect(mockMutation).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
   });
 });
