@@ -88,4 +88,33 @@ describe('PickAnnouncement', () => {
     });
     expect(getByText('A steal at pick 5!')).toBeTruthy();
   });
+  // LS-10827: the my-pick splash in an NFL draft rendered a baseball card.
+  it('renders a football card for a football pick', () => {
+    const qb: DraftPlayer = {
+      ...player,
+      name: 'Josh Allen',
+      position: 'QB',
+      avg: 0,
+      hr: 0,
+      rbi: 0,
+      sb: 0,
+      passYds: 22000,
+      passTd: 150,
+      rushYds: 4000,
+      rushTd: 60,
+    };
+    const { getByText, queryByText, queryAllByLabelText, getAllByLabelText } =
+      renderAnnouncement({ player: qb, sport: 'football', isMyPick: true });
+
+    expect(getByText('PASS YDS')).toBeTruthy();
+    expect(getAllByLabelText('football').length).toBeGreaterThan(0);
+    expect(queryByText('AVG')).toBeNull();
+    expect(queryByText('HR')).toBeNull();
+    expect(queryAllByLabelText('baseball')).toHaveLength(0);
+  });
+
+  it('keeps the baseball card when no sport is given', () => {
+    const { getByText } = renderAnnouncement();
+    expect(getByText('AVG')).toBeTruthy();
+  });
 });

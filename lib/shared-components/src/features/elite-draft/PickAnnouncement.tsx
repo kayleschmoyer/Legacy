@@ -6,6 +6,7 @@ import { type DraftPlayer } from './types';
 import { CONFETTI_COLORS } from './constants';
 import { getPositionColor } from './utils';
 import { BaseballCard } from './BaseballCard';
+import type { SportKind } from '../../config/sports';
 
 // ---------------------------------------------------------------------------
 // Pick Announcement Sub-component
@@ -133,6 +134,7 @@ export function PickAnnouncement({
   commentary,
   header,
   footer,
+  sport = 'baseball',
 }: {
   player: DraftPlayer;
   pickNumber: number;
@@ -157,8 +159,10 @@ export function PickAnnouncement({
    * ever layered over the YouTube player (LS-9113 RMF rules).
    */
   footer?: React.ReactNode;
+  /** The draft's sport — picks the card's stat set and branding (LS-10827). */
+  sport?: SportKind;
 }): React.JSX.Element {
-  const posColor = getPositionColor('baseball', player.position);
+  const posColor = getPositionColor(sport, player.position);
   const labelColor = isAuto
     ? LABEL_COLORS.auto
     : isMyPick
@@ -274,6 +278,7 @@ export function PickAnnouncement({
               round={round}
               pickNumber={roundPickNumber}
               overallPick={pickNumber}
+              sport={sport}
             />
           </YStack>
 

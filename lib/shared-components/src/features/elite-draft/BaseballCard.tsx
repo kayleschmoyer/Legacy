@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/design-tokens';
 import { type DraftPlayer } from './types';
 import { getPositionColor } from './utils';
+import type { SportKind } from '../../config/sports';
 
 function formatCareerSpan(
   startYear: number | null | undefined,
@@ -22,7 +23,9 @@ function formatCareerSpan(
 // BaseballCard – baseball card look-alike display for a drafted player (LS-628)
 // Ported to Tamagui primitives (LS-9205) so it renders under both web and
 // native — consumed by DraftCompleteView (post-draft roster grid) and
-// PickAnnouncement (live pick splash).
+// PickAnnouncement (live pick splash). Sport-aware since LS-10827: football
+// drafts get football stat cells and a football brand strip instead of the
+// batter/pitcher cells and baseball emoji.
 // ---------------------------------------------------------------------------
 
 interface BaseballCardProps {
@@ -33,6 +36,8 @@ interface BaseballCardProps {
   pickNumber: number;
   /** Overall pick number across all rounds */
   overallPick: number;
+  /** Which sport's stat cells and branding to render. Defaults to baseball. */
+  sport?: SportKind;
 }
 
 interface StatCellProps {
@@ -73,13 +78,78 @@ function StatCell({ value, label }: StatCellProps): React.JSX.Element {
   );
 }
 
+interface StatCellValue {
+  value: string;
+  label: string;
+}
+
+// Em-dash, never 0, for a football stat with no career row — same rule as the
+// board's FOOTBALL_COLUMNS (LS-9478 / the LS-9473 fabricated-zero postmortem).
+const footballNum = (n: number | undefined): string =>
+  n == null ? '—' : String(n);
+
+/** Football stat cells keyed to what the position actually produces. */
+function footballStatCells(player: DraftPlayer): StatCellValue[] {
+  const passYds = { value: footballNum(player.passYds), label: 'PASS YDS' };
+  const passTd = { value: footballNum(player.passTd), label: 'PASS TD' };
+  const rushYds = { value: footballNum(player.rushYds), label: 'RUSH YDS' };
+  const rushTd = { value: footballNum(player.rushTd), label: 'RUSH TD' };
+  const rec = { value: footballNum(player.rec), label: 'REC' };
+  const recTd = { value: footballNum(player.recTd), label: 'REC TD' };
+  switch (player.position.toUpperCase()) {
+    case 'QB':
+      return [passYds, passTd, rushYds, rushTd];
+    case 'RB':
+      return [rushYds, rushTd, rec, recTd];
+    case 'WR':
+    case 'TE':
+      return [rec, recTd, rushYds, rushTd];
+    case 'K':
+      return [{ value: footballNum(player.fg), label: 'FG' }];
+    default:
+      return [
+        passYds,
+        rushYds,
+        rec,
+        { value: footballNum(player.td), label: 'TD' },
+      ];
+  }
+}
+
+function baseballStatCells(player: DraftPlayer): StatCellValue[] {
+  return player.isPitcher
+    ? [
+        { value: player.era?.toFixed(2) ?? '—', label: 'ERA' },
+        { value: String(player.wins ?? 0), label: 'W' },
+        { value: String(player.strikeouts ?? 0), label: 'K' },
+        { value: String(player.saves ?? 0), label: 'SV' },
+      ]
+    : [
+        { value: player.avg.toFixed(3), label: 'AVG' },
+        { value: String(player.hr), label: 'HR' },
+        { value: String(player.rbi), label: 'RBI' },
+        { value: String(player.sb), label: 'SB' },
+      ];
+}
+
+const BRAND_EMOJI: Record<SportKind, { glyph: string; label: string }> = {
+  baseball: { glyph: '⚾', label: 'baseball' },
+  football: { glyph: '🏈', label: 'football' },
+};
+
 export function BaseballCard({
   player,
   round,
   pickNumber,
   overallPick,
+  sport = 'baseball',
 }: BaseballCardProps): React.JSX.Element {
-  const posColor = getPositionColor('baseball', player.position);
+  const posColor = getPositionColor(sport, player.position);
+  const brandEmoji = BRAND_EMOJI[sport];
+  const statCells =
+    sport === 'football'
+      ? footballStatCells(player)
+      : baseballStatCells(player);
   const secondaryPositions = player.eligiblePositions?.filter(
     (p) => p !== player.position,
   );
@@ -161,12 +231,12 @@ export function BaseballCard({
         backgroundColor={withAlpha(shadowBase.dark, 0.2)}
         flexShrink={0}
       >
-        <Text role="img" aria-label="baseball">
-          {'⚾'}
+        <Text role="img" aria-label={brandEmoji.label}>
+          {brandEmoji.glyph}
         </Text>{' '}
         LEGACY SPORTS{' '}
-        <Text role="img" aria-label="baseball">
-          {'⚾'}
+        <Text role="img" aria-label={brandEmoji.label}>
+          {brandEmoji.glyph}
         </Text>
       </Text>
 
@@ -232,22 +302,12 @@ export function BaseballCard({
           marginBottom={4}
         />
 
-        {/* Stats – pitcher vs batter layout (2x2) */}
-        {player.isPitcher ? (
-          <XStack flexWrap="wrap" gap={3} marginBottom={4}>
-            <StatCell value={player.era?.toFixed(2) ?? '—'} label="ERA" />
-            <StatCell value={String(player.wins ?? 0)} label="W" />
-            <StatCell value={String(player.strikeouts ?? 0)} label="K" />
-            <StatCell value={String(player.saves ?? 0)} label="SV" />
-          </XStack>
-        ) : (
-          <XStack flexWrap="wrap" gap={3} marginBottom={4}>
-            <StatCell value={player.avg.toFixed(3)} label="AVG" />
-            <StatCell value={String(player.hr)} label="HR" />
-            <StatCell value={String(player.rbi)} label="RBI" />
-            <StatCell value={String(player.sb)} label="SB" />
-          </XStack>
-        )}
+        {/* Stats – 2x2: pitcher vs batter for baseball, by position for football */}
+        <XStack flexWrap="wrap" gap={3} marginBottom={4}>
+          {statCells.map((cell) => (
+            <StatCell key={cell.label} value={cell.value} label={cell.label} />
+          ))}
+        </XStack>
 
         {/* Pts/Matchup footer */}
         {player.ppg != null && (

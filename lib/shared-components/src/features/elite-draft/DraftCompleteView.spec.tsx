@@ -10,7 +10,7 @@
 import React from 'react';
 import { DraftCompleteView } from './DraftCompleteView';
 import type { DraftPickRecord, DraftPlayer } from './types';
-import { render } from '../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 
 function buildLargeRoster(count: number): {
   picks: DraftPickRecord[];
@@ -163,5 +163,107 @@ describe('DraftCompleteView', () => {
     expect(onNavigate).toHaveBeenLastCalledWith('/baseball/mock-draft');
     getByText('Go to My Leagues').click();
     expect(onNavigate).toHaveBeenLastCalledWith('/football');
+  });
+  // LS-10827: NFL Draft Complete rendered BaseballCard for every team tab —
+  // AVG/HR/RBI/SB cells and a "⚾ LEGACY SPORTS ⚾" strip on football players.
+  describe('roster cards by sport (LS-10827)', () => {
+    const footballPlayers: DraftPlayer[] = [
+      {
+        id: 1,
+        name: 'Josh Allen',
+        position: 'QB',
+        avg: 0,
+        hr: 0,
+        rbi: 0,
+        runs: 0,
+        sb: 0,
+        games: 0,
+        hits: 0,
+        obp: 0,
+        slg: 0,
+        passYds: 22000,
+        passTd: 150,
+        rushYds: 4000,
+        rushTd: 60,
+      },
+      {
+        id: 2,
+        name: 'Gary Anderson',
+        position: 'K',
+        avg: 0,
+        hr: 0,
+        rbi: 0,
+        runs: 0,
+        sb: 0,
+        games: 0,
+        hits: 0,
+        obp: 0,
+        slg: 0,
+        fg: 538,
+      },
+    ];
+    const footballPicks: DraftPickRecord[] = footballPlayers.map((p, i) => ({
+      id: String(i + 1),
+      draftId: 1,
+      round: 1,
+      pickNumber: i + 1,
+      overallPick: i + 1,
+      pickedAt: new Date(0).toISOString(),
+      // One player per team so both team tabs are exercised.
+      teamId: i + 1,
+      playerId: p.id,
+    }));
+    const footballProps = {
+      ...defaultProps,
+      sport: 'football' as const,
+      pickHistory: footballPicks,
+      myTeamPicks: [footballPicks[0]],
+      myTeam: [footballPlayers[0]],
+      leagueTeams: [
+        { id: '1', name: 'Mine', leagueId: 1 },
+        { id: '2', name: 'Kayles', leagueId: 1 },
+      ],
+      statsLookup: new Map(footballPlayers.map((p) => [p.id, p])),
+    };
+
+    function expectNoBaseballCard(utils: ReturnType<typeof render>): void {
+      for (const label of ['AVG', 'HR', 'RBI', 'SB', 'ERA']) {
+        expect(utils.queryByText(label)).toBeNull();
+      }
+      expect(utils.queryAllByLabelText('baseball')).toHaveLength(0);
+    }
+
+    it('renders football cards with no baseball stats or emoji on every team tab', () => {
+      const utils = render(<DraftCompleteView {...footballProps} />);
+
+      expect(utils.getByText('Josh Allen')).toBeTruthy();
+      expect(utils.getByText('PASS YDS')).toBeTruthy();
+      expect(utils.getByText('22000')).toBeTruthy();
+      expect(utils.getAllByLabelText('football').length).toBeGreaterThan(0);
+      expectNoBaseballCard(utils);
+
+      fireEvent.click(utils.getByText('Kayles'));
+      expect(utils.getByText('Gary Anderson')).toBeTruthy();
+      expect(utils.getByText('FG')).toBeTruthy();
+      expect(utils.getByText('538')).toBeTruthy();
+      expectNoBaseballCard(utils);
+    });
+
+    it('keeps the baseball card for an MLB draft', () => {
+      const { picks, players, statsLookup } = buildLargeRoster(1);
+      const utils = render(
+        <DraftCompleteView
+          {...defaultProps}
+          pickHistory={picks}
+          myTeam={players}
+          myTeamPicks={picks}
+          statsLookup={statsLookup}
+        />,
+      );
+      expect(utils.getByText('AVG')).toBeTruthy();
+      expect(utils.getByText('HR')).toBeTruthy();
+      expect(utils.getAllByLabelText('baseball').length).toBeGreaterThan(0);
+      expect(utils.queryByText('PASS YDS')).toBeNull();
+    });
   });
 });

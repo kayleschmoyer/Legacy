@@ -1894,6 +1894,7 @@ export function EliteDraftBoardScreen({
           leaving={ui.announcementLeaving}
           commentary={announcementCommentary}
           onDismiss={ui.dismissAnnouncement}
+          sport={sport}
         />
       )}
 

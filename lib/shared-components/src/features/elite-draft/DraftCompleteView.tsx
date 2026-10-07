@@ -21,7 +21,8 @@ interface DraftCompleteViewProps {
    */
   draftSummary: { isMock?: boolean; name?: string } | null | undefined;
   leagueId: number | null;
-  /** Routes the CTAs to this sport's pages (LS-10528). */
+  /** Routes the CTAs to this sport's pages (LS-10528) and picks the roster
+   * card's stat set and branding (LS-10827). */
   sport: SportKind;
   pickHistory: DraftPickRecord[];
   myTeamId: number | null;
@@ -52,6 +53,7 @@ const BG_FX_IMAGE = [
 interface RosterCardGridProps {
   picks: DraftPickRecord[];
   players: DraftPlayer[];
+  sport: SportKind;
   emptyMessage?: string;
 }
 
@@ -62,6 +64,7 @@ interface RosterCardGridProps {
 function RosterCardGrid({
   picks,
   players,
+  sport,
   emptyMessage,
 }: RosterCardGridProps): React.JSX.Element {
   return (
@@ -77,6 +80,7 @@ function RosterCardGrid({
                 round={pick.round}
                 pickNumber={pick.pickNumber}
                 overallPick={pick.overallPick}
+                sport={sport}
               />
             </YStack>
           );
@@ -291,6 +295,7 @@ export function DraftCompleteView({
             <RosterCardGrid
               picks={selectedTeamPicks}
               players={selectedTeamPlayers}
+              sport={sport}
               emptyMessage="No picks found for this team."
             />
           </YStack>
@@ -309,7 +314,11 @@ export function DraftCompleteView({
             >
               Your Roster ({myTeam.length} players)
             </Text>
-            <RosterCardGrid picks={myTeamPicks} players={myTeam} />
+            <RosterCardGrid
+              picks={myTeamPicks}
+              players={myTeam}
+              sport={sport}
+            />
           </YStack>
         )}
       </ScrollView>

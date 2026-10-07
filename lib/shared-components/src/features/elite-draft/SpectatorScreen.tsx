@@ -363,6 +363,7 @@ export function SpectatorScreen({
         mlbPlayerIdFor={data.mlbPlayerIdFor}
         notablePlayFor={data.notablePlayFor}
         highlightVideoFor={data.highlightVideoFor}
+        sport={sport}
       />
 
       <div className="sr-only" aria-live="polite">

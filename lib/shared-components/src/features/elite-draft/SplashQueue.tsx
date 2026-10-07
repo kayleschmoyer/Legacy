@@ -9,6 +9,7 @@ import { PickAnnouncement } from './PickAnnouncement';
 import { PickSplashHighlightVideo } from './PickSplashHighlightVideo';
 import { PickSplashStatGraphic } from './PickSplashStatGraphic';
 import { getMlbHeadshotUrl } from './draftUtils';
+import type { SportKind } from '../../config/sports';
 
 // ---------------------------------------------------------------------------
 // SplashQueue — FIFO pick-reveal queue for the spectator screen (LS-8942)
@@ -215,6 +216,8 @@ export interface SplashQueueProps {
   notablePlayFor?: (playerId: number) => NotablePlaySummary | null;
   /** playerId → validated highlight video for the video tier (LS-9113); null falls back to the graphic. */
   highlightVideoFor?: (playerId: number) => HighlightVideoSummary | null;
+  /** The draft's sport — picks the pick card's stat set and branding (LS-10827). */
+  sport?: SportKind;
 }
 
 /**
@@ -232,6 +235,7 @@ export function SplashQueue({
   mlbPlayerIdFor,
   notablePlayFor,
   highlightVideoFor,
+  sport,
 }: SplashQueueProps): React.JSX.Element | null {
   const [headshotFailed, setHeadshotFailed] = useState(false);
   const activePickNumber = active?.overallPick;
@@ -307,6 +311,7 @@ export function SplashQueue({
       commentary={commentaryFor?.(active)}
       header={header}
       footer={footer}
+      sport={sport}
     />
   );
 }
