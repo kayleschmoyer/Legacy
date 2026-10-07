@@ -121,4 +121,66 @@ describe('DraftTeamTab', () => {
     fireEvent.click(getByText('RT'));
     expect(onSelectTeam).toHaveBeenCalledWith(2);
   });
+
+  // LS-10805: the pills are role="button" divs on web, so Enter/Space must be
+  // wired explicitly or keyboard users can focus a team but never select it.
+  function renderSwitcher(selectedTeamId: number | null = null) {
+    const onSelectTeam = jest.fn();
+    const utils = render(
+      <DraftTeamTab
+        teams={TEAMS}
+        myTeamId={1}
+        selectedTeamId={selectedTeamId}
+        onSelectTeam={onSelectTeam}
+        pickHistory={PICK_HISTORY}
+        statsLookup={STATS_LOOKUP}
+        leaguePositions={LEAGUE_POSITIONS}
+        sport="football"
+        maxRosterSize={6}
+      />,
+    );
+    return { ...utils, onSelectTeam };
+  }
+
+  it.each([
+    ['Enter', 'Enter'],
+    ['Space', ' '],
+  ])('selects a rival team when %s is pressed on its pill', (_label, key) => {
+    const { getByRole, onSelectTeam } = renderSwitcher();
+
+    fireEvent.keyDown(getByRole('button', { name: 'Rival Team' }), { key });
+    expect(onSelectTeam).toHaveBeenCalledWith(2);
+  });
+
+  it.each([
+    ['Enter', 'Enter'],
+    ['Space', ' '],
+  ])('restores my team when %s is pressed on MY TEAM', (_label, key) => {
+    const { getByRole, onSelectTeam } = renderSwitcher(2);
+
+    fireEvent.keyDown(getByRole('button', { name: 'My team' }), { key });
+    expect(onSelectTeam).toHaveBeenCalledWith(null);
+  });
+
+  it('ignores keys other than Enter and Space', () => {
+    const { getByRole, onSelectTeam } = renderSwitcher();
+
+    fireEvent.keyDown(getByRole('button', { name: 'Rival Team' }), {
+      key: 'a',
+    });
+    expect(onSelectTeam).not.toHaveBeenCalled();
+  });
+
+  it('exposes the selected pill via aria-pressed', () => {
+    const { getByRole } = renderSwitcher(2);
+
+    expect(getByRole('button', { name: 'Rival Team' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(getByRole('button', { name: 'My team' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
 });

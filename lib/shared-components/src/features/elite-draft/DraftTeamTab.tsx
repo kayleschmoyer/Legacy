@@ -19,6 +19,7 @@ import { initialsOf } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { withAlpha } from '../../utils/colors';
+import { handleKeyActivate } from '../../utils/keyboardActivation';
 import type { SportKind } from '../../config/sports';
 
 function unknownPlayer(pick: DraftPickRecord): DraftPlayer {
@@ -110,7 +111,9 @@ export function DraftTeamTab({
             aria-label="My team"
             accessibilityLabel="My team"
             accessibilityState={{ selected: isMineActive }}
+            aria-pressed={isMineActive}
             onPress={() => onSelectTeam(null)}
+            onKeyDown={handleKeyActivate(() => onSelectTeam(null))}
             paddingVertical={6}
             paddingHorizontal={12}
             borderRadius={999}
@@ -147,7 +150,11 @@ export function DraftTeamTab({
                   aria-label={team.name}
                   accessibilityLabel={team.name}
                   accessibilityState={{ selected: active }}
+                  aria-pressed={active}
                   onPress={() => onSelectTeam(Number(team.id))}
+                  onKeyDown={handleKeyActivate(() =>
+                    onSelectTeam(Number(team.id)),
+                  )}
                   paddingVertical={6}
                   paddingHorizontal={12}
                   borderRadius={999}
