@@ -9,6 +9,7 @@
  * the interactive tutorial launcher).
  */
 
+import type { Page } from '@playwright/test';
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
 
 test.describe('Help Page — header and layout @smoke', () => {
@@ -455,5 +456,83 @@ test.describe('Help Page — contact and support @regression', () => {
       /discord\.gg\/JBhRrE8ZtK/i,
     );
     await expect(page.getByText(/#urgent-support/i)).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-10757: the contact-card grid tried to switch to one column through
+// `$sm={{ style: … }}`, which Tamagui never applies, so phones kept the
+// two-column desktop grid and the card text wrapped one word per line.
+// ---------------------------------------------------------------------------
+
+const CONTACT_CARD_TITLES = [
+  'Report a Bug',
+  'Suggest a Feature',
+  'Join our Discord',
+] as const;
+
+async function contactCardBoxes(page: Page) {
+  await expect(
+    page.getByRole('heading', { name: /talk to a real person/i }),
+  ).toBeVisible();
+  const boxes: Array<{ x: number; y: number; width: number; height: number }> =
+    [];
+  for (const title of CONTACT_CARD_TITLES) {
+    const card = page
+      .getByTestId('help-contact-grid')
+      .locator(':scope > *')
+      .filter({ hasText: title });
+    await card.scrollIntoViewIfNeeded();
+    const box = await card.boundingBox();
+    if (!box) throw new Error(`${title} card did not render`);
+    boxes.push(box);
+  }
+  return boxes;
+}
+
+test.describe('Help Page — contact cards at 375px (LS-10757) @regression', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('contact cards stack in one full-width column', async ({ page }) => {
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+
+    const grid = page.getByTestId('help-contact-grid');
+    const gridBox = await grid.boundingBox();
+    expect(gridBox).not.toBeNull();
+    if (!gridBox) return;
+
+    const boxes = await contactCardBoxes(page);
+    for (const [i, box] of boxes.entries()) {
+      // Each card spans the whole grid width…
+      expect(Math.abs(box.width - gridBox.width)).toBeLessThanOrEqual(1);
+      // …and sits below the previous one.
+      if (i > 0) {
+        expect(box.y).toBeGreaterThanOrEqual(
+          boxes[i - 1].y + boxes[i - 1].height - 1,
+        );
+      }
+    }
+
+    // No card content spills horizontally past its card.
+    const overflowing = await grid.evaluate(
+      (el) =>
+        Array.from(el.children).filter((c) => c.scrollWidth > c.clientWidth + 1)
+          .length,
+    );
+    expect(overflowing).toBe(0);
+  });
+});
+
+test.describe('Help Page — contact cards on desktop (LS-10757) @regression', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('contact cards keep the two-column grid', async ({ page }) => {
+    await page.goto('/help');
+    await page.waitForLoadState('load');
+
+    const [first, second] = await contactCardBoxes(page);
+    expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(1);
+    expect(second.x).toBeGreaterThan(first.x + first.width - 1);
   });
 });

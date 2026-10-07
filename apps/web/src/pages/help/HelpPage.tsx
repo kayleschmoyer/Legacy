@@ -6,7 +6,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { ScrollView, styled } from 'tamagui';
+import { ScrollView, styled, useMedia } from 'tamagui';
 import {
   DISCORD_URL,
   HELP_CONTACT_ITEMS,
@@ -446,6 +446,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
 /* ─── Main component ─── */
 
 export default function HelpPage() {
+  const media = useMedia();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [featureRequestOpen, setFeatureRequestOpen] = useState(false);
@@ -860,16 +861,15 @@ export default function HelpPage() {
               />
 
               <YStack
+                data-testid="help-contact-grid"
                 gap={14}
+                // Tamagui never applies `style` inside a media prop, so the
+                // column count comes from useMedia() (LS-10757).
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                }}
-                $sm={{
-                  style: {
-                    display: 'grid',
-                    gridTemplateColumns: '1fr',
-                  } as never,
+                  gridTemplateColumns: media.sm
+                    ? 'minmax(0, 1fr)'
+                    : 'repeat(2, minmax(0, 1fr))',
                 }}
               >
                 {HELP_CONTACT_ITEMS.map((item) => {
