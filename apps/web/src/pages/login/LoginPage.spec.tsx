@@ -83,6 +83,11 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../lib/csrf', () => ({ storeCsrfToken: jest.fn() }));
 jest.mock('../../lib/session-precache', () => ({
+  // readCachedUserId stays real so redirect tests can drive it through the
+  // cached `ls_user_profile` (LS-10787).
+  ...jest.requireActual<typeof import('../../lib/session-precache')>(
+    '../../lib/session-precache',
+  ),
   storeDiscordSessionPreCache: jest.fn(),
 }));
 jest.mock('../../lib/full-page-redirect', () => ({
@@ -624,11 +629,18 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     replaceStateSpy.mockRestore();
   });
 
-  it('redirects to the stored last-visited league after a Discord login (LS-6694)', async () => {
-    localStorage.setItem(
-      'ls_last_visited_league',
-      JSON.stringify({ leagueId: 42, sport: 'football' }),
-    );
+  // The real hydrateSession stores the signed-in user's profile; the mock
+  // doesn't, so these tests seed `ls_user_profile` for it (LS-10787).
+  const signInAs = (id: number) => {
+    mockHydrateSession.mockImplementation(() => {
+      localStorage.setItem(
+        'ls_user_profile',
+        JSON.stringify({ id, email: `user${id}@example.com` }),
+      );
+      return true;
+    });
+  };
+  const mockDiscordExchange = () => {
     global.fetch = jest.fn(() =>
       Promise.resolve({
         ok: true,
@@ -637,7 +649,15 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
           Promise.resolve({ jwt: 'header.payload.sig', csrfToken: 'csrf-1' }),
       }),
     ) as unknown as typeof fetch;
-    mockHydrateSession.mockReturnValue(true);
+  };
+  const storeLastLeague = (league: Record<string, unknown>) => {
+    localStorage.setItem('ls_last_visited_league', JSON.stringify(league));
+  };
+
+  it('returns the same user to their last-visited league, e.g. after a session expiry (LS-6694 / LS-10787)', async () => {
+    storeLastLeague({ leagueId: 42, sport: 'football', userId: 7 });
+    mockDiscordExchange();
+    signInAs(7);
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
 
     renderPage();
@@ -654,7 +674,61 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     });
 
     replaceStateSpy.mockRestore();
-    localStorage.clear();
+  });
+
+  it("never sends a different user to the previous user's league (LS-10787)", async () => {
+    storeLastLeague({ leagueId: 42, sport: 'football', userId: 7 });
+    mockDiscordExchange();
+    signInAs(8);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/');
+    });
+    expect(replaceStateSpy).not.toHaveBeenCalledWith(
+      null,
+      '',
+      '/football/league/42',
+    );
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it('ignores a last-visited league that has no owner (LS-10787)', async () => {
+    storeLastLeague({ leagueId: 42, sport: 'football' });
+    mockDiscordExchange();
+    signInAs(7);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/');
+    });
+
+    replaceStateSpy.mockRestore();
+  });
+
+  it("prefers the came-from deep link over the user's last-visited league (LS-10809)", async () => {
+    storeLastLeague({ leagueId: 42, sport: 'football', userId: 7 });
+    sessionStorage.setItem('ls_login_came_from', '/trade-center?leagueId=9');
+    mockDiscordExchange();
+    signInAs(7);
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        '',
+        '/trade-center?leagueId=9',
+      );
+    });
+
+    replaceStateSpy.mockRestore();
   });
 
   it('falls back to pre-cache + full reload when the JWT cannot be hydrated', async () => {

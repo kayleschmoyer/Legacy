@@ -28,11 +28,14 @@ import {
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
-import { storeDiscordSessionPreCache } from '../../lib/session-precache';
+import {
+  readCachedUserId,
+  storeDiscordSessionPreCache,
+} from '../../lib/session-precache';
 import { getSafeRedirectTarget } from '../../lib/safe-redirect';
 import { fullPageRedirect } from '../../lib/full-page-redirect';
 import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
-import { getLastVisitedLeague } from '../../lib/last-visited-league';
+import { getLastVisitedLeagueForUser } from '../../lib/last-visited-league';
 import { env } from '../../config/environment';
 import './LoginPage.css';
 
@@ -71,15 +74,19 @@ function DiscordGlyph() {
  * Resolve the post-login redirect target. Precedence:
  *   1. An explicit deep-link the user came from before the Discord round-trip
  *      (LGN-037) — consumed here so it is used at most once.
- *   2. The user's last-opened league, for returning users (LS-6694).
+ *   2. The user's last-opened league, for returning users (LS-6694) — only if
+ *      that same user opened it (LS-10787). An explicit Sign Out removes the
+ *      entry, so in practice this is the session-expiry re-sign-in path.
  *   3. The generic app-root destination.
+ * Must run after the login has stored the new user's profile, since that is
+ * where the user id comes from.
  * Always routed through getSafeRedirectTarget so a poisoned config value or a
  * tampered came-from entry can never turn this into an open redirect (LS-6691).
  */
 function resolvePostLoginRedirect(): string {
   const cameFrom = consumeCameFrom();
   if (cameFrom) return getSafeRedirectTarget(cameFrom);
-  const lastLeague = getLastVisitedLeague();
+  const lastLeague = getLastVisitedLeagueForUser(readCachedUserId());
   const target = lastLeague ? lastVisitedLeaguePath(lastLeague) : env.baseUrl;
   return getSafeRedirectTarget(target);
 }
@@ -365,10 +372,12 @@ export function LoginPage(): React.JSX.Element {
         // config value or a tampered came-from entry can never turn this into an
         // open redirect, whether we SPA-navigate or fall back to a full reload
         // (LS-6691).
-        const safeTarget = resolvePostLoginRedirect();
+        // Hydrate (or pre-cache) first: both write the signed-in user's
+        // profile, which resolvePostLoginRedirect reads to match the
+        // last-visited league to this user (LS-10787).
         const hydrated = hydrateSession(result.jwt);
         if (hydrated) {
-          window.history.replaceState(null, '', safeTarget);
+          window.history.replaceState(null, '', resolvePostLoginRedirect());
         } else {
           // Decode failed — fall back to the pre-cache + full reload path so the
           // session is still restored via the HttpOnly cookie on next load.
@@ -376,7 +385,7 @@ export function LoginPage(): React.JSX.Element {
           // and re-verified by the background JWT refresh.  See
           // lib/session-precache.ts.
           storeDiscordSessionPreCache(result.jwt);
-          fullPageRedirect(safeTarget);
+          fullPageRedirect(resolvePostLoginRedirect());
         }
       } catch (err) {
         LOGGER.error(

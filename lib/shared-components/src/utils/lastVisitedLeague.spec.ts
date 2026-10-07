@@ -106,6 +106,39 @@ describe('parseLastVisitedLeague rejects malformed input', () => {
   });
 });
 
+describe('user scoping (LS-10787)', () => {
+  it('round-trips the owning user id', () => {
+    const league = makeLastVisitedLeague(42, 'football', 7);
+    expect(league).toEqual({ leagueId: 42, sport: 'football', userId: 7 });
+    expect(parseLastVisitedLeague(serializeLastVisitedLeague(league))).toEqual(
+      league,
+    );
+  });
+
+  it('omits a missing or invalid user id', () => {
+    expect(makeLastVisitedLeague(42, 'football', null)).toEqual({
+      leagueId: 42,
+      sport: 'football',
+    });
+    expect(makeLastVisitedLeague(42, 'football', 0)).toEqual({
+      leagueId: 42,
+      sport: 'football',
+    });
+    expect(
+      serializeLastVisitedLeague({ leagueId: 42, sport: 'football' }),
+    ).toBe('{"leagueId":42,"sport":"football"}');
+  });
+
+  it('keeps an entry without a user id but drops an invalid one', () => {
+    expect(
+      parseLastVisitedLeague('{"leagueId":42,"sport":"baseball"}'),
+    ).toEqual({ leagueId: 42, sport: 'baseball' });
+    expect(
+      parseLastVisitedLeague('{"leagueId":42,"sport":"baseball","userId":"7"}'),
+    ).toEqual({ leagueId: 42, sport: 'baseball' });
+  });
+});
+
 describe('LAST_VISITED_LEAGUE_KEY', () => {
   it('is the namespaced storage key', () => {
     expect(LAST_VISITED_LEAGUE_KEY).toBe('ls_last_visited_league');

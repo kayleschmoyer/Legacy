@@ -43,6 +43,10 @@ import { NAV_Z_INDEX } from '../constants/dimensions';
 import { useFeatureValue } from '../context/GrowthBookProvider';
 import { useIsPremiumStatus } from '../hooks/useIsPremium';
 import { trackFeatureGateBlocked } from '../utils/analytics';
+import {
+  makeScrollPositionSaver,
+  scrollPositionKey,
+} from '../lib/user-scoped-storage';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -635,7 +639,7 @@ function App() {
     }
     let saved: string | null = null;
     try {
-      saved = sessionStorage.getItem(`scroll:${pathname}`);
+      saved = sessionStorage.getItem(scrollPositionKey(pathname));
     } catch {
       // Ignore storage errors (private browsing, quota exceeded).
     }
@@ -650,13 +654,7 @@ function App() {
 
   // Capture scroll position just before the user navigates away.
   useEffect(() => {
-    const save = () => {
-      try {
-        sessionStorage.setItem(`scroll:${pathname}`, String(window.scrollY));
-      } catch {
-        // Ignore storage errors (private browsing, quota exceeded).
-      }
-    };
+    const save = makeScrollPositionSaver(pathname);
     window.addEventListener('beforeunload', save);
     return () => {
       save();

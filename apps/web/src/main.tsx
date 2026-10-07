@@ -43,6 +43,7 @@ import {
 import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { LoginPage } from './pages/login/LoginPage';
 import { clearWebPushRegistration } from './hooks/useWebPushRegistration';
+import { clearUserScopedStorage } from './lib/user-scoped-storage';
 
 if (envConfigErrors.length > 0) {
   LOGGER.error(
@@ -255,6 +256,10 @@ try {
                 // Forget the push-subscription fingerprint so the next sign-in
                 // re-registers rather than skipping as unchanged (LS-9541).
                 clearWebPushRegistration();
+                // Explicit Sign Out only (not session expiry): drop the last
+                // league, visited-route scroll keys and other per-user entries
+                // so the next sign-in starts clean (LS-10787).
+                clearUserScopedStorage();
               }}
             >
               <EnhancedAuthGuard

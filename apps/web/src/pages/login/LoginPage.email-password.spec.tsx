@@ -81,6 +81,11 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../lib/csrf', () => ({ storeCsrfToken: jest.fn() }));
 jest.mock('../../lib/session-precache', () => ({
+  // readCachedUserId stays real so redirect tests can drive it through the
+  // cached `ls_user_profile` (LS-10787).
+  ...jest.requireActual<typeof import('../../lib/session-precache')>(
+    '../../lib/session-precache',
+  ),
   storeDiscordSessionPreCache: jest.fn(),
 }));
 jest.mock('../../config/environment', () => ({

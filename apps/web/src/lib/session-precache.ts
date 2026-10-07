@@ -24,6 +24,25 @@ const USER_PROFILE_KEY = 'ls_user_profile';
 const TOKEN_EXPIRY_KEY = 'ls_token_expiry';
 
 /**
+ * Read the signed-in user's id from the cached profile, or `null` when there
+ * is none. AuthService writes the profile as soon as a login succeeds, so the
+ * login page can use this to pick a post-login redirect for that specific user
+ * (LS-10787) before the auth state has re-rendered. Same UI-only trust level as
+ * the rest of the pre-cache: never use it for an authorization decision.
+ */
+export function readCachedUserId(): number | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(USER_PROFILE_KEY);
+    if (!raw) return null;
+    const { id } = JSON.parse(raw) as { id?: unknown };
+    return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Decode a JWT payload and write a pre-cache user profile + token expiry to
  * localStorage so AuthProvider can hydrate the UI on the next page load
  * without waiting for a network round-trip.

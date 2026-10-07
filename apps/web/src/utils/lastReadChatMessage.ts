@@ -11,7 +11,8 @@
  */
 import { LOGGER } from '@legacy-sports/logging';
 
-const KEY_PREFIX = 'ls.lastReadChatMessage.';
+/** Key prefix; also cleared on Sign Out (lib/user-scoped-storage.ts). */
+export const LAST_READ_CHAT_KEY_PREFIX = 'ls.lastReadChatMessage.';
 
 export type ChatReadKey = number | string;
 
@@ -25,7 +26,9 @@ function isValidKey(key: ChatReadKey): boolean {
 export function getLastReadChatMessageId(key: ChatReadKey): number | null {
   if (!isValidKey(key)) return null;
   try {
-    const raw = window.localStorage.getItem(`${KEY_PREFIX}${key}`);
+    const raw = window.localStorage.getItem(
+      `${LAST_READ_CHAT_KEY_PREFIX}${key}`,
+    );
     if (!raw) return null;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : null;
@@ -46,7 +49,10 @@ export function setLastReadChatMessageId(
   if (!isValidKey(key)) return;
   if (!Number.isFinite(messageId)) return;
   try {
-    window.localStorage.setItem(`${KEY_PREFIX}${key}`, String(messageId));
+    window.localStorage.setItem(
+      `${LAST_READ_CHAT_KEY_PREFIX}${key}`,
+      String(messageId),
+    );
   } catch (error) {
     LOGGER.warn(
       'Failed to persist last-read chat message id',

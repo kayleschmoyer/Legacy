@@ -30,6 +30,7 @@ import { useAppDispatch } from '../../../store/hooks';
 import { PageMeta } from '../../../components/PageMeta';
 import { useLeagueScoringSettings } from '../../../lib/scoring';
 import { setLastVisitedLeague } from '../../../lib/last-visited-league';
+import { leagueRoleKey } from '../../../lib/user-scoped-storage';
 import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';
 import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
@@ -49,8 +50,6 @@ function LeagueWSPageHandler({
   useLeagueWebSocket({ onDraftStarted, onSubscriptionUpdated, onReconnect });
   return null;
 }
-
-const roleKey = (leagueId: number) => `ls-v2-role:${leagueId}`;
 
 // Backward-compatible URL mapping. Legacy LeagueDetailPage accepted these tab
 // slugs in addition to V2's canonical IDs; preserved so old bookmarks and
@@ -115,13 +114,18 @@ export function LeagueDetailPageV2(): React.JSX.Element {
 
   // Persist this league as the user's most recently opened one so the next
   // login can redirect them straight here instead of the generic `/` route
-  // (LS-6694). Best-effort and storage-failure tolerant.
+  // (LS-6694). Tagged with the user's id so it is never replayed for another
+  // account on a shared browser (LS-10787). Best-effort and storage-failure
+  // tolerant.
   const leagueSport = league?.sport;
+  const userId = user?.id;
   useEffect(() => {
-    if (Number.isFinite(leagueId) && leagueSport) {
-      setLastVisitedLeague(leagueId, leagueSport);
+    // No user (e.g. mid sign-out) → no write: an ownerless entry would
+    // otherwise reappear after Sign Out cleared it.
+    if (Number.isFinite(leagueId) && leagueSport && userId != null) {
+      setLastVisitedLeague(leagueId, leagueSport, userId);
     }
-  }, [leagueId, leagueSport]);
+  }, [leagueId, leagueSport, userId]);
 
   const [getTeams, { data: teamsData }] = useGetLeagueTeamsLazyQuery();
   useEffect(() => {
@@ -183,7 +187,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   const [storedRole, setStoredRole] = useState<string>(() => {
     if (typeof window === 'undefined' || !Number.isFinite(leagueId)) return '';
     try {
-      return window.localStorage.getItem(roleKey(leagueId)) ?? '';
+      return window.localStorage.getItem(leagueRoleKey(leagueId)) ?? '';
     } catch {
       return '';
     }
@@ -193,7 +197,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   useEffect(() => {
     if (!Number.isFinite(leagueId)) return;
     try {
-      setStoredRole(window.localStorage.getItem(roleKey(leagueId)) ?? '');
+      setStoredRole(window.localStorage.getItem(leagueRoleKey(leagueId)) ?? '');
     } catch {
       setStoredRole('');
     }
@@ -206,7 +210,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     if (!isMember && !isCommissioner) {
       setStoredRole('');
       try {
-        window.localStorage.removeItem(roleKey(leagueId));
+        window.localStorage.removeItem(leagueRoleKey(leagueId));
       } catch {
         // storage unavailable — no-op
       }
@@ -224,7 +228,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
       setStoredRole(r);
       if (!Number.isFinite(leagueId)) return;
       try {
-        window.localStorage.setItem(roleKey(leagueId), r);
+        window.localStorage.setItem(leagueRoleKey(leagueId), r);
       } catch (err: unknown) {
         // Pass the Error instance as a non-message arg so Rollbar / LogArgs
         // can extract the stack trace; never wrap it in `{ err }`.

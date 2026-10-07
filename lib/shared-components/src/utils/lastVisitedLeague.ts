@@ -17,10 +17,20 @@ import type { Sport } from './colors';
 export interface LastVisitedLeague {
   leagueId: number;
   sport: Sport;
+  /**
+   * Id of the user who opened the league. Lets the post-login redirect ignore
+   * an entry left behind by a different account on a shared browser
+   * (LS-10787). Optional so entries written without it still parse.
+   */
+  userId?: number;
 }
 
 /** Storage key used by both the web (`localStorage`) and mobile (`AsyncStorage`) wrappers. */
 export const LAST_VISITED_LEAGUE_KEY = 'ls_last_visited_league';
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
 
 /** Narrow an arbitrary sport value to the canonical union (defaults to baseball). */
 function normalizeSport(sport: unknown): Sport {
@@ -44,8 +54,11 @@ export function lastVisitedLeaguePath(league: LastVisitedLeague): string {
 export function makeLastVisitedLeague(
   leagueId: number,
   sport: string | null | undefined,
+  userId?: number | null,
 ): LastVisitedLeague {
-  return { leagueId, sport: normalizeSport(sport) };
+  const league: LastVisitedLeague = { leagueId, sport: normalizeSport(sport) };
+  if (isPositiveInteger(userId)) league.userId = userId;
+  return league;
 }
 
 /** Serialize a last-visited league for storage. */
@@ -53,6 +66,7 @@ export function serializeLastVisitedLeague(league: LastVisitedLeague): string {
   return JSON.stringify({
     leagueId: league.leagueId,
     sport: normalizeSport(league.sport),
+    ...(isPositiveInteger(league.userId) ? { userId: league.userId } : {}),
   });
 }
 
@@ -60,6 +74,7 @@ export function serializeLastVisitedLeague(league: LastVisitedLeague): string {
  * Parse a stored last-visited league. Returns `null` for any malformed input
  * (missing/empty value, invalid JSON, wrong shape, non-positive id, or an
  * unrecognized sport) so callers can safely fall back to the default route.
+ * A missing or invalid `userId` is dropped rather than rejecting the entry.
  */
 export function parseLastVisitedLeague(
   raw: string | null | undefined,
@@ -68,19 +83,16 @@ export function parseLastVisitedLeague(
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return null;
-    const { leagueId, sport } = parsed as {
+    const { leagueId, sport, userId } = parsed as {
       leagueId?: unknown;
       sport?: unknown;
+      userId?: unknown;
     };
-    if (
-      typeof leagueId !== 'number' ||
-      !Number.isInteger(leagueId) ||
-      leagueId <= 0
-    ) {
-      return null;
-    }
+    if (!isPositiveInteger(leagueId)) return null;
     if (sport !== 'baseball' && sport !== 'football') return null;
-    return { leagueId, sport };
+    return isPositiveInteger(userId)
+      ? { leagueId, sport, userId }
+      : { leagueId, sport };
   } catch {
     return null;
   }
