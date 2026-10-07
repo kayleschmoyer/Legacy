@@ -232,8 +232,11 @@ export function LoginPage(): React.JSX.Element {
     fetchPolicy: 'cache-first',
   });
 
-  const playerCount = playerCountData?.playerCount ?? 22184;
-  const playerCountDisplay = playerCount.toLocaleString('en-US');
+  // No hard-coded fallback: a stale constant disagreed with the live count
+  // (LS-10747). Show a neutral placeholder while loading or on error.
+  const playerCount = playerCountData?.playerCount;
+  const playerCountDisplay =
+    playerCount == null ? '—' : playerCount.toLocaleString('en-US');
 
   const marqueeEntries = useMemo(() => {
     const entries = onThisDayData?.onThisDay;

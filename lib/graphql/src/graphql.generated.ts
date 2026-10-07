@@ -4040,7 +4040,7 @@ export type Query = {
   playerCareerBatting?: Maybe<CareerBatting>;
   playerCareerFielding?: Maybe<CareerFielding>;
   playerCareerPitching?: Maybe<CareerPitching>;
-  /** Total number of players in the database */
+  /** Number of players browsable in the Players list, across both sports */
   playerCount?: Maybe<Scalars['Int']['output']>;
   /** Fetch MLB season stats for a player from the external data provider. Stub resolver — full implementation added in LS-1864 via MlbDataProvider. */
   playerMlbStats?: Maybe<Scalars['String']['output']>;

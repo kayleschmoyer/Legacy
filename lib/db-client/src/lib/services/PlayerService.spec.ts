@@ -403,3 +403,32 @@ describe('PlayerService — searchPlayers', () => {
     expect(mockDb.limit).toHaveBeenCalledWith(10);
   });
 });
+
+describe('PlayerService — countBrowsablePlayers (LS-10747)', () => {
+  const options = { type: 'pg-local' } as DbOptions;
+  const { PublicSchema } = jest.requireMock<{
+    PublicSchema: { players: object; careerBatting: object };
+  }>('../client/PublicDbClient');
+
+  it('sums the MLB career-batting total and the NFL players total, not every players row', async () => {
+    const service = new PlayerService(options);
+    const footballWhere = jest.fn().mockResolvedValue([{ count: 20054 }]);
+    const from = jest.fn((table: object) =>
+      table === PublicSchema.careerBatting
+        ? Promise.resolve([{ count: 19178 }])
+        : { where: footballWhere },
+    );
+    const mockDb = { select: jest.fn(() => ({ from })) };
+    mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
+      handler(mockDb as never),
+    );
+
+    await expect(service.countBrowsablePlayers()).resolves.toBe(39232);
+
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenCalledWith(PublicSchema.careerBatting);
+    expect(from).toHaveBeenCalledWith(PublicSchema.players);
+    // The players query is scoped to football; baseball comes from career_batting.
+    expect(footballWhere).toHaveBeenCalledTimes(1);
+  });
+});

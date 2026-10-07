@@ -711,6 +711,29 @@ export class PlayerService {
   }
 
   /**
+   * Count players browsable in the Players list, across both sports
+   * (LS-10747). Mirrors the list's unfiltered totals so the landing-page
+   * "Players across every era" stat matches what users can browse:
+   * - MLB: one `career_batting` row per player (`careerBattingStats.totalCount`)
+   * - NFL: `players WHERE sport = 'football'` (`footballPlayers.totalCount`,
+   *   overview view)
+   * A raw `count(*)` over `players` overstates this, because baseball rows
+   * without a career batting line never appear in the list.
+   */
+  async countBrowsablePlayers(): Promise<number> {
+    return runWithPublicClient(this.options, async (db) => {
+      const [[mlb], [nfl]] = await Promise.all([
+        db.select({ count: count() }).from(PublicSchema.careerBatting),
+        db
+          .select({ count: count() })
+          .from(PublicSchema.players)
+          .where(eq(PublicSchema.players.sport, 'football')),
+      ]);
+      return Number(mlb?.count ?? 0) + Number(nfl?.count ?? 0);
+    });
+  }
+
+  /**
    * Search players by name (searches first name, last name, and full name).
    *
    * Results are ranked by relevance so a small `limit` still surfaces the

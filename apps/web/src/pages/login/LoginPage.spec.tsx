@@ -100,6 +100,7 @@ jest.mock('../../config/environment', () => ({
     googleClientId: 'test',
   },
 }));
+let mockPlayerCountData: { playerCount: number } | undefined;
 jest.mock('@legacy-sports/graphql', () => ({
   // Preserve real exports (enums like TwentyQuestionsCategory are used by
   // shared-components code pulled in via requireActual); override only the
@@ -108,7 +109,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     '@legacy-sports/graphql',
   ),
   useGetOnThisDayQuery: () => ({ data: undefined }),
-  useGetPlayerCountQuery: () => ({ data: undefined }),
+  useGetPlayerCountQuery: () => ({ data: mockPlayerCountData }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -151,6 +152,7 @@ let configureSpy: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPlayerCountData = undefined;
   mockLogin.mockResolvedValue(undefined);
   mockAuthError = null;
   mockAuthConfig = {
@@ -1172,5 +1174,27 @@ describe('LoginPage Google sign-in deep-link preservation (LS-7520)', () => {
     expect(sessionStorage.getItem('ls_login_came_from')).toBeNull();
 
     replaceStateSpy.mockRestore();
+  });
+});
+
+describe('LoginPage "Players across every era" stat (LS-10747)', () => {
+  function playerCountCell() {
+    return screen.getByText('Players across every era').previousElementSibling;
+  }
+
+  it('shows a neutral placeholder, never a hard-coded count, while the query is loading or failed', async () => {
+    renderPage();
+    await waitForSignInButton();
+
+    expect(playerCountCell()).toHaveTextContent('—');
+    expect(screen.queryByText('22,184')).not.toBeInTheDocument();
+  });
+
+  it('shows the live browsable-player count once the query resolves', async () => {
+    mockPlayerCountData = { playerCount: 39232 };
+    renderPage();
+    await waitForSignInButton();
+
+    expect(playerCountCell()).toHaveTextContent('39,232');
   });
 });

@@ -346,12 +346,14 @@ PlayerRef.implement({
   }),
 });
 
-// Total number of players in the database (unauthenticated — used on the login page)
+// Number of players browsable in the Players list, across both sports
+// (unauthenticated — used on the login page; LS-10747)
 builder.queryField('playerCount', (t) =>
   t.int({
-    description: 'Total number of players in the database',
+    description:
+      'Number of players browsable in the Players list, across both sports',
     resolve: async () => {
-      return dbService.players.countPlayers();
+      return dbService.players.countBrowsablePlayers();
     },
   }),
 );

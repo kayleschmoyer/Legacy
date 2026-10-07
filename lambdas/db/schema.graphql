@@ -4995,7 +4995,7 @@ type Query {
   playerCareerPitching(playerId: Int!): CareerPitching
 
   """
-  Total number of players in the database
+  Number of players browsable in the Players list, across both sports
   """
   playerCount: Int
 
