@@ -71,7 +71,7 @@ test.describe('Bug Report Button @smoke', () => {
     await expect(dialog).toBeVisible();
 
     await expect(
-      dialog.getByRole('textbox', { name: /bug description/i }),
+      dialog.getByRole('textbox', { name: /what happened\?/i }),
     ).toBeVisible();
 
     await expect(
@@ -167,7 +167,7 @@ test.describe('Bug Report Button – Mobile @regression', () => {
     // Navigation's outside-click handler this would collapse the mobile nav
     // panel and unmount the dialog trigger, closing the dialog prematurely.
     const descriptionField = dialog.getByRole('textbox', {
-      name: /bug description/i,
+      name: /what happened\?/i,
     });
     await descriptionField.fill(
       'Mobile nav regression test: dialog should remain open after typing.',
@@ -196,7 +196,7 @@ test.describe('Bug Report Dialog – short viewport (LS-10430) @regression', () 
 
     const dialog = page.getByRole('dialog');
     await dialog
-      .getByRole('textbox', { name: /bug description/i })
+      .getByRole('textbox', { name: /what happened\?/i })
       .fill('Short viewport regression: Submit must stay reachable.');
 
     const submit = dialog.getByRole('button', { name: /submit report/i });
@@ -270,7 +270,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
   });
 
   test('Submit button enables after typing a description', async ({ page }) => {
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     const submitButton = page.getByRole('button', { name: /submit report/i });
 
     await textarea.fill('The dashboard crashes when clicking the roster tab.');
@@ -278,7 +278,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
   });
 
   test('character counter updates as user types', async ({ page }) => {
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     const text = 'Reproducible crash on roster tab.';
 
     await textarea.fill(text);
@@ -336,7 +336,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
   test('form resets to blank after closing and reopening the dialog', async ({
     page,
   }) => {
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill('Some text I typed.');
 
     // Close via Cancel (Dialog.Close asChild may alter the element role)
@@ -354,7 +354,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
 
     // Textarea should be empty again
     await expect(
-      page.getByRole('textbox', { name: /bug description/i }),
+      page.getByRole('textbox', { name: /what happened\?/i }),
     ).toHaveValue('');
   });
 });
@@ -379,7 +379,7 @@ test.describe('Bug Report Submission @regression', () => {
       });
     });
 
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill(
       'Navigating to /baseball/league/999 returns a 404 page.',
     );
@@ -404,7 +404,7 @@ test.describe('Bug Report Submission @regression', () => {
       });
     });
 
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill('Login button disappears after OAuth redirect.');
 
     await page.getByRole('button', { name: /submit report/i }).click();
@@ -429,7 +429,7 @@ test.describe('Bug Report Submission @regression', () => {
       });
     });
 
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill('Stats page times out for players with >10 seasons.');
 
     await page.getByRole('button', { name: /submit report/i }).click();
@@ -509,7 +509,7 @@ test.describe('Bug Report Submission @regression', () => {
       });
     });
 
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill(
       'Draft board does not load for leagues with >12 teams.',
     );
@@ -527,7 +527,7 @@ test.describe('Bug Report Submission @regression', () => {
       await route.abort('failed');
     });
 
-    const textarea = page.getByRole('textbox', { name: /bug description/i });
+    const textarea = page.getByRole('textbox', { name: /what happened\?/i });
     await textarea.fill('Crash when trying to trade a player mid-draft.');
 
     await page.getByRole('button', { name: /submit report/i }).click();

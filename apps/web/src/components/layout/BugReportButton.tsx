@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   Button,
   Paragraph,
@@ -87,7 +87,7 @@ const REPORT_KINDS = {
     subtitle: "Describe what happened and we'll file a ticket automatically.",
     placeholder:
       'Describe the issue, steps to reproduce, and what you expected to happen...',
-    inputLabel: 'Bug description',
+    fieldLabel: 'What happened?',
     submitLabel: 'Submit Report',
     fallbackSummary: 'Bug report',
     labels: ['user-reported', 'web'],
@@ -98,7 +98,7 @@ const REPORT_KINDS = {
     subtitle: "Tell us your idea and we'll file it for the team to review.",
     placeholder:
       'Describe the feature you want, and what it would let you do...',
-    inputLabel: 'Feature request description',
+    fieldLabel: "What's your idea?",
     submitLabel: 'Submit Suggestion',
     fallbackSummary: 'Feature request',
     labels: ['user-reported', 'web', 'feature-request'],
@@ -110,7 +110,8 @@ const REPORT_KINDS = {
     title: string;
     subtitle: string;
     placeholder: string;
-    inputLabel: string;
+    /** Visible label for the description textarea — also its accessible name. */
+    fieldLabel: string;
     submitLabel: string;
     fallbackSummary: string;
     labels: readonly string[];
@@ -158,6 +159,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
   returnFocusRef,
 }) => {
   const copy = REPORT_KINDS[kind];
+  const descriptionId = useId();
   const auth = useAuth();
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
@@ -555,16 +557,26 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                 <YStack gap="$4" paddingHorizontal="$5" paddingVertical="$2">
                   {/* Description input */}
                   <YStack gap="$2">
-                    <Paragraph size="$3" fontWeight="600" color="$color">
-                      What happened?
+                    {/* Per-kind visible label, tied to the textarea so it is
+                        also the field's accessible name (LS-10700). A
+                        Paragraph rendered as <label> rather than Tamagui's
+                        Label, which applies button sizing to the text. */}
+                    <Paragraph
+                      tag="label"
+                      htmlFor={descriptionId}
+                      size="$3"
+                      fontWeight="600"
+                      color="$color"
+                    >
+                      {copy.fieldLabel}
                     </Paragraph>
                     <textarea
+                      id={descriptionId}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       maxLength={MAX_DESCRIPTION_LENGTH}
                       rows={5}
                       placeholder={copy.placeholder}
-                      aria-label={copy.inputLabel}
                       disabled={isLoading}
                       style={{
                         width: '100%',

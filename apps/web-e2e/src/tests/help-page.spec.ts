@@ -366,6 +366,13 @@ test.describe('Help Page — contact and support @regression', () => {
       page.getByRole('dialog').getByText('Suggest a Feature'),
     ).toBeVisible();
     await expect(page.getByText(/tell us your idea/i)).toBeVisible();
+    // The description field is labelled with feature copy, not the bug
+    // dialog's "What happened?" (LS-10700).
+    await expect(
+      page
+        .getByRole('dialog')
+        .getByRole('textbox', { name: /what's your idea\?/i }),
+    ).toBeVisible();
   });
 
   // Without jiraProxyUrl configured, the entry falls back to Discord — the
