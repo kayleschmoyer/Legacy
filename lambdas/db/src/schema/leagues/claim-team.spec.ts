@@ -12,7 +12,8 @@
  * re-verification against `league_members` inside the transaction.
  *
  * These tests mock the transaction handle to exercise the three branches:
- *   1. Successful claim — locked row, no existing membership → update + insert.
+ *   1. Successful claim — locked row, no existing membership → update + insert,
+ *      then the joiner's pending direct invites are settled (LS-10831).
  *   2. Full league — no unlocked candidate row → return { fullLeague: true }.
  *   3. Race detected — locked row but membership already exists (a concurrent
  *      transaction committed first) → return { fullLeague: true }, no writes.
@@ -89,7 +90,8 @@ describe('claimUnassignedTeamForUser (LS-2497)', () => {
     expect(stringified).toMatch(/FOR UPDATE OF t SKIP LOCKED/);
     expect(stringified).toMatch(/lm\.user_id IS NULL/);
 
-    expect(tx.update).toHaveBeenCalledTimes(1);
+    // The team rename, then the pending-invite settle (LS-10831).
+    expect(tx.update).toHaveBeenCalledTimes(2);
     expect(tx.insert).toHaveBeenCalledTimes(1);
   });
 

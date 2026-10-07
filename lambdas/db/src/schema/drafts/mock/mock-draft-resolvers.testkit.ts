@@ -45,6 +45,9 @@ export interface CapturedMockDraftResolvers {
   revokeInvite: CapturedResolver<ResolverPayload>;
   myInvites: CapturedResolver<ResolverPayload>;
   pendingInvites: CapturedResolver<ResolverPayload[]>;
+  // Joining by code must settle a pending direct invite (LS-10831). Registered
+  // by leagues/mutations, which direct-invites imports.
+  joinLeagueByCode: CapturedResolver<ResolverPayload>;
   // Weekly quota read (LS-10483) — lives with the other draft queries.
   getMyMockDraftUsage: CapturedResolver<ResolverPayload>;
 }

@@ -14,6 +14,7 @@ import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
 import { validateBrandingUrl } from './validate-branding-url';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder, type Context } from '../builder';
+import { settleLeagueInvitesOnJoin } from '../invites/settle-on-join';
 import { postSystemLeagueMessage } from '../league-messages-helper';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
 import {
@@ -926,21 +927,26 @@ builder.mutationField('inviteAssistantManager', (t) =>
         throw UserInputError(INVITE_FAILURE_MESSAGE);
       }
 
-      // 6. Insert the new league_members row with assistant_manager permission
-      const inserted = await db
-        .insert(PublicSchema.leagueMembers)
-        .values({
-          leagueId,
-          userId: inviteeId,
-          teamId,
-          permissionLevel: 'assistant_manager',
-        })
-        .returning({
-          leagueId: PublicSchema.leagueMembers.leagueId,
-          userId: PublicSchema.leagueMembers.userId,
-          teamId: PublicSchema.leagueMembers.teamId,
-          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-        });
+      // 6. Insert the new league_members row with assistant_manager permission,
+      // settling any pending direct invite to the league with it (LS-10831).
+      const inserted = await db.transaction(async (tx) => {
+        const rows = await tx
+          .insert(PublicSchema.leagueMembers)
+          .values({
+            leagueId,
+            userId: inviteeId,
+            teamId,
+            permissionLevel: 'assistant_manager',
+          })
+          .returning({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+            userId: PublicSchema.leagueMembers.userId,
+            teamId: PublicSchema.leagueMembers.teamId,
+            permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+          });
+        await settleLeagueInvitesOnJoin(tx, leagueId, inviteeId);
+        return rows;
+      });
 
       LOGGER.info('Invited assistant manager', {
         invitedBy: userId,

@@ -16,7 +16,18 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import {
   DRAFT_INVITE_NOTIFICATION_TYPE,
@@ -885,7 +896,28 @@ builder.queryField('pendingInvites', (t) =>
           and(
             'draftId' in target
               ? eq(PublicSchema.invitations.draftId, target.draftId)
-              : eq(PublicSchema.invitations.leagueId, target.leagueId),
+              : and(
+                  eq(PublicSchema.invitations.leagueId, target.leagueId),
+                  // Joining settles the invite (LS-10831); this also hides
+                  // one left pending by a membership written another way.
+                  notExists(
+                    context.db
+                      .select({ userId: PublicSchema.leagueMembers.userId })
+                      .from(PublicSchema.leagueMembers)
+                      .where(
+                        and(
+                          eq(
+                            PublicSchema.leagueMembers.leagueId,
+                            target.leagueId,
+                          ),
+                          eq(
+                            PublicSchema.leagueMembers.userId,
+                            PublicSchema.invitations.invitedUserId,
+                          ),
+                        ),
+                      ),
+                  ),
+                ),
             pendingAndLive(new Date()),
           ),
         )

@@ -485,6 +485,93 @@ describe('Invites — DB integration (LS-10078)', () => {
     });
   });
 
+  describe('league invites settle on join (LS-10831)', () => {
+    async function createLeague(): Promise<{
+      leagueId: number;
+      inviteCode: string;
+      freeTeamId: number;
+    }> {
+      const [league] = await db
+        .insert(leagues)
+        .values({
+          name: 'Settle League',
+          owner: STRANGER.id,
+          sport: 'baseball',
+          inviteCode: 'LSSETL01',
+        })
+        .returning();
+      const [ownTeam, freeTeam] = await db
+        .insert(teams)
+        .values([
+          { name: 'Team 1', leagueId: league.id },
+          { name: 'Team 2', leagueId: league.id },
+        ])
+        .returning();
+      await db.insert(leagueMembers).values({
+        leagueId: league.id,
+        userId: STRANGER.id,
+        teamId: ownTeam.id,
+        permissionLevel: 'commissioner' as const,
+      });
+      return {
+        leagueId: league.id,
+        inviteCode: 'LSSETL01',
+        freeTeamId: freeTeam.id,
+      };
+    }
+
+    async function inviteRow(inviteId: number) {
+      const [row] = await db
+        .select()
+        .from(invitations)
+        .where(eq(invitations.id, inviteId));
+      return row;
+    }
+
+    it('joining by invite code accepts the pending direct invite', async () => {
+      const { leagueId, inviteCode } = await createLeague();
+      const invite = await resolvers.sendDraftInvite(
+        {},
+        { leagueId, username: INVITEE.username },
+        contextFor(STRANGER),
+      );
+
+      await resolvers.joinLeagueByCode(
+        {},
+        { inviteCode, teamName: 'Code Joiners' },
+        contextFor(INVITEE),
+      );
+
+      const row = await inviteRow(invite.id as number);
+      expect(row.status).toBe('accepted');
+      expect(row.respondedAt).not.toBeNull();
+      await expect(
+        resolvers.pendingInvites({}, { leagueId }, contextFor(STRANGER)),
+      ).resolves.toEqual([]);
+    });
+
+    it('pendingInvites never lists an invite for a current member', async () => {
+      const { leagueId, freeTeamId } = await createLeague();
+      const invite = await resolvers.sendDraftInvite(
+        {},
+        { leagueId, username: INVITEE.username },
+        contextFor(STRANGER),
+      );
+      // Membership written outside any join path, as rows predating the fix were.
+      await db.insert(leagueMembers).values({
+        leagueId,
+        userId: INVITEE.id,
+        teamId: freeTeamId,
+        permissionLevel: 'general_manager' as const,
+      });
+
+      await expect(
+        resolvers.pendingInvites({}, { leagueId }, contextFor(STRANGER)),
+      ).resolves.toEqual([]);
+      expect((await inviteRow(invite.id as number)).status).toBe('pending');
+    });
+  });
+
   describe('resolveInviteCode and myInvites', () => {
     it('previews a mock-draft code and a league code', async () => {
       const { draftId, inviteCode } = await createLobby(3);

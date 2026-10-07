@@ -128,9 +128,10 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
    *   [3] existing-member check for claimed team inside tx → []
    *   [4] team update inside tx → undefined
    *   [5] leagueMembers insert inside tx → undefined
-   *   [6] post-claim team SELECT
-   *   [7] chat message insert RETURNING
-   *   [8] existing league members for push notification
+   *   [6] settle pending direct invites inside tx → undefined (LS-10831)
+   *   [7] post-claim team SELECT
+   *   [8] chat message insert RETURNING
+   *   [9] existing league members for push notification
    *
    *  executeQueue:
    *   [0] FOR UPDATE raw query → { rows: [{ id: 42 }] }
@@ -144,6 +145,7 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
       [],
       [{ tier: 'premium' }],
       [],
+      undefined,
       undefined,
       undefined,
       [teamRow],

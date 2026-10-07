@@ -82,6 +82,7 @@ import {
   requirePremium,
 } from '../authorization';
 import { writeAuditLog } from '../audit-log';
+import { settleLeagueInvitesOnJoin } from '../invites/settle-on-join';
 import { requireFreshEntitlement } from '../fresh-entitlements';
 import { ENTITLEMENTS } from '../entitlements';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
@@ -1792,6 +1793,9 @@ export async function claimUnassignedTeamForUser(
       teamId,
       permissionLevel,
     });
+
+    // Joining by code or public join settles any direct invite (LS-10831).
+    await settleLeagueInvitesOnJoin(tx, leagueId, userId);
 
     return { teamId };
   });
