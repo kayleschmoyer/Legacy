@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   ChartErrorBoundary,
   compareEditorialCells,
@@ -958,6 +959,120 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
     expect(
       screen.queryByText('Season by Season · Pitching'),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — keyboard-operable stat tabs (LS-10653)
+// ---------------------------------------------------------------------------
+
+describe('PlayerDetailModal — keyboard-accessible stat tabs (LS-10653)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasEntitlement = false;
+    // Two-way player with both arc series: every tab and the arc sub-selector render.
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [battingSeason()],
+        playerSeasonPitching: [pitchingSeason()],
+      },
+    });
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(true, true));
+  });
+
+  function mainTabList() {
+    return screen.getByRole('tablist', { name: 'Player statistics' });
+  }
+
+  it('exposes the stat strip as a tablist with aria-selected tabs and a labelled tabpanel', () => {
+    renderModal();
+    const tabs = within(mainTabList()).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      'Career Arc',
+      'Batting',
+      'Pitching',
+    ]);
+    expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ]);
+    // Roving tabindex: only the active tab is in the Tab order.
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual([
+      '0',
+      '-1',
+      '-1',
+    ]);
+    const panel = screen.getByRole('tabpanel', { name: 'Career Arc' });
+    expect(tabs[0]).toHaveAttribute('aria-controls', panel.id);
+  });
+
+  it('reaches the strip with Tab, moves with arrow keys, and activates with Enter/Space', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const [careerArc, batting, pitching] =
+      within(mainTabList()).getAllByRole('tab');
+
+    // Tab from the top of the document lands on the active stat tab.
+    for (let i = 0; i < 20 && document.activeElement !== careerArc; i++) {
+      await user.tab();
+    }
+    expect(careerArc).toHaveFocus();
+
+    // Arrows move focus without changing the selection.
+    await user.keyboard('{ArrowRight}');
+    expect(batting).toHaveFocus();
+    expect(careerArc).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{Enter}');
+    expect(batting).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Batting' })).toHaveTextContent(
+      'Season by Season · Batting',
+    );
+
+    await user.keyboard('{ArrowRight}[Space]');
+    expect(pitching).toHaveFocus();
+    expect(pitching).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+
+    // Wraps at both ends; Home/End jump to the first/last tab.
+    await user.keyboard('{ArrowRight}');
+    expect(careerArc).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(pitching).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(careerArc).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(pitching).toHaveFocus();
+  });
+
+  it('makes the Career Arc Batting/Pitching sub-selector keyboard operable', async () => {
+    const { CareerArcChart } = jest.requireMock('./CareerArcChart');
+    const user = userEvent.setup();
+    renderModal();
+
+    const arcList = screen.getByRole('tablist', {
+      name: 'Career arc stat type',
+    });
+    const [arcBatting, arcPitching] = within(arcList).getAllByRole('tab');
+    expect(arcBatting).toHaveAttribute('aria-selected', 'true');
+    expect(arcBatting).toHaveAttribute('tabindex', '0');
+    expect(arcPitching).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('tabpanel', { name: 'Batting' })).toHaveTextContent(
+      'CareerArcChart',
+    );
+
+    arcBatting.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(arcPitching).toHaveFocus();
+    await user.keyboard('[Space]');
+    expect(arcPitching).toHaveAttribute('aria-selected', 'true');
+    expect(CareerArcChart).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mode: 'pitching' }),
+      undefined,
+    );
   });
 });
 

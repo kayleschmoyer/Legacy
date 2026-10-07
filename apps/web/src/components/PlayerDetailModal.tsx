@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -466,19 +467,66 @@ function SectionHead({ title, meta }: { title: string; meta?: string }) {
   );
 }
 
+// Roving focus for an EditorialTab strip (WAI-ARIA tabs, manual activation):
+// arrows / Home / End move focus between the tabs and Enter / Space selects.
+// The tabs are found in the DOM rather than via refs so the strip needs no
+// per-tab ref plumbing; this is a no-op on native, where no key events fire.
+function handleEditorialTabListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+  const tabs = Array.from(
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'),
+  );
+  if (tabs.length === 0) return;
+  const current = tabs.findIndex((t) => t.contains(e.target as Node));
+  let next: number;
+  switch (e.key) {
+    case 'ArrowRight':
+      next = (current + 1) % tabs.length;
+      break;
+    case 'ArrowLeft':
+      next = (Math.max(current, 0) - 1 + tabs.length) % tabs.length;
+      break;
+    case 'Home':
+      next = 0;
+      break;
+    case 'End':
+      next = tabs.length - 1;
+      break;
+    default:
+      return;
+  }
+  e.preventDefault();
+  tabs[next].focus();
+}
+
 function EditorialTab({
   label,
   tabKey,
   active,
   onPress,
+  tabId,
+  panelId,
 }: {
   label: string;
   tabKey: string;
   active: boolean;
   onPress: () => void;
+  tabId: string;
+  panelId: string;
 }) {
   return (
     <YStack
+      role="tab"
+      id={tabId}
+      aria-selected={active}
+      aria-controls={active ? panelId : undefined}
+      // Roving tabindex: only the selected tab is in the Tab order.
+      tabIndex={active ? 0 : -1}
+      onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
       cursor="pointer"
       paddingHorizontal={18}
       paddingVertical={14}
@@ -487,6 +535,12 @@ function EditorialTab({
       animation="quick"
       pressStyle={{ scale: 0.97 }}
       hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
+      focusVisibleStyle={{
+        outlineWidth: 2,
+        outlineStyle: 'solid',
+        outlineColor: BRAND_GOLD,
+        outlineOffset: -2,
+      }}
       onPress={onPress}
       style={{ scrollSnapAlign: 'start' }}
     >
@@ -786,6 +840,10 @@ export function PlayerDetailModal({
   // same build, same player, different tab per load.
   const [selectedTab, setSelectedTab] = useState<StatsTab | null>(null);
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
+  // DOM ids tying each stat tab to the panel it controls (LS-10653).
+  const tabIdBase = useId();
+  const statsPanelId = `${tabIdBase}-stats-panel`;
+  const arcPanelId = `${tabIdBase}-arc-panel`;
   const { isPremium } = useIsPremiumStatus();
   // Premium plans grant every catalog entitlement, so these advanced-stats gates
   // resolve to the user's premium status (LS-8643). Per-entitlement client
@@ -1700,6 +1758,9 @@ export function PlayerDetailModal({
                 overflow="hidden"
               >
                 <XStack
+                  role="tablist"
+                  aria-label="Player statistics"
+                  onKeyDown={handleEditorialTabListKeyDown}
                   overflow="scroll"
                   style={{ scrollSnapType: 'x mandatory' }}
                 >
@@ -1710,6 +1771,8 @@ export function PlayerDetailModal({
                       tabKey={tab.key}
                       active={effectiveActiveTab === tab.key}
                       onPress={() => setSelectedTab(tab.key)}
+                      tabId={`${tabIdBase}-tab-${tab.key}`}
+                      panelId={statsPanelId}
                     />
                   ))}
                 </XStack>
@@ -1726,138 +1789,163 @@ export function PlayerDetailModal({
                 />
               </YStack>
 
-              {/* Career Arc */}
-              {effectiveActiveTab === 'career-arc' && (
-                <YStack gap={12} marginTop={22}>
-                  {hasBattingArc && hasPitchingArc && (
-                    <XStack gap={4}>
-                      <EditorialTab
-                        label="Batting"
-                        tabKey="arc-batting"
-                        active={arcMode === 'batting'}
-                        onPress={() => setArcMode('batting')}
-                      />
-                      <EditorialTab
-                        label="Pitching"
-                        tabKey="arc-pitching"
-                        active={arcMode === 'pitching'}
-                        onPress={() => setArcMode('pitching')}
-                      />
-                    </XStack>
-                  )}
-                  <YStack
-                    padding={22}
-                    backgroundColor={SURFACE_SUBTLE}
-                    borderWidth={1}
-                    borderColor={STATS_BORDER}
-                    borderRadius={16}
-                  >
-                    <ChartErrorBoundary>
-                      <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
-                        <CareerArcChart
-                          key={playerId ?? 0}
-                          battingSeasons={displayArcData?.arcBatting}
-                          pitchingSeasons={displayArcData?.arcPitching}
-                          mode={hasBattingArc ? arcMode : 'pitching'}
+              <YStack
+                role="tabpanel"
+                id={statsPanelId}
+                aria-labelledby={`${tabIdBase}-tab-${effectiveActiveTab}`}
+              >
+                {/* Career Arc */}
+                {effectiveActiveTab === 'career-arc' && (
+                  <YStack gap={12} marginTop={22}>
+                    {hasBattingArc && hasPitchingArc && (
+                      <XStack
+                        role="tablist"
+                        aria-label="Career arc stat type"
+                        onKeyDown={handleEditorialTabListKeyDown}
+                        gap={4}
+                      >
+                        <EditorialTab
+                          label="Batting"
+                          tabKey="arc-batting"
+                          active={arcMode === 'batting'}
+                          onPress={() => setArcMode('batting')}
+                          tabId={`${tabIdBase}-tab-arc-batting`}
+                          panelId={arcPanelId}
                         />
-                      </React.Suspense>
-                    </ChartErrorBoundary>
+                        <EditorialTab
+                          label="Pitching"
+                          tabKey="arc-pitching"
+                          active={arcMode === 'pitching'}
+                          onPress={() => setArcMode('pitching')}
+                          tabId={`${tabIdBase}-tab-arc-pitching`}
+                          panelId={arcPanelId}
+                        />
+                      </XStack>
+                    )}
+                    <YStack
+                      // Only a tabpanel while the sub-selector above is shown.
+                      {...(hasBattingArc && hasPitchingArc
+                        ? {
+                            role: 'tabpanel' as const,
+                            id: arcPanelId,
+                            'aria-labelledby': `${tabIdBase}-tab-arc-${arcMode}`,
+                          }
+                        : {})}
+                      padding={22}
+                      backgroundColor={SURFACE_SUBTLE}
+                      borderWidth={1}
+                      borderColor={STATS_BORDER}
+                      borderRadius={16}
+                    >
+                      <ChartErrorBoundary>
+                        <React.Suspense
+                          fallback={<Spinner color={BRAND_GOLD} />}
+                        >
+                          <CareerArcChart
+                            key={playerId ?? 0}
+                            battingSeasons={displayArcData?.arcBatting}
+                            pitchingSeasons={displayArcData?.arcPitching}
+                            mode={hasBattingArc ? arcMode : 'pitching'}
+                          />
+                        </React.Suspense>
+                      </ChartErrorBoundary>
+                    </YStack>
                   </YStack>
-                </YStack>
-              )}
-
-              {effectiveActiveTab === 'batting' &&
-                battingTableRows.length > 0 && (
-                  <>
-                    <SectionHead title="Season by Season · Batting" />
-                    <EditorialTable
-                      caption="Season batting statistics"
-                      headers={
-                        hasAdvancedBatting
-                          ? [
-                              'Year',
-                              'G',
-                              'PA',
-                              'AB',
-                              'H',
-                              'HR',
-                              'RBI',
-                              'SB',
-                              'AVG',
-                              'OBP',
-                              'SLG',
-                              'OPS',
-                              'BABIP',
-                              'OPS+',
-                            ]
-                          : [
-                              'Year',
-                              'G',
-                              'PA',
-                              'AB',
-                              'H',
-                              'HR',
-                              'RBI',
-                              'SB',
-                              'AVG',
-                              'OBP',
-                              'SLG',
-                            ]
-                      }
-                      rows={battingTableRows}
-                    />
-                  </>
                 )}
 
-              {effectiveActiveTab === 'pitching' &&
-                pitchingTableRows.length > 0 && (
-                  <>
-                    <SectionHead title="Season by Season · Pitching" />
-                    <EditorialTable
-                      caption="Season pitching statistics"
-                      headers={[
-                        'Year',
-                        'G',
-                        'W-L',
-                        'ERA',
-                        'IP',
-                        'SO',
-                        'BB',
-                        ...(hasPremiumPitching
-                          ? ['FIP', 'WHIP', 'K/9', 'BB/9']
-                          : []),
-                      ]}
-                      rows={pitchingTableRows}
-                    />
-                  </>
-                )}
+                {effectiveActiveTab === 'batting' &&
+                  battingTableRows.length > 0 && (
+                    <>
+                      <SectionHead title="Season by Season · Batting" />
+                      <EditorialTable
+                        caption="Season batting statistics"
+                        headers={
+                          hasAdvancedBatting
+                            ? [
+                                'Year',
+                                'G',
+                                'PA',
+                                'AB',
+                                'H',
+                                'HR',
+                                'RBI',
+                                'SB',
+                                'AVG',
+                                'OBP',
+                                'SLG',
+                                'OPS',
+                                'BABIP',
+                                'OPS+',
+                              ]
+                            : [
+                                'Year',
+                                'G',
+                                'PA',
+                                'AB',
+                                'H',
+                                'HR',
+                                'RBI',
+                                'SB',
+                                'AVG',
+                                'OBP',
+                                'SLG',
+                              ]
+                        }
+                        rows={battingTableRows}
+                      />
+                    </>
+                  )}
 
-              {effectiveActiveTab === 'fielding' &&
-                fieldingTableRows.length > 0 && (
-                  <>
-                    <SectionHead title="Season by Season · Fielding" />
-                    <EditorialTable
-                      caption="Season fielding statistics"
-                      headers={
-                        hasPremiumFielding
-                          ? [
-                              'Year',
-                              'POS',
-                              'G',
-                              'INN',
-                              'PO',
-                              'A',
-                              'E',
-                              'DRS',
-                              'UZR',
-                              'OAA',
-                            ]
-                          : ['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']
-                      }
-                      rows={fieldingTableRows}
-                    />
-                  </>
-                )}
+                {effectiveActiveTab === 'pitching' &&
+                  pitchingTableRows.length > 0 && (
+                    <>
+                      <SectionHead title="Season by Season · Pitching" />
+                      <EditorialTable
+                        caption="Season pitching statistics"
+                        headers={[
+                          'Year',
+                          'G',
+                          'W-L',
+                          'ERA',
+                          'IP',
+                          'SO',
+                          'BB',
+                          ...(hasPremiumPitching
+                            ? ['FIP', 'WHIP', 'K/9', 'BB/9']
+                            : []),
+                        ]}
+                        rows={pitchingTableRows}
+                      />
+                    </>
+                  )}
+
+                {effectiveActiveTab === 'fielding' &&
+                  fieldingTableRows.length > 0 && (
+                    <>
+                      <SectionHead title="Season by Season · Fielding" />
+                      <EditorialTable
+                        caption="Season fielding statistics"
+                        headers={
+                          hasPremiumFielding
+                            ? [
+                                'Year',
+                                'POS',
+                                'G',
+                                'INN',
+                                'PO',
+                                'A',
+                                'E',
+                                'DRS',
+                                'UZR',
+                                'OAA',
+                              ]
+                            : ['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']
+                        }
+                        rows={fieldingTableRows}
+                      />
+                    </>
+                  )}
+              </YStack>
             </>
           )}
         </YStack>
