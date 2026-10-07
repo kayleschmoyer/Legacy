@@ -158,10 +158,13 @@ export function DraftQueueTab({
       </XStack>
 
       {localEntries.length === 0 ? (
+        // Solid border, not dashed: this card is the only thing the empty
+        // queue renders, and a dashed border + radius is the one construct
+        // unique to it (LS-10633 — Players -> Queue force-quit on Android).
         <YStack
+          testID="draft-queue-empty"
           marginHorizontal="$3"
           borderWidth={1}
-          borderStyle="dashed"
           borderColor="$outlineDefault"
           borderRadius={12}
           padding="$4"

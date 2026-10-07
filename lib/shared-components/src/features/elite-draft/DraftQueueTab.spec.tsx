@@ -59,6 +59,32 @@ describe('DraftQueueTab', () => {
     expect(getByText(/Star players from the list/)).toBeTruthy();
   });
 
+  it('keeps rendering through empty -> populated -> empty queue transitions (LS-10633)', () => {
+    const props = {
+      draftId: 1,
+      statsLookup: STATS_LOOKUP,
+      sport: 'football' as const,
+      onRemove: jest.fn(),
+    };
+    const { getByTestId, queryByTestId, getByText, rerender } = render(
+      <DraftQueueTab {...props} entries={[]} />,
+    );
+    expect(getByTestId('draft-queue-empty')).toBeTruthy();
+
+    rerender(
+      <DraftQueueTab
+        {...props}
+        entries={[makeEntry(1, 'Justin', 'Jefferson')]}
+      />,
+    );
+    expect(queryByTestId('draft-queue-empty')).toBeNull();
+    expect(getByText('Justin Jefferson')).toBeTruthy();
+
+    rerender(<DraftQueueTab {...props} entries={[]} />);
+    expect(getByTestId('draft-queue-empty')).toBeTruthy();
+    expect(getByText('My Queue · 0')).toBeTruthy();
+  });
+
   it('renders one row per queue entry with rank and name', () => {
     const entries = [
       makeEntry(1, 'Justin', 'Jefferson'),
