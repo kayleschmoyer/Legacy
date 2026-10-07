@@ -147,15 +147,17 @@ export function NextStepControl({
   //   a) the backend cleared currentMatchup (null) — the server already
   //      signalled completion; just verify at least one week was played, OR
   //   b) currentMatchup is still set — fall back to the week-count check:
-  //      all scheduled weeks have been played and the final matchup is marked
-  //      completed.
+  //      the *current* week is the final scheduled week and it is marked
+  //      completed. LS-10801: this must use currentWeek, not highestWeek —
+  //      the draft pre-creates every regular-season week, so highestWeek
+  //      already equals totalMatchups from Week 1.
   const isSeasonComplete =
     draftStatus === 'completed' &&
     !frozenAt &&
     highestWeek > 0 &&
     (!hasCurrentMatchup ||
       (totalMatchups != null &&
-        highestWeek >= totalMatchups &&
+        currentWeek >= totalMatchups &&
         currentMatchup?.status === MatchupStatus.Completed));
 
   const handleRenewalConfirm = async () => {

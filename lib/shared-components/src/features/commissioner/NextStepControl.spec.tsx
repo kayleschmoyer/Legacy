@@ -255,3 +255,68 @@ describe('NextStepControl — advance reports why nothing happened (LS-10804)', 
     expect(onError).not.toHaveBeenCalled();
   });
 });
+
+describe('NextStepControl — Season Complete panel (LS-10801)', () => {
+  // The draft pre-creates every regular-season week, so the matchups query
+  // already returns weeks 1–5 while the league is still on Week 1.
+  const allWeeks = [1, 2, 3, 4, 5].map((weekNumber) => ({
+    weekNumber,
+    gamesPerMatchup: 1,
+  }));
+
+  function matchupFor(weekNumber: number) {
+    return {
+      id: weekNumber,
+      weekNumber,
+      status: 'COMPLETED',
+      selectedGamesCount: 1,
+    } as unknown as React.ComponentProps<
+      typeof NextStepControl
+    >['currentMatchup'];
+  }
+
+  function renderControl(
+    currentMatchup: React.ComponentProps<
+      typeof NextStepControl
+    >['currentMatchup'],
+  ) {
+    render(
+      <NextStepControl
+        {...defaultProps}
+        draftStatus="completed"
+        totalMatchups={5}
+        currentMatchup={currentMatchup}
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    mockDraftMode = 'automated';
+    mockMatchups = allWeeks;
+  });
+
+  afterEach(() => {
+    mockMatchups = [];
+  });
+
+  it('does not offer a new season when only Week 1 of 5 is completed', () => {
+    renderControl(matchupFor(1));
+
+    expect(screen.queryByText('Start New Season')).not.toBeInTheDocument();
+    expect(screen.getByTestId('start-draft-button')).toHaveTextContent(
+      /Advance/i,
+    );
+  });
+
+  it('offers a new season once the final regular-season week is completed', () => {
+    renderControl(matchupFor(5));
+
+    expect(screen.getByText('Start New Season')).toBeInTheDocument();
+  });
+
+  it('offers a new season when the backend has cleared currentMatchup', () => {
+    renderControl(null);
+
+    expect(screen.getByText('Start New Season')).toBeInTheDocument();
+  });
+});
