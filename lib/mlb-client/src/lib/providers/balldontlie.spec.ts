@@ -9,8 +9,10 @@ import {
   BallDontLieProvider,
   BallDontLieRetryBudgetError,
   isRetryableError,
+  nextDate,
   retryDelay,
   retryFitsBudget,
+  toEasternDate,
 } from './balldontlie';
 
 // Spy on axios.get only — do NOT jest.mock('axios') as that auto-mocks
@@ -208,7 +210,7 @@ describe('BallDontLieProvider.getScoreboard', () => {
       .mockRejectedValueOnce(makeAxiosError())
       .mockResolvedValueOnce(BDL_RESPONSE);
 
-    const result = await makeProvider().getScoreboard('2024-07-05');
+    const result = await makeProvider().getScoreboard('2024-07-04');
 
     expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
     expect(result.games).toHaveLength(1);
@@ -219,7 +221,7 @@ describe('BallDontLieProvider.getScoreboard', () => {
       .mockRejectedValueOnce(makeAxiosError(429))
       .mockResolvedValueOnce(BDL_RESPONSE);
 
-    const result = await makeProvider().getScoreboard('2024-07-06');
+    const result = await makeProvider().getScoreboard('2024-07-04');
 
     expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
     expect(result.games).toHaveLength(1);
@@ -230,7 +232,7 @@ describe('BallDontLieProvider.getScoreboard', () => {
       .mockRejectedValueOnce(makeAxiosError(503))
       .mockResolvedValueOnce(BDL_RESPONSE);
 
-    const result = await makeProvider().getScoreboard('2024-07-09');
+    const result = await makeProvider().getScoreboard('2024-07-04');
 
     expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
     expect(result.games).toHaveLength(1);
@@ -308,7 +310,7 @@ describe('BallDontLieProvider.getScoreboard', () => {
 
     // Populate cache with a successful fetch.
     mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
-    await provider.getScoreboard('2024-07-11');
+    await provider.getScoreboard('2024-07-04');
 
     // Expire the cache entry manually.
     const cacheMap = (
@@ -316,15 +318,15 @@ describe('BallDontLieProvider.getScoreboard', () => {
         cache: Map<string, { data: unknown; expiry: number }>;
       }
     ).cache;
-    const entry = cacheMap.get('scoreboard:2024-07-11');
+    const entry = cacheMap.get('scoreboard:2024-07-04');
     if (entry) entry.expiry = Date.now() - 1;
 
     // API rate-limits all subsequent attempts.
     mockedAxiosGet.mockRejectedValue(makeAxiosError(429));
 
-    const result = await provider.getScoreboard('2024-07-11');
+    const result = await provider.getScoreboard('2024-07-04');
 
-    expect(result.date).toBe('2024-07-11');
+    expect(result.date).toBe('2024-07-04');
     expect(result.games).toHaveLength(1);
     // 1 initial populate + 3 rate-limited attempts (1 + MAX_RETRIES)
     expect(mockedAxiosGet).toHaveBeenCalledTimes(4);
@@ -345,21 +347,21 @@ describe('BallDontLieProvider.getScoreboard', () => {
 
     // Populate stale cache.
     mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
-    await provider.getScoreboard('2024-07-13');
+    await provider.getScoreboard('2024-07-04');
     const cacheMap = (
       provider as unknown as {
         cache: Map<string, { data: unknown; expiry: number }>;
       }
     ).cache;
-    const entry = cacheMap.get('scoreboard:2024-07-13');
+    const entry = cacheMap.get('scoreboard:2024-07-04');
     if (entry) entry.expiry = Date.now() - 1;
 
     // API times out (ECONNABORTED — not retried).
     mockedAxiosGet.mockRejectedValue(makeTimeoutError());
 
-    const result = await provider.getScoreboard('2024-07-13');
+    const result = await provider.getScoreboard('2024-07-04');
 
-    expect(result.date).toBe('2024-07-13');
+    expect(result.date).toBe('2024-07-04');
     expect(result.games).toHaveLength(1);
     // 1 initial populate + 1 timeout attempt (no retries)
     expect(mockedAxiosGet).toHaveBeenCalledTimes(2);
@@ -387,18 +389,18 @@ describe('BallDontLieProvider.getScoreboard', () => {
     it('serves stale cache instead of waiting out a 60s Retry-After', async () => {
       const provider = makeProvider();
       mockedAxiosGet.mockResolvedValueOnce(BDL_RESPONSE);
-      await provider.getScoreboard('2024-07-21');
+      await provider.getScoreboard('2024-07-04');
       const cacheMap = (
         provider as unknown as {
           cache: Map<string, { data: unknown; expiry: number }>;
         }
       ).cache;
-      const entry = cacheMap.get('scoreboard:2024-07-21');
+      const entry = cacheMap.get('scoreboard:2024-07-04');
       if (entry) entry.expiry = Date.now() - 1;
       jest.mocked(setTimeout).mockClear();
 
       mockedAxiosGet.mockRejectedValue(makeAxiosError(429, '60'));
-      const result = await provider.getScoreboard('2024-07-21');
+      const result = await provider.getScoreboard('2024-07-04');
 
       expect(result.games).toHaveLength(1);
       expect(waits()).toEqual([]);
@@ -451,5 +453,77 @@ describe('BallDontLieProvider.getScoreboard', () => {
     );
     // No retries for timeout
     expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── ET date bucketing (LS-10645) ────────────────────────────────────────────
+
+describe('scoreboard ET date bucketing (LS-10645)', () => {
+  function bdlGame(id: number, date: string | null) {
+    return { ...BDL_RESPONSE.data.data[0], id, date };
+  }
+
+  // Real BDL timestamps for the 2024 World Series: BDL files each night game
+  // under the next UTC day.
+  const WS_RESPONSE = {
+    data: {
+      data: [
+        bdlGame(58590, '2024-10-30T00:08:00.000Z'), // G4, 8:08 PM ET 10/29
+        bdlGame(58595, '2024-10-31T00:08:00.000Z'), // G5, 8:08 PM ET 10/30
+        bdlGame(99001, '2024-10-30T17:05:00.000Z'), // 1:05 PM ET 10/30 day game
+      ],
+    },
+  };
+
+  it('toEasternDate converts a UTC start time to its US Eastern date', () => {
+    expect(toEasternDate('2024-10-30T00:08:00.000Z')).toBe('2024-10-29');
+    expect(toEasternDate('2024-10-30T17:05:00.000Z')).toBe('2024-10-30');
+    expect(toEasternDate('2024-01-15T04:59:00Z')).toBe('2024-01-14');
+    expect(toEasternDate('2024-01-15T05:00:00Z')).toBe('2024-01-15');
+    expect(toEasternDate(null)).toBeNull();
+    expect(toEasternDate('not-a-date')).toBeNull();
+  });
+
+  it('nextDate rolls over month and year boundaries', () => {
+    expect(nextDate('2024-10-30')).toBe('2024-10-31');
+    expect(nextDate('2024-10-31')).toBe('2024-11-01');
+    expect(nextDate('2024-12-31')).toBe('2025-01-01');
+  });
+
+  it('requests the given date and the next UTC date', async () => {
+    mockedAxiosGet.mockResolvedValueOnce(WS_RESPONSE);
+    await new BallDontLieProvider('test-api-key').getScoreboard('2024-10-30');
+
+    const params = mockedAxiosGet.mock.calls[0][1]?.params as URLSearchParams;
+    expect(params.getAll('dates[]')).toEqual(['2024-10-30', '2024-10-31']);
+  });
+
+  it("shows WS Game 5 (not Game 4) on 2024-10-30, plus that day's day game", async () => {
+    mockedAxiosGet.mockResolvedValueOnce(WS_RESPONSE);
+    const result = await new BallDontLieProvider('test-api-key').getScoreboard(
+      '2024-10-30',
+    );
+
+    expect(result.games.map((g) => g.gamePk)).toEqual([58595, 99001]);
+  });
+
+  it('shows WS Game 4 on 2024-10-29', async () => {
+    mockedAxiosGet.mockResolvedValueOnce(WS_RESPONSE);
+    const result = await new BallDontLieProvider('test-api-key').getScoreboard(
+      '2024-10-29',
+    );
+
+    expect(result.games.map((g) => g.gamePk)).toEqual([58590]);
+  });
+
+  it('drops games with no start time, since they cannot be placed on a date', async () => {
+    mockedAxiosGet.mockResolvedValueOnce({
+      data: { data: [bdlGame(1, null)] },
+    });
+    const result = await new BallDontLieProvider('test-api-key').getScoreboard(
+      '2024-10-30',
+    );
+
+    expect(result.games).toHaveLength(0);
   });
 });

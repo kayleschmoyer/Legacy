@@ -98,6 +98,39 @@ function mapBdlGame(game: BdlGame): MlbGame {
   };
 }
 
+// ─── Scoreboard date bucketing ───────────────────────────────────────────────
+
+// Scoreboard dates are MLB calendar (US Eastern) dates. BDL's dates[] filter
+// matches on the UTC start date, so a 7:05 PM ET game on D is returned under
+// D+1 (LS-10645). We request D and D+1 and keep games whose start time falls
+// on D in this time zone.
+const SCOREBOARD_TIME_ZONE = 'America/New_York';
+
+const etDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: SCOREBOARD_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * YYYY-MM-DD of an ISO timestamp in US Eastern time, or null when the
+ * timestamp is missing or unparseable. Exported for unit testing.
+ */
+export function toEasternDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return etDateFormatter.format(ms);
+}
+
+/** The calendar day after a YYYY-MM-DD date. Exported for unit testing. */
+export function nextDate(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 // ─── Retry helpers ────────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 2;
@@ -272,12 +305,18 @@ export class BallDontLieProvider implements MlbDataProvider {
           {
             headers: { Authorization: this.apiKey },
             // BDL uses dates[] array filter; URLSearchParams encodes brackets correctly
-            params: new URLSearchParams({ 'dates[]': date, per_page: '100' }),
+            params: new URLSearchParams([
+              ['dates[]', date],
+              ['dates[]', nextDate(date)],
+              ['per_page', '100'],
+            ]),
             timeout: REQUEST_TIMEOUT_MS,
           },
         );
 
-        const games = (response.data.data ?? []).map(mapBdlGame);
+        const games = (response.data.data ?? [])
+          .filter((g) => toEasternDate(g.date) === date)
+          .map(mapBdlGame);
         const hasLiveGames = games.some((g) => g.status === 'Live');
         const ttl = hasLiveGames ? LIVE_TTL_MS : STATIC_TTL_MS;
         const scoreboard: Scoreboard = {
