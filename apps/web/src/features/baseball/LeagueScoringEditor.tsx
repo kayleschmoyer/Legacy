@@ -661,18 +661,27 @@ export function LeagueScoringEditor(
         animation="quick"
         overflow="hidden"
         style={{ transition: 'background-color 0.2s ease' }}
+        // Below 660px the input group leaves too little width for the stat
+        // name, so stack the input under the label instead (LS-10800).
+        $xxs={{ flexDirection: 'column', alignItems: 'stretch', gap: '$2' }}
       >
         {/* Invisible spacer aligned with accent bar */}
-        <XStack width={4} flexShrink={0} />
+        <XStack width={4} flexShrink={0} $xxs={{ display: 'none' }} />
 
         {/* Stat info — takes remaining space */}
         <YStack flex={1} space="$0.5" overflow="hidden">
-          <XStack alignItems="center" gap="$1.5" overflow="hidden">
+          <XStack
+            alignItems="center"
+            gap="$1.5"
+            overflow="hidden"
+            $xxs={{ flexWrap: 'wrap' }}
+          >
             <Text
               fontSize="$3"
               fontWeight="600"
               color="$color12"
               numberOfLines={1}
+              $xxs={{ flexShrink: 0, maxWidth: '100%' }}
             >
               {stat.displayName}
             </Text>
@@ -703,7 +712,12 @@ export function LeagueScoringEditor(
         </YStack>
 
         {/* Input + suffix + reset */}
-        <XStack alignItems="center" gap="$1.5" flexShrink={0}>
+        <XStack
+          alignItems="center"
+          gap="$1.5"
+          flexShrink={0}
+          $xxs={{ alignSelf: 'flex-start' }}
+        >
           <Input
             value={value}
             onChangeText={(text: string) => handleValueChange(statId, text)}

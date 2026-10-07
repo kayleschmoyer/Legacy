@@ -1153,3 +1153,75 @@ test.describe('Commissioner Scoring Editor — Football @critical', () => {
     await expect(page.getByTestId('position-bonus-section')).toHaveCount(0);
   });
 });
+
+// LS-10800: at 375px the non-shrinking multiplier input squeezed each stat
+// name to a 1px-wide ellipsis. Below 660px the row now stacks the input under
+// the label, so every name must render unclipped. The CUSTOM chip is forced on
+// (multiplier ≠ default) because it is the widest label line.
+test.describe('Commissioner Scoring Editor — narrow viewport @regression', () => {
+  function withCustomMultipliers<T extends { stats: unknown[] }>(
+    profile: T,
+  ): T {
+    return {
+      ...profile,
+      stats: (profile.stats as Array<Record<string, unknown>>).map((s) => ({
+        ...s,
+        multiplier: Number(s['defaultMultiplier']) + 2.5,
+        isOverride: true,
+      })),
+    };
+  }
+
+  async function expectStatNamesUnclipped(
+    page: import('@playwright/test').Page,
+    names: string[],
+  ) {
+    const scoringRegion = page.getByTestId('scoring-editor');
+    for (const name of names) {
+      const label = scoringRegion.getByText(name, { exact: true });
+      await expect(label).toBeVisible();
+      const { scrollWidth, clientWidth } = await label.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(scrollWidth, `"${name}" is clipped`).toBeLessThanOrEqual(
+        clientWidth,
+      );
+    }
+  }
+
+  test('baseball stat names are fully readable at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await setupGraphQL(page, {
+      scoringProfile: withCustomMultipliers(makeScoringProfile()),
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await expandScoringSection(page);
+
+    await expectStatNamesUnclipped(page, [
+      'Home Runs',
+      'Strikeouts (Pitching)',
+      'Errors',
+    ]);
+  });
+
+  test('football stat names are fully readable at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'dst' }),
+      scoringProfile: withCustomMultipliers(makeFootballScoringProfile('dst')),
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    await expectStatNamesUnclipped(page, [
+      'Passing Yards',
+      'Rushing Yards',
+      'Receptions',
+      'Field Goals Made',
+      'Sacks',
+    ]);
+  });
+});
