@@ -1091,6 +1091,34 @@ describe('League Mutations', () => {
       ).rejects.toThrow(/Salary cap leagues requires an upgraded subscription/);
     });
 
+    it('should reject a salary floor above the persisted salary cap (LS-10748)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) membership lookup → commissioner, 2) current league cap state →
+      // disabled with a persisted cap of 100 (no entitlement lookup).
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([
+          { salaryCapEnabled: false, salaryCap: 100, salaryFloor: null },
+        ]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, salaryFloor: 101 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary floor cannot exceed the salary cap');
+    });
+
     it('should require advanced_playoff_formats entitlement with a descriptive message when setting a 6-team playoff format (LS-5974)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
@@ -2317,6 +2345,13 @@ describe('League Mutations', () => {
       await expect(resolve({ salaryFloor: -1 })).rejects.toThrow(
         'Salary floor cannot be negative',
       );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a salary floor above the salary cap (LS-10748)', async () => {
+      await expect(
+        resolve({ salaryCap: 100, salaryFloor: 101 }),
+      ).rejects.toThrow('Salary floor cannot exceed the salary cap');
       expect(mockCreateLeague).not.toHaveBeenCalled();
     });
 

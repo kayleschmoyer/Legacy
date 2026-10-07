@@ -1789,6 +1789,55 @@ describe('validateFormFull — league name length (LS-6055)', () => {
   });
 });
 
+describe('validateFormFull — salary floor vs cap (LS-10748)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'snake',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: true,
+    salaryCap: 100,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
+  };
+
+  it('flags a salary floor above the cap', () => {
+    const errs = validateFormFull({ ...baseFormData, salaryFloor: 101 });
+    expect(errs.salaryFloor).toBe('Salary floor cannot exceed the salary cap.');
+  });
+
+  it('accepts a salary floor equal to the cap', () => {
+    const errs = validateFormFull({ ...baseFormData, salaryFloor: 100 });
+    expect(errs.salaryFloor).toBeUndefined();
+  });
+
+  it('ignores the floor when the salary cap is disabled', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      salaryCapEnabled: false,
+      salaryFloor: 101,
+    });
+    expect(errs.salaryFloor).toBeUndefined();
+  });
+});
+
 describe('validateFormFull — auction budget/min bid (LS-6092, upper bound LS-6074/CLB-027)', () => {
   const baseFormData: CreateLeagueFormData = {
     sport: 'baseball',

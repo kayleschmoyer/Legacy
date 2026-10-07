@@ -91,6 +91,9 @@ import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
 
+const SALARY_FLOOR_EXCEEDS_CAP_MESSAGE =
+  'Salary floor cannot exceed the salary cap';
+
 /** Throws a UserInputError when seconds is outside the 30–172800 range. */
 export function validatePickTimeLimitSeconds(
   seconds: number | null | undefined,
@@ -980,6 +983,13 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       }
       if (inputSalaryFloor != null && inputSalaryFloor < 0) {
         throw UserInputError('Salary floor cannot be negative');
+      }
+      if (
+        inputSalaryCap != null &&
+        inputSalaryFloor != null &&
+        inputSalaryFloor > inputSalaryCap
+      ) {
+        throw UserInputError(SALARY_FLOOR_EXCEEDS_CAP_MESSAGE);
       }
       if (inputLuxuryTaxThreshold != null && inputLuxuryTaxThreshold < 0) {
         throw UserInputError('Luxury tax threshold cannot be negative');
@@ -3015,12 +3025,20 @@ builder.mutationField('updateLeagueSettings', (t) =>
         (minSalary !== null && minSalary !== undefined) ||
         (salaryEscalationPct !== null && salaryEscalationPct !== undefined) ||
         (salaryDecayPct !== null && salaryDecayPct !== undefined);
+      let currentSalaryCap: number | null | undefined;
+      let currentSalaryFloor: number | null | undefined;
       if (salaryCapSubFieldUpdated) {
         const [currentLeague] = await context.db
-          .select({ salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled })
+          .select({
+            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+            salaryCap: PublicSchema.leagues.salaryCap,
+            salaryFloor: PublicSchema.leagues.salaryFloor,
+          })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
           .limit(1);
+        currentSalaryCap = currentLeague?.salaryCap;
+        currentSalaryFloor = currentLeague?.salaryFloor;
         if (currentLeague?.salaryCapEnabled) {
           await requireFreshEntitlement(
             context,
@@ -3044,6 +3062,21 @@ builder.mutationField('updateLeagueSettings', (t) =>
       }
       if (salaryFloor !== undefined) {
         leagueUpdate.salaryFloor = salaryFloor ?? null;
+      }
+      // Compare the post-update values so a floor-only or cap-only change
+      // cannot leave the floor above the persisted cap (LS-10748).
+      if (salaryCap !== undefined || salaryFloor !== undefined) {
+        const nextSalaryCap =
+          salaryCap !== undefined ? salaryCap : currentSalaryCap;
+        const nextSalaryFloor =
+          salaryFloor !== undefined ? salaryFloor : currentSalaryFloor;
+        if (
+          nextSalaryCap != null &&
+          nextSalaryFloor != null &&
+          nextSalaryFloor > nextSalaryCap
+        ) {
+          throw UserInputError(SALARY_FLOOR_EXCEEDS_CAP_MESSAGE);
+        }
       }
       if (luxuryTaxThreshold !== undefined) {
         leagueUpdate.luxuryTaxThreshold = luxuryTaxThreshold ?? null;

@@ -726,6 +726,7 @@ const LEAGUE_FORM_MESSAGES = {
   salaryCapOutOfRange: (min: number, max: number) =>
     `Salary cap must be between ${min} and ${max}.`,
   salaryFloorNegative: 'Salary floor cannot be negative.',
+  salaryFloorExceedsCap: 'Salary floor cannot exceed the salary cap.',
   luxuryTaxThresholdNegative: 'Luxury tax threshold cannot be negative.',
   minSalaryTooLow: 'Minimum salary must be at least 1.',
   salaryEscalationPctOutOfRange: 'Salary escalation % must be 0–100.',
@@ -833,6 +834,12 @@ export function validateFormFull(
       );
     if (f.salaryFloor !== undefined && f.salaryFloor < 0)
       errs.salaryFloor = LEAGUE_FORM_MESSAGES.salaryFloorNegative;
+    else if (
+      f.salaryFloor !== undefined &&
+      f.salaryCap !== undefined &&
+      f.salaryFloor > f.salaryCap
+    )
+      errs.salaryFloor = LEAGUE_FORM_MESSAGES.salaryFloorExceedsCap;
     if (f.luxuryTaxThreshold !== undefined && f.luxuryTaxThreshold < 0)
       errs.luxuryTaxThreshold = LEAGUE_FORM_MESSAGES.luxuryTaxThresholdNegative;
     if (f.minSalary !== undefined && f.minSalary < 1)
