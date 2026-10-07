@@ -2137,6 +2137,177 @@ describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// ProposeTradeDialog — switching trade partner (LS-10814)
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — ProposeTradeDialog partner switch (LS-10814)', () => {
+  const OTHER_TEAM_ID = 3;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposeTradeFn = jest.fn().mockResolvedValue({ data: {} });
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueByIdReturn = { data: undefined };
+    mockLeagueTeamsReturn = {
+      data: {
+        leagueTeams: [
+          makeMockTeam(RECEIVING_TEAM_ID, 'Sluggers'),
+          makeMockTeam(OTHER_TEAM_ID, 'Beta'),
+        ],
+      },
+    };
+    mockProposerRosterReturn = {
+      data: {
+        teamMembers: [
+          makeMockPlayer(10, 'Aaron', 'Judge'),
+          makeMockPlayer(20, 'Mike', 'Trout'),
+        ],
+      },
+    };
+  });
+
+  /** Opens the dialog, picks Sluggers, offers Judge, requests Trout. */
+  async function proposeToSluggersRequestingTrout(
+    utils: ReturnType<typeof render>,
+  ) {
+    const { getByText, findByText } = utils;
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+    await act(async () => {
+      const nextBtn = await findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Mike Trout'));
+    });
+    expect(await findByText(/review trade/i)).toBeTruthy();
+  }
+
+  async function backToTeamStep(utils: ReturnType<typeof render>) {
+    await act(async () => {
+      fireEvent.click(await utils.findByTestId('trade-dialog-back-to-offer'));
+    });
+    await act(async () => {
+      fireEvent.click(await utils.findByTestId('trade-dialog-back-to-team'));
+    });
+  }
+
+  async function goToRequestStep(utils: ReturnType<typeof render>) {
+    await act(async () => {
+      const nextBtn = await utils.findByText(/next.*select their players/i);
+      fireEvent.click(nextBtn.closest('button') ?? nextBtn);
+    });
+    expect(await utils.findByText(/give you/i)).toBeTruthy();
+  }
+
+  it('clears requested players and hides Review when a different partner is chosen', async () => {
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await proposeToSluggersRequestingTrout(utils);
+    await backToTeamStep(utils);
+
+    await act(async () => {
+      fireEvent.click(await utils.findByText('Beta'));
+    });
+    await goToRequestStep(utils);
+
+    expect(utils.queryByText(/review trade/i)).toBeNull();
+    expect(utils.queryByTestId('trade-dialog-review')).toBeNull();
+  });
+
+  it('sends only players picked from the new partner after a switch', async () => {
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await proposeToSluggersRequestingTrout(utils);
+    await backToTeamStep(utils);
+    await act(async () => {
+      fireEvent.click(await utils.findByText('Beta'));
+    });
+    await goToRequestStep(utils);
+
+    await act(async () => {
+      fireEvent.click(await utils.findByText('Mike Trout'));
+    });
+    await act(async () => {
+      const reviewBtn = await utils.findByText(/review trade/i);
+      fireEvent.click(reviewBtn.closest('button') ?? reviewBtn);
+    });
+    await act(async () => {
+      const sendBtn = await utils.findByText(/send trade offer/i);
+      fireEvent.click(sendBtn.closest('button') ?? sendBtn);
+      await Promise.resolve();
+    });
+
+    expect(mockProposeTradeFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          leagueId: LEAGUE_ID,
+          receivingTeamId: OTHER_TEAM_ID,
+          offeringPlayerIds: [10],
+          requestingPlayerIds: [20],
+          message: null,
+          expiresInDays: 3,
+        },
+      }),
+    );
+  });
+
+  it('keeps requested players when the same partner is re-selected', async () => {
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await proposeToSluggersRequestingTrout(utils);
+    await backToTeamStep(utils);
+
+    await act(async () => {
+      fireEvent.click(await utils.findByText('Sluggers'));
+    });
+    await goToRequestStep(utils);
+
+    expect(await utils.findByText(/review trade/i)).toBeTruthy();
+  });
+
+  it('hides Review when the requested player is not on the loaded partner roster', async () => {
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await proposeToSluggersRequestingTrout(utils);
+
+    // The partner roster no longer contains Trout (id 20).
+    mockProposerRosterReturn = {
+      data: { teamMembers: [makeMockPlayer(10, 'Aaron', 'Judge')] },
+    };
+    utils.rerender(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    await waitFor(() => {
+      expect(utils.queryByTestId('trade-dialog-review')).toBeNull();
+    });
+  });
+});
+
 // NOTE: The duplicate "Trade History Filters" describe block that was added
 // here (LS-7526) was removed — all filter scenarios are covered by the block
 // above (LS-7529) which uses the Dropdown-based team filter implementation.

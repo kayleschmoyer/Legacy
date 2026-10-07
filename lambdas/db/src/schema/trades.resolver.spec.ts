@@ -1063,6 +1063,45 @@ describe('Trades Resolver', () => {
       });
     });
 
+    it("throws BAD_USER_INPUT when a requested player is not on the receiving team's roster (LS-10814)", async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { leaguePhase: 'active', sport: 'baseball' },
+      ]); // league check
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 1, permissionLevel: 'general_manager' },
+      ]); // resolveUserTeam membership
+      mockDb.limit.mockResolvedValueOnce([{ isLocked: false }]); // resolveUserTeam teams check
+      mockDb.limit.mockResolvedValueOnce([{ id: 3, name: 'Beta' }]); // receiving team exists
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]); // name snapshot
+      mockDb.then
+        .mockImplementationOnce((resolve: (v: unknown) => void) =>
+          resolve([{ total: 0 }]),
+        ) // rate limit
+        .mockImplementationOnce((resolve: (v: unknown) => void) =>
+          resolve([{ playerId: 10 }]),
+        ) // offering players on proposing roster
+        .mockImplementationOnce((resolve: (v: unknown) => void) => resolve([])); // requested player 20 belongs to a different team, not Beta
+
+      const resolver = getResolver('mutation', 'proposeTrade');
+      await expect(
+        (resolver as (...a: unknown[]) => Promise<unknown>)(
+          {},
+          {
+            leagueId: 1,
+            receivingTeamId: 3,
+            offeringPlayerIds: [10],
+            requestingPlayerIds: [20],
+          },
+          mockContext,
+          undefined,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining("not on the other team's roster"),
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
     it('blocks an over-limit proposing team with ROSTER_OVER_LIMIT, passing the net roster change (LS-10477)', async () => {
       mockDb.limit.mockResolvedValueOnce([
         { leaguePhase: 'active', sport: 'baseball', maxRosterSize: 26 },

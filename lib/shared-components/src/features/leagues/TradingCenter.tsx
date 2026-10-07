@@ -887,9 +887,20 @@ function ProposeTradeDialog({
 
   const myPlayers = myPlayersData?.teamMembers ?? [];
   const theirPlayers = theirPlayersData?.teamMembers ?? [];
+  const hasValidRequest = theirPlayers.some(
+    (tm) =>
+      tm.playerId != null && draft.requestingPlayerIds.includes(tm.playerId),
+  );
 
+  // Requested players only exist on the chosen partner's roster, so switching
+  // partners must drop them — otherwise Review/Send stay enabled for ids the
+  // new partner doesn't own (LS-10814). Offered players are ours and survive.
   const handleSelectTeam = (teamId: number) => {
-    setDraft((d) => ({ ...d, receivingTeamId: teamId }));
+    setDraft((d) =>
+      d.receivingTeamId === teamId
+        ? d
+        : { ...d, receivingTeamId: teamId, requestingPlayerIds: [] },
+    );
     // Pre-load both rosters
     void loadMyPlayers({ variables: { teamId: userTeamId } });
     void loadTheirPlayers({ variables: { teamId } });
@@ -1371,7 +1382,7 @@ function ProposeTradeDialog({
                     ← Back
                   </Text>
                 </Button>
-                {draft.requestingPlayerIds.length > 0 && (
+                {hasValidRequest && (
                   <Button
                     flex={2}
                     data-testid="trade-dialog-review"
