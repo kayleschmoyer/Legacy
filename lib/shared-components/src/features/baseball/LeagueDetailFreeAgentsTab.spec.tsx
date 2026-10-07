@@ -554,4 +554,38 @@ describe('LeagueDetailFreeAgentsTab', () => {
       expect(screen.queryByText(/My FAAB Budget/)).not.toBeInTheDocument();
     });
   });
+
+  describe('waiver subtitle (LS-10684)', () => {
+    const standardLeague: FreeAgentsTabLeague = {
+      ...league,
+      waiverEnabled: true,
+      waiverType: 'standard',
+      faabBudgetDefault: 100,
+    };
+
+    it.each(['baseball', 'football'] as const)(
+      'omits the FAAB budget on a %s standard-waiver league',
+      (sport) => {
+        render(
+          <LeagueDetailFreeAgentsTab league={{ ...standardLeague, sport }} />,
+        );
+        expect(screen.getByText('Standard waivers active')).toBeInTheDocument();
+        expect(screen.queryByText(/FAAB/)).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(['baseball', 'football'] as const)(
+      'shows the FAAB budget on a %s FAAB league',
+      (sport) => {
+        render(
+          <LeagueDetailFreeAgentsTab
+            league={{ ...standardLeague, sport, waiverType: 'faab' }}
+          />,
+        );
+        expect(
+          screen.getByText('FAAB waivers active · FAAB 100'),
+        ).toBeInTheDocument();
+      },
+    );
+  });
 });

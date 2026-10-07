@@ -1047,9 +1047,18 @@ export const LeagueDetailFreeAgentsTab: React.FC<
   const footballIsLoading = footballLoading || takenLoading;
   const canClaim = isMember && myTeamId != null;
   const isFaabLeague = league.waiverType?.toLowerCase() === 'faab';
+  const waiverLabel = isFaabLeague
+    ? 'FAAB waivers'
+    : league.waiverType?.toLowerCase() === 'standard'
+      ? 'Standard waivers'
+      : 'Waivers';
+  // The FAAB budget only applies to FAAB leagues — faabBudgetDefault is
+  // populated (default 100) for every league, including Standard (LS-10684).
   const subTitle = league.waiverEnabled
-    ? `${league.waiverType ?? 'Waivers'} active${
-        league.faabBudgetDefault ? ` · FAAB ${league.faabBudgetDefault}` : ''
+    ? `${waiverLabel} active${
+        isFaabLeague && league.faabBudgetDefault
+          ? ` · FAAB ${league.faabBudgetDefault}`
+          : ''
       }`
     : 'Available players in the league pool';
 
