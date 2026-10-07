@@ -50,6 +50,15 @@ test.describe('Skip link coverage across major pages @regression', () => {
 
   for (const { path, name } of staticPages) {
     test(`skip link exists on ${name} page`, async ({ page }) => {
+      // The e2e user has no leagues, so Home auto-opens the first-run
+      // onboarding tutorial once the league query resolves (1-3s under load).
+      // Its modal focus trap then legitimately takes focus mid-assertion, and
+      // the Enter meant for the skip link closes the tutorial instead
+      // (LS-10887). Mark onboarding complete so this test exercises the skip
+      // link on the dashboard, not a race with the modal.
+      await page.addInitScript(() => {
+        window.localStorage.setItem('ls_onboarding_complete', 'true');
+      });
       await page.goto(path);
       await page.waitForLoadState('load');
       await assertSkipLinkWorks(page);
