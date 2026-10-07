@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Check } from '@tamagui/lucide-icons/icons/Check';
@@ -41,6 +41,56 @@ const CHIP_STYLES: React.CSSProperties = {
   maxWidth: 240,
   flexShrink: 0,
 };
+
+/** Width of the dropdown panel on viewports wide enough to fit it. */
+const PANEL_WIDTH_PX = 340;
+/** Minimum gap kept between the panel and the viewport / bottom-bar edges. */
+const VIEWPORT_GUTTER_PX = 16;
+/** Vertical gap between the chip and the top of the panel. */
+const PANEL_OFFSET_PX = 8;
+/** MobileBottomBar's root — fixed to the viewport bottom on phones (LS-10754). */
+const BOTTOM_BAR_SELECTOR =
+  '[role="navigation"][aria-label="Bottom navigation"]';
+
+interface PanelLayout {
+  /** Horizontal offset from the chip's left edge. */
+  left: number;
+  width: number;
+  maxHeight: number;
+}
+
+/**
+ * Fit the dropdown inside the visible viewport (LS-10754). The panel is
+ * anchored to the chip's left edge, which on phones starts ~64px in — a
+ * fixed 340px panel then runs past a 375px viewport's right edge, and in
+ * landscape it runs under the fixed MobileBottomBar with no way to scroll.
+ * Narrow the panel to the viewport, shift it left when it would overflow, and
+ * cap its height at the space above the bottom bar (or viewport bottom).
+ */
+function measurePanelLayout(anchor: HTMLElement): PanelLayout {
+  const rect = anchor.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const width = Math.min(
+    PANEL_WIDTH_PX,
+    viewportWidth - VIEWPORT_GUTTER_PX * 2,
+  );
+  const viewportLeft = Math.max(
+    VIEWPORT_GUTTER_PX,
+    Math.min(rect.left, viewportWidth - VIEWPORT_GUTTER_PX - width),
+  );
+
+  const bottomBarRect = document
+    .querySelector(BOTTOM_BAR_SELECTOR)
+    ?.getBoundingClientRect();
+  const bottomLimit =
+    bottomBarRect && bottomBarRect.height > 0
+      ? bottomBarRect.top
+      : window.innerHeight;
+  const maxHeight =
+    bottomLimit - VIEWPORT_GUTTER_PX - (rect.bottom + PANEL_OFFSET_PX);
+
+  return { left: viewportLeft - rect.left, width, maxHeight };
+}
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'LS';
@@ -86,6 +136,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [sport, setSport] = useState<'baseball' | 'football'>('baseball');
   const ref = useRef<HTMLDivElement>(null);
+  const [panelLayout, setPanelLayout] = useState<PanelLayout | null>(null);
 
   const isLoggedIn = Boolean(auth?.user);
   const { data } = useGetUserLeaguesQuery({ skip: !isLoggedIn });
@@ -114,6 +165,16 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
       document.addEventListener('mousedown', handler);
       return () => document.removeEventListener('mousedown', handler);
     }
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      if (ref.current) setPanelLayout(measurePanelLayout(ref.current));
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, [isOpen]);
 
   useEffect(() => {
@@ -261,9 +322,13 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
           aria-label="League selector"
           style={{
             position: 'absolute',
-            left: 0,
-            top: 'calc(100% + 8px)',
-            width: 340,
+            left: panelLayout?.left ?? 0,
+            top: `calc(100% + ${PANEL_OFFSET_PX}px)`,
+            width: panelLayout?.width ?? PANEL_WIDTH_PX,
+            maxHeight: panelLayout?.maxHeight,
+            boxSizing: 'border-box',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
             background: SURFACE_PANEL,
             border: `1px solid ${withAlpha(BRAND_GOLD, 0.2)}`,
             borderRadius: 16,
