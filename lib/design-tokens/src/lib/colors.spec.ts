@@ -9,6 +9,7 @@ import {
   lightSurface,
   lightText,
   relativeLuminance,
+  semanticLight,
 } from './colors';
 
 describe('relativeLuminance', () => {
@@ -137,4 +138,56 @@ describe('text tokens meet WCAG AA (4.5:1) on every surface', () => {
     expect(Object.values(darkText)).not.toContain(ledger.disabledFg);
     expect(Object.values(lightText)).not.toContain(ledger.disabledFg);
   });
+});
+
+describe('light-theme status colours (LS-10852)', () => {
+  const AA = 4.5;
+  const surfaces = [
+    lightSurface.bg,
+    lightSurface.surfaceCard,
+    lightSurface.surfaceSubtle,
+    lightSurface.surfacePanel,
+    lightSurface.surfaceRaised,
+  ];
+
+  // Composite an `rgba(r, g, b, a)` fill over an opaque `#rrggbb` surface.
+  const composite = (rgba: string, surface: string): string => {
+    const [r, g, b, a] = rgba
+      .replace(/rgba\(|\)/g, '')
+      .split(',')
+      .map((part) => Number(part.trim()));
+    const base = surface.replace('#', '');
+    const channel = (value: number, offset: number) =>
+      Math.round(
+        value * a + parseInt(base.slice(offset, offset + 2), 16) * (1 - a),
+      )
+        .toString(16)
+        .padStart(2, '0');
+    return `#${channel(r, 0)}${channel(g, 2)}${channel(b, 4)}`;
+  };
+
+  const statuses = [
+    'success',
+    'warning',
+    'danger',
+    'info',
+    'neutral',
+    'accent',
+  ] as const;
+
+  const cases = statuses.flatMap((status) =>
+    surfaces.map((surface) => [status, surface] as const),
+  );
+
+  it.each(cases)(
+    '%s Fg clears AA on %s and over its soft fill',
+    (status, surface) => {
+      const fg = semanticLight[`${status}Fg`];
+      const soft = semanticLight[`${status}Soft`];
+      expect(contrastRatio(fg, surface)).toBeGreaterThanOrEqual(AA);
+      expect(
+        contrastRatio(fg, composite(soft, surface)),
+      ).toBeGreaterThanOrEqual(AA);
+    },
+  );
 });

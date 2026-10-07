@@ -103,6 +103,32 @@ export const semantic = {
   seamErrorSoft: 'rgba(196, 30, 58, 0.12)',
 } as const;
 
+// Light-theme status triplets (LS-10852). `semantic`'s Fg values are tuned
+// for dark surfaces (e.g. warningFg #E3B870 is ~1.9:1 on white), so the light
+// theme gets darker foregrounds and lighter soft fills. Every Fg clears WCAG
+// AA (4.5:1) on every light text surface and over its own soft fill —
+// enforced in colors.spec.ts.
+export const semanticLight = {
+  successFg: '#1B6141',
+  successSoft: 'rgba(34, 110, 74, 0.12)',
+  successBorder: 'rgba(34, 110, 74, 0.45)',
+  warningFg: '#7F5210',
+  warningSoft: 'rgba(176, 118, 38, 0.14)',
+  warningBorder: 'rgba(176, 118, 38, 0.5)',
+  dangerFg: '#A8203A',
+  dangerSoft: 'rgba(176, 46, 68, 0.1)',
+  dangerBorder: 'rgba(176, 46, 68, 0.45)',
+  infoFg: '#2B5A9C',
+  infoSoft: 'rgba(70, 110, 176, 0.12)',
+  infoBorder: 'rgba(70, 110, 176, 0.45)',
+  neutralFg: '#4A6080',
+  neutralSoft: 'rgba(127, 144, 174, 0.14)',
+  neutralBorder: '#CBD5E1',
+  accentFg: '#725B1D',
+  accentSoft: 'rgba(197, 165, 90, 0.14)',
+  accentBorder: 'rgba(150, 120, 40, 0.45)',
+} as const;
+
 // Accents introduced by the mobile design-handoff batch (LS-8794/8795/8800/
 // 8809) that have no equivalent in `semantic`: a muted ledger green for the
 // completed-step check, a softer rose for inline field errors, and a dimmed
@@ -510,6 +536,7 @@ export const colors = {
     surface: lightSurface,
     text: lightText,
     glass: glassLight,
+    semantic: semanticLight,
     // Light-theme gold is desaturated for AA contrast on white surfaces.
     brandGoldOverride: {
       gold: '#B8942B',

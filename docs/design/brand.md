@@ -42,7 +42,19 @@ Fantasy sports players (25–45) who are league commissioners and active partici
   - No `border-left` / `border-right` accent stripes wider than 1px on cards or callouts
   - No gradient text (`background-clip: text` with a gradient)
   - No cyan/purple/neon glow accents
-  - No light-theme surfaces anywhere — the app is dark-mode only (see Layout Principles). This includes token files: no `.theme-light` / `[data-theme='light']` override block.
+  - No hard-coded dark (or light) colors in components — use theme tokens so both themes work (see [Light theme](#light-theme)). Fixed dark-theme hex on a themed surface is how light-mode text ends up near-white on white.
+
+### Light theme
+
+Dark is the signature theme and the default; **Light is a supported user preference** (Profile → Preferences → Theme, or the OS setting for logged-out visitors). Every surface must work in both. Values live in `lib/design-tokens/src/lib/colors.ts` and resolve through the Tamagui `light` theme — reference tokens (`$surfacePanel`, `$color12`, `$statusWarningFg`…), never the hex below.
+
+- **Backgrounds**: page `#FFFFFF` → subtle `#EDF1F7` → panel `#EFF4FB` → card `#F5F7FA`; raised surfaces stay `#FFFFFF`.
+- **Text ramp**: `#0B1220` strongest / headlines (`$color12`), `#1F2937` body (`$color11`), `#4A6080` muted (`$textMuted`), `#606D85` quietest tier. Every tier clears AA on every light surface.
+- **Heritage gold** is desaturated for light: `$brandGold` `#B8942B` and `$brandGoldDark` `#967828` are for fills, icons and large display type only — neither reaches 4.5:1 for small text on white. Small gold text needs a darker text-specific gold (≥4.5:1).
+- **Accent fills are theme-invariant**: navy and seam-red buttons/badges keep `$textOnAccent` (`#F8FAFC`) text in both themes; gold fills keep their dark ink (`$textOnGold`).
+- **Status colors** have dedicated light values (`semanticLight`): success `#1B6141`, warning `#7F5210`, danger `#A8203A`, info `#2B5A9C`, neutral `#4A6080`, accent `#725B1D`, each with a lighter soft fill and border. The dark-theme status hues are too bright to read on light surfaces.
+- **Glass / sticky headers**: `$background075` (white at 75% in light, page navy at 75% in dark) with a backdrop blur — the global header follows the theme, not a fixed dark band.
+- **Focus ring**: `$focusRing` (`#2563EB` in light).
 
 ### Third-party brand exemption
 
