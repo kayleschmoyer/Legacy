@@ -196,6 +196,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
       type={type ?? 'button'}
       data-testid={rest['data-testid']}
       aria-selected={rest['aria-selected']}
+      aria-pressed={rest['aria-pressed']}
       aria-disabled={rest['aria-disabled']}
       aria-label={rest['aria-label']}
       role={rest.role}
@@ -3556,6 +3557,64 @@ describe('football team-count option parity across platforms (CLF-001)', () => {
   it('matches the shared wizard constants that native and the web wizard both consume', () => {
     expect(TEAM_COUNT_OPTIONS_BY_SPORT.football).toEqual(
       WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT.football,
+    );
+  });
+});
+
+describe('LeagueCreatePage — segmented controls expose selected state (LS-10707)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+    mockFootballEnabled = true;
+  });
+
+  it('marks only the selected ButtonGroup option as pressed and updates on change', () => {
+    renderPage('/baseball/league/create');
+    const teams = within(screen.getByTestId('numberOfTeams-field'));
+    const options = teams.getAllByRole('button');
+    const pressed = options.filter(
+      (b) => b.getAttribute('aria-pressed') === 'true',
+    );
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveTextContent('12');
+    for (const b of options) {
+      expect(b).toHaveAttribute('aria-pressed');
+    }
+
+    fireEvent.click(teams.getByRole('button', { name: '10' }));
+    expect(teams.getByRole('button', { name: '10' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(teams.getByRole('button', { name: '12' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('exposes the Fast Lane toggle on/off state via aria-pressed', () => {
+    renderPage('/baseball/league/create');
+    const toggle = within(screen.getByTestId('fast-lane-toggle'));
+    expect(toggle.getByRole('button', { name: '⚡ Off' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(toggle.getByRole('button', { name: '⚡ On' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    fireEvent.click(toggle.getByRole('button', { name: '⚡ On' }));
+    expect(toggle.getByRole('button', { name: '⚡ On' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(toggle.getByRole('button', { name: '⚡ Off' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
     );
   });
 });

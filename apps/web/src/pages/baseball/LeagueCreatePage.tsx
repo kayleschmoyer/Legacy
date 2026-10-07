@@ -1351,6 +1351,8 @@ function ButtonGroup<T extends string | number>({
             // getByRole('button', { name: ... }) selectors (unit + e2e) keep
             // resolving to this button (LS-6104).
             aria-label={recommended ? label : undefined}
+            // Selection is otherwise conveyed by color alone (LS-10707).
+            aria-pressed={selected}
           >
             <XStack alignItems="center" gap="$1.5">
               {locked && <Lock size={12} color={BRAND_GOLD} />}
@@ -1425,6 +1427,7 @@ function PillToggle({
               backgroundColor: selected ? '$brandNavy' : '$color3',
             }}
             pressStyle={{ scale: 0.97 }}
+            aria-pressed={selected}
           >
             <Text
               fontFamily="$display"
