@@ -13,6 +13,11 @@ mutation TwentyQuestionsAsk($input: TwentyQuestionsAskInput!) {
       parameter
       answer
       isGuess
+      guessPlayer {
+        id
+        firstName
+        lastName
+      }
     }
     targetPlayer {
       id

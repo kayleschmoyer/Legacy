@@ -8,6 +8,11 @@ export interface QuestionRecord {
   parameter: string;
   answer: boolean;
   isGuess: boolean;
+  /** The player named by a guess row; null for questions or an unresolved player. */
+  guessPlayer?: {
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
 }
 
 interface QuestionHistoryProps {
@@ -102,6 +107,13 @@ function formatQuestion(
   }
 }
 
+function formatGuess(player: QuestionRecord['guessPlayer']): string {
+  const name = [player?.firstName, player?.lastName]
+    .filter((part): part is string => Boolean(part))
+    .join(' ');
+  return name ? `Guessed ${name}` : 'Guessed a player';
+}
+
 export const QuestionHistory: React.FC<QuestionHistoryProps> = ({
   questions,
 }) => {
@@ -142,7 +154,7 @@ export const QuestionHistory: React.FC<QuestionHistoryProps> = ({
               testID={`question-text-${q.questionNumber}`}
             >
               {q.isGuess
-                ? `Guessed a player`
+                ? formatGuess(q.guessPlayer)
                 : formatQuestion(q.category, q.parameter)}
             </Paragraph>
             <YStack

@@ -13,6 +13,11 @@ mutation TwentyQuestionsGuess($gameId: String!, $playerId: Int!) {
       parameter
       answer
       isGuess
+      guessPlayer {
+        id
+        firstName
+        lastName
+      }
     }
     targetPlayer {
       id

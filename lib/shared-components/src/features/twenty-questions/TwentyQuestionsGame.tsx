@@ -44,6 +44,10 @@ interface RawGame {
     parameter?: string | null;
     answer?: boolean | null;
     isGuess?: boolean | null;
+    guessPlayer?: {
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
   }> | null;
   targetPlayer?: {
     id?: number | null;
@@ -99,6 +103,7 @@ function mapGame(raw: RawGame): GameState | null {
           parameter: q.parameter,
           answer: q.answer,
           isGuess: q.isGuess,
+          guessPlayer: q.guessPlayer ?? null,
         } satisfies QuestionRecord,
       ];
     }),

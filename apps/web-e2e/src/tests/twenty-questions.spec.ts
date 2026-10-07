@@ -95,6 +95,7 @@ async function setupTwentyQuestionsMocks(
                     parameter: '{"position":"C"}',
                     answer: true,
                     isGuess: false,
+                    guessPlayer: null,
                   },
                 ],
               }),

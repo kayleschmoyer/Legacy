@@ -16672,6 +16672,12 @@ export type TwentyQuestionsActiveGameQuery = {
       parameter?: string | null;
       answer?: boolean | null;
       isGuess?: boolean | null;
+      guessPlayer?: {
+        __typename?: 'Player';
+        id?: number | null;
+        firstName?: string | null;
+        lastName?: string | null;
+      } | null;
     }> | null;
     targetPlayer?: {
       __typename?: 'Player';
@@ -16705,6 +16711,12 @@ export type TwentyQuestionsAskMutation = {
       parameter?: string | null;
       answer?: boolean | null;
       isGuess?: boolean | null;
+      guessPlayer?: {
+        __typename?: 'Player';
+        id?: number | null;
+        firstName?: string | null;
+        lastName?: string | null;
+      } | null;
     }> | null;
     targetPlayer?: {
       __typename?: 'Player';
@@ -16739,6 +16751,12 @@ export type TwentyQuestionsGuessMutation = {
       parameter?: string | null;
       answer?: boolean | null;
       isGuess?: boolean | null;
+      guessPlayer?: {
+        __typename?: 'Player';
+        id?: number | null;
+        firstName?: string | null;
+        lastName?: string | null;
+      } | null;
     }> | null;
     targetPlayer?: {
       __typename?: 'Player';
@@ -41353,6 +41371,11 @@ export const TwentyQuestionsActiveGame = gql`
         parameter
         answer
         isGuess
+        guessPlayer {
+          id
+          firstName
+          lastName
+        }
       }
       targetPlayer {
         id
@@ -41457,6 +41480,11 @@ export const TwentyQuestionsAsk = gql`
         parameter
         answer
         isGuess
+        guessPlayer {
+          id
+          firstName
+          lastName
+        }
       }
       targetPlayer {
         id
@@ -41526,6 +41554,11 @@ export const TwentyQuestionsGuess = gql`
         parameter
         answer
         isGuess
+        guessPlayer {
+          id
+          firstName
+          lastName
+        }
       }
       targetPlayer {
         id
