@@ -1,6 +1,8 @@
 import {
   DEFAULT_BASEBALL_ROSTER_POSITIONS,
   DEFAULT_FOOTBALL_ROSTER_POSITIONS,
+  ERA_OPEN_END_YEAR,
+  ERA_YEAR_RANGES_BY_SPORT,
 } from '@legacy-sports/utils';
 import type { SportKind } from '@legacy-sports/utils';
 import { SportConfig } from '../types';
@@ -183,26 +185,42 @@ export const PLAYER_POOLS_BY_SPORT: Record<
 export const PLAYER_POOLS = PLAYER_POOLS_BY_SPORT.baseball;
 
 /**
- * Era filter options per sport, for league creation.
- * Maps to the `era_filter` database enum.
- *
- * Baseball year ranges:
- *   Dead Ball   : 1871-1919
- *   Golden Age  : 1920-1960
- *   Expansion   : 1961-1976
- *   Free Agency : 1977-1993
- *   Steroid Era : 1994-2005
- *   Modern      : 2006+
- *   Custom      : commissioner-defined
- *   All         : no restriction (default)
- *
- * Football year ranges:
- *   Pioneer         : 1920-1945
- *   Single-Platoon  : 1946-1959
- *   Super Bowl Era  : 1960-1977
- *   West Coast      : 1978-1993
- *   Salary Cap      : 1994-2010
- *   Spread Offense  : 2011+
+ * Formats a pre-defined era's inclusive year range from the canonical
+ * `ERA_YEAR_RANGES_BY_SPORT` table, e.g. "1920 – 1960" or "2006 – Now".
+ * Returns null for ids with no fixed range (`all`, `custom`, unknown).
+ */
+export function formatEraYearRange(
+  sport: SportKind,
+  eraId: string,
+  separator = ' – ',
+): string | null {
+  const range = ERA_YEAR_RANGES_BY_SPORT[sport][eraId];
+  if (!range) return null;
+  const end = range.end === ERA_OPEN_END_YEAR ? 'Now' : String(range.end);
+  return `${range.start}${separator}${end}`;
+}
+
+/** Commissioner-style `{ label: 'Golden Age (1920-1960)', value }` options. */
+function eraFilterOptions(
+  sport: SportKind,
+): Array<{ label: string; value: string }> {
+  return Object.entries(ERA_YEAR_RANGES_BY_SPORT[sport]).map(
+    ([value, range]) => {
+      const years =
+        range.end === ERA_OPEN_END_YEAR
+          ? `${range.start}+`
+          : `${range.start}-${range.end}`;
+      return { label: `${range.label} (${years})`, value };
+    },
+  );
+}
+
+/**
+ * Era filter options per sport, for league creation and Commissioner Draft
+ * Settings. Maps to the `era_filter` database enum. Labels are derived from
+ * `ERA_YEAR_RANGES_BY_SPORT` (the ranges the backend enforces), bracketed by
+ * `all` (no restriction, default) and — baseball only — `custom`
+ * (commissioner-defined years).
  */
 export const ERA_FILTERS_BY_SPORT: Record<
   SportKind,
@@ -210,50 +228,24 @@ export const ERA_FILTERS_BY_SPORT: Record<
 > = {
   baseball: Object.freeze([
     { label: 'All Eras', value: 'all' },
-    { label: 'Dead Ball Era (pre-1920)', value: 'dead_ball' },
-    { label: 'Golden Age (1920-1960)', value: 'golden_age' },
-    { label: 'Expansion Era (1961-1976)', value: 'expansion' },
-    { label: 'Free Agency Era (1977-1993)', value: 'free_agency' },
-    { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
-    { label: 'Modern Era (2006+)', value: 'modern' },
+    ...eraFilterOptions('baseball'),
     { label: 'Custom Era', value: 'custom' },
   ]),
   football: Object.freeze([
     { label: 'All Eras', value: 'all' },
-    { label: 'Pioneer Era (1920-1945)', value: 'pioneer' },
-    { label: 'Single-Platoon Era (1946-1959)', value: 'single_platoon' },
-    { label: 'Super Bowl Era (1960-1977)', value: 'super_bowl_era' },
-    { label: 'West Coast Era (1978-1993)', value: 'west_coast' },
-    { label: 'Salary Cap Era (1994-2010)', value: 'salary_cap_era' },
-    { label: 'Spread Offense Era (2011+)', value: 'spread_offense' },
+    ...eraFilterOptions('football'),
   ]),
 };
 
 /** Backwards-compatible alias — returns baseball era filters. */
 export const ERA_FILTERS = ERA_FILTERS_BY_SPORT.baseball;
 
-/** Year boundaries for pre-defined eras, keyed by sport. */
-export const ERA_YEAR_RANGES_BY_SPORT: Record<
-  SportKind,
-  Record<string, { start: number; end: number; label: string }>
-> = {
-  baseball: {
-    dead_ball: { start: 1871, end: 1919, label: 'Dead Ball Era' },
-    golden_age: { start: 1920, end: 1960, label: 'Golden Age' },
-    expansion: { start: 1961, end: 1976, label: 'Expansion Era' },
-    free_agency: { start: 1977, end: 1993, label: 'Free Agency Era' },
-    steroid_era: { start: 1994, end: 2005, label: 'Steroid Era' },
-    modern: { start: 2006, end: 9999, label: 'Modern Era' },
-  },
-  football: {
-    pioneer: { start: 1920, end: 1945, label: 'Pioneer Era' },
-    single_platoon: { start: 1946, end: 1959, label: 'Single-Platoon Era' },
-    super_bowl_era: { start: 1960, end: 1977, label: 'Super Bowl Era' },
-    west_coast: { start: 1978, end: 1993, label: 'West Coast Era' },
-    salary_cap_era: { start: 1994, end: 2010, label: 'Salary Cap Era' },
-    spread_offense: { start: 2011, end: 9999, label: 'Spread Offense Era' },
-  },
-};
+/**
+ * Year boundaries for pre-defined eras, keyed by sport. Re-exported from the
+ * canonical `@legacy-sports/utils` table that the backend draft-pool filter
+ * also reads, so every surface shows the years actually enforced (LS-10689).
+ */
+export { ERA_OPEN_END_YEAR, ERA_YEAR_RANGES_BY_SPORT };
 
 /** Backwards-compatible alias — returns baseball era year ranges. */
 export const ERA_YEAR_RANGES = ERA_YEAR_RANGES_BY_SPORT.baseball;

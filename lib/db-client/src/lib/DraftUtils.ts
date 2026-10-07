@@ -1,4 +1,5 @@
 import { and, eq, sql, SQL } from 'drizzle-orm';
+import { ERA_YEAR_RANGES_BY_SPORT } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 // Import from the defining modules, never the package barrel: '../index'
@@ -310,16 +311,15 @@ export async function validateDraftRequest(
 // League-level player eligibility filtering
 // ---------------------------------------------------------------------------
 
-// Era ranges shared between filtering logic — exported so callers can resolve
-// a named era to a [start, end] year pair without redeclaring the constant.
-export const ERA_RANGES: Record<string, [number, number]> = {
-  dead_ball: [1871, 1919],
-  golden_age: [1920, 1960],
-  expansion: [1961, 1976],
-  free_agency: [1977, 1993],
-  steroid_era: [1994, 2005],
-  modern: [2006, 9999],
-};
+// Resolves a preset baseball era to its inclusive [start, end] year pair from
+// the canonical `ERA_YEAR_RANGES_BY_SPORT` table that every UI surface also
+// displays, so the enforced pool matches the advertised years (LS-10689).
+// Looked up per call rather than copied at module load, so importing
+// db-client never depends on `@legacy-sports/utils` being fully evaluated.
+export function getPresetEraRange(era: string): [number, number] | null {
+  const range = ERA_YEAR_RANGES_BY_SPORT.baseball[era];
+  return range ? [range.start, range.end] : null;
+}
 
 export interface LeagueEligibilitySettings {
   /**
@@ -384,7 +384,7 @@ export function resolveEraRange(
     const end = settings.customEraEndYear ?? null;
     return start != null && end != null ? [start, end] : null;
   }
-  return ERA_RANGES[eraFilter] ?? null;
+  return getPresetEraRange(eraFilter);
 }
 
 /** Humanise an era key ('steroid_era' → 'Steroid Era') for error messages. */
@@ -776,7 +776,7 @@ export async function filterPlayerIdsByLeagueEligibility(
       eraStart = settings.customEraStartYear ?? null;
       eraEnd = settings.customEraEndYear ?? null;
     } else {
-      const range = ERA_RANGES[eraFilter];
+      const range = getPresetEraRange(eraFilter);
       if (range) {
         [eraStart, eraEnd] = range;
       }

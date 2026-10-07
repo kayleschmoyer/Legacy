@@ -4,6 +4,11 @@
 // baseball league create) screens so the option sets for era filters, FAAB
 // budgets, and waiver systems stay in lockstep across platforms (LS-5174).
 
+import {
+  CUSTOM_ERA_MIN_YEAR_BY_SPORT,
+  formatEraYearRange,
+} from '../../../config/sports';
+
 /** Two-sport discriminator accepted by the premium league-create controls. */
 export type LeagueSport = 'baseball' | 'football';
 
@@ -18,78 +23,57 @@ export interface EraOption {
   premium: boolean;
 }
 
-/** Historical era presets per sport. `all` and the most-recent era are free. */
-export const ERAS_BY_SPORT: Record<LeagueSport, ReadonlyArray<EraOption>> = {
+/** Wizard-facing display name + premium gating for each era id. */
+const ERA_PRESETS_BY_SPORT: Record<
+  LeagueSport,
+  ReadonlyArray<Omit<EraOption, 'years'>>
+> = {
   baseball: [
-    { id: 'all', name: 'All Eras', years: '1871 – Now', premium: false },
-    {
-      id: 'dead_ball',
-      name: 'Dead Ball (pre-1920)',
-      years: '1901 – 1919',
-      premium: true,
-    },
-    {
-      id: 'golden_age',
-      name: 'Golden Age',
-      years: '1920 – 1945',
-      premium: true,
-    },
-    { id: 'expansion', name: 'Expansion', years: '1946 – 1968', premium: true },
-    {
-      id: 'free_agency',
-      name: 'Free Agency',
-      years: '1969 – 1993',
-      premium: true,
-    },
-    {
-      id: 'steroid_era',
-      name: 'Steroid Era',
-      years: '1994 – 2005',
-      premium: true,
-    },
-    {
-      id: 'modern',
-      name: 'Modern (2006+)',
-      years: '2006 – Now',
-      premium: false,
-    },
-    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
+    { id: 'all', name: 'All Eras', premium: false },
+    { id: 'dead_ball', name: 'Dead Ball (pre-1920)', premium: true },
+    { id: 'golden_age', name: 'Golden Age', premium: true },
+    { id: 'expansion', name: 'Expansion', premium: true },
+    { id: 'free_agency', name: 'Free Agency', premium: true },
+    { id: 'steroid_era', name: 'Steroid Era', premium: true },
+    { id: 'modern', name: 'Modern (2006+)', premium: false },
+    { id: 'custom', name: 'Custom Era', premium: true },
   ],
   football: [
-    { id: 'all', name: 'All Eras', years: '1920 – Now', premium: false },
-    { id: 'pioneer', name: 'Pioneer', years: '1920 – 1945', premium: true },
-    {
-      id: 'single_platoon',
-      name: 'Single-Platoon',
-      years: '1946 – 1959',
-      premium: true,
-    },
-    {
-      id: 'super_bowl_era',
-      name: 'Super Bowl Era',
-      years: '1960 – 1977',
-      premium: true,
-    },
-    {
-      id: 'west_coast',
-      name: 'West Coast',
-      years: '1978 – 1993',
-      premium: true,
-    },
-    {
-      id: 'salary_cap_era',
-      name: 'Salary Cap',
-      years: '1994 – 2010',
-      premium: true,
-    },
-    {
-      id: 'spread_offense',
-      name: 'Spread Offense',
-      years: '2011 – Now',
-      premium: false,
-    },
-    { id: 'custom', name: 'Custom Era', years: 'Pick years', premium: true },
+    { id: 'all', name: 'All Eras', premium: false },
+    { id: 'pioneer', name: 'Pioneer', premium: true },
+    { id: 'single_platoon', name: 'Single-Platoon', premium: true },
+    { id: 'super_bowl_era', name: 'Super Bowl Era', premium: true },
+    { id: 'west_coast', name: 'West Coast', premium: true },
+    { id: 'salary_cap_era', name: 'Salary Cap', premium: true },
+    { id: 'spread_offense', name: 'Spread Offense', premium: false },
+    { id: 'custom', name: 'Custom Era', premium: true },
   ],
+};
+
+/** Years caption for an era: the canonical range, or a pseudo-era caption. */
+function eraYears(sport: LeagueSport, id: string): string {
+  if (id === 'all') return `${CUSTOM_ERA_MIN_YEAR_BY_SPORT[sport]} – Now`;
+  if (id === 'custom') return 'Pick years';
+  const years = formatEraYearRange(sport, id);
+  if (!years) throw new Error(`No year range for ${sport} era "${id}"`);
+  return years;
+}
+
+/**
+ * Historical era presets per sport. `all` and the most-recent era are free.
+ * Year captions are derived from `ERA_YEAR_RANGES_BY_SPORT` — the same table
+ * the backend draft-pool filter enforces — so the wizard can never advertise
+ * a range the league does not actually draft from (LS-10689).
+ */
+export const ERAS_BY_SPORT: Record<LeagueSport, ReadonlyArray<EraOption>> = {
+  baseball: ERA_PRESETS_BY_SPORT.baseball.map((era) => ({
+    ...era,
+    years: eraYears('baseball', era.id),
+  })),
+  football: ERA_PRESETS_BY_SPORT.football.map((era) => ({
+    ...era,
+    years: eraYears('football', era.id),
+  })),
 };
 
 /** Era ids that are available without a premium subscription, per sport. */

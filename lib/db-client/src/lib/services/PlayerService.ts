@@ -11,7 +11,10 @@ import {
   SQL,
 } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
-import { filterPlayerIdsByLeagueEligibility } from '../DraftUtils';
+import {
+  filterPlayerIdsByLeagueEligibility,
+  getPresetEraRange,
+} from '../DraftUtils';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicDb, PublicSchema } from '../client/PublicDbClient';
 import { Player, PlayerPosition } from '../../types/DatabaseTypes';
@@ -110,12 +113,8 @@ export interface PlayerFilters {
    * Restrict the pool to players whose careers overlapped with the given
    * baseball era. 'all' (default) imposes no restriction.
    *
-   * dead_ball   : seasons before 1920
-   * golden_age  : 1920-1960
-   * expansion   : 1961-1976
-   * free_agency : 1977-1993
-   * steroid_era : 1994-2005
-   * modern      : 2006+
+   * Preset eras resolve via `getPresetEraRange` (canonical table:
+   * `ERA_YEAR_RANGES_BY_SPORT` in `@legacy-sports/utils`).
    * custom      : uses customEraStartYear / customEraEndYear
    * all         : no restriction
    */
@@ -1185,16 +1184,6 @@ export class PlayerService {
     const eraFilter = filters?.baseballEraFilter;
     if (!eraFilter || eraFilter === 'all') return null;
 
-    // Map preset era names to year ranges
-    const eraRanges: Record<string, [number, number]> = {
-      dead_ball: [1871, 1919],
-      golden_age: [1920, 1960],
-      expansion: [1961, 1976],
-      free_agency: [1977, 1993],
-      steroid_era: [1994, 2005],
-      modern: [2006, 9999],
-    };
-
     let startYear: number;
     let endYear: number;
 
@@ -1204,7 +1193,7 @@ export class PlayerService {
       startYear = filters.customEraStartYear;
       endYear = filters.customEraEndYear;
     } else {
-      const range = eraRanges[eraFilter];
+      const range = getPresetEraRange(eraFilter);
       if (!range) return null;
       [startYear, endYear] = range;
     }

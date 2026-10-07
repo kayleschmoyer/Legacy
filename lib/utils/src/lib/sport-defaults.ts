@@ -101,3 +101,46 @@ export const GAMES_PER_MATCHUP_BY_SPORT: Record<
   baseball: { min: 1, max: 162, default: 5 },
   football: { min: 1, max: 17, default: 5 },
 };
+
+/** Upper-bound sentinel for an open-ended ("to present") era range. */
+export const ERA_OPEN_END_YEAR = 9999;
+
+/** Inclusive year boundaries and display name for a pre-defined era. */
+export interface EraYearRange {
+  start: number;
+  end: number;
+  label: string;
+}
+
+/**
+ * Canonical year boundaries for every pre-defined era, keyed by sport then by
+ * `era_filter` enum value (LS-10689). The backend draft-pool filters
+ * (`lib/db-client` DraftUtils / PlayerService) and every UI surface that shows
+ * an era's years (create wizard, Commissioner Draft Settings, home summary)
+ * derive from this table — never hardcode an era's years elsewhere.
+ */
+export const ERA_YEAR_RANGES_BY_SPORT: Record<
+  SportKind,
+  Readonly<Record<string, EraYearRange>>
+> = {
+  baseball: {
+    dead_ball: { start: 1871, end: 1919, label: 'Dead Ball Era' },
+    golden_age: { start: 1920, end: 1960, label: 'Golden Age' },
+    expansion: { start: 1961, end: 1976, label: 'Expansion Era' },
+    free_agency: { start: 1977, end: 1993, label: 'Free Agency Era' },
+    steroid_era: { start: 1994, end: 2005, label: 'Steroid Era' },
+    modern: { start: 2006, end: ERA_OPEN_END_YEAR, label: 'Modern Era' },
+  },
+  football: {
+    pioneer: { start: 1920, end: 1945, label: 'Pioneer Era' },
+    single_platoon: { start: 1946, end: 1959, label: 'Single-Platoon Era' },
+    super_bowl_era: { start: 1960, end: 1977, label: 'Super Bowl Era' },
+    west_coast: { start: 1978, end: 1993, label: 'West Coast Era' },
+    salary_cap_era: { start: 1994, end: 2010, label: 'Salary Cap Era' },
+    spread_offense: {
+      start: 2011,
+      end: ERA_OPEN_END_YEAR,
+      label: 'Spread Offense Era',
+    },
+  },
+};

@@ -21,7 +21,7 @@ function era(
 describe('formatEraDescriptor', () => {
   it('maps known baseball eras to a labelled year range', () => {
     expect(formatEraDescriptor(era('dead_ball'))).toBe(
-      'Dead Ball era · 1901–1919',
+      'Dead Ball era · 1871–1919',
     );
     expect(formatEraDescriptor(era('steroid_era'))).toBe(
       'Steroid Era · 1994–2005',
@@ -52,7 +52,7 @@ describe('formatEraDescriptor', () => {
 
 describe('formatEraYears', () => {
   it('extracts just the year-range suffix from a known era', () => {
-    expect(formatEraYears(era('dead_ball'))).toBe('1901–1919');
+    expect(formatEraYears(era('dead_ball'))).toBe('1871–1919');
     expect(formatEraYears(era('modern'))).toBe('2006–Now');
   });
 

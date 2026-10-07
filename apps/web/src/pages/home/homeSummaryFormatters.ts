@@ -1,22 +1,42 @@
 import type { UserLeagueSummaryFragment } from '@legacy-sports/graphql';
+import {
+  formatEraYearRange,
+  type SportKind,
+} from '@legacy-sports/shared-components';
 
-/** Maps an era-filter enum value to a "<Name> · <year range>" label. */
-export const ERA_LABELS: Record<string, string> = {
-  // Baseball
-  dead_ball: 'Dead Ball era · 1901–1919',
-  golden_age: 'Golden Age · 1920–1945',
-  expansion: 'Expansion · 1946–1968',
-  free_agency: 'Free Agency · 1969–1993',
-  steroid_era: 'Steroid Era · 1994–2005',
-  modern: 'Modern · 2006–Now',
-  // Football
-  pioneer: 'Pioneer · 1920–1945',
-  single_platoon: 'Single-Platoon · 1946–1959',
-  super_bowl_era: 'Super Bowl Era · 1960–1977',
-  west_coast: 'West Coast · 1978–1993',
-  salary_cap_era: 'Salary Cap · 1994–2010',
-  spread_offense: 'Spread Offense · 2011–Now',
+/** Short display name for each pre-defined era, keyed by sport then era id. */
+const ERA_NAMES_BY_SPORT: Record<SportKind, Record<string, string>> = {
+  baseball: {
+    dead_ball: 'Dead Ball era',
+    golden_age: 'Golden Age',
+    expansion: 'Expansion',
+    free_agency: 'Free Agency',
+    steroid_era: 'Steroid Era',
+    modern: 'Modern',
+  },
+  football: {
+    pioneer: 'Pioneer',
+    single_platoon: 'Single-Platoon',
+    super_bowl_era: 'Super Bowl Era',
+    west_coast: 'West Coast',
+    salary_cap_era: 'Salary Cap',
+    spread_offense: 'Spread Offense',
+  },
 };
+
+/**
+ * Maps an era-filter enum value to a "<Name> · <year range>" label. Years come
+ * from the canonical `ERA_YEAR_RANGES_BY_SPORT` table the backend enforces, so
+ * the summary cannot drift from the actual draft pool (LS-10689).
+ */
+export const ERA_LABELS: Record<string, string> = Object.fromEntries(
+  (Object.keys(ERA_NAMES_BY_SPORT) as SportKind[]).flatMap((sport) =>
+    Object.entries(ERA_NAMES_BY_SPORT[sport]).map(([era, name]) => [
+      era,
+      `${name} · ${formatEraYearRange(sport, era, '–') ?? ''}`,
+    ]),
+  ),
+);
 
 type EraFields = Pick<
   UserLeagueSummaryFragment,
@@ -24,7 +44,7 @@ type EraFields = Pick<
 >;
 
 /**
- * Full era descriptor for the hero sub-line, e.g. "Dead Ball era · 1901–1919"
+ * Full era descriptor for the hero sub-line, e.g. "Golden Age · 1920–1960"
  * or "1994–2004" for a custom range. Returns null when no meaningful era is
  * set (`all`, missing, or an unknown enum value).
  */
@@ -41,7 +61,7 @@ export function formatEraDescriptor(summary: EraFields): string | null {
 
 /**
  * Just the year-range portion for the denser league-row subtitle, e.g.
- * "1901–1919". Returns null when no meaningful era is set.
+ * "1920–1960". Returns null when no meaningful era is set.
  */
 export function formatEraYears(summary: EraFields): string | null {
   const era = summary.eraFilter;
@@ -52,7 +72,7 @@ export function formatEraYears(summary: EraFields): string | null {
     return `${summary.customEraStartYear}–${summary.customEraEndYear}`;
   }
   // Pull the year-range suffix out of the era label
-  // ("Dead Ball era · 1901–1919" → "1901–1919").
+  // ("Golden Age · 1920–1960" → "1920–1960").
   const label = ERA_LABELS[era];
   if (!label) return null;
   const idx = label.lastIndexOf('·');
