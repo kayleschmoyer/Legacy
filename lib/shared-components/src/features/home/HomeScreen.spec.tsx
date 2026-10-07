@@ -338,8 +338,88 @@ describe('HomeScreen', () => {
     });
   });
 
-  describe('keyboard accessibility (LS-8916)', () => {
-    it('fires onPress on the hero league card when Enter or Space is pressed', () => {
+  describe('keyboard accessibility (LS-8916, LS-10713)', () => {
+    // LS-10713: the league cards must never be a `role=button` that wraps
+    // other interactive controls — screen readers flatten a button's children
+    // into its name, and the inner actions double up Tab stops. Every action
+    // is its own sibling control instead.
+    const INTERACTIVE =
+      '[data-accessibility-role="button"], [data-accessibility-role="link"], [tabindex]';
+
+    function expectNoNestedInteractives(container: HTMLElement) {
+      const nested = Array.from(
+        container.querySelectorAll<HTMLElement>(INTERACTIVE),
+      ).filter((el) => el.querySelector(INTERACTIVE) != null);
+      expect(
+        nested.map(
+          (el) =>
+            el.getAttribute('data-accessibility-label') ??
+            el.getAttribute('data-testid'),
+        ),
+      ).toEqual([]);
+    }
+
+    function focusableLabels(container: HTMLElement): (string | null)[] {
+      return Array.from(
+        container.querySelectorAll<HTMLElement>('[tabindex="0"]'),
+      ).map((el) => el.getAttribute('data-accessibility-label'));
+    }
+
+    const preDraftRow: HomeLeagueSummary = {
+      leagueId: 77,
+      leagueName: 'QA New League',
+      sport: 'baseball',
+      leaguePhase: 'pre-draft',
+      draftScheduledAt: '2026-11-01T18:00:00.000Z',
+    };
+
+    it('renders no interactive control nested inside another on the baseball dashboard', () => {
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, preDraftRow]}
+          onSetLineup={jest.fn()}
+          onMockDraft={jest.fn()}
+        />,
+      );
+      expectNoNestedInteractives(getByTestId('home-content'));
+    });
+
+    it('renders no interactive control nested inside another on the football playboard hero', () => {
+      const footballLeague: HomeLeagueSummary = {
+        leagueId: 51,
+        leagueName: 'Steel Curtain Era',
+        sport: 'football',
+        leaguePhase: 'active',
+      };
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[footballLeague]}
+          onSetLineup={jest.fn()}
+        />,
+      );
+      const hero = getByTestId('home-playboard-hero');
+      expect(hero.getAttribute('data-accessibility-role')).toBeNull();
+      expect(hero.getAttribute('tabindex')).toBeNull();
+      expectNoNestedInteractives(hero);
+    });
+
+    it('exposes each hero action as exactly one distinct Tab stop', () => {
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onSetLineup={jest.fn()}
+        />,
+      );
+      const hero = getByTestId('home-hero-card');
+      expect(hero.getAttribute('data-accessibility-role')).toBeNull();
+      expect(hero.getAttribute('tabindex')).toBeNull();
+      expect(focusableLabels(hero)).toEqual(['View League', 'Set Lineup']);
+    });
+
+    it('still opens the league when the hero card body is clicked', () => {
       const onViewLeague = jest.fn();
       const { getByTestId } = render(
         <HomeScreen
@@ -348,15 +428,27 @@ describe('HomeScreen', () => {
           onViewLeague={onViewLeague}
         />,
       );
-      const hero = getByTestId('home-hero-card');
-      fireEvent.keyDown(hero, { key: 'Enter' });
-      expect(onViewLeague).toHaveBeenCalledWith(league);
-      onViewLeague.mockClear();
-      fireEvent.keyDown(hero, { key: ' ' });
+      fireEvent.click(getByTestId('home-hero-card'));
       expect(onViewLeague).toHaveBeenCalledWith(league);
     });
 
-    it('fires onPress on the playboard hero card when Enter or Space is pressed', () => {
+    it('opens the league from the hero View League button via Enter or Space', () => {
+      const onViewLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onViewLeague={onViewLeague}
+        />,
+      );
+      const viewLeague = getByTestId('home-hero-view-league');
+      fireEvent.keyDown(viewLeague, { key: 'Enter' });
+      expect(onViewLeague).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(viewLeague, { key: ' ' });
+      expect(onViewLeague).toHaveBeenCalledTimes(2);
+    });
+
+    it('still opens the league when the playboard hero body is clicked', () => {
       const footballLeague: HomeLeagueSummary = {
         leagueId: 51,
         leagueName: 'Steel Curtain Era',
@@ -371,15 +463,28 @@ describe('HomeScreen', () => {
           onViewLeague={onViewLeague}
         />,
       );
-      const hero = getByTestId('home-playboard-hero');
-      fireEvent.keyDown(hero, { key: 'Enter' });
-      expect(onViewLeague).toHaveBeenCalledWith(footballLeague);
-      onViewLeague.mockClear();
-      fireEvent.keyDown(hero, { key: ' ' });
+      fireEvent.click(getByTestId('home-playboard-hero'));
       expect(onViewLeague).toHaveBeenCalledWith(footballLeague);
     });
 
-    it('fires onPress on a secondary LeagueListRow when Enter or Space is pressed', () => {
+    it('gives a LeagueListRow separate open-league and mock-draft Tab stops', () => {
+      const onPress = jest.fn();
+      const onMockDraft = jest.fn();
+      const { container } = render(
+        <LeagueListRow
+          summary={preDraftRow}
+          onPress={onPress}
+          onMockDraft={onMockDraft}
+        />,
+      );
+      expectNoNestedInteractives(container);
+      expect(focusableLabels(container)).toEqual([
+        'Open QA New League',
+        'Run a mock draft for QA New League',
+      ]);
+    });
+
+    it('fires onPress on a LeagueListRow open control when Enter or Space is pressed', () => {
       const summary: HomeLeagueSummary = {
         leagueId: 43,
         leagueName: 'Second League',
@@ -387,35 +492,38 @@ describe('HomeScreen', () => {
         leaguePhase: 'active',
       };
       const onPress = jest.fn();
-      const { getByText } = render(
+      const { container } = render(
         <LeagueListRow summary={summary} onPress={onPress} />,
       );
-      const row = getByText('Second League').closest(
-        '[data-accessibility-role="button"]',
+      const open = container.querySelector(
+        '[data-accessibility-label="Open Second League"]',
       ) as HTMLElement;
-      expect(row).toBeTruthy();
-      fireEvent.keyDown(row, { key: 'Enter' });
+      expect(open).toBeTruthy();
+      fireEvent.keyDown(open, { key: 'Enter' });
       expect(onPress).toHaveBeenCalledTimes(1);
-      fireEvent.keyDown(row, { key: ' ' });
+      fireEvent.keyDown(open, { key: ' ' });
+      expect(onPress).toHaveBeenCalledTimes(2);
+      fireEvent.keyDown(open, { key: 'Tab' });
       expect(onPress).toHaveBeenCalledTimes(2);
     });
 
-    it('does not fire onPress on unrelated keys', () => {
-      const summary: HomeLeagueSummary = {
-        leagueId: 43,
-        leagueName: 'Second League',
-        sport: 'baseball',
-        leaguePhase: 'active',
-      };
+    it('opens the league once when the row body is clicked, and not when Mock Draft is', () => {
       const onPress = jest.fn();
+      const onMockDraft = jest.fn();
       const { getByText } = render(
-        <LeagueListRow summary={summary} onPress={onPress} />,
+        <LeagueListRow
+          summary={preDraftRow}
+          onPress={onPress}
+          onMockDraft={onMockDraft}
+        />,
       );
-      const row = getByText('Second League').closest(
-        '[data-accessibility-role="button"]',
-      ) as HTMLElement;
-      fireEvent.keyDown(row, { key: 'Tab' });
-      expect(onPress).not.toHaveBeenCalled();
+      fireEvent.click(getByText('Draft scheduled'));
+      expect(onPress).toHaveBeenCalledTimes(1);
+      fireEvent.click(getByText('QA New League'));
+      expect(onPress).toHaveBeenCalledTimes(2);
+      fireEvent.click(getByText('Mock Draft'));
+      expect(onMockDraft).toHaveBeenCalledTimes(1);
+      expect(onPress).toHaveBeenCalledTimes(2);
     });
   });
 

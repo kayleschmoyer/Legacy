@@ -834,16 +834,12 @@ function LeagueHeroCard({
   return (
     <XStack
       testID="home-hero-card"
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
+      // Click-anywhere for pointer users only — deliberately NOT a
+      // `role=button`/Tab stop, since it contains its own action buttons and
+      // a nested-interactive button has its children flattened into its name
+      // by screen readers (LS-10713). Keyboard/AT users open the league via
+      // the "View League" button below.
       onPress={onPress}
-      tabIndex={0}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPress();
-        }
-      }}
       cursor="pointer"
       borderRadius={6}
       borderWidth={2}
@@ -853,12 +849,6 @@ function LeagueHeroCard({
       shadowRadius={38}
       hoverStyle={{
         y: -2,
-        shadowColor: OVERLAY_BLACK_50,
-        shadowOffset: { width: 0, height: 22 },
-        shadowRadius: 44,
-      }}
-      focusStyle={{
-        borderColor: BRAND_GOLD_LIGHT,
         shadowColor: OVERLAY_BLACK_50,
         shadowOffset: { width: 0, height: 22 },
         shadowRadius: 44,
@@ -1535,19 +1525,13 @@ function PlayboardHeroCard({
   return (
     <YStack
       testID="home-playboard-hero"
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
+      // Pointer-only click-anywhere; not a `role=button`/Tab stop because it
+      // wraps its own action buttons — "View League" is the keyboard/AT path
+      // (LS-10713, same as `LeagueHeroCard`).
       onPress={onPress}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPress();
-        }
-      }}
       onLayout={(e: LayoutChangeEvent) =>
         setBoardWidth(e.nativeEvent.layout.width)
       }
-      tabIndex={0}
       cursor="pointer"
       position="relative"
       overflow="hidden"
@@ -1565,10 +1549,6 @@ function PlayboardHeroCard({
       hoverStyle={{
         borderColor: withAlpha(playboardTokens.textPrimary, 0.3),
         y: -2,
-      }}
-      focusStyle={{
-        borderColor: playboardTokens.liveMint,
-        borderWidth: 2,
       }}
     >
       {/* Dashed chalk-board inset border — decorative, matches .playboard::before. */}
@@ -1793,16 +1773,11 @@ export function LeagueListRow({
 
   return (
     <XStack
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
+      // Pointer-only click-anywhere. The row is not itself a `role=button`:
+      // it can hold the Mock Draft control, and a button wrapping a button
+      // has its children flattened by screen readers (LS-10713). The league
+      // name below is the row's keyboard/AT "open league" control instead.
       onPress={onPress}
-      tabIndex={0}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPress();
-        }
-      }}
       cursor="pointer"
       backgroundColor="$glassSurfaceLight"
       borderWidth={1}
@@ -1823,21 +1798,40 @@ export function LeagueListRow({
         backgroundColor: '$glassSurface',
         borderColor: '$glassBorderHover',
       }}
-      focusStyle={{
-        backgroundColor: '$glassSurface',
-        borderColor: '$glassBorderHover',
-      }}
     >
       <YStack flex={1} gap="$1" minWidth={0}>
-        <Text
-          fontFamily={DISPLAY_FONT}
-          fontWeight="700"
-          fontSize={18}
-          color="$color"
-          numberOfLines={1}
+        <YStack
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
+          onPress={(e: GestureResponderEvent) => {
+            // The row is pressable too — don't open the league twice.
+            e.stopPropagation?.();
+            onPress();
+          }}
+          tabIndex={0}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onPress();
+            }
+          }}
+          alignSelf="flex-start"
+          maxWidth="100%"
+          borderBottomWidth={1}
+          borderBottomColor="transparent"
+          focusStyle={{ borderBottomColor: '$borderColorFocus' }}
         >
-          {summary.leagueName ?? 'League'}
-        </Text>
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="700"
+            fontSize={18}
+            color="$color"
+            numberOfLines={1}
+          >
+            {summary.leagueName ?? 'League'}
+          </Text>
+        </YStack>
         {subParts.length > 0 ? (
           <Text
             fontFamily={BODY_FONT}
