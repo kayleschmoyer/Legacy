@@ -930,7 +930,8 @@ describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
   // fixed-shape element — only its copy varies by hasLeagues/loading — so
   // these assert the side panel (the structural piece that used to
   // disappear in the compact variant) is always present, in every
-  // loading/hasLeagues combination.
+  // loading/hasLeagues combination. Asserted by testID rather than copy since
+  // the panel's copy itself varies by hasLeagues (LS-10666).
   it('renders the same hero shape while the leagues query is loading', () => {
     render(
       <NFLHome
@@ -942,7 +943,7 @@ describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
     );
 
     expect(screen.getByTestId('football-hero')).toBeInTheDocument();
-    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByTestId('nfl-home-getting-started')).toBeInTheDocument();
     expect(screen.getByText('Quick Wins')).toBeInTheDocument();
   });
 
@@ -950,7 +951,7 @@ describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
 
     expect(screen.getByTestId('football-hero')).toBeInTheDocument();
-    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByTestId('nfl-home-getting-started')).toBeInTheDocument();
     expect(screen.getByText('Quick Wins')).toBeInTheDocument();
   });
 
@@ -964,7 +965,7 @@ describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
     );
 
     expect(screen.getByTestId('football-hero')).toBeInTheDocument();
-    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByTestId('nfl-home-getting-started')).toBeInTheDocument();
     expect(screen.getByText('Quick Wins')).toBeInTheDocument();
   });
 });
@@ -1340,5 +1341,75 @@ describe('NFLHome — "All Sports" switcher option (LS-6286 / FBH-032)', () => {
     );
     expect(screen.getByTestId('sport-switcher-baseball')).toBeInTheDocument();
     expect(screen.getByTestId('sport-switcher-all')).toBeInTheDocument();
+  });
+});
+
+describe('NFLHome — getting-started panel copy (LS-10666)', () => {
+  it('hides the onboarding copy from a manager with active leagues', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const panel = screen.getByTestId('nfl-home-getting-started');
+    expect(screen.queryByText('Build your first roster')).toBeNull();
+    expect(screen.queryByText(/Create or join a league/)).toBeNull();
+    expect(
+      within(panel).getByText('Your week at a glance'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the onboarding copy to a manager with no leagues', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    const panel = screen.getByTestId('nfl-home-getting-started');
+    expect(within(panel).getByText('Getting Started')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('Build your first roster'),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Create or join a league/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the onboarding copy when every league is archived', () => {
+    render(
+      <NFLHome
+        leagues={[FROZEN_LEAGUE]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(screen.getByText('Build your first roster')).toBeInTheDocument();
+  });
+
+  it('keeps the panel mounted but hidden while leagues are loading', () => {
+    // Same fixed shape as the loaded state (LS-6277 / FBH-023), so the hero
+    // height doesn't shift, but no copy is shown until we know which applies.
+    const { rerender } = render(
+      <NFLHome
+        leagues={[]}
+        loading
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const loadingPanel = screen.getByTestId('nfl-home-getting-started');
+    expect(loadingPanel).toHaveAttribute('aria-hidden', 'true');
+    expect(loadingPanel).toHaveStyle({ opacity: 0 });
+
+    rerender(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const loadedPanel = screen.getByTestId('nfl-home-getting-started');
+    expect(loadedPanel).not.toHaveAttribute('aria-hidden');
+    expect(
+      within(loadedPanel).getByText('Your week at a glance'),
+    ).toBeVisible();
   });
 });

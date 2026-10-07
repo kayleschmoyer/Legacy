@@ -566,6 +566,24 @@ function NFLHome({
       .includes(debouncedSearch.trim().toLowerCase()),
   );
 
+  // The side panel keeps the same shape for every state (LS-6277 / FBH-023) —
+  // only its copy varies. Managers with leagues must never see the
+  // "Build your first roster" onboarding copy (LS-10666), and while the leagues
+  // query is still in flight we don't yet know which copy applies, so the
+  // text keeps its space but stays invisible rather than flashing the wrong one.
+  const gettingStartedCopy = hasLeagues
+    ? {
+        eyebrow: 'Game day',
+        heading: 'Your week at a glance',
+        body: "Your leagues are live — check lineups, waivers, and this week's matchups below so you're set before every kickoff.",
+      }
+    : {
+        eyebrow: 'Getting Started',
+        heading: 'Build your first roster',
+        body: 'Create or join a league to start tracking your season — weekly matchups, roster stats, and draft countdowns will appear here.',
+      };
+  const hideGettingStartedCopy = loading && !hasLeagues;
+
   // Static, football-specific "getting started" copy ported from the canonical
   // (now-retired) web FootballLandingPage side panel. Varies only by whether the
   // manager already has leagues — no user/query data is needed (LS-7819).
@@ -730,6 +748,9 @@ function NFLHome({
               borderWidth={1}
               borderColor="$glassBorder"
               gap="$4"
+              testID="nfl-home-getting-started"
+              opacity={hideGettingStartedCopy ? 0 : 1}
+              aria-hidden={hideGettingStartedCopy || undefined}
             >
               <YStack gap="$1">
                 <Paragraph
@@ -738,16 +759,15 @@ function NFLHome({
                   textTransform="uppercase"
                   letterSpacing={1}
                 >
-                  Getting Started
+                  {gettingStartedCopy.eyebrow}
                 </Paragraph>
                 <H3 fontSize="$7" color="$color">
-                  Build your first roster
+                  {gettingStartedCopy.heading}
                 </H3>
               </YStack>
               <Separator backgroundColor="$glassBorder" />
               <Paragraph fontSize="$3" color="$glassTextSubdued">
-                Create or join a league to start tracking your season — weekly
-                matchups, roster stats, and draft countdowns will appear here.
+                {gettingStartedCopy.body}
               </Paragraph>
             </YStack>
 
