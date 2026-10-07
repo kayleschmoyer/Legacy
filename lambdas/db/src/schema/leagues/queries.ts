@@ -21,6 +21,7 @@ import {
   ilike,
   inArray,
   ne,
+  or,
   sql,
   SQL,
 } from 'drizzle-orm';
@@ -33,6 +34,7 @@ import {
   Team,
   TeamMember,
 } from './types';
+import { getUserMatchupSide } from './user-matchup-side';
 import { builder } from '../builder';
 import { verifyLeagueReadAccess } from '../authorization';
 import {
@@ -2020,11 +2022,31 @@ builder.queryField('getUserLeagueSummaries', (t) =>
       const draftLeagueIds = leagues
         .filter((l) => l.draftStatus !== 'completed')
         .map((l) => l.id);
-      const matchupIdsToFetch = leagues.flatMap((l) =>
-        l.leaguePhase === 'active' && l.currentMatchup != null
-          ? [l.currentMatchup]
-          : [],
-      );
+      // The user's own matchup for each active league's current week (LS-10776).
+      // `leagues.current_matchup` is one league-level pointer, not per team, so
+      // it is only used to identify the week when `current_week` is unset —
+      // never as the user's matchup itself. Mirrors the league Matchup tab,
+      // which picks the week's matchup containing the user's team (LS-5902).
+      const userMatchupConditions = leagues.flatMap((l) => {
+        if (l.leaguePhase !== 'active' || l.userTeamId == null) return [];
+        const weekCondition =
+          l.currentWeek != null
+            ? eq(PublicSchema.matchups.weekNumber, l.currentWeek)
+            : l.currentMatchup != null
+              ? eq(PublicSchema.matchups.id, l.currentMatchup)
+              : null;
+        if (weekCondition == null) return [];
+        return [
+          and(
+            eq(PublicSchema.matchups.leagueId, l.id),
+            weekCondition,
+            or(
+              eq(PublicSchema.matchups.team1Id, l.userTeamId),
+              eq(PublicSchema.matchups.team2Id, l.userTeamId),
+            ),
+          ),
+        ];
+      });
 
       const [draftRows, matchupRows] = await Promise.all([
         draftLeagueIds.length > 0
@@ -2033,16 +2055,21 @@ builder.queryField('getUserLeagueSummaries', (t) =>
               .from(PublicSchema.drafts)
               .where(inArray(PublicSchema.drafts.leagueId, draftLeagueIds))
           : Promise.resolve([]),
-        matchupIdsToFetch.length > 0
+        userMatchupConditions.length > 0
           ? context.db
               .select()
               .from(PublicSchema.matchups)
-              .where(inArray(PublicSchema.matchups.id, matchupIdsToFetch))
+              .where(or(...userMatchupConditions))
+              .orderBy(PublicSchema.matchups.id)
           : Promise.resolve([]),
       ]);
 
       const draftMap = new Map(draftRows.map((d) => [d.leagueId, d]));
-      const matchupMap = new Map(matchupRows.map((m) => [m.id, m]));
+      // One matchup per league; rows are id-ordered so the first wins.
+      const userMatchupMap = new Map<number, (typeof matchupRows)[number]>();
+      for (const m of matchupRows) {
+        if (!userMatchupMap.has(m.leagueId)) userMatchupMap.set(m.leagueId, m);
+      }
 
       // First pass: compute scores and collect all opponent team IDs
       type PartialSummary = {
@@ -2056,9 +2083,12 @@ builder.queryField('getUserLeagueSummaries', (t) =>
       };
 
       const partials: PartialSummary[] = leagues.map((league) => {
-        const matchupRow =
-          league.currentMatchup != null
-            ? (matchupMap.get(league.currentMatchup) ?? null)
+        const matchupRow = userMatchupMap.get(league.id) ?? null;
+        // No row (bye) or a row without the user's team ⇒ no matchup, which
+        // the dashboard renders as its bye state.
+        const side =
+          matchupRow && league.userTeamId != null
+            ? getUserMatchupSide(matchupRow, league.userTeamId)
             : null;
 
         let userScore: number | null = null;
@@ -2068,26 +2098,11 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         let matchupStatus: string | null = null;
         let matchupEndTime: string | null = null;
 
-        if (matchupRow && league.userTeamId != null) {
+        if (matchupRow && side) {
           matchupId = matchupRow.id;
           matchupStatus = matchupRow.status;
           matchupEndTime = matchupRow.endTime ?? null;
-          const isTeam1 = matchupRow.team1Id === league.userTeamId;
-          userScore = isTeam1
-            ? matchupRow.team1Score != null
-              ? parseFloat(matchupRow.team1Score)
-              : null
-            : matchupRow.team2Score != null
-              ? parseFloat(matchupRow.team2Score)
-              : null;
-          opponentScore = isTeam1
-            ? matchupRow.team2Score != null
-              ? parseFloat(matchupRow.team2Score)
-              : null
-            : matchupRow.team1Score != null
-              ? parseFloat(matchupRow.team1Score)
-              : null;
-          opponentTeamId = isTeam1 ? matchupRow.team2Id : matchupRow.team1Id;
+          ({ userScore, opponentScore, opponentTeamId } = side);
         }
 
         return {
