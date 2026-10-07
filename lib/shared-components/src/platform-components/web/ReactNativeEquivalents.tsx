@@ -303,6 +303,47 @@ function FlatList<ItemT>({
     }
   }, [onEndReached, onEndReachedThreshold]);
 
+  // The scroll listener above only fires when this container is itself the
+  // scroller. A FlatList laid out in normal document flow with no bounded
+  // height grows to fit its content, so the *page* scrolls instead and that
+  // listener never runs — the list silently stops after its first page
+  // (LS-10682). An end-of-content sentinel observed against the viewport
+  // fires onEndReached whichever ancestor does the scrolling. Re-observing
+  // when the item count changes re-checks a sentinel that is still on screen
+  // after a page lands.
+  const endSentinelRef = React.useRef<HTMLDivElement>(null);
+  // Latest handler via ref so inline `onEndReached` arrows don't rebuild the
+  // observer on every render.
+  const onEndReachedRef = React.useRef(onEndReached);
+  onEndReachedRef.current = onEndReached;
+  const hasOnEndReached = Boolean(onEndReached);
+  const itemCount = data?.length ?? 0;
+  React.useEffect(() => {
+    const sentinel = endSentinelRef.current;
+    if (
+      !hasOnEndReached ||
+      !sentinel ||
+      horizontal ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          onEndReachedRef.current?.({ distanceFromEnd: 0 });
+        }
+      },
+      {
+        rootMargin: `0px 0px ${Math.round(
+          (onEndReachedThreshold || 0.1) * window.innerHeight,
+        )}px 0px`,
+      },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasOnEndReached, onEndReachedThreshold, horizontal, itemCount]);
+
   const renderComponent = (
     Component:
       | React.ComponentType<unknown>
@@ -367,6 +408,9 @@ function FlatList<ItemT>({
             </div>
           ))}
         {renderComponent(ListFooterComponent)}
+        {onEndReached && !horizontal && (
+          <div ref={endSentinelRef} aria-hidden style={{ height: 1 }} />
+        )}
       </div>
     </div>
   );

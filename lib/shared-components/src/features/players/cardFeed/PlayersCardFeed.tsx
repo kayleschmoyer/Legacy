@@ -7,6 +7,7 @@ import { SortControl } from './SortControl';
 import { PlayerFeedCard } from './PlayerFeedCard';
 import { PremiumTeaserCard } from './PremiumTeaserCard';
 import { PlayerFeedSkeleton } from './PlayerFeedSkeleton';
+import { LoadMoreButton } from './LoadMoreButton';
 import { playersCardFeedTopPadding } from './cardFeedHelpers';
 import { EmptyCard, ErrorCard } from '../shell/StateCards';
 import { FONT_DISPLAY } from '../shell/tokens';
@@ -231,6 +232,14 @@ export function PlayersCardFeed({
                   <YStack alignItems="center" paddingVertical={16}>
                     <Spinner size="small" color="$orange9" />
                   </YStack>
+                ) : hasMore ? (
+                  // Explicit, keyboard-operable continuation (LS-10682) so the
+                  // next page never depends solely on scroll-driven
+                  // onEndReached firing.
+                  <LoadMoreButton
+                    onPress={onEndReached}
+                    testID={`${testID}-load-more`}
+                  />
                 ) : null
               }
             />

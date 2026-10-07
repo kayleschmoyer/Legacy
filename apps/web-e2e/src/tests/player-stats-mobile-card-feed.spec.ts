@@ -199,6 +199,72 @@ async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
   });
 }
 
+const FEED_PAGE_SIZE = 25;
+const FEED_TOTAL = 50;
+
+/** One synthetic career-batting edge for the paged card-feed fixture. */
+function pagedBattingEdge(n: number) {
+  const base = MOCK_BATTING_EDGES[0].node;
+  return {
+    __typename: 'CareerBattingEdge',
+    node: {
+      ...base,
+      playerId: 1000 + n,
+      player: {
+        ...base.player,
+        id: 1000 + n,
+        firstName: 'Feed',
+        lastName: `Player ${n}`,
+      },
+    },
+  };
+}
+
+/**
+ * Two-page `getCareerBattingStats` mock (LS-10682): the first request (no
+ * `after`) returns players 1–25 with `hasNextPage: true`, the follow-up
+ * (`after: 'cursor-25'`) returns 26–50 and ends the connection. Every other
+ * operation falls through to {@link mockPlayerStatsGraphQL}'s handlers.
+ */
+async function mockPagedCareerBattingStats(
+  page: import('@playwright/test').Page,
+) {
+  await mockPlayerStatsGraphQL(page);
+  await page.route(isGraphQLEndpoint, async (route) => {
+    if (extractOperationName(route).toLowerCase() !== 'getcareerbattingstats') {
+      await route.fallback();
+      return;
+    }
+    const body = route.request().postDataJSON() as {
+      variables?: { after?: string | null };
+    } | null;
+    const variables = body?.variables ?? {};
+    const start =
+      variables.after === `cursor-${FEED_PAGE_SIZE}` ? 1 + FEED_PAGE_SIZE : 1;
+    const end = Math.min(start + FEED_PAGE_SIZE - 1, FEED_TOTAL);
+    const edges = [];
+    for (let n = start; n <= end; n += 1) edges.push(pagedBattingEdge(n));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            totalCount: FEED_TOTAL,
+            edges,
+            pageInfo: {
+              ...MOCK_PAGE_INFO,
+              hasNextPage: end < FEED_TOTAL,
+              endCursor: `cursor-${end}`,
+            },
+          },
+        },
+      }),
+    });
+  });
+}
+
 test.describe('Player Stats Page — narrow-viewport card feed (LS-9075) @regression', () => {
   test('renders the card feed (not the table) at phone width', async ({
     page,
@@ -288,6 +354,43 @@ test.describe('Player Stats Page — narrow-viewport card feed (LS-9075) @regres
     await expect(
       page.getByTestId('players-stats-card-feed-mlb-search'),
     ).toHaveValue('Bonds');
+  });
+
+  test('scrolling to the bottom at phone width loads the next page of cards (LS-10682)', async ({
+    page,
+    playersPage,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 504 });
+    await mockPagedCareerBattingStats(page);
+    await playersPage.gotoStats();
+    await playersPage.stats.expectCardFeedVisible('mlb');
+    await playersPage.stats.expectPlayerVisible('Feed Player 25');
+
+    // Scroll the way a phone user does — wheel/touch over the list until the
+    // page bottom — rather than calling scrollIntoView on the list element.
+    await page.mouse.move(187, 300);
+    for (let i = 0; i < 20; i += 1) {
+      await page.mouse.wheel(0, 2000);
+    }
+
+    await playersPage.stats.expectPlayerVisible('Feed Player 26');
+  });
+
+  test('the card feed offers a keyboard-accessible Load more control (LS-10682)', async ({
+    page,
+    playersPage,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 504 });
+    await mockPagedCareerBattingStats(page);
+    await playersPage.gotoStats();
+    await playersPage.stats.expectCardFeedVisible('mlb');
+
+    const loadMore = page.getByRole('button', { name: 'Load more players' });
+    await loadMore.focus();
+    await page.keyboard.press('Enter');
+
+    await playersPage.stats.expectPlayerVisible('Feed Player 50');
+    await expect(loadMore).toHaveCount(0);
   });
 
   // Share (gap 2, third affordance): PlayersCardFeed has no share/export

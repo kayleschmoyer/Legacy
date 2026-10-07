@@ -180,4 +180,41 @@ describe('PlayersCardFeed', () => {
 
     expect(onOverflowPress).toHaveBeenCalledTimes(1);
   });
+  describe('load more footer (LS-10682)', () => {
+    test('renders a Load more button when more pages exist and calls onEndReached on press', () => {
+      const props = baseProps();
+      render(<PlayersCardFeed {...props} hasMore />);
+
+      fireEvent.click(screen.getByTestId('players-card-feed-load-more'));
+
+      expect(props.onEndReached).toHaveBeenCalledTimes(1);
+    });
+
+    test('activates Load more from the keyboard', () => {
+      const props = baseProps();
+      render(<PlayersCardFeed {...props} hasMore />);
+
+      const button = screen.getByTestId('players-card-feed-load-more');
+      fireEvent.keyDown(button, { key: 'Enter' });
+      fireEvent.keyDown(button, { key: ' ' });
+
+      expect(props.onEndReached).toHaveBeenCalledTimes(2);
+    });
+
+    test('shows the spinner instead of Load more while the next page loads', () => {
+      render(<PlayersCardFeed {...baseProps()} hasMore isLoadingMore />);
+
+      expect(
+        screen.queryByTestId('players-card-feed-load-more'),
+      ).not.toBeInTheDocument();
+    });
+
+    test('hides Load more once the last page is loaded', () => {
+      render(<PlayersCardFeed {...baseProps()} hasMore={false} />);
+
+      expect(
+        screen.queryByTestId('players-card-feed-load-more'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
