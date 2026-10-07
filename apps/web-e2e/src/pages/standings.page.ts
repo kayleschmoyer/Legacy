@@ -49,6 +49,18 @@ export class StandingsPage extends BaseScreen {
     return this.driver.byText(value, { exact: true });
   }
 
+  /**
+   * A cell in the horizontally scrolling stats pane by its exact value —
+   * below 980px the stat columns live in that pane, not inside the team's
+   * DOM row (the row `aria-owns` them), so they can't be row-scoped (LS-10717).
+   */
+  scrollingStatCell(value: string | RegExp): UIElement {
+    return this.driver
+      .byRole('region', { name: 'Standings stats, scrolls horizontally' })
+      .byRole('cell')
+      .filterByText(value);
+  }
+
   /** The full table row for a team, scoped by its display name. */
   row(teamName: string): UIElement {
     return this.driver.byRole('row').filterByText(teamName);

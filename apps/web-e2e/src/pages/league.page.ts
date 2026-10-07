@@ -376,6 +376,17 @@ export class LeaguePage extends BaseScreen {
   }
 
   /**
+   * The standings table's horizontally scrolling stats pane — mounted only
+   * below `$gtMd` (<980px), where # + Team are pinned and the stat columns
+   * scroll (LS-10717).
+   */
+  get standingsScrollRegion(): UIElement {
+    return this.driver.byRole('region', {
+      name: 'Standings stats, scrolls horizontally',
+    });
+  }
+
+  /**
    * The commissioner Scoring Rules accordion toggle (collapsed by default —
    * `openScoringSection` expands it).
    */

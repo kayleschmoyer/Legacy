@@ -380,6 +380,11 @@ const animations = createAnimations({
     type: 'timing' as const,
     duration: 75,
   },
+  // Standings scroll-caption fade-out (LS-10717).
+  '150ms': {
+    type: 'timing' as const,
+    duration: 150,
+  },
   '200ms': {
     type: 'timing' as const,
     duration: 200,

@@ -6,8 +6,8 @@
  * team list renders with W/L columns and the current user's team is visually
  * tagged. Also locks in the specific QA finding the ticket was filed from
  * (Android emulator, 2026-07-24): the "You" tag must not overlap the
- * adjacent W/L columns even when the current user's team name wraps to two
- * lines on a narrow viewport.
+ * adjacent W/L columns for a long team name on a narrow viewport (where,
+ * since LS-10717, the name truncates to one line in the pinned Team column).
  *
  * All GraphQL queries are mocked (route.fulfill only — no route.continue()),
  * so this spec runs without a live backend.
@@ -83,7 +83,7 @@ const MOCK_TEAMS = [
   },
 ];
 
-/** teamId 2's name is long enough to wrap to two lines on a narrow viewport. */
+/** teamId 2's name is too long to fit the pinned Team column at 375px. */
 const CURRENT_USER_TEAM_NAME = 'Diamond Dynasty Wildcats';
 
 const MOCK_STANDINGS = [
@@ -230,11 +230,11 @@ test.describe('Standings Tab — ranked list @regression', () => {
 
 test.describe('Standings Tab — "You" tag layout @regression', () => {
   // Narrow, mobile-web viewport — matches the ticket's source QA finding
-  // (Android emulator) and is the width at which the team-name column is
-  // narrow enough for a long team name to wrap to two lines.
+  // (Android emulator) and the phone width where the pinned Team column is
+  // narrowest (LS-10717).
   test.use({ viewport: { width: 375, height: 800 } });
 
-  test('"You" tag does not overlap the W/L columns when the team name wraps to two lines', async ({
+  test('"You" tag does not overlap the W/L columns for a long team name', async ({
     page,
     leaguePage,
     standingsPage,
@@ -244,18 +244,19 @@ test.describe('Standings Tab — "You" tag layout @regression', () => {
     await leaguePage.openTab('Standings');
     await standingsPage.expectNoAppError();
 
-    // The full (un-truncated) long team name renders — confirms it wraps
-    // instead of being ellipsis-truncated to a single line.
+    // The long team name renders in the pinned Team column — truncated to
+    // one line with an ellipsis below 980px (LS-10717), its full text still
+    // in the DOM / accessible name.
     const row = standingsPage.row(CURRENT_USER_TEAM_NAME);
     await row.byText(CURRENT_USER_TEAM_NAME).expectVisible();
 
     await standingsPage.youTag().expectVisible();
     const youBox = requireBox(await standingsPage.youTag().boundingBox());
 
-    // Wins (6) and losses (9) are unique values in this row/table, so an
-    // exact-text match unambiguously scopes to this row's W/L cells.
-    const winCell = row.byRole('cell').filterByText(/^6$/);
-    const lossCell = row.byRole('cell').filterByText(/^9$/);
+    // Wins (6) and losses (9) are unique values in the stats pane, so an
+    // exact-text match unambiguously finds this team's W/L cells.
+    const winCell = standingsPage.scrollingStatCell(/^6$/);
+    const lossCell = standingsPage.scrollingStatCell(/^9$/);
     const winBox = requireBox(await winCell.boundingBox());
     const lossBox = requireBox(await lossCell.boundingBox());
 

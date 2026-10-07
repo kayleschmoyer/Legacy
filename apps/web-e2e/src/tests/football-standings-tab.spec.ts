@@ -246,12 +246,12 @@ test.describe('Football Standings Tab — navigation @smoke', () => {
 
 test.describe('Football Standings Tab — data rendering @regression', () => {
   /**
-   * T/Win% columns hide below the `$sm` breakpoint and PF/PA below `$md`
-   * (StandingsTable's responsive column hiding) — both thresholds sit above
-   * the mobile projects' 375px viewport, so this desktop-only column set
-   * never renders there (LS-9493). Pinned rather than skipped so the column
-   * assertions still run under the mobile projects (LS-9712); the sibling
-   * tests below keep their phone-width coverage.
+   * Pinned to the desktop viewport so these assertions cover the single
+   * full-width table (≥980). Below that every column is still rendered, in a
+   * horizontally scrolling pane beside the pinned Team column (LS-10717), so
+   * off-screen columns are not "visible" at 375px. Pinned rather than skipped
+   * so the column assertions still run under the mobile projects (LS-9712);
+   * the sibling tests below keep their phone-width coverage.
    */
   test.describe('desktop column set', () => {
     test.use({ viewport: DESKTOP_VIEWPORT });
@@ -317,22 +317,52 @@ test.describe('Football Standings Tab — data rendering @regression', () => {
 // ── Standings Tab — division grouping ─────────────────────────────────────────
 
 test.describe('Football Standings Tab — division grouping @regression', () => {
-  test('groups standings by division when the league has divisions', async ({
-    page,
-    standingsPage,
-  }) => {
-    await mockFootballStandings(page, { standings: MOCK_DIVISION_STANDINGS });
-    await standingsPage.goto(1, 'football');
-    await standingsPage.expectNoAppError();
+  test.describe('desktop', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-    await expect(page.getByText('NFC West')).toBeVisible();
-    await expect(page.getByText('AFC East')).toBeVisible();
+    test('groups standings into one table per division', async ({
+      page,
+      standingsPage,
+    }) => {
+      await mockFootballStandings(page, { standings: MOCK_DIVISION_STANDINGS });
+      await standingsPage.goto(1, 'football');
+      await standingsPage.expectNoAppError();
 
-    // Two division tables render, one per division.
-    await expect(page.getByRole('table')).toHaveCount(2);
+      await expect(page.getByText('NFC West')).toBeVisible();
+      await expect(page.getByText('AFC East')).toBeVisible();
 
-    // Each division's own teams render (spot-check the AFC East member).
-    await standingsPage.team('Southgate Marauders').expectVisible();
+      // Two division tables render, one per division.
+      await expect(page.getByRole('table')).toHaveCount(2);
+
+      // Each division's own teams render (spot-check the AFC East member).
+      await standingsPage.team('Southgate Marauders').expectVisible();
+    });
+  });
+
+  test.describe('phone', () => {
+    test.use({ viewport: { width: 375, height: 800 } });
+
+    test('groups standings under division label rows in one scrolling table', async ({
+      page,
+      standingsPage,
+    }) => {
+      await mockFootballStandings(page, { standings: MOCK_DIVISION_STANDINGS });
+      await standingsPage.goto(1, 'football');
+      await standingsPage.expectNoAppError();
+
+      // Below 980px the pinned Team pane and the scrolling stats pane share
+      // one table so their rows stay aligned (LS-10717); each division is a
+      // label row inside it.
+      await expect(page.getByRole('table')).toHaveCount(1);
+      await expect(
+        page.getByRole('row').filter({ hasText: 'NFC West' }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('row').filter({ hasText: 'AFC East' }),
+      ).toBeVisible();
+
+      await standingsPage.team('Southgate Marauders').expectVisible();
+    });
   });
 });
 

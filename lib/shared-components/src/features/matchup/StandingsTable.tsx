@@ -1,54 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { Card, H3, Separator, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Eye } from '@tamagui/lucide-icons/icons/Eye';
-import { type GetLeagueStandingsQuery } from '@legacy-sports/graphql';
 import {
-  BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
-  GRAY,
-  GREEN,
-  RANK_SILVER,
-  SLATE_400,
-  withAlpha,
-} from '../../utils/colors';
+  ClinchBadge,
+  diffOf,
+  formatDiff,
+  formatMedianRecord,
+  formatWinPct,
+  rankBadgeColor,
+  type SortDirection,
+  type SortKey,
+  sortStandings,
+  type StandingRecord,
+  teamDisplayName,
+} from './standingsTableModel';
+import {
+  type StandingsGroup,
+  StandingsScrollSkeleton,
+  StandingsScrollTable,
+} from './StandingsScrollTable';
+import { BRAND_GOLD, BRAND_GOLD_LIGHT, withAlpha } from '../../utils/colors';
 import { AvatarImage } from '../../components/AvatarImage';
-
-function rankBadgeColor(rank: number): string {
-  if (rank === 1 || rank === 3) return BRAND_GOLD;
-  if (rank === 2) return RANK_SILVER;
-  return GRAY;
-}
-
-/** Playoff seeding badge shown late in the season (LS-6345). */
-const CLINCH_BADGE_CONFIG = {
-  CLINCHED: { label: 'CLINCHED', color: GREEN },
-  IN: { label: 'IN', color: BRAND_GOLD_LIGHT },
-  OUT: { label: 'OUT', color: SLATE_400 },
-} as const;
-
-function ClinchBadge({ status }: { status: keyof typeof CLINCH_BADGE_CONFIG }) {
-  const { label, color } = CLINCH_BADGE_CONFIG[status];
-  return (
-    <Text
-      flexShrink={0}
-      fontSize={10}
-      fontWeight="800"
-      color={color}
-      borderColor={color}
-      borderWidth={1}
-      borderRadius="$2"
-      paddingHorizontal="$1.5"
-      paddingVertical={1}
-      letterSpacing={0.4}
-    >
-      {label}
-    </Text>
-  );
-}
-
-type StandingRecord = NonNullable<
-  GetLeagueStandingsQuery['getLeagueStandings']
->[0];
 
 export interface StandingsTableProps {
   standings: StandingRecord[];
@@ -82,96 +54,11 @@ export interface StandingsTableProps {
   showMedianRecord?: boolean;
 }
 
-type SortKey =
-  | 'rank'
-  | 'team'
-  | 'wins'
-  | 'losses'
-  | 'ties'
-  | 'winPct'
-  | 'pointsFor'
-  | 'pointsAgainst'
-  | 'diff'
-  | 'waiverOrder'
-  | 'medianRecord';
-type SortDirection = 'asc' | 'desc';
-
 function streakColor(streak: string | null | undefined): string | undefined {
   if (!streak) return undefined;
   if (streak.startsWith('W')) return '$green10';
   if (streak.startsWith('L')) return '$red10';
   return undefined;
-}
-
-const diffOf = (s: StandingRecord): number | null =>
-  s.pointsFor != null && s.pointsAgainst != null
-    ? s.pointsFor - s.pointsAgainst
-    : null;
-
-function sortStandings(
-  list: StandingRecord[],
-  sortKey: SortKey,
-  sortDirection: SortDirection,
-  waiverOrders?: Record<string, number>,
-): StandingRecord[] {
-  return [...list].sort((a, b) => {
-    let aValue: number | string;
-    let bValue: number | string;
-
-    switch (sortKey) {
-      case 'rank':
-      case 'winPct':
-        aValue = a.winPercentage ?? 0;
-        bValue = b.winPercentage ?? 0;
-        break;
-      case 'team':
-        aValue = a.teamName ?? '';
-        bValue = b.teamName ?? '';
-        break;
-      case 'wins':
-        aValue = a.wins ?? 0;
-        bValue = b.wins ?? 0;
-        break;
-      case 'losses':
-        aValue = a.losses ?? 0;
-        bValue = b.losses ?? 0;
-        break;
-      case 'ties':
-        aValue = a.ties ?? 0;
-        bValue = b.ties ?? 0;
-        break;
-      case 'pointsFor':
-        aValue = a.pointsFor ?? 0;
-        bValue = b.pointsFor ?? 0;
-        break;
-      case 'pointsAgainst':
-        aValue = a.pointsAgainst ?? 0;
-        bValue = b.pointsAgainst ?? 0;
-        break;
-      case 'diff':
-        aValue = diffOf(a) ?? 0;
-        bValue = diffOf(b) ?? 0;
-        break;
-      case 'waiverOrder':
-        aValue =
-          (a.teamId != null ? waiverOrders?.[a.teamId] : undefined) ??
-          Number.MAX_SAFE_INTEGER;
-        bValue =
-          (b.teamId != null ? waiverOrders?.[b.teamId] : undefined) ??
-          Number.MAX_SAFE_INTEGER;
-        break;
-      case 'medianRecord':
-        aValue = a.medianWins ?? 0;
-        bValue = b.medianWins ?? 0;
-        break;
-      default:
-        return 0;
-    }
-
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
 }
 
 interface StandingsRowProps {
@@ -292,7 +179,7 @@ function StandingsRow({
             color={isCurrentUser ? BRAND_GOLD_LIGHT : undefined}
             textDecorationLine="none"
           >
-            {standing.teamName ?? `Team ${standing.teamId}`}
+            {teamDisplayName(standing)}
           </Text>
           {standing.clinchStatus ? (
             <ClinchBadge status={standing.clinchStatus} />
@@ -342,8 +229,6 @@ function StandingsRow({
         width={44}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtSm={{ display: 'flex' }}
       >
         <Text fontSize="$3">{standing.ties ?? 0}</Text>
       </YStack>
@@ -353,11 +238,9 @@ function StandingsRow({
         width={60}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtSm={{ display: 'flex' }}
       >
         <Text fontSize="$3" fontWeight="600">
-          {((standing.winPercentage ?? 0) * 100).toFixed(1)}%
+          {formatWinPct(standing)}
         </Text>
       </YStack>
       <YStack
@@ -366,8 +249,6 @@ function StandingsRow({
         width={80}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
       >
         <Text fontSize="$3">{(standing.pointsFor ?? 0).toFixed(2)}</Text>
       </YStack>
@@ -377,8 +258,6 @@ function StandingsRow({
         width={80}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
       >
         <Text fontSize="$3">{(standing.pointsAgainst ?? 0).toFixed(2)}</Text>
       </YStack>
@@ -388,11 +267,9 @@ function StandingsRow({
         width={70}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
       >
         <Text fontSize="$3" color={diffColor}>
-          {diff == null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
+          {formatDiff(diff)}
         </Text>
       </YStack>
       <YStack
@@ -401,8 +278,6 @@ function StandingsRow({
         width={56}
         alignItems="center"
         justifyContent="center"
-        display="none"
-        $gtMd={{ display: 'flex' }}
       >
         <Text
           fontSize="$3"
@@ -419,8 +294,6 @@ function StandingsRow({
           width={60}
           alignItems="center"
           justifyContent="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <Text fontSize="$3" color="$gray11">
             {waiverOrder ?? '—'}
@@ -434,13 +307,9 @@ function StandingsRow({
           width={70}
           alignItems="center"
           justifyContent="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <Text fontSize="$3" color="$gray11">
-            {standing.medianWins != null && standing.medianLosses != null
-              ? `${standing.medianWins}-${standing.medianLosses}`
-              : '—'}
+            {formatMedianRecord(standing)}
           </Text>
         </YStack>
       ) : null}
@@ -451,15 +320,17 @@ function StandingsRow({
 /**
  * StandingsTable - Sortable league standings table.
  *
- * Full column set: Rank, Team, W, L, T, Win%, PF, PA, Diff (PF−PA), and an
- * optional Waiver column. All columns are sortable, including Rank (sorts by
- * win%, the ranking criterion) and Waiver. Supports division grouping (rank
- * resets per division), current-user row highlight, row press navigation,
- * and responsive column hiding: T/Win% appear from `$gtSm` (≥860) and
- * PF/PA/Diff/Waiver from `$gtMd` (≥980), so the column set grows with the
- * design-token bands — minimal ≤859, +T/Win% across 860–979, full from 980.
- * ("Hide below `$sm`" is the wrong way to read a maxWidth token: `$sm`
- * matches its own band AND everything narrower.)
+ * Full column set: Rank, Team, W, L, T, Win%, PF, PA, Diff (PF−PA), Strk, and
+ * optional Waiver / Median columns. All columns except Strk are sortable,
+ * including Rank (sorts by win%, the ranking criterion) and Waiver. Supports
+ * division grouping (rank resets per division), current-user row highlight,
+ * and row press navigation.
+ *
+ * Every column is reachable at every width (LS-10717). From `$gtMd` (≥980)
+ * this renders the single full-width table; below that it renders
+ * {@link StandingsScrollTable}: # + Team pinned on the left and the stat
+ * columns in a horizontally scrolling, keyboard-focusable pane with a scroll
+ * cue.
  */
 export function StandingsTable({
   standings,
@@ -474,6 +345,8 @@ export function StandingsTable({
   waiverOrders,
   showMedianRecord = false,
 }: StandingsTableProps) {
+  const media = useMedia();
+  const wide = media.gtMd === true;
   const [sortKey, setSortKey] = useState<SortKey>('winPct');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -521,8 +394,15 @@ export function StandingsTable({
 
   if (loading) {
     return (
-      <Card padding="$4">
-        <Text color="$gray11">Loading standings...</Text>
+      <Card padding="$4" $xs={{ padding: '$3' }}>
+        {wide ? (
+          <Text color="$gray11">Loading standings...</Text>
+        ) : (
+          <StandingsScrollSkeleton
+            showWaiverOrder={showWaiverOrder}
+            showMedianRecord={showMedianRecord}
+          />
+        )}
       </Card>
     );
   }
@@ -538,7 +418,12 @@ export function StandingsTable({
   if (standings.length === 0) {
     return (
       <Card padding="$4">
-        <Text color="$gray11">No standings available</Text>
+        <Text
+          color={wide ? '$gray11' : '$textMuted'}
+          textAlign={wide ? undefined : 'center'}
+        >
+          No standings available
+        </Text>
       </Card>
     );
   }
@@ -624,8 +509,6 @@ export function StandingsTable({
           role="columnheader"
           width={44}
           alignItems="center"
-          display="none"
-          $gtSm={{ display: 'flex' }}
         >
           <SortButton label="T" sortKeyValue="ties" />
         </YStack>
@@ -635,8 +518,6 @@ export function StandingsTable({
           role="columnheader"
           width={60}
           alignItems="center"
-          display="none"
-          $gtSm={{ display: 'flex' }}
         >
           <SortButton label="Win%" sortKeyValue="winPct" />
         </YStack>
@@ -646,8 +527,6 @@ export function StandingsTable({
           role="columnheader"
           width={80}
           alignItems="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <SortButton label="PF" sortKeyValue="pointsFor" />
         </YStack>
@@ -657,8 +536,6 @@ export function StandingsTable({
           role="columnheader"
           width={80}
           alignItems="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <SortButton label="PA" sortKeyValue="pointsAgainst" />
         </YStack>
@@ -668,8 +545,6 @@ export function StandingsTable({
           role="columnheader"
           width={70}
           alignItems="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <SortButton label="Diff" sortKeyValue="diff" />
         </YStack>
@@ -679,8 +554,6 @@ export function StandingsTable({
           role="columnheader"
           width={56}
           alignItems="center"
-          display="none"
-          $gtMd={{ display: 'flex' }}
         >
           <Text fontSize="$3" fontWeight="bold" color="$gray11">
             Strk
@@ -693,8 +566,6 @@ export function StandingsTable({
             role="columnheader"
             width={60}
             alignItems="center"
-            display="none"
-            $gtMd={{ display: 'flex' }}
           >
             <SortButton label="Waiver" sortKeyValue="waiverOrder" />
           </YStack>
@@ -706,8 +577,6 @@ export function StandingsTable({
             role="columnheader"
             width={70}
             alignItems="center"
-            display="none"
-            $gtMd={{ display: 'flex' }}
           >
             <SortButton label="Median" sortKeyValue="medianRecord" />
           </YStack>
@@ -715,6 +584,46 @@ export function StandingsTable({
       </XStack>
     </YStack>
   );
+
+  if (!wide) {
+    const groups: StandingsGroup[] =
+      hasDivisions && divisionGroups
+        ? divisionGroups.map((g) => ({
+            key: String(g.divisionId),
+            label: g.divisionName,
+            teams: g.teams,
+          }))
+        : [{ key: 'all', label: null, teams: sortedStandings }];
+    return (
+      <Card
+        elevate
+        bordered
+        padding="$4"
+        $xs={{ padding: '$3' }}
+        width="100%"
+        maxWidth={900}
+      >
+        <H3 marginBottom="$1">{title}</H3>
+        <StandingsScrollTable
+          groups={groups}
+          title={title}
+          subtitle={subtitle}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          isCurrentUser={isCurrentUser}
+          onTeamPress={onTeamPress}
+          getTeamUrl={getTeamUrl}
+          showWaiverOrder={showWaiverOrder}
+          waiverOrders={waiverOrders}
+          showMedianRecord={showMedianRecord}
+        />
+        <Text fontSize="$1" color="$gray9" marginTop="$3">
+          Ties in the standings are broken by total points scored (PF).
+        </Text>
+      </Card>
+    );
+  }
 
   return (
     <Card elevate bordered padding="$4" width="100%" maxWidth={900}>

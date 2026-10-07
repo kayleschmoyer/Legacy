@@ -21,6 +21,7 @@ import {
   useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -526,6 +527,12 @@ test.describe('Table accessibility @regression', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Standings table', () => {
+    // Native `<table>`/`<thead>`/`<th scope>` semantics are the ≥980px
+    // layout. Below that the table is a two-pane ARIA table (pinned Team +
+    // horizontally scrolling stats, LS-10717) — covered by the phone-width
+    // describe below.
+    test.use({ viewport: DESKTOP_VIEWPORT });
+
     test.beforeEach(async ({ page }) => {
       await mockStandingsGraphQL(page);
       await page.goto(`/baseball/league/${LEAGUE_ID}/standings`);
@@ -585,6 +592,64 @@ test.describe('Table accessibility @regression', () => {
       for (const detail of tableDetails) {
         expect(detail.hasTbody).toBe(true);
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Standings table below 980px — two-pane ARIA table (LS-10717)
+  // -------------------------------------------------------------------------
+
+  test.describe('Standings table — phone width', () => {
+    test.use({ viewport: { width: 375, height: 800 } });
+
+    test.beforeEach(async ({ page }) => {
+      await mockStandingsGraphQL(page);
+      await page.goto(`/baseball/league/${LEAGUE_ID}/standings`);
+      await page.waitForLoadState('load');
+      await page.waitForSelector('[role="table"]', { timeout: 10000 });
+    });
+
+    test('standings table has an accessible name and column headers', async ({
+      page,
+    }) => {
+      await expect(
+        page.getByRole('table', { name: /League Standings/ }),
+      ).toBeVisible();
+      // Every column renders below 980px — none are hidden.
+      for (const name of [/^W/, /^L/, /^Win%/, /^PF/, /^PA/, /^Diff/]) {
+        await expect(
+          page.getByRole('columnheader', { name }).first(),
+        ).toBeAttached();
+      }
+    });
+
+    test('every row owns resolvable cells (one logical row per team)', async ({
+      page,
+    }) => {
+      const { rows, unresolved } = await page.evaluate(() => {
+        const owners = Array.from(
+          document.querySelectorAll('[role="row"][aria-owns]'),
+        );
+        let missing = 0;
+        for (const row of owners) {
+          for (const id of (row.getAttribute('aria-owns') ?? '').split(' ')) {
+            if (!document.getElementById(id)) missing += 1;
+          }
+        }
+        return { rows: owners.length, unresolved: missing };
+      });
+      expect(rows).toBeGreaterThan(1);
+      expect(unresolved).toBe(0);
+    });
+
+    test('scrolling stats pane is a labelled, focusable region', async ({
+      page,
+    }) => {
+      const region = page.getByRole('region', {
+        name: 'Standings stats, scrolls horizontally',
+      });
+      await expect(region).toBeVisible();
+      await expect(region).toHaveAttribute('tabindex', '0');
     });
   });
 
@@ -693,6 +758,10 @@ test.describe('Table accessibility @regression', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Cross-page table a11y summary', () => {
+    // Native-table audit — the ≥980px layout (see the phone-width describe
+    // above for the <980 ARIA table).
+    test.use({ viewport: DESKTOP_VIEWPORT });
+
     test('standings page tables have no a11y issues', async ({ page }) => {
       await mockStandingsGraphQL(page);
       await page.goto(`/baseball/league/${LEAGUE_ID}/standings`);

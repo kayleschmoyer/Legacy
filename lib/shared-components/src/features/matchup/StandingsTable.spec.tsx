@@ -1,4 +1,5 @@
 import React from 'react';
+import { useMedia } from 'tamagui';
 import { StandingsTable } from './StandingsTable';
 import { fireEvent, render } from '../../test-utils';
 
@@ -250,6 +251,9 @@ describe('StandingsTable', () => {
   });
 
   it('renders the full team name (wrap, not ellipsis-truncate) alongside the "You" chip for long names', () => {
+    // Wide (≥980) layout — below that the pinned Team cell is one line with
+    // an ellipsis (LS-10717, covered in StandingsScrollTable.spec.tsx).
+    (useMedia as unknown as jest.Mock).mockReturnValueOnce({ gtMd: true });
     const longName = 'Diamond Dynasty Wildcats of Doom';
     const { getByText, getAllByText } = render(
       <StandingsTable

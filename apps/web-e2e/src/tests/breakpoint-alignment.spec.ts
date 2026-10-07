@@ -17,19 +17,20 @@
  *     parent stacks and the sidebar fills the row; at or above it the sidebar
  *     is its fixed 340px column.
  *   - the `$md`/`$gtMd` boundary, which LS-9896 moved from 1020/1021 → 979/980.
- *     Probe: `StandingsTable`'s PF column header, `display: none` with
- *     `$gtMd={{ display: 'flex' }}` — hidden at 979px, visible at 980px.
+ *     Probe: `StandingsTable`'s horizontally scrolling stats region, mounted
+ *     only while `useMedia().gtMd` is false (LS-10717) — present at 979px,
+ *     gone at 980px.
  *   - the `$xs`/`$gtXs` boundary, which LS-9897 moved from 660/661 → 799/800.
  *     Probe: `LeagueHero`'s quick-share "Invite" button, `$xs={{ display:
  *     'none' }}` — hidden at 799px, visible at 800px. `$xs` is the only media
  *     key that element sets `display` on, so the flip reads the `xs` band
  *     directly rather than the resolution of two overlapping keys.
  *   - the `$sm`/`$gtSm` boundary, which LS-9898 moved from 800/801 → 859/860.
- *     Probe: `StandingsTable`'s T column header, `display: none` with
- *     `$gtSm={{ display: 'flex' }}` — hidden at 859px, visible at 860px. Same
- *     table as the `$md` case above but a different column, so the two bands
- *     are read independently: T is gated on `$gtSm` alone and PF on `$gtMd`
- *     alone.
+ *     Probe: Create League's collapsed "Roster & Schedule" summary,
+ *     `$sm={{ display: 'none' }}` — hidden at 859px, visible at 860px. `$sm`
+ *     is the only media key that element sets `display` on. (This band used
+ *     to be probed by StandingsTable's T column; LS-10717 made every standings
+ *     column reachable at every width, so that gate no longer exists.)
  *
  * With `$sm` covered the whole scale is now pinned at real viewport widths,
  * which is the point: every band's flip is asserted in a browser, not just in
@@ -177,7 +178,7 @@ async function mockStandingsForBoundary(page: import('@playwright/test').Page) {
 }
 
 test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale @regression', () => {
-  test(`PF column hides one pixel below the boundary (${MD_BOUNDARY - 1}px)`, async ({
+  test(`standings scroll region is mounted one pixel below the boundary (${MD_BOUNDARY - 1}px)`, async ({
     page,
     leaguePage,
     standingsPage,
@@ -187,11 +188,11 @@ test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale
     await standingsPage.goto(1, 'football');
     await standingsPage.expectNoAppError();
 
-    // `$md` (≤979) has this column's `display: none` in effect.
-    await leaguePage.standingsColumnHeader(/^PF$/).expectHidden();
+    // `gtMd` is false (≤979): the pinned-Team + scrolling-stats layout.
+    await leaguePage.standingsScrollRegion.expectVisible();
   });
 
-  test(`PF column shows at the boundary (${MD_BOUNDARY}px)`, async ({
+  test(`standings render as the single full table at the boundary (${MD_BOUNDARY}px)`, async ({
     page,
     leaguePage,
     standingsPage,
@@ -201,8 +202,9 @@ test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale
     await standingsPage.goto(1, 'football');
     await standingsPage.expectNoAppError();
 
-    // `$gtMd` (≥980) has flipped this column to `display: flex`.
-    await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
+    // `$gtMd` (≥980): full table, no scroll machinery mounted.
+    await leaguePage.standingsColumnHeader(/^PF/).expectVisible();
+    await leaguePage.standingsScrollRegion.expectHidden();
   });
 
   test('the stock Tamagui $gtMd width (1021) is no longer the flip point', async ({
@@ -210,15 +212,16 @@ test.describe('Breakpoint alignment — $md/$gtMd fire on the design-token scale
     leaguePage,
     standingsPage,
   }) => {
-    // The discriminating case: before this change `$gtMd` resolved to
-    // `minWidth: 1021`, so 1000 still hid the PF column. This assertion
-    // fails against the stock config.
+    // The discriminating case: before LS-9896 `$gtMd` resolved to
+    // `minWidth: 1021`, so 1000 was still below it. This assertion fails
+    // against the stock config.
     await page.setViewportSize({ width: 1000, height: 900 });
     await mockStandingsForBoundary(page);
     await standingsPage.goto(1, 'football');
     await standingsPage.expectNoAppError();
 
-    await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
+    await leaguePage.standingsColumnHeader(/^PF/).expectVisible();
+    await leaguePage.standingsScrollRegion.expectHidden();
   });
 });
 
@@ -313,50 +316,46 @@ test.describe('Breakpoint alignment — $xs/$gtXs fire on the design-token scale
  */
 const SM_BOUNDARY = breakpoints.md;
 
+/** A create-form section that is collapsed, with a summary, on first load. */
+const SM_PROBE_SECTION = 'roster-schedule';
+
 test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale @regression', () => {
-  test(`T column hides one pixel below the boundary (${SM_BOUNDARY - 1}px)`, async ({
+  test(`section summary hides one pixel below the boundary (${SM_BOUNDARY - 1}px)`, async ({
     page,
     leaguePage,
-    standingsPage,
   }) => {
     await page.setViewportSize({ width: SM_BOUNDARY - 1, height: 900 });
-    await mockStandingsForBoundary(page);
-    await standingsPage.goto(1, 'football');
-    await standingsPage.expectNoAppError();
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    // `$sm` (≤859) leaves this column's base `display: none` in effect.
-    await leaguePage.standingsColumnHeader(/^T$/).expectHidden();
+    // `$sm` (≤859) has this summary's `display: none` in effect.
+    await leaguePage.sectionSummary(SM_PROBE_SECTION).expectHidden();
   });
 
-  test(`T column shows at the boundary (${SM_BOUNDARY}px)`, async ({
+  test(`section summary shows at the boundary (${SM_BOUNDARY}px)`, async ({
     page,
     leaguePage,
-    standingsPage,
   }) => {
     await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
-    await mockStandingsForBoundary(page);
-    await standingsPage.goto(1, 'football');
-    await standingsPage.expectNoAppError();
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    // `$gtSm` (≥860) has flipped this column to `display: flex`.
-    await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
+    // `$gtSm` (≥860): `$sm` no longer applies, so the summary is back.
+    await leaguePage.sectionSummary(SM_PROBE_SECTION).expectVisible();
   });
 
-  test('the stock Tamagui $gtSm width (801) is no longer the flip point', async ({
+  test('the stock Tamagui $sm width (800) is no longer the flip point', async ({
     page,
     leaguePage,
-    standingsPage,
   }) => {
-    // The discriminating case: before LS-9898 `$gtSm` resolved to
-    // `minWidth: 801`, so an 830px viewport already revealed the T column.
-    // 830 is now inside the `sm` band and the column stays hidden. This
-    // assertion fails against the stock config.
+    // The discriminating case: before LS-9898 `$sm` resolved to
+    // `maxWidth: 800`, so an 830px viewport was already outside it. 830 is
+    // now inside the `sm` band. This assertion fails against the stock config.
     await page.setViewportSize({ width: 830, height: 900 });
-    await mockStandingsForBoundary(page);
-    await standingsPage.goto(1, 'football');
-    await standingsPage.expectNoAppError();
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    await leaguePage.standingsColumnHeader(/^T$/).expectHidden();
+    await leaguePage.sectionSummary(SM_PROBE_SECTION).expectHidden();
   });
 
   test(`both bands resolve independently at the boundary (${SM_BOUNDARY}px)`, async ({
@@ -364,18 +363,18 @@ test.describe('Breakpoint alignment — $sm/$gtSm fire on the design-token scale
     leaguePage,
     standingsPage,
   }) => {
-    // Guards the invariant that made this slice indivisible: `$sm` and
-    // `$gtSm` must be exact complements. If `$sm` had moved to 859 while
-    // `$gtSm` stayed at 801, widths 801–859 would match BOTH keys and this
-    // column's visibility would depend on cascade order rather than width.
-    // At 860 the `gtSm` column is visible while the wider `gtMd` one is not.
+    // Guards the invariant that made this slice indivisible: the bands must
+    // not bleed into each other. At 860 `$sm` has stopped applying while the
+    // wider `$gtMd` has not yet started.
     await page.setViewportSize({ width: SM_BOUNDARY, height: 900 });
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.sectionSummary(SM_PROBE_SECTION).expectVisible();
+
     await mockStandingsForBoundary(page);
     await standingsPage.goto(1, 'football');
     await standingsPage.expectNoAppError();
-
-    await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^PF$/).expectHidden();
+    await leaguePage.standingsScrollRegion.expectVisible();
   });
 });
 
