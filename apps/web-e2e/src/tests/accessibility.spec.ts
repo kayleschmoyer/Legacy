@@ -261,6 +261,58 @@ test.describe('Primary Navigation Landmark @smoke', () => {
       primaryNav.getByRole('link', { name: /^minigames$/i }),
     ).toBeVisible();
   });
+
+  test('primary nav links are real anchors with hrefs (LS-10779)', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    // A real href is what enables open-in-new-tab / Ctrl+click / middle-click.
+    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(
+      primaryNav.getByRole('link', { name: /^players$/i }),
+    ).toHaveAttribute('href', '/players');
+    await expect(
+      primaryNav.getByRole('link', { name: /^minigames$/i }),
+    ).toHaveAttribute('href', '/games');
+  });
+
+  test('plain click and Enter navigate in-app; modified click opens a new tab (LS-10779)', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+    // Survives client-side navigation only — a full reload would clear it.
+    await page.evaluate(() => {
+      (window as unknown as { __spaMarker: boolean }).__spaMarker = true;
+    });
+    const hasSpaMarker = () =>
+      page.evaluate(
+        () => (window as unknown as { __spaMarker?: boolean }).__spaMarker,
+      );
+
+    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
+    const players = primaryNav.getByRole('link', { name: /^players$/i });
+
+    const [newTab] = await Promise.all([
+      context.waitForEvent('page'),
+      players.click({ modifiers: ['ControlOrMeta'] }),
+    ]);
+    await newTab.waitForURL('**/players');
+    await newTab.close();
+    await expect(page).toHaveURL(/\/about$/);
+
+    await players.click();
+    await page.waitForURL('**/players');
+    expect(await hasSpaMarker()).toBe(true);
+
+    await primaryNav.getByRole('link', { name: /^minigames$/i }).focus();
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/games');
+    expect(await hasSpaMarker()).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

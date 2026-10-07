@@ -104,11 +104,13 @@ exports[`App FootballHubPage should match complete football page layout snapshot
                 borderradius="9999"
                 cursor="pointer"
                 gap="7"
+                href="/players"
                 paddinghorizontal="16"
                 paddingvertical="9"
                 role="link"
-                style="transition: background 120ms ease-out; user-select: none;"
+                style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
                 tabindex="0"
+                tag="a"
               >
                 <svg
                   aria-hidden="true"
@@ -167,11 +169,13 @@ exports[`App FootballHubPage should match complete football page layout snapshot
                 borderradius="9999"
                 cursor="pointer"
                 gap="7"
+                href="/games"
                 paddinghorizontal="16"
                 paddingvertical="9"
                 role="link"
-                style="transition: background 120ms ease-out; user-select: none;"
+                style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
                 tabindex="0"
+                tag="a"
               >
                 <svg
                   aria-hidden="true"
@@ -383,11 +387,13 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                 borderradius="9999"
                 cursor="pointer"
                 gap="7"
+                href="/players"
                 paddinghorizontal="16"
                 paddingvertical="9"
                 role="link"
-                style="transition: background 120ms ease-out; user-select: none;"
+                style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
                 tabindex="0"
+                tag="a"
               >
                 <svg
                   aria-hidden="true"
@@ -446,11 +452,13 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
                 borderradius="9999"
                 cursor="pointer"
                 gap="7"
+                href="/games"
                 paddinghorizontal="16"
                 paddingvertical="9"
                 role="link"
-                style="transition: background 120ms ease-out; user-select: none;"
+                style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
                 tabindex="0"
+                tag="a"
               >
                 <svg
                   aria-hidden="true"
@@ -641,11 +649,13 @@ exports[`App Navigation should match navigation snapshot 1`] = `
             borderradius="9999"
             cursor="pointer"
             gap="7"
+            href="/players"
             paddinghorizontal="16"
             paddingvertical="9"
             role="link"
-            style="transition: background 120ms ease-out; user-select: none;"
+            style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
             tabindex="0"
+            tag="a"
           >
             <svg
               aria-hidden="true"
@@ -704,11 +714,13 @@ exports[`App Navigation should match navigation snapshot 1`] = `
             borderradius="9999"
             cursor="pointer"
             gap="7"
+            href="/games"
             paddinghorizontal="16"
             paddingvertical="9"
             role="link"
-            style="transition: background 120ms ease-out; user-select: none;"
+            style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
             tabindex="0"
+            tag="a"
           >
             <svg
               aria-hidden="true"
@@ -880,11 +892,13 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             borderradius="9999"
             cursor="pointer"
             gap="7"
+            href="/players"
             paddinghorizontal="16"
             paddingvertical="9"
             role="link"
-            style="transition: background 120ms ease-out; user-select: none;"
+            style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
             tabindex="0"
+            tag="a"
           >
             <svg
               aria-hidden="true"
@@ -943,11 +957,13 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             borderradius="9999"
             cursor="pointer"
             gap="7"
+            href="/games"
             paddinghorizontal="16"
             paddingvertical="9"
             role="link"
-            style="transition: background 120ms ease-out; user-select: none;"
+            style="transition: background 120ms ease-out; user-select: none; text-decoration: none;"
             tabindex="0"
+            tag="a"
           >
             <svg
               aria-hidden="true"

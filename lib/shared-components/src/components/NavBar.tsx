@@ -3,6 +3,7 @@ import { Text, XStack } from 'tamagui';
 import type { BrandIconName } from './icons/BrandIcon';
 import { BrandIcon } from './icons/BrandIcon';
 import { handleKeyActivate } from '../utils/keyboardActivation';
+import { Platform } from '../platform-components';
 
 export type { BrandIconName };
 
@@ -15,6 +16,8 @@ export interface NavLink {
    * Route path for this link. When provided, the pill exposes `role="link"`
    * (matching `getByRole('link', ...)`) instead of the default
    * `role="button"` — this is a navigational destination, not an action.
+   * On web it also renders as a real `<a href>` so open-in-new-tab,
+   * Ctrl/Cmd/middle-click and copy-link work (LS-10779).
    */
   href?: string;
 }
@@ -97,8 +100,39 @@ export function NavBar({
   );
 }
 
+interface PressEventLike {
+  button?: number;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  preventDefault?: () => void;
+}
+
+/**
+ * Click handler for a web anchor pill: modified or non-primary clicks are left
+ * to the browser (new tab / window), while a plain click is turned into an
+ * in-app SPA navigation via `onPress` with the full-page load prevented.
+ */
+function handleAnchorPress(onPress: (() => void) | undefined) {
+  return (e: PressEventLike) => {
+    if (
+      (e.button != null && e.button !== 0) ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey
+    ) {
+      return;
+    }
+    e.preventDefault?.();
+    onPress?.();
+  };
+}
+
 function NavPill({ link }: { link: NavLink }) {
   const [hovered, setHovered] = React.useState(false);
+  const asAnchor = Platform.OS === 'web' && link.href != null;
 
   // Text/background render through real Tamagui props below, so a `$token`
   // string is all they need — Tamagui resolves it per-theme, cross-platform.
@@ -125,7 +159,13 @@ function NavPill({ link }: { link: NavLink }) {
       paddingVertical={9}
       borderRadius={9999}
       cursor="pointer"
-      onPress={link.onPress}
+      {...(asAnchor
+        ? {
+            tag: 'a',
+            href: link.href,
+            onPress: handleAnchorPress(link.onPress),
+          }
+        : { onPress: link.onPress })}
       role={link.href ? 'link' : 'button'}
       tabIndex={0}
       onKeyDown={handleKeyActivate(link.onPress)}
@@ -134,6 +174,7 @@ function NavPill({ link }: { link: NavLink }) {
         {
           transition: 'background 120ms ease-out',
           userSelect: 'none',
+          textDecoration: 'none',
         } as never
       }
       onMouseEnter={() => setHovered(true)}
