@@ -124,6 +124,23 @@ export function getGroupOrder(
   });
 }
 
+/**
+ * Returns the stats a commissioner may attach a position bonus to: only those
+ * whose group belongs to the league's sport/defensive format. The scoring
+ * profile can carry definitions from other sports (and both DST and IDP
+ * groups), which must not reach the bonus picker (LS-10788).
+ *
+ * @param stats - Every stat on the league's scoring profile.
+ * @param groupOrder - The league's visible groups, from `getGroupOrder`.
+ * @returns The subset of `stats` whose group is in `groupOrder`.
+ */
+export function getBonusEligibleStats<T extends { group: string }>(
+  stats: readonly T[],
+  groupOrder: readonly string[],
+): T[] {
+  return stats.filter((stat) => groupOrder.includes(stat.group));
+}
+
 export function ScoringSettingsEditor(
   props: ScoringSettingsEditorProps,
 ): React.JSX.Element {
@@ -149,6 +166,11 @@ export function ScoringSettingsEditor(
   );
 
   const stats = useMemo(() => collectProfileStats(profile), [profile]);
+
+  const bonusEligibleStats = useMemo(
+    () => getBonusEligibleStats(stats, groupOrder),
+    [stats, groupOrder],
+  );
 
   const groupedStats = useMemo(() => {
     const groups: Record<string, ProfileStat[]> = {};
@@ -783,7 +805,7 @@ export function ScoringSettingsEditor(
                   ? DefensiveFormat.Idp
                   : DefensiveFormat.Dst
               }
-              availableStats={stats}
+              availableStats={bonusEligibleStats}
             />
           </PremiumGate>
         ) : null}

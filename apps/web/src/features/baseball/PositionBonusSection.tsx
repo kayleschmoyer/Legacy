@@ -16,6 +16,7 @@ import {
   parseInput,
   type PositionBonus,
   positionBonusKey,
+  SCORING_GROUP_COPY,
   validatePositionBonus,
 } from '@legacy-sports/scoring';
 import {
@@ -26,13 +27,51 @@ import {
 
 /**
  * Stat definitions eligible for a position bonus — a subset of `ProfileStat`.
- * `group` is untyped (matches `ProfileStat.group: string`) since this field
- * is only carried through, never read, by this component.
+ * `group` is untyped (matches `ProfileStat.group: string`); it is only read to
+ * disambiguate option labels.
  */
 export interface BonusEligibleStat {
   id: number;
   group: string;
   displayName: string;
+}
+
+/** A bonus-eligible stat plus the visible label the picker shows for it. */
+export interface BonusStatOption extends BonusEligibleStat {
+  label: string;
+}
+
+/**
+ * Builds the stat picker's options, sorted by label. A display name shared by
+ * more than one stat (e.g. "Sacks" in both D/ST and IDP) is prefixed with its
+ * group title so no two options read the same (LS-10788).
+ *
+ * @param stats - Stats the commissioner may attach a bonus to.
+ * @returns One option per stat with a distinguishable `label`.
+ */
+export function buildBonusStatOptions(
+  stats: readonly BonusEligibleStat[],
+): BonusStatOption[] {
+  const nameCounts = new Map<string, number>();
+  for (const stat of stats) {
+    nameCounts.set(
+      stat.displayName,
+      (nameCounts.get(stat.displayName) ?? 0) + 1,
+    );
+  }
+
+  return stats
+    .map((stat) => {
+      const isShared = (nameCounts.get(stat.displayName) ?? 0) > 1;
+      const groupTitle = SCORING_GROUP_COPY[stat.group]?.title ?? stat.group;
+      return {
+        ...stat,
+        label: isShared
+          ? `${groupTitle} · ${stat.displayName}`
+          : stat.displayName,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 interface PositionBonusSectionProps {
@@ -78,10 +117,7 @@ export function PositionBonusSection(
   }, [defensiveFormat]);
 
   const statOptions = useMemo(
-    () =>
-      [...availableStats].sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
-      ),
+    () => buildBonusStatOptions(availableStats),
     [availableStats],
   );
 
@@ -90,7 +126,7 @@ export function PositionBonusSection(
   const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   const statById = useMemo(() => {
-    const map = new Map<number, BonusEligibleStat>();
+    const map = new Map<number, BonusStatOption>();
     for (const stat of statOptions) {
       map.set(stat.id, stat);
     }
@@ -143,7 +179,7 @@ export function PositionBonusSection(
     if (isDuplicate) {
       setErrors((prev) => ({
         ...prev,
-        [draft.key]: `A bonus for ${draft.position} / ${stat.displayName} already exists`,
+        [draft.key]: `A bonus for ${draft.position} / ${stat.label} already exists`,
       }));
       return;
     }
@@ -154,7 +190,7 @@ export function PositionBonusSection(
         id: null,
         position: draft.position,
         statDefinitionId: stat.id,
-        statDisplayName: stat.displayName,
+        statDisplayName: stat.label,
         bonusMultiplier: parsed,
         defaultBonusMultiplier: 0,
       },
@@ -360,7 +396,7 @@ export function PositionBonusSection(
             >
               {statOptions.map((stat) => (
                 <option key={stat.id} value={stat.id}>
-                  {stat.displayName}
+                  {stat.label}
                 </option>
               ))}
             </select>

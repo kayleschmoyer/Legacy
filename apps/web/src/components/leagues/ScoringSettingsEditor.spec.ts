@@ -1,4 +1,4 @@
-import { getGroupOrder } from './ScoringSettingsEditor';
+import { getBonusEligibleStats, getGroupOrder } from './ScoringSettingsEditor';
 
 describe('getGroupOrder', () => {
   it('returns baseball groups when sport is baseball', () => {
@@ -44,5 +44,39 @@ describe('getGroupOrder', () => {
     expect(order).not.toContain('batting');
     expect(order).not.toContain('pitching');
     expect(order).not.toContain('fielding');
+  });
+});
+
+describe('getBonusEligibleStats', () => {
+  const stats = [
+    { id: 1, group: 'passing', displayName: 'Passing Yards' },
+    { id: 2, group: 'batting', displayName: 'Home Runs' },
+    { id: 3, group: 'pitching', displayName: 'Earned Runs' },
+    { id: 4, group: 'defense', displayName: 'Sacks' },
+    { id: 5, group: 'idp', displayName: 'Sacks' },
+  ];
+
+  it('offers only football DST-league stats for a football DST league (LS-10788)', () => {
+    const eligible = getBonusEligibleStats(
+      stats,
+      getGroupOrder('football', 'dst'),
+    );
+    expect(eligible.map((s) => s.id)).toEqual([1, 4]);
+  });
+
+  it('offers only football IDP-league stats for a football IDP league', () => {
+    const eligible = getBonusEligibleStats(
+      stats,
+      getGroupOrder('football', 'idp'),
+    );
+    expect(eligible.map((s) => s.id)).toEqual([1, 5]);
+  });
+
+  it('offers only baseball stats for a baseball league', () => {
+    const eligible = getBonusEligibleStats(
+      stats,
+      getGroupOrder('baseball', null),
+    );
+    expect(eligible.map((s) => s.id)).toEqual([2, 3]);
   });
 });
