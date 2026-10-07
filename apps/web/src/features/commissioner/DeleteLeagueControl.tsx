@@ -264,6 +264,15 @@ export function DeleteLeagueControl({
                 placeholder={leagueName}
                 value={confirmationText}
                 onChangeText={setConfirmationText}
+                // react-native-web's TextInput stops propagation of every
+                // keydown, so Tamagui's document-level Escape listener never
+                // sees Esc while this (autofocused) field has focus. Close
+                // the dialog here instead (LS-10698).
+                onKeyPress={(e: { nativeEvent: { key: string } }) => {
+                  if (e.nativeEvent.key === 'Escape') {
+                    setShowConfirmDialog(false);
+                  }
+                }}
                 autoFocus
               />
               {confirmationText && confirmationText !== leagueName && (
