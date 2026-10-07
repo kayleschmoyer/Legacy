@@ -53,13 +53,15 @@ jest.mock('react-router-dom', () => ({
   Link: ({
     children,
     to,
+    tabIndex,
     'aria-label': ariaLabel,
   }: {
     children?: React.ReactNode;
     to: string;
+    tabIndex?: number;
     'aria-label'?: string;
   }) => (
-    <a href={to} aria-label={ariaLabel}>
+    <a href={to} tabIndex={tabIndex} aria-label={ariaLabel}>
       {children}
     </a>
   ),
@@ -224,6 +226,41 @@ describe('ScoreboardTicker overflow-only marquee (LS-10425)', () => {
     expect(screen.getByTestId('scoreboard-ticker-track')).toHaveAttribute(
       'data-marquee',
       'false',
+    );
+  });
+});
+
+describe('ScoreboardTicker hidden marquee copy is not focusable (LS-10783)', () => {
+  it('removes every link in the aria-hidden duplicate from the tab order', () => {
+    contentWidth = 600;
+    viewportWidth = 400;
+
+    render(<ScoreboardTicker />);
+
+    const track = screen.getByTestId('scoreboard-ticker-track');
+    const hiddenCopy = track.querySelector(':scope > [aria-hidden="true"]');
+    expect(hiddenCopy).not.toBeNull();
+    const hiddenLinks = hiddenCopy?.querySelectorAll('a') ?? [];
+    expect(hiddenLinks).toHaveLength(mockGames.length);
+    hiddenLinks.forEach((link) =>
+      expect(link).toHaveAttribute('tabindex', '-1'),
+    );
+  });
+
+  it('keeps each game reachable by keyboard exactly once while the marquee runs', () => {
+    contentWidth = 600;
+    viewportWidth = 400;
+
+    render(<ScoreboardTicker />);
+
+    const tabbable = chipLinks().filter(
+      (link) => link.getAttribute('tabindex') !== '-1',
+    );
+    expect(tabbable.map((link) => link.getAttribute('aria-label'))).toEqual(
+      mockGames.map(
+        (g) =>
+          `${g.awayTeam.abbreviation} ${g.awayTeam.runs}, ${g.homeTeam.abbreviation} ${g.homeTeam.runs} — FINAL`,
+      ),
     );
   });
 });

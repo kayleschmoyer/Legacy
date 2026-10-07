@@ -121,7 +121,14 @@ function gameStatusText(game: TickerGame): string {
 
 // ─── Game chip ────────────────────────────────────────────────────────────────
 
-function GameChip({ game }: { game: TickerGame }) {
+function GameChip({
+  game,
+  focusable = true,
+}: {
+  game: TickerGame;
+  /** False for the aria-hidden marquee duplicate, so keyboard users tab each game once. */
+  focusable?: boolean;
+}) {
   const isLive = game.status === 'Live';
   const isFinal = game.status === 'Final';
   const isPreview = !isLive && !isFinal;
@@ -153,6 +160,7 @@ function GameChip({ game }: { game: TickerGame }) {
       to="/scoreboard"
       style={{ textDecoration: 'none', flexShrink: 0 }}
       aria-label={ariaLabel}
+      tabIndex={focusable ? undefined : -1}
     >
       <XStack
         alignItems="center"
@@ -433,10 +441,10 @@ export function ScoreboardTicker() {
 
   const scrollDuration = scrollDurationSecs(games.length);
 
-  const renderChips = (keyPrefix: string) =>
+  const renderChips = (keyPrefix: string, focusable = true) =>
     games.map((game, idx) => (
       <React.Fragment key={`${keyPrefix}${game.gamePk}`}>
-        <GameChip game={game} />
+        <GameChip game={game} focusable={focusable} />
         {idx < games.length - 1 && <Separator />}
       </React.Fragment>
     ));
@@ -489,8 +497,11 @@ export function ScoreboardTicker() {
            * so the translateX(-50%) scroll loops seamlessly: each copy ends
            * with a separator so the halves are equal width and the seam reads
            * "…C · A…". The duplicate is aria-hidden to avoid screen-reader
-           * repetition. The first copy stays mounted in both modes so its
-           * width can be measured without remounting.
+           * repetition, and its links are tabIndex -1 so keyboard focus never
+           * lands inside aria-hidden content (LS-10783). Not `inert`: that
+           * would also block clicks on the copy that is visibly scrolling.
+           * The first copy stays mounted in both modes so its width can be
+           * measured without remounting.
            */
           <ScrollOuter>
             <div
@@ -535,7 +546,7 @@ export function ScoreboardTicker() {
                   <>
                     <Separator />
                     <div aria-hidden="true" style={{ display: 'contents' }}>
-                      {renderChips('dup-')}
+                      {renderChips('dup-', false)}
                       <Separator />
                     </div>
                   </>
