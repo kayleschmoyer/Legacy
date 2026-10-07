@@ -1094,6 +1094,8 @@ export function EliteDraftBoardScreen({
     token: token ?? authToken ?? undefined,
     fetchPlayer: fetchDraftPlayer,
     onPlayerDrafted,
+    currentOverallPick: queries.currentPickInfo?.overallPick ?? null,
+    draftComplete: ui.draftComplete,
     onLeagueDeleted: handleLeagueDeleted,
   });
 

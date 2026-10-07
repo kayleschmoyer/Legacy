@@ -1401,3 +1401,169 @@ describe('useDraftWebSocket — pick undo re-arms announcements (LS-10593)', () 
     expect(params.refetchAutoPickStatuses).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('useDraftWebSocket — live-draft safety net (LS-10845)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockBackgroundCallback = null;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  type Params = ReturnType<typeof makeDefaultParams> & {
+    currentOverallPick?: number | null;
+    draftComplete?: boolean;
+  };
+
+  function renderSafetyNet(overrides: Partial<Params> = {}) {
+    const params: Params = {
+      ...makeDefaultParams(),
+      currentOverallPick: 5,
+      ...overrides,
+    };
+    const hook = renderHook((p: Params) => useDraftWebSocket(p), {
+      initialProps: params,
+    });
+    act(() => mockInstance._emit('connected'));
+    return { params, ...hook };
+  }
+
+  const pickEvent = (overallPick: number) => ({
+    draftId: 42,
+    leagueId: 1,
+    pickId: overallPick,
+    teamId: 20,
+    playerId: overallPick,
+    round: 1,
+    pickNumber: overallPick,
+    overallPick,
+    nextPick: {
+      teamId: 10,
+      round: 1,
+      pickNumber: overallPick + 1,
+      overallPick: overallPick + 1,
+    },
+    wasAutoPick: false,
+    currentPickDeadline: null,
+  });
+
+  it('polls the current pick while the draft is live', () => {
+    const { params } = renderSafetyNet();
+    params.refetchCurrentPick.mockClear();
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    expect(params.refetchCurrentPick).toHaveBeenCalledTimes(3);
+    expect(params.refetchCurrentPick).toHaveBeenCalledWith({ draftId: 42 });
+  });
+
+  it('does not poll for callers that do not opt in', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+    act(() => mockInstance._emit('connected'));
+    params.refetchCurrentPick.mockClear();
+
+    act(() => {
+      jest.advanceTimersByTime(30_000);
+    });
+
+    expect(params.refetchCurrentPick).not.toHaveBeenCalled();
+  });
+
+  it('stops polling once the draft is complete', () => {
+    const { params } = renderSafetyNet({ draftComplete: true });
+    params.refetchCurrentPick.mockClear();
+
+    act(() => {
+      jest.advanceTimersByTime(30_000);
+    });
+
+    expect(params.refetchCurrentPick).not.toHaveBeenCalled();
+  });
+
+  it('pauses polling while the app is backgrounded', () => {
+    const { params } = renderSafetyNet();
+    act(() => mockBackgroundCallback?.());
+    params.refetchCurrentPick.mockClear();
+
+    act(() => {
+      jest.advanceTimersByTime(30_000);
+    });
+
+    expect(params.refetchCurrentPick).not.toHaveBeenCalled();
+  });
+
+  it('resyncs and replaces the socket when the pick advances without a socket event', () => {
+    const { params, rerender } = renderSafetyNet();
+    // Let the initial-connect resync window lapse.
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+    params.refetchPickHistory.mockClear();
+    params.refetchAvailablePlayers.mockClear();
+    mockInstance.disconnect.mockClear();
+    mockInstance.connect.mockClear();
+
+    // The poll reveals two picks the socket never delivered.
+    rerender({ ...params, currentOverallPick: 7 });
+    act(() => {
+      jest.advanceTimersByTime(3_000);
+    });
+
+    expect(params.refetchPickHistory).toHaveBeenCalledTimes(1);
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(mockInstance.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockInstance.connect).toHaveBeenCalled();
+  });
+
+  it('does nothing extra when the socket announced the pick', () => {
+    const { params, rerender } = renderSafetyNet();
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent(5));
+    });
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+    params.refetchPickHistory.mockClear();
+    mockInstance.disconnect.mockClear();
+
+    rerender({ ...params, currentOverallPick: 6 });
+    act(() => {
+      jest.advanceTimersByTime(3_000);
+    });
+
+    expect(params.refetchPickHistory).not.toHaveBeenCalled();
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+
+  it("waits for the socket's event when our own pick's refetch lands first", () => {
+    const { params, rerender } = renderSafetyNet();
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+    params.refetchPickHistory.mockClear();
+    mockInstance.disconnect.mockClear();
+
+    rerender({ ...params, currentOverallPick: 6 });
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, pickEvent(5));
+    });
+    act(() => {
+      jest.advanceTimersByTime(3_000);
+    });
+
+    // Only the pick event's own debounced refetch — no resync burst.
+    expect(params.refetchPickHistory).toHaveBeenCalledTimes(1);
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+});

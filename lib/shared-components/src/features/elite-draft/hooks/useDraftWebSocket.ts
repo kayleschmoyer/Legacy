@@ -54,6 +54,28 @@ const FOREGROUND_FORCE_RECONNECT_MS = 5 * 1000;
  * so the same data isn't refetched twice (LS-10593).
  */
 const RESYNC_DEDUPE_MS = 2 * 1000;
+/**
+ * Cadence of the current-pick safety-net poll while a draft is live. The
+ * socket is the primary channel, but a socket that silently stops delivering
+ * (a mobile radio handoff, a NAT drop, a server-side send to a connection the
+ * gateway already retired) is only noticed by the heartbeat after several
+ * missed pings — 45s+ at the draft cadence. Until then the board kept showing
+ * a team that had already picked as on the clock while the user's own clock
+ * ran down (LS-10845). One cheap current-pick query every few seconds bounds
+ * that staleness regardless of why the event went missing.
+ */
+const PICK_SAFETY_POLL_MS = 5 * 1000;
+/**
+ * When the current pick advances without a matching DRAFT_PICK_MADE (e.g.
+ * our own pick's mutation refetch lands first), wait this long for the
+ * socket's event before treating it as missed (LS-10845).
+ */
+const MISSED_PICK_GRACE_MS = 3 * 1000;
+/**
+ * A pick change within this long of a resync is the resync's own refetch
+ * landing, not a missed event (LS-10845).
+ */
+const RESYNC_EXPLAINS_CHANGE_MS = 15 * 1000;
 
 type ReconnectRefetchOutcome = 'ok' | 'cancelled' | 'failed';
 
@@ -141,6 +163,16 @@ interface UseDraftWebSocketParams {
    */
   onPickUndone?: (overallPick: number) => void;
   /**
+   * The current pick's overall number from the current-pick query. Passing
+   * it (even as `null` while loading) opts into the live-draft safety net
+   * (LS-10845): the current pick is polled while the draft is live, and a
+   * pick advance the socket never announced triggers a full resync plus a
+   * fresh socket.
+   */
+  currentOverallPick?: number | null;
+  /** Stops the safety-net poll once the draft is over (LS-10845). */
+  draftComplete?: boolean;
+  /**
    * Fired when the league (and so this draft) is deleted while the room is
    * open. The room has nothing left to show, so the screen should leave.
    */
@@ -178,8 +210,14 @@ export function useDraftWebSocket({
   fetchPlayer,
   onPlayerDrafted,
   onPickUndone,
+  currentOverallPick,
+  draftComplete = false,
   onLeagueDeleted,
 }: UseDraftWebSocketParams) {
+  // The overall pick the socket says is on the clock — set by every pick /
+  // undo event so the safety net can tell a socket-announced advance from a
+  // missed one (LS-10845).
+  const wsExpectedOverallPickRef = useRef<number | null>(null);
   // Holds the latest pick notification while debouncing refetches for batch auto-picks.
   const pendingRefetchNotifRef = useRef<DraftPickNotification | null>(null);
   const refetchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -214,6 +252,9 @@ export function useDraftWebSocket({
         notification.teamId ?? notification.participantId,
       );
       const isMyTeamPick = pickTeamId !== null && pickTeamId === myTeamId;
+
+      wsExpectedOverallPickRef.current =
+        notification.nextPick?.overallPick ?? notification.overallPick + 1;
 
       const pickKey = notification.overallPick;
       if (!notifiedPicksRef.current.has(pickKey)) {
@@ -443,6 +484,7 @@ export function useDraftWebSocket({
 
   const handleDraftPickUndone = useCallback(
     (notification: DraftPickUndoneNotification) => {
+      wsExpectedOverallPickRef.current = notification.overallPick;
       setLiveMessage(
         `Pick #${notification.overallPick} has been undone by the commissioner.`,
       );
@@ -631,7 +673,7 @@ export function useDraftWebSocket({
    * on unmount).
    */
   const resync = useCallback(
-    (reason: 'reconnect' | 'foreground'): (() => void) => {
+    (reason: 'reconnect' | 'foreground' | 'missed-pick'): (() => void) => {
       const noop = () => undefined;
       if (draftId === null) return noop;
 
@@ -863,6 +905,78 @@ export function useDraftWebSocket({
     ],
   );
   useAppForeground(handleForeground, handleBackground);
+
+  // Live-draft safety net (LS-10845). See PICK_SAFETY_POLL_MS: the socket can
+  // go quiet without closing, and until the heartbeat notices, the board
+  // would otherwise show a stale team on the clock. Poll the current pick so
+  // "whose turn" and the clock (useDraftTimer refetches the deadline when the
+  // pick advances) can never lag more than a few seconds.
+  const safetyNetEnabled =
+    socketExpected && currentOverallPick !== undefined && !draftComplete;
+  const refetchCurrentPickRef = useRef(refetchCurrentPick);
+  refetchCurrentPickRef.current = refetchCurrentPick;
+  useEffect(() => {
+    if (!safetyNetEnabled || draftId === null) return undefined;
+    const timer = setInterval(() => {
+      // Parked while backgrounded — foreground resyncs on return.
+      if (suspendedForBackgroundRef.current) return;
+      refetchCurrentPickRef
+        .current({ draftId })
+        .catch((e: unknown) =>
+          LOGGER.debug('Current-pick safety poll failed', { error: e }),
+        );
+    }, PICK_SAFETY_POLL_MS);
+    return () => clearInterval(timer);
+  }, [safetyNetEnabled, draftId]);
+
+  // A pick advance the socket never announced means it missed events: the
+  // pick history, player pool and queue are stale too, and the socket itself
+  // can't be trusted. Resync everything and replace the socket (LS-10845).
+  const currentOverallPickRef = useRef(currentOverallPick);
+  currentOverallPickRef.current = currentOverallPick;
+  const prevOverallPickRef = useRef<number | null>(null);
+  useEffect(() => {
+    const current = currentOverallPick ?? null;
+    const prev = prevOverallPickRef.current;
+    prevOverallPickRef.current = current;
+    if (
+      !safetyNetEnabled ||
+      current === null ||
+      prev === null ||
+      current === prev ||
+      current === wsExpectedOverallPickRef.current
+    ) {
+      return undefined;
+    }
+
+    // Give the socket's own event a moment — our own pick's mutation refetch
+    // routinely lands before the DRAFT_PICK_MADE broadcast does.
+    const timer = setTimeout(() => {
+      const latest = currentOverallPickRef.current ?? null;
+      if (latest === null || latest === wsExpectedOverallPickRef.current) {
+        return;
+      }
+      wsExpectedOverallPickRef.current = latest;
+      if (Date.now() - lastResyncAtRef.current < RESYNC_EXPLAINS_CHANGE_MS) {
+        return;
+      }
+      LOGGER.warn('[useDraftWebSocket] socket missed a pick — resyncing', {
+        draftId,
+        overallPick: latest,
+      });
+      resync('missed-pick');
+      wsDisconnect();
+      wsConnect();
+    }, MISSED_PICK_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    currentOverallPick,
+    safetyNetEnabled,
+    draftId,
+    resync,
+    wsConnect,
+    wsDisconnect,
+  ]);
 
   /**
    * Debounced, renderable view of the socket state (LS-9856). The raw

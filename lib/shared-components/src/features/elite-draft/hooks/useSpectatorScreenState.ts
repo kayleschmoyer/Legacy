@@ -117,6 +117,8 @@ export function useSpectatorScreenState({
     token: token ?? authToken ?? undefined,
     fetchPlayer: fetchDraftPlayer,
     onPickUndone: removePick,
+    currentOverallPick: data.currentPickInfo?.overallPick ?? null,
+    draftComplete,
     onLeagueDeleted,
   });
 
