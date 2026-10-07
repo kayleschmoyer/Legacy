@@ -1361,9 +1361,14 @@ export function EliteDraftBoardScreen({
     return <NoLeagueScreen onNavigate={onNavigate} />;
   }
 
+  // Initial load only. A filter/search change refetches available players with
+  // new variables and Apollo clears `data` meanwhile; a mock draft has no
+  // `leagueData` to hold the gate shut, so checking `data` alone unmounted the
+  // whole board — and the open pick sheet — on every filter change (LS-10806).
   if (
     (queries.leagueLoading || queries.availablePlayersLoading) &&
     !queries.availablePlayersData &&
+    !queries.previousAvailablePlayersData &&
     !queries.leagueData
   ) {
     return <LoadingScreen />;

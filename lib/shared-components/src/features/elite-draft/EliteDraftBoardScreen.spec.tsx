@@ -1869,6 +1869,58 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     ).toBe('false');
   });
 
+  // LS-10806: a mock draft has no league, so `leagueData` never arrives. A
+  // position/search change refetches available players with new variables,
+  // and Apollo clears `data` until they land — the initial-load gate used to
+  // fire then, unmounting the board (and the open sheet) behind LoadingScreen.
+  it('keeps the pick sheet open while a filter change refetches players in a mock draft', () => {
+    const mockQueries = {
+      isMock: true,
+      isRoomMode: true,
+      leagueData: undefined,
+      availablePlayersData: { getAvailableDraftPlayers: [] },
+    };
+    setupCompactLiveDraft({ isMyPick: true, queries: mockQueries });
+
+    const { rerender } = render(<EliteDraftBoardScreen {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('draft-pick-cta'));
+
+    setupCompactLiveDraft({
+      isMyPick: true,
+      queries: {
+        ...mockQueries,
+        availablePlayersLoading: true,
+        availablePlayersData: undefined,
+        previousAvailablePlayersData: { getAvailableDraftPlayers: [] },
+      },
+    });
+    rerender(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('draft-board-loading')).toBeNull();
+    expect(
+      screen.getByTestId('draft-pick-sheet').getAttribute('data-open'),
+    ).toBe('true');
+    expect(screen.getByTestId('draft-players-tab')).toBeTruthy();
+  });
+
+  it('still shows LoadingScreen on the initial load of a mock draft', () => {
+    setupCompactLiveDraft({
+      queries: {
+        isMock: true,
+        isRoomMode: true,
+        leagueData: undefined,
+        availablePlayersLoading: true,
+        availablePlayersData: undefined,
+        previousAvailablePlayersData: undefined,
+      },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByTestId('draft-board-loading')).toBeTruthy();
+    expect(screen.queryByTestId('draft-pick-sheet')).toBeNull();
+  });
+
   // LS-9253: Control All Teams — every team's turn is pickable, not just the
   // human's own seat, routed through commissionerPick (not makeDraftPick)
   // since the current-clock team isn't the human's own registered team.

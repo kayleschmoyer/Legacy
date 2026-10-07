@@ -833,6 +833,7 @@ export function useDraftQueries({
     // Available players
     availablePlayers,
     availablePlayersData,
+    previousAvailablePlayersData,
     availablePlayersLoading,
     openSlotPositions,
     refetchOpenSlotPositions,
