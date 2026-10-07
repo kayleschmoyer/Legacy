@@ -15,6 +15,7 @@ import './version';
 import './scoring';
 import './notifications';
 import './user-preferences';
+import './favorite-players';
 import './chat-and-tiebreakers';
 import './drafts';
 import './invites';

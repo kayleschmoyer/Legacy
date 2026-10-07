@@ -976,6 +976,14 @@ export type ExpireSubscriptionGracePeriodsResult = {
   expired?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A player the signed-in user starred. Global per user: shared across every league and draft, and separate from a draft's queue. */
+export type FavoritePlayer = {
+  __typename?: 'FavoritePlayer';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+};
+
 export type FootballCareerDefense = {
   __typename?: 'FootballCareerDefense';
   defTd?: Maybe<Scalars['Int']['output']>;
@@ -2326,6 +2334,8 @@ export type Mutation = {
   /** Allowlist an address for the Android download. The address need not have a user account — that is the normal case for a new tester. Admin only. */
   addAppDownloadAllowlistEntry?: Maybe<AppDownloadAllowlistResult>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  /** Star a player for the signed-in user. Idempotent: starring a favorite again returns the existing favorite. */
+  addFavoritePlayer?: Maybe<FavoritePlayer>;
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   adminRegenerateLeagueSchedule?: Maybe<AdvanceLeagueWeekResponse>;
@@ -2471,6 +2481,8 @@ export type Mutation = {
   /** Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release. */
   releasePlayer?: Maybe<RosterLimitStatus>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
+  /** Unstar a player for the signed-in user. Idempotent: removing a player who is not a favorite still returns true. */
+  removeFavoritePlayer?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
@@ -2616,6 +2628,10 @@ export type MutationAddAppDownloadAllowlistEntryArgs = {
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAddFavoritePlayerArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationAddToDraftQueueArgs = {
@@ -3021,6 +3037,10 @@ export type MutationReleasePlayerArgs = {
 export type MutationRemoveAssistantManagerArgs = {
   teamId: Scalars['Int']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationRemoveFavoritePlayerArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationRemoveFromDraftQueueArgs = {
@@ -3984,6 +4004,8 @@ export type Query = {
   myDataRequests?: Maybe<Array<DataRequest>>;
   /** Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog. */
   myEntitlements: Array<Scalars['String']['output']>;
+  /** The signed-in user's favorite players, newest first. Pass sport to limit them to one sport. */
+  myFavoritePlayers?: Maybe<Array<FavoritePlayer>>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
   /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
@@ -4503,6 +4525,10 @@ export type QueryMatchupScoresArgs = {
 export type QueryMyAwardVotesArgs = {
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type QueryMyFavoritePlayersArgs = {
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryMyInvitesArgs = {

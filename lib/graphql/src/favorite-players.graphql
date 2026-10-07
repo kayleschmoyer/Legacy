@@ -1,0 +1,25 @@
+# Global per-user favorite players (LS-10861, story LS-10789).
+# Favorites follow the user across every league and draft and are separate
+# from a draft's queue.
+
+fragment FavoritePlayer on FavoritePlayer {
+  playerId
+  sport
+  createdAt
+}
+
+query GetMyFavoritePlayers($sport: Sport) {
+  myFavoritePlayers(sport: $sport) {
+    ...FavoritePlayer
+  }
+}
+
+mutation AddFavoritePlayer($playerId: Int!) {
+  addFavoritePlayer(playerId: $playerId) {
+    ...FavoritePlayer
+  }
+}
+
+mutation RemoveFavoritePlayer($playerId: Int!) {
+  removeFavoritePlayer(playerId: $playerId)
+}

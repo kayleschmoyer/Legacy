@@ -982,6 +982,14 @@ export type ExpireSubscriptionGracePeriodsResult = {
   expired?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A player the signed-in user starred. Global per user: shared across every league and draft, and separate from a draft's queue. */
+export type FavoritePlayer = {
+  __typename?: 'FavoritePlayer';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  sport?: Maybe<Sport>;
+};
+
 export type FootballCareerDefense = {
   __typename?: 'FootballCareerDefense';
   defTd?: Maybe<Scalars['Int']['output']>;
@@ -2332,6 +2340,8 @@ export type Mutation = {
   /** Allowlist an address for the Android download. The address need not have a user account — that is the normal case for a new tester. Admin only. */
   addAppDownloadAllowlistEntry?: Maybe<AppDownloadAllowlistResult>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  /** Star a player for the signed-in user. Idempotent: starring a favorite again returns the existing favorite. */
+  addFavoritePlayer?: Maybe<FavoritePlayer>;
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   adminRegenerateLeagueSchedule?: Maybe<AdvanceLeagueWeekResponse>;
@@ -2477,6 +2487,8 @@ export type Mutation = {
   /** Release a player from your roster while it is over the league's roster limit. Returns the roster-limit status after the release. */
   releasePlayer?: Maybe<RosterLimitStatus>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
+  /** Unstar a player for the signed-in user. Idempotent: removing a player who is not a favorite still returns true. */
+  removeFavoritePlayer?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
@@ -2622,6 +2634,10 @@ export type MutationAddAppDownloadAllowlistEntryArgs = {
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAddFavoritePlayerArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationAddToDraftQueueArgs = {
@@ -3027,6 +3043,10 @@ export type MutationReleasePlayerArgs = {
 export type MutationRemoveAssistantManagerArgs = {
   teamId: Scalars['Int']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationRemoveFavoritePlayerArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationRemoveFromDraftQueueArgs = {
@@ -3990,6 +4010,8 @@ export type Query = {
   myDataRequests?: Maybe<Array<DataRequest>>;
   /** Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog. */
   myEntitlements: Array<Scalars['String']['output']>;
+  /** The signed-in user's favorite players, newest first. Pass sport to limit them to one sport. */
+  myFavoritePlayers?: Maybe<Array<FavoritePlayer>>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
   /** The caller's pending, unexpired invites, newest first, cursor-paged (LS-10078). The Mock Drafts hub (LS-10079) lists these. */
@@ -4509,6 +4531,10 @@ export type QueryMatchupScoresArgs = {
 export type QueryMyAwardVotesArgs = {
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type QueryMyFavoritePlayersArgs = {
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryMyInvitesArgs = {
@@ -11040,6 +11066,50 @@ export type CreateSeasonDraftGameMutationVariables = Exact<{
 export type CreateSeasonDraftGameMutation = {
   __typename?: 'Mutation';
   createSeasonDraftGame?: number | null;
+};
+
+export type FavoritePlayerFragment = {
+  __typename?: 'FavoritePlayer';
+  playerId?: number | null;
+  sport?: Sport | null;
+  createdAt?: string | null;
+};
+
+export type GetMyFavoritePlayersQueryVariables = Exact<{
+  sport?: InputMaybe<Sport>;
+}>;
+
+export type GetMyFavoritePlayersQuery = {
+  __typename?: 'Query';
+  myFavoritePlayers?: Array<{
+    __typename?: 'FavoritePlayer';
+    playerId?: number | null;
+    sport?: Sport | null;
+    createdAt?: string | null;
+  }> | null;
+};
+
+export type AddFavoritePlayerMutationVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type AddFavoritePlayerMutation = {
+  __typename?: 'Mutation';
+  addFavoritePlayer?: {
+    __typename?: 'FavoritePlayer';
+    playerId?: number | null;
+    sport?: Sport | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type RemoveFavoritePlayerMutationVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type RemoveFavoritePlayerMutation = {
+  __typename?: 'Mutation';
+  removeFavoritePlayer?: boolean | null;
 };
 
 export type FootballGamePassingStatsFragment = {
@@ -17666,6 +17736,13 @@ export const AchievementRestrictionFragmentDoc = gql`
     repeatableRosterMax
     createdAt
     updatedAt
+  }
+`;
+export const FavoritePlayerFragmentDoc = gql`
+  fragment FavoritePlayer on FavoritePlayer {
+    playerId
+    sport
+    createdAt
   }
 `;
 export const FootballGamePassingStatsFragmentDoc = gql`
@@ -28315,6 +28392,192 @@ export type CreateSeasonDraftGameMutationResult =
 export type CreateSeasonDraftGameMutationOptions = BaseMutationOptions<
   CreateSeasonDraftGameMutation,
   CreateSeasonDraftGameMutationVariables
+>;
+export const GetMyFavoritePlayers = gql`
+  query GetMyFavoritePlayers($sport: Sport) {
+    myFavoritePlayers(sport: $sport) {
+      ...FavoritePlayer
+    }
+  }
+  ${FavoritePlayerFragmentDoc}
+`;
+
+/**
+ * __useGetMyFavoritePlayersQuery__
+ *
+ * To run a query within a React component, call `useGetMyFavoritePlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyFavoritePlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyFavoritePlayersQuery({
+ *   variables: {
+ *      sport: // value for 'sport'
+ *   },
+ * });
+ */
+export function useGetMyFavoritePlayersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyFavoritePlayersQuery,
+    GetMyFavoritePlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyFavoritePlayersQuery,
+    GetMyFavoritePlayersQueryVariables
+  >(GetMyFavoritePlayers, options);
+}
+export function useGetMyFavoritePlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyFavoritePlayersQuery,
+    GetMyFavoritePlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyFavoritePlayersQuery,
+    GetMyFavoritePlayersQueryVariables
+  >(GetMyFavoritePlayers, options);
+}
+export function useGetMyFavoritePlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyFavoritePlayersQuery,
+        GetMyFavoritePlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyFavoritePlayersQuery,
+    GetMyFavoritePlayersQueryVariables
+  >(
+    GetMyFavoritePlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyFavoritePlayersQuery,
+          GetMyFavoritePlayersQueryVariables
+        >,
+  );
+}
+export type GetMyFavoritePlayersQueryHookResult = ReturnType<
+  typeof useGetMyFavoritePlayersQuery
+>;
+export type GetMyFavoritePlayersLazyQueryHookResult = ReturnType<
+  typeof useGetMyFavoritePlayersLazyQuery
+>;
+export type GetMyFavoritePlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyFavoritePlayersSuspenseQuery
+>;
+export type GetMyFavoritePlayersQueryResult = Apollo.QueryResult<
+  GetMyFavoritePlayersQuery,
+  GetMyFavoritePlayersQueryVariables
+>;
+export const AddFavoritePlayer = gql`
+  mutation AddFavoritePlayer($playerId: Int!) {
+    addFavoritePlayer(playerId: $playerId) {
+      ...FavoritePlayer
+    }
+  }
+  ${FavoritePlayerFragmentDoc}
+`;
+export type AddFavoritePlayerMutationFn = MutationFunction<
+  AddFavoritePlayerMutation,
+  AddFavoritePlayerMutationVariables
+>;
+
+/**
+ * __useAddFavoritePlayerMutation__
+ *
+ * To run a mutation, you first call `useAddFavoritePlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAddFavoritePlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [addFavoritePlayerMutation, { data, loading, error }] = useAddFavoritePlayerMutation({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useAddFavoritePlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AddFavoritePlayerMutation,
+    AddFavoritePlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AddFavoritePlayerMutation,
+    AddFavoritePlayerMutationVariables
+  >(AddFavoritePlayer, options);
+}
+export type AddFavoritePlayerMutationHookResult = ReturnType<
+  typeof useAddFavoritePlayerMutation
+>;
+export type AddFavoritePlayerMutationResult =
+  Apollo.MutationResult<AddFavoritePlayerMutation>;
+export type AddFavoritePlayerMutationOptions = BaseMutationOptions<
+  AddFavoritePlayerMutation,
+  AddFavoritePlayerMutationVariables
+>;
+export const RemoveFavoritePlayer = gql`
+  mutation RemoveFavoritePlayer($playerId: Int!) {
+    removeFavoritePlayer(playerId: $playerId)
+  }
+`;
+export type RemoveFavoritePlayerMutationFn = MutationFunction<
+  RemoveFavoritePlayerMutation,
+  RemoveFavoritePlayerMutationVariables
+>;
+
+/**
+ * __useRemoveFavoritePlayerMutation__
+ *
+ * To run a mutation, you first call `useRemoveFavoritePlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRemoveFavoritePlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [removeFavoritePlayerMutation, { data, loading, error }] = useRemoveFavoritePlayerMutation({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useRemoveFavoritePlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RemoveFavoritePlayerMutation,
+    RemoveFavoritePlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RemoveFavoritePlayerMutation,
+    RemoveFavoritePlayerMutationVariables
+  >(RemoveFavoritePlayer, options);
+}
+export type RemoveFavoritePlayerMutationHookResult = ReturnType<
+  typeof useRemoveFavoritePlayerMutation
+>;
+export type RemoveFavoritePlayerMutationResult =
+  Apollo.MutationResult<RemoveFavoritePlayerMutation>;
+export type RemoveFavoritePlayerMutationOptions = BaseMutationOptions<
+  RemoveFavoritePlayerMutation,
+  RemoveFavoritePlayerMutationVariables
 >;
 export const GetAllPlayerSeasonStats = gql`
   query GetAllPlayerSeasonStats($playerId: Int!) {
