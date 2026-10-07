@@ -1,0 +1,17 @@
+{
+  "name": "legacy-sports",
+  "mcpServerPrefix": "legacy-sports",
+  "jira": {
+    "projectKey": "LS",
+    "siteUrl": "https://bkrupa.atlassian.net"
+  },
+  "github": {
+    "deploysRepo": "bkrupa/legacy-sports-deploys",
+    "deploysPagesBaseUrl": "https://bkrupa.github.io/legacy-sports-deploys"
+  },
+  "aws": {
+    "resourcePrefix": "legacy-sports",
+    "ciArtifactsBucket": "legacy-sports-dev-ci-artifacts"
+  },
+  "dotfileDir": ".legacy-sports"
+}

@@ -18,6 +18,40 @@ MCP server configuration is maintained in multiple files to support different AI
 
 VS Code-based agents use a `"type": "stdio"` field per server; CLI-based agents omit it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while other clients use `${VAR_NAME}`.
 
+## Harness Config (`harness.config.json`)
+
+Every repo-identity value the servers, hooks and scripts need — Jira project
+key and site URL, the deploys repo and its Pages URL, the AWS resource prefix
+and CI artifacts bucket, the per-user dotfile directory, and the MCP
+server-name prefix — lives in **`harness.config.json`** at the repository root
+and is read through **`@legacy-sports/mcp-config`** (`lib/mcp-config`). This is
+step 1 of extracting the harness into a reusable plugin (LS-10950): a second
+project installs the same tooling with a different file instead of forking
+string literals.
+
+```ts
+import {
+  getHarnessConfig,
+  ticketKeyPattern,
+  awsResourceName,
+} from '@legacy-sports/mcp-config';
+
+const cfg = getHarnessConfig(); // cached; walks up from cwd to find the file
+ticketKeyPattern(cfg); // /\b(LS-\d+)\b/
+awsResourceName(cfg, 'dev', 'graphql'); // 'legacy-sports-dev-graphql'
+```
+
+Resolution order: `configPath` option → `HARNESS_CONFIG_PATH` env var → nearest
+`harness.config.json` walking up from `cwd` → built-in defaults (equal to this
+repo's values, so hosted Lambdas with no repo on disk are unchanged). Every
+leaf is overridable with a `HARNESS_*` env var (`HARNESS_JIRA_PROJECT_KEY`,
+`HARNESS_AWS_RESOURCE_PREFIX`, … — see `HARNESS_ENV_OVERRIDES`). An invalid
+file or override throws rather than falling back, so a misconfigured server
+fails at startup instead of filing tickets in the wrong project.
+
+> Call sites still hardcode these values today; LS-10952 threads the config
+> through the servers, hooks and scripts, and LS-10953 renames the servers.
+
 ## Tool Reference
 
 Every tool across all servers — names, descriptions, and full input schemas — is

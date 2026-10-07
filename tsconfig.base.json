@@ -43,6 +43,7 @@
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/logging/server": ["lib/logging/src/server.ts"],
       "@legacy-sports/mcp-bearer-auth": ["lib/mcp-bearer-auth/src/index.ts"],
+      "@legacy-sports/mcp-config": ["lib/mcp-config/src/index.ts"],
       "@legacy-sports/mcp-docs": ["lib/mcp-docs/src/index.ts"],
       "@legacy-sports/mcp-docs/pages/*": [
         "lib/mcp-docs/src/pages/*.generated.ts"
