@@ -9,6 +9,9 @@ export function calculatePlayoffProjections(
     playoffTeams?: number;
     remainingWeeks?: number;
     simulationCount?: number;
+    /** Base RNG seed. Defaults to a hash of the standings, so identical
+     *  inputs always yield identical projections (LS-10759). */
+    seed?: number;
   } = {},
 ): PlayoffProjection[] {
   const {
@@ -16,6 +19,8 @@ export function calculatePlayoffProjections(
     remainingWeeks = 5,
     simulationCount = 1000,
   } = options;
+  const seed =
+    options.seed ?? hashStandings(teamStats, playoffTeams, remainingWeeks);
 
   const projections: PlayoffProjection[] = [];
 
@@ -26,6 +31,7 @@ export function calculatePlayoffProjections(
       teamStats,
       remainingWeeks,
       simulationCount,
+      createRng(seed ^ Math.imul(stats.teamId, 0x9e3779b1)),
     );
 
     // Calculate playoff probability based on simulations
@@ -70,9 +76,11 @@ export function calculatePlayoffProjections(
     });
   });
 
-  // Sort by playoff probability (highest first)
+  // Sort by playoff probability (highest first); teamId breaks ties so the
+  // order does not depend on DB row order (LS-10759)
   return projections.sort(
-    (a, b) => b.playoffProbability - a.playoffProbability,
+    (a, b) =>
+      b.playoffProbability - a.playoffProbability || a.teamId - b.teamId,
   );
 }
 
@@ -84,6 +92,7 @@ function runPlayoffSimulations(
   allTeams: TeamStats[],
   remainingWeeks: number,
   simulationCount: number,
+  random: () => number,
 ): {
   playoffAppearances: number;
   totalWins: number;
@@ -103,13 +112,13 @@ function runPlayoffSimulations(
     // Simulate remaining matchups
     for (let week = 0; week < remainingWeeks; week++) {
       // Add some randomness around the base probability
-      const randomFactor = (Math.random() - 0.5) * 0.2; // ±10% variance
+      const randomFactor = (random() - 0.5) * 0.2; // ±10% variance
       const winProbability = Math.max(
         0.1,
         Math.min(0.9, baseWinProbability + randomFactor),
       );
 
-      if (Math.random() < winProbability) {
+      if (random() < winProbability) {
         simWins += 1;
       } else {
         simLosses += 1;
@@ -176,7 +185,12 @@ function calculateStrengthOfSchedule(
 }
 
 /**
- * Calculate magic number (wins needed to clinch playoff spot)
+ * Calculate magic number (wins needed to clinch playoff spot).
+ *
+ * A team clinches once it has strictly more wins than the best-case finish of
+ * the `playoffTeams`-th best *other* team, so tied records are treated
+ * symmetrically instead of by array order (LS-10759). Returns null when the
+ * team cannot clinch on its own wins alone (e.g. early in the season).
  */
 function calculateMagicNumber(
   team: TeamStats,
@@ -184,32 +198,18 @@ function calculateMagicNumber(
   playoffTeams: number,
   remainingWeeks: number,
 ): number | null {
-  // Sort teams by wins (descending)
-  const sortedTeams = [...allTeams].sort((a, b) => b.wins - a.wins);
+  if (playoffTeams <= 0) return null;
 
-  // Find the team at the playoff cutoff line
-  const cutoffTeam = sortedTeams[playoffTeams - 1];
-  if (!cutoffTeam) return null;
+  const others = allTeams
+    .filter((t) => t.teamId !== team.teamId)
+    .sort((a, b) => b.wins - a.wins);
 
-  // If team is currently in playoff position
-  const currentPosition = sortedTeams.findIndex(
-    (t) => t.teamId === team.teamId,
-  );
-  if (currentPosition < playoffTeams) {
-    // Already in playoffs, calculate wins to clinch
-    const teamsBelow = sortedTeams.slice(playoffTeams);
-    const maxWinsBelow = Math.max(
-      ...teamsBelow.map((t) => t.wins + remainingWeeks),
-    );
-    const winsNeeded = maxWinsBelow - team.wins + 1;
-    return Math.max(0, winsNeeded);
-  }
+  // Fewer rivals than playoff spots: the team cannot be pushed out
+  const threat = others[playoffTeams - 1];
+  if (!threat) return 0;
 
-  // Not in playoffs, calculate wins needed to pass cutoff
-  const winsNeeded = cutoffTeam.wins - team.wins + 1;
-  if (winsNeeded > remainingWeeks) {
-    return null; // Eliminated
-  }
+  const winsNeeded = threat.wins + remainingWeeks - team.wins + 1;
+  if (winsNeeded > remainingWeeks) return null;
 
   return Math.max(0, winsNeeded);
 }
@@ -249,4 +249,38 @@ function calculateEliminationNumber(
   }
 
   return Math.min(remainingWeeks, lossesUntilCaught);
+}
+
+/**
+ * Deterministic 32-bit hash of the standings so projections are stable across
+ * reloads until a result changes. Order-independent (sorted by teamId).
+ */
+function hashStandings(
+  teamStats: TeamStats[],
+  playoffTeams: number,
+  remainingWeeks: number,
+): number {
+  const key = [...teamStats]
+    .sort((a, b) => a.teamId - b.teamId)
+    .map((t) => `${t.teamId}:${t.wins}-${t.losses}-${t.ties}`)
+    .join('|');
+  let hash = 2166136261;
+  for (const char of `${key}#${playoffTeams}#${remainingWeeks}`) {
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Seeded PRNG (mulberry32) returning floats in [0, 1).
+ */
+function createRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

@@ -193,6 +193,46 @@ builder.queryField('getTeamStatistics', (t) =>
 );
 
 /**
+ * League settings that drive playoff projections (LS-10759).
+ */
+interface PlayoffSettings {
+  draftStatus: string;
+  totalMatchups: number;
+  playoffEnabled: boolean;
+  playoffFormat: string;
+}
+
+/**
+ * Derive projection options from the league's real schedule and playoff
+ * format instead of the library defaults (5 weeks, half the league). Returns
+ * null when projections are not meaningful yet — the draft has not completed
+ * or playoffs are disabled — so callers can return an empty list.
+ */
+function resolvePlayoffOptions(
+  league: PlayoffSettings,
+  teamStats: { matchupsPlayed: number }[],
+  overrides: { playoffTeams?: number | null; remainingWeeks?: number | null },
+): { playoffTeams: number; remainingWeeks: number } | null {
+  if (league.draftStatus !== 'completed' || !league.playoffEnabled) {
+    return null;
+  }
+
+  const formatTeams = parseInt(league.playoffFormat.split('-')[0], 10);
+  const playoffTeams =
+    overrides.playoffTeams ??
+    (Number.isFinite(formatTeams) && formatTeams > 0
+      ? formatTeams
+      : Math.ceil(teamStats.length / 2));
+
+  const matchupsPlayed = Math.max(0, ...teamStats.map((t) => t.matchupsPlayed));
+  const remainingWeeks =
+    overrides.remainingWeeks ??
+    Math.max(0, league.totalMatchups - matchupsPlayed);
+
+  return { playoffTeams, remainingWeeks };
+}
+
+/**
  * Query: Get Playoff Projections
  */
 builder.queryField('getPlayoffProjections', (t) =>
@@ -206,6 +246,21 @@ builder.queryField('getPlayoffProjections', (t) =>
     resolve: async (parent, args, context) => {
       if (!context.user) {
         throw AuthenticationError();
+      }
+
+      const [league] = await context.db
+        .select({
+          draftStatus: PublicSchema.leagues.draftStatus,
+          totalMatchups: PublicSchema.leagues.totalMatchups,
+          playoffEnabled: PublicSchema.leagues.playoffEnabled,
+          playoffFormat: PublicSchema.leagues.playoffFormat,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
+
+      if (!league) {
+        throw new Error('League not found');
       }
 
       // Get all teams
@@ -234,10 +289,8 @@ builder.queryField('getPlayoffProjections', (t) =>
         await import('@legacy-sports/analytics');
 
       const teamStats = calculateTeamStats(matchups, teams);
-      return calculatePlayoffProjections(teamStats, {
-        playoffTeams: args.playoffTeams ?? undefined,
-        remainingWeeks: args.remainingWeeks ?? undefined,
-      });
+      const options = resolvePlayoffOptions(league, teamStats, args);
+      return options ? calculatePlayoffProjections(teamStats, options) : [];
     },
   }),
 );
@@ -263,6 +316,10 @@ builder.queryField('getLeagueAnalytics', (t) =>
           name: PublicSchema.leagues.name,
           currentWeek: PublicSchema.leagues.currentWeek,
           currentMatchup: PublicSchema.leagues.currentMatchup,
+          draftStatus: PublicSchema.leagues.draftStatus,
+          totalMatchups: PublicSchema.leagues.totalMatchups,
+          playoffEnabled: PublicSchema.leagues.playoffEnabled,
+          playoffFormat: PublicSchema.leagues.playoffFormat,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, args.leagueId))
@@ -328,7 +385,10 @@ builder.queryField('getLeagueAnalytics', (t) =>
 
       // Add playoff projections
       const teamStats = calculateTeamStats(matchups, teams);
-      analytics.playoffProjections = calculatePlayoffProjections(teamStats);
+      const playoffOptions = resolvePlayoffOptions(league, teamStats, {});
+      analytics.playoffProjections = playoffOptions
+        ? calculatePlayoffProjections(teamStats, playoffOptions)
+        : [];
 
       return analytics;
     },

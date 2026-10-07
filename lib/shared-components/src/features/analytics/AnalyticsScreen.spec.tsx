@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GetLeagueAnalytics } from '@legacy-sports/graphql';
 import { AnalyticsScreen } from './AnalyticsScreen';
 import { MockedProvider } from '../../test-utils/MockedProvider';
@@ -224,5 +224,36 @@ describe('AnalyticsScreen', () => {
     });
     // Should not render the string "null"
     expect(screen.queryByText(/null/)).toBeNull();
+  });
+  it('shows an empty state when there are no playoff projections', async () => {
+    const emptyProjectionsMock = [
+      {
+        request: {
+          query: GetLeagueAnalytics,
+          variables: { leagueId: 1 },
+        },
+        result: {
+          data: {
+            getLeagueAnalytics: {
+              ...mockAnalyticsData,
+              playoffProjections: [],
+            },
+          },
+        },
+      },
+    ];
+
+    render(
+      <MockedProvider mocks={emptyProjectionsMock} addTypename={false}>
+        <AnalyticsScreen leagueId={1} />
+      </MockedProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Fantasy League Analytics')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('Playoff Projections'));
+
+    expect(screen.getByText(/once the draft is complete/)).toBeTruthy();
   });
 });

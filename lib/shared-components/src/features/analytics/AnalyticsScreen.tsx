@@ -319,6 +319,12 @@ export function AnalyticsScreen({ leagueId }: AnalyticsScreenProps) {
                 Monte Carlo simulations of remaining matchups
               </Text>
               <YStack space="$2">
+                {(analytics.playoffProjections?.length ?? 0) === 0 && (
+                  <Text color="$gray11" fontSize="$2">
+                    Playoff projections will appear once the draft is complete
+                    and playoffs are enabled.
+                  </Text>
+                )}
                 {analytics.playoffProjections?.map((proj, index) => {
                   const playoffProbabilityColor =
                     proj.playoffProbability == null

@@ -12,6 +12,13 @@
 
 import type { GraphQLSchema } from 'graphql';
 
+const completedLeague = {
+  draftStatus: 'completed',
+  totalMatchups: 10,
+  playoffEnabled: true,
+  playoffFormat: '4-team',
+};
+
 describe('analytics resolver', () => {
   let schema: GraphQLSchema;
   let mockDb: {
@@ -99,6 +106,10 @@ describe('analytics resolver', () => {
             name: 'name',
             currentWeek: 'currentWeek',
             currentMatchup: 'currentMatchup',
+            draftStatus: 'draftStatus',
+            totalMatchups: 'totalMatchups',
+            playoffEnabled: 'playoffEnabled',
+            playoffFormat: 'playoffFormat',
           },
           teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
           leagueMembers: {
@@ -308,6 +319,7 @@ describe('analytics resolver', () => {
       ];
       mockCalculatePlayoffProjections.mockReturnValue(expectedProjections);
 
+      mockDb.limit.mockResolvedValueOnce([completedLeague]);
       mockDb.then
         .mockImplementationOnce((resolve) => resolve([]))
         .mockImplementationOnce((resolve) => resolve([]));
@@ -319,8 +331,102 @@ describe('analytics resolver', () => {
         undefined as never,
       );
 
-      expect(mockCalculatePlayoffProjections).toHaveBeenCalled();
+      expect(mockCalculatePlayoffProjections).toHaveBeenCalledWith([], {
+        playoffTeams: 4,
+        remainingWeeks: 2,
+      });
       expect(result).toEqual(expectedProjections);
+    });
+
+    // LS-10759: the client only sends leagueId, so the schedule length and
+    // playoff size must come from the league's own settings.
+    it('derives remaining weeks and playoff size from league settings', async () => {
+      const teamStats = [
+        { teamId: 1, matchupsPlayed: 0 },
+        { teamId: 2, matchupsPlayed: 0 },
+      ];
+      mockCalculateTeamStats.mockReturnValue(teamStats);
+      mockDb.limit.mockResolvedValueOnce([
+        { ...completedLeague, totalMatchups: 10, playoffFormat: '6-team' },
+      ]);
+
+      await getResolver()(
+        {},
+        { leagueId: 1, playoffTeams: null, remainingWeeks: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCalculatePlayoffProjections).toHaveBeenCalledWith(teamStats, {
+        playoffTeams: 6,
+        remainingWeeks: 10,
+      });
+    });
+
+    it('subtracts matchups already played from the schedule', async () => {
+      const teamStats = [
+        { teamId: 1, matchupsPlayed: 3 },
+        { teamId: 2, matchupsPlayed: 3 },
+      ];
+      mockCalculateTeamStats.mockReturnValue(teamStats);
+      mockDb.limit.mockResolvedValueOnce([completedLeague]);
+
+      await getResolver()(
+        {},
+        { leagueId: 1, playoffTeams: null, remainingWeeks: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCalculatePlayoffProjections).toHaveBeenCalledWith(teamStats, {
+        playoffTeams: 4,
+        remainingWeeks: 7,
+      });
+    });
+
+    it('returns an empty list before the draft is complete', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { ...completedLeague, draftStatus: 'not-started' },
+      ]);
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, playoffTeams: null, remainingWeeks: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+      expect(mockCalculatePlayoffProjections).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty list when playoffs are disabled', async () => {
+      mockDb.limit.mockResolvedValueOnce([
+        { ...completedLeague, playoffEnabled: false },
+      ]);
+
+      const result = await getResolver()(
+        {},
+        { leagueId: 1, playoffTeams: null, remainingWeeks: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+      expect(mockCalculatePlayoffProjections).not.toHaveBeenCalled();
+    });
+
+    it('throws when the league is not found', async () => {
+      mockDb.limit.mockResolvedValueOnce([]);
+
+      await expect(
+        getResolver()(
+          {},
+          { leagueId: 99, playoffTeams: null, remainingWeeks: null },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('League not found');
     });
   });
 
@@ -368,7 +474,12 @@ describe('analytics resolver', () => {
 
       // League lookup - limit returns league
       mockDb.limit.mockResolvedValueOnce([
-        { id: 1, name: 'Fantasy Baseball 2024', currentMatchup: null },
+        {
+          id: 1,
+          name: 'Fantasy Baseball 2024',
+          currentMatchup: null,
+          ...completedLeague,
+        },
       ]);
       // Teams and matchups queries (thenable, no limit)
       mockDb.then
@@ -390,6 +501,36 @@ describe('analytics resolver', () => {
         expect.anything(),
       );
       expect(result.leagueId).toBe(1);
+      expect(mockCalculatePlayoffProjections).toHaveBeenCalledWith([], {
+        playoffTeams: 4,
+        remainingWeeks: 10,
+      });
+    });
+
+    it('returns no playoff projections for a pre-draft league', async () => {
+      mockGenerateLeagueAnalytics.mockReturnValue({
+        leagueId: 1,
+        playoffProjections: [],
+      });
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          id: 1,
+          name: 'Pre-draft League',
+          currentMatchup: null,
+          ...completedLeague,
+          draftStatus: 'not-started',
+        },
+      ]);
+
+      const result = (await getResolver()(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      )) as { playoffProjections: unknown[] };
+
+      expect(result.playoffProjections).toEqual([]);
+      expect(mockCalculatePlayoffProjections).not.toHaveBeenCalled();
     });
   });
 });
