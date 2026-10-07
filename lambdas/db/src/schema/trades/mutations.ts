@@ -21,6 +21,10 @@ import { and, count, eq, gte, inArray, ne, or } from 'drizzle-orm';
 import { TradeOffer, TradeVoteChoice } from './types';
 import { fetchTradeVotesData } from './votes';
 import {
+  buildTradeSystemMessageText,
+  type TradeSystemMessageAction,
+} from './system-message';
+import {
   assertCapSpace,
   computeTeamPayroll,
   computeTeamPayrollExcluding,
@@ -297,16 +301,8 @@ async function syncMatchupPlayersForTradeLeg(
 
 // ── Helper: post a system chat message for a trade action ─────────────────
 
-const TRADE_ACTION_LABELS: Record<string, string> = {
-  proposed: 'proposed a trade to',
-  accepted: 'accepted a trade with',
-  rejected: 'rejected a trade from',
-  cancelled: 'cancelled their trade offer to',
-  vetoed: 'vetoed the trade between',
-};
-
 async function postTradeSystemMessage(
-  action: 'proposed' | 'accepted' | 'rejected' | 'cancelled' | 'vetoed',
+  action: TradeSystemMessageAction,
   opts: {
     leagueId: number;
     tradeId: number;
@@ -336,22 +332,11 @@ async function postTradeSystemMessage(
     const proposingTeamName = proposingRow?.name ?? `Team ${proposingTeamId}`;
     const receivingTeamName = receivingRow?.name ?? `Team ${receivingTeamId}`;
 
-    const label = TRADE_ACTION_LABELS[action] ?? action;
-    const emoji =
-      action === 'accepted'
-        ? '✅'
-        : action === 'vetoed'
-          ? '🚫'
-          : action === 'rejected'
-            ? '❌'
-            : action === 'cancelled'
-              ? '↩️'
-              : '🔁';
-
-    const messageText =
-      action === 'vetoed'
-        ? `${emoji} Commissioner vetoed the trade between ${proposingTeamName} and ${receivingTeamName}`
-        : `${emoji} ${action === 'proposed' ? proposingTeamName : action === 'accepted' || action === 'rejected' ? receivingTeamName : proposingTeamName} ${label} ${action === 'proposed' ? receivingTeamName : proposingTeamName}`;
+    const messageText = buildTradeSystemMessageText(
+      action,
+      proposingTeamName,
+      receivingTeamName,
+    );
 
     const tradeMetadata: Record<string, unknown> = {
       action,

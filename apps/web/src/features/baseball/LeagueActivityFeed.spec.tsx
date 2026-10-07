@@ -148,4 +148,51 @@ describe('eventToActivityItem', () => {
     });
     expect(result).toBeNull();
   });
+
+  describe('trade proposed / cancelled rows (LS-10679)', () => {
+    const namedPayload = JSON.stringify({
+      tradeId: 7,
+      proposingTeamId: 1,
+      receivingTeamId: 2,
+      proposingTeamName: 'Team A',
+      receivingTeamName: 'Team B',
+    });
+
+    it('names both teams on a proposed trade when the payload has them', () => {
+      const result = eventToActivityItem({
+        ...baseEvent,
+        eventType: LeagueActivityEventType.TradeProposed,
+        payload: namedPayload,
+      });
+      expect(result?.detail).toBe('Team A proposed a trade to Team B.');
+    });
+
+    it('names both teams on a cancelled trade when the payload has them', () => {
+      const result = eventToActivityItem({
+        ...baseEvent,
+        eventType: LeagueActivityEventType.TradeCancelled,
+        payload: namedPayload,
+      });
+      expect(result?.detail).toBe(
+        'Team A cancelled their trade offer to Team B.',
+      );
+    });
+
+    it('falls back to actor copy when team names are missing', () => {
+      const proposed = eventToActivityItem({
+        ...baseEvent,
+        eventType: LeagueActivityEventType.TradeProposed,
+        payload: JSON.stringify({ tradeId: 7 }),
+      });
+      const cancelled = eventToActivityItem({
+        ...baseEvent,
+        eventType: LeagueActivityEventType.TradeCancelled,
+        payload: null,
+      });
+      expect(proposed?.detail).toBe(
+        'alice proposed a trade with another team.',
+      );
+      expect(cancelled?.detail).toBe('alice cancelled a pending trade.');
+    });
+  });
 });

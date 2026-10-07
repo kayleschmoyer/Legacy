@@ -137,6 +137,13 @@ export function eventToActivityItem(event: {
   const isoDate = event.occurredAt ?? new Date().toISOString();
   const actor = event.actorUsername ?? 'A manager';
   const lid = event.leagueId ?? 0;
+  const proposingTeamName = payload['proposingTeamName'];
+  const receivingTeamName = payload['receivingTeamName'];
+  const tradeTeams =
+    typeof proposingTeamName === 'string' &&
+    typeof receivingTeamName === 'string'
+      ? { proposing: proposingTeamName, receiving: receivingTeamName }
+      : null;
 
   switch (event.eventType) {
     case LeagueActivityEventType.TradeProposed:
@@ -145,7 +152,9 @@ export function eventToActivityItem(event: {
         type: 'trade',
         icon: <ArrowLeftRight size={16} color={BRAND_GOLD_LIGHT} />,
         title: 'Trade proposed',
-        detail: `${actor} proposed a trade with another team.`,
+        detail: tradeTeams
+          ? `${tradeTeams.proposing} proposed a trade to ${tradeTeams.receiving}.`
+          : `${actor} proposed a trade with another team.`,
         isoDate,
         accentColor: BRAND_GOLD_LIGHT,
         linkTo: `/leagues/${lid}/trades`,
@@ -186,7 +195,9 @@ export function eventToActivityItem(event: {
         type: 'trade',
         icon: <ArrowLeftRight size={16} color="rgb(148, 163, 184)" />,
         title: 'Trade cancelled',
-        detail: `${actor} cancelled a pending trade.`,
+        detail: tradeTeams
+          ? `${tradeTeams.proposing} cancelled their trade offer to ${tradeTeams.receiving}.`
+          : `${actor} cancelled a pending trade.`,
         isoDate,
         accentColor: '$gray11',
         linkTo: `/leagues/${lid}/trades`,
