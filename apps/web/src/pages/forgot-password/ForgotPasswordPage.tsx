@@ -46,7 +46,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
   return (
     <>
       <PageMeta
-        title="Forgot Password — Legacy Sports"
+        title="Forgot Password"
         description="Reset your Legacy Sports password."
       />
 

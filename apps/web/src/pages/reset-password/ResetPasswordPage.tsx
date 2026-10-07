@@ -122,7 +122,7 @@ export function ResetPasswordPage(): React.JSX.Element {
   return (
     <>
       <PageMeta
-        title="Reset Password — Legacy Sports"
+        title="Reset Password"
         description="Choose a new password for your Legacy Sports account."
       />
 

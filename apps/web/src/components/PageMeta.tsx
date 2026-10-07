@@ -41,6 +41,19 @@ interface PageMetaProps {
 const SITE_NAME = 'Legacy Sports';
 const DEFAULT_IMAGE_PATH = '/logo-512.png';
 
+// A trailing brand a caller already appended, e.g. "Minigames — Legacy Sports".
+const TRAILING_BRAND = /\s*[|·—–-]\s*Legacy Sports\s*$/;
+
+/**
+ * Builds the document title: `${title} | Legacy Sports`. A brand suffix the
+ * caller already included is dropped first so the brand never appears twice
+ * (LS-10711).
+ */
+export function formatPageTitle(title: string): string {
+  const base = title.replace(TRAILING_BRAND, '').trim();
+  return !base || base === SITE_NAME ? SITE_NAME : `${base} | ${SITE_NAME}`;
+}
+
 /**
  * PageMeta — sets document metadata for every page.
  *
@@ -69,7 +82,7 @@ export function PageMeta({
       : 'https://legacy.sports';
   const pageUrl = canonicalUrl ?? `${origin}${pathname}`;
   const image = imageUrl ?? `${origin}${DEFAULT_IMAGE_PATH}`;
-  const fullTitle = `${title} | ${SITE_NAME}`;
+  const fullTitle = formatPageTitle(title);
 
   return (
     <>

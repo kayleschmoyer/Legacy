@@ -15,7 +15,12 @@ import {
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
 } from '@legacy-sports/graphql';
-import { TAB_IDS, type TabId, WEB_LEAGUE_TABS } from './tabConfig';
+import {
+  leagueTabTitle,
+  TAB_IDS,
+  type TabId,
+  WEB_LEAGUE_TABS,
+} from './tabConfig';
 import { OverviewTab } from './tabs/Overview';
 import { MatchupTab } from './tabs/Matchup';
 import { RosterTab } from './tabs/Roster';
@@ -385,7 +390,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
         }}
       />
       <PageMeta
-        title={`${league.name ?? 'League'} · Legacy Sports`}
+        title={leagueTabTitle(tab, league.name)}
         description={`Manage and view ${league.name ?? 'your league'} — matchups, roster, standings, trades and more.`}
       />
       {/* The league's creator (`league.owner` — there is no commissioner

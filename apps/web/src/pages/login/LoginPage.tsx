@@ -570,7 +570,7 @@ export function LoginPage(): React.JSX.Element {
     return (
       <>
         <PageMeta
-          title="Signing in — Legacy Sports"
+          title="Signing in"
           description="Completing your Discord sign-in to Legacy Sports."
         />
 
@@ -614,7 +614,7 @@ export function LoginPage(): React.JSX.Element {
   return (
     <>
       <PageMeta
-        title="Sign In — Legacy Sports"
+        title="Sign In"
         description="Sign in to Legacy Sports to access your fantasy baseball leagues, draft tools, and live stats."
       />
 

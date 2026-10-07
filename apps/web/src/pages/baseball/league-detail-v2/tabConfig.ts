@@ -30,3 +30,16 @@ export const WEB_LEAGUE_TABS: readonly (LeagueTabDef & { id: TabId })[] = [
 ];
 
 export const TAB_IDS: readonly TabId[] = WEB_LEAGUE_TABS.map((t) => t.id);
+
+/**
+ * Page title for a league-detail tab, e.g. "Standings – QA Test Sluggers".
+ * PageMeta appends the " | Legacy Sports" suffix, so the brand must not be
+ * included here (LS-10711).
+ */
+export function leagueTabTitle(
+  tab: TabId,
+  leagueName: string | null | undefined,
+): string {
+  const label = WEB_LEAGUE_TABS.find((t) => t.id === tab)?.label ?? 'Overview';
+  return `${label} – ${leagueName || 'League'}`;
+}

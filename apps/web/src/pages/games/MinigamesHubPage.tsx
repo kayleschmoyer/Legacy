@@ -32,7 +32,7 @@ export const MinigamesHubPage: React.FC = () => {
   return (
     <>
       <PageMeta
-        title="Minigames — Legacy Sports"
+        title="Minigames"
         description="Quick-draft showdowns and trivia built on 150 years of archived baseball statistics."
       />
       <MinigamesHub
