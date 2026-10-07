@@ -48,7 +48,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
       username: 'casey',
       email: 'casey@example.com',
       picture: null,
-      accessLevel: 'user',
+      accessLevel: 'none',
     },
   }),
   useMfa: () => ({}),

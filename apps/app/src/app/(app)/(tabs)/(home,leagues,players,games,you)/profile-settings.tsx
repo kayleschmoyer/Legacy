@@ -32,7 +32,7 @@ import {
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
-import { validateUsername } from '@legacy-sports/utils';
+import { getAccessLevelLabel, validateUsername } from '@legacy-sports/utils';
 import {
   unlinkDiscordAccount,
   useAuthHandlers,
@@ -44,17 +44,6 @@ import {
 } from '../../../../features/subscription';
 import { trackSignOut } from '../../../../utils/analytics';
 import { useSystemBackAction } from '../../../../common/hooks/useSystemBackAction';
-
-function getAccessLevelLabel(level: string): string {
-  switch (level) {
-    case 'admin':
-      return 'Administrator';
-    case 'user':
-      return 'Member';
-    default:
-      return 'Limited';
-  }
-}
 
 type LinkedProvider = 'discord' | 'google' | 'apple';
 
@@ -361,7 +350,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                       fontWeight="600"
                       color={isAdmin ? brand.seamRed : brand.goldLight}
                     >
-                      {getAccessLevelLabel(isAdmin ? 'admin' : 'user')}
+                      {getAccessLevelLabel(isAdmin ? 'admin' : 'none')}
                     </Paragraph>
                   </XStack>
                 </YStack>

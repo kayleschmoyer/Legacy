@@ -128,7 +128,7 @@ jest.mock('../../components/auth/AuthPendingFallback', () => ({
   AuthPendingFallback: () => <div data-testid="auth-pending-fallback" />,
 }));
 
-function renderPage(picture: string | null) {
+function renderPage(picture: string | null, accessLevel = 'none') {
   mockUseAuth.mockReturnValue({
     config: {},
     user: {
@@ -136,7 +136,7 @@ function renderPage(picture: string | null) {
       username: 'casey',
       email: 'casey@example.com',
       picture,
-      accessLevel: 'user',
+      accessLevel,
     },
   });
   return render(<ProfileSettingsPage />);
@@ -247,5 +247,21 @@ describe('ProfileSettingsPage without a user (LS-10457)', () => {
     render(<ProfileSettingsPage />);
     expect(screen.getByTestId('auth-pending-fallback')).toBeTruthy();
     expect(screen.queryByText('Profile Settings')).toBeNull();
+  });
+});
+
+describe('ProfileSettingsPage access level (LS-10650)', () => {
+  it("labels a non-admin ('none') user Member, never Limited", () => {
+    renderPage(null, 'none');
+
+    expect(screen.getAllByText('Member')).toHaveLength(2);
+    expect(screen.queryByText('Limited')).toBeNull();
+  });
+
+  it('labels an admin Administrator', () => {
+    renderPage(null, 'admin');
+
+    expect(screen.getAllByText('Administrator')).toHaveLength(2);
+    expect(screen.queryByText('Member')).toBeNull();
   });
 });

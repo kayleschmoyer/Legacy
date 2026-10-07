@@ -29,7 +29,7 @@ const mockUser = {
   username: 'testuser',
   email: 'test@example.com',
   avatarUrl: null as string | null,
-  accessLevel: 'user',
+  accessLevel: 'none',
 };
 
 jest.mock('../../../../utils/analytics', () => ({
@@ -318,6 +318,21 @@ describe('ProfileSettingsScreen', () => {
     it('renders the Profile Settings heading', () => {
       render(<ProfileSettingsScreen />);
       expect(screen.getByText('Profile Settings')).toBeTruthy();
+    });
+
+    it('labels a non-admin user Member, never Limited (LS-10650)', () => {
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('Member')).toBeTruthy();
+      expect(screen.queryByText('Limited')).toBeNull();
+    });
+
+    it('labels an admin user Administrator', () => {
+      mockUseGetUserByIdQuery.mockReturnValue({
+        data: { user: { ...mockUser, accessLevel: 'admin' } },
+        refetch: (...args: unknown[]): unknown => mockRefetchUser(...args),
+      });
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText('Administrator')).toBeTruthy();
     });
 
     it('renders the username from user data', () => {

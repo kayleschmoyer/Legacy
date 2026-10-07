@@ -23,7 +23,7 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
-import { validateUsername } from '@legacy-sports/utils';
+import { getAccessLevelLabel, validateUsername } from '@legacy-sports/utils';
 import { getSessionStatus } from './sessionStatus';
 import { signOut } from './signOut';
 import TwoFactorSection from '../../components/profile/TwoFactorSection';
@@ -165,18 +165,14 @@ const AccessLevelBadge = styled(XStack, {
         backgroundColor: '$statusDangerBg',
         borderColor: '$statusDangerBorder',
       },
-      user: {
+      member: {
         backgroundColor: '$accentMuted',
         borderColor: '$brandNavyLight',
-      },
-      none: {
-        backgroundColor: '$statusNeutralBg',
-        borderColor: '$glassBorder',
       },
     },
   } as const,
   defaultVariants: {
-    level: 'user',
+    level: 'member',
   },
 });
 
@@ -210,26 +206,8 @@ const sectionCardGradientStyle: React.CSSProperties = {
 
 /* ─── Helpers ─── */
 
-function getAccessLevelLabel(level: string): string {
-  switch (level) {
-    case 'admin':
-      return 'Administrator';
-    case 'user':
-      return 'Member';
-    default:
-      return 'Limited';
-  }
-}
-
 function getAccessBadgeColor(level: string): string {
-  switch (level) {
-    case 'admin':
-      return 'var(--brandSeamRed)';
-    case 'user':
-      return 'var(--brandGoldLight)';
-    default:
-      return 'var(--colorPress)';
-  }
+  return level === 'admin' ? 'var(--brandSeamRed)' : 'var(--brandGoldLight)';
 }
 
 /* ─── Main Component ─── */
@@ -580,7 +558,9 @@ const ProfileSettingsPage: React.FC = () => {
                   <Paragraph size="$3" color="$colorPress">
                     {userEmail}
                   </Paragraph>
-                  <AccessLevelBadge level={accessLevel}>
+                  <AccessLevelBadge
+                    level={accessLevel === 'admin' ? 'admin' : 'member'}
+                  >
                     <Paragraph
                       size="$2"
                       fontWeight="600"
