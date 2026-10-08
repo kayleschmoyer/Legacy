@@ -184,6 +184,40 @@ describe('useDraftWebSocket — draft completion (LS-3823)', () => {
     expect(params.refetchLeague).toHaveBeenCalled();
   });
 
+  it('refetches pick history when DraftCompleted event fires', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+    params.refetchPickHistory.mockClear();
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_COMPLETED, {
+        leagueId: 1,
+        selectionMethod: 'standard',
+      });
+    });
+
+    // The recap builds every roster from pick history; a client that missed
+    // the final picks while disconnected needs this re-read.
+    expect(params.refetchPickHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch pick history when the draft has not completed', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+    params.refetchPickHistory.mockClear();
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_STARTED, {
+        leagueId: 1,
+        draftId: 42,
+      });
+    });
+
+    expect(params.refetchPickHistory).not.toHaveBeenCalled();
+  });
+
   it('calls setDraftComplete(true) when last pick notification has no nextPick', () => {
     const params = makeDefaultParams();
 
