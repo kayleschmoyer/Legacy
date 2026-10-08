@@ -63,25 +63,24 @@ describe('ci-orchestrator.yml — report-runner-shutdown scheduling (LS-9710)', 
     );
   });
 
-  it('keeps the sibling post-pipeline jobs on the self-hosted-when-available fallback', () => {
+  it('keeps the heavy reusable workflows on the self-hosted runner-label', () => {
     // Confirms the LS-9710 fix only narrowed report-runner-shutdown's
-    // scheduling, not the other post-pipeline jobs that don't share its
-    // "reports on pool health" purpose.
+    // scheduling, not the jobs that genuinely need the workspace image.
     //
-    // LS-10140 moved remove-merge-label-on-failure out of this set: it now
-    // consults the same runner-shutdown detector, so it inherits the same
-    // requirement to be schedulable while the self-hosted pool is down. See
-    // its own assertion in the LS-10140 describe block below.
+    // LS-10140 moved remove-merge-label-on-failure to ubuntu-latest (it
+    // consults the runner-shutdown detector). merge-queue review (2026-10)
+    // moved label-pr and restore-merge-label-on-success too: both only make
+    // API calls (guarded in bookkeeping-runner-placement.test.mjs). What must
+    // stay on the pool is the work that builds and scans.
     const { parsed } = loadOrchestrator();
-    const fallbackExpr =
-      "${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}";
-    for (const jobName of ['label-pr', 'restore-merge-label-on-success']) {
+    const labelExpr = '${{ needs.determine-scope.outputs.runner-label }}';
+    for (const jobName of ['ci-pipeline', 'security-scanning']) {
       const job = parsed.jobs[jobName];
       assert.ok(job, `${jobName} job must exist in ci-orchestrator.yml`);
       assert.equal(
-        job['runs-on'],
-        fallbackExpr,
-        `${jobName} should still use the runner-label fallback`,
+        job.with['runner-label'],
+        labelExpr,
+        `${jobName} should still receive the resolved self-hosted runner-label`,
       );
     }
   });
@@ -711,5 +710,186 @@ describe('detect-runner-shutdown action — API errors fail safe (LS-10297)', ()
       },
     });
     assert.equal(outputs['shutdown-detected'], 'false');
+  });
+});
+
+/**
+ * merge-queue review (2026-10): check-prior-success keys on CI Gate alone.
+ *
+ * It used to require every _commitStatus context in ruleset.json to be
+ * `success`. The pipeline only produces CI Gate, so a migration PR (red
+ * "Verify All Migrations Applied") or a conflicting PR re-ran full CI + E2E on
+ * every approval, and a flake in that duplicate run let
+ * remove-merge-label-on-failure strip merge-when-ready.
+ *
+ * These tests run the step's github-script body against a mocked Octokit.
+ */
+describe('ci-orchestrator.yml — check-prior-success decides on CI Gate (merge-queue review 2026-10)', () => {
+  const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+  const HEAD = 'a'.repeat(40);
+
+  async function runGuard({
+    eventName,
+    statuses,
+    checkRuns = [],
+    siblingRuns = [],
+  }) {
+    const script = stepScript(
+      'determine-scope',
+      '🔍 Check for prior CI success',
+    );
+    const outputs = {};
+    const core = {
+      info: noop,
+      warning: noop,
+      error: noop,
+      setOutput: (k, v) => {
+        outputs[k] = v;
+      },
+    };
+    const listWorkflowRuns = async () => ({
+      data: { workflow_runs: siblingRuns },
+    });
+    const github = {
+      rest: {
+        pulls: { get: async () => ({ data: { head: { sha: HEAD } } }) },
+        checks: {
+          listForRef: async () => ({ data: { check_runs: checkRuns } }),
+        },
+        repos: {
+          listCommitStatusesForRef: async () => ({
+            data: Object.entries(statuses).map(([ctx, state]) => ({
+              context: ctx,
+              state,
+            })),
+          }),
+        },
+        actions: { listWorkflowRuns },
+      },
+      paginate: async () => siblingRuns,
+    };
+    const context = {
+      eventName,
+      sha: HEAD,
+      runId: 1,
+      repo: { owner: 'bkrupa', repo: 'legacy-sports' },
+      payload:
+        eventName === 'pull_request_review'
+          ? { pull_request: { number: 8400, head: { sha: HEAD } } }
+          : {},
+    };
+    const saved = { ...process.env };
+    process.env.GITHUB_WORKSPACE = REPO_ROOT;
+    process.env.RESOLVED_PR_NUMBER = '8400';
+    process.env.RESOLVED_HEAD_SHA = HEAD;
+    try {
+      await new AsyncFunction('github', 'context', 'core', 'require', script)(
+        github,
+        context,
+        core,
+        require,
+      );
+    } finally {
+      process.env = saved;
+    }
+    return outputs['ci-already-passed'];
+  }
+
+  const REVIEW = 'pull_request_review';
+  const DISPATCH = 'workflow_dispatch';
+  const otherContextsRed = {
+    'bot-review': 'success',
+    'No Merge Conflicts': 'failure',
+    'Verify All Migrations Applied': 'failure',
+  };
+
+  it('skips an approval re-run when CI Gate is success even though other required contexts are red', async () => {
+    assert.equal(
+      await runGuard({
+        eventName: REVIEW,
+        statuses: { ...otherContextsRed, 'CI Gate': 'success' },
+      }),
+      'true',
+    );
+  });
+
+  it('skips an approval re-run when CI Gate is already failure on the live head', async () => {
+    assert.equal(
+      await runGuard({
+        eventName: REVIEW,
+        statuses: { ...otherContextsRed, 'CI Gate': 'failure' },
+      }),
+      'true',
+    );
+  });
+
+  it('NEGATIVE CONTROL: ci:run (workflow_dispatch) still re-runs a red CI Gate', async () => {
+    assert.equal(
+      await runGuard({
+        eventName: DISPATCH,
+        statuses: { 'CI Gate': 'failure' },
+      }),
+      'false',
+    );
+  });
+
+  it('NEGATIVE CONTROL: a pending CI Gate with nothing in flight still runs CI', async () => {
+    assert.equal(
+      await runGuard({ eventName: REVIEW, statuses: { 'CI Gate': 'pending' } }),
+      'false',
+    );
+  });
+
+  it('keeps the in-flight check: a pending CI Gate with an active CI Pipeline job skips', async () => {
+    assert.equal(
+      await runGuard({
+        eventName: REVIEW,
+        statuses: { 'CI Gate': 'pending' },
+        checkRuns: [
+          {
+            name: '🚀 CI Pipeline / lint',
+            status: 'in_progress',
+            conclusion: null,
+          },
+        ],
+      }),
+      'true',
+    );
+  });
+
+  it('keeps the LS-9887 sibling check: a queued push-run on the SHA skips', async () => {
+    assert.equal(
+      await runGuard({
+        eventName: REVIEW,
+        statuses: {},
+        siblingRuns: [{ id: 2, status: 'queued', event: 'pull_request' }],
+      }),
+      'true',
+    );
+  });
+});
+
+describe('ci-orchestrator.yml — scans skip with the pipeline on a decided SHA (merge-queue review 2026-10)', () => {
+  it('gates security-scanning and label-pr on ci-already-passed like ci-pipeline', () => {
+    const { parsed } = loadOrchestrator();
+    for (const jobName of ['ci-pipeline', 'security-scanning', 'label-pr']) {
+      assert.match(
+        parsed.jobs[jobName].if,
+        /needs\.determine-scope\.outputs\.ci-already-passed != 'true'/,
+        `${jobName} must not re-run on an approval of an already-decided SHA`,
+      );
+    }
+  });
+
+  it('restore-merge-label-on-success no longer dispatches merge-queue.yml itself', () => {
+    const script = stepScript(
+      'restore-merge-label-on-success',
+      'Restore merge-when-ready label if bot approval is active',
+    );
+    assert.doesNotMatch(
+      script,
+      /dispatches/,
+      "merge-queue.yml's workflow_run trigger already fires on this run's completion",
+    );
   });
 });

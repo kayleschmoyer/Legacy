@@ -39,6 +39,10 @@ const PINNED_JOBS = [
   ['ci-pipeline.yml', 'summarize'],
   ['merge-queue.yml', 'process-merge-queue'],
   ['lambda-terraform-apply.yml', 'report-runner-shutdown'],
+  // merge-queue review (2026-10): API-only label bookkeeping in the orchestrator.
+  ['ci-orchestrator.yml', 'restore-merge-label-on-success'],
+  ['ci-orchestrator.yml', 'label-pr'],
+  ['ci-orchestrator.yml', 'remove-merge-label-on-failure'],
 ];
 
 describe('bookkeeping jobs run on GitHub-hosted runners (LS-10312)', () => {

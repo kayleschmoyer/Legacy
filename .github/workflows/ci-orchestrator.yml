@@ -478,6 +478,16 @@ jobs:
       # deadlocking the merge queue (no run ever posts CI Gate for the current
       # head). Mirror ci-gate.js's SHA-currency guard: re-fetch the PR's live
       # head via the API and evaluate against that, not the payload snapshot.
+      #
+      # merge-queue review (2026-10): the short-circuit now keys on `CI Gate`
+      # alone, not on every required context in ruleset.json. This pipeline
+      # only produces CI Gate. Requiring bot-review / No Merge Conflicts /
+      # Verify All Migrations Applied as well meant that a migration PR (red
+      # migrations check until the migration is applied) or a conflicting PR
+      # re-ran full CI + E2E on every approval of an already-decided SHA. If
+      # that duplicate run flaked, remove-merge-label-on-failure (approval runs
+      # only) stripped merge-when-ready from a PR whose real verdict was green.
+      # See the decision comment inside the script for the failure case.
       - name: "🔍 Check for prior CI success"
         id: check-prior-success
         if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch'
@@ -628,9 +638,36 @@ jobs:
                 statusPage++;
               }
 
-              const allPassed =
-                checkRunContexts.every(name => passedNames.has(name)) &&
-                statusContexts.every(ctx => latestStatusByContext.get(ctx) === 'success');
+              // merge-queue review (2026-10): decide on CI Gate, the one
+              // required context this pipeline produces (posted only by
+              // .github/scripts/ci-gate.js: `pending` while undecided —
+              // including the seed and a cancelled run (LS-10140) — and
+              // `success`/`failure` as terminal verdicts). The other required
+              // contexts belong to other workflows and say nothing about
+              // whether CI needs to run again for this SHA.
+              //
+              //   - `success` → skip, on every trigger (the ci-already-passed
+              //     case; ci-gate.js's LS-9811 prediction relies on it).
+              //   - `failure` → skip ONLY for pull_request_review. An
+              //     approval does not change the code, so re-running a red
+              //     SHA just to see whether it flakes green is not the
+              //     approval's job: the author pushes a fix or applies
+              //     `ci:run`. workflow_dispatch (the ci:run handler, manual
+              //     re-runs) is that explicit request, so it falls through
+              //     and re-runs CI as before. Skipping leaves the red CI Gate
+              //     in place (the merge stays blocked) and, with ci-pipeline
+              //     skipped, neither merge-label job fires — the label state
+              //     the failing run already settled is left alone.
+              //   - `pending` / absent → not decided; fall through to the
+              //     in-flight / sibling-run checks below, then run CI.
+              //
+              // The output keeps its name (`ci-already-passed`) because the
+              // ci-pipeline job's `if` and ci-gate.js's comments key on it;
+              // read it as "CI must not run again for this SHA on this event".
+              const CI_GATE_CONTEXT = 'CI Gate';
+              const ciGateState = latestStatusByContext.get(CI_GATE_CONTEXT);
+              const allPassed = ciGateState === 'success';
+              const decidedRed = context.eventName === 'pull_request_review' && ciGateState === 'failure';
 
               // In-flight CI detection: post-LS-8014 the granular CI jobs
               // ("🚀 CI Pipeline / lint" etc.) are informational check runs and
@@ -677,7 +714,7 @@ jobs:
               // Fail-safe direction is preserved: any error here falls
               // through to the check-run logic rather than skipping CI.
               let siblingDispatching = null;
-              if (!allPassed && !anyActive) {
+              if (!allPassed && !decidedRed && !anyActive) {
                 try {
                   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
                     owner,
@@ -703,7 +740,13 @@ jobs:
               }
 
               if (allPassed) {
-                core.info(`All required contexts already green for SHA ${sha} — skipping CI re-run.`);
+                core.info(`${CI_GATE_CONTEXT} is already success for SHA ${sha} — skipping CI re-run.`);
+                core.setOutput('ci-already-passed', 'true');
+              } else if (decidedRed) {
+                core.info(
+                  `${CI_GATE_CONTEXT} is already failure for SHA ${sha} — an approval does not re-run ` +
+                    'CI on a decided SHA. Push a fix or apply the ci:run label to re-run it.'
+                );
                 core.setOutput('ci-already-passed', 'true');
               } else if (anyActive) {
                 const active = [...activeNames].filter(name => name.startsWith(CI_PIPELINE_PREFIX));
@@ -747,7 +790,10 @@ jobs:
   security-scanning:
     name: "🔐 Security Scanning"
     needs: [determine-scope]
-    if: ${{ !cancelled() && needs.determine-scope.result != 'skipped' && needs.determine-scope.outputs.run-security == 'true' }}
+    # merge-queue review (2026-10): skip when check-prior-success decided this
+    # SHA needs no re-run (same gate as ci-pipeline) — an approval of an
+    # already-scanned head must not re-run the scans.
+    if: ${{ !cancelled() && needs.determine-scope.result != 'skipped' && needs.determine-scope.outputs.run-security == 'true' && needs.determine-scope.outputs.ci-already-passed != 'true' }}
     uses: ./.github/workflows/security-scanning.yml
     with:
       # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
@@ -762,8 +808,15 @@ jobs:
   label-pr:
     name: "🏷️ Label PR"
     needs: [determine-scope, security-scanning]
-    if: "!cancelled() && needs.determine-scope.result != 'skipped' && github.event.pull_request.number"
-    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
+    # merge-queue review (2026-10): when security-scanning was skipped as a
+    # re-run of a decided SHA, its result is `skipped`, which this job would
+    # read as "not failing" and strip a "CI: Security" label the earlier run
+    # applied. Skip alongside it instead.
+    if: "!cancelled() && needs.determine-scope.result != 'skipped' && needs.determine-scope.outputs.ci-already-passed != 'true' && github.event.pull_request.number"
+    # merge-queue review (2026-10): API calls only, so GitHub-hosted like the
+    # LS-10312 bookkeeping jobs, not the self-hosted spot pool.
+    # Guarded by .github/scripts/__tests__/bookkeeping-runner-placement.test.mjs.
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: "Label PR on Security Failure"
@@ -844,7 +897,10 @@ jobs:
       needs.determine-scope.result != 'skipped' &&
       needs.ci-pipeline.outputs.overall-status == 'success' &&
       github.event.pull_request.number
-    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
+    # merge-queue review (2026-10): API calls only, so GitHub-hosted like the
+    # LS-10312 bookkeeping jobs, not the self-hosted spot pool.
+    # Guarded by .github/scripts/__tests__/bookkeeping-runner-placement.test.mjs.
+    runs-on: ubuntu-latest
     steps:
       - name: Generate GitHub App Token
         id: generate-token
@@ -868,28 +924,20 @@ jobs:
             });
 
             if (pr.labels.some(l => l.name === 'merge-when-ready')) {
-              // Label already present — no labeled event will fire, so the EMQ won't
-              // get its normal post-CI trigger. The workflow_run trigger on CI Orchestrator
-              // completion is supposed to handle this, but it can be filtered out when
-              // the triggering workflow's head_branch resolves to the base branch (main).
-              // Dispatch the merge queue explicitly to guarantee it evaluates this PR.
-              core.info(`PR #${prNumber} already has merge-when-ready — dispatching EMQ directly`);
-              try {
-                await github.request(
-                  'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
-                  {
-                    owner,
-                    repo,
-                    workflow_id: 'merge-queue.yml',
-                    ref: 'main',
-                    inputs: { dry_run: 'false', force_check: 'false', is_retry: 'false' },
-                  }
-                );
-                core.info('Dispatched merge-queue.yml to re-evaluate merge-ready PRs');
-              } catch (error) {
-                core.error(`Failed to dispatch merge-queue.yml: ${error.message}`);
-                throw error;
-              }
+              // Label already present — nothing to restore. merge-queue.yml's
+              // workflow_run trigger fires when this orchestrator run completes
+              // and its job `if` admits workflow_run.event == pull_request /
+              // pull_request_review, the only events this job runs on (it
+              // requires github.event.pull_request.number). merge-queue review
+              // (2026-10): this used to also dispatch merge-queue.yml, citing
+              // the `branches-ignore: main` filter. For a PR-event run
+              // head_branch is the PR's head branch, so that filter only bites
+              // a PR whose head branch is itself named `main` (a fork's main),
+              // and fork-triggered runs get no secrets to mint the app token
+              // above anyway. The dispatch just queued a second merge-queue
+              // run per green CI; the cron safety net (LS-10600) covers lost
+              // triggers.
+              core.info(`PR #${prNumber} already has merge-when-ready — merge queue runs on this run's workflow_run completion`);
               return;
             }
 
