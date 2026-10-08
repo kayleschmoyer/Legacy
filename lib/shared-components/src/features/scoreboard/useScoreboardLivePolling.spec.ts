@@ -82,7 +82,10 @@ describe('nextScoreboardRefetchDelayMs (LS-10721)', () => {
 
 describe('useScoreboardLivePolling', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    // Pin a morning clock: the hook only schedules refetches while `date` is
+    // still today, so a slate 14h out must not cross local midnight. With the
+    // real clock this suite failed whenever it ran after ~10:00 (LS-10993).
+    jest.useFakeTimers({ now: new Date(2026, 5, 15, 9, 0, 0) });
   });
 
   afterEach(() => {
