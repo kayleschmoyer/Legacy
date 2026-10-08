@@ -21,6 +21,10 @@ jest.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams()],
 }));
 
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: () => ({ isPremium: false, isLoading: false }),
+}));
+
 jest.mock('@legacy-sports/shared-components/ui', () => {
   const Passthrough = ({ children }: ChildrenProps) => <div>{children}</div>;
   return {

@@ -28,9 +28,16 @@ const mockUseAuth = jest.fn<AuthMock, []>();
 // Prefixed `mock` so jest's hoisted factory below may close over it.
 let mockUsernameLoading = false;
 
+const mockNavigate = jest.fn();
+let mockPremiumStatus = { isPremium: false, isLoading: false };
+
 jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
   useSearchParams: () => [new URLSearchParams()],
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: () => mockPremiumStatus,
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => {
@@ -285,6 +292,44 @@ describe('ProfileSettingsPage access level (LS-10650)', () => {
 
     expect(screen.getAllByText('Administrator')).toHaveLength(2);
     expect(screen.queryByText('Member')).toBeNull();
+  });
+});
+
+describe('ProfileSettingsPage subscription card (LS-7226)', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset();
+    mockPremiumStatus = { isPremium: false, isLoading: false };
+  });
+
+  it('shows the Free plan state for a non-premium user', () => {
+    renderPage(null);
+
+    expect(screen.getByText('Subscription & Billing')).toBeVisible();
+    expect(screen.getByText('Free plan — tap to upgrade')).toBeVisible();
+  });
+
+  it('shows Premium for a premium user', () => {
+    mockPremiumStatus = { isPremium: true, isLoading: false };
+    renderPage(null);
+
+    expect(screen.getByText('Premium')).toBeVisible();
+    expect(screen.queryByText(/Free plan/)).toBeNull();
+  });
+
+  it('does not claim a plan while premium status is loading', () => {
+    mockPremiumStatus = { isPremium: false, isLoading: true };
+    renderPage(null);
+
+    expect(screen.getByText('Loading plan…')).toBeVisible();
+    expect(screen.queryByText(/Free plan/)).toBeNull();
+  });
+
+  it('navigates to /profile/subscription when the card is pressed', () => {
+    renderPage(null);
+
+    fireEvent.click(screen.getByText('Subscription & Billing'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/profile/subscription');
   });
 });
 

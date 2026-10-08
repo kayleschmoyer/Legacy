@@ -35,6 +35,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { AuthPendingFallback } from '../../components/auth/AuthPendingFallback';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useImageLoadError } from '../../hooks/useImageLoadError';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { trackSignOut } from '../../utils/analytics';
 import { showToast } from '../../components/layout/SuccessToast';
 
@@ -238,6 +239,11 @@ const ProfileSettingsPage: React.FC = () => {
   const accessLevel = user?.accessLevel ?? 'none';
 
   const mfa = useMfa(authService);
+  const { isPremium, isLoading: isPremiumLoading } = useIsPremiumStatus();
+  const goToSubscription = useCallback(
+    () => navigate('/profile/subscription'),
+    [navigate],
+  );
 
   // Session row: derived from the cached token expiry, re-evaluated every 30s
   // (and whenever the auth context changes, e.g. a token refresh).
@@ -1073,6 +1079,57 @@ const ProfileSettingsPage: React.FC = () => {
             </SectionBody>
           </SectionCard>
 
+          {/* ── Subscription & Billing (LS-7226) ── */}
+          <SectionCard
+            data-testid="profile-subscription-section"
+            style={sectionCardGradientStyle}
+          >
+            <SubscriptionLink
+              role="link"
+              tabIndex={0}
+              aria-label={
+                isPremium
+                  ? 'Subscription and billing settings. Premium plan.'
+                  : 'Subscription and billing settings. Free plan.'
+              }
+              onPress={goToSubscription}
+              onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                if (e.repeat) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  goToSubscription();
+                }
+              }}
+            >
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="subscription">
+                    {isPremium ? '⭐' : '💎'}
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Subscription &amp; Billing
+                </Paragraph>
+                <Paragraph
+                  size="$2"
+                  color="$colorPress"
+                  data-testid="profile-subscription-status"
+                >
+                  {isPremiumLoading
+                    ? 'Loading plan…'
+                    : isPremium
+                      ? 'Premium'
+                      : 'Free plan — tap to upgrade'}
+                </Paragraph>
+              </YStack>
+              <Paragraph size="$4" color="$colorPress" aria-hidden>
+                ›
+              </Paragraph>
+            </SubscriptionLink>
+          </SectionCard>
+
           {/* ── Danger Zone ── */}
           <SectionCard
             style={{
@@ -1174,6 +1231,21 @@ const ProfileSettingsPage: React.FC = () => {
     </PageContainer>
   );
 };
+
+const SubscriptionLink = styled(YStack, {
+  flexDirection: 'row',
+  paddingHorizontal: '$5',
+  paddingVertical: '$4',
+  alignItems: 'center',
+  gap: '$3',
+  cursor: 'pointer',
+  hoverStyle: {
+    opacity: 0.85,
+  },
+  pressStyle: {
+    opacity: 0.9,
+  },
+});
 
 const SignOutButton = styled(YStack, {
   paddingHorizontal: '$5',
