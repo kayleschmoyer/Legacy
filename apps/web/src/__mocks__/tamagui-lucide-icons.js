@@ -95,3 +95,7 @@ export default mockIcon;
 // Icons used by the baseball LeagueScoringEditor (LS-10743)
 export const RotateCcw = () => 'RotateCcw';
 export const Save = () => 'Save';
+
+// Icons used by the /help page (LS-10746)
+export const AlertTriangle = () => 'AlertTriangle';
+export const Lightbulb = () => 'Lightbulb';

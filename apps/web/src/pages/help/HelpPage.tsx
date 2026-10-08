@@ -25,6 +25,7 @@ import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { BugReportButton } from '../../components/layout/BugReportButton';
 import { env } from '../../config/environment';
+import { useThemeContext } from '../../context/ThemeContext';
 import { PageMeta } from '../../components/PageMeta';
 import {
   onboardingTutorialAnalytics,
@@ -50,6 +51,89 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
+
+/* ─── Per-theme palette ───
+ * LS-10746: the page sits on the themed `$background`, so in light theme the
+ * fixed dark-theme text colours were near-white on white. Dark keeps the
+ * page's original raw values verbatim (the dark page is unchanged); light
+ * reads the Tamagui theme — `var(--token)` in plain DOM styles, `$token` on
+ * Tamagui props (the quick-link chips and contact cards are animated, and
+ * animated components crash on CSS vars — scripts/check-animated-theme-vars.mjs).
+ * The tutorial hero is a dark accent card in both themes, so it keeps its
+ * fixed colours.
+ */
+
+interface HelpPalette {
+  /** Page H1. */
+  display: string;
+  /** Section titles, FAQ questions, card titles. */
+  heading: string;
+  /** Intro, FAQ answers, callout copy, footer © line. */
+  body: string;
+  /** Section subtitles, card descriptions, arrows. */
+  muted: string;
+  /** FAQ numbers, footer tagline. */
+  subtle: string;
+  /** Gold eyebrows, open FAQ question, links (DOM `color`). */
+  gold: string;
+  /** Gold icon colour (Tamagui icon `color` prop). */
+  goldIcon: string;
+  /** Closed FAQ chevron (Tamagui icon `color` prop). */
+  mutedIcon: string;
+  urgentText: string;
+  rowHover: string;
+  iconTile: string;
+  code: string;
+  /** Callout base fill under its red tint (DOM `background`). */
+  calloutBase: string;
+  /** Tamagui props: borders, dividers and panel fills. */
+  border: string;
+  panel: string;
+  panelHover: string;
+}
+
+const HELP_PALETTE: Record<'dark' | 'light', HelpPalette> = {
+  dark: {
+    display: WHITE,
+    heading: TEXT_INTERFACE,
+    body: TEXT_FG2,
+    muted: TEXT_SECONDARY,
+    subtle: TEXT_TERTIARY,
+    gold: BRAND_GOLD_LIGHT,
+    goldIcon: BRAND_GOLD_LIGHT,
+    mutedIcon: TEXT_SECONDARY,
+    urgentText: BRAND_SEAM_RED_LIGHT,
+    rowHover: withAlpha(WHITE, 0.02),
+    iconTile: withAlpha(BRAND_NAVY, 0.4),
+    code: withAlpha(WHITE, 0.05),
+    calloutBase: SURFACE_PANEL,
+    border: STATS_BORDER,
+    panel: SURFACE_PANEL,
+    panelHover: SURFACE_CARD,
+  },
+  light: {
+    display: 'var(--color12)',
+    heading: 'var(--color12)',
+    body: 'var(--color11)',
+    muted: 'var(--textMuted)',
+    subtle: 'var(--fg4)',
+    gold: 'var(--goldText)',
+    goldIcon: '$goldText',
+    mutedIcon: '$textMuted',
+    urgentText: 'var(--statusDangerFg)',
+    rowHover: 'var(--surfaceInteractive)',
+    iconTile: 'var(--accentMuted)',
+    code: 'var(--accentMuted)',
+    calloutBase: 'var(--surfacePanel)',
+    border: '$surfacePanelBorder',
+    panel: '$surfacePanel',
+    panelHover: '$surfaceCard',
+  },
+};
+
+function useHelpPalette(): HelpPalette {
+  return HELP_PALETTE[useThemeContext().resolvedTheme];
+}
 
 /* ─── Contact icon lookup ───
  * Keyed by HELP_CONTACT_ITEMS.title (stable semantic identifier) rather than
@@ -177,12 +261,13 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
     .slice(0, 40);
   const faqId = `faq-${slug}`;
   const num = String(index + 1).padStart(2, '0');
+  const palette = useHelpPalette();
 
   return (
     <YStack
       data-testid={`faq-item-${slug}`}
       borderBottomWidth={1}
-      borderBottomColor={withAlpha(STATS_BORDER, 1)}
+      borderBottomColor={palette.border}
     >
       <button
         type="button"
@@ -198,7 +283,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
           gridTemplateColumns: 'auto 1fr auto',
           gap: 18,
           textAlign: 'left',
-          color: TEXT_INTERFACE,
+          color: palette.heading,
           minHeight: 44,
           alignItems: 'center',
           width: '100%',
@@ -208,7 +293,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
           paddingBottom: 22,
           border: 'none',
           backgroundColor:
-            hovering || focused ? withAlpha(WHITE, 0.02) : 'transparent',
+            hovering || focused ? palette.rowHover : 'transparent',
           cursor: 'pointer',
         }}
       >
@@ -217,7 +302,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
             fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
             fontWeight: 500,
             fontSize: 12,
-            color: TEXT_TERTIARY,
+            color: palette.subtle,
             letterSpacing: '0.06em',
             fontVariantNumeric: 'tabular-nums',
             width: 32,
@@ -231,7 +316,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
             fontWeight: 700,
             fontSize: 18,
             letterSpacing: '0.01em',
-            color: open ? BRAND_GOLD_LIGHT : TEXT_INTERFACE,
+            color: open ? palette.gold : palette.heading,
             transition: 'color 150ms ease',
           }}
         >
@@ -239,7 +324,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
         </span>
         <ChevronDown
           size={16}
-          color={open ? BRAND_GOLD_LIGHT : TEXT_SECONDARY}
+          color={open ? palette.goldIcon : palette.mutedIcon}
           style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 150ms ease',
@@ -261,7 +346,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
               fontFamily: FONT_BODY,
               fontSize: 15,
               lineHeight: 1.65,
-              color: TEXT_FG2,
+              color: palette.body,
               margin: 0,
               maxWidth: '65ch',
             }}
@@ -279,15 +364,9 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
 const ContactCardBase = styled(YStack, {
   borderRadius: 16,
   borderWidth: 1,
-  borderColor: STATS_BORDER,
-  backgroundColor: SURFACE_PANEL,
   padding: 22,
   cursor: 'pointer' as never,
   animation: 'quick',
-  hoverStyle: {
-    borderColor: withAlpha(BRAND_GOLD, 0.35),
-    backgroundColor: SURFACE_CARD,
-  },
 });
 
 interface ContactOptionProps {
@@ -313,9 +392,16 @@ function ContactOption({
       ? () => window.open(href, '_blank', 'noopener,noreferrer')
       : undefined;
   const IconComponent = CONTACT_ICON_MAP[title];
+  const palette = useHelpPalette();
 
   return (
     <ContactCardBase
+      borderColor={palette.border}
+      backgroundColor={palette.panel}
+      hoverStyle={{
+        borderColor: withAlpha(BRAND_GOLD, 0.35),
+        backgroundColor: palette.panelHover,
+      }}
       onPress={handlePress}
       cursor={handlePress ? ('pointer' as never) : undefined}
       role={handlePress ? 'button' : undefined}
@@ -340,11 +426,11 @@ function ContactOption({
           alignItems="center"
           justifyContent="center"
           borderWidth={1}
-          borderColor={STATS_BORDER}
-          style={{ background: withAlpha(BRAND_NAVY, 0.4) }}
+          borderColor={palette.border}
+          style={{ background: palette.iconTile }}
         >
           {IconComponent ? (
-            <IconComponent size={24} color={BRAND_GOLD_LIGHT} />
+            <IconComponent size={24} color={palette.goldIcon} />
           ) : (
             <span role="img" aria-label={iconLabel} style={{ fontSize: 22 }}>
               {icon}
@@ -358,7 +444,7 @@ function ContactOption({
               fontWeight: 700,
               fontSize: 16,
               letterSpacing: '0.04em',
-              color: TEXT_INTERFACE,
+              color: palette.heading,
             }}
           >
             {title}
@@ -368,7 +454,7 @@ function ContactOption({
               fontFamily: FONT_BODY,
               fontSize: 13,
               lineHeight: 1.45,
-              color: TEXT_SECONDARY,
+              color: palette.muted,
             }}
           >
             {description}
@@ -379,7 +465,7 @@ function ContactOption({
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
             fontSize: 12,
-            color: TEXT_TERTIARY,
+            color: palette.subtle,
           }}
         >
           ↗
@@ -398,6 +484,7 @@ interface SectionHeadProps {
 }
 
 function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
+  const palette = useHelpPalette();
   return (
     <YStack gap={6} maxWidth="70ch" marginBottom={20}>
       {eyebrow && (
@@ -408,7 +495,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
             fontSize: 12,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
-            color: BRAND_GOLD_LIGHT,
+            color: palette.gold,
           }}
         >
           {eyebrow}
@@ -421,7 +508,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
           fontSize: 30,
           lineHeight: 1.1,
           letterSpacing: '-0.01em',
-          color: TEXT_INTERFACE,
+          color: palette.heading,
           margin: 0,
         }}
       >
@@ -432,7 +519,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
           style={{
             fontFamily: FONT_BODY,
             fontSize: 15,
-            color: TEXT_SECONDARY,
+            color: palette.muted,
             margin: 0,
           }}
         >
@@ -447,6 +534,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
 
 export default function HelpPage() {
   const media = useMedia();
+  const palette = useHelpPalette();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [featureRequestOpen, setFeatureRequestOpen] = useState(false);
@@ -494,7 +582,7 @@ export default function HelpPage() {
                   fontSize: 12,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
-                  color: BRAND_GOLD_LIGHT,
+                  color: palette.gold,
                 }}
               >
                 The Clubhouse
@@ -506,7 +594,7 @@ export default function HelpPage() {
                   fontSize: 'clamp(40px, 5vw, 56px)',
                   lineHeight: 1,
                   letterSpacing: '-0.02em',
-                  color: WHITE,
+                  color: palette.display,
                   margin: 0,
                 }}
               >
@@ -517,7 +605,7 @@ export default function HelpPage() {
                   fontFamily: FONT_BODY,
                   fontSize: 18,
                   lineHeight: 1.6,
-                  color: TEXT_FG2,
+                  color: palette.body,
                   margin: '8px 0 0',
                   maxWidth: '62ch',
                 }}
@@ -529,7 +617,9 @@ export default function HelpPage() {
               </p>
             </YStack>
 
-            {/* ── Tutorial hero ── */}
+            {/* ── Tutorial hero ──
+                A dark accent card in both themes (like the navy/gold accent
+                surfaces elsewhere), so it keeps its fixed colours (LS-10746). */}
             <YStack
               borderTopWidth={0}
               paddingVertical={0}
@@ -722,7 +812,7 @@ export default function HelpPage() {
             {/* ── Quick Links ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor={STATS_BORDER}
+              borderTopColor={palette.border}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -746,17 +836,17 @@ export default function HelpPage() {
                       paddingVertical={12}
                       borderRadius={9999}
                       borderWidth={1}
-                      borderColor={STATS_BORDER}
-                      backgroundColor={SURFACE_PANEL}
+                      borderColor={palette.border}
+                      backgroundColor={palette.panel}
                       cursor="pointer"
                       animation="quick"
                       hoverStyle={{
                         borderColor: withAlpha(BRAND_GOLD, 0.45),
-                        backgroundColor: SURFACE_CARD,
+                        backgroundColor: palette.panelHover,
                       }}
                       style={{ minHeight: 44 }}
                     >
-                      <Icon size={16} color={BRAND_GOLD_LIGHT} />
+                      <Icon size={16} color={palette.goldIcon} />
                       <span
                         style={{
                           fontFamily: FONT_DISPLAY,
@@ -764,7 +854,7 @@ export default function HelpPage() {
                           fontSize: 13,
                           letterSpacing: '0.06em',
                           textTransform: 'uppercase',
-                          color: TEXT_INTERFACE,
+                          color: palette.heading,
                         }}
                       >
                         {label}
@@ -775,7 +865,7 @@ export default function HelpPage() {
                           fontFamily:
                             "'JetBrains Mono', ui-monospace, Menlo, monospace",
                           fontSize: 14,
-                          color: TEXT_SECONDARY,
+                          color: palette.muted,
                         }}
                       >
                         →
@@ -789,7 +879,7 @@ export default function HelpPage() {
             {/* ── FAQ ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor={STATS_BORDER}
+              borderTopColor={palette.border}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -802,8 +892,8 @@ export default function HelpPage() {
               <YStack
                 borderRadius={16}
                 borderWidth={1}
-                borderColor={STATS_BORDER}
-                backgroundColor={SURFACE_PANEL}
+                borderColor={palette.border}
+                backgroundColor={palette.panel}
                 overflow="hidden"
               >
                 {HELP_FAQ_ITEMS.map((item, i) => (
@@ -820,7 +910,7 @@ export default function HelpPage() {
             {/* ── Historical Stats FAQ ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor={STATS_BORDER}
+              borderTopColor={palette.border}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -833,8 +923,8 @@ export default function HelpPage() {
               <YStack
                 borderRadius={16}
                 borderWidth={1}
-                borderColor={STATS_BORDER}
-                backgroundColor={SURFACE_PANEL}
+                borderColor={palette.border}
+                backgroundColor={palette.panel}
                 overflow="hidden"
               >
                 {HELP_HISTORICAL_FAQ_ITEMS.map((item, i) => (
@@ -851,7 +941,7 @@ export default function HelpPage() {
             {/* ── Contact & Support ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor={STATS_BORDER}
+              borderTopColor={palette.border}
               paddingTop={40}
               $sm={{ paddingTop: 28 }}
             >
@@ -906,7 +996,7 @@ export default function HelpPage() {
                 borderWidth={1}
                 borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
                 style={{
-                  background: `linear-gradient(135deg, ${withAlpha(BRAND_SEAM_RED, 0.08)}, ${withAlpha(BRAND_SEAM_RED, 0.02)}), ${SURFACE_PANEL}`,
+                  background: `linear-gradient(135deg, ${withAlpha(BRAND_SEAM_RED, 0.08)}, ${withAlpha(BRAND_SEAM_RED, 0.02)}), ${palette.calloutBase}`,
                 }}
                 gap={12}
               >
@@ -941,7 +1031,7 @@ export default function HelpPage() {
                         fontSize: 11,
                         letterSpacing: '0.14em',
                         textTransform: 'uppercase',
-                        color: BRAND_SEAM_RED_LIGHT,
+                        color: palette.urgentText,
                       }}
                     >
                       Urgent account issues
@@ -954,7 +1044,7 @@ export default function HelpPage() {
                     fontFamily: FONT_BODY,
                     fontSize: 15,
                     lineHeight: 1.55,
-                    color: TEXT_FG2,
+                    color: palette.body,
                     margin: 0,
                     maxWidth: '62ch',
                   }}
@@ -965,7 +1055,7 @@ export default function HelpPage() {
                     href={DISCORD_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: BRAND_GOLD_LIGHT, fontWeight: 600 }}
+                    style={{ color: palette.gold, fontWeight: 600 }}
                   >
                     Discord server
                   </a>{' '}
@@ -975,10 +1065,10 @@ export default function HelpPage() {
                       fontFamily:
                         "'JetBrains Mono', ui-monospace, Menlo, monospace",
                       fontSize: 13,
-                      background: withAlpha(WHITE, 0.05),
+                      background: palette.code,
                       padding: '1px 6px',
                       borderRadius: 4,
-                      color: TEXT_INTERFACE,
+                      color: palette.heading,
                     }}
                   >
                     #urgent-support
@@ -993,7 +1083,7 @@ export default function HelpPage() {
               marginTop={64}
               paddingTop={32}
               borderTopWidth={1}
-              borderTopColor={STATS_BORDER}
+              borderTopColor={palette.border}
               gap={6}
               $sm={{ marginTop: 48, paddingTop: 20 }}
             >
@@ -1001,7 +1091,7 @@ export default function HelpPage() {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 13,
-                  color: TEXT_FG2,
+                  color: palette.body,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
@@ -1012,7 +1102,7 @@ export default function HelpPage() {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 12,
-                  color: TEXT_TERTIARY,
+                  color: palette.subtle,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
