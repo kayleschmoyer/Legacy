@@ -1,3 +1,5 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type { DbOptions } from '@legacy-sports/utils/node';
 import { PlayerService } from './PlayerService';
 
@@ -414,6 +416,15 @@ describe('PlayerService — searchPlayers', () => {
     expect(result).toHaveLength(1);
     expect(mockDb.where).toHaveBeenCalledTimes(1);
     expect(mockDb.limit).toHaveBeenCalledWith(10);
+  });
+
+  it('also matches legal-name aliases, e.g. "Henry Aaron" (LS-10669)', async () => {
+    await service.searchPlayers('Henry Aaron', 10, 'baseball');
+
+    const [condition] = mockDb.where.mock.calls[0] as [SQL];
+    const where = new PgDialect().sqlToQuery(condition);
+    expect(where.sql).toContain('"name_aliases" ILIKE');
+    expect(where.params).toContain('%Henry Aaron%');
   });
 
   it('passes adversarial SQL injection input through as a bound parameter (LS-7025)', async () => {

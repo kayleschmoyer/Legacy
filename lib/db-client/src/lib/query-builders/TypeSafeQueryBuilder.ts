@@ -7,6 +7,7 @@ import {
   gte,
   ilike,
   lte,
+  or,
   sql,
   SQL,
 } from 'drizzle-orm';
@@ -34,14 +35,24 @@ export function normalizeSearchTerm(searchTerm: string): string {
  * (both columns are NOT NULL, so `first || ' ' || last` contains each), and
  * avoids OR-ing in unindexed per-column arms that force a sequential scan.
  * The term is normalized with {@link normalizeSearchTerm} first (LS-10657).
+ * A second arm matches legal-name aliases (`players.name_aliases`, LS-10669)
+ * through its own trigram index, so both arms stay indexable.
  */
 export function buildPlayerNameSearch(
   searchTerm: string,
 ): SQL<unknown> | undefined {
   const term = normalizeSearchTerm(searchTerm);
-  return ilike(
-    sql`lower(public.f_unaccent(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}))`,
-    sql`public.f_unaccent(${`%${term}%`})`,
+  const pattern = sql`public.f_unaccent(${`%${term}%`})`;
+  return or(
+    ilike(
+      sql`lower(public.f_unaccent(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName}))`,
+      pattern,
+    ),
+    // Legal-name aliases (LS-10669), indexed by idx_players_name_aliases_trgm.
+    ilike(
+      sql`lower(public.f_unaccent(${PublicSchema.players}.${sql.identifier('name_aliases')}))`,
+      pattern,
+    ),
   );
 }
 

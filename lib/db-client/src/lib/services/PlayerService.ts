@@ -781,6 +781,8 @@ export class PlayerService {
         ilike(firstName, `%${searchTerm}%`),
         ilike(lastName, `%${searchTerm}%`),
         sql`${fullName} ILIKE ${'%' + searchTerm + '%'}`,
+        // Legal-name aliases, e.g. "Henry Aaron" (LS-10669)
+        sql`${PublicSchema.players}.${sql.identifier('name_aliases')} ILIKE ${'%' + searchTerm + '%'}`,
       );
 
       const whereCondition = sport
@@ -1030,6 +1032,7 @@ export class PlayerService {
               p.first_name ILIKE ${'%' + term + '%'}
               OR p.last_name ILIKE ${'%' + term + '%'}
               OR (p.first_name || ' ' || p.last_name) ILIKE ${'%' + term + '%'}
+              OR p.name_aliases ILIKE ${'%' + term + '%'}
             )`,
           );
         }

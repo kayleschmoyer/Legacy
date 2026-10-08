@@ -84,6 +84,10 @@ export const players = pgTable(
       // GIN trigram indexes for LIKE '%name%' search: idx_players_name_trgm (LS-905)
       // and idx_players_unaccent_name_trgm (LS-10728, accent-insensitive)
       // Managed by migration — cannot be modeled in Drizzle (expression + pg_trgm ops class)
+      // `name_aliases` (LS-10669: `|`-joined legal-name aliases, e.g. "Henry
+      // Aaron") and idx_players_name_aliases_trgm are also migration-managed and
+      // deliberately unmodeled: adding the column would widen the inferred
+      // Player row type at every hand-built row. Search reads it via raw SQL.
       // Partial unique index: one row per pfr_id when non-null (LS-246)
       playersPfrIdUnique: uniqueIndex('players_pfr_id_unique')
         .on(table.pfrId)
