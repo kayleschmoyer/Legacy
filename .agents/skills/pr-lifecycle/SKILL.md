@@ -83,7 +83,7 @@ Full explanations, examples, and the CI-tool instant-snapshot reference table: [
 4.  Never skip `make pc`.
 5.  Always use `--body-file` or an MCP tool for the PR body — never inline `--body` in any shell.
 6.  Never create a PR from `main`.
-7.  Always create PRs as drafts, then mark ready before handoff — draft is a working state, not an ending state.
+7.  Always create PRs as drafts, then mark ready before handoff — draft is a working state, not an ending state. A PR left in draft is stuck: CI does not run its full pipeline and it cannot enter the merge queue. Before ending ANY turn that touched a PR, confirm `isDraft: false` via `github_view_pr`; if it is still draft and validation + self-review are green (or the only red is proven pre-existing), call `github_mark_pr_ready` now.
 8.  Check Runs ≠ Commit Statuses — `github_retrigger_check` cannot find `bot-review` or other commit statuses.
 9.  React to each push notification as it arrives — never poll (`sleep N && gh ...`) for CI/PR status.
 10. Batch known PR fixes into one push.

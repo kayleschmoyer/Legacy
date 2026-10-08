@@ -1,0 +1,118 @@
+# =============================================================================
+# Stale Draft PR Sweep
+# =============================================================================
+# LS-10975. Agents open PRs as drafts and are told to promote them once
+# validation + self-review are green. When they don't, the PR stalls: draft PRs
+# don't run the full CI pipeline and can't enter the merge queue.
+#
+# Mechanical backstop, for open DRAFT PRs labelled `agent-in-progress`:
+#   - no push for 2h+  -> comment telling the agent to call github_mark_pr_ready
+#   - no push for 6h+  -> promote (markPullRequestReadyForReview) and apply
+#                         `bot:ready-for-review`
+# Opt out with the `keep-draft` label. Decision logic (unit-tested, fails
+# closed) lives in .github/scripts/stale-draft-pr-sweep.js.
+# =============================================================================
+
+name: "Stale Draft PR Sweep"
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: stale-draft-pr-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: "📝 Nudge / promote stale draft PRs"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Promotion and labelling use the Agent Author app token so the resulting
+      # events trigger downstream workflows (GITHUB_TOKEN events do not).
+      - name: Generate App Token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/stale-draft-pr-sweep.js
+          sparse-checkout-cone-mode: false
+
+      - name: "Nudge or promote stale drafts"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          script: |
+            const { decideStaleDraft, nudgeBody } = require('./.github/scripts/stale-draft-pr-sweep.js');
+            const { owner, repo } = context.repo;
+            const now = Date.now();
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const drafts = prs.filter((pr) => pr.draft);
+
+            const rows = [];
+            let errors = 0;
+            for (const pr of drafts) {
+              try {
+                const { data: head } = await github.rest.repos.getCommit({
+                  owner, repo, ref: pr.head.sha,
+                });
+                const lastPushAt = head.commit.committer?.date || head.commit.author?.date;
+                const comments = (await github.paginate(github.rest.issues.listComments, {
+                  owner, repo, issue_number: pr.number, per_page: 100,
+                })).map((c) => c.body || '');
+
+                const decision = decideStaleDraft({ pr, lastPushAt, comments, now });
+                core.info(`PR #${pr.number}: ${decision.action} (${decision.reason})`);
+
+                if (decision.action === 'nudge') {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: pr.number, body: nudgeBody(),
+                  });
+                } else if (decision.action === 'promote') {
+                  await github.graphql(
+                    `mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }`,
+                    { id: pr.node_id },
+                  );
+                  await github.rest.issues.addLabels({
+                    owner, repo, issue_number: pr.number, labels: ['bot:ready-for-review'],
+                  });
+                }
+                if (decision.action !== 'skip') {
+                  rows.push([`#${pr.number}`, decision.action, decision.reason]);
+                }
+              } catch (e) {
+                errors += 1;
+                core.warning(`PR #${pr.number}: ${e.message}`);
+                rows.push([`#${pr.number}`, 'error', e.message]);
+              }
+            }
+
+            await core.summary
+              .addHeading('Stale draft PR sweep')
+              .addRaw(`${drafts.length} draft PRs scanned; ${rows.length} acted on.`)
+              .addTable([
+                [{ data: 'PR', header: true }, { data: 'Action', header: true }, { data: 'Reason', header: true }],
+                ...rows,
+              ])
+              .write();
+
+            if (errors > 0) {
+              core.setFailed(`${errors} PR(s) could not be processed — see warnings above.`);
+            }

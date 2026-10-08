@@ -17,7 +17,8 @@ Defenses against this come in three tiers, weakest to strongest. **The common fa
    1. **Implement + commit**
    2. **Push + open draft PR + apply `agent-in-progress` + post continuation checkpoint** — `blockedBy` (1)
    3. **Migrations + validation (`make pc`)** — `blockedBy` (2)
-   4. **Self-review green + mark ready + watch to merge** — `blockedBy` (3)
+   4. **Self-review green + `github_mark_pr_ready` (PR must show `isDraft: false`)** — `blockedBy` (3). Its own task so it can't hide inside "watch to merge": a draft PR never runs the full CI pipeline and never merges.
+   5. **Watch to merge** — `blockedBy` (4)
 
    Task (3) being `blockedBy` task (2) is the load-bearing edge: the durable checkpoint (pushed branch + draft PR) exists **before** the long validation, so a container kill mid-`make pc` is recoverable. This beats prose because it persists as explicit state across compaction rather than as a gist — but be honest about its limit: it is **agent-honored, not tool-enforced.** Nothing refuses to start a blocked task; "never start a blocked task, and never delete a dependency to unblock yourself" is still an instruction the agent must _choose_ to obey. A graph that was never created, or created without the edge, enforces nothing — and that, not a defiant agent, is the usual real-world failure (an agent ran `make pc` before opening the PR because no graph gated the `make pc` call).
 

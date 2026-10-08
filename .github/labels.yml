@@ -226,6 +226,12 @@
   color: "0075ca"
   description: "PR is actively being watched by an agent — sweep agents should skip it"
 
+# Opt-out for .github/workflows/stale-draft-pr-sweep.yml (LS-10975): a draft PR
+# that is intentionally still in progress and must not be auto-promoted.
+- name: keep-draft
+  color: "fbca04"
+  description: "Intentionally still in draft - exempt from the stale-draft auto-promote sweep"
+
 - name: sweep-claimed
   color: "e4e669"
   description: "Sweep agent actively working on this PR"
