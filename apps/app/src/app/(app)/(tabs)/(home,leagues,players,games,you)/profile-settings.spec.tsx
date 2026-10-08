@@ -842,6 +842,20 @@ describe('ProfileSettingsScreen', () => {
       ).toBeTruthy();
     });
 
+    it.each([
+      ['annual', 'Premium (Annual)'],
+      ['lifetime', 'Premium (Lifetime)'],
+      ['founders', 'Premium (founders)'],
+    ])('labels the %s tier', (tier, label) => {
+      mockSubscriptionState = {
+        isPremium: true,
+        tier,
+        subscription: { ...baseSubscription, tier },
+      };
+      render(<ProfileSettingsScreen />);
+      expect(screen.getByText(label)).toBeTruthy();
+    });
+
     it('warns with the billing deadline when the payment failed', () => {
       mockSubscriptionState = {
         ...premium,

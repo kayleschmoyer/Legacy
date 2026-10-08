@@ -45,6 +45,18 @@ import {
 import { trackSignOut } from '../../../../utils/analytics';
 import { useSystemBackAction } from '../../../../common/hooks/useSystemBackAction';
 
+const TIER_LABELS: Readonly<Record<string, string>> = {
+  monthly: 'Monthly',
+  annual: 'Annual',
+  lifetime: 'Lifetime',
+};
+
+/** Maps a subscription tier to its display label; unknown tiers surface the raw name. */
+function getTierLabel(tier: string | null | undefined): string {
+  if (!tier) return 'Monthly';
+  return TIER_LABELS[tier] ?? tier;
+}
+
 type LinkedProvider = 'discord' | 'google' | 'apple';
 
 const KNOWN_PROVIDERS: readonly LinkedProvider[] = [
@@ -748,7 +760,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 </Paragraph>
                 <Paragraph size="$2" color="$colorPress">
                   {isPremium
-                    ? `Premium (${tier === 'annual' ? 'Annual' : 'Monthly'})`
+                    ? `Premium (${getTierLabel(tier)})`
                     : 'Free plan \u2014 tap to upgrade'}
                 </Paragraph>
                 {subscriptionWarning ? (
