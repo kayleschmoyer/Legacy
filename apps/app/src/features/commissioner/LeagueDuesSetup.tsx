@@ -10,11 +10,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetLeagueDuesSettingsQuery,
   useUpdateDuesSettingsMutation,
 } from '@legacy-sports/graphql';
+import { getDuesAmountError } from '@legacy-sports/utils';
 
 export function parseDollarsToCents(value: string): number {
   const s = (value ?? '').trim();
@@ -24,6 +26,34 @@ export function parseDollarsToCents(value: string): number {
   const fractionalCents = parseInt(fraction.padEnd(2, '0').slice(0, 2), 10);
   const result = dollarCents + fractionalCents;
   return isNaN(result) ? 0 : result;
+}
+
+export const GENERIC_DUES_SAVE_ERROR =
+  "Couldn't save dues settings. Please check the amount and try again.";
+
+/** Resolver error codes whose message is written for end users. */
+const USER_FACING_ERROR_CODES = new Set(['BAD_USER_INPUT', 'FORBIDDEN']);
+
+/**
+ * Maps a failed save to user-facing copy (LS-10987, mirrors the web
+ * `LeagueDuesControl`). Only errors raised by the resolver itself (they carry
+ * a `path`) with a user-facing code pass their message through; request-level
+ * failures such as GraphQL variable coercion have no `path` and fall back to
+ * generic copy so raw transport text never reaches the user.
+ */
+export function getDuesSaveErrorMessage(err: unknown): string {
+  if (CombinedGraphQLErrors.is(err)) {
+    const userFacing = err.errors.find((e) => {
+      const code = e.extensions?.code;
+      return (
+        e.path != null &&
+        typeof code === 'string' &&
+        USER_FACING_ERROR_CODES.has(code)
+      );
+    });
+    if (userFacing) return userFacing.message;
+  }
+  return GENERIC_DUES_SAVE_ERROR;
 }
 
 export interface LeagueDuesSetupProps {
@@ -79,10 +109,7 @@ export function LeagueDuesSetup({
     useUpdateDuesSettingsMutation();
 
   const amountCents = parseDollarsToCents(amountDollars);
-  const validationError =
-    enabled && (isNaN(amountCents) || amountCents <= 0)
-      ? 'Please enter a valid dues amount greater than $0'
-      : null;
+  const validationError = enabled ? getDuesAmountError(amountCents) : null;
 
   const handleAmountChange = useCallback((text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, '');
@@ -116,9 +143,7 @@ export function LeagueDuesSetup({
       onSuccess?.('Dues settings saved successfully!');
     } catch (err) {
       LOGGER.error('Failed to update dues settings', { err });
-      const errorMessage =
-        err instanceof Error ? err.message : 'Unknown error occurred';
-      onError?.(new Error(errorMessage));
+      onError?.(new Error(getDuesSaveErrorMessage(err)));
     }
   };
 
