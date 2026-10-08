@@ -484,6 +484,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
               <MatchupTab
                 league={league}
                 myTeamId={userTeamId ?? null}
+                myTeamIdSettled={userTeamIdSettled}
                 initialMatchupId={routeMatchupId ?? null}
                 onTeam={onTeamNav}
                 isCommissioner={isCommissioner}

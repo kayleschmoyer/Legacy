@@ -55,6 +55,12 @@ function footballMatchupFormatLabel(scoringFormat?: string | null): string {
 export interface MatchupTabProps {
   league: LeagueFragment;
   myTeamId: number | null;
+  /**
+   * False while the parent is still resolving `myTeamId` (LS-10777). Until it
+   * settles, a null `myTeamId` is indistinguishable from observer mode, so the
+   * tab holds its loading state instead of picking a matchup.
+   */
+  myTeamIdSettled?: boolean;
   initialMatchupId: string | null;
   onTeam: (teamId: number) => void;
   isCommissioner?: boolean;
@@ -64,6 +70,7 @@ export interface MatchupTabProps {
 export const MatchupTab: React.FC<MatchupTabProps> = ({
   league,
   myTeamId,
+  myTeamIdSettled = true,
   initialMatchupId,
   onTeam,
   isCommissioner,
@@ -81,7 +88,9 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   });
   const audioEnabled =
     preferencesData?.getUserPreferences?.audioEnabled === true;
-  const { currentWeek } = useCurrentWeek(league.id ?? null);
+  const { currentWeek, loading: currentWeekLoading } = useCurrentWeek(
+    league.id ?? null,
+  );
   const [week, setWeek] = useState<number>(
     league.currentWeekNumber ?? currentWeek ?? 1,
   );
@@ -90,10 +99,20 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     else if (currentWeek) setWeek(currentWeek);
   }, [league.currentWeekNumber, currentWeek]);
 
-  const { matchups, refetch: refetchMatchups } = useMatchupsByWeek(
-    league.id ?? null,
-    week,
-  );
+  const {
+    matchups,
+    loading: matchupsLoading,
+    refetch: refetchMatchups,
+  } = useMatchupsByWeek(league.id ?? null, week);
+
+  // The week's matchup list is only trustworthy once the week, the list and
+  // the viewer's team have all resolved. Before that an empty list means
+  // "not loaded yet", not "no matchup" — treating it as the latter flashed the
+  // "No Active Matchup" commissioner CTA on every load (LS-10777).
+  const matchupListSettled =
+    !(league.currentWeekNumber == null && currentWeekLoading) &&
+    !(matchupsLoading && matchups.length === 0) &&
+    myTeamIdSettled;
 
   // Football's Matchups List (LS-5419) surfaces every matchup for the week
   // with the viewer's own matchup pinned to the top; baseball keeps its
@@ -121,7 +140,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   }, [allMatchups]);
 
   const myMatchup = useMemo(() => {
-    if (!matchups || matchups.length === 0) return null;
+    if (!matchupListSettled || !matchups || matchups.length === 0) return null;
     if (myTeamId) {
       // The user has a team in this league — only ever show *their* matchup.
       // Do not fall back to matchups[0]: that would silently show a
@@ -135,7 +154,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     // Observer mode (no team in this league): defaulting to the first
     // matchup is the intended browsing experience.
     return matchups[0];
-  }, [matchups, myTeamId]);
+  }, [matchupListSettled, matchups, myTeamId]);
 
   const [browseMatchupId, setBrowseMatchupId] = useState<number | null>(null);
   // Discard a browsed matchup selection whenever the viewed week changes —
@@ -149,6 +168,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   // isn't playing this week (bye or a dropped team) — matchups exist for the
   // week, just not one with `myTeamId` in it.
   const isMyTeamOnByeThisWeek =
+    matchupListSettled &&
     !initialMatchupId &&
     browseMatchupId == null &&
     Boolean(myTeamId) &&
@@ -329,12 +349,16 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     totalGames > 0 ? Math.round((gamesPlayed / totalGames) * 100) : 0;
 
   const hasNoMatchup =
+    matchupListSettled &&
     !matchupLoading &&
     !matchupError &&
     matchupId == null &&
     !isMyTeamOnByeThisWeek;
 
-  if (matchupLoading && !matchup) {
+  if (
+    (matchupLoading && !matchup) ||
+    (matchupId == null && !matchupListSettled)
+  ) {
     return (
       <div
         data-testid="matchup-loading"

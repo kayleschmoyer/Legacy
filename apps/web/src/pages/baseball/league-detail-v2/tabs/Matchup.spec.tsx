@@ -15,6 +15,9 @@
  *  10. Matchups List tab (LS-5419): football renders every matchup for the
  *      week with the viewer's matchup pinned to the top; baseball does not
  *      render the list; tapping a card browses to that matchup's detail.
+ *  11. Load race (LS-10777): the loading state, never the "No Active Matchup"
+ *      empty state, shows while the week, its matchup list or the viewer's
+ *      team id is still resolving.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -46,7 +49,7 @@ const mockUseMatchupById = jest.fn<
 >();
 
 const mockUseMatchupsByWeek = jest.fn<
-  { matchups: object[]; refetch: jest.Mock },
+  { matchups: object[]; loading?: boolean; refetch: jest.Mock },
   [number | null, number | null]
 >();
 
@@ -55,8 +58,13 @@ const mockUseMatchupsForLeague = jest.fn<
   [number | null]
 >(() => ({ matchups: [] }));
 
+const mockUseCurrentWeek = jest.fn<
+  { currentWeek: number | null; loading: boolean },
+  []
+>(() => ({ currentWeek: 1, loading: false }));
+
 jest.mock('../../../../hooks/useMatchup', () => ({
-  useCurrentWeek: () => ({ currentWeek: 1 }),
+  useCurrentWeek: () => mockUseCurrentWeek(),
   useMatchupsByWeek: (leagueId: number | null, week: number | null) =>
     mockUseMatchupsByWeek(leagueId, week),
   useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
@@ -237,6 +245,7 @@ function renderTab(
     /** Pass null to test the no-matchup state (matchupId=null path). */
     initialMatchupId?: string | null;
     myTeamId?: number | null;
+    myTeamIdSettled?: boolean;
   } = {},
 ) {
   const initialMatchupId =
@@ -245,6 +254,7 @@ function renderTab(
     <MatchupTab
       league={{ ...baseLeague, ...leagueOverrides }}
       myTeamId={'myTeamId' in extra ? (extra.myTeamId ?? null) : 10}
+      myTeamIdSettled={extra.myTeamIdSettled}
       initialMatchupId={initialMatchupId ?? null}
       onTeam={jest.fn()}
       isCommissioner={extra.isCommissioner}
@@ -262,6 +272,7 @@ beforeEach(() => {
   });
   mockUseMatchupsByWeek.mockReturnValue({ matchups: [], refetch: jest.fn() });
   mockUseMatchupsForLeague.mockReturnValue({ matchups: [] });
+  mockUseCurrentWeek.mockReturnValue({ currentWeek: 1, loading: false });
   mockUpdateContext.mockClear();
   mockUseLeagueWebSocketClient.mockReturnValue({
     client: { updateContext: mockUpdateContext },
@@ -543,6 +554,86 @@ describe('MatchupTab — no active matchup empty state', () => {
   it('does not show commissioner button to non-commissioners', () => {
     renderTab({}, { isCommissioner: false, initialMatchupId: null });
     expect(screen.queryByTestId('go-to-commish')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupTab — matchup list load race (LS-10777)', () => {
+  beforeEach(() => {
+    // useMatchupById is idle while no matchupId has been resolved yet.
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+  });
+
+  function expectLoadingNotEmpty() {
+    expect(screen.getByTestId('matchup-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('matchup-empty')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('go-to-commish')).not.toBeInTheDocument();
+  }
+
+  it('shows the loading state while the week matchup list is pending', () => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [],
+      loading: true,
+      refetch: jest.fn(),
+    });
+    renderTab(
+      {},
+      { isCommissioner: true, onCommish: jest.fn(), initialMatchupId: null },
+    );
+    expectLoadingNotEmpty();
+  });
+
+  it('shows the loading state while the current week is pending', () => {
+    mockUseCurrentWeek.mockReturnValue({ currentWeek: null, loading: true });
+    renderTab(
+      { currentWeekNumber: null },
+      { isCommissioner: true, onCommish: jest.fn(), initialMatchupId: null },
+    );
+    expectLoadingNotEmpty();
+  });
+
+  it("shows the loading state while the viewer's team id is pending", () => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [{ id: '7', team1Id: 10, team2Id: 20 }],
+      refetch: jest.fn(),
+    });
+    renderTab(
+      {},
+      { initialMatchupId: null, myTeamId: null, myTeamIdSettled: false },
+    );
+    expectLoadingNotEmpty();
+    // No observer-mode fallback to a stranger's matchup before the team id is known.
+    expect(mockUseMatchupById).toHaveBeenLastCalledWith(null);
+  });
+
+  it('resolves the matchup once the week list arrives', () => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [{ id: '7', team1Id: 10, team2Id: 20 }],
+      loading: false,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: null });
+    expect(mockUseMatchupById).toHaveBeenLastCalledWith(7);
+    expect(screen.queryByTestId('matchup-empty')).not.toBeInTheDocument();
+  });
+
+  it('still shows the empty state and CTA once a loaded week has no matchups', () => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [],
+      loading: false,
+      refetch: jest.fn(),
+    });
+    renderTab(
+      {},
+      { isCommissioner: true, onCommish: jest.fn(), initialMatchupId: null },
+    );
+    expect(screen.getByTestId('matchup-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('go-to-commish')).toBeInTheDocument();
+    expect(screen.queryByTestId('matchup-loading')).not.toBeInTheDocument();
   });
 });
 
