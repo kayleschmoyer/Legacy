@@ -205,33 +205,40 @@ export function HomePage(): React.JSX.Element {
   const userName = formatDisplayName(auth?.user?.username || 'Manager');
 
   /* ── Onboarding tutorial: show once for new users with no leagues ── */
+  // Only a successful, empty summaries response proves the user is new. A
+  // failed query (offline, flaky network) also leaves the summaries empty, and
+  // must not be read as "no leagues" — that opened the tutorial over the
+  // dashboard error state for existing users (LS-10716).
+  const confirmedNoLeagues =
+    !summariesLoading &&
+    !summariesError &&
+    summaryData?.getUserLeagueSummaries != null &&
+    summaryData.getUserLeagueSummaries.length === 0;
+
   useEffect(() => {
-    if (!userId) return;
-    if (!hasLeagues && !summariesLoading) {
-      const key = getOnboardingKey(userId);
-      try {
-        if (migrateLegacyOnboardingFlag(window.localStorage, key)) return;
-        const completed = parseOnboardingComplete(
-          window.localStorage.getItem(key),
-        );
-        if (!completed) {
-          setTutorialInitialStep(
-            readOnboardingStep(
-              window.localStorage,
-              getOnboardingStepKey(userId),
-            ),
-          );
-          setTutorialOpen(true);
-        }
-      } catch (caught) {
-        LOGGER.error(
-          'HomePage: onboarding localStorage access failed',
-          caught instanceof Error ? caught : new Error(String(caught)),
+    if (!userId || !confirmedNoLeagues) return;
+    const key = getOnboardingKey(userId);
+    try {
+      if (migrateLegacyOnboardingFlag(window.localStorage, key)) return;
+      const completed = parseOnboardingComplete(
+        window.localStorage.getItem(key),
+      );
+      if (!completed) {
+        setTutorialInitialStep(
+          readOnboardingStep(window.localStorage, getOnboardingStepKey(userId)),
         );
         setTutorialOpen(true);
       }
+    } catch (caught) {
+      // Without storage we cannot tell whether the tutorial was already
+      // completed, so leave it closed rather than re-showing it on every
+      // visit; "How it works" still opens it on demand.
+      LOGGER.error(
+        'HomePage: onboarding localStorage access failed',
+        caught instanceof Error ? caught : new Error(String(caught)),
+      );
     }
-  }, [userId, hasLeagues, summariesLoading]);
+  }, [userId, confirmedNoLeagues]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
