@@ -497,6 +497,27 @@ test.describe('League Discovery — pagination @regression', () => {
     const secondPage = mockPublicLeagues(2, DISCOVERY_PAGE_SIZE + 1);
     let secondPageRequested = false;
 
+    // The page also auto-loads the next page when its sentinel nears the
+    // viewport (IntersectionObserver). On a short mobile viewport that fires
+    // while Playwright is still actionability-checking the button, swapping
+    // the button for a "Loading…" span (and, once the short second page lands,
+    // removing it entirely) so the click never completes (LS-10999). Keep the
+    // sentinel un-observed so this test drives the button deterministically.
+    await page.addInitScript(() => {
+      const NativeObserver = window.IntersectionObserver;
+      window.IntersectionObserver = class extends NativeObserver {
+        override observe(target: Element): void {
+          if (
+            target.getAttribute('data-testid') ===
+            'discovery-load-more-sentinel'
+          ) {
+            return;
+          }
+          super.observe(target);
+        }
+      };
+    });
+
     await page.route(isGraphQLEndpoint, async (route) => {
       const operation = extractOperationName(route).toLowerCase();
       if (operation !== 'getpublicleagues') {
