@@ -280,6 +280,13 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
         ),
       ),
       {
+        type: 'callout',
+        icon: '🎟️',
+        iconLabel: 'ticket',
+        title: "What's included free",
+        body: 'Free accounts can be in up to 3 leagues total (baseball and football combined), get 2 mock drafts per week, and can’t use Premium-only league formats such as Keeper mode. Premium lifts these limits.',
+      },
+      {
         type: 'checklist',
         items: [
           {
@@ -302,6 +309,13 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
             desc: 'Check weekly scores as archived game stats accumulate into your matchup total.',
             link: '/baseball',
             linkText: 'View Leagues →',
+          },
+          {
+            step: '4',
+            title: 'Need more room?',
+            desc: 'Premium unlocks unlimited leagues, unlimited mock drafts, and every league format.',
+            link: '/pricing',
+            linkText: 'See Plans →',
           },
         ],
       },

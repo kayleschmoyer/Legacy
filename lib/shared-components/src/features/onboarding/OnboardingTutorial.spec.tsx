@@ -175,6 +175,31 @@ describe('OnboardingTutorial — step navigation', () => {
   });
 });
 
+describe('OnboardingTutorial — free plan limits (LS-6895)', () => {
+  it('states the free-tier caps on the final step, before the Create League CTA', () => {
+    render(<OnboardingTutorial onClose={jest.fn()} />);
+    advanceToLastStep();
+
+    const callout = screen.getByText("What's included free");
+    const cta = screen.getByText('Create League →');
+    expect(screen.getByText(/up to 3 leagues total/)).toBeInTheDocument();
+    expect(screen.getByText(/2 mock drafts per week/)).toBeInTheDocument();
+    expect(
+      callout.compareDocumentPosition(cta) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('links to /pricing and navigates there on press', () => {
+    const onNavigate = jest.fn();
+    render(<OnboardingTutorial onClose={jest.fn()} onNavigate={onNavigate} />);
+    advanceToLastStep();
+
+    fireEvent.click(screen.getByText('See Plans →'));
+
+    expect(onNavigate).toHaveBeenCalledWith('/pricing');
+  });
+});
+
 describe('OnboardingTutorial — step resume (LS-6900)', () => {
   it('opens on the provided initialStep', () => {
     render(<OnboardingTutorial onClose={jest.fn()} initialStep={3} />);

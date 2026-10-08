@@ -48,7 +48,7 @@ describe('ONBOARDING_STEPS', () => {
     );
     expect(
       checklist?.type === 'checklist' && checklist.items.map((i) => i.link),
-    ).toEqual(['/baseball/league/create', null, '/baseball']);
+    ).toEqual(['/baseball/league/create', null, '/baseball', '/pricing']);
   });
 
   describe('copy (LS-10774)', () => {
