@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Button,
   H1,
@@ -12,6 +11,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { CookieSettingsButton } from '../../consent/ConsentManager';
 import { BRAND_GOLD } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
+import { useBackOrHome } from '../../hooks/useBackOrHome';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -107,7 +107,7 @@ function tableCellStyles(palette: TablePalette) {
 }
 
 export default function PrivacyPolicyPage() {
-  const navigate = useNavigate();
+  const goBack = useBackOrHome();
   const { resolvedTheme } = useThemeContext();
   const {
     th: thStyle,
@@ -465,7 +465,7 @@ export default function PrivacyPolicyPage() {
 
       <YStack gap="$3" marginTop="$2">
         <Button
-          onPress={() => navigate(-1)}
+          onPress={goBack}
           variant="secondary"
           size="$3"
           alignSelf="flex-start"

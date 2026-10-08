@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Button,
   H1,
@@ -10,6 +9,7 @@ import {
 import { styled, Text } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { BRAND_GOLD } from '../../constants/colors';
+import { useBackOrHome } from '../../hooks/useBackOrHome';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -43,7 +43,7 @@ const BodyText = styled(Paragraph, {
 });
 
 export default function TermsOfServicePage() {
-  const navigate = useNavigate();
+  const goBack = useBackOrHome();
 
   return (
     <Container>
@@ -149,7 +149,7 @@ export default function TermsOfServicePage() {
 
       <YStack gap="$3" marginTop="$2">
         <Button
-          onPress={() => navigate(-1)}
+          onPress={goBack}
           variant="secondary"
           size="$3"
           alignSelf="flex-start"
