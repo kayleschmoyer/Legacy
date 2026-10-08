@@ -199,3 +199,30 @@ describe('LeagueSwitcherChip — LS-10754 panel fits the viewport', () => {
     expect(panel.style.left).toBe('0px');
   });
 });
+
+describe('LeagueSwitcherChip — LS-10705 fluid chip in the mobile header', () => {
+  beforeEach(() => {
+    mockUserLeagues = mockLeaguesFixture;
+  });
+
+  it('lets the chip and its wrapper shrink when fluid', () => {
+    render(
+      <MemoryRouter>
+        <LeagueSwitcherChip fluid />
+      </MemoryRouter>,
+    );
+    const chip = screen.getByTestId('league-switcher-chip');
+    expect(chip.style.flexShrink).toBe('1');
+    expect(chip.style.minWidth).toBe('0');
+    const wrapper = chip.parentElement as HTMLElement;
+    expect(wrapper.style.flexShrink).toBe('1');
+    expect(wrapper.style.minWidth).toBe('0');
+  });
+
+  it('keeps the fixed-width chip by default (desktop nav)', () => {
+    renderChip();
+    const chip = screen.getByTestId('league-switcher-chip');
+    expect(chip.style.flexShrink).toBe('0');
+    expect((chip.parentElement as HTMLElement).style.flexShrink).toBe('0');
+  });
+});

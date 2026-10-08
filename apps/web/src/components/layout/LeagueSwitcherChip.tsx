@@ -149,9 +149,19 @@ function getLeagueContext(
 
 interface Props {
   draftLive?: boolean;
+  /**
+   * Let the chip shrink to the space its row leaves it, ellipsizing the
+   * league name (LS-10705). The mobile header row is hamburger + chip + Help +
+   * Notifications; a fixed-width chip with a long league name pushed the bell
+   * past a 375px viewport's right edge. The desktop nav keeps the fixed chip.
+   */
+  fluid?: boolean;
 }
 
-export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
+export const LeagueSwitcherChip: React.FC<Props> = ({
+  draftLive = false,
+  fluid = false,
+}) => {
   const auth = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -222,6 +232,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
 
   const chipStyle: React.CSSProperties = {
     ...CHIP_STYLES,
+    ...(fluid ? { flexShrink: 1, minWidth: 0 } : {}),
     border: `1px solid ${chipPalette.border}`,
     background: chipPalette.background,
     color: chipPalette.text,
@@ -241,7 +252,15 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+    <div
+      ref={ref}
+      style={{
+        position: 'relative',
+        ...(fluid
+          ? { display: 'flex', flexShrink: 1, minWidth: 0 }
+          : { flexShrink: 0 }),
+      }}
+    >
       {/* Inject glow keyframes once */}
       <style>{`
         @keyframes switcherDraftGlow {

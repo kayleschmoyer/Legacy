@@ -575,8 +575,8 @@ function Navigation() {
               <Menu size={20} />
             </button>
 
-            {/* League chip */}
-            <LeagueSwitcherChip />
+            {/* League chip — shrinks so Help + bell stay on-screen (LS-10705) */}
+            <LeagueSwitcherChip fluid />
 
             <div style={{ flex: 1 }} />
 
