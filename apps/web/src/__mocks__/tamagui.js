@@ -148,6 +148,9 @@ export const TamaguiProvider = ({ children, ...props }) =>
   React.createElement('div', props, children);
 export const Theme = ({ children, ...props }) =>
   React.createElement('div', props, children);
+// AnimatePresence only orchestrates exit animations, so render children as-is.
+export const AnimatePresence = ({ children }) =>
+  React.createElement(React.Fragment, null, children);
 export const createTamagui = () => ({});
 export const config = {};
 

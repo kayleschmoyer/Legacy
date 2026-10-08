@@ -91,3 +91,7 @@ export const Sun = () => 'Sun';
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
+
+// Icons used by the baseball LeagueScoringEditor (LS-10743)
+export const RotateCcw = () => 'RotateCcw';
+export const Save = () => 'Save';

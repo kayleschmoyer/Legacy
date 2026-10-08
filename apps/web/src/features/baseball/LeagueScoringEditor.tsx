@@ -385,6 +385,15 @@ export function LeagueScoringEditor(
     () => Object.values(fieldErrors).some((value) => Boolean(value)),
     [fieldErrors],
   );
+  // Names the offending fields in the footer summary so screen-reader users
+  // learn which inputs to fix, not just that something is wrong (LS-10743).
+  const invalidStatNames = useMemo(
+    () =>
+      stats
+        .filter((stat) => Boolean(fieldErrors[stat.id]))
+        .map((stat) => stat.displayName),
+    [stats, fieldErrors],
+  );
 
   const pendingUpdates = useMemo(
     () => valuesToUpdates(stats, formValues, baselineMultipliers),
@@ -636,6 +645,7 @@ export function LeagueScoringEditor(
     const statId = stat.id;
     const value = formValues[statId] ?? '';
     const errorMessage = fieldErrors[statId];
+    const errorId = `scoring-${statId}-error`;
     const isOverride =
       Math.abs(stat.multiplier - stat.defaultMultiplier) > 0.0001;
     const parsed = parseInput(value);
@@ -747,6 +757,8 @@ export function LeagueScoringEditor(
               transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
             }}
             aria-label={`${stat.displayName} multiplier`}
+            aria-invalid={errorMessage ? true : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
           />
           <Text fontSize="$2" color="$gray8" fontWeight="500">
             x
@@ -773,6 +785,7 @@ export function LeagueScoringEditor(
         {/* Error below the row */}
         {errorMessage ? (
           <Text
+            id={errorId}
             fontSize={11}
             color="$red10"
             position="absolute"
@@ -1098,8 +1111,10 @@ export function LeagueScoringEditor(
               </Text>
             ) : null}
             {hasValidationErrors ? (
-              <Text fontSize="$2" color="$red9">
-                Fix highlighted fields before saving.
+              <Text fontSize="$2" color="$red9" role="alert">
+                {invalidStatNames.length > 0
+                  ? `Fix these fields before saving: ${invalidStatNames.join(', ')}.`
+                  : 'Fix highlighted fields before saving.'}
               </Text>
             ) : null}
           </YStack>
