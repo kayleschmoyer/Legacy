@@ -23,6 +23,8 @@ interface UseDraftEffectsParams {
   setUrgentMessage: (v: string) => void;
   setLiveMessage: (v: string) => void;
   setPlayerSearch: (v: string) => void;
+  /** Re-reads pick history once completion is detected without a socket event. */
+  refetchPickHistory?: () => unknown;
 }
 
 export function useDraftEffects({
@@ -43,13 +45,17 @@ export function useDraftEffects({
   setUrgentMessage,
   setLiveMessage,
   setPlayerSearch,
+  refetchPickHistory,
 }: UseDraftEffectsParams) {
   // Mark draft complete when server data indicates it (either source)
+  // Completion seen without the socket event means picks may have been missed
+  // while disconnected, so re-read pick history for the recap's rosters.
   useEffect(() => {
     if (leagueDraft?.draftCompletedAt) {
       setDraftComplete(true);
+      void refetchPickHistory?.();
     }
-  }, [leagueDraft?.draftCompletedAt, setDraftComplete]);
+  }, [leagueDraft?.draftCompletedAt, setDraftComplete, refetchPickHistory]);
 
   // Mark draft complete when the current-pick poll signals completion.
   // getCurrentDraftPickInfo returns isComplete:true once draftCompletedAt is set
@@ -58,8 +64,9 @@ export function useDraftEffects({
   useEffect(() => {
     if (currentPickInfo?.isComplete) {
       setDraftComplete(true);
+      void refetchPickHistory?.();
     }
-  }, [currentPickInfo?.isComplete, setDraftComplete]);
+  }, [currentPickInfo?.isComplete, setDraftComplete, refetchPickHistory]);
 
   // Detect paused status from league data
   useEffect(() => {

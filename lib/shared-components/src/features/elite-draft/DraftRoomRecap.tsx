@@ -156,34 +156,8 @@ export function DraftRoomRecap({
   const isViewingOwnTeam =
     selectedTeamId == null || selectedTeamId === myTeamKey;
 
-  const pickValues = useMemo<PickValue[]>(() => {
-    const adpRanks = buildAdpRanks(pickHistory, statsLookup);
-    return myTeamPicks.map((pick, i) => {
-      const rank = adpRanks.get(pick.playerId) ?? pick.overallPick;
-      return { pick, player: myTeam[i], value: pick.overallPick - rank };
-    });
-  }, [pickHistory, myTeamPicks, myTeam, statsLookup]);
-
-  const totalValue = useMemo(
-    () => pickValues.reduce((sum, v) => sum + v.value, 0),
-    [pickValues],
-  );
-  const projPtsTotal = useMemo(
-    () => myTeam.reduce((sum, p) => sum + (p.ppg ?? 0), 0),
-    [myTeam],
-  );
-  const bestValue = useMemo(
-    () =>
-      pickValues.reduce<PickValue | null>(
-        (best, v) => (best == null || v.value > best.value ? v : best),
-        null,
-      ),
-    [pickValues],
-  );
-  const grade = gradeFor(totalValue, myTeamPicks.length);
-
-  // The roster list follows the team selector; the stat cards and BEST
-  // VALUE callout above it always describe the viewer's own draft.
+  // The roster list, grade cards and BEST VALUE callout all follow the team
+  // selector, so any team's roster and draft grade can be reviewed.
   const rosterPicks = useMemo(
     () =>
       isViewingOwnTeam
@@ -198,6 +172,32 @@ export function DraftRoomRecap({
         : resolveDraftedPlayers(rosterPicks, statsLookup),
     [isViewingOwnTeam, myTeam, rosterPicks, statsLookup],
   );
+
+  const pickValues = useMemo<PickValue[]>(() => {
+    const adpRanks = buildAdpRanks(pickHistory, statsLookup);
+    return rosterPicks.map((pick, i) => {
+      const rank = adpRanks.get(pick.playerId) ?? pick.overallPick;
+      return { pick, player: rosterPlayers[i], value: pick.overallPick - rank };
+    });
+  }, [pickHistory, rosterPicks, rosterPlayers, statsLookup]);
+
+  const totalValue = useMemo(
+    () => pickValues.reduce((sum, v) => sum + v.value, 0),
+    [pickValues],
+  );
+  const projPtsTotal = useMemo(
+    () => rosterPlayers.reduce((sum, p) => sum + (p.ppg ?? 0), 0),
+    [rosterPlayers],
+  );
+  const bestValue = useMemo(
+    () =>
+      pickValues.reduce<PickValue | null>(
+        (best, v) => (best == null || v.value > best.value ? v : best),
+        null,
+      ),
+    [pickValues],
+  );
+  const grade = gradeFor(totalValue, rosterPicks.length);
 
   const pickByPlayerId = useMemo(() => {
     const map = new Map<number, DraftPickRecord>();

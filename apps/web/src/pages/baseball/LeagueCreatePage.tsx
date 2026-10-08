@@ -35,8 +35,12 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  defaultDivisionCount,
   FOOTBALL_DST_DATA_AVAILABLE,
+  isValidDivisionCount,
+  MIN_TEAMS_PER_DIVISION,
   stripInvisibleAndControlChars,
+  validDivisionCounts,
 } from '@legacy-sports/utils';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
@@ -85,7 +89,6 @@ import {
   getUserTimezoneLabel,
 } from '../../utils/draftDateUtils';
 import {
-  DEFAULT_NUM_DIVISIONS,
   FREE_LEAGUE_LIMIT,
   MAX_LEAGUE_NAME_LENGTH,
   MAX_SALARY_CAP,
@@ -264,7 +267,6 @@ export const TEAM_COUNT_OPTIONS_BY_SPORT: Record<SportId, readonly number[]> = {
   baseball: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16],
   football: WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT.football,
 };
-const ALL_DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
 
 // ── Sport-specific datasets (per docs/design/HI6N3yPYUzeh981B5SkXmw CreateForm.jsx) ──
 
@@ -714,6 +716,7 @@ const LEAGUE_FORM_MESSAGES = {
   teamsOutOfRange: 'Teams must be 4–16.',
   moreDivisionsThanTeams: 'More divisions than teams.',
   divisionParityMismatch: 'Division parity must match team parity.',
+  divisionTooSmall: `Each division needs at least ${MIN_TEAMS_PER_DIVISION} teams.`,
   rosterOutOfRange: (min: number, max: number) =>
     `Roster must be ${min}–${max}.`,
   gamesPerMatchupOutOfRange: (min: number, max: number, sport: string) =>
@@ -787,6 +790,11 @@ export function validateFormFull(
     errs.numberOfDivisions = LEAGUE_FORM_MESSAGES.moreDivisionsThanTeams;
   if (f.numberOfTeams % 2 === 1 && f.numberOfDivisions % 2 === 0)
     errs.numberOfDivisions = LEAGUE_FORM_MESSAGES.divisionParityMismatch;
+  else if (
+    f.numberOfDivisions <= f.numberOfTeams &&
+    !isValidDivisionCount(f.numberOfTeams, f.numberOfDivisions)
+  )
+    errs.numberOfDivisions = LEAGUE_FORM_MESSAGES.divisionTooSmall;
   const range = ROSTER_RANGE_BY_SPORT[f.sport];
   if (f.maxRosterSize < range.min || f.maxRosterSize > range.max)
     errs.maxRosterSize = LEAGUE_FORM_MESSAGES.rosterOutOfRange(
@@ -1905,8 +1913,13 @@ export function LeagueCreatePage(): React.JSX.Element {
       sport: selectedSport,
       leagueName: initialLeagueName,
       numberOfTeams: initialNumberOfTeams,
-      numberOfDivisions: DEFAULT_NUM_DIVISIONS,
-      schedulingStrategy: 'divisional',
+      // A prefilled team count (?teams=) can be too small for the default two
+      // divisions of at least MIN_TEAMS_PER_DIVISION teams each.
+      numberOfDivisions: defaultDivisionCount(initialNumberOfTeams),
+      schedulingStrategy:
+        defaultDivisionCount(initialNumberOfTeams) === 1
+          ? 'round-robin'
+          : 'divisional',
       playerPool: 'all',
       draftMode: 'live',
       selectionMethod: 'standard',
@@ -2203,16 +2216,14 @@ export function LeagueCreatePage(): React.JSX.Element {
       if (
         field === 'numberOfTeams' &&
         typeof value === 'number' &&
-        next.numberOfDivisions % 2 !== value % 2
+        !isValidDivisionCount(value, next.numberOfDivisions)
       ) {
         // Team-count parity changed (in either direction), stranding the
         // current division count on the wrong parity — the ButtonGroup
         // filters its options to matching parity, so the stale value would
         // render with nothing highlighted. Snap to the nearest same-parity
         // option instead of hardcoding 1 (LS-6060).
-        const validDivisionOptions = ALL_DIVISION_COUNT_OPTIONS.filter(
-          (d) => d <= value && d % 2 === value % 2,
-        );
+        const validDivisionOptions = validDivisionCounts(value);
         const staleDivisions = next.numberOfDivisions;
         next.numberOfDivisions = validDivisionOptions.reduce(
           (nearest, d) =>
@@ -2223,7 +2234,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         );
         if (next.numberOfDivisions !== staleDivisions) {
           setDivisionResetNotice(
-            `Divisions reset to ${next.numberOfDivisions} to match team parity.`,
+            `Divisions reset to ${next.numberOfDivisions} to fit the team count.`,
           );
         }
       } else if (field === 'numberOfDivisions') {
@@ -3319,17 +3330,13 @@ export function LeagueCreatePage(): React.JSX.Element {
                     testId="numberOfDivisions-field"
                     hint={
                       formData.numberOfTeams % 2 === 1
-                        ? `With ${formData.numberOfTeams} teams, only odd division counts (${ALL_DIVISION_COUNT_OPTIONS.filter((d) => d <= formData.numberOfTeams && d % 2 === 1).join(', ')}) are allowed for equal team distribution.`
-                        : 'How many divisions to split your teams into'
+                        ? `With ${formData.numberOfTeams} teams, only odd division counts (${validDivisionCounts(formData.numberOfTeams).join(', ')}) are allowed for equal team distribution. Each division needs at least ${MIN_TEAMS_PER_DIVISION} teams.`
+                        : `How many divisions to split your teams into. Each division needs at least ${MIN_TEAMS_PER_DIVISION} teams.`
                     }
                   >
                     <ButtonGroup
                       value={formData.numberOfDivisions}
-                      options={ALL_DIVISION_COUNT_OPTIONS.filter(
-                        (d) =>
-                          d <= formData.numberOfTeams &&
-                          formData.numberOfTeams % 2 === d % 2,
-                      )}
+                      options={validDivisionCounts(formData.numberOfTeams)}
                       onChange={(v) =>
                         handleInputChange('numberOfDivisions', v)
                       }

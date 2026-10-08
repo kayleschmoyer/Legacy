@@ -61,17 +61,27 @@ describe('createInitialWizardForm', () => {
 
 describe('division parity (web parity rule)', () => {
   it('allows only same-parity counts no larger than the team count', () => {
-    expect(validDivisionOptions(12)).toEqual([2, 4]);
-    expect(validDivisionOptions(5)).toEqual([1, 3]);
-    expect(validDivisionOptions(2)).toEqual([2]);
+    expect(validDivisionOptions(12)).toEqual([1, 2]);
+    expect(validDivisionOptions(5)).toEqual([1]);
+    expect(validDivisionOptions(2)).toEqual([1]);
+  });
+
+  it('never offers a division smaller than the 6-team minimum', () => {
+    expect(validDivisionOptions(11)).toEqual([1]);
+    expect(validDivisionOptions(10)).toEqual([1]);
+    expect(validDivisionOptions(14)).toEqual([1, 2]);
+    // 15 teams / 3 divisions would be 5 per division.
+    expect(validDivisionOptions(15)).toEqual([1]);
+    // 16 teams / 4 divisions would be 4 per division.
+    expect(validDivisionOptions(16)).toEqual([1, 2]);
   });
 
   it('snaps to the nearest same-parity option rather than collapsing to 1', () => {
-    // 4 divisions with 16 teams stays 4 when the league drops to 14 teams.
-    expect(reconcileDivisions(4, 14)).toBe(4);
-    // Switching to an odd team count forces an odd division count.
-    expect(reconcileDivisions(4, 5)).toBe(3);
-    expect(reconcileDivisions(2, 9)).toBe(1);
+    // 4 divisions is never valid now — it snaps to the nearest option (2).
+    expect(reconcileDivisions(4, 14)).toBe(2);
+    // Too few teams for 2 divisions of 6 collapses to a single division.
+    expect(reconcileDivisions(2, 10)).toBe(1);
+    expect(reconcileDivisions(3, 9)).toBe(1);
   });
 
   it('keeps a still-valid count untouched', () => {
@@ -79,21 +89,22 @@ describe('division parity (web parity rule)', () => {
   });
 
   it('explains the odd-team constraint in the hint copy', () => {
-    expect(divisionsHint(9)).toContain('only odd division counts (1, 3)');
-    expect(divisionsHint(12)).toBe(
+    expect(divisionsHint(13)).toContain('only odd division counts (1)');
+    expect(divisionsHint(12)).toContain(
       'How many divisions to split your teams into',
     );
+    expect(divisionsHint(12)).toContain('at least 6 teams');
   });
 });
 
 describe('applyWizardFieldChange', () => {
-  it('auto-resets divisions when the team-count parity changes', () => {
+  it('auto-resets divisions when the team count no longer supports them', () => {
     const next = applyWizardFieldChange(
-      form({ numberOfTeams: 12, numberOfDivisions: 4 }),
+      form({ numberOfTeams: 12, numberOfDivisions: 2 }),
       'numberOfTeams',
-      5,
+      9,
     );
-    expect(next.numberOfDivisions).toBe(3);
+    expect(next.numberOfDivisions).toBe(1);
   });
 
   it('forces Random selection when the draft mode goes automated (web parity)', () => {
@@ -173,6 +184,15 @@ describe('validateWizardStep — basics', () => {
     expect(errors.numberOfDivisions).toBe(
       WIZARD_MESSAGES.moreDivisionsThanTeams,
     );
+  });
+
+  it('rejects a division smaller than 6 teams', () => {
+    const errors = validateWizardStep(
+      'basics',
+      form({ numberOfTeams: 10, numberOfDivisions: 2 }),
+      'baseball',
+    );
+    expect(errors.numberOfDivisions).toBe(WIZARD_MESSAGES.divisionTooSmall);
   });
 
   it('rejects an even division count for an odd team count', () => {

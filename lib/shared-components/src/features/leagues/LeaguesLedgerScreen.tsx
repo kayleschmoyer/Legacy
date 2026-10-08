@@ -487,115 +487,127 @@ export function LeaguesLedgerScreen({
     );
   }
 
+  // Create / Join sit in a pinned footer below the scroll area rather than at
+  // the end of the list, so they stay reachable however many leagues the user
+  // has (a long list used to push them out of reach).
   return (
-    <ScrollView
-      testID="leagues-ledger-scroll"
-      flex={1}
-      backgroundColor="$background"
-      paddingTop={topInset}
-      refreshControl={refreshControl}
-    >
-      <YStack paddingVertical={24} paddingHorizontal={20} gap={18}>
-        <LedgerMasthead
-          leagueCount={leagues.length}
-          aggregateRecord={aggregateRecord}
-        />
+    <YStack flex={1} backgroundColor="$background">
+      <ScrollView
+        testID="leagues-ledger-scroll"
+        flex={1}
+        paddingTop={topInset}
+        refreshControl={refreshControl}
+      >
+        <YStack paddingVertical={24} paddingHorizontal={20} gap={18}>
+          <LedgerMasthead
+            leagueCount={leagues.length}
+            aggregateRecord={aggregateRecord}
+          />
 
-        {rows.length === 0 ? (
-          <YStack
-            testID="leagues-empty-state"
-            alignItems="center"
-            gap="$4"
-            paddingVertical={48}
-          >
-            <Trophy size={48} color={INDEX_NUMERAL} />
-            <Text
-              fontFamily="$body"
-              fontSize={15}
-              color={TEXT_MUTED}
-              textAlign="center"
-            >
-              You are not in any leagues yet.
-            </Text>
-            <XStack
-              testID="leagues-browse-cta"
+          {rows.length === 0 ? (
+            <YStack
+              testID="leagues-empty-state"
               alignItems="center"
-              justifyContent="center"
-              borderWidth={1}
-              borderColor={OUTLINE_STRONG}
-              borderRadius={2}
-              paddingVertical={13}
-              paddingHorizontal={24}
-              cursor="pointer"
-              pressStyle={{ opacity: 0.7 }}
-              onPress={onBrowseLeagues}
-              tabIndex={0}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === 'Enter' || e.key === ' ') onBrowseLeagues();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Browse leagues"
+              gap="$4"
+              paddingVertical={48}
             >
-              <Text
-                fontFamily="$heading"
-                fontWeight="800"
-                fontSize={14}
-                letterSpacing={1.5}
-                color={TEXT_PRIMARY}
-              >
-                BROWSE LEAGUES
-              </Text>
-            </XStack>
-          </YStack>
-        ) : (
-          <YStack testID="leagues-list">
-            <LedgerColumnHeader />
-            {rows.map((summary, index) => (
-              <LedgerRow
-                key={summary.leagueId ?? `league-${index}`}
-                summary={summary}
-                index={index}
-                onPress={() => onViewLeague(summary)}
-              />
-            ))}
-            <XStack
-              testID="leagues-ledger-footer"
-              alignItems="center"
-              justifyContent="space-between"
-              gap="$3"
-              marginTop={2}
-              paddingVertical={12}
-              paddingHorizontal={4}
-              borderTopWidth={1}
-              borderTopColor={GOLD_RULE}
-            >
+              <Trophy size={48} color={INDEX_NUMERAL} />
               <Text
                 fontFamily="$body"
-                fontStyle="italic"
-                fontSize={12}
+                fontSize={15}
                 color={TEXT_MUTED}
-                flexShrink={1}
+                textAlign="center"
               >
-                Season to date across all leagues
+                You are not in any leagues yet.
               </Text>
-              <Text
-                fontFamily="$heading"
-                fontWeight="800"
-                fontSize={18}
-                color={BRAND_GOLD_LIGHT}
-                fontVariant={['tabular-nums']}
+              <XStack
+                testID="leagues-browse-cta"
+                alignItems="center"
+                justifyContent="center"
+                borderWidth={1}
+                borderColor={OUTLINE_STRONG}
+                borderRadius={2}
+                paddingVertical={13}
+                paddingHorizontal={24}
+                cursor="pointer"
+                pressStyle={{ opacity: 0.7 }}
+                onPress={onBrowseLeagues}
+                tabIndex={0}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') onBrowseLeagues();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Browse leagues"
               >
-                {aggregateRecord ?? '—'}
-              </Text>
-            </XStack>
-          </YStack>
-        )}
-
+                <Text
+                  fontFamily="$heading"
+                  fontWeight="800"
+                  fontSize={14}
+                  letterSpacing={1.5}
+                  color={TEXT_PRIMARY}
+                >
+                  BROWSE LEAGUES
+                </Text>
+              </XStack>
+            </YStack>
+          ) : (
+            <YStack testID="leagues-list">
+              <LedgerColumnHeader />
+              {rows.map((summary, index) => (
+                <LedgerRow
+                  key={summary.leagueId ?? `league-${index}`}
+                  summary={summary}
+                  index={index}
+                  onPress={() => onViewLeague(summary)}
+                />
+              ))}
+              <XStack
+                testID="leagues-ledger-footer"
+                alignItems="center"
+                justifyContent="space-between"
+                gap="$3"
+                marginTop={2}
+                paddingVertical={12}
+                paddingHorizontal={4}
+                borderTopWidth={1}
+                borderTopColor={GOLD_RULE}
+              >
+                <Text
+                  fontFamily="$body"
+                  fontStyle="italic"
+                  fontSize={12}
+                  color={TEXT_MUTED}
+                  flexShrink={1}
+                >
+                  Season to date across all leagues
+                </Text>
+                <Text
+                  fontFamily="$heading"
+                  fontWeight="800"
+                  fontSize={18}
+                  color={BRAND_GOLD_LIGHT}
+                  fontVariant={['tabular-nums']}
+                >
+                  {aggregateRecord ?? '—'}
+                </Text>
+              </XStack>
+            </YStack>
+          )}
+        </YStack>
+      </ScrollView>
+      <YStack
+        testID="leagues-actions-footer"
+        paddingVertical={12}
+        paddingHorizontal={20}
+        borderTopWidth={1}
+        borderTopColor={HAIRLINE}
+        backgroundColor="$background"
+      >
         <LedgerActions
           onCreateLeague={onCreateLeague}
           onJoinLeague={onJoinLeague}
         />
       </YStack>
-    </ScrollView>
+    </YStack>
   );
 }

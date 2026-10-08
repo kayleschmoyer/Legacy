@@ -97,6 +97,21 @@ describe('LeaguesLedgerScreen', () => {
     });
   });
 
+  describe('action buttons', () => {
+    it('pins Create / Join outside the scroll area so a long list cannot push them out of reach', () => {
+      const { getByTestId } = render(
+        <LeaguesLedgerScreen
+          {...baseProps}
+          leagues={[liveLeague, activeLeague, preDraftLeague]}
+        />,
+      );
+      const footer = getByTestId('leagues-actions-footer');
+      expect(footer).toContainElement(getByTestId('leagues-create-button'));
+      expect(footer).toContainElement(getByTestId('leagues-add-button'));
+      expect(getByTestId('leagues-ledger-scroll')).not.toContainElement(footer);
+    });
+  });
+
   describe('masthead', () => {
     it('shows the league count and the active-only aggregate record', () => {
       const { getByTestId } = render(

@@ -432,10 +432,15 @@ export function useDraftWebSocket({
       // draftCompletedAt as null and the "Draft Complete!" banner never renders
       // unless the user manually reloads the page (LS-3823).
       void refetchDraft();
+      // The recap builds every team's roster from pick history, so a client
+      // that missed the final picks while disconnected would otherwise show
+      // other teams as not full.
+      void refetchPickHistory();
     },
     [
       refetchDraft,
       refetchLeague,
+      refetchPickHistory,
       setDraftComplete,
       setDraftPaused,
       setLiveMessage,

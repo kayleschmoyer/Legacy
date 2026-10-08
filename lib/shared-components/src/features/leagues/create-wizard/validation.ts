@@ -9,6 +9,7 @@
 // additions from `validateFormFull` in
 // `apps/web/src/pages/baseball/LeagueCreatePage.tsx`.
 
+import { MIN_TEAMS_PER_DIVISION } from '@legacy-sports/utils';
 import {
   AUCTION_BUDGET_RANGE,
   AUCTION_MIN_BID_RANGE,
@@ -38,6 +39,7 @@ export const WIZARD_MESSAGES = {
   teamsOutOfRange: `Teams must be ${TEAM_COUNT_MIN}–${TEAM_COUNT_MAX}.`,
   moreDivisionsThanTeams: 'More divisions than teams.',
   divisionParityMismatch: 'Division parity must match team parity.',
+  divisionTooSmall: `Each division needs at least ${MIN_TEAMS_PER_DIVISION} teams.`,
   rosterOutOfRange: (min: number, max: number) =>
     `Roster must be ${min}–${max}.`,
   draftDateRequired: 'Please select a draft date.',
@@ -72,9 +74,14 @@ function validateBasics(form: LeagueCreateWizardForm): WizardErrors {
   if (form.numberOfDivisions > form.numberOfTeams) {
     errors.numberOfDivisions = WIZARD_MESSAGES.moreDivisionsThanTeams;
   } else if (
-    !validDivisionOptions(form.numberOfTeams).includes(form.numberOfDivisions)
+    form.numberOfTeams % 2 !== form.numberOfDivisions % 2 &&
+    form.numberOfDivisions !== 1
   ) {
     errors.numberOfDivisions = WIZARD_MESSAGES.divisionParityMismatch;
+  } else if (
+    !validDivisionOptions(form.numberOfTeams).includes(form.numberOfDivisions)
+  ) {
+    errors.numberOfDivisions = WIZARD_MESSAGES.divisionTooSmall;
   }
   return errors;
 }

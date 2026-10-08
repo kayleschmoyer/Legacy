@@ -1028,7 +1028,7 @@ describe('LeagueCreatePage — division reset notice (LS-6058)', () => {
     fireEvent.click(screen.getByRole('button', { name: '9' }));
 
     expect(screen.getByTestId('division-reset-notice')).toHaveTextContent(
-      'Divisions reset to 1 to match team parity.',
+      'Divisions reset to 1 to fit the team count.',
     );
   });
 
@@ -1052,7 +1052,7 @@ describe('LeagueCreatePage — division reset notice (LS-6058)', () => {
     fireEvent.click(screen.getByRole('button', { name: '9' }));
     expect(screen.getByTestId('division-reset-notice')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
 
     expect(
       screen.queryByTestId('division-reset-notice'),
@@ -1562,21 +1562,16 @@ describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
     expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
   });
 
-  it('auto-snaps a stale odd division count when returning to an even team count (LS-6060)', () => {
+  it('keeps divisions valid when returning to a team count that supports two (LS-6060)', () => {
     renderPage('/baseball/league/create');
     expandAllSections();
 
-    // 9 teams only allows odd division counts — pick a valid non-1 odd value.
+    // 9 teams cannot fill two divisions of 6, so divisions collapse to 1.
     fireEvent.click(screen.getByRole('button', { name: '9' }));
-    fireEvent.click(screen.getByRole('button', { name: '3' }));
-    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
-
-    // Switching back to an even team count without touching divisions
-    // manually must not strand the odd division count — it should
-    // auto-snap to a valid even option (Divisional stays enabled).
+    // Back to 12 teams: the 2-division option is selectable again.
     fireEvent.click(screen.getByRole('button', { name: '12' }));
 
-    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '2' })).toBeEnabled();
   });
 
   it('falls back to round-robin in the mutation when 1 division forced Divisional off', async () => {
@@ -1614,18 +1609,6 @@ describe('LeagueCreatePage — odd team count bye-week hint (LS-6061)', () => {
     expandAllSections();
 
     fireEvent.click(screen.getByRole('button', { name: '9' }));
-
-    expect(
-      screen.getByText(/one team will have a bye each week all season/i),
-    ).toBeInTheDocument();
-  });
-
-  it('shows a bye-week warning when the team count is odd and divisional (odd division count) is selected', () => {
-    renderPage('/baseball/league/create');
-    expandAllSections();
-
-    fireEvent.click(screen.getByRole('button', { name: '9' }));
-    fireEvent.click(screen.getByRole('button', { name: '3' }));
 
     expect(
       screen.getByText(/one team will have a bye each week all season/i),

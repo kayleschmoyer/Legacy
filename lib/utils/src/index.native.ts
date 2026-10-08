@@ -7,6 +7,7 @@ export * from './lib/allowed-positions';
 export * from './lib/commissioner-audit-actions';
 export * from './lib/ErrorHandling';
 export * from './lib/disclosure-scoring';
+export * from './lib/division-rules';
 export * from './lib/DbOptions.native';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';

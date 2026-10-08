@@ -1255,6 +1255,7 @@ export function EliteDraftBoardScreen({
     setUrgentMessage: ui.setUrgentMessage,
     setLiveMessage: ui.setLiveMessage,
     setPlayerSearch: ui.setPlayerSearch,
+    refetchPickHistory: queries.refetchPickHistory,
   });
 
   // LS-4986: notify callers when the draft is actively running so they can set

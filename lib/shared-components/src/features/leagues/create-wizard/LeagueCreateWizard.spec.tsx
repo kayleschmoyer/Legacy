@@ -143,27 +143,27 @@ describe('LeagueCreateWizard — basics step', () => {
     expect(getByText(`${VALID_NAME.length}/50`)).toBeTruthy();
   });
 
-  it('disables division counts that violate the team-parity rule', () => {
+  it('disables division counts that would leave a division under 6 teams', () => {
     const { getByTestId } = renderWizard({ initialLeagueName: VALID_NAME });
 
-    // 12 teams (even) → only even division counts are selectable.
-    expect(getByTestId('chip-numberOfDivisions-1')).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    // 12 teams → only 1 or 2 divisions (each division needs 6+ teams).
     expect(getByTestId('chip-numberOfDivisions-3')).toHaveAttribute(
       'aria-disabled',
       'true',
     );
-    fireEvent.click(getByTestId('chip-numberOfDivisions-4'));
     expect(getByTestId('chip-numberOfDivisions-4')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(getByTestId('chip-numberOfDivisions-1'));
+    expect(getByTestId('chip-numberOfDivisions-1')).toHaveAttribute(
       'aria-pressed',
       'true',
     );
 
     // A disabled chip stays inert — the selection does not move to it.
-    fireEvent.click(getByTestId('chip-numberOfDivisions-3'));
-    expect(getByTestId('chip-numberOfDivisions-4')).toHaveAttribute(
+    fireEvent.click(getByTestId('chip-numberOfDivisions-4'));
+    expect(getByTestId('chip-numberOfDivisions-1')).toHaveAttribute(
       'aria-pressed',
       'true',
     );

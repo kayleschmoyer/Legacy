@@ -248,14 +248,15 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
-    // Default team count (12) allows division options 2 and 4 — select 4.
-    await leaguePage.selectDivisionCount(4);
+    // Default team count (12) allows division options 1 and 2 (each division
+    // needs at least 6 teams) — select 1.
+    await leaguePage.selectDivisionCount(1);
     await leaguePage.fillLeagueName('Division Pick League');
     await leaguePage.submitCreate();
     await leaguePage.continueToLeague();
 
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
-    expect(submittedDivisions).toBe(4);
+    expect(submittedDivisions).toBe(1);
   });
 
   test('should filter division options to team-count parity and reset an invalid selection (LS-5365)', async ({
@@ -290,19 +291,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
-    // Default is 12 teams / 2 divisions. Pick the even division option (4)
-    // first, then flip team count to an odd value (7) — the even divisions
-    // selection is no longer valid, so it snaps to the nearest same-parity
-    // option (3, the closer of the two odd choices [1, 3] to the stale value
-    // of 4 — LeagueCreatePage handleInputChange, LS-6060), and only odd
-    // division options remain selectable.
-    await leaguePage.selectDivisionCount(4);
+    // Default is 12 teams / 2 divisions. Flip team count to an odd value (7) —
+    // two divisions is no longer valid (parity, and each division needs at
+    // least 6 teams), so it snaps to the only remaining option (1 —
+    // LeagueCreatePage handleInputChange, LS-6060).
     await leaguePage.selectTeamCount(7);
 
     await leaguePage
-      .text(
-        'With 7 teams, only odd division counts (1, 3) are allowed for equal team distribution.',
-      )
+      .text(/With 7 teams, only odd division counts \(1\) are allowed/)
       .expectVisible();
     await leaguePage.numberOfDivisionsField
       .byRole('button', { name: '2', exact: true })
@@ -316,7 +312,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.continueToLeague();
 
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
-    expect(submittedDivisions).toBe(3);
+    expect(submittedDivisions).toBe(1);
   });
 
   // ─── Draft Mode ───────────────────────────────────────────────────────────

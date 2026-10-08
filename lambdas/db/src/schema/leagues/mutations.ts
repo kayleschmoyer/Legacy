@@ -15,6 +15,9 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import {
   containsHtmlLikeMarkup,
+  defaultDivisionCount,
+  isValidDivisionCount,
+  MIN_TEAMS_PER_DIVISION,
   sanitizeDisplayName,
 } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
@@ -803,7 +806,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
-      const resolvedNumberOfDivisions = numberOfDivisions ?? 2;
+      const resolvedNumberOfDivisions =
+        numberOfDivisions ?? defaultDivisionCount(numberOfTeams);
       if (resolvedNumberOfDivisions > numberOfTeams) {
         throw UserInputError(
           'Number of divisions cannot exceed number of teams',
@@ -816,6 +820,12 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       if (numberOfTeams % 2 === 1 && resolvedNumberOfDivisions % 2 === 0) {
         throw UserInputError(
           'Leagues with an odd number of teams must have an odd number of divisions',
+        );
+      }
+
+      if (!isValidDivisionCount(numberOfTeams, resolvedNumberOfDivisions)) {
+        throw UserInputError(
+          `Each division must have at least ${MIN_TEAMS_PER_DIVISION} teams`,
         );
       }
 

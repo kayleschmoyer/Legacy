@@ -2,7 +2,11 @@
 // flow (LS-8809). Kept separate from the components so the per-step validation
 // rules in `validation.ts` can be unit-tested without rendering anything.
 
-import { FOOTBALL_DST_DATA_AVAILABLE } from '@legacy-sports/utils';
+import {
+  FOOTBALL_DST_DATA_AVAILABLE,
+  MIN_TEAMS_PER_DIVISION,
+  validDivisionCounts,
+} from '@legacy-sports/utils';
 import type { WaiverType } from '../premium/constants';
 
 /** Two-sport discriminator for the wizard. Mirrors `LeagueSport`. */
@@ -347,15 +351,14 @@ export function createInitialWizardForm(
 // ── Divisions parity (web parity rule) ───────────────────────────────────────
 
 /**
- * Division counts selectable for a given team count. The web form enforces
- * two rules — divisions must not exceed teams, and an odd team count cannot
- * pair with an even division count (equal distribution). Counts outside this
- * set render disabled rather than being hidden, so the constraint is visible.
+ * Division counts selectable for a given team count. A division needs at least
+ * `MIN_TEAMS_PER_DIVISION` teams, an odd team count cannot pair with an even
+ * division count (equal distribution), and a single division is always valid.
+ * Counts outside this set render disabled rather than being hidden, so the
+ * constraint is visible. Shared with the server (`@legacy-sports/utils`).
  */
 export function validDivisionOptions(numberOfTeams: number): number[] {
-  return DIVISION_COUNT_OPTIONS.filter(
-    (d) => d <= numberOfTeams && numberOfTeams % 2 === d % 2,
-  );
+  return validDivisionCounts(numberOfTeams);
 }
 
 /**
@@ -426,11 +429,12 @@ export function applyWizardFieldChange<K extends keyof LeagueCreateWizardForm>(
   return next;
 }
 
-/** Hint copy under the divisions chips — mirrors the web parity wording. */
+/** Hint copy under the divisions chips. */
 export function divisionsHint(numberOfTeams: number): string {
+  const minRule = `Each division needs at least ${MIN_TEAMS_PER_DIVISION} teams.`;
   return numberOfTeams % 2 === 1
     ? `With ${numberOfTeams} teams, only odd division counts (${validDivisionOptions(
         numberOfTeams,
-      ).join(', ')}) are allowed for equal team distribution.`
-    : 'How many divisions to split your teams into';
+      ).join(', ')}) are allowed for equal team distribution. ${minRule}`
+    : `How many divisions to split your teams into. ${minRule}`;
 }

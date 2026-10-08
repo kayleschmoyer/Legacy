@@ -201,15 +201,25 @@ describe('DraftRoomRecap', () => {
 
       fireEvent.click(getByTestId('draft-recap-team-2'));
 
-      expect(getAllByText('Player Twenty')).toHaveLength(1);
-      // My own players leave the roster list; Player Eleven stays only in
-      // the BEST VALUE callout, which always describes my draft.
+      // The roster row and the BEST VALUE callout both follow the selected
+      // team, so the rival's only pick shows in each.
+      expect(getAllByText('Player Twenty')).toHaveLength(2);
       expect(queryByText('Player Ten')).toBeNull();
-      expect(getAllByText('Player Eleven')).toHaveLength(1);
+      expect(queryByText('Player Eleven')).toBeNull();
 
       fireEvent.click(getByTestId('draft-recap-team-1'));
       expect(queryByText('Player Twenty')).toBeNull();
       expect(getAllByText('Player Ten')).toHaveLength(1);
+    });
+
+    it("shows the selected team's draft grade, not just mine", () => {
+      const { getByTestId, getAllByText } = render(
+        <DraftRoomRecap {...baseProps()} />,
+      );
+      // Team 2 drafted the top projection at pick 2 → ADP value +1 (shown on
+      // the stat card and the BEST VALUE callout).
+      fireEvent.click(getByTestId('draft-recap-team-2'));
+      expect(getAllByText('+1').length).toBeGreaterThan(0);
     });
 
     it('hides the selector when there is no other team to view', () => {

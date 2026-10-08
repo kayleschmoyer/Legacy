@@ -12,6 +12,11 @@ import {
 } from 'tamagui';
 import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
 import {
+  defaultDivisionCount,
+  isValidDivisionCount,
+  validDivisionCounts,
+} from '@legacy-sports/utils';
+import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -207,6 +212,15 @@ export function CreateLeagueDialog({
     setPlayoffFormat('4-team');
   }, []);
 
+  // Divisions must hold at least MIN_TEAMS_PER_DIVISION teams each, so a team
+  // count change can strand the current division count — snap back to a legal one.
+  const handleTeamCountChange = (n: number) => {
+    setTeamCount(n);
+    if (!isValidDivisionCount(n, numberOfDivisions)) {
+      setNumberOfDivisions(defaultDivisionCount(n));
+    }
+  };
+
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next);
     if (!next) {
@@ -318,7 +332,7 @@ export function CreateLeagueDialog({
                     label={String(n)}
                     selected={teamCount === n}
                     accessibilityLabel={`Select ${n} teams`}
-                    onPress={setTeamCount}
+                    onPress={handleTeamCountChange}
                   />
                 ))}
               </XStack>
@@ -331,7 +345,7 @@ export function CreateLeagueDialog({
                   Divisions
                 </Text>
                 <XStack gap="$1.5" flexWrap="wrap">
-                  {[1, 2, 3, 4].map((n) => (
+                  {validDivisionCounts(teamCount).map((n) => (
                     <OptionButton
                       key={n}
                       value={n}

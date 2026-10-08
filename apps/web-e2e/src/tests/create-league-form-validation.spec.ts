@@ -74,7 +74,7 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
     await leaguePage.clickButton('7', { exact: true });
 
     await leaguePage
-      .text(/With 7 teams, only odd division counts \(1, 3\) are allowed/i)
+      .text(/With 7 teams, only odd division counts \(1\) are allowed/i)
       .expectVisible();
     await leaguePage.text(/All settings look good/i).expectVisible();
   });
