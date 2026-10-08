@@ -93,14 +93,25 @@ describe('GameCard', () => {
     expect(getAllByText('–').length).toBe(2);
   });
 
-  it('shows an upcoming start time in the viewer’s local time zone (LS-10456)', () => {
+  it('shows an upcoming start time in the viewer’s local time zone, labelled with the zone (LS-10456, LS-10651)', () => {
     const spy = jest.spyOn(Date.prototype, 'toLocaleTimeString');
     try {
       const { getByText } = render(<GameCard game={upcomingGame} />);
       const expected = new Date(
         upcomingGame.startTime ?? '',
-      ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      ).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      });
       expect(getByText(expected)).toBeTruthy();
+      // The zone label is part of the rendered text (e.g. "7:05 PM EDT").
+      expect(expected).not.toBe(
+        new Date(upcomingGame.startTime ?? '').toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+      );
       // No explicit timeZone — the device's local zone is used, never a
       // fixed league/ET zone.
       for (const [, options] of spy.mock.calls) {

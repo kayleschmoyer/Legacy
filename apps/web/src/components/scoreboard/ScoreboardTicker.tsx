@@ -22,12 +22,15 @@ function scrollDurationSecs(gameCount: number): number {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// The viewer's local zone, labelled (e.g. "7:05 PM EDT") so the time is not
+// ambiguous (LS-10651).
 function formatStartTime(iso: string | null | undefined): string {
   if (!iso) return '';
   try {
     return new Date(iso).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
+      timeZoneName: 'short',
     });
   } catch {
     return iso;
@@ -98,7 +101,7 @@ const ScrollOuter = styled(XStack, {
  * Human-readable status string.
  * Live:    "TOP 7 · 2 OUT"
  * Final:   "FINAL"
- * Preview: "7:05 PM"
+ * Preview: "7:05 PM EDT"
  */
 function gameStatusText(game: TickerGame): string {
   const { status, inning, inningHalf, outs, startTime } = game;
@@ -151,8 +154,10 @@ function GameChip({
   const statusColor = isLive ? '$green8' : '$color10';
   const statusText = gameStatusText(game);
 
+  // The accessible name must contain the visible "vs" connector (WCAG 2.5.3
+  // Label in Name), so speech-input users can say what they see (LS-10651).
   const ariaLabel = isPreview
-    ? `${game.awayTeam.abbreviation} at ${game.homeTeam.abbreviation}, ${statusText}`
+    ? `${game.awayTeam.abbreviation} vs ${game.homeTeam.abbreviation}, ${statusText}`
     : `${game.awayTeam.abbreviation} ${game.awayTeam.runs}, ${game.homeTeam.abbreviation} ${game.homeTeam.runs} — ${statusText}`;
 
   return (

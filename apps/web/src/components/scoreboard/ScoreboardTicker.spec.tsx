@@ -92,9 +92,12 @@ const mockGames = [
   },
 ];
 
+// Overridable per test; reset to the all-Final slate in beforeEach.
+let mockScoreboardGames: Array<Record<string, unknown>> = mockGames;
+
 jest.mock('@legacy-sports/graphql', () => ({
   useGetScoreboardQuery: () => ({
-    data: { scoreboard: { games: mockGames } },
+    data: { scoreboard: { games: mockScoreboardGames } },
     startPolling: jest.fn(),
     stopPolling: jest.fn(),
     refetch: jest.fn(),
@@ -158,6 +161,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  mockScoreboardGames = mockGames;
   resizeCallbacks = [];
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver =
     MockResizeObserver;
@@ -262,5 +266,53 @@ describe('ScoreboardTicker hidden marquee copy is not focusable (LS-10783)', () 
           `${g.awayTeam.abbreviation} ${g.awayTeam.runs}, ${g.homeTeam.abbreviation} ${g.homeTeam.runs} — FINAL`,
       ),
     );
+  });
+});
+
+describe('ScoreboardTicker preview chip label and time (LS-10651)', () => {
+  const startTime = '2026-10-06T22:00:00Z';
+  const previewGame = {
+    gamePk: 9,
+    status: 'Preview',
+    startTime,
+    homeTeam: { abbreviation: 'ATL', runs: 0 },
+    awayTeam: { abbreviation: 'LAD', runs: 0 },
+  };
+
+  it('uses the visible "vs" connector in the accessible name', () => {
+    mockScoreboardGames = [previewGame];
+    contentWidth = 300;
+    viewportWidth = 400;
+
+    render(<ScoreboardTicker />);
+
+    const [link] = chipLinks();
+    const visibleConnector = within(link).getByText('vs').textContent ?? '';
+    expect(link.getAttribute('aria-label')).toContain(
+      `LAD ${visibleConnector} ATL`,
+    );
+  });
+
+  it('labels the start time with a time zone abbreviation', () => {
+    mockScoreboardGames = [previewGame];
+    contentWidth = 300;
+    viewportWidth = 400;
+
+    render(<ScoreboardTicker />);
+
+    const expected = new Date(startTime).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    });
+    expect(
+      new Date(startTime).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    ).not.toBe(expected);
+    const [link] = chipLinks();
+    expect(within(link).getByText(expected)).toBeTruthy();
+    expect(link.getAttribute('aria-label')).toBe(`LAD vs ATL, ${expected}`);
   });
 });

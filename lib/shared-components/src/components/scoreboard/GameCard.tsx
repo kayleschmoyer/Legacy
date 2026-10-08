@@ -29,12 +29,15 @@ export interface GameCardProps {
 
 const TABULAR_NUMS = ['tabular-nums'] as 'tabular-nums'[];
 
+// The viewer's local zone, labelled (e.g. "7:05 PM EDT") so the time is not
+// ambiguous (LS-10651).
 function formatStartTime(iso: string | null | undefined): string {
   if (!iso) return '';
   try {
     return new Date(iso).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
+      timeZoneName: 'short',
     });
   } catch {
     return iso;
