@@ -106,6 +106,76 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     [teamMembersData?.teamMembers],
   );
 
+  const currentWeek = league.currentWeekNumber ?? 1;
+  const totalMatchups = league.totalMatchups ?? currentWeek;
+  const [week, setWeek] = useState<number>(currentWeek);
+  const isPast = week < currentWeek;
+  const isFuture = week > currentWeek;
+  const isCurrent = week === currentWeek;
+  // Only a finalized past week is locked — future weeks are editable so
+  // managers can set lineups ahead of time (LS-9768). The server's own
+  // `checkPlayersNotLocked` guard (lambdas/db/src/schema/authorization.ts)
+  // only ever locks the league's *current* week, so a future-week edit here
+  // can never collide with that check.
+  const readOnly = isPast;
+  // A future-week edit is scoped to that week and later ones server-side —
+  // it never touches the current week's lineup (LS-10815).
+  const editWeekNumber = isFuture ? week : undefined;
+
+  const { matchups } = useMatchupsByWeek(league.id ?? null, week);
+  const myMatchup = useMemo(() => {
+    if (myTeamId == null) return null;
+    return (
+      matchups.find(
+        (m) => m != null && (m.team1Id === myTeamId || m.team2Id === myTeamId),
+      ) ?? null
+    );
+  }, [matchups, myTeamId]);
+  const matchupId = myMatchup?.id != null ? Number(myMatchup.id) : null;
+  const { matchup } = useMatchupById(matchupId);
+
+  const {
+    data: playersData,
+    error: playersError,
+    refetch: refetchMatchupPlayers,
+  } = useGetMatchupPlayersQuery({
+    variables: { matchupId: matchupId ?? 0 },
+    skip: !matchupId,
+    errorPolicy: 'all',
+  });
+
+  // The board shows the viewed week's lineup. `team_members` holds the
+  // current week's; an upcoming week's — which may already carry edits made
+  // ahead of time — lives in its matchup_players rows (LS-10815). Falls back
+  // to `team_members` when the week has no rows for this team (bye week, or
+  // still loading), which is the lineup that week inherits anyway.
+  const boardPlayers = useMemo<readonly TeamMemberFragment[]>(() => {
+    if (!isFuture) return teamPlayers;
+    const weekPositions = new Map<number, number | null>();
+    for (const mp of playersData?.getMatchupPlayers ?? []) {
+      if (mp.teamId === myTeamId && mp.playerId != null) {
+        weekPositions.set(mp.playerId, mp.positionId ?? null);
+      }
+    }
+    if (weekPositions.size === 0) return teamPlayers;
+    return teamPlayers.map((tm) => {
+      const playerId = tm.player?.id ?? tm.playerId;
+      return playerId != null && weekPositions.has(playerId)
+        ? { ...tm, positionId: weekPositions.get(playerId) ?? null }
+        : tm;
+    });
+  }, [isFuture, teamPlayers, playersData?.getMatchupPlayers, myTeamId]);
+
+  // A lineup edit changes `team_members` (current week) or the viewed week's
+  // matchup_players (future week) — reload both so the board and the
+  // per-player stats reflect it.
+  const refreshLineup = useCallback(async () => {
+    await Promise.all([
+      refetch(),
+      matchupId != null ? refetchMatchupPlayers() : undefined,
+    ]);
+  }, [refetch, refetchMatchupPlayers, matchupId]);
+
   const [updatePosition] = useUpdateTeamMemberPositionMutation();
   const [swapPositions] = useSwapTeamMemberPositionsMutation();
 
@@ -135,12 +205,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       addInFlight([position.id]);
       try {
         await updatePosition({
-          variables: { teamMemberId: player.id, positionId: position.id },
+          variables: {
+            teamMemberId: player.id,
+            positionId: position.id,
+            weekNumber: editWeekNumber,
+          },
           // Handled locally below (locked-player banner, or LOGGER.error for
           // anything else) — skip the global Apollo error toast/Rollbar link.
           context: { suppressGlobalError: true },
         });
-        await refetch();
+        await refreshLineup();
       } catch (err) {
         if (isMatchupLockedError(err)) {
           setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
@@ -158,24 +232,35 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         removeInFlight([position.id]);
       }
     },
-    [updatePosition, refetch, inFlightPositionIds, addInFlight, removeInFlight],
+    [
+      updatePosition,
+      refreshLineup,
+      editWeekNumber,
+      inFlightPositionIds,
+      addInFlight,
+      removeInFlight,
+    ],
   );
 
   const handleRemove = useCallback(
     async (position: LeaguePositionFragment) => {
       if (position.id == null) return;
       if (inFlightPositionIds.has(position.id)) return;
-      const occupant = teamPlayers.find((p) => p.positionId === position.id);
+      const occupant = boardPlayers.find((p) => p.positionId === position.id);
       if (!occupant?.id) return;
       addInFlight([position.id]);
       try {
         await updatePosition({
-          variables: { teamMemberId: occupant.id, positionId: null },
+          variables: {
+            teamMemberId: occupant.id,
+            positionId: null,
+            weekNumber: editWeekNumber,
+          },
           // Handled locally below (locked-player banner, or LOGGER.error for
           // anything else) — skip the global Apollo error toast/Rollbar link.
           context: { suppressGlobalError: true },
         });
-        await refetch();
+        await refreshLineup();
       } catch (err) {
         if (isMatchupLockedError(err)) {
           setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
@@ -195,8 +280,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     },
     [
       updatePosition,
-      refetch,
-      teamPlayers,
+      refreshLineup,
+      editWeekNumber,
+      boardPlayers,
       inFlightPositionIds,
       addInFlight,
       removeInFlight,
@@ -222,12 +308,13 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
             positionIdA: target.id,
             teamMemberIdB: displaced.id,
             positionIdB: incoming.positionId ?? undefined,
+            weekNumber: editWeekNumber,
           },
           // Handled locally below (locked-player banner, or LOGGER.error for
           // anything else) — skip the global Apollo error toast/Rollbar link.
           context: { suppressGlobalError: true },
         });
-        await refetch();
+        await refreshLineup();
       } catch (err) {
         if (isMatchupLockedError(err)) {
           setLockedPlayerNotice(PLAYER_LOCKED_MESSAGE);
@@ -246,21 +333,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         removeInFlight(affectedIds);
       }
     },
-    [swapPositions, refetch, inFlightPositionIds, addInFlight, removeInFlight],
+    [
+      swapPositions,
+      refreshLineup,
+      editWeekNumber,
+      inFlightPositionIds,
+      addInFlight,
+      removeInFlight,
+    ],
   );
 
-  const currentWeek = league.currentWeekNumber ?? 1;
-  const totalMatchups = league.totalMatchups ?? currentWeek;
-  const [week, setWeek] = useState<number>(currentWeek);
-  const isPast = week < currentWeek;
-  const isFuture = week > currentWeek;
-  const isCurrent = week === currentWeek;
-  // Only a finalized past week is locked — future weeks are editable so
-  // managers can set lineups ahead of time (LS-9768). The server's own
-  // `checkPlayersNotLocked` guard (lambdas/db/src/schema/authorization.ts)
-  // only ever locks the league's *current* week, so a future-week edit here
-  // can never collide with that check.
-  const readOnly = isPast;
   const isFootball = league.sport === Sport.Football;
 
   // Bye-week warning data (LS-6334) — football only. IR-slot enforcement was
@@ -283,23 +365,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   // viewed week → matchup players → league scoring settings → computed
   // scores/projections. All of it degrades gracefully (hero hides the
   // scoreline, rows fall back to eligibility sub-lines) when data is missing.
-  const { matchups } = useMatchupsByWeek(league.id ?? null, week);
-  const myMatchup = useMemo(() => {
-    if (myTeamId == null) return null;
-    return (
-      matchups.find(
-        (m) => m != null && (m.team1Id === myTeamId || m.team2Id === myTeamId),
-      ) ?? null
-    );
-  }, [matchups, myTeamId]);
-  const matchupId = myMatchup?.id != null ? Number(myMatchup.id) : null;
-  const { matchup } = useMatchupById(matchupId);
-
-  const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
-    variables: { matchupId: matchupId ?? 0 },
-    skip: !matchupId,
-    errorPolicy: 'all',
-  });
   const { settings: scoringSettings } = useLeagueScoringSettings(
     league.id ?? undefined,
   );
@@ -565,7 +630,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
         sport={league.sport === Sport.Football ? 'football' : 'baseball'}
         positions={positions}
-        teamPlayers={teamPlayers}
+        teamPlayers={boardPlayers}
         onPlayerAssign={(player, position) => {
           void handleAssign(player, position);
         }}

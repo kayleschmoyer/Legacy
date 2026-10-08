@@ -3253,6 +3253,7 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationToggleDraftAutoPickArgs = {
@@ -3386,6 +3387,7 @@ export type MutationUpdateTeamBrandingArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationUpdateUserAvatarArgs = {
@@ -9958,6 +9960,7 @@ export type GetTeamByIdQuery = {
 export type UpdateTeamMemberPositionMutationVariables = Exact<{
   teamMemberId: Scalars['Int']['input'];
   positionId?: InputMaybe<Scalars['Int']['input']>;
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type UpdateTeamMemberPositionMutation = {
@@ -10003,6 +10006,7 @@ export type SwapTeamMemberPositionsMutationVariables = Exact<{
   positionIdA?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdB: Scalars['Int']['input'];
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type SwapTeamMemberPositionsMutation = {
@@ -25159,10 +25163,15 @@ export type GetTeamByIdQueryResult = Apollo.QueryResult<
   GetTeamByIdQueryVariables
 >;
 export const UpdateTeamMemberPosition = gql`
-  mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+  mutation UpdateTeamMemberPosition(
+    $teamMemberId: Int!
+    $positionId: Int
+    $weekNumber: Int
+  ) {
     updateTeamMemberPosition(
       teamMemberId: $teamMemberId
       positionId: $positionId
+      weekNumber: $weekNumber
     ) {
       ...TeamMember
       ...AppTeamMember
@@ -25191,6 +25200,7 @@ export type UpdateTeamMemberPositionMutationFn = MutationFunction<
  *   variables: {
  *      teamMemberId: // value for 'teamMemberId'
  *      positionId: // value for 'positionId'
+ *      weekNumber: // value for 'weekNumber'
  *   },
  * });
  */
@@ -25221,12 +25231,14 @@ export const SwapTeamMemberPositions = gql`
     $positionIdA: Int
     $teamMemberIdB: Int!
     $positionIdB: Int
+    $weekNumber: Int
   ) {
     swapTeamMemberPositions(
       teamMemberIdA: $teamMemberIdA
       positionIdA: $positionIdA
       teamMemberIdB: $teamMemberIdB
       positionIdB: $positionIdB
+      weekNumber: $weekNumber
     ) {
       ...TeamMember
       ...AppTeamMember
@@ -25257,6 +25269,7 @@ export type SwapTeamMemberPositionsMutationFn = MutationFunction<
  *      positionIdA: // value for 'positionIdA'
  *      teamMemberIdB: // value for 'teamMemberIdB'
  *      positionIdB: // value for 'positionIdB'
+ *      weekNumber: // value for 'weekNumber'
  *   },
  * });
  */

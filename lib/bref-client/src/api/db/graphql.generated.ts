@@ -3247,6 +3247,7 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationToggleDraftAutoPickArgs = {
@@ -3380,6 +3381,7 @@ export type MutationUpdateTeamBrandingArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+  weekNumber?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationUpdateUserAvatarArgs = {

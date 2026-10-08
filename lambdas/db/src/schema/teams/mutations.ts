@@ -11,6 +11,11 @@ import {
   sanitizeDisplayName,
 } from '@legacy-sports/utils';
 import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
+import {
+  applyFutureWeekLineupChanges,
+  isFutureWeekEdit,
+  type LineupChange,
+} from './future-week-lineup';
 import { validateBrandingUrl } from './validate-branding-url';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder, type Context } from '../builder';
@@ -201,6 +206,15 @@ export async function syncCurrentMatchupPositions(
   }
 }
 
+const teamMemberColumns = {
+  id: PublicSchema.teamMembers.id,
+  teamId: PublicSchema.teamMembers.teamId,
+  leagueId: PublicSchema.teamMembers.leagueId,
+  playerId: PublicSchema.teamMembers.playerId,
+  positionId: PublicSchema.teamMembers.positionId,
+  onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+};
+
 /**
  * The transactional body of `swapTeamMemberPositions`. Must run inside a
  * transaction (`tx`).
@@ -219,9 +233,49 @@ export async function swapTeamMemberPositionsInTx(
     positionIdA?: number | null;
     teamMemberIdB: number;
     positionIdB?: number | null;
+    /** The week being edited; a week after the current one is a future-week edit (LS-10815). */
+    weekNumber?: number | null;
   },
 ) {
-  const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB } = args;
+  const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB, weekNumber } =
+    args;
+
+  // Future-week edit (LS-10815): write only that week's and later weeks'
+  // matchup_players — team_members is the current week's lineup and stays put.
+  const members = await tx
+    .select(teamMemberColumns)
+    .from(PublicSchema.teamMembers)
+    .where(
+      inArray(PublicSchema.teamMembers.id, [teamMemberIdA, teamMemberIdB]),
+    );
+  const memberA = members.find((m) => m.id === teamMemberIdA);
+  const memberB = members.find((m) => m.id === teamMemberIdB);
+  if (
+    memberA &&
+    memberB &&
+    weekNumber != null &&
+    (await isFutureWeekEdit(tx, memberA.leagueId, weekNumber))
+  ) {
+    const changesByTeam = new Map<number, LineupChange[]>();
+    for (const [member, positionId] of [
+      [memberA, positionIdA ?? null],
+      [memberB, positionIdB ?? null],
+    ] as const) {
+      if (member.teamId == null) continue;
+      const teamChanges = changesByTeam.get(member.teamId) ?? [];
+      teamChanges.push({ playerId: member.playerId, positionId });
+      changesByTeam.set(member.teamId, teamChanges);
+    }
+    for (const [teamId, changes] of changesByTeam) {
+      await applyFutureWeekLineupChanges(tx, {
+        leagueId: memberA.leagueId,
+        teamId,
+        fromWeek: weekNumber,
+        changes,
+      });
+    }
+    return [memberA, memberB];
+  }
 
   // Step 1: Clear both positions to avoid unique constraint violation
   const cleared = await tx
@@ -294,17 +348,17 @@ export async function swapTeamMemberPositionsInTx(
   // leagueId — both members belong to the same league. A sync failure rolls
   // back the whole mutation instead of silently diverging team_members from
   // matchup_players (LS-6034).
-  const [memberA, memberB] = [updatedA[0], updatedB[0]];
-  if (memberA.teamId && memberB.teamId) {
-    await syncCurrentMatchupPositions(tx, memberA.leagueId, [
+  const [updatedMemberA, updatedMemberB] = [updatedA[0], updatedB[0]];
+  if (updatedMemberA.teamId && updatedMemberB.teamId) {
+    await syncCurrentMatchupPositions(tx, updatedMemberA.leagueId, [
       {
-        teamId: memberA.teamId,
-        playerId: memberA.playerId,
+        teamId: updatedMemberA.teamId,
+        playerId: updatedMemberA.playerId,
         positionId: positionIdA ?? null,
       },
       {
-        teamId: memberB.teamId,
-        playerId: memberB.playerId,
+        teamId: updatedMemberB.teamId,
+        playerId: updatedMemberB.playerId,
         positionId: positionIdB ?? null,
       },
       ...displaced
@@ -319,7 +373,121 @@ export async function swapTeamMemberPositionsInTx(
     ]);
   }
 
-  return [memberA, memberB];
+  return [updatedMemberA, updatedMemberB];
+}
+
+/**
+ * The transactional body of `updateTeamMemberPosition`. Must run inside a
+ * transaction (`tx`).
+ */
+export async function updateTeamMemberPositionInTx(
+  tx: PublicDb,
+  args: {
+    teamMemberId: number;
+    positionId?: number | null;
+    /** The week being edited; a week after the current one is a future-week edit (LS-10815). */
+    weekNumber?: number | null;
+  },
+) {
+  const { teamMemberId, positionId, weekNumber } = args;
+
+  // Resolve the member's team so slot-clearing is scoped to it.
+  const [existing] = await tx
+    .select(teamMemberColumns)
+    .from(PublicSchema.teamMembers)
+    .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+    .limit(1);
+
+  if (!existing) {
+    throw UserInputError('Team member not found');
+  }
+
+  // Future-week edit (LS-10815): write only that week's and later weeks'
+  // matchup_players — team_members is the current week's lineup and stays put.
+  if (
+    weekNumber != null &&
+    existing.teamId != null &&
+    (await isFutureWeekEdit(tx, existing.leagueId, weekNumber))
+  ) {
+    await applyFutureWeekLineupChanges(tx, {
+      leagueId: existing.leagueId,
+      teamId: existing.teamId,
+      fromWeek: weekNumber,
+      changes: [
+        { playerId: existing.playerId, positionId: positionId ?? null },
+      ],
+    });
+    return existing;
+  }
+
+  // Free the target slot if a different member on the same team
+  // currently occupies it. Skipped when clearing a position (null),
+  // which can never collide.
+  let displaced: Array<{ teamId: number | null; playerId: number }> = [];
+  if (positionId != null && existing.teamId != null) {
+    displaced = await tx
+      .update(PublicSchema.teamMembers)
+      .set({ positionId: null })
+      .where(
+        and(
+          eq(PublicSchema.teamMembers.teamId, existing.teamId),
+          eq(PublicSchema.teamMembers.positionId, positionId),
+          ne(PublicSchema.teamMembers.id, teamMemberId),
+        ),
+      )
+      .returning({
+        teamId: PublicSchema.teamMembers.teamId,
+        playerId: PublicSchema.teamMembers.playerId,
+      });
+  }
+
+  // Update the team member position
+  const updated = await tx
+    .update(PublicSchema.teamMembers)
+    .set({ positionId: positionId ?? null })
+    .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+    .returning({
+      id: PublicSchema.teamMembers.id,
+      teamId: PublicSchema.teamMembers.teamId,
+      leagueId: PublicSchema.teamMembers.leagueId,
+      playerId: PublicSchema.teamMembers.playerId,
+      positionId: PublicSchema.teamMembers.positionId,
+      onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+    });
+
+  if (updated.length === 0) {
+    throw UserInputError('Team member not found');
+  }
+
+  const member = updated[0];
+
+  // Mirror the position change(s) onto matchup_players for the
+  // active week, in the SAME transaction as the team_members update
+  // above. The assigned member moves to `positionId`; any displaced
+  // incumbent is benched (null) so the lineup stays consistent. A
+  // sync failure now rolls back the whole mutation instead of
+  // silently diverging team_members from matchup_players (LS-6034).
+  if (member.teamId) {
+    const changes = [
+      {
+        teamId: member.teamId,
+        playerId: member.playerId,
+        positionId: positionId ?? null,
+      },
+      ...displaced
+        .filter(
+          (d): d is { teamId: number; playerId: number } => d.teamId != null,
+        )
+        .map((d) => ({
+          teamId: d.teamId,
+          playerId: d.playerId,
+          positionId: null,
+        })),
+    ];
+    await syncCurrentMatchupPositions(tx, member.leagueId, changes);
+  }
+
+  return member;
 }
 
 /**
@@ -378,6 +546,10 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
     args: {
       teamMemberId: t.arg.int({ required: true }),
       positionId: t.arg.int({ required: false }),
+      // The week being edited. A week after the league's current week edits
+      // only that week's and later weeks' lineups, never the current one
+      // (LS-10815). Omitted = the current week.
+      weekNumber: t.arg.int({ required: false }),
     },
     resolve: authorized(
       {
@@ -391,7 +563,7 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
         allowCommissionerLockOverride: true,
       },
       async (_parent, args, context, user, meta) => {
-        const { teamMemberId, positionId } = args;
+        const { teamMemberId, positionId, weekNumber } = args;
         const db = context.db;
 
         // Slot-eligibility gate (LS-6427). Runs before the `try` below, and
@@ -426,89 +598,13 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
           // incumbent benched without the new player taking the slot. The web
           // UI routes occupied-slot moves through `swapTeamMemberPositions`, so
           // this path is exercised mainly by direct API callers (LS-7871).
-          const { member } = await db.transaction(async (tx) => {
-            // Resolve the member's team so slot-clearing is scoped to it.
-            const [existing] = await tx
-              .select({ teamId: PublicSchema.teamMembers.teamId })
-              .from(PublicSchema.teamMembers)
-              .where(eq(PublicSchema.teamMembers.id, teamMemberId))
-              .limit(1);
-
-            if (!existing) {
-              throw UserInputError('Team member not found');
-            }
-
-            // Free the target slot if a different member on the same team
-            // currently occupies it. Skipped when clearing a position (null),
-            // which can never collide.
-            let displaced: Array<{ teamId: number | null; playerId: number }> =
-              [];
-            if (positionId != null && existing.teamId != null) {
-              displaced = await tx
-                .update(PublicSchema.teamMembers)
-                .set({ positionId: null })
-                .where(
-                  and(
-                    eq(PublicSchema.teamMembers.teamId, existing.teamId),
-                    eq(PublicSchema.teamMembers.positionId, positionId),
-                    ne(PublicSchema.teamMembers.id, teamMemberId),
-                  ),
-                )
-                .returning({
-                  teamId: PublicSchema.teamMembers.teamId,
-                  playerId: PublicSchema.teamMembers.playerId,
-                });
-            }
-
-            // Update the team member position
-            const updated = await tx
-              .update(PublicSchema.teamMembers)
-              .set({ positionId: positionId ?? null })
-              .where(eq(PublicSchema.teamMembers.id, teamMemberId))
-              .returning({
-                id: PublicSchema.teamMembers.id,
-                teamId: PublicSchema.teamMembers.teamId,
-                leagueId: PublicSchema.teamMembers.leagueId,
-                playerId: PublicSchema.teamMembers.playerId,
-                positionId: PublicSchema.teamMembers.positionId,
-                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
-              });
-
-            if (updated.length === 0) {
-              throw UserInputError('Team member not found');
-            }
-
-            const member = updated[0];
-
-            // Mirror the position change(s) onto matchup_players for the
-            // active week, in the SAME transaction as the team_members update
-            // above. The assigned member moves to `positionId`; any displaced
-            // incumbent is benched (null) so the lineup stays consistent. A
-            // sync failure now rolls back the whole mutation instead of
-            // silently diverging team_members from matchup_players (LS-6034).
-            if (member.teamId) {
-              const changes = [
-                {
-                  teamId: member.teamId,
-                  playerId: member.playerId,
-                  positionId: positionId ?? null,
-                },
-                ...displaced
-                  .filter(
-                    (d): d is { teamId: number; playerId: number } =>
-                      d.teamId != null,
-                  )
-                  .map((d) => ({
-                    teamId: d.teamId,
-                    playerId: d.playerId,
-                    positionId: null,
-                  })),
-              ];
-              await syncCurrentMatchupPositions(tx, member.leagueId, changes);
-            }
-
-            return { member };
-          });
+          const member = await db.transaction((tx) =>
+            updateTeamMemberPositionInTx(tx, {
+              teamMemberId,
+              positionId,
+              weekNumber,
+            }),
+          );
 
           if (meta.isCommissionerLockOverride) {
             await announceCommissionerLockOverride(context, {
@@ -541,6 +637,8 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
       positionIdA: t.arg.int({ required: false }),
       teamMemberIdB: t.arg.int({ required: true }),
       positionIdB: t.arg.int({ required: false }),
+      // See `updateTeamMemberPosition.weekNumber` (LS-10815).
+      weekNumber: t.arg.int({ required: false }),
     },
     resolve: authorized(
       {

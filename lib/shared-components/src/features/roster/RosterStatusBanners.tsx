@@ -8,8 +8,8 @@ export interface RosterStatusBannersProps {
   isPast: boolean;
   /**
    * Viewing an upcoming week — lineup is editable (LS-9768). Changes apply to
-   * the player's persistent roster slot and carry forward to this and later
-   * weeks until edited again.
+   * this and later weeks only; the current week's lineup is untouched
+   * (LS-10815).
    */
   isFuture: boolean;
 }
@@ -88,7 +88,7 @@ export function RosterStatusBanners({
         kind="info"
         icon={<Info size={18} color="var(--brandGold)" />}
         title="Upcoming Week"
-        sub="You're setting a lineup ahead of time — changes carry forward to this and later weeks until you edit them again."
+        sub="You're setting a lineup ahead of time — changes apply to this and later weeks, not the current week."
       />
     );
   }

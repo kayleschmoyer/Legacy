@@ -3707,6 +3707,7 @@ type Mutation {
     positionIdB: Int
     teamMemberIdA: Int!
     teamMemberIdB: Int!
+    weekNumber: Int
   ): [TeamMember!]
 
   """
@@ -3830,7 +3831,11 @@ type Mutation {
     secondaryColor: String
     teamId: Int!
   ): Team
-  updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
+  updateTeamMemberPosition(
+    positionId: Int
+    teamMemberId: Int!
+    weekNumber: Int
+  ): TeamMember
 
   """
   Update the avatar URL for the currently authenticated user.

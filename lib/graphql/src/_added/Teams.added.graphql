@@ -22,10 +22,15 @@ query GetTeamById($teamId: Int!) {
   }
 }
 
-mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
+mutation UpdateTeamMemberPosition(
+  $teamMemberId: Int!
+  $positionId: Int
+  $weekNumber: Int
+) {
   updateTeamMemberPosition(
     teamMemberId: $teamMemberId
     positionId: $positionId
+    weekNumber: $weekNumber
   ) {
     ...TeamMember
     ...AppTeamMember
@@ -37,12 +42,14 @@ mutation SwapTeamMemberPositions(
   $positionIdA: Int
   $teamMemberIdB: Int!
   $positionIdB: Int
+  $weekNumber: Int
 ) {
   swapTeamMemberPositions(
     teamMemberIdA: $teamMemberIdA
     positionIdA: $positionIdA
     teamMemberIdB: $teamMemberIdB
     positionIdB: $positionIdB
+    weekNumber: $weekNumber
   ) {
     ...TeamMember
     ...AppTeamMember

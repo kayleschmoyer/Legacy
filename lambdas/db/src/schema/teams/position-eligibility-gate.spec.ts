@@ -203,7 +203,7 @@ describe('updateTeamMemberPosition — slot-eligibility gate (AC1)', () => {
       [{ id: 77, positionType: 'FLEX' }],
       [{ playerId: 9, position: 'WR' }], // WR is FLEX-eligible
     ]);
-    transaction.mockResolvedValue({ member: { id: 42 } });
+    transaction.mockResolvedValue({ id: 42 });
     const resolvers = await captureResolvers();
 
     await expect(

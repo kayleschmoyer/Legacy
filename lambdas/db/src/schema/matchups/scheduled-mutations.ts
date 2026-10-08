@@ -20,6 +20,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { assertAuthorized } from './system-auth';
 import { builder } from '../builder';
+import { promotePlannedLineupsOnActivation } from '../teams/future-week-lineup';
 import { PlayoffService } from '../../services/playoff-service';
 
 const badgeService = createBadgeService(getDbOptions());
@@ -1095,6 +1096,10 @@ async function advanceLeagueWeekInternal(
     // All future matchups are pre-created at draft time using positions that
     // were correct then; this step keeps them up-to-date as teams evolve.
     const activatedMatchupIds = activatedMatchups.map((m) => m.id);
+    // Lineups set for this week ahead of time live only in its
+    // matchup_players rows (LS-10815) — fold them into team_members first so
+    // the resync below keeps them instead of reverting to last week's lineup.
+    await promotePlannedLineupsOnActivation(db, leagueId, activatedMatchupIds);
     const teamIds = Array.from(
       new Set(
         activatedMatchups.flatMap((m) =>
