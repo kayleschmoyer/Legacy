@@ -26,7 +26,7 @@ Run a single ad-hoc DML statement (INSERT/UPDATE/DELETE) against the dev databas
 
 ### `db_migrate`
 
-Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tunnel). Send { migrations: [{ name, hash, tsSource }] } ordered by timestamp — tsSource is raw .ts source, transpiled server-side (no client esbuild step); jsSource (pre-transpiled CJS) also still works — exactly one per migration. ASYNC: validates, persists a job row, fires a worker, returns { jobId, status: "running" } — poll db_migration_status({ jobId }) every ~5s until terminal (done/failed/orphaned) for the result ({ applied, appliedNames, skipped, success, failed?, error? }). Already-applied migrations are skipped and the run stops on the first failure, so re-submitting after a failure is resume-safe. A running job is joined, not duplicated. Dev-only.
+Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tunnel). Per migration send exactly one of: ref { branch|sha, path } (PREFERRED — server fetches the pushed lib/db-client/migrations/*.ts file itself, no transcription; name/hash default to the filename), tsSource (raw .ts, transpiled server-side), or jsSource (pre-transpiled CJS). ASYNC: returns { jobId, status: "running" } — poll db_migration_status({ jobId }) every ~5s until terminal (done/failed/orphaned) for { applied, appliedNames, skipped, success, failed?, error?, sources? } (sources = blobSha/sha256 of ref files). Already-applied migrations are skipped and the run stops on the first failure, so re-submitting is resume-safe. A running job is joined, not duplicated. Dev-only.
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tu
 
 ### `db_migration_status`
 
-Report which migrations are applied vs pending on the dev database, over HTTPS (no SSM tunnel). Pass the local migration filenames (e.g. "20260616_120000_add_x.ts") so the server can compute the pending set; applied migrations are keyed by filename in drizzle.__drizzle_migrations. Alternatively pass jobId (from db_migrate) to poll an async migration job: returns { jobId, status: running|done|failed|orphaned, terminal, ... } and, once terminal, the full db_migrate result (applied, appliedNames, skipped, success, failed?, error?).
+Report which migrations are applied vs pending on the dev database, over HTTPS (no SSM tunnel). Pass the local migration filenames (e.g. "20260616_120000_add_x.ts") so the server can compute the pending set; applied migrations are keyed by filename in drizzle.__drizzle_migrations. Alternatively pass jobId (from db_migrate) to poll an async migration job: returns { jobId, status: running|done|failed|orphaned, terminal, ... } and, once terminal, the full db_migrate result (applied, appliedNames, skipped, success, failed?, error?, sources?).
 
 | Param | Type | Required | Constraints | Description |
 | --- | --- | --- | --- | --- |

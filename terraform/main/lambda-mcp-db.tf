@@ -53,7 +53,7 @@ resource "aws_iam_policy" "mcp_db_lambda_secrets" {
   # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
   # LS-6675 before it). A generated name makes the replacement always safe.
   name_prefix = "${local.name_prefix}-mcp-db-lambda-secrets-"
-  description = "Allows the MCP DB Lambda to read DB credentials, the mcp_readonly/mcp_write role secrets, and the Rollbar token from Secrets Manager"
+  description = "Allows the MCP DB Lambda to read DB credentials, the mcp_readonly/mcp_write role secrets, the Rollbar token, and the GitHub App credentials from Secrets Manager"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -66,6 +66,9 @@ resource "aws_iam_policy" "mcp_db_lambda_secrets" {
           aws_secretsmanager_secret.mcp_readonly_db_credentials.arn,
           aws_secretsmanager_secret.mcp_write_db_credentials.arn,
           aws_secretsmanager_secret.rollbar_access_token.arn,
+          # Agent Author GitHub App credentials — db_migrate's by-ref input
+          # (LS-10974) reads migration files from bkrupa/legacy-sports with them.
+          aws_secretsmanager_secret.mcp_github_token.arn,
         ]
       }
     ]
@@ -193,6 +196,10 @@ resource "aws_lambda_function" "mcp_db" {
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME    = aws_secretsmanager_secret.rollbar_access_token.name
+      # GitHub App credentials (shared with the GitHub/CI MCP Lambdas) used by
+      # db_migrate's by-ref input to fetch lib/db-client/migrations/* from the
+      # repo server-side (LS-10974). Egress goes through the VPC NAT.
+      GITHUB_TOKEN_SECRET_NAME = aws_secretsmanager_secret.mcp_github_token.name
 
       MCP_COGNITO_ISSUER   = local.mcp_cognito_issuer
       MCP_COGNITO_AUDIENCE = aws_cognito_user_pool_client.mcp_cli.id

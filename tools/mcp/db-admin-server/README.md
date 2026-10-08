@@ -54,7 +54,32 @@ a developer's local migrations directory, so the caller POSTs
 via the TypeScript compiler API (`transpileTsSource`, LS-9582), so no
 client-side transpile step is required. `jsSource` (already-transpiled CJS,
 e.g. from esbuild) is still accepted for backward compatibility; provide
-exactly one of `jsSource`/`tsSource` per migration, never both.
+exactly one of `jsSource`/`tsSource`/`ref` per migration.
+
+**By-ref input (LS-10974) — preferred for agents.** Instead of sending the
+source, pass `ref: { branch | sha, path }` and the server fetches the file
+itself from `bkrupa/legacy-sports` at that ref (`src/github-source.ts`), then
+transpiles it exactly like `tsSource`:
+
+```
+{ migrations: [{ ref: { branch: "<pushed branch>", path: "lib/db-client/migrations/<file>.ts" } }] }
+```
+
+`name`/`hash` are optional for ref items (both default to the path's filename;
+if given they must match it). The path must be a single file directly under
+`lib/db-client/migrations/` named `YYYYMMDD_HHMMSS_<name>.ts` — anything else
+is rejected before any network call — and the repo is fixed server-side, never
+caller-supplied. The fetch uses the Agent Author GitHub App credentials shared
+with the GitHub/CI MCP Lambdas (`GITHUB_TOKEN_SECRET_NAME`); the decoded bytes
+are re-hashed and must match the git blob SHA GitHub reported. Both the submit
+ack and the terminal job result carry `sources: [{ name, repo, path, ref,
+blobSha, sha256, bytes }]` for every ref item, so callers can confirm exactly
+what ran (`blobSha` equals `git hash-object <file>` /
+`git rev-parse <ref>:<path>`). The branch must be pushed. This exists because
+re-emitting a large seed migration inline (~82 KB in LS-10674) truncated in
+transit and produced invalid JSON; the regression spec in
+`src/tools/migrate.spec.ts` submits and applies a ~100 KB migration through
+the ref path.
 
 **Async job contract (LS-8563).** The tool validates the payload, persists it
 to a job row (`drizzle.__db_migrate_jobs`, created on demand), fires an async
@@ -64,7 +89,7 @@ backfills) runs in the worker branch with the function's full ~15-min timeout.
 Poll `db_migration_status({ jobId })` (~5s cadence) until `terminal: true`; the
 terminal payload carries the same result shape the tool used to return
 synchronously (`applied`, `appliedNames`, `skipped`, `success`, `failed?`,
-`error?`). A `db_migrate` call while a job is running **joins** it (returns the
+`error?`), plus `sources?` for ref items (LS-10974). A `db_migrate` call while a job is running **joins** it (returns the
 existing `jobId`) — a partial unique index allows at most one `running` row. A
 worker that dies without a terminal write is reported as `orphaned` once its
 `updated_at` heartbeat exceeds the stale cutoff (`DB_MIGRATE_JOB_STALE_MS`,
@@ -94,14 +119,13 @@ still transpiles locally with esbuild before POSTing (`src/client/migrate-client
 and polls the job to its terminal state so callers still see one logical
 operation; this path is unaffected by LS-9582.
 
-**Agent callers** (MCP session, calling the `db_migrate` tool directly): read
-each pending migration file's raw `.ts` source (e.g. with the `Read` tool) and
-pass it straight through as `tsSource` — `{ migrations: [{ name, hash,
-tsSource }] }`. The server transpiles it itself (LS-9582); no local esbuild
-invocation, and no intermediate script, is needed. (The
-`scripts/db/transpile-migration.mjs` helper from LS-9203 still works — it
-produces a `jsSource`-shaped payload — but `tsSource` is the simpler path now
-that the server does the transpile.)
+**Agent callers** (MCP session, calling the `db_migrate` tool directly): push
+the branch, then pass each pending migration **by ref** —
+`{ migrations: [{ ref: { branch, path } }] }` (LS-10974). Nothing is
+transcribed, so file size does not matter. Fall back to inline `tsSource`
+(`{ name, hash, tsSource }`, LS-9582) only for a small, unpushed migration.
+(The `scripts/db/transpile-migration.mjs` helper from LS-9203 still produces a
+`jsSource`-shaped payload, but neither inline form is needed for pushed files.)
 
 ### `db_execute` (ad-hoc data writes)
 
@@ -145,6 +169,7 @@ returns any `RETURNING` rows plus the affected `rowCount`.
 - `DB_WRITE_STATEMENT_TIMEOUT_MS` — `db_execute` connection statement_timeout (default 30000)
 - `DB_MIGRATE_JOB_STALE_MS` — heartbeat age past which a `running` job is treated as dead (default 960000)
 - `AWS_LAMBDA_FUNCTION_NAME` — runtime-provided; used for the async self-invoke
+- `GITHUB_TOKEN_SECRET_NAME` — Secrets Manager secret `{ app_id, installation_id, private_key }` (the shared `mcp_github_token` Agent Author app); used by `db_migrate`'s by-ref input to read `lib/db-client/migrations/*` (LS-10974)
 
 ## Build
 

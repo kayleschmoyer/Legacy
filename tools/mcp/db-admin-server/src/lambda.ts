@@ -60,7 +60,7 @@ function createMcpServer(caller: McpCaller): McpServer {
       'the pending set; applied migrations are keyed by filename in drizzle.__drizzle_migrations. ' +
       'Alternatively pass jobId (from db_migrate) to poll an async migration job: returns ' +
       '{ jobId, status: running|done|failed|orphaned, terminal, ... } and, once terminal, the full ' +
-      'db_migrate result (applied, appliedNames, skipped, success, failed?, error?).',
+      'db_migrate result (applied, appliedNames, skipped, success, failed?, error?, sources?).',
     {
       localMigrationNames: z
         .array(z.string())
@@ -81,34 +81,36 @@ function createMcpServer(caller: McpCaller): McpServer {
   server.tool(
     'db_migrate',
     'Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tunnel). ' +
-      'Send { migrations: [{ name, hash, tsSource }] } ordered by timestamp — tsSource is raw ' +
-      '.ts source, transpiled server-side (no client esbuild step); jsSource (pre-transpiled ' +
-      'CJS) also still works — exactly one per migration. ASYNC: validates, persists a job row, ' +
-      'fires a worker, returns { jobId, status: "running" } — poll db_migration_status({ jobId }) ' +
-      'every ~5s until terminal (done/failed/orphaned) for the result ({ applied, appliedNames, ' +
-      'skipped, success, failed?, error? }). Already-applied migrations are skipped and the run ' +
-      'stops on the first failure, so re-submitting after a failure is resume-safe. A running ' +
-      'job is joined, not duplicated. Dev-only.',
+      'Per migration send exactly one of: ref { branch|sha, path } (PREFERRED — server fetches the ' +
+      'pushed lib/db-client/migrations/*.ts file itself, no transcription; name/hash default to the ' +
+      'filename), tsSource (raw .ts, transpiled server-side), or jsSource (pre-transpiled CJS). ' +
+      'ASYNC: returns { jobId, status: "running" } — poll db_migration_status({ jobId }) ' +
+      'every ~5s until terminal (done/failed/orphaned) for { applied, appliedNames, ' +
+      'skipped, success, failed?, error?, sources? } (sources = blobSha/sha256 of ref files). ' +
+      'Already-applied migrations are skipped and the run stops on the first failure, so ' +
+      're-submitting is resume-safe. A running job is joined, not duplicated. Dev-only.',
     {
       migrations: z
         .array(
           z.object({
             name: z
               .string()
+              .optional()
               .describe('Migration filename, e.g. "20260616_120000_add_x.ts".'),
-            hash: z.string().describe('Tracking key (the migration filename).'),
-            jsSource: z
+            hash: z
               .string()
               .optional()
-              .describe(
-                'Pre-transpiled CJS source (one of jsSource/tsSource).',
-              ),
-            tsSource: z
-              .string()
+              .describe('Tracking key (the filename).'),
+            jsSource: z.string().optional().describe('Pre-transpiled CJS.'),
+            tsSource: z.string().optional().describe('Raw TS source.'),
+            ref: z
+              .object({
+                branch: z.string().optional(),
+                sha: z.string().optional(),
+                path: z.string().describe('lib/db-client/migrations/<file>.ts'),
+              })
               .optional()
-              .describe(
-                'Raw TS source; transpiled server-side (one of jsSource/tsSource).',
-              ),
+              .describe('Fetch from bkrupa/legacy-sports at branch or sha.'),
           }),
         )
         .describe('Pending migrations to apply, ordered by timestamp.'),

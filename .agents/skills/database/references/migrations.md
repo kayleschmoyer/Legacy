@@ -29,13 +29,15 @@ pnpm --prefix lib/db-client run db:up
 
 Confirm the output reports `Applied N new migrations` or `No new migrations to apply`. Any other result is a failure — do not proceed to `make pc`.
 
-To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`). The hosted Lambda cannot see your local migrations directory, so **you** must supply the source — never hand-run `esbuild` and hand-paste the output. Read each pending migration file's raw `.ts` source and pass it as `tsSource`; the server transpiles it itself (LS-9582):
+To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`). The hosted Lambda cannot see your local migrations directory. **Preferred (LS-10974): push the branch, then pass each migration by ref** — the server fetches the file from `bkrupa/legacy-sports` at that branch/SHA, transpiles it, and reports what it ran:
 
 ```
-migrations: [{ name: "<file>.ts", hash: "<file>.ts", tsSource: "<raw .ts source>" }, ...]
+migrations: [{ ref: { branch: "<pushed branch>", path: "lib/db-client/migrations/<file>.ts" } }, ...]
 ```
 
-(`jsSource` — pre-transpiled CJS, e.g. via `node scripts/db/transpile-migration.mjs [<migration-file>...]`, LS-9203 — still works too; provide exactly one of `jsSource`/`tsSource` per migration.) The server skips already-applied migrations, so submitting the full pending set is safe. The call is async (LS-8563): it returns `{ jobId, status: "running" }`; poll `db_migration_status({ jobId })` every ~5s until `terminal: true` for the applied/skipped result.
+`name`/`hash` default to the filename. The path must be directly under `lib/db-client/migrations/` and named `YYYYMMDD_HHMMSS_*.ts`. The submit ack and the terminal job result include `sources: [{ name, path, ref, blobSha, sha256, bytes }]`; `blobSha` should equal `git rev-parse <branch>:<path>`. Nothing is transcribed through model output, so large seed/backfill migrations (LS-10674's ~82 KB file) apply the same way as small ones.
+
+Inline source still works for a small, unpushed migration: `{ name: "<file>.ts", hash: "<file>.ts", tsSource: "<raw .ts source>" }` (server-side transpile, LS-9582), or `jsSource` from `node scripts/db/transpile-migration.mjs` (LS-9203). Never hand-run `esbuild` and hand-paste the output. Provide exactly one of `ref`/`tsSource`/`jsSource` per migration. The server skips already-applied migrations, so submitting the full pending set is safe. The call is async (LS-8563): it returns `{ jobId, status: "running" }`; poll `db_migration_status({ jobId })` every ~5s until `terminal: true` for the applied/skipped result.
 
 ### 3. Verify (spot-check)
 

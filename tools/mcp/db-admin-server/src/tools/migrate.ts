@@ -20,6 +20,12 @@ import {
   reapStaleJobs,
 } from '../jobs.js';
 import { invokeWorkerAsync } from '../invoke-worker.js';
+import {
+  fetchMigrationFromRepo,
+  type MigrationRef,
+  type MigrationSourceInfo,
+  validateMigrationRef,
+} from '../github-source.js';
 
 /**
  * `db_migrate` — apply UNMERGED local-branch migrations to the dev database
@@ -52,22 +58,35 @@ import { invokeWorkerAsync } from '../invoke-worker.js';
  * bundles safely into the single-file Lambda output — before the payload is
  * validated or persisted. Every downstream consumer (validation, the job row,
  * the worker) only ever sees the resulting `jsSource`.
+ *
+ * A third input form, `ref: { branch | sha, path }` (LS-10974), avoids sending
+ * the source at all: the server fetches the file from `bkrupa/legacy-sports`
+ * at that ref (`../github-source.ts` — path restricted to
+ * `lib/db-client/migrations/YYYYMMDD_HHMMSS_*.ts`), then transpiles it exactly
+ * like `tsSource`. The fetched file's git blob SHA + SHA-256 are carried on the
+ * normalized item and reported in both the submit ack and the job result.
  */
 
 /**
  * One migration as sent by the client, ordered by timestamp. Provide exactly
- * one of `jsSource` (pre-transpiled CJS, e.g. via `esbuild`) or `tsSource`
- * (raw TypeScript, transpiled server-side) — not both, not neither.
+ * one of `jsSource` (pre-transpiled CJS, e.g. via `esbuild`), `tsSource` (raw
+ * TypeScript, transpiled server-side), or `ref` (fetched from the repo and
+ * transpiled server-side, LS-10974).
+ *
+ * `name` / `hash` are required for inline sources. For `ref` items they may be
+ * omitted — both default to the path's filename — and must equal it if given.
  */
 export interface MigrationPayloadItem {
   /** Migration filename, e.g. `20260616_120000_add_x.ts`. */
-  name: string;
+  name?: string;
   /** Tracking key in `drizzle.__drizzle_migrations` — the runner keys on filename. */
-  hash: string;
+  hash?: string;
   /** Client-transpiled CJS source of the migration module. */
   jsSource?: string;
   /** Raw TypeScript migration source, transpiled to CJS server-side (LS-9582). */
   tsSource?: string;
+  /** Repo ref to fetch the migration from, server-side (LS-10974). */
+  ref?: MigrationRef;
 }
 
 /** A migration payload item after `normalizeMigrations` — `jsSource` is always populated. */
@@ -75,6 +94,8 @@ export interface NormalizedMigrationItem {
   name: string;
   hash: string;
   jsSource: string;
+  /** Provenance of a `ref` item (LS-10974); absent for inline sources. */
+  source?: MigrationSourceInfo;
 }
 
 export interface MigrateParams {
@@ -91,6 +112,8 @@ export interface MigrateResult {
   failed?: string;
   /** Present only when a migration failed. */
   error?: string;
+  /** Provenance (blob SHA / SHA-256) of every `ref` item in the batch (LS-10974). */
+  sources?: MigrationSourceInfo[];
 }
 
 /** Environments in which `db_migrate` is permitted to run. */
@@ -240,38 +263,93 @@ export function transpileTsSource(tsSource: string): string {
 
 /**
  * Normalize the raw client payload into items that always carry `jsSource`:
- * transpile `tsSource` server-side when that's what was sent, pass `jsSource`
- * through unchanged otherwise. Rejects an item that supplies both or neither
- * (ambiguous) before any transpilation is attempted.
+ * fetch `ref` items from the repo (LS-10974), transpile `tsSource` (fetched or
+ * inline) server-side, and pass `jsSource` through unchanged. Rejects an item
+ * that supplies more than one source form, or none, before any fetch or
+ * transpilation is attempted.
  */
-function normalizeMigrations(
+async function normalizeMigrations(
   migrations: MigrationPayloadItem[],
-): NormalizedMigrationItem[] {
+): Promise<NormalizedMigrationItem[]> {
   if (!Array.isArray(migrations)) {
     throw new Error('No migrations provided.');
   }
+  // Checked again in validatePayload; enforced here too so an oversized batch
+  // never triggers a burst of GitHub fetches.
+  if (migrations.length > MAX_MIGRATION_COUNT) {
+    throw new Error(
+      `Too many migrations in one call (${migrations.length} > ${MAX_MIGRATION_COUNT}).`,
+    );
+  }
 
-  return migrations.map((m) => {
+  const forms = migrations.map((m) => {
     const hasJs = typeof m.jsSource === 'string' && m.jsSource.length > 0;
     const hasTs = typeof m.tsSource === 'string' && m.tsSource.length > 0;
-
-    if (hasJs && hasTs) {
+    const hasRef = m.ref !== undefined && m.ref !== null;
+    const label = m.name ?? m.ref?.path ?? '<unnamed>';
+    if ([hasJs, hasTs, hasRef].filter(Boolean).length > 1) {
       throw new Error(
-        `Migration '${m.name}' provided both jsSource and tsSource — pass exactly one.`,
+        `Migration '${label}' provided more than one of jsSource, tsSource and ref — pass exactly one.`,
       );
     }
-    if (hasTs) {
-      return {
-        name: m.name,
-        hash: m.hash,
-        jsSource: transpileTsSource(m.tsSource as string),
-      };
+    if (!hasJs && !hasTs && !hasRef) {
+      throw new Error(
+        `Migration '${label}' must provide jsSource, tsSource or ref.`,
+      );
     }
-    if (hasJs) {
-      return { name: m.name, hash: m.hash, jsSource: m.jsSource as string };
+    if (hasRef) {
+      // Path/ref allowlist runs before any network call.
+      const { name } = validateMigrationRef(m.ref as MigrationRef);
+      for (const [field, value] of [
+        ['name', m.name],
+        ['hash', m.hash],
+      ] as const) {
+        if (value !== undefined && value !== name) {
+          throw new Error(
+            `Migration ${field} '${value}' does not match ref path filename '${name}'.`,
+          );
+        }
+      }
+      return 'ref';
     }
-    throw new Error(`Migration '${m.name}' must provide jsSource or tsSource.`);
+    return hasTs ? 'ts' : 'js';
   });
+
+  // Fetch every ref item in parallel — the submit path must stay well inside
+  // the API Gateway's ~29s window even for a 50-migration batch.
+  return Promise.all(
+    migrations.map(async (m, i): Promise<NormalizedMigrationItem> => {
+      if (forms[i] === 'ref') {
+        const fetched = await fetchMigrationFromRepo(m.ref as MigrationRef);
+        return {
+          name: fetched.name,
+          hash: fetched.name,
+          jsSource: transpileTsSource(fetched.tsSource),
+          source: fetched.source,
+        };
+      }
+      const name = m.name as string;
+      const hash = m.hash as string;
+      if (forms[i] === 'ts') {
+        return {
+          name,
+          hash,
+          jsSource: transpileTsSource(m.tsSource as string),
+        };
+      }
+      return { name, hash, jsSource: m.jsSource as string };
+    }),
+  );
+}
+
+/** Provenance list for the `ref` items of a batch, or undefined if there are none. */
+export function collectSources(
+  migrations: NormalizedMigrationItem[],
+): MigrationSourceInfo[] | undefined {
+  const sources = migrations
+    .map((m) => m.source)
+    .filter((s): s is MigrationSourceInfo => s !== undefined);
+  return sources.length > 0 ? sources : undefined;
 }
 
 /** Validate the request payload (count, total size, per-item name format). */
@@ -287,10 +365,10 @@ function validatePayload(migrations: NormalizedMigrationItem[]): void {
 
   let totalBytes = 0;
   for (const m of migrations) {
-    if (!MIGRATION_NAME_RE.test(m.name)) {
+    if (typeof m.name !== 'string' || !MIGRATION_NAME_RE.test(m.name)) {
       throw new Error(`Invalid migration name: '${m.name}'.`);
     }
-    if (!MIGRATION_NAME_RE.test(m.hash)) {
+    if (typeof m.hash !== 'string' || !MIGRATION_NAME_RE.test(m.hash)) {
       throw new Error(`Invalid migration hash: '${m.hash}'.`);
     }
     if (typeof m.jsSource !== 'string' || m.jsSource.length === 0) {
@@ -360,6 +438,7 @@ export async function applyMigrationBatch(
   const ordered = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
 
   const appliedAlready = await getAppliedHashes(sql);
+  const sources = collectSources(ordered);
 
   LOGGER.info(
     `[db_migrate] start (${principal}): ${ordered.length} migration(s) submitted`,
@@ -383,7 +462,7 @@ export async function applyMigrationBatch(
       await applyMigrationModule(sql, m.hash, moduleToApply);
       appliedNames.push(m.name);
       LOGGER.info(
-        `[db_migrate] applied migration=${m.name} hash=${m.hash} (${principal})`,
+        `[db_migrate] applied migration=${m.name} hash=${m.hash}${m.source ? ` blob=${m.source.blobSha} ref=${m.source.ref}` : ''} (${principal})`,
       );
     } catch (error) {
       const message = errorMessage(error);
@@ -397,6 +476,7 @@ export async function applyMigrationBatch(
         success: false,
         failed: m.name,
         error: message,
+        ...(sources ? { sources } : {}),
       };
     }
     await onProgress?.();
@@ -411,6 +491,7 @@ export async function applyMigrationBatch(
     appliedNames,
     skipped,
     success: true,
+    ...(sources ? { sources } : {}),
   };
 }
 
@@ -422,6 +503,12 @@ export interface MigrateSubmitResult {
   joined: boolean;
   submitted: number;
   hint: string;
+  /**
+   * Provenance of every `ref` item submitted (LS-10974). Omitted when a running
+   * job was joined — that job applies its own payload, so read its `sources`
+   * from the `db_migration_status` result instead.
+   */
+  sources?: MigrationSourceInfo[];
 }
 
 const POLL_HINT =
@@ -447,7 +534,7 @@ export async function migrate(
   let migrations: NormalizedMigrationItem[];
   try {
     assertDevEnvironment();
-    migrations = normalizeMigrations(params.migrations);
+    migrations = await normalizeMigrations(params.migrations);
     validatePayload(migrations);
   } catch (error) {
     LOGGER.error(
@@ -468,6 +555,7 @@ export async function migrate(
   // Persist in apply order so the worker (and the audit trail) see the same
   // ordering the sync loop used to enforce.
   const ordered = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
+  const sources = collectSources(ordered);
 
   let sql: postgres.Sql;
   try {
@@ -571,6 +659,7 @@ export async function migrate(
       joined: false,
       submitted: ordered.length,
       hint: POLL_HINT,
+      ...(sources ? { sources } : {}),
     };
     return jsonResult(submitted);
   } catch (error) {

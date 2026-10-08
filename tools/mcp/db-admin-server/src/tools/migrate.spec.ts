@@ -17,10 +17,18 @@ import {
 } from '../jobs.js';
 import { invokeWorkerAsync } from '../invoke-worker.js';
 import type { McpCaller } from '../audit.js';
+import { fetchMigrationFromRepo, gitBlobSha } from '../github-source.js';
 
 jest.mock('../db.js');
 jest.mock('../jobs.js');
 jest.mock('../invoke-worker.js');
+// Keep the real path/ref validation; only the network fetch is mocked.
+jest.mock('../github-source.js', () => ({
+  ...jest.requireActual<typeof import('../github-source.js')>(
+    '../github-source.js',
+  ),
+  fetchMigrationFromRepo: jest.fn(),
+}));
 // Replace the migration-runner with a factory so the real module never runs
 // under @swc/jest; we only need to observe applyMigrationModule's calls.
 jest.mock('@legacy-sports/db-client/src/scripts/migration-runner.js', () => ({
@@ -51,6 +59,10 @@ const mockInsertJob = insertJob as jest.MockedFunction<typeof insertJob>;
 const mockFinishJob = finishJob as jest.MockedFunction<typeof finishJob>;
 const mockInvokeWorker = invokeWorkerAsync as jest.MockedFunction<
   typeof invokeWorkerAsync
+>;
+
+const mockFetchMigration = fetchMigrationFromRepo as jest.MockedFunction<
+  typeof fetchMigrationFromRepo
 >;
 
 const CALLER: McpCaller = { clientId: 'client-abc', sub: 'sub-123' };
@@ -320,7 +332,7 @@ describe('db_migrate (async submit)', () => {
     expect(result.isError).toBe(true);
     const payload = parse(result.content[0].text);
     expect(String(payload.error)).toContain(
-      'provided both jsSource and tsSource',
+      'provided more than one of jsSource, tsSource and ref',
     );
     expect(mockInsertJob).not.toHaveBeenCalled();
   });
@@ -338,7 +350,7 @@ describe('db_migrate (async submit)', () => {
     expect(result.isError).toBe(true);
     const payload = parse(result.content[0].text);
     expect(String(payload.error)).toContain(
-      'must provide jsSource or tsSource',
+      'must provide jsSource, tsSource or ref',
     );
     expect(mockInsertJob).not.toHaveBeenCalled();
   });
@@ -457,5 +469,203 @@ describe('db_migrate (async submit)', () => {
       'failed',
       expect.stringContaining('AccessDenied'),
     );
+  });
+});
+
+describe('db_migrate by repo ref (LS-10974)', () => {
+  const originalEnv = process.env['NODE_ENV'];
+  const NAME = '20261006_180000_backfill_big.ts';
+  const PATH = `lib/db-client/migrations/${NAME}`;
+
+  /** A ~100 KB migration: an up() plus a large inline seed array. */
+  const BIG_SOURCE = [
+    "import type { PgDatabase } from 'drizzle-orm/pg-core';",
+    `const ROWS: string[] = ${JSON.stringify(
+      Array.from({ length: 2_500 }, (_, i) => `row-${i}-${'x'.repeat(30)}`),
+    )};`,
+    'export const up = async ({ db }: { db: PgDatabase<never> }): Promise<void> => {',
+    '  void db;',
+    '  void ROWS.length;',
+    '};',
+  ].join('\n');
+
+  function fetched(source = BIG_SOURCE) {
+    const bytes = Buffer.from(source);
+    return {
+      name: NAME,
+      tsSource: source,
+      source: {
+        name: NAME,
+        repo: 'bkrupa/legacy-sports',
+        path: PATH,
+        ref: 'claude/feature',
+        blobSha: gitBlobSha(bytes),
+        sha256: 'sha256-of-file',
+        bytes: bytes.length,
+      },
+    };
+  }
+
+  beforeEach(() => {
+    process.env['NODE_ENV'] = 'dev';
+    mockGetMigrationSql.mockResolvedValue(makeSql([]));
+    mockEnsureJobsTable.mockResolvedValue(undefined);
+    mockReapStaleJobs.mockResolvedValue([]);
+    mockFindRunningJob.mockResolvedValue(null);
+    mockInsertJob.mockResolvedValue('job-1');
+    mockInvokeWorker.mockResolvedValue(undefined);
+    mockFetchMigration.mockResolvedValue(fetched());
+  });
+
+  afterEach(() => {
+    process.env['NODE_ENV'] = originalEnv;
+    jest.clearAllMocks();
+  });
+
+  it('submits a ~100 KB migration given only { branch, path } and applies it with provenance', async () => {
+    expect(BIG_SOURCE.length).toBeGreaterThan(95_000);
+
+    const result = await migrate(
+      { migrations: [{ ref: { branch: 'claude/feature', path: PATH } }] },
+      CALLER,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(mockFetchMigration).toHaveBeenCalledWith({
+      branch: 'claude/feature',
+      path: PATH,
+    });
+    const ack = parse(result.content[0].text);
+    expect(ack.jobId).toBe('job-1');
+    expect(ack.sources).toEqual([fetched().source]);
+
+    // name/hash default to the filename; the transpiled source + provenance persist.
+    const inserted = mockInsertJob.mock.calls[0][1];
+    expect(inserted.migrationNames).toEqual([NAME]);
+    const persisted = JSON.parse(inserted.payload) as {
+      migrations: NormalizedMigrationItem[];
+    };
+    expect(persisted.migrations[0]).toMatchObject({
+      name: NAME,
+      hash: NAME,
+      source: fetched().source,
+    });
+    expect(persisted.migrations[0].jsSource).toContain('exports.up');
+
+    // The worker path evaluates the transpiled module and reports the blob SHA.
+    mockApply.mockResolvedValue(undefined);
+    const applied = await applyMigrationBatch(
+      makeSql([]),
+      persisted.migrations,
+      'p',
+    );
+    expect(applied.success).toBe(true);
+    expect(applied.appliedNames).toEqual([NAME]);
+    expect(applied.sources?.[0].blobSha).toBe(
+      gitBlobSha(Buffer.from(BIG_SOURCE)),
+    );
+  });
+
+  it('reports provenance for an already-applied ref migration (skipped, idempotent)', async () => {
+    const result = await applyMigrationBatch(
+      makeSql([NAME]),
+      [{ ...item(NAME), source: fetched().source }],
+      'p',
+    );
+
+    expect(result.skipped).toEqual([NAME]);
+    expect(result.sources).toEqual([fetched().source]);
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it('rejects a path outside lib/db-client/migrations/ before fetching', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          { ref: { branch: 'main', path: 'lib/db-client/src/schema.ts' } },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(String(parse(result.content[0].text).error)).toContain(
+      'is not allowed',
+    );
+    expect(mockFetchMigration).not.toHaveBeenCalled();
+    expect(mockInsertJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a name that does not match the ref filename', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          {
+            name: '20260101_000000_other.ts',
+            ref: { branch: 'main', path: PATH },
+          },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(String(parse(result.content[0].text).error)).toContain(
+      'does not match ref path filename',
+    );
+    expect(mockFetchMigration).not.toHaveBeenCalled();
+  });
+
+  it('rejects a migration that provides both ref and tsSource', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          {
+            tsSource: 'export const up = async () => {};',
+            ref: { branch: 'main', path: PATH },
+          },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(String(parse(result.content[0].text).error)).toContain(
+      'more than one of jsSource, tsSource and ref',
+    );
+  });
+
+  it('surfaces a GitHub fetch failure without creating a job', async () => {
+    mockFetchMigration.mockRejectedValue(
+      new Error(`Migration '${PATH}' not found at ref 'gone'`),
+    );
+
+    const result = await migrate(
+      { migrations: [{ ref: { branch: 'gone', path: PATH } }] },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(String(parse(result.content[0].text).error)).toContain(
+      'not found at ref',
+    );
+    expect(mockInsertJob).not.toHaveBeenCalled();
+  });
+
+  it('mixes ref and inline items and only reports sources for ref items', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          item('20260101_000000_inline.ts'),
+          { ref: { sha: 'abc1234', path: PATH } },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBeUndefined();
+    const ack = parse(result.content[0].text);
+    expect(ack.submitted).toBe(2);
+    expect(ack.sources).toEqual([fetched().source]);
   });
 });
