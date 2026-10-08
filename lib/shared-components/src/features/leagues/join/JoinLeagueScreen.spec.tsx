@@ -171,6 +171,33 @@ describe('JoinLeagueScreen (LS-8812)', () => {
     });
   });
 
+  describe('pasted invite codes (LS-10652)', () => {
+    it.each([
+      ['surrounding spaces', '  LHTCJ9ZZ  '],
+      ['an internal space', 'LHTC J9ZZ'],
+      ['a dash', 'lhtc-j9zz'],
+    ])(
+      'normalizes a code pasted with %s and validates it',
+      async (_label, pasted) => {
+        const validateInviteCode = jest.fn().mockResolvedValue(VALID_LEAGUE);
+        const { getByTestId } = renderScreen({ validateInviteCode });
+        const input = getByTestId('join-invite-code-input');
+
+        await enterCode(input, pasted);
+
+        expect((input as HTMLInputElement).value).toBe('LHTCJ9ZZ');
+        expect(validateInviteCode).toHaveBeenCalledWith('LHTCJ9ZZ');
+      },
+    );
+
+    it('does not cap the field natively, so a padded paste is not truncated', () => {
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('join-invite-code-input')).not.toHaveAttribute(
+        'maxlength',
+      );
+    });
+  });
+
   describe('validation card states (AC4)', () => {
     it('shows the checking state while in flight', () => {
       const { getByTestId } = renderScreen({

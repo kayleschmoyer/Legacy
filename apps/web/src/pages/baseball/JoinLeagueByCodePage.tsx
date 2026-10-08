@@ -9,6 +9,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
+import { normalizeInviteCode } from '@legacy-sports/utils';
 import {
   Sport,
   useGetPublicLeaguesQuery,
@@ -411,7 +412,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 placeholder="Enter 8-character code"
                 value={inviteCode}
                 onChangeText={(text: string) => {
-                  setInviteCode(text.toUpperCase());
+                  setInviteCode(normalizeInviteCode(text));
                   // Only clear errors that relate to the invite-code field so
                   // unrelated form-level errors (e.g. league-full) stay visible
                   if (
@@ -421,7 +422,8 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     setError(null);
                   }
                 }}
-                maxLength={8}
+                // No native maxLength: the browser would truncate a padded
+                // paste before normalizeInviteCode strips it (LS-10652).
                 autoCapitalize="characters"
                 autoCorrect={false}
                 fontFamily="$mono"

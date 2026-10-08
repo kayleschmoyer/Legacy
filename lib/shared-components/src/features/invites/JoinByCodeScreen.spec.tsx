@@ -150,6 +150,17 @@ describe('JoinByCodeScreen', () => {
     );
   });
 
+  it('normalizes a pasted code with spaces and dashes (LS-10652)', async () => {
+    renderScreen([resolveMock('LEAG2345', leaguePreview)], '');
+    const codeInput = screen.getByPlaceholderText('Enter 8-character code');
+    expect(codeInput).not.toHaveAttribute('maxlength');
+
+    fireEvent.change(codeInput, { target: { value: '  leag-2345  ' } });
+
+    expect(codeInput).toHaveValue('LEAG2345');
+    expect(await screen.findByTestId('join-preview-league')).toBeTruthy();
+  });
+
   it('says so when the code matches nothing', async () => {
     renderScreen([resolveMock('ZZZZ2345', null)], 'ZZZZ2345');
     expect(await screen.findByTestId('join-not-found')).toBeTruthy();

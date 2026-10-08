@@ -10,6 +10,7 @@
 import { useCallback, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
+import { normalizeInviteCode } from '@legacy-sports/utils';
 import {
   JoinLeagueByCode as JOIN_LEAGUE_BY_CODE,
   JoinMockDraft as JOIN_MOCK_DRAFT,
@@ -35,9 +36,8 @@ export type InvitePreviewData = NonNullable<
 /** Invite codes are 8 characters from an unambiguous alphabet. */
 export const INVITE_CODE_PATTERN = /^[A-Z0-9]{8}$/;
 
-export function normalizeInviteCode(raw: string): string {
-  return raw.trim().toUpperCase();
-}
+// Re-exported so JoinByCodeScreen keeps one import for the code helpers.
+export { normalizeInviteCode };
 
 export interface UseInviteCodeParams {
   code: string;

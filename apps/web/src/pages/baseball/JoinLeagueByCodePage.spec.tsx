@@ -89,13 +89,29 @@ jest.mock('tamagui', () => ({
   createTokens: (tokens: unknown) => tokens,
   H1: ({ children }: any) => <h1>{children}</h1>,
   H2: ({ children }: any) => <h2>{children}</h2>,
-  Input: ({ value, onChangeText, placeholder, disabled, id }: any) => (
+  Input: ({
+    value,
+    onChangeText,
+    placeholder,
+    disabled,
+    id,
+    maxLength,
+  }: any) => (
     <input
       id={id}
       value={value ?? ''}
       placeholder={placeholder}
       disabled={disabled}
-      onChange={(e) => onChangeText?.(e.target.value)}
+      // jsdom does not enforce `maxlength` on a programmatic change, but a real
+      // browser truncates a paste to it before onChange fires — emulate that so
+      // a native cap that eats pasted characters is caught (LS-10652).
+      onChange={(e) =>
+        onChangeText?.(
+          typeof maxLength === 'number'
+            ? e.target.value.slice(0, maxLength)
+            : e.target.value,
+        )
+      }
     />
   ),
   Spinner: () => <span data-testid="spinner" />,
@@ -623,6 +639,31 @@ describe('JoinLeagueByCodePage', () => {
     expect(
       screen.queryByTestId('invite-validation-auth-required'),
     ).not.toBeInTheDocument();
+  });
+
+  describe('pasted invite codes (LS-10652)', () => {
+    it.each([
+      ['surrounding spaces', '  LHTCJ9ZZ  '],
+      ['an internal space', 'LHTC J9ZZ'],
+      ['a dash', 'lhtc-j9zz'],
+    ])(
+      'normalizes a code pasted with %s and validates it',
+      (_label, pasted) => {
+        renderPage();
+        const codeInput = screen.getByPlaceholderText(
+          /Enter 8-character code/i,
+        );
+
+        act(() => {
+          fireEvent.change(codeInput, { target: { value: pasted } });
+        });
+
+        expect(codeInput).toHaveValue('LHTCJ9ZZ');
+        expect(mockValidateCode).toHaveBeenCalledWith({
+          variables: { code: 'LHTCJ9ZZ' },
+        });
+      },
+    );
   });
 
   /**

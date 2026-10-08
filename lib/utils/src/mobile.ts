@@ -22,6 +22,9 @@ export * from './lib/division-rules';
 // "undefined is not a function" for any user with a scheduled draft (LS-8755).
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
+// Invite-code input normalizer used by shared-components' join screens
+// (LS-10652); missing here it is `undefined` on device.
+export * from './lib/invite-code';
 export * from './lib/notification-types';
 // Pure, Hermes-safe percentage rounding consumed by the mobile matchup
 // win-probability panel. Metro resolves '@legacy-sports/utils' to this file

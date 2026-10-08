@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Check } from '@tamagui/lucide-icons';
+import { normalizeInviteCode } from '@legacy-sports/utils';
 import { formatSpotsRemaining, spotMeterFill } from './joinLeagueFormat';
 import type { InviteCodeValidation } from './joinLeagueTypes';
 import { keyboardPressProps } from './pressable';
@@ -284,12 +285,11 @@ export function InviteCodeTab({
           testID="join-invite-code-input"
           placeholder="ABC12XYZ"
           value={inviteCode}
-          onChange={onTextChange(onInviteCodeChange, (text) =>
-            text.toUpperCase(),
-          )}
+          onChange={onTextChange(onInviteCodeChange, normalizeInviteCode)}
           onFocus={() => setCodeFocused(true)}
           onBlur={() => setCodeFocused(false)}
-          maxLength={8}
+          // No native maxLength: it would truncate a padded paste before
+          // normalizeInviteCode strips it (LS-10652).
           autoCapitalize="characters"
           autoCorrect={false}
           disabled={joining}

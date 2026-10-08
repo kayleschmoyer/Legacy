@@ -251,7 +251,8 @@ export function JoinByCodeScreen({
           onChangeText={(text: string) =>
             setCodeInput(normalizeInviteCode(text))
           }
-          maxLength={8}
+          // No native maxLength: it would truncate a padded paste before
+          // normalizeInviteCode strips it (LS-10652).
           autoCapitalize="characters"
           autoCorrect={false}
           fontFamily="$mono"
